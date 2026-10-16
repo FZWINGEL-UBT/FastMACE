@@ -826,8 +826,9 @@ deterministic.
 | Name clash on PyPI | check before phase 6 |
 
 Open decisions for the owner:
-1. Repository: inside ResearchModule (`FastMACE/`) or a separate repository
-   from phase 0? A separate repository simplifies CI and release.
+1. Repository — **decided (user, 16 October 2026): inside ResearchModule as
+   `FastMACE/` for now.** A separate repository (simpler CI and release) can
+   follow before the first public release.
 2. Minimum MACE version to support beyond 0.3.16.
 3. Whether the gate on the user's structure is on by default (recommended) or
    opt-in.
