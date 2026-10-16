@@ -1,9 +1,10 @@
 # FastMACE — Specification
 
-Status: draft 0.2, 16 October 2026. Owner: Fabian Zwingel. Written from the
+Status: draft 0.3, 16 October 2026. Owner: Fabian Zwingel. Written from the
 Langevin_Thermostat experiment (`Experiments/Langevin_Thermostat/`), whose GPU
-engine this library generalises. Draft 0.2 answers a review of draft 0.1
-and records the owner's decisions 6 and 7 (§18, §19).
+engine this library generalises. Draft 0.2 answered a review of draft 0.1
+and recorded the owner's decisions 6 and 7; draft 0.3 answers a second
+review, of draft 0.2 (§18, §19).
 
 FastMACE is a standalone Python library that runs pretrained MACE models
 (MACE 0.3.x family, including PolarMACE) for atomistic simulation on NVIDIA
@@ -205,6 +206,21 @@ failures):
 - OMOL-0 is outside its training domain on dense oxides and collapses in NaCl
   MD.
 
+**Energy scale.** MACE-POLAR-1, MACE-OMOL-0 and the `omol` and `spice_wB97M`
+heads of MH-1 use all-electron atomic reference energies (E0): Cl
+≈ −12,522 eV, Na ≈ −4,412 eV, O ≈ −2,048 eV, Br ≈ −70,042 eV; Nb and Ta
+(≈ −1,545 eV) are pseudopotential values. The other heads and models use
+E0 of a few eV (MH-1 `matpes_r2scan`: Cl −4.8 eV, Ta −40.5 eV). POLAR-1
+stores its E0 table in float32, OMOL-0 and MH-1 in float64. NbCl5 3×3×3
+with all-electron E0 has a total near −2.08 × 10⁷ eV, where one float32
+step is 2 eV. Stock float32 energies of these models are therefore off by
+45–102 meV/atom on NbCl5 (gates of 16 October 2026,
+`results/new-models-local-rtx5060ti-20261016/`,
+`results/omol-opt-rtx5060ti-20261016/`), against 0.001–0.13 meV/atom for the
+pseudopotential-referenced models (`results/all-models-rtx5060ti-20261015/`).
+Forces and stress are unaffected (E0 is a constant per species); every
+energy-based decision is not, hence §7.3.
+
 **Licences.** Model licences must be shown at load time: OMOL-0 is under the
 ASL licence (non-commercial).
 
@@ -324,7 +340,7 @@ class Rewrite:
   today's adopted rewrites.
 - `"approximate"` rewrites are never default.
 
-### 6.2 Catalogue for 1.0 (all adopted today, defaults as in `main.py` on 16 October 2026)
+### 6.2 Catalogue for 1.0 (adopted today unless marked; defaults as in `main.py` on 16 October 2026)
 
 | Rewrite | Applies to | Gain (measured) | Constraint |
 | --- | --- | --- | --- |
@@ -344,6 +360,8 @@ class Rewrite:
 | `polar_uvu` (PR 1711) | PolarMACE | 4–5× with MH-1 rewrites | — |
 | `pipelined`, `async_output` | engine features (§8.1) | 3.0% NaCl; bit-identical | — |
 | `unfuse_full_addmm`, `first_derivative_only`, expandable segments allocator | engine | avoids 2 × 32 MB copies per step | torch ≥ 2.14 |
+| `float64_energy` (energy accumulation, §7.3; new in the library) | all | correctness, not speed: stock float32 NbCl5 energies off by 45–102 meV/atom with all-electron E0 | always on; applied to the float32 reference too (§12.1) |
+| `single_graph_strain` (MACE PR 1498 backport) | all, stress path | being measured in the research engine (`langevin/upstream_mace.py`, 16 October 2026) | one graph; adopt here once that study is committed |
 
 Opt-in only:
 - PR 1762 Fukui regularisation and charge-dipole cap (changes the model);
@@ -416,7 +434,7 @@ anneal = fm.protocols.ramp(0, 1000, ps=20) + fm.protocols.ramp(1000, 250, rate_K
 sim.run(schedule=anneal)                         # whole schedule: 540,000 steps at 0.5 fs
 sim.run(schedule=anneal, steps=200_000)          # first 200,000 steps, then pause (resumable)
 sim.run(steps=100_000, mc=fm.mc.Swap(pairs=[("Na", "Nb")], every=100, attempts=50,
-                                     velocities="rescale"))   # §10.4
+                                     velocities="exchange"))  # §10.4; the default for swaps
 sim.save_restart("run/restart.npz"); sim = fm.Simulation.resume("run/")
 ```
 
@@ -441,7 +459,22 @@ schedule, the thermostat target stays at its current value.
   `float64`) is the model evaluation. *Integration precision* is always
   float64 for positions, momenta, cell and barostat state; forces and stress
   are cast to float64 before they enter the integrator (as `GPULangevin` and
-  `gpu_npt` do today). Provenance records both.
+  `gpu_npt` do today). Provenance records both. MC energy evaluations have
+  their own precision (§10.4).
+- **Energy:** the scalar potential energy is always accumulated in float64,
+  for MD observables, relaxations, quenches, `evaluate()` and MC alike (§4.3:
+  float32 totals are off by up to 102 meV/atom for all-electron E0). The E0
+  table is kept in float64 (an exact upcast of the checkpoint's table) and
+  summed in float64. Every other contribution is computed in the force
+  precision, which autograd differentiates, and reduced over atoms, pairs
+  or k-vectors into float64: per-atom interaction energies, pair repulsion,
+  the embedding readout energy (OMOL-0), PolarMACE's local electron energy,
+  electrostatic energy (per-k and self terms) and field term, and D3. The
+  energy is never taken from MACE's `out["node_energy"]`, which in 0.3.16
+  omits the embedding readout energy of `ScaleShiftMACE` and the electron,
+  electrostatic and field energies of `PolarMACE`. Per-atom energies
+  (`needs_per_atom`) state which terms they resolve; terms that are not
+  atom-resolved (k-space electrostatics) are reported separately.
 - **Buffer ownership:** engine methods that return tensors from inside a step
   return views of engine-owned buffers, valid until the next step or event,
   and say so in their names (`*_view`). `ForceField.evaluate` and every
@@ -508,6 +541,28 @@ uploaded in batches.
   They never change shapes or addresses.
 - **Encapsulated counters.** The streaming edge counter becomes part of the
   engine, which removes `bind_streaming_count`.
+- **Runtime-state registry.** Every buffer that a stage writes and that lives
+  across steps registers itself, together with how it is saved, restored or
+  reset: positions, velocities, forces, energy, stress, cell, barostat state,
+  mid-step copies (`_v_mid`, `_p_mid`), neighbour-list buffers (edge index,
+  shifts, count, build cell, reference positions), derived geometry (volume,
+  reciprocal cell), pipeline flags and floors, and sticky flags (neighbour
+  overflow, k-vector overflow, whose `|=` never clears by itself). Capture,
+  events (§8.5) and restart (§10.6) all work from this registry; a CI test
+  compares it with the attributes an engine actually mutates.
+- **Capture warm-ups leave no trace.** The eager warm-up runs of a capture
+  snapshot and restore every registered buffer, sticky flags included. Today
+  `GPULangevinBAOAB._graph_state` misses the force field's volume and
+  reciprocal cell, `_v_mid`, `_p_mid`, the pipeline flags and the polar
+  overflow flag; a test compares the full registered state before and after
+  each capture.
+- **Energy-only graph.** MC energy evaluations use a separate forward-only
+  compiled and captured graph under `torch.no_grad()`. Calling the force
+  graph with forces switched off while positions require gradients would run
+  AOTAutograd's joint graph, save activations nobody uses and leave
+  `grad_fn` references on output buffers, which break later captures (the
+  failure recorded in `polar_gpu._Call`). Compiling it costs setup time,
+  reported by the benchmark suite (§12.5).
 
 ### 8.2 Tier 2: compiled, no graphs
 
@@ -537,7 +592,24 @@ this:
 - The `ForceField` takes a declared species superset (default: species in the
   initial structure). Columns and caches are built for the superset.
 - A species outside the superset raises before stepping, or triggers a
-  planned rebuild if the workload allows it.
+  planned rebuild if the workload allows it. Membership is checked
+  explicitly at setup and on every host-side mutation (atomic number in the
+  superset; one-hot row sums to 1). Today an atom outside the columns gets an
+  all-zero one-hot row, which `argmax` silently maps to slot 0 in the
+  reassociated first interaction and the species skip zeroes.
+- Every species-indexed table is built for the superset **without
+  depending on which species are present**. Today
+  `_FirstInteractionReassociation` takes each species' embedding from
+  `node_feats[onehot.argmax(dim=0)]`, the first atom of that species; for a
+  superset species with no atoms that is atom 0 of another species. The
+  library computes the `[S, C]` table by applying the node embedding (plus a
+  per-structure joint embedding, OMOL-0) to the identity basis of the
+  superset columns, and registers it as a derived buffer.
+- Neighbour-list sender groups (species order for the segmented first sum)
+  are a registered derived buffer read on every rebuild, with a fixed group
+  count equal to the superset size. Today `build_gpu` uploads them once, on
+  the first fixed-cell build, and counts groups as `max() + 1`, which is too
+  small when the highest superset species is absent.
 
 **Derived-state registry.** Updating the species and mass buffers alone is not
 enough: the integrators cache mass-dependent coefficients (Langevin's
@@ -555,12 +627,18 @@ transmutation, mass or charge change, displacement move, thermostat target
 change that touches cached coefficients) is one event:
 1. **Quiesce:** finish pending work (pipelined force stage, asynchronous
    output, speculative steps) so that the state is a committed step.
-2. **Snapshot** the affected state: species, masses, charges, positions for
-   displacements, momenta of touched atoms, cached energy, forces and stress,
-   and the registered derived buffers they feed.
-3. **Apply** the mutation and refresh all registered derived buffers.
+2. **Snapshot** the affected state: species, masses, charges, momenta of
+   touched atoms, cached energy, forces and stress, the registered derived
+   buffers they feed, and the random-number cursor. Displacements also
+   snapshot the positions and the neighbour-list state of the runtime-state
+   registry (edge index, shifts, unit shifts, count, streaming count, flags).
+3. **Apply** the mutation and refresh all registered derived buffers;
+   displacements also re-compact the neighbour list and run the rebuild test.
 4. **Evaluate** what the decision needs (energy for MC; §10.4), with the
-   overflow check of §8.1 before any decision.
+   overflow and rebuild check of §8.1 before any decision. An overflowed or
+   rebuild-requiring attempt is not a rejection: the snapshot is restored
+   (random-number cursor included), capacities are grown or the list is
+   rebuilt, and the same attempt is redone with the same random numbers.
 5. **Accept or reject.** Reject restores the snapshot exactly (cached forces
    are restored, not recomputed). Accept keeps the new state; if it was
    accepted on an energy-only evaluation, the cached forces and stress are
@@ -571,7 +649,9 @@ change that touches cached coefficients) is one event:
    its end.
 
 Random numbers consumed by a proposal are not restored on rejection; their
-consumption is part of the chain and of the restart state (§10.6). Velocity
+consumption is part of the chain and of the restart state (§10.6). A rejected
+displacement restores the neighbour-list state as well, so the next MD step
+or swap sees the list of the committed positions. Velocity
 handling for changed masses is part of the move definition (§10.4), not a
 free policy. A test runs the first MD step after an accepted and after a
 rejected event and compares it with a fresh construction from the committed
@@ -639,6 +719,7 @@ class Workload:
     mc_moves: tuple[str, ...]             # "swap", "transmute", "displace"; drives the ΔE gate (§12.3)
     reproducible: bool                    # bitwise within the scope of §9.3; refuses what it cannot guarantee
     precision: Literal["float32", "float64"]   # force precision; integration is always float64 (§7.3)
+    mc_energy_precision: Literal["auto", "float32", "float64"]   # §10.4; auto = force precision if the ΔE gate passes
 ```
 
 Periodicity and constraints come from the `Atoms` object and are checked
@@ -646,16 +727,25 @@ against §4.4.
 
 Model traits come from `capabilities.py`: interaction classes,
 `apply_cutoff`, joint embeddings, PolarMACE, heads, `padding_is_exact`,
-`first_inputs_species_only`. Hardware traits: compute capability, memory,
-OEq build availability, Triton availability, NVRTC.
+`first_inputs_species_only`, all-electron or pseudopotential E0 (§4.3).
+Hardware and software traits: compute capability, memory, OEq build
+availability, Triton availability, NVRTC, and whether cuEquivariance's fused
+kernels actually load. cuEquivariance replaces a requested fused kernel by
+its naive implementation with only a `UserWarning` when
+`cuequivariance_ops_torch` cannot be imported, for example after a cuBLAS
+mismatch (MACE PR 1614). The run is then correct but slow. The planner
+refuses such a plan unless `allow_naive_cueq=True`, which is recorded. The
+research engine is adding this check now
+(`langevin/upstream_mace.py`, 16 October 2026).
 
 ### 9.3 Decision rules (initial set)
 
-A plan has four independent dimensions: **execution mode** (the tiers of §8:
+A plan has five independent dimensions: **execution mode** (the tiers of §8:
 graph, compiled, eager, reference), **backend** (hybrid cuEq/OEq, plain
-cuEq), **rewrite set** and **force precision**. The physics (model, head, charge/spin, D3 and its
-parameters, polar options, reference corrections) is fixed by the user and is
-never changed by a rule or a fallback. Rules are evaluated in this order; a
+cuEq), **rewrite set**, **force precision** and **MC energy precision**. The
+physics (model, head, charge/spin, D3 and its parameters, polar options,
+reference corrections) is fixed by the user and is never changed by a rule
+or a fallback. Rules are evaluated in this order; a
 later rule cannot override an earlier one.
 
 | Order | Condition | Decision |
@@ -686,7 +776,17 @@ kernels make their own guarantees. The option therefore means:
   `torch.use_deterministic_algorithms(True)` (with the required cuBLAS
   workspace setting), and a per-component allow-list. Any operator or kernel
   without a deterministic implementation makes the planner refuse the plan;
-  it never falls back to a nondeterministic one.
+  it never falls back to a nondeterministic one. FastMACE's own kernels
+  declare their determinism in their rewrite records. Today's
+  `edge_outer_sum` (behind `reassociate_first`) is not deterministic: its
+  segmented forward uses relaxed `tl.atomic_add` where a receiver's segment
+  crosses a 32-edge chunk, and its unsegmented forward uses `index_add`. In
+  reproducible mode it needs a deterministic variant (one program per
+  receiver segment, or a sorted segmented reduction), or the rewrite is off.
+  (The streaming convolution is hybrid-only and off anyway.) The GPU
+  neighbour-list build
+  is already deterministic (it sorts the atomic pair-search output on a
+  unique key).
 - **Qualification:** repeated runs and an interrupted-versus-uninterrupted
   run must match bit for bit (§12.2) before the option is offered for a
   backend and model family.
@@ -695,11 +795,14 @@ kernels make their own guarantees. The option therefore means:
 
 A failure (rewrite self-check, gate, replay or transition check, compilation
 error) triggers this algorithm, not a fixed "one tier down":
-1. **Candidates** are points in the four dimensions above, never a change of
+1. **Candidates** are points in the five dimensions above, never a change of
    physics. Each candidate is built from a pristine copy of the loaded model
    (the checkpoint state before any rewrite), not by undoing rewrites in
    place.
-2. **Diagnose the dimension.** Re-run the failing check on the same rewrite
+2. **Diagnose the dimension.** A failure of only the move-energy part of the
+   gate (§12.3) is first tried in the MC energy precision dimension: the MC
+   energy path switches to float64 while MD forces keep their precision.
+   Otherwise, re-run the failing check on the same rewrite
    set in eager mode. If eager passes, the fault lies in compilation or
    capture: try compiled mode without graphs, then eager. If eager fails, the
    fault lies in a rewrite: bisect the rewrite set (respecting `requires`),
@@ -799,48 +902,105 @@ acceptance:
   sphere of radius δ. δ stays fixed while sampling; adaptive δ is allowed
   only during equilibration and is recorded.
 
-**Momenta of atoms whose mass changes.** Part of the move definition, with
-two valid choices:
-- `rescale` (default): p' = p √(m_new / m_old), which keeps each atom's
-  kinetic energy (as LAMMPS `fix atom/swap` does by default);
-- `redraw`: after an accepted move, the momenta of the changed atoms are drawn
-  from Maxwell–Boltzmann at T with the new masses (seeded stream).
+**Fixed-shape selection.** Inside a captured graph an atom of species s is
+chosen without `torch.nonzero` (a host synchronisation and a dynamic shape):
+every atom gets a uniform random key from the device stream, keys of atoms
+of other species are set to +∞, and `argmin` picks the atom. A minimum of +∞
+marks the attempt impossible.
+
+**Fixed positions versus displacements.** Swaps and transmutations change no
+position and no cell: during their attempts the neighbour list needs no
+compaction, no rebuild can be triggered, and no edge or k-vector capacity
+can overflow. Displacements change distances across the cutoff: each trial
+re-compacts the list and runs the rebuild test, and an overflow or required
+rebuild is handled as in §8.5 step 4; a rejection restores the neighbour-list
+state.
+
+**Momenta of atoms whose mass changes.** Part of the move definition. The
+engines store velocities v (p = m v); both forms are given so the square
+root cannot be inverted:
+- `exchange` (swaps only; default): the two atoms swap velocities along with
+  their species, v_i' = v_j and v_j' = v_i, so p_i' = p_j. This is the same
+  as exchanging the two atoms' positions, each keeping its own momentum.
+  Kinetic energy and total momentum are unchanged.
+- `rescale`: p' = p √(m_new / m_old), that is v' = v √(m_old / m_new). This
+  keeps each atom's kinetic energy (as LAMMPS `fix atom/swap` does by
+  default) but changes the total momentum when masses differ.
+- `redraw`: after an accepted move, the velocities of the changed atoms are
+  drawn from Maxwell–Boltzmann at T with the new masses (seeded stream).
+- `redraw_all`: after an MC block with an accepted move, all velocities are
+  drawn from Maxwell–Boltzmann at T and projected to zero total momentum,
+  v_i ← v_i − (Σ_j m_j v_j) / M.
+
+Defaults: `exchange` for swaps; for transmutations `rescale`, or
+`redraw_all` when the integrator fixes the centre of mass.
+
+**Centre of mass.** `fixcm` (§4.4) concerns the integrator's random terms,
+as in ASE: the noise has no centre-of-mass component, while friction acts on
+all velocities. An MC move must not change the total momentum behind its
+back. `exchange` conserves it exactly. With `fixcm` on, the single-atom
+`rescale` and `redraw` are refused, and `redraw_all` restores zero total
+momentum exactly (it is a Gibbs step in the zero-momentum subspace).
 
 Keeping velocities unchanged with an energy criterion on the potential alone
 is not offered. It changes the kinetic energy (masses (1, 4) and velocities
 (2, 1) give E_kin 4 before and 8.5 after the mass swap, at fixed positions)
 and breaks detailed balance.
 
-**Acceptance.** For both momentum choices:
+**Acceptance.** For every momentum choice:
 `P_acc = min(1, exp(−β (ΔU − Σ_s Δμ_s ΔN_s)))`, with ΔN_s = 0 for swaps and
 displacements. **Convention:** Δμ_s are configurational (mass-independent)
 chemical-potential differences relative to a reference species, so
 equilibrium species populations at fixed positions do not depend on masses.
-Why both choices give this rule: `rescale` keeps the kinetic energy, and its
-Jacobian (m_new/m_old)^{3/2} per changed atom cancels the mass factor of the
-momentum partition function under this convention (for swaps the Jacobians
-multiply to 1 under any convention). `redraw` is a Metropolis step on the
-configurational marginal followed by a Gibbs step on the momenta. Users with
-full chemical potentials (including the ideal-gas term
-(3/2) k_B T ln m) convert with `fm.mc.configurational_mu(...)`. The
+Why every choice gives this rule:
+- `exchange` permutes (mass, momentum) pairs, with Jacobian 1 and unchanged
+  kinetic energy.
+- `rescale` keeps the kinetic energy; its Jacobian (m_new/m_old)^{3/2} per
+  changed atom cancels the mass factor of the momentum partition function
+  under this convention (for swaps the Jacobians multiply to 1 under any
+  convention).
+- `redraw` and `redraw_all` are a Metropolis step on the configurational
+  marginal followed by a Gibbs step on the momenta.
+
+Users with full chemical potentials convert with
+`fm.mc.configurational_mu(...)`, which applies
+Δμ_s^conf = Δμ_s^full + (3/2) k_B T ln(m_s / m_ref). This follows from
+μ^full = μ^conf + k_B T ln Λ³ with the thermal wavelength Λ ∝ m^(−1/2). The
 exact-enumeration test (§12.2) checks the convention.
 
-**Evaluation.** Each attempt is one event under the transaction contract of
-§8.5 and costs one energy evaluation of the trial state (forward only, no
-backward). Attempts of one MC block run back to back; forces and stress are
-recomputed once at the end of the block if any move was accepted.
-Displacements can change the neighbour list and overflow a capacity; the
-overflow check precedes the decision (§8.1).
+**Charge and spin.** In models with total charge and spin inputs (POLAR-1,
+OMOL-0), a transmutation at fixed total charge changes the electron count by
+ΔZ, and an odd change makes the spin multiplicity invalid (Na ↔ Mg). Each
+species in a transmutable set therefore carries a formal charge q_s. The
+default requires an isovalent set (Δq = 0). A move updates the total charge
+by Δq, which is a registered derived buffer (§8.5), and is allowed only if
+ΔZ − Δq is even. The planner refuses sets that violate this (e.g. Na ↔ Mg
+without formal charges, or O ↔ Cl with an even Δq). Whether a model handles
+the changed charge state physically is a model question (§4.3), not an
+engine one.
 
-**Energy precision.** A float32 total energy cannot resolve MC energy
-differences in production cells. NbCl5 3×3×3 (1,944 atoms) has a total of
-about −20,652 eV; its float32 spacing is 2⁻⁹ eV ≈ 2 meV (visible in the
-FP32 relaxation log of `results/anneal-production-rtx5060ti-20261010/NbCl5`),
-while 0.01 k_B T at 250 K is 0.2 meV. The MC path therefore keeps per-atom
-energies in the force precision but sums them, and forms ΔE, in float64.
-Per-atom energies of about 10 eV have a float32 spacing near 1 µeV, so the
-summed rounding of all 1,944 atoms stays near 0.04 meV even where hybrid
-atomic sums perturb every atom.
+**Evaluation.** Each attempt is one event under the transaction contract of
+§8.5 and costs one energy evaluation of the trial state, on the forward-only
+energy graph under `torch.no_grad()` (§8.1). Attempts of one MC block run
+back to back; forces and stress are recomputed once at the end of the block
+if any move was accepted.
+
+**Energy precision.** Energies are accumulated in float64 (§7.3). A float32
+total cannot resolve MC energy differences: NbCl5 3×3×3 (1,944 atoms) totals
+about −20,652 eV with MH-1 `matpes_r2scan` (float32 step 2⁻⁹ eV ≈ 2 meV,
+visible in the FP32 relaxation log of
+`results/anneal-production-rtx5060ti-20261010/NbCl5`) and about
+−2.08 × 10⁷ eV with all-electron E0 (step 2 eV). 0.01 k_B T at 250 K is
+0.2 meV. Accumulation alone is not enough: the float32 forward pass carries
+per-atom errors of its own. Stock float32 MH-1 r²SCAN energies differ from
+float64 by 0.05–0.13 meV/atom on NaNbO3 and NbCl5 (gates of 15 October
+2026), most of it not from the summation, which accounts for about
+0.01 meV/atom. Whether these errors cancel in ΔE to below 0.01 k_B T has not
+been measured. The move-energy gate (§12.3) decides:
+`mc_energy_precision="auto"` uses the force precision if the gate passes and
+a float64 forward otherwise, while MD forces keep their precision. Float64
+runs at a small fraction of the float32 rate on consumer and workstation
+GPUs, so phase 3 measures the cost of both (§16).
 
 **Graph capture.** One attempt (propose → apply → refresh derived buffers →
 energy → accept or restore) is a capturable graph with device-side random
@@ -897,9 +1057,28 @@ if it had not been interrupted (bit for bit where the plan is reproducible,
   precision, physics options (charge/spin inputs; D3 with all its parameters,
   §11.2; polar options such as the PR 1762 settings; the reference
   corrections of §12.1), MACE and FastMACE versions.
-- **Plan:** execution mode, backend and rewrites; capacity buckets and the
-  neighbour-list reference positions, from which the list is rebuilt
-  deterministically, so that a reproducible resume rebuilds at the same steps.
+- **Plan:** execution mode, backend, rewrites and MC energy precision; edge
+  and capacity buckets.
+
+**Canonical restart points.** The neighbour lists and the pipeline carry
+more hidden state than reference positions:
+- the build cell h₀ (in variable-cell runs the candidates are built in h₀,
+  and the rebuild test measures strain against it);
+- the build-time sender groups (species order of the segmented first sum,
+  which an MC move since the last rebuild may have changed);
+- the pipeline's padded-size floor and next edge bucket (`_pipe_floor`,
+  `_pipe_edges`);
+- and the same again for every further list, such as D3's.
+
+Rather than serialise all of it, a restart write is a canonicalisation
+point, in interrupted and uninterrupted runs alike. It quiesces the
+pipeline, rebuilds every neighbour list from the current positions, cell
+and species (deterministic: the GPU build sorts on a unique key), and resets
+pipeline floors. The resumed run then starts from exactly the state the
+uninterrupted run has at that step. Bitwise continuation is defined against
+an uninterrupted run with the same restart cadence. The runtime-state
+registry (§8.1) lists, for every persistent buffer, whether it is saved or
+reset at this point, and a CI test checks that nothing is left over.
 
 Restart files are written atomically (temporary file, then rename, as today),
 every 10,000 steps by default and only at committed steps: never inside an MC
@@ -940,9 +1119,32 @@ multiplicity are per-structure inputs with validation.
 The molecular chlorides need D3 for NPT: without it, NbCl5 swells 20% at
 300 K and evaporates at 600 K. Today D3 exists only through `torch-dftd` on
 the ASE path. Implement D3 inside the force field:
-- uses the same neighbour list, with a longer cutoff in a second list;
-- graph-capturable;
-- stress included.
+- **Own candidate list, no per-step compaction.** A second skin list with
+  the D3 pair cutoff, rebuilt by the same displacement and strain test. At
+  40 bohr plus skin it holds about 3 million directed candidate pairs for
+  NbCl5 3×3×3 (≈ 1,600 per atom at 28.8 Å³/atom), some 40 times the MACE
+  list. Compacting that every step (prefix sum and copy) would cost more
+  than D3 itself. D3 needs only scalar functions of r_ij, so the kernel
+  iterates over the candidate list directly with an in-register
+  r² ≤ r_cut² mask, over undirected pairs (i < j).
+- **Two passes, analytic derivatives.** Pass 1: coordination numbers CN_i
+  (cutoff `cnthr`). Pass 2: energy, forces and virial from explicit
+  derivatives with respect to r_ij and CN_i, not autograd over millions of
+  pairs.
+- **Graph-capturable.** Masks with `where`, never `torch.nonzero`.
+  `torch-dftd` 0.5.1 cannot be captured for exactly this reason: its
+  coordination number selects pairs with `torch.nonzero(r <= cutoff)`.
+- **Precision.** Pair terms in the force precision; CN, energy and virial
+  reductions in float64 (§7.3); the result must pass the gate (§12.3).
+- **Unit constants.** Use the reference implementation's constants so that
+  validation compares implementations, not constants: `torch-dftd`
+  hard-codes `d3_autoang = 0.52917726` and `d3_autoev = 27.21138505`, which
+  differ from ASE's `Bohr` and `Hartree` by about 1e-7 relative. The
+  constants are recorded with the parameters. (`mace_mp` passes
+  `cutoff = 40 * ase.units.Bohr`, which `torch-dftd` converts back with its
+  own constant: 39.9999963 bohr.)
+- **Stress** included; the D3 list's build state follows the canonical
+  restart points (§10.6).
 
 **Parameters.** "D3(BJ)" alone does not identify the correction. The force
 field takes and records every choice, and they are part of the force-field
@@ -956,6 +1158,8 @@ identity (§10.6):
 | coordination-number cutoff | 40 bohr (`torch-dftd` 0.5.1 default `cnthr`) |
 | three-body (ATM) term | off (`torch-dftd` default `abc=False`) |
 | cutoff smoothing | none (`torch-dftd` default) |
+| precision | float64 (`mace_mp` passes the calculator's dtype; `TorchDFTD3Calculator`'s own default is float32) |
+| unit constants | `torch-dftd`'s `d3_autoang`, `d3_autoev` |
 
 **Correctness criterion.** Implementation correctness and physical stability
 are separate questions:
@@ -1003,6 +1207,15 @@ model family. It has three kinds of entries:
   with the same change applied (for D3: MACE plus `torch-dftd` with the
   parameters of §11.2), and results are labelled non-stock.
 
+**Energy accumulation in the references.** The float32 yardstick of the
+ratio rule accumulates its energy in float64, as production does (§7.3).
+Stock float32 totals are off by up to 102 meV/atom with all-electron E0
+(§4.3); against that yardstick a production energy could be off by 200
+meV/atom and still pass. With float64 accumulation on both sides, the rule
+measures the precision of the forward pass, not of the E0 sum. This is a
+numerical treatment of the reference, recorded like a correction; it does
+not change the model.
+
 The record's identifier is part of the force-field identity (§10.6) and of
 provenance (§13). Fallbacks (§9.4) keep the record: they never drop a
 correction or an option, so a correct implementation cannot fail
@@ -1015,11 +1228,12 @@ defective behaviour.
 | --- | --- | --- |
 | CPU unit | CI (CPU) | rewrite algebra on tiny models (`tiny_mace_calculator`), block linear/grouped/merged, k-vectors, PR 1762 port, neighbour list vs ASE/matscipy, integrator algebra, planner rules and precedence, restart round-trip. Today 294 tests; 8 workers locally (WSL RAM limit), `-n 24` on workstations |
 | GPU self-check | CI (GPU) + every user run | per-rewrite and per-model checks (§6.4, §12.3) |
-| Energy, force and stress gate | CI (GPU), `fastmace check` | today's rule: production path's max error vs float64 ≤ 2 × the float32 calculator's error, now for energy per atom as well as forces and stress; rattled and strained cells, hydrostatic and full; move-energy differences for MC plans (§12.3) |
+| Energy, force and stress gate | CI (GPU), `fastmace check` | today's rule: production path's max error vs float64 ≤ 2 × the float32 calculator's error, now for energy per atom (float32 yardstick with float64 accumulation, §12.1) as well as forces and stress; rattled and strained cells, hydrostatic and full; all-electron and pseudopotential E0 models; move-energy differences for MC plans (§12.3) |
 | Replay and transitions | CI (GPU) | the production path as executed: captured replay, pipelined and speculative steps; across a neighbour rebuild, a capacity overflow with re-capture, a cell deformation past the rebuild threshold, an accepted and a rejected species change, and a restart, each compared with a fresh direct evaluation of the same state |
-| Mutation events | CI (CPU, GPU) | derived-state registry against fresh construction (§8.5); first MD step after accept and after reject against fresh construction |
-| MC exact enumeration | CI (CPU tiny model; GPU) | a small cell at fixed positions (e.g. 8 sites, 4 + 4 atoms: 70 configurations; transmutation: 256), all configurations evaluated with the reference: per-move acceptance probabilities against the reference ΔE, and sampled populations against Boltzmann weights (χ² test, fixed seed). Hybrid MD/MC: kinetic temperature with MC on and off agrees for `rescale` and `redraw`; a negative control with unchanged velocities must fail |
-| Restart | CI (CPU, GPU) | §10.6: round trip; interrupted vs uninterrupted across accepted and rejected swaps and a partly consumed noise batch |
+| Mutation events | CI (CPU, GPU) | derived-state registry against fresh construction (§8.5); first MD step after accept and after reject against fresh construction; a superset species with no atoms (its table row from the identity basis, not from atom 0), the last superset species absent (sender-group count), an atom outside the superset (explicit error); a rejected displacement leaves the neighbour list of the committed positions; an overflowing displacement is redone with the same random numbers |
+| Runtime state | CI (GPU) | runtime-state registry against the attributes each stage mutates; full registered state identical before and after every capture warm-up, sticky flags included (§8.1) |
+| MC exact enumeration | CI (CPU tiny model; GPU) | a small cell at fixed positions (e.g. 8 sites, 4 + 4 atoms: 70 configurations; transmutation: 256), all configurations evaluated with the reference: per-move acceptance probabilities against the reference ΔE, and sampled populations against Boltzmann weights (χ² test, fixed seed). Hybrid MD/MC: kinetic temperature with MC on and off agrees for `exchange`, `rescale`, `redraw` and (with `fixcm`) `redraw_all`, and the total momentum stays zero under `fixcm`; a negative control with unchanged velocities must fail. Charge/spin: a set violating the parity rule is refused (§10.4) |
+| Restart | CI (CPU, GPU) | §10.6: round trip; interrupted vs uninterrupted (same restart cadence) across accepted and rejected swaps, a partly consumed noise batch, a variable-cell run with h ≠ h₀ at the restart step, a count-overflow redo before it, and a D3 list |
 | Reproducibility | CI (GPU) | in reproducible mode, repeated runs and restarts bit for bit (§9.3) |
 | Isolation | CI (GPU) | A → B → A with two crystals for the plain, MH-1 and polar paths (§8.7) |
 | Fallback | CI (GPU) | deliberately broken rewrite and broken capture: eager diagnosis, bisection, pristine rebuild, validated activation (§9.4) |
@@ -1033,7 +1247,8 @@ defective behaviour.
 - 2 rattled copies (0.05 Å) and, for NPT, 2 strained copies (±2%);
 - production path, **in the mode it will run** (captured replay in graph
   mode), against the reference of §12.1;
-- energy per atom, forces and stress: the ratio rule of §12.2, with an
+- energy per atom, forces and stress: the ratio rule of §12.2 (energy
+  against the float32 yardstick with float64 accumulation, §12.1), with an
   absolute floor of 0.01 meV/atom for energy where float32 happens to be
   nearly exact;
 - for MC plans, move-energy differences ΔE for sample moves of every enabled
@@ -1045,7 +1260,8 @@ defective behaviour.
   calculator forms ΔE from float32 totals, whose spacing (≈ 2 meV for
   NbCl5 3×3×3, §10.4) would let errors of several per cent in acceptance
   pass. A species-dependent constant energy error, invisible to forces and
-  stress, fails here.
+  stress, fails here. If only this part fails, the MC energy path moves to
+  float64 (§9.4) and the check is repeated.
 
 It takes seconds to a minute. A failing gate triggers the fallback algorithm
 (§9.4).
@@ -1169,18 +1385,21 @@ workstation GPU.
 | Phase | Content | Acceptance | Estimate (1 developer) |
 | --- | --- | --- | --- |
 | 0. Skeleton | repo layout, packaging, CI (CPU), licence, port CPU tests | `pip install -e .`; CPU suite green | 1 week |
-| 1. Core extraction and contracts | `model`, `rewrites` (registry with today's catalogue), `neighbors`, `state` (complete state, §10.6), `engine.graph`, `integrators.langevin`/`baoab`; a minimal planner (the only component that builds engines: hard refusals, mode and backend choice, `Plan` record; no runtime adaptation); restart format (§10.6); reference policy (§12.1); gate with energy and captured replay; no globals, no NAS or experiment imports, no wrapper script | against a frozen research-engine revision on the same machine and configuration, in alternating A/B blocks: steady-state step time within 3%, setup time and peak memory reported; gate passes for all 14 models; restart round trip, interrupted vs uninterrupted (bitwise on CPU float64, statistical for hybrid); `Experiments/Langevin_Thermostat/main.py` runs on top of FastMACE | 4–5 weeks |
+| 1. Core extraction and contracts | `model`, `rewrites` (registry with today's catalogue), `neighbors`, `state` (complete state, §10.6), `engine.graph`, `integrators.langevin`/`baoab`; a minimal planner (the only component that builds engines: hard refusals, mode and backend choice, `Plan` record; no runtime adaptation); float64 energy accumulation (§7.3); runtime-state registry and complete capture restore (§8.1); restart format with canonical restart points (§10.6); reference policy (§12.1); gate with energy and captured replay; no globals, no NAS or experiment imports, no wrapper script | against a frozen research-engine revision on the same machine and configuration, in alternating A/B blocks: steady-state step time within 3%, setup time and peak memory reported; gate passes for all 14 models, energy included (POLAR-1 and OMOL-0 energies within the gate instead of 45–102 meV/atom off); restart round trip, interrupted vs uninterrupted (bitwise on CPU float64, statistical for hybrid); `Experiments/Langevin_Thermostat/main.py` runs on top of FastMACE | 5–6 weeks |
 | 2. Safety | self-checks, gate statuses and resource policy (§12.3), fallback algorithm (§9.4), versioned registry, instance isolation (§8.7), provenance schema, GPU CI | unknown MACE version runs the reference path cleanly; a deliberately broken rewrite and a broken capture each end in the correct validated fallback; A → B → A passes; CI on two GPU architectures | 3 weeks |
-| 3. Dynamic topology and MC | species superset, derived-state registry, transactional events (§8.5), overflow before commit, re-capture policy, adaptive skin and headroom, compiled-tier path; MC driver (swap, transmutation, displacement; `rescale`/`redraw`), move-energy gate, MC restart state | species-change events (no energy evaluation) every 100 steps at 1500 K keep ≥ 90% of fixed-species step speed; MC attempt cost reported separately as a fraction of an MD step; first MD step after accept and reject equals fresh construction; exact-enumeration test passes; interrupted vs uninterrupted across accepted swaps; swap-MC annealing protocol runs end to end | 4–5 weeks |
-| 3b. NPT for the chlorides | GPU D3 in the force field (§11.2) with stress and its second, longer neighbour list, including the deformation-aware rebuild test; D3 in the BAOAB NPT path; constant-pressure melt–quench protocol | D3 against `torch-dftd` and `dftd3`; GPU NPT + D3 against the independent implementation (§11.2); the NbCl5 NPT melt–quench protocol runs end to end. Its physical outcome is recorded, not judged (decision 6, §18) | 2–3 weeks |
+| 3. Dynamic topology and MC | species superset, derived-state registry, transactional events (§8.5), overflow before commit, re-capture policy, adaptive skin and headroom, compiled-tier path; energy-only graph; MC driver (swap, transmutation, displacement; fixed-shape selection; `exchange`/`rescale`/`redraw`/`redraw_all`; charge/spin parity), move-energy gate with MC energy precision, MC restart state | species-change events (no energy evaluation) every 100 steps at 1500 K keep ≥ 90% of fixed-species step speed; MC attempt cost reported separately as a fraction of an MD step, in float32 and float64; ΔE errors of float32 forwards measured on MH-1 and an all-electron model; first MD step after accept and reject equals fresh construction; exact-enumeration test passes; interrupted vs uninterrupted across accepted swaps; swap-MC annealing protocol runs end to end | 5–6 weeks |
+| 3b. NPT for the chlorides | GPU D3 in the force field (§11.2): own candidate list without per-step compaction, two-pass kernel with analytic derivatives and stress, deformation-aware rebuild test; D3 in the BAOAB NPT path; constant-pressure melt–quench protocol | D3 against `torch-dftd` and `dftd3`; GPU NPT + D3 against the independent implementation (§11.2); the NbCl5 NPT melt–quench protocol runs end to end. Its physical outcome is recorded, not judged (decision 6, §18) | 3–4 weeks |
 | 4. Physics | NVE, CSVR, NHC, MTK, Berendsen; GPU FIRE/LBFGS, fixed and variable cell; `FixAtoms` | ASE-equivalence tests; GPU LBFGS reproduces the annealing-benchmark minima | 3–4 weeks |
 | 5. Planner completion | remaining rules of §9.3 and their precedence, runtime adaptation (§9.6), optional calibration, `str(plan)` | each rule and the precedence order have a test | 1–2 weeks |
 | 6. Release | docs, examples, benchmark tables, PyPI, upstream PRs (MACE: linear rewrites, reassociation; OEq: no-`nvcc` host build) | 1.0 tagged; docs build; install from PyPI on a clean machine | 2–3 weeks |
 
-The total is about 20–26 weeks (4.5–6 months) to 1.0, up from 4–5 months in
-draft 0.1, because the planner, restart and reference contracts and the MC
-driver now come before the dynamic-topology milestone. The first production
-deliverable is phases 0–3b (14–17 weeks, about 3.5–4 months): NVT and
+The total is about 23–29 weeks (5.5–7 months) to 1.0, up from 4–5 months in
+draft 0.1: the planner, restart and reference contracts and the MC driver
+now come before the dynamic-topology milestone (draft 0.2), and draft 0.3
+adds float64 energy accumulation, the runtime-state registry, the
+energy-only graph, the MC energy-precision measurement and a dedicated D3
+kernel. The first production deliverable is phases 0–3b (17–20 weeks, about
+4–5 months): NVT and
 constant-pressure melt–quench and atom exchange on the fastest tier,
 including the chlorides with D3 (decision 6). The barostat settings still
 need their qualification study (an experiment, not library work) before NPT
@@ -1219,6 +1438,9 @@ deterministic.
 | Model-level failures look like engine bugs (POLAR-1-S NaNbO3, OMOL NaCl) | planner warnings with diagnoses; gate against the reference (§12.1) separates the two |
 | Barostat settings and equilibrium volumes unqualified | keep warning; qualification study before recommending NPT defaults |
 | Hybrid MD/MC samples the wrong distribution (mass changes, proposal asymmetry, chemical-potential convention) | moves defined with their momentum transformation and acceptance (§10.4); exact-enumeration test with a negative control (§12.2) |
+| Energies of all-electron-E0 models (POLAR-1, OMOL-0, MH-1 `omol`/`spice` heads) wrong by up to 102 meV/atom in float32 | float64 energy accumulation everywhere (§7.3) and in the float32 yardstick (§12.1) |
+| float32 forward errors do not cancel in MC ΔE (unmeasured) | move-energy gate; float64 MC energy path as fallback, whose cost on GPUs with slow FP64 is measured in phase 3 (§10.4, §16) |
+| Hidden engine state breaks capture, events or restart (stale build cell, sticky flags, frozen sender groups) | runtime-state and derived-state registries with CI checks; canonical restart points (§8.1, §8.5, §10.6) |
 | A stale derived buffer after an event (masses, coefficients, species pairs) | derived-state registry checked against fresh construction (§8.5) |
 | The float64 reference does not fit where the FP32 production path does | sequential reference evaluation, CPU and reduced-cell options, explicit `unavailable` status (§12.3) |
 | A fault appears only inside CUDA graphs (as with Inductor's programmatic dependent launch) | gate and transition tests through captured replay (§12.2, §12.3) |
@@ -1286,3 +1508,27 @@ floors were accepted. Checking them against the NbCl5 3×3×3 relaxation log
 showed that float32 totals are spaced about 2 meV apart, ten times the ΔE
 floor at 250 K, so the ΔE rule lost its ratio term and the MC path sums
 energies in float64 (§10.4, §12.3).
+
+**Draft 0.3 (16 October 2026)** answers a second review, of draft 0.2, that
+cross-checked it against `gpu_langevin.py`, `gpu_npt.py`, `polar_gpu.py`,
+`edge_outer_sum.py`, `pair_search.py`, MACE 0.3.16, `torch-dftd` 0.5.1 and the
+recorded gate metadata. Every claim was checked against code, checkpoints and
+results; all were adopted, two with a different mechanism and two with
+corrected figures (below).
+
+| Finding | Where answered |
+| --- | --- |
+| All-electron E0 (−2,048 to −70,042 eV per atom) and float32 sums break energies and the ΔE gate; `out["node_energy"]` omits terms of `ScaleShiftMACE` and `PolarMACE` | §4.3 energy scale; §7.3 energy; §6.2 `float64_energy`; §12.1. Checked: POLAR-1/OMOL-0 NbCl5 float32 energies off by 45–102 meV/atom. The review's Br E0 (−74,936 eV) is −70,042 eV in these checkpoints. Beyond the review: float32 forwards also carry 0.05–0.13 meV/atom errors on MH-1 r²SCAN, so the MC energy precision became a plan dimension with a float64 fallback (§9.3, §9.4, §10.4) |
+| Absent superset species: first-atom `argmax` in the reassociation table, silent slot 0 for undeclared species, sender groups frozen at the first build with `max() + 1` groups | §8.5 species superset |
+| Energy-only evaluation must run under `no_grad`; swaps/transmutations differ from displacements; no `nonzero` in captured selection; displacement rejection must restore the neighbour list; overflowing attempts must be replayable | §8.1 energy-only graph; §8.5 steps 2–4; §10.4 fixed-shape selection, fixed positions versus displacements |
+| Restart misses build cell h₀, build-time sender groups, pipeline floor and edge bucket, D3 list state | §10.6 canonical restart points (a rebuild at every restart write, in both runs) instead of serialising each item, plus the runtime-state registry |
+| D3: `torch-dftd` uses `nonzero` (not capturable), its own unit constants and float32 by default; per-step compaction of a 40-bohr list is too expensive | §11.2 design bullets and parameter table. Candidate count recomputed as about 3 million for NbCl5 3×3×3 |
+| Velocity versus momentum formulas; `fixcm` with MC; incomplete capture warm-up restore | §10.4 momenta (both forms) and centre of mass, with a new `exchange` swap that conserves kinetic energy and total momentum exactly; §8.1 capture warm-ups |
+| Reproducible mode and `edge_outer_sum` atomics; aliovalent transmutations in charge/spin models; sign of the μ conversion | §9.3 enforcement; §10.4 charge and spin; §10.4 acceptance (explicit formula) |
+
+Also in draft 0.3: the two upstream MACE changes that the research engine is
+adding on 16 October 2026 (`langevin/upstream_mace.py`): the single-graph
+strain of MACE PR 1498 as a pending catalogue entry (§6.2), and the check for
+cuEquivariance's silent naive fallback (MACE PR 1614) as a planner trait
+(§9.2). Phases 1, 3 and 3b grew; the first deliverable is now 17–20 weeks
+(§16).
