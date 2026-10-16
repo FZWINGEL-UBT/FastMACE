@@ -3,7 +3,7 @@
 Status: draft 0.2, 16 October 2026. Owner: Fabian Zwingel. Written from the
 Langevin_Thermostat experiment (`Experiments/Langevin_Thermostat/`), whose GPU
 engine this library generalises. Draft 0.2 answers a review of draft 0.1
-(§19).
+and records the owner's decisions 6 and 7 (§18, §19).
 
 FastMACE is a standalone Python library that runs pretrained MACE models
 (MACE 0.3.x family, including PolarMACE) for atomistic simulation on NVIDIA
@@ -832,6 +832,16 @@ recomputed once at the end of the block if any move was accepted.
 Displacements can change the neighbour list and overflow a capacity; the
 overflow check precedes the decision (§8.1).
 
+**Energy precision.** A float32 total energy cannot resolve MC energy
+differences in production cells. NbCl5 3×3×3 (1,944 atoms) has a total of
+about −20,652 eV; its float32 spacing is 2⁻⁹ eV ≈ 2 meV (visible in the
+FP32 relaxation log of `results/anneal-production-rtx5060ti-20261010/NbCl5`),
+while 0.01 k_B T at 250 K is 0.2 meV. The MC path therefore keeps per-atom
+energies in the force precision but sums them, and forms ΔE, in float64.
+Per-atom energies of about 10 eV have a float32 spacing near 1 µeV, so the
+summed rounding of all 1,944 atoms stays near 0.04 meV even where hybrid
+atomic sums perturb every atom.
+
 **Graph capture.** One attempt (propose → apply → refresh derived buffers →
 energy → accept or restore) is a capturable graph with device-side random
 numbers and a device-side accept mask, so swaps at high temperature keep
@@ -960,7 +970,9 @@ are separate questions:
 - *Physics:* whether NbCl5 stays solid at 600 K with MH-1 + D3 is a model
   qualification, not an acceptance test of the library. The 15 October study
   is one seed, 5 ps, 216 atoms, float64 ASE, and leaves the long-run
-  behaviour open (`studies/npt/README.md`).
+  behaviour open (`studies/npt/README.md`). A physical failure outside the
+  model's training data is an accepted outcome (user decision, 16 October
+  2026; §18 decision 6).
 
 ### 11.3 Constraints
 
@@ -1027,10 +1039,13 @@ defective behaviour.
 - for MC plans, move-energy differences ΔE for sample moves of every enabled
   type (each swap pair, transmutation to every superset species including
   those absent at setup, displacements):
-  `|ΔE_prod − ΔE_ref| ≤ max(2 |ΔE_f32 − ΔE_ref|, 0.01 k_B T_min)`, with
-  T_min the lowest MC temperature of the run. At the floor, acceptance
-  probabilities are off by about 1%. A species-dependent constant energy
-  error, invisible to forces and stress, fails here.
+  `|ΔE_prod − ΔE_ref| ≤ 0.01 k_B T_min`, with T_min the lowest temperature
+  at which the run attempts MC moves. Acceptance probabilities are then off
+  by at most about 1%. There is deliberately no ratio term: the float32
+  calculator forms ΔE from float32 totals, whose spacing (≈ 2 meV for
+  NbCl5 3×3×3, §10.4) would let errors of several per cent in acceptance
+  pass. A species-dependent constant energy error, invisible to forces and
+  stress, fails here.
 
 It takes seconds to a minute. A failing gate triggers the fallback algorithm
 (§9.4).
@@ -1157,20 +1172,19 @@ workstation GPU.
 | 1. Core extraction and contracts | `model`, `rewrites` (registry with today's catalogue), `neighbors`, `state` (complete state, §10.6), `engine.graph`, `integrators.langevin`/`baoab`; a minimal planner (the only component that builds engines: hard refusals, mode and backend choice, `Plan` record; no runtime adaptation); restart format (§10.6); reference policy (§12.1); gate with energy and captured replay; no globals, no NAS or experiment imports, no wrapper script | against a frozen research-engine revision on the same machine and configuration, in alternating A/B blocks: steady-state step time within 3%, setup time and peak memory reported; gate passes for all 14 models; restart round trip, interrupted vs uninterrupted (bitwise on CPU float64, statistical for hybrid); `Experiments/Langevin_Thermostat/main.py` runs on top of FastMACE | 4–5 weeks |
 | 2. Safety | self-checks, gate statuses and resource policy (§12.3), fallback algorithm (§9.4), versioned registry, instance isolation (§8.7), provenance schema, GPU CI | unknown MACE version runs the reference path cleanly; a deliberately broken rewrite and a broken capture each end in the correct validated fallback; A → B → A passes; CI on two GPU architectures | 3 weeks |
 | 3. Dynamic topology and MC | species superset, derived-state registry, transactional events (§8.5), overflow before commit, re-capture policy, adaptive skin and headroom, compiled-tier path; MC driver (swap, transmutation, displacement; `rescale`/`redraw`), move-energy gate, MC restart state | species-change events (no energy evaluation) every 100 steps at 1500 K keep ≥ 90% of fixed-species step speed; MC attempt cost reported separately as a fraction of an MD step; first MD step after accept and reject equals fresh construction; exact-enumeration test passes; interrupted vs uninterrupted across accepted swaps; swap-MC annealing protocol runs end to end | 4–5 weeks |
-| 4. Physics | NVE, CSVR, NHC, MTK, Berendsen; GPU FIRE/LBFGS, fixed and variable cell; `FixAtoms`; GPU D3 | ASE-equivalence tests; D3 against `torch-dftd` and `dftd3`, and GPU NPT + D3 against the independent implementation (§11.2); GPU LBFGS reproduces the annealing-benchmark minima | 4–6 weeks |
+| 3b. NPT for the chlorides | GPU D3 in the force field (§11.2) with stress and its second, longer neighbour list, including the deformation-aware rebuild test; D3 in the BAOAB NPT path; constant-pressure melt–quench protocol | D3 against `torch-dftd` and `dftd3`; GPU NPT + D3 against the independent implementation (§11.2); the NbCl5 NPT melt–quench protocol runs end to end. Its physical outcome is recorded, not judged (decision 6, §18) | 2–3 weeks |
+| 4. Physics | NVE, CSVR, NHC, MTK, Berendsen; GPU FIRE/LBFGS, fixed and variable cell; `FixAtoms` | ASE-equivalence tests; GPU LBFGS reproduces the annealing-benchmark minima | 3–4 weeks |
 | 5. Planner completion | remaining rules of §9.3 and their precedence, runtime adaptation (§9.6), optional calibration, `str(plan)` | each rule and the precedence order have a test | 1–2 weeks |
 | 6. Release | docs, examples, benchmark tables, PyPI, upstream PRs (MACE: linear rewrites, reassociation; OEq: no-`nvcc` host build) | 1.0 tagged; docs build; install from PyPI on a clean machine | 2–3 weeks |
 
-The total is about 19–25 weeks (4.5–6 months) to 1.0, up from 4–5 months in
+The total is about 20–26 weeks (4.5–6 months) to 1.0, up from 4–5 months in
 draft 0.1, because the planner, restart and reference contracts and the MC
-driver now come before the dynamic-topology milestone. Phases 0–3 (12–14
-weeks, about 3 months) cover the NVT production needs: melt–quench and atom
-exchange on the fastest tier. If constant-pressure melt–quench of the
-chlorides belongs to that first deliverable, GPU D3 with its §11.2
-validation moves ahead of the rest of phase 4 (about 2–3 weeks more on the
-critical path), and the barostat settings need their qualification study
-(an experiment, not library work) before NPT defaults are recommended (open
-decision 6).
+driver now come before the dynamic-topology milestone. The first production
+deliverable is phases 0–3b (14–17 weeks, about 3.5–4 months): NVT and
+constant-pressure melt–quench and atom exchange on the fastest tier,
+including the chlorides with D3 (decision 6). The barostat settings still
+need their qualification study (an experiment, not library work) before NPT
+defaults are recommended.
 
 During migration the experiment keeps working: `workflow.py` switches to
 FastMACE imports behind a compatibility layer, and results must match the
@@ -1223,11 +1237,17 @@ Open decisions for the owner:
 4. Licence choice (MIT proposed).
 5. Which GPUs to provide as CI runners (local RTX 5060 Ti, a workstation
    RTX 4000 Ada).
-6. Whether constant-pressure melt–quench of the chlorides is part of the
-   first production deliverable; if so, GPU D3 moves onto the critical path
-   (§16).
-7. The proposed absolute floors of the gate: 0.01 meV/atom for energy and
-   0.01 k_B T_min for move-energy differences (§12.3).
+6. Constant-pressure melt–quench of the chlorides — **decided (user,
+   16 October 2026): part of the first production deliverable**, so GPU D3
+   is on the critical path (phase 3b, §16). If the chlorides fail
+   physically because the model's training data do not cover those
+   conditions (for example NbCl5 evaporating at 600 K even with D3), that is
+   an accepted model limitation, not a library failure: acceptance is
+   implementation correctness (§11.2).
+7. Gate floors — **accepted (user, 16 October 2026):** 0.01 meV/atom for
+   total energy and 0.01 k_B T_min for move-energy differences (§12.3). With
+   them, the ΔE rule became the floor alone and the MC path sums energies in
+   float64 (§10.4), because float32 totals cannot resolve the floor.
 
 ---
 
@@ -1257,3 +1277,12 @@ against the code before it was adopted; all were adopted.
 | PBC and constraint support undeclared | §4.4 |
 | Performance target with or without MC evaluations | §10.4 cost; §16 phase 3 |
 | Baseline from mixed machines | §3.3; §12.5; §16 phase 1 |
+
+**Owner decisions (16 October 2026, same day).** Decision 6: constant-pressure
+melt–quench of the chlorides is part of the first production deliverable;
+GPU D3 moved from phase 4 into a new phase 3b, and physical failures outside
+the model's training data are accepted (§11.2, §16). Decision 7: the gate
+floors were accepted. Checking them against the NbCl5 3×3×3 relaxation log
+showed that float32 totals are spaced about 2 meV apart, ten times the ΔE
+floor at 250 K, so the ΔE rule lost its ratio term and the MC path sums
+energies in float64 (§10.4, §12.3).
