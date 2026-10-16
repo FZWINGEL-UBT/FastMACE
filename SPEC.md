@@ -1,8 +1,8 @@
 # FastMACE — Specification
 
-Status: draft 0.5, 16 October 2026. Owner: Fabian Zwingel. Written from the
+Status: draft 0.6, 16 October 2026. Owner: Fabian Zwingel. Written from the
 Langevin_Thermostat experiment (`Experiments/Langevin_Thermostat/`), whose GPU
-engine this library generalises. Drafts 0.2–0.5 answer four reviews and
+engine this library generalises. Drafts 0.2–0.6 answer five reviews and
 record the owner's decisions 6 and 7 (§18, §19).
 
 FastMACE is a standalone Python library that runs pretrained MACE models
@@ -77,7 +77,7 @@ breadth of the integrator catalogue:
 | Long NVT/NPT MD of one crystal (heating/cooling, annealing) | max speed, restart, async output | graph engine |
 | Melt–quench, amorphous structure generation | high T, many neighbour rebuilds, quench relaxations | graph engine, adaptive skin |
 | Species exchange / swap Monte Carlo at high T | species change in place, accept/reject on GPU | graph engine with a species superset |
-| Insertion/deletion (GCMC), evaporation | atom count changes | compiled tier with atom buckets |
+| Insertion/deletion (GCMC), evaporation | atom count changes | not in 1.0 (refused, §9.3 rule 7); 1.x compiled tier with exact atom counts, 2.x ghost-atom buckets (§8.6, §17) |
 | Relaxations (fixed or variable cell) | FIRE/LBFGS, stress | compiled or graph engine |
 | Drop-in speed-up of ASE scripts | ASE `Calculator` | calculator front end |
 | Charged / long-range systems (PolarMACE) | k-space path, per-graph charge/spin | graph engine with polar path |
@@ -100,14 +100,15 @@ lines:
 | `oeq_streaming/` | vendored | OpenEquivariance PR 223 receiver-streaming kernels via NVRTC (BSD-3, LBNL; keep LICENSE and NOTICE) | `fastmace.kernels.oeq_streaming` |
 | `pair_search.py` | 102 | GPU pair search | `fastmace.neighbors` |
 | `quench.py` | 249 | Frame selection and quench relaxations | `fastmace.protocols.quench` |
-| `workflow.py` | 1,422 | CLI, protocol profiles, provenance, resume | split: `fastmace.cli`, `fastmace.protocols`, `fastmace.provenance` |
+| `workflow.py` | 1,440 | CLI, protocol profiles, provenance, resume (output truncation on resume, §10.6) | split: `fastmace.cli`, `fastmace.protocols`, `fastmace.provenance` |
+| `upstream_mace.py` | 151 | backports from MACE develop (single-graph strain, PR 1498) and the naive-cuEq guard (PR 1614); process-local, installed files untouched | `fastmace.rewrites` (strain), `fastmace.planner` (kernel trait) |
 
 Tooling that becomes the validation suite:
 - `tools/validation/npt_stress_reference.py` (force/stress gate);
 - `tools/validation/roundoff_reference.py`;
 - `studies/other_models/probes/model_step_time.py` (benchmark);
 - `studies/further_optimizations/probes/step_breakdown_probe.py` (profiler);
-- `tests/` (294 CPU tests).
+- `tests/` (299 CPU tests, `test_upstream_mace.py` included).
 
 ### 3.2 Couplings that must be removed
 
@@ -177,6 +178,7 @@ rewrites it cannot verify.
 | graph-longrange | 0.4.0 (MACE 0.3.16 calls this interface) | extra `[polar]`, pinned per MACE version |
 | Triton | as shipped with torch | as shipped with torch |
 | torch-dftd | 0.5.1 | extra `[d3]` until the native GPU D3 lands (§11.2) |
+| OEq host toolchain (fallback build only) | GCC 11.4, ninja, CUDA runtime header wheels (`cuda.h`, `nvrtc.h`, CCCL) | not needed with the prebuilt extension wheels of §14; documented for the fallback build |
 
 ### 4.2 Hardware
 
@@ -282,7 +284,8 @@ fastmace/
     compiled.py          torch.compile without graphs (§8.2)
     eager.py             eager hybrid (§8.3)
     reference.py         MACE MACECalculator path (§8.4)
-    subprocess.py        runs a plan in a child process: backend switches that §8.7 forbids in-process, fallbacks (§9.4)
+    subprocess.py        runs a plan in a child process from a restart write of the last committed step (§8.7, §10.6):
+                         backend switches that §8.7 forbids in-process, fallbacks (§9.4)
   planner/
     workload.py          WorkloadSpec: what the user's run will do (§9.2)
     plan.py              Planner, Plan, decision rules, fallback algorithm (§9.3, §9.4)
@@ -292,7 +295,7 @@ fastmace/
     polar.py             PolarMACE GPU path (§11.1)
     d3.py                GPU D3 dispersion, all parameters explicit (§11.2)
   io/
-    trajectory.py        async writer, ASE Trajectory/extxyz, every-n-steps, chunked large files
+    trajectory.py        async writer, ASE Trajectory/extxyz, every-n-steps, files chunked at restart points (§10.6)
     restart.py           checkpoint/restart format (§10.6)
   provenance.py          run metadata (§13)
   protocols/             schedule algebra (§7.6); heat/cool profiles, anneal, quench, melt–quench (from workflow.py profiles)
@@ -337,32 +340,36 @@ class Rewrite:
 
 **Defaults.**
 - `"exact"` means bit-for-bit identical math up to summation order.
-- `"rounding"` covers reassociation and changed GEMM grouping; this is all of
-  today's adopted rewrites.
+- `"rounding"` covers reassociation, folded or factored weights and changed
+  GEMM grouping; most adopted rewrites are of this kind (§6.2 column).
 - `"approximate"` rewrites are never default.
 
 ### 6.2 Catalogue for 1.0 (adopted today unless marked; defaults as in `main.py` on 16 October 2026)
 
-| Rewrite | Applies to | Step-time change (measured; negative = faster) | Constraint |
-| --- | --- | --- | --- |
-| `factor_species` (species-factored radial input) | MH-1 class | part of the MH-1 package | — |
-| `fold_cutoff` (cutoff folded into the last radial layer) | MH-1 class, `apply_cutoff=False` | — | — |
-| `sort_receivers` | all | −3 to −5% (large crystals) | — |
-| `density_first` (division before `linear_1`) | MH-1 class | ≈ −11% together with `reassociate_first` | bias-free `linear_1` |
-| `reassociate_first` (first interaction without per-edge TP weights) + Triton backward | MH-1 class, `GENERIC_*` | MH-1 package; OMOL −9% NbCl5 | species-only first inputs: linear node embedding, at most per-graph joint embeddings, single graph, fixed species superset |
-| `segmented_first_sum` | with `reassociate_first` + sorting | −1.6% NaNbO3 | — |
-| `joint_radial_input`, `fused_folded_backward`, `gpu_neighbour_list` | MH-1 class (folded) | −6 to −15% together | — |
-| `block_linear` | cuEq `Linear` (internal shared weights) | −11.8% NaCl (MH-1) | — |
-| `grouped_linear` | with `block_linear` | MH-1 −2 to −5%, OMOL −4% | — |
-| `merged_residual` | with `block_linear` + `density_first` | included above | — |
-| `streaming_conv` (OEq PR 223 kernels, NVRTC) | folded MH-1 class, `GENERIC_*` with OEq fusion | −7.7% NaNbO3; generic −16 to −28% with reassociation | OEq present; edge counter binding |
-| `generic_species_skip` | MP-0/density family | −7 to −39% | fixed species superset |
-| `generic_fused_radial_backward` | MP-0/density family | −3 to −5% large cells | — |
-| `polar_uvu` (PR 1711) | PolarMACE | 4–5× faster with the MH-1 rewrites (step time ÷ 4–5) | — |
-| `pipelined`, `async_output` | engine features (§8.1) | −3.0% NaCl (pipelined); asynchronous output bit-identical | — |
-| `unfuse_full_addmm`, `first_derivative_only`, expandable segments allocator | engine | avoids 2 × 32 MB copies per step | torch ≥ 2.14 |
-| `float64_energy` (energy accumulation, §7.3; new in the library) | all | correctness, not speed: stock float32 NbCl5 energies off by 45–102 meV/atom with all-electron E0 | always on; applied to the float32 reference too (§12.1) |
-| `single_graph_strain` (MACE PR 1498 backport) | all, stress path | being measured in the research engine (`langevin/upstream_mace.py`, 16 October 2026) | one graph; adopt here once that study is committed |
+| Rewrite | Exactness (§6.1) | Applies to | Step-time change (measured; negative = faster) | Constraint |
+| --- | --- | --- | --- | --- |
+| `factor_species` (species-factored radial input) | rounding | MH-1 class | part of the MH-1 package | — |
+| `fold_cutoff` (cutoff folded into the last radial layer) | rounding | MH-1 class, `apply_cutoff=False` | — | — |
+| `sort_receivers` | exact (permutation) | all | −3 to −5% (large crystals) | — |
+| `density_first` (division before `linear_1`) | rounding | MH-1 class | ≈ −11% together with `reassociate_first` | bias-free `linear_1` |
+| `reassociate_first` (first interaction without per-edge TP weights) + Triton backward | rounding | MH-1 class, `GENERIC_*` | MH-1 package; OMOL −9% NbCl5 | species-only first inputs: linear node embedding, at most per-graph joint embeddings, single graph, fixed species superset |
+| `segmented_first_sum` | exact (summation order) | with `reassociate_first` + sorting | −1.6% NaNbO3 | — |
+| `joint_radial_input`, `fused_folded_backward`, `gpu_neighbour_list` | rounding, rounding, exact (same pairs) | MH-1 class (folded) | −6 to −15% together | — |
+| `block_linear` | rounding (GEMM grouping) | cuEq `Linear` (internal shared weights) | −11.8% NaCl (MH-1) | — |
+| `grouped_linear` | rounding | with `block_linear` | MH-1 −2 to −5%, OMOL −4% | — |
+| `merged_residual` | rounding | with `block_linear` + `density_first` | included above | — |
+| `streaming_conv` (OEq PR 223 kernels, NVRTC) | exact (summation order; atomic sums, not bitwise reproducible) | folded MH-1 class, `GENERIC_*` with OEq fusion | −7.7% NaNbO3; generic −16 to −28% with reassociation | OEq present; edge counter binding |
+| `generic_species_skip` | exact (absent columns multiply zeros) | MP-0/density family | −7 to −39% | fixed species superset |
+| `generic_fused_radial_backward` | rounding | MP-0/density family | −3 to −5% large cells | — |
+| `polar_uvu` (PR 1711) | rounding (GEMM form) | PolarMACE | 4–5× faster with the MH-1 rewrites (step time ÷ 4–5) | — |
+| `pipelined`, `async_output` | exact (bit-identical) | engine features (§8.1) | −3.0% NaCl (pipelined); asynchronous output bit-identical | — |
+| `unfuse_full_addmm`, `first_derivative_only`, expandable segments allocator | exact | engine | avoids 2 × 32 MB copies per step | torch ≥ 2.14 |
+| `float64_energy` (energy accumulation, §7.3; new in the library) | reference treatment (§12.1), not a model rewrite | all | correctness, not speed: stock float32 NbCl5 energies off by 45–102 meV/atom with all-electron E0 | always on; applied to the float32 reference too (§12.1) |
+| `single_graph_strain` (MACE PR 1498 backport) | rounding | all, stress path | adopted in the research engine on 16 October 2026 (`langevin/upstream_mace.py`, `--single-graph-strain`, `auto` = on for both engines; acts only where stress is computed) | one graph; default `auto` here too |
+
+The exactness column is the initial classification from each rewrite's
+algebra; the self-check record of the rewrite (§6.4) is authoritative and
+overrides it.
 
 Opt-in only:
 - PR 1762 Fukui regularisation and charge-dipole cap (changes the model);
@@ -422,11 +429,12 @@ e, f, s = ff.evaluate(atoms, stress=True)               # one-off evaluation
 ### 7.2 Simulation
 
 ```python
+ff = fm.ForceField(model, atoms, species=["Na", "Nb", "Cl", "O"])   # superset and precision live here (§7.1)
 sim = fm.Simulation(
-    atoms, model,
+    atoms, ff,                          # a model is accepted too; the ForceField is then built with defaults (§7.6)
     integrator=fm.integrators.Langevin(timestep_fs=0.5, temperature_K=300, friction_per_fs=0.02),
-    workload=fm.Workload(species_changes=True, atom_count_changes=False, cell="fixed",
-                         host_callbacks_every=1000),
+    workload=fm.Workload(species_changes=True, mc_moves=("swap",), max_temperature_K=1000,
+                         min_mc_temperature_K=250, host_callbacks_every=1000),
     output=fm.Output("run/", trajectory_every=20, thermo_every=20, restart_every=10_000),
     seed=1,
 )
@@ -553,13 +561,26 @@ electrostatics are not (§7.3).
   otherwise `ValueError`.
 - Each segment's duration is rounded to whole steps at the run's timestep;
   segment boundaries and the total are recorded.
-- The target temperature is piecewise linear in the step.
+- The target temperature is piecewise linear in the step and reaches the
+  integrator as a device-scalar fill before the step, not as an event (§8.5).
 - MC blocks are attached to the simulation (every n MD steps), not to
-  segments; a block uses the target temperature at its step. The schedule
-  position is restart state (§10.6).
+  segments; a block uses the target temperature at its step. `run` refuses a
+  block whose target temperature is below `Workload.min_mc_temperature_K`
+  (§9.2, §12.3). The schedule position is restart state (§10.6).
 
 **Species superset.** Owned by the `ForceField` (`species=`); the planner and
 `Workload` read it from there (§9.2).
+
+**Simulation inputs.** `Simulation` takes a model or a `ForceField`; with a
+model it builds the `ForceField` with defaults (the species of the initial
+structure, float32). The ensemble, the cell mode and whether stress is needed
+are those of the `integrator=` or `optimizer=` object; `Workload` has no copy
+of them, nor of the force precision or the superset (§9.2). `run(mc=…)` is
+checked against the declared workload before any step: a move type not in
+`mc_moves`, a swap pair or transmutable set naming a species outside the
+superset, or a block whose target temperature is below
+`min_mc_temperature_K` raises `PlanRefused`, because the gate (§12.3) never
+covered it.
 
 ---
 
@@ -684,8 +705,14 @@ registered buffers; a test enumerates the registry against a fresh
 construction so that a forgotten buffer fails CI.
 
 **Transaction contract.** Every in-place mutation (species swap,
-transmutation, mass or charge change, displacement move, thermostat target
-change that touches cached coefficients) is one event:
+transmutation, mass or charge change, displacement move, and a parameter
+change that alters cached coefficients: friction, a barostat τ or mass) is
+one event. Schedule-driven changes of the target temperature or pressure are
+**not** events: the target is a device scalar that the host fills before a
+step, as today's `sqrt_kT` (`gpu_langevin.py`, `set_temperature`), and no
+cached coefficient depends on it (Langevin's `c3_unit`, `c4_unit`, `c5_unit`
+depend on friction and masses only). A ramp therefore changes the target
+every step (§7.6) without quiescing the pipeline. An event runs as follows:
 1. **Quiesce:** finish pending work (pipelined force stage, asynchronous
    output, speculative steps) so that the state is a committed step.
 2. **Snapshot** the affected state: species, masses, charges, momenta of
@@ -699,7 +726,9 @@ change that touches cached coefficients) is one event:
    overflow and rebuild check of §8.1 before any decision.
    - **Rebuild needed at the trial positions** (a displacement beyond the
      skin test): the list is built **around the trial geometry**, in trial
-     buffers, before the trial is evaluated. The committed list stays in the
+     buffers, before the trial is evaluated. This build runs eagerly, outside
+     the captured attempt: the GPU build synchronises the host for the pair
+     count and may reallocate (§10.4). The committed list stays in the
      snapshot for a rejection; an acceptance commits the trial list.
      Rebuilding at the restored committed positions and replaying the same
      displacement would loop forever: with the default 0.3 Å skin, every
@@ -752,17 +781,24 @@ otherwise).
 
 ### 8.6 Atom-count changes
 
-Atom capacity comes in buckets with padded "ghost" atoms: zero mass,
-excluded from neighbour pairs and an excluded species column. This needs a
-proof that ghost atoms contribute exactly zero, checked like
-`padding_is_exact`. Until that proof holds, atom-count changes run on tier 2.
+Atom capacity comes in buckets with padded "ghost" atoms: zero mass (an
+inverse mass of zero in the integrator), excluded from neighbour pairs and an
+excluded species column. This needs a proof that ghost atoms contribute
+exactly zero, checked like `padding_is_exact`. None of this is in 1.0: the
+planner refuses `atom_count_changes=True` (§9.3 rule 7), because no 1.0 move,
+integrator or restart entry changes the atom count. Insertion and deletion on
+the compiled tier with exact atom counts are 1.x (§10.4); ghost-atom buckets
+at graph speed are 2.x (§17).
 
 ### 8.7 Process constraints (enforced, not documented only)
 
 - **One backend family per process.** MACE's autograd-compile policy is
   process-wide, so the planner refuses to compile hybrid and plain
   cuEquivariance models in one process. It offers a subprocess runner
-  instead.
+  instead, which hands the state to the child through a restart write and
+  `resume(allow_plan_change=True)` from the last committed step (§10.6),
+  never through pickled live objects; the output chunks of §10.6 continue in
+  the child.
 - **Allocator first.** `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` must
   be set before the first CUDA allocation (torch ≥ 2.14). `fastmace` sets it
   on import if CUDA is not yet initialised; otherwise it warns.
@@ -799,24 +835,25 @@ per-shape table is ever stored. This is the project's generality rule.
 ```python
 @dataclass
 class Workload:
-    ensemble: Literal["nve", "nvt", "npt", "relax"]
-    cell: Literal["fixed", "hydrostatic", "full"]
     species_changes: bool                 # swaps/transmutations
-    atom_count_changes: bool              # insertion/deletion, evaporation removal
+    atom_count_changes: bool              # reserved; refused in 1.0 (§9.3 rule 7, §8.6)
     max_temperature_K: float              # drives skin and bucket headroom
+    min_mc_temperature_K: float | None    # lowest target temperature with MC attempts; ΔE gate threshold (§12.3)
     host_callbacks_every: int | None      # user Python per n steps
-    needs_stress: bool
     needs_per_atom: set[str]              # energies, charges, ...
     mc_moves: tuple[str, ...]             # "swap", "transmute", "displace"; drives the ΔE gate (§12.3)
     reproducible: bool                    # bitwise within the scope of §9.3; refuses what it cannot guarantee
-    precision: Literal["float32", "float64"]   # force precision; integration is always float64 (§7.3)
     mc_energy_precision: Literal["auto", "float32", "float64"]   # §10.4; auto = force precision if the ΔE gate passes
 ```
 
-Periodicity and constraints come from the `Atoms` object and are checked
-against §4.4. The species superset has one owner, the `ForceField`
-(`species=`, §7.1); the planner reads it from there, and `Workload` has no
-copy of it.
+`Workload` holds only what no other object knows. Periodicity and constraints
+come from the `Atoms` object and are checked against §4.4. The ensemble, the
+cell mode and whether stress is needed come from the integrator or optimiser
+passed to `Simulation` (§7.6). The force precision and the species superset
+have one owner, the `ForceField` (`precision=`, `species=`, §7.1); the
+planner reads them from there. Draft 0.4 removed the superset copy from
+`Workload`, draft 0.6 the ensemble, cell, stress and precision copies, for
+the same reason: two owners of one fact disagree.
 
 Model traits come from `capabilities.py`: interaction classes,
 `apply_cutoff`, joint embeddings, PolarMACE, heads, `padding_is_exact`,
@@ -828,8 +865,10 @@ its naive implementation with only a `UserWarning` when
 `cuequivariance_ops_torch` cannot be imported, for example after a cuBLAS
 mismatch (MACE PR 1614). The run is then correct but slow. The planner
 refuses such a plan unless `allow_naive_cueq=True`, which is recorded. The
-research engine is adding this check now
-(`langevin/upstream_mace.py`, 16 October 2026).
+research engine has this guard since 16 October 2026
+(`langevin/upstream_mace.py`; it refuses when the symmetric contraction or
+the convolution fell back; cuEq's `Linear` layers are naive by design and are
+not checked).
 
 ### 9.3 Decision rules (initial set)
 
@@ -840,28 +879,28 @@ physics (model, head, charge/spin, D3 and its parameters, polar options,
 reference corrections) is fixed by the user and is never changed by a rule
 or a fallback.
 
-Rules are evaluated in this strict order. Rules 1–6 are **hard constraints**
+Rules are evaluated in this strict order. Rules 1–7 are **hard constraints**
 (correctness or an explicit user requirement): a later rule cannot weaken
 them, and a user override cannot lift them, except through the `allow_*`
 flag named in the rule, which is recorded. When several hard constraints
 refuse, all reasons are reported together in one `PlanRefused` error
-(§7.6). Rules 7–12 are **preferences**: a user override replaces the
+(§7.6). Rules 8–12 are **preferences**: a user override replaces the
 decision, and the overridden plan is self-checked and gated like any other.
 Rules 13–15 are **reactions** to checks.
 
 | Order | Kind | Condition | Decision |
 | --- | --- | --- | --- |
-| 1 | hard | workload outside §4.4 (PBC, constraints), or `nve`/`nvt` with a variable cell | refuse; reference tier only with `allow_reference=True` |
-| 2 | hard | a species outside the ForceField's declared superset | refuse |
+| 1 | hard | workload outside §4.4 (PBC, constraints), or a variable cell with an integrator that has no barostat | refuse; reference tier only with `allow_reference=True` |
+| 2 | hard | a species outside the ForceField's declared superset, in the structure or in a declared move set (swap pairs, transmutable sets) | refuse |
 | 3 | hard | PolarMACE with a plain compiled backend | refuse that combination (zero forces); hybrid, or eager plain |
 | 4 | hard | `padding_is_exact` false | no graph mode (padded edges would change energies); compiled with exact edge counts |
 | 5 | hard | `reproducible=True` | only a qualified (backend, model family) with its deterministic allow-list (see below); refuse otherwise |
 | 6 | hard | cuEquivariance's fused kernels do not load (§9.2) | refuse unless `allow_naive_cueq=True` |
-| 7 | preference | `atom_count_changes` | compiled mode until ghost-atom exactness is proven (§8.6); the species superset still applies if `species_changes` is also set |
-| 8 | preference | `species_changes`, no atom-count changes, graph mode still allowed | graph mode; species-dependent rewrites built for the superset |
+| 7 | hard | `atom_count_changes=True` | refuse: not in 1.0 (§8.6, §17) |
+| 8 | preference | `species_changes`, graph mode still allowed | graph mode; species-dependent rewrites built for the superset |
 | 9 | preference | `host_callbacks_every` small (< ~10 steps) | compiled mode (graph replays would be broken up anyway) |
-| 10 | preference | `ensemble` and `cell` | `npt` selects a barostat integrator; `relax` with a variable cell selects a cell-filtered optimiser (FIRE/LBFGS), not an NPT integrator; variable-cell plans enable the stress path and the deformation-aware neighbour test; polar: k-vector headroom |
-| 11 | preference | `max_temperature_K` high | larger skin and bucket headroom (scaled from expected displacement per rebuild interval); re-capture budget |
+| 10 | preference | the integrator or optimiser and its cell mode (§9.2) | a barostat integrator or a cell-filtered optimiser (FIRE/LBFGS, never an NPT integrator for a relaxation) enables the stress path and the deformation-aware neighbour test; polar: k-vector headroom |
+| 11 | preference | `max_temperature_K` high; `"displace"` in `mc_moves`; D3 on | larger skin and bucket headroom (scaled from expected displacement per rebuild interval); a skin that keeps displacement trial rebuilds rare (§10.4); the D3 list's own skin (§11.2); re-capture budget |
 | 12 | preference | GPU memory insufficient for estimated edge bucket × feature width | drop memory-heavy rewrites or warn (e.g. generic-only POLAR-1-L NPT on NbCl5 ran out of memory on 20 GB) |
 | 13 | reaction | a rewrite self-check fails | disable that rewrite and every rewrite that requires it, record reasons, re-plan |
 | 14 | reaction | the gate fails (§12.3) | fallback algorithm (§9.4); never run silently with a failing gate |
@@ -922,27 +961,34 @@ error) triggers this algorithm, not a fixed "one tier down":
    not just a single culprit, and every rewrite in it and every rewrite that
    requires one is disabled.
    **Budget:** diagnosis uses the reduced gate (one rattled copy, the
-   failing quantity only). At most 12 gate runs are allowed per fallback;
-   when the budget is spent, the planner stops with the full record (step
-   5). Only the candidate to activate runs the full gate (step 4).
+   failing quantity only), which is cheap, and has its own budget of 64
+   reduced-gate runs per fallback (ddmin over the ~16 catalogue entries of
+   §6.2 needs about n log n runs typically and is quadratic in the worst
+   case; the 12 of draft 0.4 could not finish). When that budget is spent the
+   search stops and the planner tries a fixed **terminal sequence** instead:
+   (1) the same mode with every rewrite off, (2) eager with every rewrite
+   off, (3) the reference tier if it fits (§12.3). Each is validated as in
+   step 4; if none passes, the planner refuses with the full record. Full
+   gate runs (step 4) are counted separately, one per candidate to activate.
 3. **Backend changes respect §8.7.** A plain cuEquivariance candidate after a
-   hybrid model was compiled in the process runs eager or in a subprocess,
-   never as a second compiled backend in the same process.
+   hybrid model was compiled in the process runs eager or in a subprocess
+   (through a restart write, §8.7), never as a second compiled backend in the
+   same process.
 4. **Validate before activation.** A candidate becomes active only after it
    passes the self-checks and the gate in the mode it will run in (replay
    included, §12.3). The failed plan and every tried candidate are recorded.
 5. **Stop.** The reference tier is the last candidate only if it fits
-   (§12.3); otherwise the planner refuses with the full record. Mid-run
-   fallbacks (§9.6) follow the same steps between segments, from the last
-   committed state.
+   (§12.3); otherwise, or when the terminal sequence of step 2 is exhausted,
+   the planner refuses with the full record. Mid-run fallbacks (§9.6) follow
+   the same steps between segments, from the last committed state.
 
 ### 9.5 Output
 
 `Plan` is a frozen object: tier, enabled and disabled rewrites with reasons,
 bucket and skin settings, kernel availability, the fallback candidates and
 predicted memory. `str(plan)` is human-readable, and the plan is written into
-provenance (§13). Users can override the preferences of §9.3 (rules 7–12),
-never the hard constraints (rules 1–6) except through their `allow_*` flags;
+provenance (§13). Users can override the preferences of §9.3 (rules 8–12),
+never the hard constraints (rules 1–7) except through their `allow_*` flags;
 every override is self-checked and gated.
 
 A plan never changes in place. A runtime switch (§9.6) or a fallback creates
@@ -953,7 +999,7 @@ keeps the whole chain, and the restart file stores the active revision.
 
 During a run the planner monitors:
 - re-capture count;
-- neighbour rebuild frequency;
+- neighbour rebuild frequency and build time, per list (MACE, D3);
 - bucket overflow;
 - non-finite observables.
 
@@ -973,6 +1019,8 @@ Every integrator:
 - draws random numbers from a seeded on-device stream, or batches host
   uploads (`NOISE_BATCH`);
 - exposes observables (T, E_pot, E_kin, P, V, conserved quantity);
+- keeps its targets (temperature, pressure) as device scalars that schedule
+  updates fill before a step without quiescing (§8.5);
 - serialises its own state for restarts (§10.6);
 - registers its mass- and species-derived coefficients (§8.5);
 - declares its constraint support (§4.4);
@@ -1143,10 +1191,19 @@ a float64 forward otherwise, while MD forces keep their precision. Float64
 runs at a small fraction of the float32 rate on consumer and workstation
 GPUs, so phase 3 measures the cost of both (§16).
 
-**Graph capture.** One attempt (propose → apply → refresh derived buffers →
-energy → accept or restore) is a capturable graph with device-side random
-numbers and a device-side accept mask, so swaps at high temperature keep
-tier-1 speed.
+**Graph capture.** A swap or transmutation attempt (propose → apply → refresh
+derived buffers → energy → accept or restore) is one capturable graph with
+device-side random numbers and a device-side accept mask, so swaps at high
+temperature keep tier-1 speed. A displacement attempt is captured only while
+the rebuild test passes: the GPU neighbour build synchronises the host for
+the pair count and may reallocate (`build_gpu`, `pair_search.candidate_pairs`),
+so a trial that needs a rebuild (§8.5 step 4) leaves the graph, builds
+eagerly in trial buffers and then runs the captured energy graph. With δ
+near skin/2 (0.15 Å at the default skin) plus the MD drift since the last
+build, most trials would take that path, so rule 11 (§9.3) raises the skin
+for displacement workloads, and the benchmark reports displacement-attempt
+cost with and without a trial rebuild, separately from swap cost (§16,
+phase 3).
 
 **Schedule and counters.** n MD steps, then m attempts. Attempted, impossible
 and accepted counts per move type are device-side counters, incremented
@@ -1175,7 +1232,8 @@ Port today's profiles:
 - Heating/cooling ramps, holds, and the `fast` and `ultrafast` profiles.
 
 Add melt–quench and a swap-MC annealing protocol. Protocols are data
-(TOML/YAML or Python objects), not code paths in a CLI.
+(TOML/YAML or Python objects), not code paths in a CLI; YAML is read with
+`safe_load` only.
 
 ### 10.6 Simulation state and restart
 
@@ -1234,6 +1292,23 @@ force-field identity. A different plan (another GPU or rewrite set) needs
 `allow_plan_change=True` and is recorded: same physics, but no bitwise
 continuation.
 
+**Output files at restart points.** The engine state is complete, but the
+run has also written files, and asynchronous output (§8.1) writes frames and
+thermo rows after the last restart point; on a plain resume they would be
+duplicated or forked. Today's resume drops them by rewriting
+`temperature.csv` and `md.traj` to the restart step
+(`workflow.truncate_outputs`), which rereads and rewrites the whole
+trajectory, up to 770 MB on the NAS. The library instead makes every restart
+point a chunk boundary of the trajectory and thermo files (§5,
+`io/trajectory.py`): a restart write closes the current chunks and records
+their indices in the restart file. Resume deletes the chunks after the
+restart step and opens new ones; nothing is rewritten. If the outputs are
+ahead of the restart and cannot be truncated (read-only, or chunks missing),
+`Simulation.resume` refuses with `RestartMismatch`. MC counters are restart
+state already. A test crashes a run between a restart write and the next
+flush and checks the resumed run's files for duplicate or missing frames and
+rows (§12.2).
+
 Tests (§12.2): save → load → save gives identical files; interrupted and
 uninterrupted runs crossing accepted and rejected swaps and a partly consumed
 noise batch agree bit for bit on CPU float64 and in reproducible mode, and
@@ -1266,16 +1341,30 @@ multiplicity are per-structure inputs with validation.
 The molecular chlorides need D3 for NPT: without it, NbCl5 swells 20% at
 300 K and evaporates at 600 K. Today D3 exists only through `torch-dftd` on
 the ASE path. Implement D3 inside the force field:
-- **Own candidate list, no per-step compaction.** A second skin list with
-  the D3 pair cutoff, rebuilt by the same displacement and strain test, and
-  **stored as a half list** (undirected pairs, i < j, plus self-image pairs
-  once). At 40 bohr plus skin, NbCl5 3×3×3 (≈ 1,600 neighbours per atom at
-  28.8 Å³/atom) has about 3 million directed, i.e. 1.5 million stored,
-  candidate pairs, some 40 times the MACE list. Compacting that every step
-  (prefix sum and copy) would cost more than D3 itself. D3 needs only scalar
-  functions of r_ij, so the kernel iterates over the stored pairs directly
-  with an in-register r² ≤ r_cut² mask and adds each pair's contribution to
-  both atoms.
+- **Own candidate list with its own skin, no per-step compaction.** A
+  second skin list with the D3 pair cutoff. It has its **own skin and its
+  own displacement and strain test** against its own reference positions,
+  not the MACE list's. With the MACE skin (0.3 Å, test `max > skin/2`) the
+  production NbCl5 anneal rebuilt its list 27,697 times in 540,000 steps,
+  once per 19.5 steps averaged over the ramp and more often near 1000 K
+  (`results/anneal-production-rtx5060ti-20261010/NbCl5/metadata.json`,
+  `engine_info/neighbour_rebuilds`). A D3 build enumerates about 40 times
+  the MACE list's candidates through the host-synchronising build path
+  (`build_gpu`: sort on the unique key, pair count read by the host, buffer
+  regrowth), so at that cadence the builds alone would exceed the cost
+  target below. A 2 Å skin raises the pair count by only
+  ((21.2 + 2)/(21.2 + 0.3))³ ≈ 1.25 and cuts the rebuild rate several-fold;
+  rule 11 (§9.3) chooses the D3 skin from `max_temperature_K`, and the plan
+  and provenance record it. The list is **stored as a half list**
+  (undirected pairs, i < j, plus self-image pairs once). At 40 bohr plus the
+  0.3 Å MACE skin, NbCl5 3×3×3 (28.8 Å³/atom; 4/3 π (21.5 Å)³ / 28.8 Å³
+  ≈ 1,440 neighbours per atom) has about 2.8 million directed, i.e.
+  1.4 million stored, candidate pairs; with a 2 Å skin about 1,800
+  neighbours, 3.5 million directed and 1.75 million stored. Either is some
+  40 times the MACE list. Compacting that every step (prefix sum and copy)
+  would cost more than D3 itself. D3 needs only scalar functions of r_ij, so
+  the kernel iterates over the stored pairs directly with an in-register
+  r² ≤ r_cut² mask and adds each pair's contribution to both atoms.
 - **Periodic images.** Like the MACE list today, the D3 list enumerates
   every periodic image within the cutoff (the image range follows from the
   cutoff and the cell widths, `build_gpu`); it makes no minimum-image
@@ -1284,10 +1373,13 @@ the ASE path. Implement D3 inside the force field:
   therefore valid, and no cell-size refusal is needed. Small cells only
   raise the pair count, which the memory estimate (§9.3 rule 12) includes.
 - **Cost target.** At most 10% of the MD step time on NbCl5 3×3×3,
-  measured in phase 3b against the same step without D3 (§16). Three
-  bandwidth-bound passes over 1.5 million pairs move on the order of 150 MB
-  per step; the hybrid NbCl5 step takes about 29 ms on the RTX 5060 Ti
-  (§3.3). The target is provisional until that measurement.
+  **amortised over a run with its builds included**, measured in phase 3b
+  against the same run without D3 on the production ramp (§16). Three
+  bandwidth-bound passes over 1.4–1.75 million pairs move on the order of
+  150–200 MB per step; the hybrid NbCl5 step takes about 29 ms on the
+  RTX 5060 Ti (§3.3), so the per-step budget is about 2.9 ms. The target is
+  provisional until that measurement. D3 build time and rebuild count are
+  runtime counters (§9.6, §13).
 - **Three passes, analytic derivatives.** The C6 coefficients depend on the
   coordination numbers, so the forces need dE/dCN_i of every atom complete
   before they can be propagated through CN. Pass 1: coordination numbers
@@ -1410,18 +1502,18 @@ defective behaviour.
 
 | Class | Runs on | Content |
 | --- | --- | --- |
-| CPU unit | CI (CPU) | rewrite algebra on tiny models (`tiny_mace_calculator`), block linear/grouped/merged, k-vectors, PR 1762 port, neighbour list vs ASE/matscipy, integrator algebra, planner rules and precedence, restart round-trip. Today 294 tests; 8 workers locally (WSL RAM limit), `-n 24` on workstations |
+| CPU unit | CI (CPU) | rewrite algebra on tiny models (`tiny_mace_calculator`), block linear/grouped/merged, k-vectors, PR 1762 port, neighbour list vs ASE/matscipy, integrator algebra, planner rules and precedence, `run` refusing undeclared moves and blocks below `min_mc_temperature_K` (§7.6), restart round-trip. Today 299 tests; 8 workers locally (WSL RAM limit), `-n 24` on workstations |
 | GPU self-check | CI (GPU) + every user run | per-rewrite and per-model checks (§6.4, §12.3) |
 | Energy, force and stress gate | CI (GPU), `fastmace check` | today's rule: production path's max error vs float64 ≤ 2 × the float32 calculator's error, now for energy per atom (float32 yardstick with float64 accumulation, §12.1) as well as forces and stress; rattled and strained cells, hydrostatic and full; all-electron and pseudopotential E0 models; move-energy differences for MC plans (§12.3) |
 | Replay and transitions | CI (GPU) | the production path as executed: captured replay, pipelined and speculative steps; across a neighbour rebuild, a capacity overflow with re-capture, a cell deformation past the rebuild threshold, an accepted and a rejected species change, and a restart, each compared with a fresh direct evaluation of the same state |
-| Mutation events | CI (CPU, GPU) | derived-state registry against fresh construction (§8.5); first MD step after accept and after reject against fresh construction; a superset species with no atoms (its table row from the identity basis, not from atom 0), the last superset species absent (sender-group count), an atom outside the superset (explicit error); a rejected displacement leaves the neighbour list of the committed positions; a displacement beyond skin/2 (> 0.15 Å at the default skin) is evaluated on a list built around the trial geometry, accepted and rejected, without looping; an overflowing displacement is redone with the same random numbers; the first NPT step after an accepted move equals a fresh construction (`force_eps` refreshed), hydrostatic and full cell |
+| Mutation events | CI (CPU, GPU) | derived-state registry against fresh construction (§8.5); first MD step after accept and after reject against fresh construction; a superset species with no atoms (its table row from the identity basis, not from atom 0), the last superset species absent (sender-group count), an atom outside the superset (explicit error); a rejected displacement leaves the neighbour list of the committed positions; a displacement beyond skin/2 (> 0.15 Å at the default skin) is evaluated on a list built eagerly around the trial geometry, accepted and rejected, without looping, and its ΔE equals a direct evaluation; an overflowing displacement is redone with the same random numbers; the first NPT step after an accepted move equals a fresh construction (`force_eps` refreshed), hydrostatic and full cell; a ramp step changes the target without an event (no quiesce, §8.5) |
 | Runtime state | CI (GPU) | runtime-state registry against the attributes each stage mutates; full registered state identical before and after every capture warm-up, sticky flags included (§8.1) |
 | MC exact enumeration | CI (CPU tiny model; GPU) | a small cell at fixed positions (e.g. 8 sites, 4 + 4 atoms: 70 configurations; transmutation: 256), all configurations evaluated with the reference: per-move acceptance probabilities against the reference ΔE (including the first attempt after MD, whose baseline comes from the MC evaluator), and sampled populations against Boltzmann weights (χ² test, fixed seed). Hybrid MD/MC: kinetic temperature with MC on and off agrees for `exchange`, `rescale`, `redraw` and (with `fixcm`) `redraw_all`, and the total momentum stays zero under `fixcm`; a negative control with unchanged velocities must fail. Charge/spin: a set violating the parity rule is refused (§10.4) |
-| Restart | CI (CPU, GPU) | §10.6: round trip; interrupted vs uninterrupted (same restart cadence) across accepted and rejected swaps, a partly consumed noise batch, a variable-cell run with h ≠ h₀ at the restart step, a count-overflow redo before it, and a D3 list |
+| Restart | CI (CPU, GPU) | §10.6: round trip; interrupted vs uninterrupted (same restart cadence) across accepted and rejected swaps, a partly consumed noise batch, a variable-cell run with h ≠ h₀ at the restart step, a count-overflow redo before it, and a D3 list; a crash between a restart write and the next output flush leaves the resumed run's trajectory and thermo files without duplicate or missing frames and rows (chunks deleted, nothing rewritten) |
 | Reproducibility | CI (GPU) | in reproducible mode, repeated runs and restarts bit for bit (§9.3) |
 | Isolation | CI (GPU) | A → B → A with two crystals for the plain, MH-1 and polar paths (§8.7) |
 | Fallback | CI (GPU) | deliberately broken rewrite and broken capture: eager diagnosis, bisection, pristine rebuild, validated activation (§9.4) |
-| ASE equivalence | CI (GPU) | Langevin: same seed reproduces ASE's noise stream (NaCl 9 ps: same T and E_pot in every 50 K bin, |ΔPE| < 0.01 meV/atom); BAOAB: the ASE variant (`ASE_TRACE_DRAG_ALL_ELEMENTS=True`) vs ASE `LangevinBAOAB` exactly, and the corrected production variant vs an independent corrected reference (§12.1); new integrators vs reference implementations |
+| ASE equivalence | CI (GPU) | Langevin: same seed reproduces ASE's noise stream (NaCl 9 ps: same T and E_pot in every 50 K bin, \|ΔPE\| < 0.01 meV/atom); BAOAB: the ASE variant (`ASE_TRACE_DRAG_ALL_ELEMENTS=True`) vs ASE `LangevinBAOAB` exactly, and the corrected production variant vs an independent corrected reference (§12.1); new integrators vs reference implementations |
 | Statistical | nightly | long MD: distributions of T, E, P, V vs float64 stock ASE; hybrid runs are compared statistically, not bitwise |
 | Performance | nightly | step-time suite (§12.5); regressions > 3% flagged (cross-process noise is about 3%; compare small effects with alternating A/B in one process) |
 
@@ -1441,9 +1533,11 @@ defective behaviour.
 - for MC plans, move-energy differences ΔE for sample moves of every enabled
   type (each swap pair, transmutation to every superset species including
   those absent at setup, displacements):
-  `|ΔE_prod − ΔE_ref| ≤ 0.01 k_B T_min`, with T_min the lowest temperature
-  at which the run attempts MC moves. Acceptance probabilities are then off
-  by at most about 1%. There is deliberately no ratio term: what matters is
+  `|ΔE_prod − ΔE_ref| ≤ 0.01 k_B T_min`, with T_min =
+  `Workload.min_mc_temperature_K` (§9.2), declared at construction because
+  the gate runs before any schedule is known; `run` refuses an MC block
+  whose target temperature is below it (§7.6). Acceptance probabilities are
+  then off by at most about 1%. There is deliberately no ratio term: what matters is
   the error in acceptance, not parity with float32. Stock float32 totals are
   spaced about 2 meV apart for NbCl5 3×3×3 (§10.4), and even with float64
   accumulation, twice the float32 forward error bears no relation to
@@ -1520,8 +1614,9 @@ Every run writes `metadata.json` with:
   parameters, schedule. Full generator states and prefetched random batches
   live only in the restart file (§10.6), not in `metadata.json`;
 - gate status (§12.3) and self-check results;
-- re-capture and rebuild counts, overflows redone, tier switches, MC
-  counters, timing summary;
+- re-capture counts; rebuild counts and build times per neighbour list
+  (MACE, D3) with their skins; overflows redone; tier switches; MC counters;
+  restart points with their output chunk indices (§10.6); timing summary;
 - code version (package version + git hash when installed from source).
 
 This is today's provenance block, made complete and schema-versioned.
@@ -1538,15 +1633,22 @@ This is today's provenance block, made complete and schema-versioned.
   `fm.load` downloads from official sources and shows the model licence.
 - **Extras:** `fastmace[oeq]`, `fastmace[polar]` (graph-longrange pinned per
   MACE version), `fastmace[d3]` (until native D3), `fastmace[dev]`.
-- **No `nvcc` at install or run time:**
+- **No `nvcc` at install or run time, and no compiler on the default path:**
   - The streaming kernels already compile through NVRTC.
-  - OEq's host extension needs a build path without `nvcc` (today:
-    `oeq_no_nvcc.sh` with runtime headers, per-process extension directory,
-    `OEQ_EXTENSION_SEED`, lock-file workaround for OEq 0.7/torch 2.14).
-  - Either ship prebuilt OEq extension wheels per torch/CUDA, or upstream the
-    fix to OEq.
-  - Whichever is chosen, `main.py`'s refusal to run without the wrapper must
-    disappear.
+  - "No `nvcc`" is not "no compiler". OEq's host extension today needs a
+    host toolchain (`studies/hybrid_oeq/scripts/oeq_no_nvcc.sh`): `g++`,
+    ninja (`OEQ_JIT_EXTENSION=1`, `MAX_JOBS`), the CUDA runtime headers
+    (`cuda.h`, `nvrtc.h`, CCCL) from the pip runtime wheels, a sentinel in
+    place of `nvcc`, a per-process extension directory, `OEQ_EXTENSION_SEED`
+    and the lock-file workaround for OEq 0.7/torch 2.14.
+  - 1.0 ships prebuilt OEq host-extension wheels per torch/CUDA build, so
+    `fastmace[oeq]` needs no compiler. The host-toolchain build stays as a
+    documented fallback for other builds (§4.1); `fastmace info` reports
+    which of the two is in use and what the fallback is missing. Upstreaming
+    the no-`nvcc` build to OEq (§16, phase 6) reduces what the wheels must
+    carry.
+  - Whichever path is active, `main.py`'s refusal to run without the wrapper
+    must disappear.
 - **Caches:**
   - Triton and Inductor caches, the OEq extension cache and compile caches go
     under a configurable cache root (`FASTMACE_CACHE`), never inside
@@ -1583,13 +1685,13 @@ workstation GPU.
 | --- | --- | --- | --- |
 | 0. Skeleton | repo layout, packaging, CI (CPU), licence, port CPU tests | `pip install -e .`; CPU suite green | 1 week |
 | 1a. Extraction | `model`, `rewrites` (registry with today's catalogue), `neighbors`, `state`, `engine.graph`, `integrators.langevin`/`baoab`, behind the planner interface with one fixed plan (today's `main.py` defaults); no globals, no NAS or experiment imports, no wrapper script | against a frozen research-engine revision on the same machine and configuration, in alternating A/B blocks: steady-state step time within 3%, setup time and peak memory reported; today's force/stress gate passes for all 14 models; `Experiments/Langevin_Thermostat/main.py` runs on top of FastMACE | 3–4 weeks |
-| 1b. Contracts | rule-based minimal planner (hard constraints, mode and backend choice, `Plan` record with revisions; no runtime adaptation); float64 energy accumulation (§7.3); runtime-state registry and complete capture restore (§8.1); complete state and restart with canonical restart points (§10.6); reference policy (§12.1) with the BAOAB integrator correction qualified against an independent corrected reference; gate with energy, floors and captured replay (§12.3); exceptions and checkpoint trust (§7.6) | gate passes for all 14 models, energy included (POLAR-1 and OMOL-0 energies within the gate instead of 45–102 meV/atom off); registry and capture-state CI checks pass; restart round trip, interrupted vs uninterrupted with the same cadence (bitwise on CPU float64, statistical for hybrid) | 3–4 weeks |
-| 2. Safety | self-checks, gate statuses and resource policy (§12.3), fallback algorithm with ddmin and gate budget (§9.4), subprocess runner (§8.7), versioned registry, instance isolation (§8.7), provenance schema, GPU CI; qualification of `reproducible=True` for one family (plain cuEq, MH-1) | unknown MACE version runs the reference path cleanly; a deliberately broken rewrite, a broken pair of interacting rewrites and a broken capture each end in the correct validated fallback within the budget; A → B → A passes; CI on two GPU architectures; reproducible mode bitwise on repeated and restarted runs, or recorded as not qualifiable with the blocking kernel named | 3–4 weeks |
-| 3. Dynamic topology and MC | species superset, derived-state registry, transactional events (§8.5), overflow before commit, re-capture policy, adaptive skin and headroom, compiled-tier path; energy-only graph; MC driver (swap, transmutation, displacement; MC-evaluator baseline per block; displacement trials rebuilt around the trial geometry; fixed-shape selection; `exchange`/`rescale`/`redraw`/`redraw_all`; charge/spin parity), move-energy gate with MC energy precision, MC restart state | species-change events (no energy evaluation) every 100 steps at 1500 K keep ≥ 90% of fixed-species step speed; MC attempt cost reported separately as a fraction of an MD step, in float32 and float64; ΔE errors of float32 forwards measured on MH-1 and an all-electron model; first MD step after accept and reject equals fresh construction; exact-enumeration test passes; interrupted vs uninterrupted across accepted swaps; swap-MC annealing protocol runs end to end | 5–6 weeks |
-| 3b. NPT for the chlorides | GPU D3 in the force field (§11.2): own candidate list without per-step compaction, three-pass kernel with analytic derivatives (including the CN chain term) and stress, deformation-aware rebuild test; D3 in the BAOAB NPT path; constant-pressure melt–quench protocol | D3 against `torch-dftd` and `dftd3`; GPU NPT + D3 against the independent implementation (§11.2); the NbCl5 NPT melt–quench protocol runs end to end. Its physical outcome is recorded, not judged (decision 6, §18) | 3–4 weeks |
+| 1b. Contracts | rule-based minimal planner (hard constraints, mode and backend choice, `Plan` record with revisions; no runtime adaptation); `Simulation` taking a `ForceField`, the reduced `Workload` and the `run` checks (§7.6, §9.2); float64 energy accumulation (§7.3); runtime-state registry and complete capture restore (§8.1); complete state and restart with canonical restart points and output chunks at restart points (§10.6); reference policy (§12.1) with the BAOAB integrator correction qualified against an independent corrected reference; gate with energy, floors and captured replay (§12.3); exceptions and checkpoint trust (§7.6) | gate passes for all 14 models, energy included (POLAR-1 and OMOL-0 energies within the gate instead of 45–102 meV/atom off); registry and capture-state CI checks pass; restart round trip, interrupted vs uninterrupted with the same cadence (bitwise on CPU float64, statistical for hybrid); a crash between a restart write and the next flush resumes without duplicate frames | 3–4 weeks |
+| 2. Safety | self-checks, gate statuses and resource policy (§12.3), fallback algorithm with ddmin, diagnosis budget and terminal sequence (§9.4), subprocess runner through a restart write (§8.7), versioned registry, instance isolation (§8.7), provenance schema, GPU CI; qualification of `reproducible=True` for one family (plain cuEq, MH-1) | unknown MACE version runs the reference path cleanly; a deliberately broken rewrite, a broken pair of interacting rewrites and a broken capture each end in the correct validated fallback within the budget, and an exhausted budget ends in the terminal sequence; A → B → A passes; CI on two GPU architectures; reproducible mode bitwise on repeated and restarted runs, or recorded as not qualifiable with the blocking kernel named | 3–4 weeks |
+| 3. Dynamic topology and MC | species superset, derived-state registry, transactional events (§8.5; scheduled targets as device-scalar fills), overflow before commit, re-capture policy, adaptive skin and headroom (rule 11, displacement skin), compiled-tier path; energy-only graph; MC driver (swap, transmutation, displacement; MC-evaluator baseline per block; displacement trials rebuilt eagerly around the trial geometry; fixed-shape selection; `exchange`/`rescale`/`redraw`/`redraw_all`; charge/spin parity), move-energy gate with `min_mc_temperature_K` and MC energy precision, MC restart state | species-change events (no energy evaluation) every 100 steps at 1500 K keep ≥ 90% of fixed-species step speed; MC attempt cost reported separately as a fraction of an MD step, in float32 and float64, for swaps and for displacements with and without a trial rebuild; ΔE errors of float32 forwards measured on MH-1 and an all-electron model; first MD step after accept and reject equals fresh construction; exact-enumeration test passes; interrupted vs uninterrupted across accepted swaps; swap-MC annealing protocol runs end to end | 5–6 weeks |
+| 3b. NPT for the chlorides | GPU D3 in the force field (§11.2): own candidate list with its own skin and without per-step compaction, three-pass kernel with analytic derivatives (including the CN chain term) and stress, own deformation-aware rebuild test; D3 in the BAOAB NPT path; constant-pressure melt–quench protocol | D3 against `torch-dftd` and `dftd3`; GPU NPT + D3 against the independent implementation (§11.2); amortised D3 cost with builds included measured against the 10% target on the production ramp; the NbCl5 NPT melt–quench protocol runs end to end. Its physical outcome is recorded, not judged (decision 6, §18) | 3–4 weeks |
 | 4. Physics | NVE, CSVR, NHC, MTK, Berendsen; GPU FIRE/LBFGS, fixed and variable cell; `FixAtoms` | ASE-equivalence tests; GPU LBFGS reproduces the annealing-benchmark minima | 3–4 weeks |
 | 5. Planner completion | remaining rules of §9.3 and their precedence, runtime adaptation (§9.6), optional calibration, `str(plan)` | each rule and the precedence order have a test | 1–2 weeks |
-| 6. Release | docs, examples, benchmark tables, PyPI, upstream PRs (MACE: linear rewrites, reassociation; OEq: no-`nvcc` host build) | 1.0 tagged; docs build; install from PyPI on a clean machine | 2–3 weeks |
+| 6. Release | docs, examples, benchmark tables, PyPI, prebuilt OEq host-extension wheels (§14), upstream PRs (MACE: linear rewrites, reassociation; OEq: no-`nvcc` host build) | 1.0 tagged; docs build; `pip install fastmace[oeq]` on a clean machine without a compiler | 2–3 weeks |
 
 The total is about 24–32 weeks (6–8 months) to 1.0, up from 4–5 months in
 draft 0.1. The planner, restart and reference contracts and the MC driver
@@ -1597,9 +1699,12 @@ came before the dynamic-topology milestone in draft 0.2. Draft 0.3 added
 float64 energy accumulation, the runtime-state registry, the energy-only
 graph, the MC energy-precision measurement and a dedicated D3 kernel.
 Draft 0.4 split phase 1 and added the subprocess runner, the API contracts
-and the reproducible-mode qualification. **These estimates are floors** for
-one developer: they assume the research engine's code moves with few
-surprises.
+and the reproducible-mode qualification. Draft 0.6 changed no estimate: its
+items (API ownership, output chunks, the terminal fallback sequence, the D3
+skin, the displacement path) are small inside the phases that already hold
+them, and the prebuilt OEq wheels fall into phase 6. **These estimates are
+floors** for one developer: they assume the research engine's code moves
+with few surprises.
 
 The first production deliverable is phases 0–3b (18–23 weeks, about 4.5–6
 months): NVT and constant-pressure melt–quench and atom exchange on the
@@ -1650,6 +1755,10 @@ deterministic.
 | Positioning vs existing tools (TorchSim batched MLIP MD; MACE's LAMMPS ML-IAP) | FastMACE's distinct value: exact model-level rewrites plus graph-speed single-structure MD with dynamic species; re-check competitors' feature sets before 1.0 and consider offering the force field as a backend to them |
 | Licensing of dependencies and models | §14; licence display at load |
 | Name clash on PyPI | check before phase 6 |
+| D3 list rebuilds at high T cost more than D3 itself (27,697 MACE-list rebuilds in the 540,000-step NbCl5 anneal) | own skin and rebuild test for the D3 list; amortised cost target with builds included; build time counted (§11.2) |
+| Output files ahead of the last restart point are duplicated or forked on resume | outputs chunked at restart points; resume deletes chunks, never rewrites (§10.6) |
+| Displacement MC spends its time in eager trial rebuilds | skin from rule 11; cost reported with and without a rebuild (§10.4) |
+| A fallback diagnosis that never ends, or ends nowhere | diagnosis budget and the terminal sequence: rewrites off, eager, reference, refuse (§9.4) |
 
 Open decisions for the owner:
 1. Repository — **decided (user, 16 October 2026): inside ResearchModule as
@@ -1805,3 +1914,30 @@ adopted:
 **Owner decision (16 October 2026, after draft 0.5).** The force and stress
 gate floors of draft 0.4 (1 × 10⁻⁵ eV/Å, 1 × 10⁻⁷ eV/Å³) are accepted
 (decision 7, §12.3).
+
+**Draft 0.6 (16 October 2026)** answers a fifth review, of draft 0.5, that
+checked the spec against `gpu_langevin.py`, `gpu_npt.py`, `pair_search.py`,
+`workflow.py`, `oeq_no_nvcc.sh`, the production annealing metadata and the
+uncommitted working tree. The review found the physics and numerical
+contracts consistent (MC acceptance algebra and the μ convention, E0 figures
+and float32 ulps, the float64-reduction gradient, the kinetic-stress split
+in `gpu_npt.py`, the deterministic GPU build, the frozen sender groups) and
+twelve gaps between sections; all twelve were adopted (owner decision,
+16 October 2026).
+
+| Finding | Check | Where answered |
+| --- | --- | --- |
+| A. `Simulation` takes a model, so the superset the `ForceField` owns cannot be declared on that path; `Workload.precision`, `ensemble`, `cell`, `needs_stress` duplicate the `ForceField` and the integrator; `run(mc=…)` undefined for undeclared moves | §7.2 example used only species present at setup; rule 10 "selects" an integrator the user already passed | §7.2 example; §7.6 Simulation inputs; §9.2 reduced `Workload`; §9.3 rules 1, 2, 10 |
+| B. `atom_count_changes` had a tier and a rule but no 1.0 move, integrator or restart entry | §2, §9.2, rule 7 versus §10.4, §5, §17 | §2 row; §8.6; §9.3 hard rule 7 (refused in 1.0) |
+| C. A 12-run gate budget cannot finish ddmin over ~16 rewrites, and an exhausted budget had no defined end | n log n ≈ 64 reduced-gate runs typical | §9.4 step 2: 64 reduced-gate runs, terminal sequence (rewrites off, eager, reference, refuse); step 5 |
+| D. Output files written after the last restart point were not reconciled; today's resume rewrites the whole trajectory | `workflow.truncate_outputs` (`workflow.py:824`) rereads and rewrites `md.traj` | §10.6 output chunks at restart points; §5; §8.7 subprocess transport; §12.2 restart row; §13 |
+| E. The D3 list shared the MACE skin, so its builds (40× the candidates, host-synchronising) would exceed the 10% target | 27,697 rebuilds in 540,000 steps (`anneal-production-rtx5060ti-20261010/NbCl5`); `build_gpu` syncs on the pair count | §11.2 own skin and test, amortised target, corrected pair counts (≈ 1,440 neighbours, 2.8 million directed at the MACE skin); §9.3 rule 11; §9.6; §13; §16 phase 3b |
+| F. "One attempt is a capturable graph" also covered displacement trials that need a rebuild, which the GPU build cannot do inside a capture | `candidate_pairs` reads `counter.item()`, `build_gpu` reads `int(keep.sum())` and may reallocate | §10.4 graph capture scoped to swaps and transmutations; §8.5 step 4; §9.3 rule 11; §12.2; §16 phase 3 |
+| G. A thermostat-target change was listed as an event while ramps change the target every step | today `set_temperature` fills the device scalar `sqrt_kT` (`gpu_langevin.py:2204`); `c3_unit`, `c4_unit`, `c5_unit` depend on friction and masses only | §8.5 transaction contract (scheduled targets are device-scalar fills); §7.6; §10.1 |
+| H. The move-energy gate needs T_min before `run` provides the schedule | `Workload` had `max_temperature_K` only | §9.2 `min_mc_temperature_K`; §12.3; §7.6 `run` refusal |
+| I. "No `nvcc`" promised without listing the host toolchain the OEq extension needs | `oeq_no_nvcc.sh`: `g++`, ninja, runtime header wheels, `nvcc` sentinel | §14 prebuilt wheels as the 1.0 path, toolchain fallback documented; §4.1 row; §16 phase 6 |
+| J. §6.1 classified every adopted rewrite as "rounding", against its own definition for `sort_receivers`, `async_output`, `fold_cutoff`; no exactness column | definition: exact = identical up to summation order | §6.1 wording; §6.2 exactness column (initial classification; the self-check record is authoritative) |
+| K. Wording overtaken by the working tree: single-graph strain and the naive-cuEq guard are adopted; counts stale | uncommitted AGENTS.md and `langevin/upstream_mace.py`; `workflow.py` 1,440 lines; 299 tests | §6.2 `single_graph_strain` default `auto`; §9.2; §3.1 (new `upstream_mace.py` row) |
+| L. Security nits: YAML loader unspecified; subprocess transport unspecified | — | §10.5 `safe_load`; §8.7 and §9.4 restart write as transport |
+
+Estimates unchanged (§16). Four risks added (§18).
