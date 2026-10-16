@@ -1434,10 +1434,10 @@ defective behaviour.
 - energy per atom, forces and stress: the ratio rule of §12.2 (energy
   against the float32 yardstick with float64 accumulation, §12.1). Each
   quantity has an absolute floor so that the rule stays stable where the
-  float32 yardstick happens to be nearly exact: 0.01 meV/atom for energy
-  (accepted, decision 7), and, proposed, 1 × 10⁻⁵ eV/Å for the maximum
-  force component and 1 × 10⁻⁷ eV/Å³ (≈ 16 kPa) for the maximum stress
-  component, both well below the float32 errors recorded so far;
+  float32 yardstick happens to be nearly exact: 0.01 meV/atom for energy,
+  1 × 10⁻⁵ eV/Å for the maximum force component and 1 × 10⁻⁷ eV/Å³
+  (≈ 16 kPa) for the maximum stress component (all accepted, decision 7),
+  the latter two well below the float32 errors recorded so far;
 - for MC plans, move-energy differences ΔE for sample moves of every enabled
   type (each swap pair, transmutation to every superset species including
   those absent at setup, displacements):
@@ -1672,9 +1672,9 @@ Open decisions for the owner:
 7. Gate floors — **accepted (user, 16 October 2026):** 0.01 meV/atom for
    total energy and 0.01 k_B T_min for move-energy differences (§12.3). With
    them, the ΔE rule became the floor alone and the MC path sums energies in
-   float64 (§10.4), because float32 totals cannot resolve the floor. Draft
-   0.4 proposes floors for forces (1 × 10⁻⁵ eV/Å) and stress
-   (1 × 10⁻⁷ eV/Å³) as well (§12.3); these await confirmation.
+   float64 (§10.4), because float32 totals cannot resolve the floor. The
+   floors for forces (1 × 10⁻⁵ eV/Å) and stress (1 × 10⁻⁷ eV/Å³) proposed
+   in draft 0.4 were **accepted too (user, 16 October 2026)** (§12.3).
 
 ---
 
@@ -1801,3 +1801,7 @@ adopted:
 | D3 with two passes cannot complete dE/dCN_i before propagating it to forces | C6 depends on CN; the chain term needs all pairs of atom i first | §11.2 three passes with a kernel boundary; cost estimate ~150 MB per step. The reviewer's 0.0013 eV/Å force effect is cited, not re-measured |
 | Accepted MC moves leave BAOAB's `force_eps` stale | `_update_force_eps` reads the stress and the kinetic energy or tensor; `_stage_a` consumes it first | §8.5 step 6: fixed refresh order, integrator caches in the derived-state registry; first-NPT-step test, both cell modes |
 | Copying the ASE trajectory tests would not qualify production BAOAB | `gpu_npt.py` multiplies the trace term by the identity (Quigley–Probert Eq. 5b); ASE 3.27 adds it to all nine elements; the tests patch `ASE_TRACE_DRAG_ALL_ELEMENTS=True` | §12.1 fourth kind of entry, integrator corrections; §12.2 two-part BAOAB qualification; §16 phase 1b |
+
+**Owner decision (16 October 2026, after draft 0.5).** The force and stress
+gate floors of draft 0.4 (1 × 10⁻⁵ eV/Å, 1 × 10⁻⁷ eV/Å³) are accepted
+(decision 7, §12.3).
