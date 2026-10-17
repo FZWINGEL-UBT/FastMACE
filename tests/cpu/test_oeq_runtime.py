@@ -1,4 +1,4 @@
-"""The OEq runtime plan (fastmace/kernels/_oeq_runtime.py, plan task 1a-T00): pure environment computation.
+"""The OEq runtime plan (fastmace/kernels/_oeq_runtime.py, plan tasks 1a-T00 and 1a-T05): pure environment computation.
 
 A fake cu13 wheel directory and driver in tmp_path; nothing is imported from
 torch or OpenEquivariance and nothing touches a GPU.
@@ -62,7 +62,6 @@ def test_plan_links_headers_libraries_and_driver(tmp_path):
         assert plan.links[lib64 / f"lib{name}.so"] == runtime / "lib" / f"lib{name}.so.13"
     assert [p.name for p in plan.preload] == ["libcudart.so.13", "libnvrtc.so.13", "libcublasLt.so.13",
                                               "libcublas.so.13"]
-    assert plan.loader_path.split(os.pathsep) == [str(runtime / "lib"), str(driver.parent)]
 
 
 def test_plan_keeps_user_settings(tmp_path):
@@ -70,7 +69,6 @@ def test_plan_keeps_user_settings(tmp_path):
     plan, runtime, driver, cache = make_plan(tmp_path, environ)
     assert plan.environment["MAX_JOBS"] == "2"
     assert plan.environment["CPATH"].split(os.pathsep) == [str(runtime / "include" / "cccl"), "/inc"]
-    assert plan.loader_path.split(os.pathsep)[-1] == "/l"
     assert environ == {"PATH": "/a", "CPATH": "/inc", "MAX_JOBS": "2", "LD_LIBRARY_PATH": "/l"}  # unchanged
 
 
@@ -123,4 +121,21 @@ def test_materialize_is_idempotent(tmp_path):
 def test_prepare_refuses_after_openequivariance_import(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "openequivariance", object())
     with pytest.raises(runtime_module.OEqRuntimeError, match="already imported"):
+        runtime_module.prepare_in_process(tmp_path, environ={})
+
+
+def test_promoted_module_has_only_the_in_process_entry_point():
+    # 1a-T05 removed the spike's re-exec and launcher candidates (plan, conductor decisions after wave 0).
+    for name in ("prepare_by_reexec", "main", "PREPARED_VARIABLE"):
+        assert not hasattr(runtime_module, name)
+    assert callable(runtime_module.prepare_in_process)
+    assert "loader_path" not in runtime_module.RuntimePlan.__dataclass_fields__
+
+
+@pytest.mark.parametrize("module", ["openequivariance", "torch.utils.cpp_extension"])
+def test_prepare_names_the_module_imported_too_early(tmp_path, monkeypatch, module):
+    fake = type("Module", (), {"CUDA_HOME": "/usr/local/cuda"})()
+    monkeypatch.delitem(sys.modules, "openequivariance", raising=False)
+    monkeypatch.setitem(sys.modules, module, fake)
+    with pytest.raises(runtime_module.OEqRuntimeError, match=module.replace(".", r"\.")):
         runtime_module.prepare_in_process(tmp_path, environ={})
