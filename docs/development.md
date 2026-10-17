@@ -39,3 +39,23 @@ CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environmen
 
 Never install FastMACE into the GPU environments; GPU runs use
 `PYTHONPATH=<checkout>` with the environment's Python (AGENTS.md).
+
+## Bitwise equality in CPU float64 tests
+
+Found in task 0-T04 (17 October 2026, `fastmace_cpu`, torch 2.14.1+cpu,
+MACE 0.3.16). On CPU with more than one OpenMP thread, the **first model
+evaluated in a process** gives results that differ from every later model by
+about 2e-17 relative (1 force component in 192 on a tiny NaCl model). It does
+so even when the weights are bitwise equal. Repeated evaluations of one
+model are bitwise equal, and all later models agree bitwise with each other.
+The difference disappears with `OMP_NUM_THREADS=1`, with TorchScript's
+profiling executor disabled (`torch._C._jit_set_profiling_executor(False)`),
+or after one throwaway evaluation in the process.
+
+For equivalence tests (FastMACE against the research engine, phase 1a), use
+either of these:
+
+- compare at `rtol=1e-12` (forces also `atol=1e-14`) in float64; or
+- run one throwaway evaluation in the process before comparing bitwise.
+
+Do not compare the first evaluation of a process bitwise against anything.

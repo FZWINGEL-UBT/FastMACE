@@ -2091,7 +2091,9 @@ This is today's provenance block, made complete and schema-versioned.
     (one, the OEq extension build, fatal on a broken client). FastMACE must
     therefore (a) make `filelock.FileLock` a `SoftFileLock` before torch is
     imported, at `import fastmace`, (b) set `CUDA_CACHE_DISABLE=1` when
-    `CUDA_CACHE_PATH` lies on NFS unless the user set it, and (c) record the
+    the CUDA driver cache directory lies on NFS (`CUDA_CACHE_PATH`, or the
+    driver's default `~/.nv/ComputeCache` when that is unset; NFS detected
+    from `/proc/self/mounts`) unless the user set it, and (c) record the
     lock mode in the provenance (§13); an opt-out restores kernel locks. The
     research engine does this since 16–17 October 2026 (zero NFS lock
     requests per run, no start-up cost;
@@ -2545,3 +2547,6 @@ licence MIT (§14, §18). No other change.
 **Draft 0.12, second amendment (17 October 2026):** owner decision 1
 changed: FastMACE moved from `ResearchModule/FastMACE/` to its own
 repository `FZWINGEL-UBT/FastMACE` on an NVMe drive (§18). No content change.
+
+**Draft 0.12, third amendment (17 October 2026):** §14 (b) states which
+driver cache directory the NFS rule checks (task 0-T03). No other change.

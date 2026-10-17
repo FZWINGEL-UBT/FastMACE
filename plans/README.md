@@ -6,7 +6,7 @@ phase before it is under way, not all in advance. Worker rules are in
 
 | Phase | Plan | Status |
 | --- | --- | --- |
-| 0. Skeleton | [phase-0.md](phase-0.md) | planned (17 October 2026) |
+| 0. Skeleton | [phase-0.md](phase-0.md) | T01–T05 merged (17 October 2026); T06 (CI), T07 (NAS) open |
 | 1a. Extraction | [phase-1a.md](phase-1a.md) | planned (17 October 2026) |
 | 1b. Contracts | — | written during 1a |
 | 2. Safety | — | |
