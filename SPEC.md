@@ -2044,7 +2044,8 @@ This is today's provenance block, made complete and schema-versioned.
 
 - **Name:** `fastmace`. Check PyPI and GitHub for clashes before the first
   release; the import name and CLI follow.
-- **Licence:** MIT (compatible with MACE). Vendored OEq kernels keep their
+- **Licence:** MIT (compatible with MACE; owner decision 4, 17 October
+  2026). Vendored OEq kernels keep their
   BSD-3 licence and notice. The cuEquivariance ops wheels are NVIDIA-licensed:
   depend on them, do not vendor them. Model weights are never redistributed;
   `fm.load` downloads from official sources and shows the model licence.
@@ -2224,7 +2225,7 @@ Open decisions for the owner:
 3. Whether the gate on the user's structure is on by default (recommended) or
    opt-in, and whether an `unavailable` gate refuses the run by default
    (proposed, §12.3) or only warns.
-4. Licence choice (MIT proposed).
+4. Licence — **decided (user, 17 October 2026): MIT** (§14).
 5. Which GPUs to provide as CI runners (local RTX 5060 Ti, a workstation
    RTX 4000 Ada).
 6. Constant-pressure melt–quench of the chlorides — **decided (user,
@@ -2525,3 +2526,6 @@ licence was checked against the ACEsuit `mace-foundations` model table.
 | Report: "printed at setup" versus "filled in once measured" | §7.7 | §7.7: two-stage report, `speed: pending` at setup, one line when measured, whole-run mean at the end |
 
 Estimates unchanged (§16).
+
+**Draft 0.12, amendment (17 October 2026):** owner decision 4 recorded,
+licence MIT (§14, §18). No other change.

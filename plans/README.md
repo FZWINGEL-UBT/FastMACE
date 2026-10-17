@@ -16,7 +16,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | 5. Planner completion | — | |
 | 6. Release | — | |
 
-Open owner decisions that phases wait on (SPEC §18): licence (4, phase 0),
+Open owner decisions that phases wait on (SPEC §18; licence decided: MIT):
 minimum MACE version (2, by phase 2), gate default (3, phase 1b), CI GPU
 runners (5, phase 2).
 

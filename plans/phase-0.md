@@ -25,12 +25,12 @@ In detail:
 Phase 0 copies no engine code. It depends on none of the contract wording,
 so it can run while the phase 1a design (1a-T01, 1a-T02) is being written.
 
-## Owner decision needed first
+## Owner decisions
 
-- **Licence (SPEC §18 decision 4).** §14 proposes MIT. Needed for T01's
-  `LICENSE` and `pyproject.toml`. If it is not decided when T01 starts, T01
-  leaves `LICENSE` out and marks the `license` field `TODO`; nothing else
-  waits on it.
+- **Licence: MIT** (SPEC §18 decision 4, decided 17 October 2026). T01
+  writes `LICENSE` (MIT, copyright Fabian Zwingel) and sets
+  `license = "MIT"` in `pyproject.toml`. The vendored OEq kernels keep
+  their BSD-3 licence (SPEC §14).
 
 ## Tasks
 
@@ -41,7 +41,7 @@ sections, files it owns, tests to write first, done-when.
 
 - Spec: §5 (layout), §4.1 (dependency pins), §14 (name, extras).
 - Files: `FastMACE/pyproject.toml`, `FastMACE/README.md`, `FastMACE/LICENSE`
-  (after decision 4), `FastMACE/fastmace/__init__.py` (`__version__ =
+  (MIT), `FastMACE/fastmace/__init__.py` (`__version__ =
   "0.0.1.dev0"`), one `__init__.py` with a one-line docstring per subpackage
   of §5 (`model`, `rewrites`, `kernels`, `neighbors`, `integrators`, `mc`,
   `optimize`, `engine`, `planner`, `reference`, `longrange`, `io`,
