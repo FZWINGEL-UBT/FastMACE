@@ -1,6 +1,6 @@
 """SimulationState: the device-resident physical state of one structure (SPEC §10.6, docs/design/interfaces.md).
 
-Phase 1a stub (plan task 1a-T02); 1a-T12 fills it. The state holds tensors at fixed device
+Phase 1a (plan tasks 1a-T02 and 1a-T12). The state holds tensors at fixed device
 addresses: every update is in place (``copy_``, ``add_``), never a rebinding, because the CUDA
 graphs of the engine capture those addresses. Integrators read and write it during the half
 steps; the engine writes the force results of each step into it; nothing else changes it
@@ -90,16 +90,34 @@ class SimulationState:
         """Build the state from an ASE ``Atoms`` (positions, velocities, masses, cell, numbers).
 
         Forces and energy start as zeros; the engine fills them with the initial evaluation.
-        ``compute_stress`` allocates ``stress``. Refuses constraints (SPEC §4.4).
+        ``compute_stress`` allocates ``stress``. Refuses constraints (SPEC §4.4). The noise batch is
+        left to the integrator, whose layout it is.
         """
-        raise NotImplementedError("1a-T12")
+        if atoms.constraints:
+            raise ValueError("Constraints are not supported (SPEC §4.4)")
+        import numpy as np  # here, so that importing the interfaces stays cheap (no torch)
+        import torch
+
+        f64 = dict(dtype=torch.float64, device=device)
+        positions = torch.tensor(atoms.get_positions(), **f64)
+        return cls(
+            positions=positions,
+            velocities=torch.tensor(atoms.get_velocities(), **f64),
+            masses=torch.tensor(atoms.get_masses()[:, None], **f64),
+            cell=torch.tensor(atoms.cell.array, **f64),
+            species=torch.tensor(atoms.numbers, dtype=torch.int64, device=device),
+            forces=torch.zeros_like(positions),
+            energy=torch.zeros(1, **f64),
+            stress=torch.zeros((3, 3), **f64) if compute_stress else None,
+            rng=RandomStream(np.random.default_rng(seed)),
+        )
 
     @property
     def natoms(self) -> int:
         """Number of atoms N."""
-        raise NotImplementedError("1a-T12")
+        return self.positions.shape[0]
 
     @property
     def momenta(self) -> torch.Tensor:
         """``velocities * masses``: a new tensor, the same expression as the baseline's output path."""
-        raise NotImplementedError("1a-T12")
+        return self.velocities * self.masses

@@ -116,10 +116,8 @@ def test_engine_methods_are_abstract():
 
 def test_stubs_raise_not_implemented():
     from fastmace.planner.plan import Plan
-    from fastmace.state import SimulationState
 
-    with pytest.raises(NotImplementedError):
-        SimulationState.from_atoms(None, "cpu", 0)
+    # SimulationState.from_atoms is filled by 1a-T12 (tests/cpu/test_integrators.py).
     plan = Plan(tier="graph")
     with pytest.raises(NotImplementedError):
         plan.describe()
