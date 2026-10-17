@@ -20,8 +20,10 @@ The installed package files are never modified. Entries so far:
 - ``polar_longrange`` (1a-T10, recorded here by 1a-T06): PolarMACE's class-level long-range
   wrappers, installed and recorded by ``fastmace.longrange.polar.install()``; this registry
   reports ``polar.installed()``. It is not undone from here.
-
-Plan task 1a-T08 adds entries through the conductor.
+- ``capture_safe_mask_head``, ``first_derivative_only``, ``unfuse_full_addmm`` and
+  ``single_graph_strain`` (1a-T08): the engine-level rewrites of ``fastmace.rewrites.engine``
+  (MACE's readout mask, its force functions, Inductor's addmm rule with its cache key, and MACE
+  PR 1498's one-graph strain). Each can be undone with ``restore``.
 """
 
 from __future__ import annotations
@@ -229,3 +231,126 @@ def prepare_oeq_runtime(cache):
                          + ", ".join(p.name for p in runtime_plan.preload))
     _RECORDS["oeq_runtime"] = record
     return record
+
+
+# ------------------------------------------------------------------------ engine-level rewrites (1a-T08)
+
+# MACE 0.3.16 parameters of the functions the engine-level patches replace.
+MASK_HEAD_PARAMETERS = ("x", "head", "num_heads")
+COMPUTE_FORCES_PARAMETERS = ("energy", "positions", "training")
+COMPUTE_FORCES_VIRIALS_PARAMETERS = ("energy", "positions", "displacement", "cell", "training", "compute_stress")
+SYMMETRIC_DISPLACEMENT_PARAMETERS = ("positions", "unit_shifts", "cell", "edge_index", "num_graphs", "batch",
+                                     "displacement")
+
+
+def _check_parameters(function, expected, label):
+    parameters = tuple(inspect.signature(function).parameters)
+    if parameters != expected:
+        raise RuntimeError(f"installed {label} takes {parameters}, not the MACE 0.3.16 parameters {expected}")
+
+
+def _install(name, targets, detail):
+    record = PatchRecord(name, True, tuple(targets), detail)
+    _RECORDS[name] = record
+    return record
+
+
+def set_capture_safe_mask_head(enabled=True):
+    """Put ``rewrites.engine.capture_safe_mask_head`` into MACE's readout blocks (True) or MACE's own back (False).
+
+    MACE's mask_head builds the multi-head mask with indexed assignment, which CUDA graph capture
+    rejects; mace.modules.blocks imports it by name. Returns the record in force (None after False).
+    """
+    name = "capture_safe_mask_head"
+    if not enabled:
+        restore(name)
+        return None
+    if name in _RECORDS:
+        return _RECORDS[name]
+    from mace.modules import blocks
+
+    from fastmace.rewrites import engine
+    _check_parameters(_original(blocks, "mask_head"), MASK_HEAD_PARAMETERS, "mace.modules.blocks.mask_head")
+    return _install(name, [_put(blocks, "mask_head", engine.capture_safe_mask_head)],
+                    "multi-head readout mask without indexed assignment (CUDA graph capture)")
+
+
+def set_first_derivative_only(enabled=True):
+    """MACE's compute_forces(_virials) without the second-derivative graph for training=True (True), or MACE's (False).
+
+    Only calls with training=True change (compiled cuEquivariance models); training=False goes to
+    MACE's own function. Returns the record in force (None after False).
+    """
+    name = "first_derivative_only"
+    if not enabled:
+        restore(name)
+        return None
+    if name in _RECORDS:
+        return _RECORDS[name]
+    from mace.modules import utils
+
+    from fastmace.rewrites import engine
+    _check_parameters(_original(utils, "compute_forces"), COMPUTE_FORCES_PARAMETERS,
+                      "mace.modules.utils.compute_forces")
+    _check_parameters(_original(utils, "compute_forces_virials"), COMPUTE_FORCES_VIRIALS_PARAMETERS,
+                      "mace.modules.utils.compute_forces_virials")
+    targets = [_put(utils, "compute_forces", engine.first_derivative_forces),
+               _put(utils, "compute_forces_virials", engine.first_derivative_forces_virials)]
+    return _install(name, targets, "force and virial gradients with create_graph=False for training=True")
+
+
+def set_unfuse_full_addmm(enabled=True):
+    """Keep Inductor's ``mm + full-matrix add`` unfused on the GPU (True), or torch's own rule (False).
+
+    Replaces torch._inductor.fx_passes.post_grad.should_prefer_unfused_addmm (looked up per match)
+    and sets a no-op post_grad_custom_pre_pass whose uuid keys the compiler cache; both are undone
+    together. On a torch without the newer bias-like check nothing is needed and nothing changes
+    (returns None). Refuses when another custom pre pass is in use. Returns the record in force.
+    """
+    name = "unfuse_full_addmm"
+    if not enabled:
+        restore(name)
+        return None
+    if name in _RECORDS:
+        return _RECORDS[name]
+    try:
+        from torch._inductor import config as inductor_config
+        from torch._inductor.fx_passes import post_grad
+    except ImportError:
+        return None
+    if not hasattr(post_grad, "_is_bias_like_addmm_input"):
+        return None  # torch 2.5 behaviour already
+    from fastmace.rewrites import engine
+    current = inductor_config.post_grad_custom_pre_pass
+    if current is not None and not (hasattr(current, "uuid") and current.uuid() == engine.UNFUSED_ADDMM_UUID):
+        raise RuntimeError("Inductor's post_grad_custom_pre_pass is already in use; cannot key the addmm choice")
+    rule = engine.unfused_full_addmm_rule(_original(post_grad, "should_prefer_unfused_addmm"), post_grad)
+    targets = [_put(post_grad, "should_prefer_unfused_addmm", rule)]
+    if current is None:
+        targets.append(_put(inductor_config, "post_grad_custom_pre_pass", engine.unfused_addmm_key()))
+    return _install(name, targets, f"mm + full-matrix add unfused on the GPU; cache key {engine.UNFUSED_ADDMM_UUID}")
+
+
+def set_single_graph_strain(enabled=True):
+    """Put MACE PR 1498's one-graph get_symmetric_displacement into MACE (True), or MACE's own back (False).
+
+    Replaces the function in mace.modules.utils, which prepare_graph calls (MACE, ScaleShiftMACE,
+    PolarMACE), and in mace.modules.models, which imports it by name (EnergyDipolesMACE).
+    torch.compile traces whichever function is in place, so call this before a model is
+    compiled. Refuses a MACE whose function has another signature. Returns the record in force
+    (None after False).
+    """
+    name = "single_graph_strain"
+    if not enabled:
+        restore(name)
+        return None
+    if name in _RECORDS:
+        return _RECORDS[name]
+    from mace.modules import models, utils
+
+    from fastmace.rewrites import engine
+    _check_parameters(_original(utils, "get_symmetric_displacement"), SYMMETRIC_DISPLACEMENT_PARAMETERS,
+                      "mace.modules.utils.get_symmetric_displacement")
+    targets = [_put(module, "get_symmetric_displacement", engine.single_graph_symmetric_displacement)
+               for module in (utils, models) if hasattr(module, "get_symmetric_displacement")]
+    return _install(name, targets, "MACE PR 1498: one-graph strain without per-edge cell gathers")
