@@ -169,6 +169,21 @@ sections, files it owns, tests to write first, done-when.
   settings.
 - The repository is private, so Actions minutes count against the account:
   cache pip downloads, and use `concurrency` to cancel superseded runs.
+- **Qualified-stack cell (conductor decision, 17 October 2026, after
+  0-T02).** `pyproject.toml` keeps the §4.1 floors, so a plain install picks
+  newer versions (0-T02 got cuEquivariance 0.13.0 and ASE 3.29.0). Add
+  `constraints/qualified.txt` with the qualified pins of §4.1 (torch 2.14.1,
+  mace-torch 0.3.16, cuequivariance(-torch) 0.12.0, e3nn 0.4.4, ase 3.27.0,
+  numpy 2.2.6) and one extra CI cell, Python 3.10, installing with
+  `-c constraints/qualified.txt`. The other cells keep testing the latest
+  versions the floors allow.
+- **`pyproject.toml` changes collected from the phase 0 reviews** (this task
+  owns `pyproject.toml` now): a `[tool.ruff]` section (line length 120, the
+  rules the CI runs, `fastmace` and `_support` as first-party so `isort`
+  keeps `import fastmace` before `torch`); `filelock` as a declared base
+  dependency (0-T03 patches it); a warning filter for graph_longrange
+  0.4.0's NumPy 2.0 `DeprecationWarning`s. CI runs `ruff check fastmace
+  tests`.
 - Done when: a push to the task branch shows the matrix green, or the
   refusal is reported.
 
