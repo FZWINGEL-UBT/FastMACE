@@ -94,7 +94,7 @@ def generic_interaction_forward(self, node_attrs, node_feats, edge_attrs, edge_f
         message = reassociation(node_feats, node_attrs, edge_attrs, hidden, edge_index,
                                 fc_last_weight(self.radial_last))
     elif getattr(self, "streaming_kernels", None) is not None:
-        from fastmace.rewrites.mh1 import streaming_message
+        from fastmace.rewrites.mh1.modules import streaming_message
         message = streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes)
     elif hasattr(self, "conv_fusion"):
         message = self.conv_tp(node_feats, edge_attrs, tp_weights, edge_index)

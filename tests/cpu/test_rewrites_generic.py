@@ -41,7 +41,7 @@ FAMILIES = ("residual", "density", "off")
 
 def mh1_available():
     try:
-        importlib.import_module("fastmace.rewrites.mh1")
+        importlib.import_module("fastmace.rewrites.mh1.modules")
     except ImportError:
         return False
     return True

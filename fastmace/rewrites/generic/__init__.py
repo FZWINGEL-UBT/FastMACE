@@ -28,8 +28,10 @@ features and the cutoff), with and without a cutoff, on random inputs in the mod
 MACE-OFF's first block (``RealAgnosticInteractionBlock``) is not generic, so
 ``generic_reassociate`` never applies to MACE-OFF; the other three act on its later blocks.
 
-The reassociation and streaming modules come from the MH-1 family (``fastmace.rewrites.mh1``,
-plan task 1a-T07); they are imported when a record is applied.
+The reassociation and streaming modules come from the MH-1 family
+(``fastmace.rewrites.mh1.modules``, plan task 1a-T07); they are imported when a record is
+applied. ``attach_streaming_kernels`` registers a ``streaming_count`` buffer that counts every
+edge until the engine binds its edge counter (``fastmace.rewrites.mh1.bind_streaming_count``).
 """
 
 from __future__ import annotations
@@ -113,7 +115,7 @@ def apply_species_skip(model, context):
 
 def apply_reassociate(model, context):
     """Reassociate the first interaction if it is generic and its inputs are species-only; returns the names."""
-    from fastmace.rewrites.mh1 import FirstInteractionReassociation, probe_first_tensor_product
+    from fastmace.rewrites.mh1.modules import FirstInteractionReassociation, probe_first_tensor_product
 
     columns = _columns(context, "generic_reassociate")
     generic = _generic_interactions(model)
@@ -149,7 +151,7 @@ def apply_streaming(model, context):
     for index, interaction, kind in _generic_interactions(model):
         if getattr(interaction, "first_reassociation", None) is not None or not _oeq_fused(interaction):
             continue
-        from fastmace.rewrites.mh1 import attach_streaming_kernels
+        from fastmace.rewrites.mh1.modules import attach_streaming_kernels
 
         _prepare(interaction, kind)
         attach_streaming_kernels(interaction)
