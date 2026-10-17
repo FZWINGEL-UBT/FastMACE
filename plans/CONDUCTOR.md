@@ -26,7 +26,7 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
   Their decisions are in `plans/phase-1a.md`, in the sections "Conductor
   decisions after wave 0", "after wave 1" and "after wave 1b". Read them
   before briefing anyone.
-- **Next: wave 2.** T06 (rewrite registry and linear family) comes first,
+- **Next: wave 2.** T10 is merged (see "after T10" in the plan). T06 (rewrite registry and linear family) comes first,
   then T07 and T08 in parallel. T10 (PolarMACE) needs only T03 and T05, so
   it can start now. It also fixes the tiny polar model; see the wave 1
   decisions. See "Order and parallelism" in the plan.

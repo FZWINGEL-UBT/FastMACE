@@ -594,6 +594,35 @@ T14, T16 and T18 are merged (main 7545581). Wave 1 is complete.
   commit in provenance run from the main checkout or the NAS copy, which
   has `.source_commit`. T16's git test skips in that case.
 
+## Conductor decisions after T10 (17 October 2026)
+
+T10 merged (main d057513). Wave 2 status: T10 done; T06 next (critical path),
+then T07 and T08.
+
+- **Agreement.** The float64 cuEq polar path equals the research engine's
+  `polar_gpu` run alone to 1.7e-13 eV/Å, with the energy equal. The stress
+  matches finite differences below 1e-7 eV/Å³; MACE 0.3.16's own stress is
+  wrong (issue 1642). The hybrid FP32 error against float64 is the same on
+  both sides (NbCl5 1.5e-4 vs 1.8e-4 eV/Å).
+- **References run in their own process (T10 Q2), binding on T19.** In a
+  research-engine process that has built the hybrid engine first, the
+  float64 POLAR-1-S reference on NbCl5 moves by up to 7.8e-7 eV/Å and
+  5.4e-9 eV/atom. Run alone, it equals FastMACE and stock MACE to 1e-13.
+  The cause is process-wide state in the research engine's setup and was
+  not traced further. T19's gate therefore computes every float64 and
+  float32 reference in a fresh process that builds no production engine.
+  SPEC §12.3 already requires references to run "first, one configuration
+  and one calculator at a time"; this adds "in a process that has built no
+  production engine". Record the finding in `docs/validation/` with T19.
+- **Polar registration (T10 Q1).** T06 registers `rewrites.polar.RECORDS`
+  into its registry and adds `polar.installed()` to `_patches` as
+  `polar_longrange`. The conductor names this in T06's brief.
+- **Charge/spin (T10 Q3).** T11 calls `longrange.polar.validate_charge_spin`
+  whenever it passes `total_charge` and `total_spin`.
+- **uvu per instance.** Accepted: the rewrite acts on the force field's own
+  model only. Deep copies of hybrid models lose MACE's OEq adapters; T11
+  re-applies them (`_restore_oeq_wrappers`), as the switch map notes.
+
 ## Risks specific to 1a
 
 | Risk | Mitigation |
