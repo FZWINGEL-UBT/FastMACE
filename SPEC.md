@@ -1,8 +1,8 @@
 # FastMACE — Specification
 
-Status: draft 0.9, 17 October 2026. Owner: Fabian Zwingel. Written from the
+Status: draft 0.10, 17 October 2026. Owner: Fabian Zwingel. Written from the
 Langevin_Thermostat experiment (`Experiments/Langevin_Thermostat/`), whose GPU
-engine this library generalises. Drafts 0.2–0.6, 0.8 and 0.9 answer seven
+engine this library generalises. Drafts 0.2–0.6 and 0.8–0.10 answer eight
 reviews and record the owner's decisions 6–14 (§18, §19); draft 0.7 carried
 the research
 engine's results of 16–17 October 2026 (MACE-OFF, the fused plain-cuEq
@@ -248,14 +248,17 @@ MACE-MDP (`DipolePolarizabilityMACE`) predicts dipoles and polarizabilities,
 not energies or forces, and is out of scope for 1.0 (§17).
 
 **Energy scale.** MACE-POLAR-1, MACE-OMOL-0, MACE-OFF and the `omol` and
-`spice_wB97M` heads of MH-1 use all-electron atomic reference energies (E0)
-for the light elements: Cl ≈ −12,522 eV, Na ≈ −4,412 eV, O ≈ −2,048 eV,
-Br ≈ −70,042 eV. The heavy elements are pseudopotential (effective core
-potential) values: Nb and Ta (≈ −1,545 eV), and iodine. MACE-OFF (all five
+`spice_wB97M` heads of MH-1 have E0 tables that mix all-electron and
+pseudopotential references, classified here by the E0 values themselves.
+All-electron references: Cl ≈ −12,522 eV, Na ≈ −4,412 eV, O ≈ −2,048 eV,
+Br ≈ −70,042 eV. Pseudopotential (effective core potential) references: Nb
+and Ta (≈ −1,545 eV), and iodine. This follows the def2 basis sets, which
+are all-electron up to Kr (Z ≤ 36, so Br included) and use effective core
+potentials from Rb onwards (Nb 41, I 53, Ta 73). MACE-OFF (all five
 checkpoints): H −13.57, C −1,030.57, N −1,486.38, O −2,043.93, F −2,715.32,
 P −9,287.41, S −10,834.48, Cl −12,522.65, Br −70,045.28 eV all-electron, and
-I −8,102.52 eV with a pseudopotential (≈ −298 Ha, a def2 effective-core
-valence energy; all-electron iodine is about −7,000 Ha ≈ −1.9 × 10⁵ eV). The
+I −8,102.52 eV with a pseudopotential (−297.75 Ha, a def2 effective-core
+valence energy; all-electron iodine is about −6,900 Ha ≈ −1.9 × 10⁵ eV). The
 float32 problem below depends on the magnitude of the total, not on the
 labelling, so it applies to the mixed tables as well. The other heads
 and models use E0 of a few eV (MH-1 `matpes_r2scan`: Cl −4.8 eV, Ta
@@ -500,7 +503,8 @@ anneal = fm.protocols.ramp(0, 1000, ps=20) + fm.protocols.ramp(1000, 250, rate_K
 sim.run(schedule=anneal, steps=200_000)          # the first 200,000 steps, then pause
 sim.run(steps=100_000, mc=fm.mc.Swap(pairs=[("Na", "Nb")], every=100, attempts=50,
                                      velocities="exchange"))  # steps 200,000–300,000 of the schedule, with MC (§10.4; the default for swaps)
-sim.run()                                        # the remaining 240,000 steps
+sim.run()                                        # the remaining 240,000 steps; the swap block stays attached (§7.6)
+# or: sim.run(mc=None)                           # the remaining steps without MC
 # or, in one call: sim.run(schedule=anneal)      # the whole schedule
 sim.save_restart("run/restart.npz"); sim = fm.Simulation.resume("run/")
 ```
@@ -587,10 +591,14 @@ Section 7.2 is illustrative; these contracts are binding.
 
 **Exceptions** (`fastmace.errors`), all derived from `FastMACEError`:
 - `PlanRefused`: every hard-constraint reason of §9.3 at once, and a `run`
-  request the plan does not cover (schedules and MC blocks, below);
+  request the plan does not cover (schedules and MC blocks, below). One
+  refusal raises one exception carrying all its reasons;
+- `SpeciesNotInSuperset(PlanRefused)`: rule 2, a species outside the
+  `ForceField`'s declared superset, in the structure, a declared or
+  requested move set, or a host-side mutation (§8.5). When rule 2 is among
+  the reasons of a refusal, the exception raised is this subclass, still
+  carrying every reason, so `except PlanRefused` catches it too;
 - `GateFailed`, `GateUnavailable`: with the gate record (§12.3);
-- `SpeciesNotInSuperset`: a species outside the `ForceField`'s declared
-  superset (§8.5);
 - `ModelElementError`: a declared superset species the model has no
   embedding for (§8.5);
 - `RestartMismatch`: a different force-field identity, or a plan change
@@ -603,12 +611,15 @@ Capacity overflows are internal events (§8.1) and never escape to the user.
 
 **ASE front end.** `FastMACECalculator.implemented_properties` is `energy`,
 `free_energy` (equal to `energy`), `forces`, and `stress`, in ASE units with
-Voigt stress. It is compiled-tier only (§8.2) and needs full 3D PBC (§4.4):
-non-periodic or mixed-PBC atoms raise `PlanRefused` at the first
-calculation, and it has no `allow_reference`; gas-phase molecules need
-`fm.Simulation` with the reference tier or MACE's `MACECalculator` (§4.3). `energies` (per atom) is listed only
-for models whose energy terms are all atom-resolved; PolarMACE's k-space
-electrostatics are not (§7.3).
+Voigt stress. It is compiled-tier only (§8.2) and needs full 3D PBC (§4.4).
+At the first calculation it builds a minimal plan (compiled mode, backend,
+rewrites, force precision; no workload, integrator or MC dimension) through
+the same planner, so its hard constraints apply: non-periodic or mixed-PBC
+atoms raise `PlanRefused` (rule 1), and there is no `allow_reference`.
+Gas-phase molecules need `fm.Simulation` with the reference tier or MACE's
+`MACECalculator` (§4.3). `energies` (per atom) is listed only for models
+whose energy terms are all atom-resolved; PolarMACE's k-space electrostatics
+are not (§7.3).
 
 **Loading and checkpoint trust.** MACE checkpoints are Python pickles:
 `torch.load(..., weights_only=False)` executes code from the file. So:
@@ -630,9 +641,13 @@ electrostatics are not (§7.3).
 - The target temperature is piecewise linear in the step and reaches the
   integrator as a device-scalar fill before the step, not as an event (§8.5).
 - MC blocks are attached to the simulation (every n MD steps), not to
-  segments; a block uses the target temperature at its step. `run` refuses a
+  segments; a block uses the target temperature at its step. A `run(mc=…)`
+  attaches the move set, and it stays attached for later `run` calls until
+  one passes another `mc=` or `mc=None` (detach); the attached move set is
+  restart state, so a resumed simulation continues with it. `run` refuses a
   block whose target temperature is below `Workload.min_mc_temperature_K`
-  (§9.2, §12.3). The schedule position is restart state (§10.6).
+  (§9.2, §12.3), checked over every step the call will run with the
+  attached move set. The schedule position is restart state (§10.6).
 - `run` checks the whole schedule before the first step and refuses
   (`PlanRefused`) a schedule whose maximum target exceeds
   `Workload.max_temperature_K`, which sized the skin and the buckets (rule
@@ -648,20 +663,22 @@ code, graphs) from it. `ff.evaluate()` plans for a one-off evaluation; a
 `Simulation` plans for its workload; both can use the same `ForceField`, in
 any order, under the instance isolation of §8.7 and subject to its process
 constraints: the first plan in a process fixes its reproducibility, and the
-first compiled plan its backend family. A default `ff.evaluate()` first therefore makes a
-later `reproducible=True` plan in that process refuse (the subprocess runner
-is offered), and a hybrid plan first excludes a compiled plain-cuEq plan.
+first compiled plan its backend family. A default `ff.evaluate()` first
+therefore makes a later `reproducible=True` plan in that process refuse (the
+subprocess runner is offered), and a hybrid plan first excludes a compiled
+plain-cuEq plan.
 
 **Simulation inputs.** `Simulation` takes a model or a `ForceField`; with a
 model it builds the `ForceField` with `species=` (default: the species of the
-initial structure) and float32 (owner decision 11, 17 October 2026). The ensemble, the cell mode and whether stress is needed
-are those of the `integrator=` or `optimizer=` object; `Workload` has no copy
-of them, nor of the force precision or the superset (§9.2). `run(mc=…)` is
-checked against the declared workload before any step: a move type not in
-`mc_moves`, a swap pair or transmutable set naming a species outside the
-superset, or a block whose target temperature is below
-`min_mc_temperature_K` raises `PlanRefused`, because the gate (§12.3) never
-covered it.
+initial structure) and float32 (owner decision 11, 17 October 2026). The
+ensemble, the cell mode and whether stress is needed are those of the
+`integrator=` or `optimizer=` object; `Workload` has no copy of them, nor of
+the force precision or the superset (§9.2). `run(mc=…)` is checked against
+the declared workload before any step: a move type not in `mc_moves` or a
+block whose target temperature is below `min_mc_temperature_K` raises
+`PlanRefused`, and a swap pair or transmutable set naming a species outside
+the superset raises `SpeciesNotInSuperset` (a `PlanRefused`), because the
+gate (§12.3) never covered them.
 
 ---
 
@@ -1378,8 +1395,8 @@ definition of continuation the library promises.
   cursor. Today's restart stores `_noise` and `_noise_next` for exactly this
   reason (`workflow.py`, `state()`); the generator state alone would skip or
   repeat the prefetched batch.
-- **MC state:** position within the MD/MC cycle, counters per move type,
-  adaptive step sizes.
+- **MC state:** the attached move set (§7.6), position within the MD/MC
+  cycle, counters per move type, adaptive step sizes.
 - **Force-field identity:** checkpoint SHA-256, head, species superset, force
   precision, physics options (charge/spin inputs; D3 with all its parameters,
   §11.2; polar options such as the PR 1762 settings; the reference
@@ -1890,7 +1907,7 @@ deterministic.
 | Model-level failures look like engine bugs (POLAR-1-S NaNbO3, OMOL NaCl) | planner warnings with diagnoses; gate against the reference (§12.1) separates the two |
 | Barostat settings and equilibrium volumes unqualified | keep warning; qualification study before recommending NPT defaults |
 | Hybrid MD/MC samples the wrong distribution (mass changes, proposal asymmetry, chemical-potential convention) | moves defined with their momentum transformation and acceptance (§10.4); exact-enumeration test with a negative control (§12.2) |
-| Energies of models with all-electron E0 for their light elements (POLAR-1, OMOL-0, MH-1 `omol`/`spice` heads; MACE-OFF H–Br, with a pseudopotential I, §4.3) wrong by up to 102 meV/atom in float32 (MACE-OFF up to 12) | float64 energy accumulation everywhere (§7.3) and in the float32 yardstick (§12.1) |
+| Energies of models with all-electron E0 references (POLAR-1, OMOL-0, MH-1 `omol`/`spice` heads; MACE-OFF H–Br, with a pseudopotential I; Nb, Ta and I are pseudopotential references, §4.3) wrong by up to 102 meV/atom in float32 (MACE-OFF up to 12) | float64 energy accumulation everywhere (§7.3) and in the float32 yardstick (§12.1) |
 | float32 forward errors do not cancel in MC ΔE (unmeasured) | move-energy gate; float64 MC energy path as fallback, whose cost on GPUs with slow FP64 is measured in phase 3 (§10.4, §16) |
 | Hidden engine state breaks capture, events or restart (stale build cell, sticky flags, frozen sender groups) | runtime-state and derived-state registries with CI checks; canonical restart points (§8.1, §8.5, §10.6) |
 | A stale derived buffer after an event (masses, coefficients, species pairs) | derived-state registry checked against fresh construction (§8.5) |
@@ -2147,7 +2164,7 @@ decision was needed.
 
 | Finding | Check | Where answered |
 | --- | --- | --- |
-| 1. MACE-OFF's iodine E0 is not all-electron | I −8,102.52 eV ≈ −298 Ha, a def2 effective-core valence energy; all-electron I ≈ −7,000 Ha; Br −70,045 eV is all-electron | §4.3 energy scale (light elements all-electron, Nb, Ta and I pseudopotential); §18 |
+| 1. MACE-OFF's iodine E0 is not all-electron | I −8,102.52 eV ≈ −298 Ha, a def2 effective-core valence energy; all-electron I ≈ −7,000 Ha; Br −70,045 eV is all-electron | §4.3 energy scale (all-electron and pseudopotential references; Nb, Ta and I pseudopotential); §18 |
 | 2. The §7.2 example ran the whole schedule, then 100,000 more MC steps | §7.2 rule: `steps` beyond the remaining schedule raises | §7.2: paused 200,000-step run, MC run inside the schedule, then the rest; a finished schedule needs a new `schedule=` |
 | 3. `Workload` example omitted four fields and §9.2 showed no defaults | §7.2 versus §9.2 | §9.2 defaults; §7.2 comment |
 | 4. `Workload` construction raised `PlanRefused`, the §9.3 aggregate | §7.6 definition; the same mismatch held for `run`'s schedule and MC checks | §9.2: `ValueError`; §7.6 definition widened to `run` requests the plan does not cover |
@@ -2156,5 +2173,20 @@ decision was needed.
 | 7. The backend dimension said plain cuEq is always fused | §9.3 enforcement uses the unfused form | §9.3 |
 | 8. The MACE-OFF non-PBC note covered only `fm.Simulation` | `FastMACECalculator` is compiled-tier, no `allow_reference` | §4.3; §7.6 ASE front end |
 | Also: the `species=` comment of §7.2 sat on the `ForceField` argument | §7.6 `Simulation(atoms, model, species=…)` | §7.2 alternative line |
+
+Estimates unchanged (§16).
+
+**Draft 0.10 (17 October 2026)** answers an eighth review, of draft 0.9. It
+confirmed the eight draft 0.9 findings closed (iodine −297.75 Ha against
+about −6,910 Ha all-electron; the paused example; the API fixes) and found
+three wording and exception-contract issues and one note. All were verified
+and adopted.
+
+| Finding | Check | Where answered |
+| --- | --- | --- |
+| 1. "Light" and "heavy" elements misclassified Br (all-electron) and I (pseudopotential) | E0 table; def2 is all-electron up to Kr and uses effective core potentials from Rb | §4.3 (classified by the E0 values: all-electron and pseudopotential references); §18; §19 draft 0.9 row |
+| 2. `PlanRefused` and `SpeciesNotInSuperset` overlapped on rule 2 | §7.6 definitions; §9.3 rule 2; §7.6 Simulation inputs | §7.6: `SpeciesNotInSuperset` subclasses `PlanRefused` and is raised, with every reason, when rule 2 is among them |
+| 3. The third `run` of §7.2 relied on the MC block persisting | §7.6 said only "attached to the simulation" | §7.6: `mc=` stays attached until another `mc=` or `mc=None`; restart state (§10.6); §7.2 comments |
+| Note: `FastMACECalculator` raised `PlanRefused` without a plan | §7.4, §7.6 | §7.6: it builds a minimal plan through the same planner |
 
 Estimates unchanged (§16).
