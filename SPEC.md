@@ -1,9 +1,11 @@
 # FastMACE — Specification
 
-Status: draft 0.6, 16 October 2026. Owner: Fabian Zwingel. Written from the
+Status: draft 0.7, 17 October 2026. Owner: Fabian Zwingel. Written from the
 Langevin_Thermostat experiment (`Experiments/Langevin_Thermostat/`), whose GPU
 engine this library generalises. Drafts 0.2–0.6 answer five reviews and
-record the owner's decisions 6 and 7 (§18, §19).
+record the owner's decisions 6 and 7 (§18, §19); draft 0.7 carries the
+research engine's results of 16–17 October 2026 (MACE-OFF, the fused plain-cuEq
+convolution, no NFS file locks; §19).
 
 FastMACE is a standalone Python library that runs pretrained MACE models
 (MACE 0.3.x family, including PolarMACE) for atomistic simulation on NVIDIA
@@ -101,14 +103,16 @@ lines:
 | `pair_search.py` | 102 | GPU pair search | `fastmace.neighbors` |
 | `quench.py` | 249 | Frame selection and quench relaxations | `fastmace.protocols.quench` |
 | `workflow.py` | 1,440 | CLI, protocol profiles, provenance, resume (output truncation on resume, §10.6) | split: `fastmace.cli`, `fastmace.protocols`, `fastmace.provenance` |
-| `upstream_mace.py` | 151 | backports from MACE develop (single-graph strain, PR 1498) and the naive-cuEq guard (PR 1614); process-local, installed files untouched | `fastmace.rewrites` (strain), `fastmace.planner` (kernel trait) |
+| `upstream_mace.py` | 249 | backports from MACE develop (single-graph strain, PR 1498; plain-cuEq conv fusion on any CUDA device, PR 1641) and the naive-cuEq guard (PR 1614); process-local, installed files untouched | `fastmace.rewrites` (strain), `fastmace.loading` (conv fusion), `fastmace.planner` (kernel trait) |
+| `file_locks.py` | 67 | PyTorch's `filelock` locks as soft locks, switched before torch is imported (no NFS lock requests; `docs/NON_LOCKING_DESIGN.md`) | `fastmace` import time (§14) |
 
 Tooling that becomes the validation suite:
 - `tools/validation/npt_stress_reference.py` (force/stress gate);
 - `tools/validation/roundoff_reference.py`;
 - `studies/other_models/probes/model_step_time.py` (benchmark);
 - `studies/further_optimizations/probes/step_breakdown_probe.py` (profiler);
-- `tests/` (299 CPU tests, `test_upstream_mace.py` included).
+- `tests/` (324 CPU tests, `test_upstream_mace.py` and `test_file_locks.py`
+  included).
 
 ### 3.2 Couplings that must be removed
 
@@ -122,6 +126,18 @@ Tooling that becomes the validation suite:
   - MACE's process-wide autograd-compile policy: hybrid and plain
     cuEquivariance models must not be compiled in one process.
   - `torch._dynamo.config.cache_size_limit` raised to 64.
+  - PyTorch's file-lock class (`filelock.FileLock`), switched to soft locks
+    when `langevin` is imported (`file_locks.py`), and the environments'
+    `nfs-soft-locks` start-up hook (`environment/nfs_soft_locks`) that does
+    the same for every interpreter.
+- **Model copies lose MACE's convolution adapters.** The engine deep-copies
+  the model before compiling or rewriting it. OEq modules serialize only
+  their C++ description (`_restore_oeq_wrappers`), and cuEquivariance's
+  fused convolution (`cuet.SegmentedPolynomial`, plain backend with conv
+  fusion) pickles through `__reduce__` with its constructor arguments only,
+  dropping MACE's four-argument adapter and `weight_numel`
+  (`_restore_cueq_conv_fusion`, 16 October 2026). Every copy must re-apply
+  both, or be replaced by an explicit model builder.
 
   Each must be encapsulated or documented as a process constraint and enforced
   by the planner.
@@ -131,7 +147,8 @@ Tooling that becomes the validation suite:
     table, `load_calculator`).
   - The `oeq_no_nvcc.sh` launcher and the `main.py` refusal without it: OEq
     0.7 lock-file workaround, runtime headers, per-process extension directory,
-    `OEQ_EXTENSION_SEED`.
+    `OEQ_EXTENSION_SEED`, and (since 16 October 2026) `CUDA_CACHE_DISABLE=1`
+    when the CUDA driver cache directory is on NFS (§14).
 - **Version pins.** Source-hash pins of MACE 0.3.16 forwards
   (`_NONLINEAR_FORWARD_SHA256`, the `GENERIC_INTERACTIONS` hashes, the PR 1762
   forward rewrite).
@@ -197,6 +214,7 @@ rewrites it cannot verify.
 | MACE-POLAR-1 S/M/L | PolarMACE | MH-1 rewrites + polar path (§11.1) |
 | MP-0 medium/large | `RealAgnosticResidualInteractionBlock` | `GENERIC_*` |
 | MP-0b3, MPA-0, OMAT-0, MatPES | `RealAgnosticDensity(Residual)InteractionBlock` | `GENERIC_*` |
+| MACE-OFF23 small/medium/large, OFF23b medium, OFF24 medium (organic: H, C, N, O, F, P, S, Cl, Br, I) | `RealAgnosticInteractionBlock` + `RealAgnosticResidualInteractionBlock` | `GENERIC_*` (padding exact) |
 | Anything else | — | reference tier (MACE calculator), or the compiled plain path if the padding check passes |
 
 **Model-level known issues** (surfaced as warnings by the planner, not as engine
@@ -205,7 +223,19 @@ failures):
 - POLAR-1-S has a Fukui charge runaway on NaNbO3;
 - all POLAR sizes give huge forces and pressures on NaTaO3;
 - OMOL-0 is outside its training domain on dense oxides and collapses in NaCl
-  MD.
+  MD;
+- MACE-OFF23 small/medium/large relax the experimental molecular crystals
+  (urea, naphthalene, paracetamol) to 5.5–9.2% below the experimental volume
+  (static, float64), as the MACE-OFF paper shows for OFF23(L); OFF24-medium
+  is closest (−0.5 to −5.2%); OFF23-small also rearranges naphthalene's cell
+  (a +10%, β +7°) (`studies/other_models/README.md`, 16 October 2026);
+- MACE-OFF23-large on 2,160 atoms (paracetamol 3×3×3) fits a 16 GB card only
+  in the default engine: the stock calculator and the plain engine run out of
+  memory with MACE's unfused convolution, and the float64 reference needs
+  more than 20 GB (§12.3).
+
+MACE-MDP (`DipolePolarizabilityMACE`) predicts dipoles and polarizabilities,
+not energies or forces, and is out of scope for 1.0 (§17).
 
 **Energy scale.** MACE-POLAR-1, MACE-OMOL-0 and the `omol` and `spice_wB97M`
 heads of MH-1 use all-electron atomic reference energies (E0): Cl
@@ -222,8 +252,8 @@ pseudopotential-referenced models (`results/all-models-rtx5060ti-20261015/`).
 Forces and stress are unaffected (E0 is a constant per species); every
 energy-based decision is not, hence §7.3.
 
-**Licences.** Model licences must be shown at load time: OMOL-0 is under the
-ASL licence (non-commercial).
+**Licences.** Model licences must be shown at load time: OMOL-0 and MACE-OFF
+are under the ASL licence (non-commercial).
 
 ### 4.4 Boundary conditions and constraints
 
@@ -382,7 +412,11 @@ Never enable:
 
 The experiment's markdown files record the rejected screens (no gain or wrong
 answers); copy their summary into `docs/rewrites.md` so the work is not
-repeated.
+repeated. Among them (16 October 2026): OpenEquivariance 0.7's own symmetric
+contraction, loaded with MH-1's basis and weights, is exact but 27–79× slower
+than cuEquivariance's fused `uniform_1d` kernel even compiled
+(`studies/further_optimizations/2026-10-16-oeq-symmetric-contraction.md`); the
+hybrid keeps cuEq for the symmetric contraction.
 
 ### 6.3 Surviving upstream changes
 
@@ -874,7 +908,9 @@ not checked).
 
 A plan has five independent dimensions: **execution mode** (the tiers of §8:
 graph, compiled, eager, reference), **backend** (hybrid cuEq/OEq, plain
-cuEq), **rewrite set**, **force precision** and **MC energy precision**. The
+cuEq; the plain backend uses cuEq's fused convolution on any CUDA device,
+MACE PR 1641, exact to rounding, −2 to −6% MD step in float64 and −29 to −40%
+in float32 against the unfused path), **rewrite set**, **force precision** and **MC energy precision**. The
 physics (model, head, charge/spin, D3 and its parameters, polar options,
 reference corrections) is fixed by the user and is never changed by a rule
 or a fallback.
@@ -915,7 +951,11 @@ sufficient.
   `index_select` on CUDA to deterministic implementations (they are in the
   "will act deterministically" list of its documentation).
 - **What remains unknown** is cuEquivariance's kernels, which the flag does
-  not govern, and FastMACE's own kernels.
+  not govern, and FastMACE's own kernels. They include the fused
+  convolution of the plain backend, whose scatter to the receivers happens
+  inside the cuEq kernel; repeated float64 force evaluations of the fused
+  and of the unfused plain path both differed at about 10⁻¹⁵ eV/Å
+  (16 October 2026, default mode, so not yet with the deterministic flag).
 
 The option therefore means:
 - **Scope:** bitwise-identical results for the same hardware model, driver,
@@ -1585,8 +1625,11 @@ reference is never a fallback for a plan that failed for memory.
 
 `fastmace bench` reproduces today's tables:
 - models: MH-1 (three heads), MP-0 medium/large, MP-0b3, MPA-0, OMAT-0,
-  MatPES-PBE/r²SCAN, POLAR-1-S/M/L, OMOL-0 XL;
+  MatPES-PBE/r²SCAN, POLAR-1-S/M/L, OMOL-0 XL, MACE-OFF23 S/M/L, OFF23b M,
+  OFF24 M;
 - crystals: NaCl, NaNbO3, NbCl5 (3×3×3), plus the ten benchmark crystals;
+  for organic models (MACE-OFF) the organic set of `Structures/Organic`
+  (urea, naphthalene and paracetamol 3×3×3 from COD, a 648-atom water box);
 - configurations: ASE plus calculator, plain GPU engine, default NVT, default
   NPT;
 - timing: median of 4 × 300 steps after 300 warm-up steps.
@@ -1607,7 +1650,10 @@ Every run writes `metadata.json` with:
 - model path, SHA-256, head, licence;
 - the force-field identity (§10.6) and the reference record (§12.1);
 - the plan (tier, rewrites on/off with reasons), force and integration
-  precision, TF32 flag, backend, fallbacks tried;
+  precision, TF32 flag, backend (for the plain backend: whether the
+  convolution is fused), fallbacks tried;
+- the file-lock mode (soft or kernel) and whether the CUDA driver cache was
+  disabled (§14);
 - versions of all packages and kernels (OEq extension build id, Triton
   version), GPU name, driver, compute capability;
 - seeds, generator-state hashes and stream positions (cursors), integrator
@@ -1653,8 +1699,21 @@ This is today's provenance block, made complete and schema-versioned.
   - Triton and Inductor caches, the OEq extension cache and compile caches go
     under a configurable cache root (`FASTMACE_CACHE`), never inside
     environments.
-  - Respect read-only and NFS homes: today's NFS-lock failure on coraline and
-    pytest's ownership check on the NAS are known problems.
+  - Respect read-only and NFS homes; pytest's ownership check on the NAS is a
+    known problem.
+  - **No kernel file locks on network filesystems.** NFS locking on the
+    workstations' share (NFS 4.0) broke on coraline (10 October 2026) and
+    leto (16 October 2026): the NAS refuses that client's lock requests until
+    the mount is reset. Measured sources per run: the CUDA driver's JIT cache
+    (POSIX locks on its `index`, 220–440 per run) and PyTorch's `filelock`
+    (one, the OEq extension build, fatal on a broken client). FastMACE must
+    therefore (a) make `filelock.FileLock` a `SoftFileLock` before torch is
+    imported, at `import fastmace`, (b) set `CUDA_CACHE_DISABLE=1` when
+    `CUDA_CACHE_PATH` lies on NFS unless the user set it, and (c) record the
+    lock mode in the provenance (§13); an opt-out restores kernel locks. The
+    research engine does this since 16–17 October 2026 (zero NFS lock
+    requests per run, no start-up cost;
+    `Experiments/Langevin_Thermostat/docs/NON_LOCKING_DESIGN.md`).
 
 ---
 
@@ -1731,6 +1790,9 @@ deterministic.
 - More MACE architectures and other equivariant MLIPs through the same
   registry.
 - Enhanced sampling hooks (metadynamics/PLUMED bias forces) on the GPU.
+- Property models evaluated along a trajectory, for example MACE-MDP dipoles
+  and polarizabilities for IR and Raman spectra (not a force field; needs
+  MACE develop's `DipolePolarizabilityMACE`).
 
 ---
 
@@ -1757,6 +1819,7 @@ deterministic.
 | Name clash on PyPI | check before phase 6 |
 | D3 list rebuilds at high T cost more than D3 itself (27,697 MACE-list rebuilds in the 540,000-step NbCl5 anneal) | own skin and rebuild test for the D3 list; amortised cost target with builds included; build time counted (§11.2) |
 | Output files ahead of the last restart point are duplicated or forked on resume | outputs chunked at restart points; resume deletes chunks, never rewrites (§10.6) |
+| A client's NFS lock state breaks (coraline, leto) and stops runs that lock | no kernel file locks on network filesystems: soft locks, CUDA driver cache off on NFS (§14) |
 | Displacement MC spends its time in eager trial rebuilds | skin from rule 11; cost reported with and without a rebuild (§10.4) |
 | A fallback diagnosis that never ends, or ends nowhere | diagnosis budget and the terminal sequence: rewrites off, eager, reference, refuse (§9.4) |
 
@@ -1941,3 +2004,15 @@ twelve gaps between sections; all twelve were adopted (owner decision,
 | L. Security nits: YAML loader unspecified; subprocess transport unspecified | — | §10.5 `safe_load`; §8.7 and §9.4 restart write as transport |
 
 Estimates unchanged (§16). Four risks added (§18).
+
+**Draft 0.7 (17 October 2026)** carries results of the research engine from
+16–17 October 2026 into the spec; no review. All were measured there first:
+
+| Change | Source | Where |
+| --- | --- | --- |
+| MACE-OFF (five organic models) supported: generic rewrites, gate passes on the organic set, molecules intact in 5 ps at 300 K, 3.9–16.8× faster than stock ASE; static volumes 5.5–9.2% low for OFF23; OFF23-large memory limits; MACE-MDP out of scope | `studies/other_models/README.md` (MACE-OFF section), `results/mace-off-20261016/` | §4.3 table, known issues, licences; §12.5; §17 |
+| Plain cuEq uses the fused convolution (MACE PR 1641 backport, default since 16 October 2026); model copies must re-apply MACE's fused-convolution adapter | `studies/further_optimizations/2026-10-16-upstream-mace-survey.md` (item 2) | §3.1; §3.2; §9.3 backend and `reproducible=True` |
+| No kernel file locks on network filesystems: soft `filelock`, CUDA driver cache off on NFS, lock mode in provenance | `docs/NON_LOCKING_DESIGN.md` (coraline and leto broke; the driver cache took all but one lock per run) | §3.1; §3.2; §13; §14 caches; §18 |
+| OpenEquivariance's symmetric contraction rejected (27–79× slower) | `studies/further_optimizations/2026-10-16-oeq-symmetric-contraction.md` | §6.2 |
+
+Estimates unchanged (§16).
