@@ -24,8 +24,10 @@ FAMILIES = {
                                   "offset": 100, "emb_dim": 8},
                  "total_spin": {"type": "categorical", "per": "graph", "num_classes": 101, "emb_dim": 8},
              }},
-    # MACE-POLAR-1: PolarMACE on MH-1's class.
-    "polar": {"interaction": "RealAgnosticResidualNonLinearInteractionBlock", "polar": True},
+    # MACE-POLAR-1: PolarMACE on MH-1's class, with the cutoff passed to the interactions
+    # (apply_cutoff=False) as in the released POLAR-1 models.
+    "polar": {"interaction": "RealAgnosticResidualNonLinearInteractionBlock", "apply_cutoff": False,
+              "polar": True},
     # MP-0 medium/large.
     "residual": {"interaction": "RealAgnosticResidualInteractionBlock"},
     # MP-0b3, MPA-0, OMAT-0, MatPES.
