@@ -21,6 +21,8 @@ dependencies = [
     "ase>=3.23",
     "numpy",
     "cuequivariance-torch>=0.12",
+    # fastmace switches filelock's FileLock to SoftFileLock before torch is imported (SPEC §14).
+    "filelock",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -72,4 +74,19 @@ filterwarnings = [
     "ignore::DeprecationWarning:pyparsing\\..*",
     "ignore:invalid escape sequence:DeprecationWarning:graph_longrange\\..*",
     "ignore:To copy construct from a tensor:UserWarning:mace\\..*",
+    # graph_longrange 0.4.0 passes NumPy arrays through scipy.special (gto_utils.py), NumPy 2.0 deprecation.
+    "ignore:__array_wrap__ must accept context and return_scalar:DeprecationWarning:graph_longrange\\..*",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# What the CPU CI runs (`ruff check fastmace tests`): pycodestyle errors and warnings, Pyflakes, isort.
+select = ["E", "W", "F", "I"]
+
+[tool.ruff.lint.isort]
+# `_support` is the test helper package (tests/_support). A module that must import fastmace before
+# torch puts an `# isort: split` comment after that import (tests/conftest.py).
+known-first-party = ["fastmace", "_support"]
