@@ -28,6 +28,7 @@ The installed package files are never modified. Entries so far:
 
 from __future__ import annotations
 
+import contextlib
 import importlib
 import inspect
 import sys
@@ -227,6 +228,23 @@ def set_cueq_conv_fusion(enabled):
 
 
 # ------------------------------------------------------------------------ oeq_runtime
+
+@contextlib.contextmanager
+def cueq_conv_fusion(enabled):
+    """``set_cueq_conv_fusion(enabled)`` for the duration of the block, then the rule that was in force before.
+
+    ``fastmace.model.loading.load`` converts each plain cuEq model inside this block, so its fusion
+    setting acts on that conversion only and does not leak into later conversions in the process
+    (a deep copy of a fused model loses MACE's convolution adapter). Yields the record in force
+    inside the block (None for MACE's own rule).
+    """
+    before = _RECORDS.get("cueq_conv_fusion")
+    record = set_cueq_conv_fusion(enabled)
+    try:
+        yield record
+    finally:
+        set_cueq_conv_fusion(None if before is None else before.value)
+
 
 def prepare_oeq_runtime(cache):
     """Prepare the OEq build environment in this process once (``_oeq_runtime.prepare_in_process``).
