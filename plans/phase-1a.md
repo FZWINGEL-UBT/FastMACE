@@ -449,12 +449,63 @@ Wave 4                          T17 (needs T15, T16) ── T19 (needs T17, T18)
 
 ## Checkpoints for the owner
 
-1. After T00, if the answer is a re-exec or a launcher: how hybrid runs
-   start.
-2. After T02: `docs/design/interfaces.md`, the integrator–engine cut.
+Since 17 October 2026 the owner has delegated routine review to the
+conductor ("continue as you see fit"). Checkpoints 1 and 2 became conductor
+reviews, reported to the owner. Checkpoint 3 stays the owner's call.
+
+1. After T00 (done, 17 October 2026): the answer is (a), in-process
+   preparation, so no re-exec or launcher is needed.
+2. After T02 (done, 17 October 2026): `docs/design/interfaces.md` reviewed
+   and accepted by the conductor.
 3. After T19: the acceptance report; whether `main.py` switches its default
    to `--engine fastmace`, and whether the `langevin` modules become shims
    (they stay as they are until then).
+
+## Conductor decisions after wave 0 (17 October 2026)
+
+From the T00, T01 and T02 reports. Later tasks follow these.
+
+- **OEq runtime (T00): option (a).** `fastmace/kernels/_oeq_runtime.py`
+  prepares the OEq build in-process. It must run before anything imports
+  MACE: `import mace.calculators` already imports OpenEquivariance and
+  `torch.utils.cpp_extension`, which fixes `CUDA_HOME`. So
+  `import fastmace` never imports MACE, and loading (T05) calls
+  `prepare_in_process` before its first MACE import. If MACE was imported
+  first, the hybrid is refused with a reason and the planner falls back to
+  plain cuEq. T05 promotes the module: it removes `prepare_by_reexec` and
+  the launcher `main`, keeps the `RTLD_GLOBAL` preload as a guard, and owns
+  the file from now on. A workstation check (coraline, leto) belongs to T19
+  before T17's default switch. A persistent per-build extension cache (about
+  15 s per process today) is a later task, not 1a. It would be keyed by
+  torch/CUDA/OEq build, not by shape, so it is allowed under the generality
+  rule.
+- **Switch map (T01) accepted.** On its open questions:
+  1. `GENERIC_DENSITY_FIRST` is not carried over: no gain, it stays among
+     the rejected screens in `docs/rewrites.md` (phase 6).
+  2. Two-stage `auto`: T15 reproduces `parse_args` followed by
+     `adapt_options_to_model` exactly, including `--fold-cutoff off` turning
+     off reassociation, the fused backward and streaming for the generic
+     family. Simplification is deferred to phase 5.
+  3. `species_skip` stays on for plain cuEq too, as today. Reproducible mode
+     (phase 2) decides separately.
+  4. The process-wide options are enforced as process constraints by T13's
+     `engine/constraints.py`: a second force field that differs in them is
+     refused in-process.
+  5. Field placement stays as it is.
+  6. `fused_radial_hidden` keeps its `Toggle` for CLI parity.
+  7. `float64_energy` gets its field in 1b.
+- **Interfaces (T02) accepted.**
+  - `SimulationState` stores velocities, as the baseline integrates
+    them; momenta are derived.
+  - T11's class is `MACEForceField`, and the public `fm.ForceField` becomes
+    a factory later (1b).
+  - `p_eps` and `force_eps` move into `SimulationState` in 1b.
+  - The `Hardware` record in `planner/plan.py` stays.
+- **CPU float64 equality (0-T04, `docs/development.md`):** equivalence tests
+  compare at `rtol=1e-12` or after a throwaway evaluation.
+- **NAS pytest (0-T07):** on the NAS, pytest needs
+  `--basetemp=/mnt/homes/zwingel/fastmace-cache/pytest-<name>`, because NFS
+  reports a different owner uid.
 
 ## Risks specific to 1a
 
