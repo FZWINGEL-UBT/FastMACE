@@ -17,6 +17,9 @@ The installed package files are never modified. Entries so far:
   fused cuEquivariance convolution in plain cuEq conversions.
 - ``oeq_runtime`` (1a-T05): the in-process OpenEquivariance build environment
   (``fastmace.kernels._oeq_runtime.prepare_in_process``). It cannot be undone.
+- ``polar_longrange`` (1a-T10, recorded here by 1a-T06): PolarMACE's class-level long-range
+  wrappers, installed and recorded by ``fastmace.longrange.polar.install()``; this registry
+  reports ``polar.installed()``. It is not undone from here.
 
 Plan task 1a-T08 adds entries through the conductor.
 """
@@ -25,6 +28,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
+import sys
 from dataclasses import dataclass
 
 # What is in force: name -> PatchRecord. The registry is the process-wide state this
@@ -46,14 +50,33 @@ class PatchRecord:
     detail: str = ""
 
 
+# Patches that their own module installs and records: (name, module whose installed() returns
+# the PatchRecord fields or None). The module is not imported here; if it was never imported,
+# its patch is not in force.
+_RECORDED_ELSEWHERE = (("polar_longrange", "fastmace.longrange.polar"),)
+
+
+def _recorded_elsewhere():
+    records = []
+    for name, module_name in _RECORDED_ELSEWHERE:
+        module = sys.modules.get(module_name)
+        fields = module.installed() if module is not None else None
+        if fields:
+            records.append(PatchRecord(fields["name"], fields["value"], tuple(fields["targets"]),
+                                       fields.get("detail", "")))
+    return records
+
+
 def applied():
-    """Every patch in force, in the order first applied (a tuple of PatchRecord)."""
-    return tuple(_RECORDS.values())
+    """Every patch in force, in the order first applied (a tuple of PatchRecord); then those recorded elsewhere."""
+    return tuple(_RECORDS.values()) + tuple(_recorded_elsewhere())
 
 
 def record_of(name):
     """The PatchRecord of ``name``, or None."""
-    return _RECORDS.get(name)
+    if name in _RECORDS:
+        return _RECORDS[name]
+    return next((record for record in _recorded_elsewhere() if record.name == name), None)
 
 
 def provenance():
@@ -79,6 +102,10 @@ def restore(name):
 
     The OEq runtime changes the environment of a build that has happened; it cannot be undone.
     """
+    if any(name == other for other, _ in _RECORDED_ELSEWHERE):
+        if record_of(name) is None:
+            return False
+        raise RuntimeError(f"{name} is installed and kept by its own module; it is not undone from _patches")
     record = _RECORDS.get(name)
     if record is None:
         return False
