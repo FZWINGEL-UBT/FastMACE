@@ -281,6 +281,20 @@ gates of 16 October 2026, `results/mace-off-20261016/`).
 Forces and stress are unaffected (E0 is a constant per species); every
 energy-based decision is not, hence §7.3.
 
+**E0 classification rule** (`fastmace.model.capabilities.classify_e0`,
+task 1a-T03, 17 October 2026). Each E0 is compared with an all-electron
+estimate of the free atom: Thomas–Fermi plus the Scott term,
+−0.7687 Z^(7/3) + Z²/2 hartree, accurate to about 15% for Z ≥ 3.
+- **all-electron:** E0 / estimate between 0.5 and 3;
+- **small** (a few eV, referenced to isolated-atom DFT): otherwise, when
+  |E0| < 200 eV;
+- **pseudopotential:** otherwise, when E0 < 0 and the ratio is below 0.5;
+- **unknown:** anything else, reported as such.
+
+The 200 eV cut lies between the largest small value seen (Ta −40.5 eV) and
+the smallest def2 valence energy (Rb, about −650 eV). Every value quoted
+above classifies as stated.
+
 **Licences.** Model licences must be shown at load time and are recorded per
 label in the label table (§7.6). Per the ACEsuit `mace-foundations` model
 table (checked 17 October 2026): MP-0 (a, b, b2, b3) and MPA-0 are MIT;

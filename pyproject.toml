@@ -54,6 +54,10 @@ version = { attr = "fastmace.__version__" }
 [tool.setuptools.packages.find]
 include = ["fastmace*"]
 
+[tool.setuptools.package-data]
+# The vendored OEq streaming kernels: the CUDA template and their BSD-3 licence and notice (SPEC §14).
+"fastmace.kernels.oeq_streaming" = ["*.cuh", "LICENSE", "NOTICE.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # No .pytest_cache in the repository or on the NAS checkout.

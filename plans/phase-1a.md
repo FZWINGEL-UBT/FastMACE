@@ -507,6 +507,58 @@ From the T00, T01 and T02 reports. Later tasks follow these.
   `--basetemp=/mnt/homes/zwingel/fastmace-cache/pytest-<name>`, because NFS
   reports a different owner uid.
 
+## Conductor decisions after wave 1 (17 October 2026)
+
+From the T03, T04, T05 and T09 reports. All four are merged (main eff7059
+and the commit after it). Equivalence was shown bitwise wherever the baseline
+is deterministic: neighbour lists on CPU and CUDA, Triton kernels in
+float64, rendered OEq CUDA source, plain cuEq float64 forces (4.8e-16
+eV/Å). Hybrid float32 forces agree with the baseline to 2.4–3.0e-7 eV/Å,
+within the baseline's own run-to-run scatter (3.3e-7).
+
+- **Tiny polar model (T03 Q1).** `tests/_support/tiny_models.FAMILIES["polar"]`
+  keeps MACE's default `apply_cutoff=True`, unlike real POLAR-1. T10 sets
+  `apply_cutoff=False` there and updates the polar expectations in
+  `tests/cpu/test_capabilities.py` in the same change.
+- **MACE-OFF first interaction (T03 Q2).** The research engine reports
+  `reassociate_first` as supported for MACE-OFF because some interaction is
+  generic, but its first block (`RealAgnosticInteractionBlock`) is not in
+  `GENERIC_INTERACTIONS`. T08 checks whether the rewrite applies at all
+  there. T15 reproduces the verdict either way, and the result goes into
+  `docs/rewrites.md`.
+- **E0 rule (T03 Q3)** is recorded in SPEC §4.3.
+- **Exceptions (T05 Q1).** `CheckpointTrustError`, `HybridUnavailableError`,
+  `BackendError`, `NaiveCueqError` and `ModelLicenceWarning` move to
+  `fastmace/errors.py` with the §7.6 hierarchy in 1b. Until then they stay
+  in `loading.py`.
+- **Model cache (T05 Q3).** `"models"` joins `_cache.CACHE_KINDS` in 1b,
+  together with the trust rule. Download stays opt-in and hash-checked.
+- **`load()` takes explicit arguments (T05 Q4)**: accepted. The planner
+  (T15) resolves `auto` and passes plain values.
+- **Head functionals (T05 Q6)** for MH-1's `spice_wB97M` (wb97m-d3bj),
+  `oc20_usemppbe` (pbe) and `omol` (wb97m-v): provisional. They are checked
+  against the MH-1 release before §7.7's dispersion rule uses them (1b).
+- **Hybrid tests in a second interpreter (T05 Q7, T04 Q3).**
+  `FASTMACE_HYBRID_PYTHON` names a `mace_cueq_oeq` Python for the hybrid
+  child processes; pytest runs in `mace_cueq_latest`. Both T04's streaming
+  test and T05's loading test use this mechanism. No pytest is installed into
+  the OEq environments.
+- **Package data (T04 Q1)** for `fastmace.kernels.oeq_streaming` (`*.cuh`,
+  `LICENSE`, `NOTICE.md`) is in `pyproject.toml`; a built wheel contains
+  them.
+- **`cuda-bindings` (T04 Q2)** is not listed: it arrives with torch's CUDA
+  wheels, and a separate pin could mismatch them. Revisit with the prebuilt
+  OEq wheels (phase 6).
+- **3x3 helpers (T09)** stay in `fastmace.neighbors.skin`; T11 and T12
+  import them from there.
+- **For T11/T13 (T09 notes):** `ForceField.rebuild` calls `nl.build`,
+  `use_edges` uses `nl.edges(n)`, `ForceField.buffers()` includes
+  `nl.buffers()`, and padding is
+  `round_up_edges(count, nl.capacity, edge_bucket(initial, fraction, multiple))`.
+- **Workers in this phase run as background subagents** of the conductor
+  session, in worktrees under `D:\Margraf\FastMACE-wt\`, whenever the app
+  refuses to start separate sessions. The rules are the same as for sessions.
+
 ## Risks specific to 1a
 
 | Risk | Mitigation |

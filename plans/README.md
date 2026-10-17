@@ -7,7 +7,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | Phase | Plan | Status |
 | --- | --- | --- |
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
-| 1a. Extraction | [phase-1a.md](phase-1a.md) | wave 0 (T00–T02) merged, wave 1 running (17 October 2026) |
+| 1a. Extraction | [phase-1a.md](phase-1a.md) | T00–T05 and T09 merged (17 October 2026); next T14, T16, T18, then wave 2 |
 | 1b. Contracts | — | written during 1a |
 | 2. Safety | — | |
 | 3. Dynamic topology and MC | — | |
@@ -21,3 +21,5 @@ minimum MACE version (2, by phase 2), gate default (3, phase 1b), CI GPU
 runners (5, phase 2).
 
 Task IDs are `<phase>-T<nn>`. Worker branches are `fastmace/<phase>-T<nn>`.
+
+Conductor sessions start with [CONDUCTOR.md](CONDUCTOR.md).
