@@ -1,9 +1,10 @@
 # FastMACE — Specification
 
-Status: draft 0.8, 17 October 2026. Owner: Fabian Zwingel. Written from the
+Status: draft 0.9, 17 October 2026. Owner: Fabian Zwingel. Written from the
 Langevin_Thermostat experiment (`Experiments/Langevin_Thermostat/`), whose GPU
-engine this library generalises. Drafts 0.2–0.6 and 0.8 answer six reviews and
-record the owner's decisions 6–14 (§18, §19); draft 0.7 carried the research
+engine this library generalises. Drafts 0.2–0.6, 0.8 and 0.9 answer seven
+reviews and record the owner's decisions 6–14 (§18, §19); draft 0.7 carried
+the research
 engine's results of 16–17 October 2026 (MACE-OFF, the fused plain-cuEq
 convolution, no NFS file locks; §19).
 
@@ -236,19 +237,27 @@ failures):
   the float64 reference needs more than 20 GB (§12.3). The plain engine with
   the fused convolution, now its default, was not measured at that size;
 - MACE-OFF is a molecular force field, but tiers 1–3 need 3D PBC (§4.4):
-  gas-phase molecules run in a periodic box or on the reference tier
-  (`allow_reference=True`). The measured speed-ups (3.9–16.8× against stock
+  gas-phase molecules run in a periodic box, on the reference tier of an
+  `fm.Simulation` (`allow_reference=True`, §9.3 rule 1), or with MACE's own
+  `MACECalculator`. `FastMACECalculator` is compiled-tier only, has no
+  `allow_reference`, and refuses non-periodic or mixed-PBC atoms (§7.6).
+  The measured speed-ups (3.9–16.8× against stock
   ASE) cover periodic crystals and a water box only.
 
 MACE-MDP (`DipolePolarizabilityMACE`) predicts dipoles and polarizabilities,
 not energies or forces, and is out of scope for 1.0 (§17).
 
 **Energy scale.** MACE-POLAR-1, MACE-OMOL-0, MACE-OFF and the `omol` and
-`spice_wB97M` heads of MH-1 use all-electron atomic reference energies (E0):
-Cl ≈ −12,522 eV, Na ≈ −4,412 eV, O ≈ −2,048 eV, Br ≈ −70,042 eV; Nb and Ta
-(≈ −1,545 eV) are pseudopotential values. MACE-OFF (all five checkpoints):
-H −13.57, C −1,030.57, N −1,486.38, O −2,043.93, F −2,715.32, P −9,287.41,
-S −10,834.48, Cl −12,522.65, Br −70,045.28, I −8,102.52 eV. The other heads
+`spice_wB97M` heads of MH-1 use all-electron atomic reference energies (E0)
+for the light elements: Cl ≈ −12,522 eV, Na ≈ −4,412 eV, O ≈ −2,048 eV,
+Br ≈ −70,042 eV. The heavy elements are pseudopotential (effective core
+potential) values: Nb and Ta (≈ −1,545 eV), and iodine. MACE-OFF (all five
+checkpoints): H −13.57, C −1,030.57, N −1,486.38, O −2,043.93, F −2,715.32,
+P −9,287.41, S −10,834.48, Cl −12,522.65, Br −70,045.28 eV all-electron, and
+I −8,102.52 eV with a pseudopotential (≈ −298 Ha, a def2 effective-core
+valence energy; all-electron iodine is about −7,000 Ha ≈ −1.9 × 10⁵ eV). The
+float32 problem below depends on the magnitude of the total, not on the
+labelling, so it applies to the mixed tables as well. The other heads
 and models use E0 of a few eV (MH-1 `matpes_r2scan`: Cl −4.8 eV, Ta
 −40.5 eV). POLAR-1
 stores its E0 table in float32, OMOL-0 and MH-1 in float64. NbCl5 3×3×3
@@ -478,19 +487,21 @@ e, f, s = ff.evaluate(atoms, stress=True)               # one-off evaluation
 ```python
 ff = fm.ForceField(model, atoms, species=["Na", "Nb", "Cl", "O"])   # superset and precision live here (§7.1)
 sim = fm.Simulation(
-    atoms, ff,                          # a model is accepted too, with species= for the superset (§7.6)
+    atoms, ff,
     integrator=fm.integrators.Langevin(timestep_fs=0.5, temperature_K=300, friction_per_fs=0.02),
     workload=fm.Workload(species_changes=True, mc_moves=("swap",), max_temperature_K=1000,
-                         min_mc_temperature_K=250, host_callbacks_every=1000),
+                         min_mc_temperature_K=250, host_callbacks_every=1000),  # other fields: defaults (§9.2)
     output=fm.Output("run/", trajectory_every=20, thermo_every=20, restart_every=10_000),
     seed=1,
 )
+# or, from a model: fm.Simulation(atoms, model, species=["Na", "Nb", "Cl", "O"], integrator=..., ...)  (§7.6)
 print(sim.plan)                     # tier, rewrites, reasons, fallbacks (§9)
-anneal = fm.protocols.ramp(0, 1000, ps=20) + fm.protocols.ramp(1000, 250, rate_K_per_ps=-3)  # 270 ps
-sim.run(schedule=anneal)                         # either: the whole schedule, 540,000 steps at 0.5 fs
-# or: sim.run(schedule=anneal, steps=200_000)    # the first 200,000 steps, then pause; the next run() continues
+anneal = fm.protocols.ramp(0, 1000, ps=20) + fm.protocols.ramp(1000, 250, rate_K_per_ps=-3)  # 270 ps, 540,000 steps at 0.5 fs
+sim.run(schedule=anneal, steps=200_000)          # the first 200,000 steps, then pause
 sim.run(steps=100_000, mc=fm.mc.Swap(pairs=[("Na", "Nb")], every=100, attempts=50,
-                                     velocities="exchange"))  # §10.4; the default for swaps
+                                     velocities="exchange"))  # steps 200,000–300,000 of the schedule, with MC (§10.4; the default for swaps)
+sim.run()                                        # the remaining 240,000 steps
+# or, in one call: sim.run(schedule=anneal)      # the whole schedule
 sim.save_restart("run/restart.npz"); sim = fm.Simulation.resume("run/")
 ```
 
@@ -498,8 +509,9 @@ sim.save_restart("run/restart.npz"); sim = fm.Simulation.resume("run/")
 without `steps` runs it to the end. With `steps`, it advances that many steps
 along the schedule and pauses; the next `run` (or a resume) continues from
 the recorded schedule position. `steps` beyond the remaining schedule raises
-before any step; nothing is truncated or extended silently. Without a
-schedule, the thermostat target stays at its current value.
+before any step; nothing is truncated or extended silently. A finished
+schedule has no remaining steps, so a further run needs a new `schedule=`.
+Without any schedule, the thermostat target stays at its current value.
 
 ### 7.3 Units, conventions and buffer ownership
 
@@ -574,9 +586,13 @@ that.
 Section 7.2 is illustrative; these contracts are binding.
 
 **Exceptions** (`fastmace.errors`), all derived from `FastMACEError`:
-- `PlanRefused`: every hard-constraint reason of §9.3 at once;
+- `PlanRefused`: every hard-constraint reason of §9.3 at once, and a `run`
+  request the plan does not cover (schedules and MC blocks, below);
 - `GateFailed`, `GateUnavailable`: with the gate record (§12.3);
-- `SpeciesNotInSuperset`;
+- `SpeciesNotInSuperset`: a species outside the `ForceField`'s declared
+  superset (§8.5);
+- `ModelElementError`: a declared superset species the model has no
+  embedding for (§8.5);
 - `RestartMismatch`: a different force-field identity, or a plan change
   without `allow_plan_change` (§10.6);
 - `ProcessConstraintError`: §8.7;
@@ -586,8 +602,11 @@ Section 7.2 is illustrative; these contracts are binding.
 Capacity overflows are internal events (§8.1) and never escape to the user.
 
 **ASE front end.** `FastMACECalculator.implemented_properties` is `energy`,
-`free_energy` (equal to `energy`), `forces`, and `stress` for 3D-periodic
-cells, in ASE units with Voigt stress. `energies` (per atom) is listed only
+`free_energy` (equal to `energy`), `forces`, and `stress`, in ASE units with
+Voigt stress. It is compiled-tier only (§8.2) and needs full 3D PBC (§4.4):
+non-periodic or mixed-PBC atoms raise `PlanRefused` at the first
+calculation, and it has no `allow_reference`; gas-phase molecules need
+`fm.Simulation` with the reference tier or MACE's `MACECalculator` (§4.3). `energies` (per atom) is listed only
 for models whose energy terms are all atom-resolved; PolarMACE's k-space
 electrostatics are not (§7.3).
 
@@ -627,7 +646,11 @@ electrostatics are not (§7.3).
 superset, and every plan builds its own execution copy (rewrites, compiled
 code, graphs) from it. `ff.evaluate()` plans for a one-off evaluation; a
 `Simulation` plans for its workload; both can use the same `ForceField`, in
-any order, under the instance isolation of §8.7.
+any order, under the instance isolation of §8.7 and subject to its process
+constraints: the first plan in a process fixes its reproducibility, and the
+first compiled plan its backend family. A default `ff.evaluate()` first therefore makes a
+later `reproducible=True` plan in that process refuse (the subprocess runner
+is offered), and a hybrid plan first excludes a compiled plain-cuEq plan.
 
 **Simulation inputs.** `Simulation` takes a model or a `ForceField`; with a
 model it builds the `ForceField` with `species=` (default: the species of the
@@ -736,7 +759,7 @@ this:
   initial structure). Columns and caches are built for the superset. The
   superset must be a subset of the model's element table (`model.elements`,
   MACE's `z_table`): a species the model has no embedding for raises
-  `SpeciesNotInSuperset` at `ForceField` construction.
+  `ModelElementError` at `ForceField` construction.
 - A species outside the superset raises before stepping
   (`SpeciesNotInSuperset`; a different superset needs a new `ForceField` and
   a plan revision). Membership is checked
@@ -915,18 +938,19 @@ per-shape table is ever stored. This is the project's generality rule.
 ```python
 @dataclass
 class Workload:
-    species_changes: bool                 # swaps/transmutations
-    atom_count_changes: bool              # reserved; refused in 1.0 (§9.3 rule 7, §8.6)
-    max_temperature_K: float              # drives skin and bucket headroom
-    min_mc_temperature_K: float | None    # lowest MC target temperature; ΔE gate threshold (§12.3); required when mc_moves is non-empty
-    host_callbacks_every: int | None      # user Python per n steps
-    needs_per_atom: set[str]              # energies, charges, ...
-    mc_moves: tuple[str, ...]             # "swap", "transmute", "displace"; drives the ΔE gate (§12.3)
-    reproducible: bool                    # bitwise within the scope of §9.3; refuses what it cannot guarantee
-    mc_energy_precision: Literal["auto", "float32", "float64"]   # §10.4; auto = force precision if the ΔE gate passes
+    max_temperature_K: float                       # required; drives skin and bucket headroom
+    species_changes: bool = False                  # swaps/transmutations
+    atom_count_changes: bool = False               # reserved; refused in 1.0 (§9.3 rule 7, §8.6)
+    min_mc_temperature_K: float | None = None      # lowest MC target temperature; ΔE gate threshold (§12.3); required when mc_moves is non-empty
+    host_callbacks_every: int | None = None        # user Python per n steps; None = no callbacks
+    needs_per_atom: frozenset[str] = frozenset()   # energies, charges, ...
+    mc_moves: tuple[str, ...] = ()                 # "swap", "transmute", "displace"; drives the ΔE gate (§12.3)
+    reproducible: bool = False                     # bitwise within the scope of §9.3; refuses what it cannot guarantee
+    mc_energy_precision: Literal["auto", "float32", "float64"] = "auto"   # §10.4; auto = force precision if the ΔE gate passes
 ```
 
-`Workload` validates itself at construction (`PlanRefused`): a non-empty
+`Workload` validates itself at construction (`ValueError`, before any
+planning; `PlanRefused` stays the planner's aggregate of §9.3): a non-empty
 `mc_moves` requires `min_mc_temperature_K` (owner decision 8, 17 October
 2026; `None` only for non-MC workloads), and `"swap"` or `"transmute"` in
 `mc_moves` requires `species_changes=True`; the two can therefore never
@@ -960,9 +984,10 @@ not checked).
 
 A plan has five independent dimensions: **execution mode** (the tiers of §8:
 graph, compiled, eager, reference), **backend** (hybrid cuEq/OEq, plain
-cuEq; the plain backend uses cuEq's fused convolution on any CUDA device,
-MACE PR 1641, exact to rounding, −2 to −6% MD step in float64 and −29 to −40%
-in float32 against the unfused path), **rewrite set**, **force precision** and **MC energy precision**. The
+cuEq; the plain backend uses cuEq's fused convolution by default on any CUDA
+device, MACE PR 1641, exact to rounding, −2 to −6% MD step in float64 and
+−29 to −40% in float32 against the unfused path, and the unfused convolution
+in `reproducible=True` plans, see below), **rewrite set**, **force precision** and **MC energy precision**. The
 physics (model, head, charge/spin, D3 and its parameters, polar options,
 reference corrections) is fixed by the user and is never changed by a rule
 or a fallback.
@@ -1865,7 +1890,7 @@ deterministic.
 | Model-level failures look like engine bugs (POLAR-1-S NaNbO3, OMOL NaCl) | planner warnings with diagnoses; gate against the reference (§12.1) separates the two |
 | Barostat settings and equilibrium volumes unqualified | keep warning; qualification study before recommending NPT defaults |
 | Hybrid MD/MC samples the wrong distribution (mass changes, proposal asymmetry, chemical-potential convention) | moves defined with their momentum transformation and acceptance (§10.4); exact-enumeration test with a negative control (§12.2) |
-| Energies of all-electron-E0 models (POLAR-1, OMOL-0, MACE-OFF, MH-1 `omol`/`spice` heads) wrong by up to 102 meV/atom in float32 (MACE-OFF up to 12) | float64 energy accumulation everywhere (§7.3) and in the float32 yardstick (§12.1) |
+| Energies of models with all-electron E0 for their light elements (POLAR-1, OMOL-0, MH-1 `omol`/`spice` heads; MACE-OFF H–Br, with a pseudopotential I, §4.3) wrong by up to 102 meV/atom in float32 (MACE-OFF up to 12) | float64 energy accumulation everywhere (§7.3) and in the float32 yardstick (§12.1) |
 | float32 forward errors do not cancel in MC ΔE (unmeasured) | move-energy gate; float64 MC energy path as fallback, whose cost on GPUs with slow FP64 is measured in phase 3 (§10.4, §16) |
 | Hidden engine state breaks capture, events or restart (stale build cell, sticky flags, frozen sender groups) | runtime-state and derived-state registries with CI checks; canonical restart points (§8.1, §8.5, §10.6) |
 | A stale derived buffer after an event (masses, coefficients, species pairs) | derived-state registry checked against fresh construction (§8.5) |
@@ -2111,5 +2136,25 @@ design items are owner decisions 8–14 (§18).
 | 18. Stale counts and hardware | 2,607 and 1,499 lines; 329 tests collected; leto and murphy qualified; 19 model labels | §3.1; §4.2; §12.2; §16 |
 | 19. §18's all-electron risk row omitted MACE-OFF | E0 table | §18 |
 | 20. The memory note predates the fused plain default | the 16 October benchmark ran the unfused plain path | §4.3 known issues |
+
+Estimates unchanged (§16).
+
+**Draft 0.9 (17 October 2026)** answers a seventh review, of draft 0.8. It
+confirmed the twenty draft 0.8 findings closed (counts, hardware, 19 model
+labels, the MACE-OFF gate ranges and E0 table) and found one scientific and
+seven API or wording issues. All eight were verified and adopted; no owner
+decision was needed.
+
+| Finding | Check | Where answered |
+| --- | --- | --- |
+| 1. MACE-OFF's iodine E0 is not all-electron | I −8,102.52 eV ≈ −298 Ha, a def2 effective-core valence energy; all-electron I ≈ −7,000 Ha; Br −70,045 eV is all-electron | §4.3 energy scale (light elements all-electron, Nb, Ta and I pseudopotential); §18 |
+| 2. The §7.2 example ran the whole schedule, then 100,000 more MC steps | §7.2 rule: `steps` beyond the remaining schedule raises | §7.2: paused 200,000-step run, MC run inside the schedule, then the rest; a finished schedule needs a new `schedule=` |
+| 3. `Workload` example omitted four fields and §9.2 showed no defaults | §7.2 versus §9.2 | §9.2 defaults; §7.2 comment |
+| 4. `Workload` construction raised `PlanRefused`, the §9.3 aggregate | §7.6 definition; the same mismatch held for `run`'s schedule and MC checks | §9.2: `ValueError`; §7.6 definition widened to `run` requests the plan does not cover |
+| 5. `SpeciesNotInSuperset` used for an element the model lacks | §8.5 versus §7.6 | §7.6 `ModelElementError`; §8.5 |
+| 6. "Same `ForceField`, in any order" ignored the process constraints | §8.7 one backend family, reproducible or not | §7.6 |
+| 7. The backend dimension said plain cuEq is always fused | §9.3 enforcement uses the unfused form | §9.3 |
+| 8. The MACE-OFF non-PBC note covered only `fm.Simulation` | `FastMACECalculator` is compiled-tier, no `allow_reference` | §4.3; §7.6 ASE front end |
+| Also: the `species=` comment of §7.2 sat on the `ForceField` argument | §7.6 `Simulation(atoms, model, species=…)` | §7.2 alternative line |
 
 Estimates unchanged (§16).
