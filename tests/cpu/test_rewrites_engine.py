@@ -147,6 +147,31 @@ def test_strain_through_the_registry():
     assert _patches.record_of("single_graph_strain") is not None
 
 
+def test_strain_stays_qualified_after_its_own_patch():
+    """A second resolution after apply keeps the record qualified, auto and "on" alike (review, 18 Oct)."""
+    calc = tiny_mace_calculator([11, 17])
+    registry = reg.Registry([engine.RECORDS["single_graph_strain"]])
+    registry.apply(calc.models[0], registry.resolve(calc.models[0], RewriteConfig()), original=calc.models[0])
+    assert registry.resolve(calc.models[0], RewriteConfig()).enabled == ("single_graph_strain",)
+    assert registry.resolve(calc.models[0], {"single_graph_strain": "on"}).enabled == ("single_graph_strain",)
+
+
+def test_an_unknown_replacement_still_fails_qualification():
+    from mace.modules import utils
+
+    registry = reg.Registry([engine.RECORDS["single_graph_strain"]])
+    original = utils.get_symmetric_displacement
+
+    def foreign(*args, **kwargs):  # not installed through fastmace._patches
+        return original(*args, **kwargs)
+
+    utils.get_symmetric_displacement = foreign
+    try:
+        assert not registry.qualification("single_graph_strain").supported
+    finally:
+        utils.get_symmetric_displacement = original
+
+
 # --------------------------------------------------------------------------- mask head, forces
 
 

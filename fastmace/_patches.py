@@ -40,6 +40,8 @@ _RECORDS: dict = {}
 _ORIGINALS: dict = {}
 # Objects that must stay alive while a patch is in force (the OEq runtime's preloaded libraries).
 _KEEP_ALIVE: dict = {}
+# Our replacements as installed: "module:attribute" -> object (for qualification, original_if_patched).
+_INSTALLED: dict = {}
 
 
 @dataclass(frozen=True)
@@ -96,7 +98,21 @@ def _original(module, attribute):
 def _put(module, attribute, value):
     _original(module, attribute)
     setattr(module, attribute, value)
+    _INSTALLED[f"{module.__name__}:{attribute}"] = value
     return f"{module.__name__}:{attribute}"
+
+
+def original_if_patched(target, current):
+    """MACE's preserved original for ``"module:attribute"`` when ``current`` is the replacement we installed.
+
+    Qualification (SPEC §6.3) hashes this original instead of our replacement, so that a record
+    stays qualified after its own patch is in place. Anything else, an unknown replacement
+    included, returns None and is hashed as it is.
+    """
+    active = any(target in record.targets for record in _RECORDS.values())
+    if active and target in _INSTALLED and current is _INSTALLED[target]:
+        return _ORIGINALS[target]
+    return None
 
 
 def restore(name):

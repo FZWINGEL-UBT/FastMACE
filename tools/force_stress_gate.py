@@ -61,8 +61,29 @@ def quantity_verdict(quantity, production_max_abs, ase_f32_max_abs, ratio=GATE_R
                 floor=FLOORS[quantity], limit=limit, passed=bool(production_max_abs <= limit))
 
 
+def _nonfinite(configs):
+    """Every non-finite error value in ``configs``, as "configuration index/path/quantity" strings."""
+    bad = []
+    for index, config in enumerate(configs):
+        for path in ("production", "ase_f32"):
+            for quantity in QUANTITIES:
+                if not np.isfinite(config[path][quantity]["max_abs"]):
+                    bad.append(f"{index}/{path}/{quantity}")
+            if not np.isfinite(config[path].get("energy_meV_atom", 0.0)):
+                bad.append(f"{index}/{path}/energy_meV_atom")
+    return bad
+
+
 def summarize(configs, ratio=GATE_RATIO):
-    """Worst configuration of each path, the verdict per quantity, and the overall verdict."""
+    """Worst configuration of each path, the verdict per quantity, and the overall verdict.
+
+    A non-finite error anywhere (NaN or inf, in the production path or in the float32 yardstick)
+    fails the gate before any maximum is taken: Python's max can drop a NaN depending on order,
+    and an infinite yardstick would make the limit infinite.
+    """
+    bad = _nonfinite(configs)
+    if bad:
+        return {"passed": False, "nonfinite": bad}
     summary = {}
     for quantity in QUANTITIES:
         summary[quantity] = quantity_verdict(quantity,

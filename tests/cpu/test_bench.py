@@ -318,3 +318,21 @@ def test_random_strain_is_symmetric_and_bounded(rng):
     full = gate.random_strain(rng, 0.02, full=True)
     assert np.allclose(full, full.T)
     assert np.abs(full - np.identity(3)).max() <= 0.02
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+@pytest.mark.parametrize("where", ["production", "ase_f32"])
+def test_nonfinite_errors_fail_in_either_order(bad, where):
+    """A NaN or inf error fails the gate wherever it is and whatever the order (review, 18 Oct)."""
+    good = _config(1e-4, 1e-4, 1e-6, 1e-6)
+    broken = _config(1e-4, 1e-4, 1e-6, 1e-6)
+    broken[where]["forces"]["max_abs"] = bad
+    broken[where]["stress"]["max_abs"] = bad
+    for configs in ([good, broken], [broken, good]):
+        summary = gate.summarize(configs)
+        assert summary["passed"] is False and summary["nonfinite"]
+
+
+def test_an_infinite_yardstick_does_not_license_any_error():
+    configs = [_config(10.0, float("inf"), 10.0, 1e-6)]
+    assert gate.summarize(configs)["passed"] is False

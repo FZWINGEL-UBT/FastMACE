@@ -50,7 +50,10 @@ def test_rewritten_tiny_models_agree_on_cuda(family, dtype):
     model, data = tiny_cueq(family, dtype)
     registry = reg.default_registry()
     rewritten = copy.deepcopy(model).to("cuda")  # a deep copy leaves cuEq fx constants on the CPU
-    resolution = registry.resolve(rewritten, {"block_linear": "on", "grouped_linear": "on"}, strict=False)
+    others_off = {name: "off" for name in registry.names()
+                  if name not in ("block_linear", "grouped_linear", "merged_residual")}
+    resolution = registry.resolve(rewritten, others_off | {"block_linear": "on", "grouped_linear": "on"},
+                                  strict=False)
     applied = registry.apply(rewritten, resolution, original=model)
     threshold = reg.threshold_for(dtype)
     assert [entry.name for entry in applied] == ["block_linear", "grouped_linear"]
@@ -65,5 +68,7 @@ def test_default_original_is_a_copy_on_the_model_device():
     model, _ = tiny_cueq("mh1", torch.float64)
     registry = reg.default_registry()
     rewritten = copy.deepcopy(model).to("cuda")
-    applied = registry.apply(rewritten, registry.resolve(rewritten, {"block_linear": "on"}, strict=False))
+    others_off = {name: "off" for name in registry.names() if name != "block_linear"}
+    applied = registry.apply(rewritten, registry.resolve(rewritten, others_off | {"block_linear": "on"},
+                                                         strict=False))
     assert applied[0].result.passed and applied[0].result.modules > 0

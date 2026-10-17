@@ -201,8 +201,17 @@ def _resolve(qualified):
 
 
 def source_sha256(qualified):
-    """sha256 of ``inspect.getsource`` of ``"module:Qualified.name"`` (the research engine's pins)."""
-    return hashlib.sha256(inspect.getsource(_resolve(qualified)).encode()).hexdigest()
+    """sha256 of ``inspect.getsource`` of ``"module:Qualified.name"`` (the research engine's pins).
+
+    When FastMACE's own recorded patch replaced that object (``fastmace._patches``), MACE's preserved
+    original is hashed, so a record stays qualified after its patch is applied. Any other
+    replacement is hashed as found and therefore fails its pin.
+    """
+    from fastmace import _patches
+
+    obj = _resolve(qualified)
+    original = _patches.original_if_patched(qualified, obj)
+    return hashlib.sha256(inspect.getsource(obj if original is None else original).encode()).hexdigest()
 
 
 def installed_mace_version():

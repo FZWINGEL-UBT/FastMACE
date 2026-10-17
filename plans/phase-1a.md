@@ -702,6 +702,32 @@ From the worker reports:
   probe on murphy, and records both in `docs/validation/1a-T07-T08-gpu.md`.
   Until then T07/T08 are "merged, GPU confirmation pending".
 
+Second outside review (18 October 2026, at `944de8e`). Both defects were
+reproduced and fixed, with regression tests:
+- **P1, gate aggregation.** `tools/force_stress_gate.summarize` took maxima
+  over lists that could hold NaN, and Python's `max` can drop a NaN
+  depending on order. An infinite float32 yardstick also made the limit
+  infinite. A non-finite error anywhere now fails the gate before any
+  maximum is taken (`nonfinite` lists where). Tests cover both orders, NaN
+  and inf, production and yardstick.
+- **P2, qualification after a patch.** After `single_graph_strain` was
+  applied, qualification hashed FastMACE's replacement against MACE's pin:
+  a later "auto" turned it off while it stayed active, and "on" raised.
+  `_patches` now remembers what it installed. `source_sha256` hashes the
+  preserved MACE original only when the current object is exactly
+  FastMACE's recorded replacement. An unknown replacement still fails,
+  and a test covers that case.
+- **Gate references run after the production engine.** The current gate
+  code computes its references after building the production engine. The
+  rule "after T10" requires a fresh process for references. T19 rewrites
+  the gate driver accordingly; until then the gate's results count as
+  provisional.
+- **Process-wide patches in tests.** An autouse fixture in
+  `tests/conftest.py` undoes every patch a test applied, except the OEq
+  runtime and polar long range, which cannot be undone. In one
+  single-process GPU run, the MH-1 and linear GPU tests failed only after
+  the loading tests; alone they passed.
+
 ## New optimisations: screens after T19 (owner, 17 October 2026)
 
 The owner welcomes trying new optimisations and adopting those that make
