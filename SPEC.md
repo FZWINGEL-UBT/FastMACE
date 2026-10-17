@@ -1,12 +1,12 @@
 # FastMACE — Specification
 
-Status: draft 0.11, 17 October 2026. Owner: Fabian Zwingel. Written from the
+Status: draft 0.12, 17 October 2026. Owner: Fabian Zwingel. Written from the
 Langevin_Thermostat experiment (`Experiments/Langevin_Thermostat/`), whose GPU
 engine this library generalises. Drafts 0.2–0.6 and 0.8–0.10 answer eight
 reviews and record the owner's decisions 6–14 (§18, §19); draft 0.7 carried
 the research engine's results of 16–17 October 2026 (MACE-OFF, the fused
 plain-cuEq convolution, no NFS file locks; §19); draft 0.11 adds the
-adoption layer (§7.7).
+adoption layer (§7.7), and draft 0.12 answers its review.
 
 FastMACE is a standalone Python library that runs pretrained MACE models
 (MACE 0.3.x family, including PolarMACE) for atomistic simulation on NVIDIA
@@ -277,8 +277,15 @@ gates of 16 October 2026, `results/mace-off-20261016/`).
 Forces and stress are unaffected (E0 is a constant per species); every
 energy-based decision is not, hence §7.3.
 
-**Licences.** Model licences must be shown at load time: OMOL-0 and MACE-OFF
-are under the ASL licence (non-commercial).
+**Licences.** Model licences must be shown at load time and are recorded per
+label in the label table (§7.6). Per the ACEsuit `mace-foundations` model
+table (checked 17 October 2026): MP-0 (a, b, b2, b3) and MPA-0 are MIT;
+OMAT-0, MatPES PBE and r2SCAN, OMOL-0 and MH-0/MH-1 are under the Academic
+Software License (ASL, non-commercial); MACE-OFF is ASL too (its own
+repository). POLAR-1's licence is taken from its release when its label is
+added. The same table gives MH-1's training levels of theory as
+PBE/r2SCAN/ωB97M-VV10, which fixes the per-head functionals of §7.7's
+dispersion rule.
 
 ### 4.4 Boundary conditions and constraints
 
@@ -583,9 +590,16 @@ that. `fm.calc("mh1", ...)` is a one-line wrapper around it (§7.7, level 0).
 ### 7.5 CLI
 
 - `fastmace run CONFIG.toml`: protocols as today's `main.py` profiles.
-- `fastmace md --model mh1 --structure NaCl.cif --ensemble NVT
-  --temperature 300 --steps 1000000 [--repeat 3 3 3] --output run/`: the CLI
-  face of `fm.md` (§7.7).
+- `fastmace md --model mh1 --head matpes_r2scan --structure NaCl.cif
+  --ensemble NVT --temperature 300 --steps 1000000 [--repeat 3 3 3]
+  --output run/`: the CLI face of `fm.md` (§7.7) for constant-temperature
+  runs. Flags: `--model`, `--head`, `--charge`, `--spin-multiplicity`,
+  `--structure`, `--ensemble`, `--temperature`, `--pressure` (GPa),
+  `--cell-mode`, `--timestep` (fs), `--steps`, `--repeat`, `--dispersion`
+  (`none`, `d3bj`) and `--d3-functional`, `--seed`, `--check`, `--output`,
+  `--sha256`/`--trusted`. Schedules, MC moves, explicit integrators and the
+  full D3 record go through `fastmace init` and `fastmace run`, whose TOML
+  holds every `fm.md` argument.
 - `fastmace init > run.toml`: a commented TOML for `fastmace run` (model,
   structure, ensemble, temperature or schedule, steps, repeat, output).
 - `fastmace relax` and `fastmace quench RUN_DIR`.
@@ -620,8 +634,9 @@ exposes the expert objects it built.
 ```python
 import fastmace as fm
 
-run = fm.md("NaCl.cif", model="mh1", ensemble="NVT", temperature_K=300,
-            timestep_fs=0.5, steps=1_000_000, repeat=(3, 3, 3), output="run/", seed=1)
+run = fm.md("NaCl.cif", model="mh1", head="matpes_r2scan", ensemble="NVT",
+            temperature_K=300, timestep_fs=0.5, steps=1_000_000, repeat=(3, 3, 3),
+            output="run/", seed=1)
 print(run.summary)                 # the one-screen report below
 run.plan, run.gate                 # the Plan and gate records (§9.5, §12.3)
 sim = run.simulation               # the expert handle, a normal Simulation
@@ -631,10 +646,34 @@ sim = run.simulation               # the expert handle, a normal Simulation
   `head=`, `charge=`, `spin_multiplicity=`, `sha256=`/`trusted=` as for
   `fm.load`), `ensemble` (`"NVE"`, `"NVT"`, `"NPT"`), `temperature_K` or
   `schedule=`, `pressure_GPa` and `cell_mode` for NPT, `steps` (optional
-  with a schedule), `mc=` and `min_mc_temperature_K`, `dispersion=` (`None` or `"d3bj"`), `repeat`,
+  with a schedule), `mc=` and `min_mc_temperature_K`, `dispersion=`
+  (`None`, `"d3bj"` or a full `fm.D3(...)` record, below), `repeat`,
   `output`, `seed`, `check` (as `Simulation`), and `integrator=` to choose
   one explicitly. `ensemble="NVT"` means Langevin (§10.2), `"NPT"` the BAOAB
   barostat.
+- Heads: a multi-head checkpoint (MH-1) without `head=` raises `ValueError`
+  listing its heads, here and in `fm.load`, `fm.calc` and the
+  `fastmace.ase` classes; there is no default head. A label may name a head
+  itself, as the research engine's labels do (`mh1-r2scan` = MH-1 with
+  `matpes_r2scan`, `common.py` `MODELS`).
+- **Dispersion.** "D3(BJ)" alone does not identify the correction (§11.2).
+  `dispersion="d3bj"` is shorthand that `fm.md` expands to a complete
+  `fm.D3` record before planning: Becke–Johnson damping, the functional
+  parameter set of the head's training functional from the label table
+  (`pbe` for the PBE-trained models and heads, `r2scan` for `matpes_r2scan`
+  and MatPES r2SCAN), and the §11.2 defaults for pair cutoff, CN cutoff, ATM
+  term, smoothing, precision and unit constants. The expanded record is
+  part of the force-field identity, printed in the report and recorded in
+  `metadata.json`. `"d3bj"` raises `ValueError`, naming the reason, when
+  the training reference already contains dispersion (MACE-OFF, trained on
+  ωB97M-D3(BJ); OMOL-0 and MH-1's `omol` head, ωB97M-V with its VV10
+  nonlocal term; any head whose label-table functional includes
+  dispersion), since adding D3 would count
+  it twice, and when the training functional is unknown (POLAR-1, a model
+  loaded from a path or URL), where only an explicit
+  `fm.D3(functional=…, ...)` is accepted. An explicit `fm.D3` is used as
+  given, and a functional that differs from the training functional is a
+  report warning.
 - It builds the `ForceField` (float32), `Workload`, integrator, `Output` and
   `Simulation`, then runs. It infers what it can from the arguments, since
   it knows the whole run before planning: the species superset (structure
@@ -642,7 +681,10 @@ sim = run.simulation               # the expert handle, a normal Simulation
   schedule, or `temperature_K`); `mc_moves` and `species_changes` from
   `mc=`. An explicit argument always wins.
 - MC temperature window: with a constant `temperature_K`,
-  `min_mc_temperature_K` is that temperature. With a schedule and `mc=`,
+  `min_mc_temperature_K` is that temperature, which must then be positive:
+  `temperature_K=0` with `mc=` raises `ValueError`, as does any
+  `min_mc_temperature_K ≤ 0` in `Workload` (§9.2), since the ΔE floor
+  0.01 k_B T_min would be zero (§12.3). With a schedule and `mc=`,
   `min_mc_temperature_K=` is required (`ValueError` naming it otherwise),
   because no value can be inferred safely: the schedule minimum of an
   anneal from 0 K would make the ΔE floor zero (§12.3), and every MC block
@@ -669,13 +711,26 @@ from ase import units
 from fastmace.ase import Langevin
 
 dyn = Langevin(atoms, 0.5 * units.fs, temperature_K=300, friction=0.02 / units.fs,
-               model="mh1", trajectory="run.traj", logfile="run.log", loginterval=20)
+               model="mh1", head="matpes_r2scan", trajectory="run.traj",
+               logfile="run.log", loginterval=20)
 dyn.attach(print_energy, interval=1000)
 dyn.run(1_000_000)
+print(dyn.summary)                 # the same report as fm.md
 ```
 
-- Same signatures, argument names and **units as the ASE class**, plus
-  `model=` (or `force_field=`). `friction` is in ASE's inverse time units as
+- **Arguments.** The argument names and **units of the ASE 3.27 class**:
+  each class accepts an explicit list of the ASE constructor's arguments
+  and raises `TypeError`, naming the argument, for any other. For
+  `Langevin`: `atoms`, `timestep`, `temperature` or `temperature_K`,
+  `friction`, `fixcm`, `trajectory`, `logfile`, `loginterval`,
+  `append_trajectory`. Refused: `rng` (the noise comes from FastMACE's
+  device generator; pass `seed=`), and `communicator` other than ASE's
+  default (FastMACE runs one process per structure). The other classes list
+  theirs in the API reference, and a CPU test compares each list with
+  `inspect.signature` of the ASE class, so an ASE argument that is neither
+  supported nor refused fails CI. FastMACE additions are keyword-only:
+  `model=` or `force_field=`, `head=`, `seed=`, `output=`, `check=`,
+  `dispersion=` (as `fm.md`). `friction` is in ASE's inverse time units as
   in ASE; `friction=0.02` without `/units.fs` would be about 0.002/fs, as
   it is in ASE. The shim never reinterprets an ASE argument.
 - Mapping (ASE 3.27 class → FastMACE integrator): `Langevin` → Langevin and
@@ -684,47 +739,76 @@ dyn.run(1_000_000)
   `NVTBerendsen`/`NPTBerendsen` → Berendsen (phase 4, with those
   integrators, §10.2). An ASE class without a mapping raises with the list
   of mapped ones; the shim never falls back to ASE's own loop silently.
-- Supported members: `run`, `step`, `atoms`, `nsteps`, `dt`, `attach`,
-  `observers`, `todict`, `get_time`, and the constructor's `trajectory`,
-  `logfile`, `loginterval`, `append_trajectory`. `run(n)` advances in graph
-  chunks between observer calls.
+- ASE members: `run`, `step`, `atoms`, `nsteps`, `dt`, `attach`,
+  `observers`, `todict`, `get_time`. `run(n)` advances in graph chunks
+  between observer calls. FastMACE members: `summary`, `plan`, `gate`,
+  `metadata` (the dict written to `metadata.json`), `simulation` (the
+  underlying `Simulation`, for restart and the expert API) and `output`
+  (the directory). The plan and gate are made at the first `run` or
+  `step`, which prints the report (below).
+- **Files.** `trajectory=` and `logfile=` keep their ASE meaning: one ASE
+  `Trajectory` file at that path (appended with `append_trajectory`) and
+  ASE's log format, so scripts that read them work unchanged; the
+  trajectory is written by FastMACE's asynchronous writer (§5 `io`). Every
+  other file goes to `output=`, by default `<trajectory stem>.fastmace/`
+  next to the trajectory, else `./fastmace-run/`: `metadata.json`, the
+  report, and restart files every 10,000 steps. These shim files are not
+  the chunked `fm.Output` files of §10.6. A shim run resumes through
+  `fm.Simulation.resume(output)`, which continues in the chunked format of
+  §10.6 in that directory; the interrupted ASE trajectory is left as it is,
+  may hold frames past the restart point, and `metadata.json` records the
+  step of its last frame.
 - **Observers.** Before each observer call the shim writes the committed
-  state into `atoms` (positions, momenta, cell, species) and attaches a
-  results cache as `atoms.calc`, so `get_potential_energy()`, `get_forces()`
-  and `get_stress()` return the engine's values for that step without a new
-  evaluation. After the call it compares `atoms` with what it wrote. A
-  change of positions, momenta or species is applied as one event through
-  the transaction contract (§8.5; species must be in the superset, rule 2);
-  a change of atom count, cell (except through a barostat), constraints or
-  `atoms.calc` raises. Observers every few steps make the planner choose
-  the compiled tier (rule 9), and the report says so.
+  state into `atoms` (positions, momenta, cell, species, masses, initial
+  charges) and attaches a results cache as `atoms.calc`, so
+  `get_potential_energy()`, `get_forces()` and `get_stress()` return the
+  engine's values for that step without a new evaluation. After the call
+  it compares `atoms` with what it wrote. A change of positions, momenta,
+  species, masses or charges is applied as one event through the
+  transaction contract (§8.5; species must be in the superset, rule 2). A
+  change of atom count, PBC, cell (except through a barostat), constraints,
+  `info` keys the plan reads (charge, spin) or `atoms.calc` raises, since
+  each would invalidate the plan. Observers every few steps make the
+  planner choose the compiled tier (rule 9), and the report says so.
 - Constraints follow §4.4: `FixAtoms` is refused until the integrators
   support it in phase 4, with that reason; no other tier is substituted.
 
-**Level 0: a calculator (`fm.calc`).** `atoms.calc = fm.calc("mh1")` wraps
+**Level 0: a calculator (`fm.calc`).** `atoms.calc = fm.calc("mh1", head="matpes_r2scan")` wraps
 `FastMACECalculator` (§7.4). It records, and prints once, "compatibility
 tier: compiled, no CUDA graphs; use `fm.md` or `fastmace.ase` integrators for
 full speed". It is the right choice for phonopy, NEB, custom optimisers and
 any tool that needs only an ASE calculator.
 
-**The report.** `fm.md`, the `fastmace.ase` integrators and the CLI print one
-screen at setup and keep it in `run.summary` and `metadata.json`:
+**The report.** `fm.md`, the `fastmace.ase` integrators and the CLI keep
+one report in `summary` and `metadata.json`, built in two stages. At setup
+they print everything known then: header, physics, plan, gate, setup time,
+outputs and warnings, with `speed: pending`. Once the steady-state step
+time is measured (a fixed window after warm-up), the speed line is filled
+in, printed once as a single line and written to `metadata.json`; at the
+end of the run it is replaced by the whole-run mean. For a constant-T NVT
+run:
 
 ```text
-FastMACE 1.0  |  mh1/matpes_r2scan  |  NaCl, 216 atoms (3×3×3), 3D PBC, NVT Langevin 0.5 fs
+FastMACE 1.0  |  mh1 (head matpes_r2scan)  |  NaCl, 216 atoms (3×3×3), 3D PBC, NVT Langevin 0.5 fs
+physics: no dispersion; charge/spin not used by this model
 plan:    graph, hybrid cuEq/OEq, float32, 14 rewrites on, 2 off (reasons in run.plan)
 gate:    passed (2 rattled; 0.04 meV/atom, 2e-6 eV/Å; floors §12.3)
-speed:   4.1 ms/step measured over steps 1,000–2,000 of this run
 setup:   42 s (load, rewrites, compile, capture, gate)
+speed:   pending → 4.1 ms/step, measured over steps 1,000–2,000 of this run
 output:  run/trajectory.000.traj, run/thermo.csv, run/metadata.json
-warn:    licence ASL (non-commercial); NPT barostat unqualified (§10.2)
+licence: ASL (non-commercial), from the label table (§4.3)
+warn:    none
 ```
 
+- Warnings are conditional on the run: the NPT barostat note only for NPT
+  runs, the experimental labels only for the options in use, the model
+  issues of §4.3 only for the model and structure that have them. The
+  licence line is read from the label table (§7.6) for every model, never
+  written by hand.
 - Speeds are **measured, never predicted**: the generality rule (§9.1)
   forbids per-GPU tables, so there is no "expected speed-up" figure. The
-  speed line is the run's own steady-state step time, filled in once it is
-  measured; until runtime calibration (phase 5) there is no comparison
-  between tiers. A ratio against stock ASE appears only when the user
+  speed line is the run's own steady-state step time; until runtime
+  calibration (phase 5) there is no comparison between tiers. A ratio against stock ASE appears only when the user
   measured it with `fastmace bench --vs-ase`.
 - When the run did not get the graph engine, the report says why and what
   would change it, without estimates: not 3D-periodic (reference tier with
@@ -756,9 +840,16 @@ environment problems. The CLI prints this message alone (§7.5).
   `reproducible=True` is qualified, §9.3), and the same steady-state step
   time within run-to-run noise in alternating A/B blocks (a gap is a bug:
   the layer is thin).
-- An observer that changes positions, momenta or species gives the same
-  state as the same change made through `Simulation` events; one that
-  changes the atom count, cell or constraints raises.
+- An observer that changes positions, momenta, species, masses or charges
+  gives the same state as the same change made through `Simulation`
+  events; one that changes the atom count, PBC, cell or constraints raises.
+- Each `fastmace.ase` class's argument list matches `inspect.signature` of
+  its ASE 3.27 class (every argument supported or explicitly refused); a
+  ported script's `trajectory=` file reads back with `ase.io.read` frame for
+  frame.
+- `dispersion="d3bj"` expands to the full §11.2 record matching the
+  label table's functional, and raises for MACE-OFF, OMOL-0, MH-1's `omol`
+  head and models with an unknown functional.
 - Every path that does not reach the graph engine either runs and reports
   the reason, or refuses with the reason; never silently.
 
@@ -807,6 +898,9 @@ are not (§7.3).
 - a **path or URL** is unpickled only with `sha256=` matching the file or
   `trusted=True`; otherwise `CheckpointTrustError`. The decision and the
   hash are recorded in provenance.
+- a multi-head checkpoint needs `head=` (or a label that names one);
+  otherwise `ValueError` listing the heads. The label table records each
+  label's licence and the training functional of each head (§4.3, §7.7).
 
 **Schedules.**
 - A schedule is a sequence of segments: `ramp(T0, T1, ps=…)` or
@@ -1146,7 +1240,8 @@ class Workload:
 `Workload` validates itself at construction (`ValueError`, before any
 planning; `PlanRefused` stays the planner's aggregate of §9.3): a non-empty
 `mc_moves` requires `min_mc_temperature_K` (owner decision 8, 17 October
-2026; `None` only for non-MC workloads), and `"swap"` or `"transmute"` in
+2026; `None` only for non-MC workloads), which must be positive (the ΔE
+floor of §12.3 is 0.01 k_B T_min), and `"swap"` or `"transmute"` in
 `mc_moves` requires `species_changes=True`; the two can therefore never
 disagree.
 
@@ -2412,3 +2507,21 @@ and the documentation pages. Changed on review:
 
 Estimates: phase 1b 4–6 weeks (was 3–4), total 25–34 weeks, first
 production deliverable 19–25 weeks (§16).
+
+**Draft 0.12 (17 October 2026)** answers a review of draft 0.11, which found
+the adoption layer's shape and phase 1b placement right and six details
+open, two of them physics-level. All were verified and adopted; the MH-1
+licence was checked against the ACEsuit `mace-foundations` model table.
+
+| Finding | Check | Where answered |
+| --- | --- | --- |
+| 1. `dispersion="d3bj"` did not identify the correction | §11.2 parameter table; the research engine's label table already records each label's training functional (`common.py` `MODELS`) | §7.7: `"d3bj"` expands to the full `fm.D3` record from the label table's functional and is recorded and printed; refused where the reference already contains dispersion (MACE-OFF ωB97M-D3(BJ), OMOL-0 and MH-1 `omol` ωB97M-V) or the functional is unknown (POLAR-1, paths); explicit `fm.D3(...)` otherwise. The review's "OMOL → ωB97M D3" would have double-counted VV10 |
+| 2. ASE shim signature and outputs | ASE 3.27 constructors include `fixcm`, `rng`, `communicator`; no report or restart access | §7.7: explicit argument lists checked against `inspect.signature`, `rng` and non-default `communicator` refused; `summary`, `plan`, `gate`, `metadata`, `simulation`, `output`; ASE-format trajectory and log at the given paths, everything else in `output=`, resume through `Simulation.resume` |
+| 3. Observer sync missed masses, charges and PBC | §8.5 events include mass and charge changes | §7.7: masses and charges synced and applied as events; PBC, charge/spin `info` keys raise |
+| 4. `fastmace md` lacked most `fm.md` arguments | §7.5 | §7.5: flags for head, charge, spin, pressure, cell mode, timestep, dispersion, seed, check, trust; schedules, MC and integrators through `init` + `run` |
+| 5. MH-1 example without a head | MH-1 is multi-head | §7.6 loading and §7.7: `head=` required for multi-head checkpoints, no default; examples pass it |
+| 6. `temperature_K=0` with `mc=` gave a zero ΔE floor | §12.3 floor 0.01 k_B T_min | §7.7 and §9.2: `min_mc_temperature_K` must be positive |
+| Report: NVT example warned about NPT; MH-1 licence | `mace-foundations` table: MH-0/1 ASL | §7.7 conditional warnings, licence from the label table; §4.3 licence list (MP-0, MPA-0 MIT; OMAT-0, MatPES, OMOL-0, MH-1 ASL) |
+| Report: "printed at setup" versus "filled in once measured" | §7.7 | §7.7: two-stage report, `speed: pending` at setup, one line when measured, whole-run mean at the end |
+
+Estimates unchanged (§16).
