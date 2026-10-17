@@ -144,6 +144,26 @@ def _width(segments):
     return sum(mul * dim for _, mul, dim in segments)
 
 
+def _reference(original, name):
+    """The unrewritten module that the block linear at ``name`` replaced.
+
+    An earlier rewrite may have wrapped that module: the MH-1 family's ``factor_species`` keeps
+    each species embedding as ``<path>.embedding`` of its ``ProjectedEmbedding``. The reference is
+    then the nearest enclosing path of the unrewritten model that is a cuEquivariance Linear.
+    """
+    lm = _block_type()
+    parts = name.split(".")
+    while parts:
+        try:
+            module = original.get_submodule(".".join(parts))
+        except AttributeError:
+            module = None
+        if module is not None and (len(parts) == len(name.split(".")) or lm.is_cueq_linear(module)):
+            return module
+        parts.pop()
+    raise AttributeError(f"the unrewritten model has no module {name} (nor a cuEquivariance Linear enclosing it)")
+
+
 def _check_block_modules(original, rewritten, context, grouped_only):
     import torch
 
@@ -153,7 +173,7 @@ def _check_block_modules(original, rewritten, context, grouped_only):
     for name, module in _modules(rewritten):
         if not isinstance(module, lm.BlockLinear) or (grouped_only and not module.grouped):
             continue
-        reference = original.get_submodule(name)
+        reference = _reference(original, name)
         x = _probe(module, generator, _width(module.segments_in))
         grad = torch.randn((_PROBE_ROWS, _width(module.segments_out)), generator=generator,
                            dtype=torch.float64).to(x)
