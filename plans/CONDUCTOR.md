@@ -26,7 +26,7 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
   T09). The decisions of both waves are in `plans/phase-1a.md` ("Conductor
   decisions after wave 0" and "after wave 1"). Read them before briefing
   anyone.
-- **Not started:** T14 (output and minimal restart), T16 (minimal
+- **Done since:** T14, T16, T18 (wave 1b, see the plan). **Not started (formerly listed here):** T14 (output and minimal restart), T16 (minimal
   provenance) and T18 (validation and A/B tools). They are wave 1 tasks and
   can start at once: they depend only on T01 and T02. Then wave 2: T06
   (rewrite registry and linear family) first, then T07 and T08 in parallel,

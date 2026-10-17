@@ -559,6 +559,41 @@ within the baseline's own run-to-run scatter (3.3e-7).
   session, in worktrees under `D:\Margraf\FastMACE-wt\`, whenever the app
   refuses to start separate sessions. The rules are the same as for sessions.
 
+## Conductor decisions after wave 1b (17 October 2026)
+
+T14, T16 and T18 are merged (main 7545581). Wave 1 is complete.
+
+- **Noise floor (T18, `docs/validation/1a-noise-floor.md`).** Two copies of
+  the research engine in one process on murphy agree within 0.32% with the
+  4-block protocol and within 0.16% with 12 blocks, about ten times below
+  the 3% criterion, and they do not interfere. T19 therefore uses
+  same-process A/B with 12 blocks. T19 also:
+  - swaps which engine is built first in one repeat (NaNbO3 shows a
+    0.1–0.16% offset tied to the build order);
+  - measures setup time and peak memory in single-engine processes
+    (`--sides baseline` / `--sides fastmace`), because an A/B process mixes
+    them;
+  - checks that FastMACE's forces in an A/B process equal those from a
+    FastMACE-only process, because both engines patch MACE process-wide;
+  - uses the fuller baseline export at
+    `/mnt/homes/zwingel/fastmace-baseline/1a-T18` (same tag, with
+    `oeq_no_nvcc.sh`, `common.py`, structures and a `COMMIT` file). The
+    slimmer `20261017` exports stay for the CPU equivalence tests.
+- **Restart files (T14).** The extra keys (`velocities`, `masses`,
+  `species`, `integrator_keys`, `fastmace_restart`) are accepted: FastMACE
+  resumes exactly, and research-engine files still load.
+  `Snapshot.wait()` in `engine/base.py` becomes `trajectory.wait(self)` in
+  T13. `output_steps` moves to `fastmace.protocols` in 1b.
+- **Provenance (T16).** The additions stay under the key `"fastmace"` in
+  `run.json` and in the `model` block until the schema-versioned record of
+  1b. `code_sha256` stays caller-supplied: T17's `main.py` passes its own
+  files, and the git commit covers FastMACE.
+- **Git in WSL on Windows worktrees.** WSL's git cannot read a Windows
+  worktree, whose `.git` file names a `D:/` path, so `git_commit()` returns
+  `(None, None)` there. On the main checkout it works. Runs that need the
+  commit in provenance run from the main checkout or the NAS copy, which
+  has `.source_commit`. T16's git test skips in that case.
+
 ## Risks specific to 1a
 
 | Risk | Mitigation |
