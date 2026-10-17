@@ -1,0 +1,75 @@
+[build-system]
+# setuptools >= 77 reads the SPDX `license` string (PEP 639).
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fastmace"
+dynamic = ["version"]
+description = "Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Fabian Zwingel" }]
+requires-python = ">=3.10"
+# Qualified stack (SPEC §4.1): torch 2.14.1+cu130, mace-torch 0.3.16, cuequivariance-torch 0.12.0,
+# ASE 3.27.0, NumPy 2.2.6. The CUDA-specific cuEquivariance ops wheels (-cu12/-cu13) are chosen
+# by the user's CUDA build and are not base dependencies.
+dependencies = [
+    "torch",
+    "mace-torch==0.3.16",
+    "ase>=3.23",
+    "numpy",
+    "cuequivariance-torch>=0.12",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+
+[project.optional-dependencies]
+oeq = ["openequivariance>=0.7"]
+# graph-longrange is pinned per MACE version; MACE 0.3.16 calls the 0.4.0 interface.
+polar = ["graph-longrange==0.4.0"]
+d3 = ["torch-dftd==0.5.1"]
+# Union of [oeq], [polar] and [d3]; no packages of its own (SPEC §14).
+full = [
+    "openequivariance>=0.7",
+    "graph-longrange==0.4.0",
+    "torch-dftd==0.5.1",
+]
+dev = ["pytest", "pytest-xdist", "ruff"]
+
+[tool.setuptools.dynamic]
+version = { attr = "fastmace.__version__" }
+
+[tool.setuptools.packages.find]
+include = ["fastmace*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# No .pytest_cache in the repository or on the NAS checkout.
+addopts = "-p no:cacheprovider"
+markers = [
+    "gpu: needs a CUDA GPU; skipped on CPU-only machines",
+    "slow: long-running test, excluded from the quick suite",
+]
+# Deprecations raised inside third-party packages (MACE/e3nn TorchScript, matplotlib's pyparsing
+# calls, torch's pynvml import); warnings from our own code stay visible.
+# Copied from Experiments/Langevin_Thermostat/pytest.ini.
+filterwarnings = [
+    "ignore:`torch\\.jit\\.:FutureWarning",
+    "ignore::FutureWarning:torch\\.jit\\..*",
+    "ignore:The TorchScript type system doesn't support instance-level annotations:UserWarning",
+    "ignore:The pynvml package is deprecated:FutureWarning",
+    "ignore::DeprecationWarning:matplotlib\\..*",
+    "ignore::DeprecationWarning:pyparsing\\..*",
+    "ignore:invalid escape sequence:DeprecationWarning:graph_longrange\\..*",
+    "ignore:To copy construct from a tensor:UserWarning:mace\\..*",
+]
