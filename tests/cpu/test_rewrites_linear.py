@@ -186,6 +186,14 @@ def test_grouped_linear_selfcheck():
 
 
 def tiny_cueq(family):
+    """A tiny cuEq model of ``family`` built for the CPU, and a batch for it.
+
+    With cuequivariance_ops_torch installed (the CUDA environments), cuEq builds MACE's
+    channel-wise tensor product with its CUDA-only ``uniform_1d`` kernel even when no GPU is
+    visible; without the ops it falls back to ``naive``. The conversion here takes the fallback in
+    every environment, so the test runs where a CUDA torch sees no GPU.
+    """
+    from cuequivariance_torch.primitives import segmented_polynomial
     from mace.cli.convert_e3nn_cueq import run
 
     from _support.structures import nacl
@@ -194,7 +202,8 @@ def tiny_cueq(family):
 
     calc = tiny_mace_calculator(Z_VALUES, **TINY[family])
     batch = calc._atoms_to_batch(nacl(repeat=1, rattle=0.05, seed=1))
-    model = run(calc.models[0], device="cpu", return_model=True)
+    with mock.patch.object(segmented_polynomial, "HAS_CUE_OPS", False):
+        model = run(calc.models[0], device="cpu", return_model=True)
     for parameter in model.parameters():
         parameter.requires_grad_(False)
     return model, batch
