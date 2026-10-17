@@ -644,6 +644,36 @@ and the `polar_longrange` patch entry are registered.
   `fastmace.model.loading.load(device="cpu", backend="cueq")` is the first
   place to check.
 
+## New optimisations: screens after T19 (owner, 17 October 2026)
+
+The owner welcomes trying new optimisations and adopting those that make
+FastMACE faster while passing the accuracy gates. The general-rule
+constraint of SPEC §1.1 still applies: no per-GPU or per-crystal tuning.
+Phase 1a itself only reproduces the research engine, so its equivalence
+tests stay exact. New ideas are therefore screened only after T19, once
+FastMACE has its own engine:
+
+- Measure with `fastmace.bench.ab`, FastMACE against itself (option off
+  against on) in alternating blocks in one process, on an idle GPU, with
+  12 blocks. A gain counts only if it clearly exceeds the noise floor of
+  `docs/validation/1a-noise-floor.md` (0.16–0.32%).
+- It must pass the force/stress gate (energy included once 1b adds it) for
+  the 19 labels, plus the per-module self-check at the §6.4 thresholds.
+- Adopted rewrites start as opt-in records; they become `auto` defaults
+  when the gain holds on the three crystals and two GPU architectures.
+  Every screen, including those with no gain, is logged in
+  `docs/rewrites.md`.
+
+Candidates:
+1. **Folded species embedding (T07, 17 October 2026).** Fold the species
+   embedding and the per-network linear of `factor_species`'s
+   `ProjectedEmbedding` into one per-species table, a gather by species,
+   so there is no submodule left for `block_linear`. Exactness: rounding.
+   Expected gain is small: per-atom forward kernels only, about 10 µs per
+   step, which is about 0.3% on NaCl. The research engine's contiguous
+   folded weight gave nothing. It would also make the MH-1 and linear stack
+   simpler.
+
 ## Risks specific to 1a
 
 | Risk | Mitigation |
