@@ -4,6 +4,12 @@ Status: planned, 17 October 2026. Spec: [SPEC.md](../SPEC.md) §3, §4.1,
 §4.3, §4.4, §5, §6, §8.1, §9.1, §12.2, §12.5, §16 row 1a. Estimate: 3–4
 weeks. Requires phase 0 merged.
 
+Since 17 October 2026 FastMACE has its own repository (SPEC §18 decision 1).
+"Source" paths and every path starting with `Experiments/` are in
+ResearchModule (`G:\Margraf\ResearchModule`). Workers read them there and
+write only here. The one exception is T17, which changes ResearchModule
+itself (see that task).
+
 ## Goal
 
 Move the research engine's GPU path into `fastmace` with **the same
@@ -380,7 +386,12 @@ they start with `Experiments/`.
 #### 1a-T17 `main.py` on FastMACE (M) — after T15, T16
 
 - Spec: §16 ("`main.py` runs on top of FastMACE"), migration paragraph.
-- Files: `Experiments/Langevin_Thermostat/langevin/fastmace_engine.py` (a
+- **Cross-repository task.** It runs as a session in ResearchModule, started
+  on purpose, under ResearchModule's AGENTS.md, on its own branch there.
+  FastMACE comes in through `PYTHONPATH` pointing at a FastMACE checkout of a
+  recorded commit, never as a copy or a submodule. `run.json` records that
+  commit.
+- Files (in ResearchModule): `Experiments/Langevin_Thermostat/langevin/fastmace_engine.py` (a
   `GPUEngine`-compatible adapter that asks FastMACE's planner for the
   engine), a `--engine fastmace` choice in `workflow.parse_args`, and the
   matching tests in `Experiments/Langevin_Thermostat/tests/core/`. The
