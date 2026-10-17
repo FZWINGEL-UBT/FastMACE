@@ -10,8 +10,8 @@ directory with ``cache_dir(kind)`` when it needs one.
 """
 
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from fastmace.errors import FastMACEError
 

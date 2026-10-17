@@ -15,7 +15,10 @@ and Inductor bind the class at their own import. ``FASTMACE_SOFT_FILE_LOCKS``:
 * unset: soft locks when possible. A process that imported torch first keeps
   kernel locks, and ``runtime_info()`` reports that the switch came late.
 * ``1``: soft locks; importing fastmace after torch is an error.
-* ``0``: kernel locks, and the CUDA driver cache is left alone.
+* ``0``: kernel locks, and the CUDA driver cache is left alone. If the
+  start-up hook below already made the locks soft and torch is not imported
+  yet, the kernel-lock class is restored; after torch, the soft locks stay and
+  ``runtime_info()`` says so.
 
 The CUDA driver locks its JIT cache's ``index`` file with POSIX locks, 220 to
 440 times per run. When that cache lies on NFS and the user has not set
@@ -25,9 +28,14 @@ hang on a broken mount.
 
 Our research environments may carry the ``nfs-soft-locks`` start-up hook,
 which does the same for every interpreter. Where it already made the locks
-soft, this module changes nothing.
+soft, this module changes nothing unless ``FASTMACE_SOFT_FILE_LOCKS=0``. The
+hook reads its own variables, not ours: ``LANGEVIN_SOFT_FILE_LOCKS=0`` (kernel
+locks, also for the research engine) or ``NFS_SOFT_LOCKS_HOOK=0`` switch it
+off at interpreter start, which also covers code that imports torch before
+fastmace.
 """
 
+import importlib.util
 import os
 import sys
 
@@ -77,6 +85,27 @@ def use_soft_file_locks():
     return mode()
 
 
+def restore_kernel_file_locks():
+    """Make filelock.FileLock the platform's kernel-lock class again (undoes a start-up hook's switch).
+
+    Only meaningful before torch is imported; a platform without kernel locks keeps SoftFileLock.
+    """
+    import filelock
+
+    if sys.platform == "win32":
+        names = ("WindowsFileLock", "AsyncWindowsFileLock")
+    else:
+        if importlib.util.find_spec("fcntl") is None:  # filelock's default there is SoftFileLock
+            return mode()
+        names = ("UnixFileLock", "AsyncUnixFileLock")
+    sync, asynchronous = (getattr(filelock, name, None) for name in names)
+    if sync is not None:
+        filelock.FileLock = sync
+    if asynchronous is not None:
+        filelock.AsyncFileLock = asynchronous
+    return mode()
+
+
 def configure_file_locks(environ=None):
     """Apply FASTMACE_SOFT_FILE_LOCKS for this process; returns (source, late).
 
@@ -87,9 +116,11 @@ def configure_file_locks(environ=None):
 
     wanted = requested(environ)
     if wanted is False:
+        if filelock.FileLock is filelock.SoftFileLock and "torch" not in sys.modules:
+            restore_kernel_file_locks()
         if mode() == "soft":
-            # The start-up hook switched before us; its own opt-out is LANGEVIN_SOFT_FILE_LOCKS=0.
-            return f"opted out ({ENVIRONMENT_VARIABLE}=0), but already soft before fastmace", False
+            # The start-up hook switched before torch was imported, and torch bound the soft class.
+            return f"opted out ({ENVIRONMENT_VARIABLE}=0), but soft since torch was imported", False
         return f"opted out ({ENVIRONMENT_VARIABLE}=0)", False
     if filelock.FileLock is filelock.SoftFileLock and mode() == "soft":
         if _hook_active():

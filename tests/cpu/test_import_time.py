@@ -5,11 +5,11 @@ Import order is the thing under test, so every test runs its code in a fresh int
 
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -43,6 +43,7 @@ def run(code, soft=None, hook=False, **extra):
         [sys.executable, "-c", textwrap.dedent(code)],
         cwd=REPOSITORY_ROOT,
         env=env,
+        check=False,  # the caller inspects the exit code
         capture_output=True,
         text=True,
         timeout=300,
@@ -71,7 +72,7 @@ def test_default_makes_pytorch_locks_soft():
                               extension_soft=issubclass(cpp_extension.FileLock, filelock.SoftFileLock),
                               async_soft=filelock.AsyncFileLock is filelock.AsyncSoftFileLock)))
     """)
-    assert result == dict(mode="soft", late=False, torch_soft=True, extension_soft=True, async_soft=True)
+    assert result == {"mode": "soft", "late": False, "torch_soft": True, "extension_soft": True, "async_soft": True}
 
 
 def test_soft_lock_excludes_and_removes_its_file():
@@ -91,7 +92,7 @@ def test_soft_lock_excludes_and_removes_its_file():
             first.release()
             print(json.dumps(dict(held=held, excluded=excluded, removed=not os.path.exists(path))))
         """)
-    assert result == dict(held=True, excluded=True, removed=True)
+    assert result == {"held": True, "excluded": True, "removed": True}
 
 
 def test_stale_lock_of_a_dead_process_is_broken():
@@ -123,7 +124,7 @@ def test_zero_keeps_kernel_locks():
         print(json.dumps(dict(mode=info.file_locks, source=info.file_lock_source,
                               kernel=not issubclass(FileLock, filelock.SoftFileLock))))
     """, soft="0")
-    assert result == dict(mode="kernel", source="opted out (FASTMACE_SOFT_FILE_LOCKS=0)", kernel=True)
+    assert result == {"mode": "kernel", "source": "opted out (FASTMACE_SOFT_FILE_LOCKS=0)", "kernel": True}
 
 
 def test_one_insists_on_soft_locks():
@@ -203,15 +204,57 @@ print(json.dumps(dict(unchanged=(filelock.FileLock, filelock.AsyncFileLock) == c
                       torch_soft=issubclass(FileLock, filelock.SoftFileLock), mode=info.file_locks,
                       late=info.file_lock_switch_late, source=info.file_lock_source)))
 """)
-    assert result == dict(unchanged=True, environ=True, torch_soft=True, mode="soft", late=False,
-                          source="start-up hook (nfs_soft_locks)")
+    assert result == {"unchanged": True, "environ": True, "torch_soft": True, "mode": "soft", "late": False,
+                      "source": "start-up hook (nfs_soft_locks)"}
+
+
+def test_opt_out_restores_kernel_locks_after_the_hook():
+    result = run_json(FAKE_HOOK + """
+import json, fastmace, torch
+from torch.utils._filelock import FileLock
+info = fastmace.runtime_info()
+print(json.dumps(dict(mode=info.file_locks, source=info.file_lock_source, torch_kernel=not issubclass(FileLock, filelock.SoftFileLock),
+                      async_kernel=not issubclass(filelock.AsyncFileLock, filelock.AsyncSoftFileLock))))
+""", soft="0")
+    assert result == {"mode": "kernel", "source": "opted out (FASTMACE_SOFT_FILE_LOCKS=0)",
+                      "torch_kernel": True, "async_kernel": True}
+
+
+def test_opt_out_after_torch_keeps_the_hooks_soft_locks_and_says_so():
+    result = run_json(FAKE_HOOK + """
+import json, torch, fastmace
+info = fastmace.runtime_info()
+print(json.dumps(dict(mode=info.file_locks, source=info.file_lock_source, unchanged=filelock.FileLock is filelock.SoftFileLock)))
+""", soft="0")
+    assert result["mode"] == "soft"
+    assert result["unchanged"] is True
+    assert "FASTMACE_SOFT_FILE_LOCKS=0" in result["source"]
+    assert "soft since torch was imported" in result["source"]
+
+
+def hook_installed():
+    code, line, _ = run("import importlib.util, json; print(json.dumps(importlib.util.find_spec('nfs_soft_locks') is not None))",
+                        hook=True)
+    return code == 0 and json.loads(line)
+
+
+@pytest.mark.parametrize("torch_first", [False, True])
+def test_opt_out_with_the_installed_hook(torch_first):
+    if not hook_installed():
+        pytest.skip("nfs-soft-locks start-up hook not installed in this environment")
+    order = "torch, fastmace" if torch_first else "fastmace, torch"
+    result = run_json(f"""
+        import json, filelock, nfs_soft_locks
+        hook = nfs_soft_locks.STATE["filelock"]
+        import {order}
+        print(json.dumps(dict(hook=hook, mode=fastmace.runtime_info().file_locks)))
+    """, soft="0", hook=True)
+    assert result == {"hook": "soft", "mode": "soft" if torch_first else "kernel"}
 
 
 def test_installed_hook_is_a_no_op():
     """The real hook, where the environment has it (our research environments do; CI does not)."""
-    code, line, _ = run("import importlib.util, json; print(json.dumps(importlib.util.find_spec('nfs_soft_locks') is not None))",
-                        hook=True)
-    if code != 0 or not json.loads(line):
+    if not hook_installed():
         pytest.skip("nfs-soft-locks start-up hook not installed in this environment")
     result = run_json("""
         import json, filelock, nfs_soft_locks
@@ -221,7 +264,8 @@ def test_installed_hook_is_a_no_op():
         print(json.dumps(dict(hook=nfs_soft_locks.STATE["filelock"], unchanged=filelock.FileLock is before,
                               mode=info.file_locks, late=info.file_lock_switch_late, source=info.file_lock_source)))
     """, hook=True)
-    assert result == dict(hook="soft", unchanged=True, mode="soft", late=False, source="start-up hook (nfs_soft_locks)")
+    assert result == {"hook": "soft", "unchanged": True, "mode": "soft", "late": False,
+                      "source": "start-up hook (nfs_soft_locks)"}
 
 
 # --- The CUDA driver cache on NFS ----------------------------------------------------------------------
@@ -318,11 +362,11 @@ def test_import_applies_the_cuda_rule_unless_opted_out():
 
 def test_cache_root_from_environment_and_subdirectories():
     with tempfile.TemporaryDirectory() as temp:
-        result = run_json(f"""
+        result = run_json("""
             import json, os
             from fastmace import _cache
             root = _cache.cache_root()
-            paths = {{kind: str(_cache.cache_dir(kind, create=False)) for kind in _cache.CACHE_KINDS}}
+            paths = {kind: str(_cache.cache_dir(kind, create=False)) for kind in _cache.CACHE_KINDS}
             print(json.dumps(dict(root=str(root), kinds=sorted(_cache.CACHE_KINDS), paths=paths,
                                   created=os.path.exists(paths["triton"]))))
         """, FASTMACE_CACHE=os.path.join(temp, "fm"))
