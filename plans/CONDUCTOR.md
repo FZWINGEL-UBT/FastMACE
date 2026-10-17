@@ -37,11 +37,16 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
 - Preferred: app sessions with `cwd` this repository and their own
   worktree, one per task, branch `fastmace/<phase>-T<nn>`. From a session in
   this repository, proposal cards work too.
-- If the app refuses to start sessions, run the workers as background
-  subagents (`Agent`, `run_in_background`) of your session. In that case
-  create their worktrees yourself:
-  `git worktree add -b fastmace/1a-Tnn D:/Margraf/FastMACE-wt/1a-Tnn main`.
-  The brief must name the worktree path and say "work only there".
+- The app starts sessions only in a turn the owner started. Turns started
+  by a worker's report are refused ("this turn runs an automated event").
+  So after merging, start the next workers in the owner's next turn, or ask
+  the owner to say "start the next tasks". Do **not** use background
+  subagents to get around this. The permission classifier blocked that as an
+  "Auto-Mode Bypass" on 17 October 2026. Background subagents are fine only
+  in a turn the owner started, when sessions are unavailable for another
+  reason. In that case create their worktrees yourself
+  (`git worktree add -b fastmace/1a-Tnn D:/Margraf/FastMACE-wt/1a-Tnn main`),
+  and say "work only there" in the brief.
 - **Never create worktrees of ResearchModule.** It is on a USB hard disk,
   and parallel worktrees there time out. Workers only read it, at
   `G:\Margraf\ResearchModule`.
