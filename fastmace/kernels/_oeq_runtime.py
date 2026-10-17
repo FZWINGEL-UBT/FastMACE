@@ -1,6 +1,7 @@
-"""OpenEquivariance 0.7 host-extension runtime without the oeq_no_nvcc.sh launcher (SPEC §3.2, §14).
+"""OpenEquivariance 0.7 host-extension runtime, prepared in-process (SPEC §3.2, §14).
 
-Prototype from plan task 1a-T00; the findings are in docs/design/oeq-runtime.md.
+From plan task 1a-T00 (findings in docs/design/oeq-runtime.md), promoted in
+1a-T05; it replaces ResearchModule's ``oeq_no_nvcc.sh`` launcher.
 
 OEq 0.7 with ``OEQ_JIT_EXTENSION=1`` builds its small host C++ extension with
 ``torch.utils.cpp_extension.load`` when ``openequivariance`` is first imported,
@@ -10,20 +11,16 @@ environment's pip wheels (``nvidia/cu13``) have both, under other names than a
 toolkit, so a small directory of symbolic links under the cache root stands in
 for the toolkit.
 
-Everything here can be done in the running process, before OpenEquivariance and
-``torch.utils.cpp_extension`` are imported, except ``LD_LIBRARY_PATH``: the
-dynamic loader reads it once, at process start. Instead of it, the cu13
-libraries the extension needs are loaded by absolute path with ``RTLD_GLOBAL``
-(``preload_libraries``), so the loader finds them by soname when the extension
-is loaded.
+Everything is done in the running process, before OpenEquivariance and
+``torch.utils.cpp_extension`` are imported (``import mace.calculators`` imports
+both). ``LD_LIBRARY_PATH`` is not needed: torch's RPATH already maps the cu13
+libraries. As a guard against a torch build that loads them lazily, they are
+also loaded by absolute path with ``RTLD_GLOBAL`` (``preload_libraries``), so the
+loader finds them by soname when the extension is loaded.
 
-Three entry points, from the three candidates of the spike:
-
-- ``prepare_in_process(cache)``: candidate (a), the recommended one.
-- ``prepare_by_reexec(cache)``: candidate (b), re-executes the interpreter once
-  with ``LD_LIBRARY_PATH`` set.
-- ``python -m fastmace.kernels._oeq_runtime CACHE -- COMMAND ...``: candidate
-  (c), a launcher like the shell script.
+The entry point is ``prepare_in_process(cache)``; model loading calls it once per
+process through ``fastmace._patches.prepare_oeq_runtime``, before its first MACE
+import.
 """
 
 from __future__ import annotations
@@ -44,7 +41,6 @@ printf 'nvcc invocation blocked: %s\\n' "$*" >> "${OEQ_NVCC_ATTEMPTS:?}"
 printf 'nvcc intentionally unavailable: FastMACE builds the OEq host extension without it\\n' >&2
 exit 97
 """
-PREPARED_VARIABLE = "FASTMACE_OEQ_PREPARED"
 
 
 class OEqRuntimeError(RuntimeError):
@@ -59,7 +55,6 @@ class RuntimePlan:
     links: dict = field(default_factory=dict)  # link path -> target
     files: dict = field(default_factory=dict)  # path -> (text, mode)
     environment: dict = field(default_factory=dict)  # variable -> value, for this process
-    loader_path: str = ""  # LD_LIBRARY_PATH for a new process (re-exec or launcher only)
     preload: tuple = ()  # absolute library paths, in load order
 
 
@@ -129,10 +124,8 @@ def plan(runtime, driver, cache, environ, extensions_dir, tools_dir,
             files[wrapper] = (f'#!/bin/sh\nexec g++ -L"{root / "lib64"}" "$@"\n', 0o755)
             environment["CXX"] = str(wrapper)
             break
-    loader_path = os.pathsep.join([str(runtime / "lib"), str(driver.parent)]
-                                  + [p for p in environ.get("LD_LIBRARY_PATH", "").split(os.pathsep) if p])
     return RuntimePlan(root=root, links=links, files=files, environment=environment,
-                       loader_path=loader_path, preload=tuple(preload))
+                       preload=tuple(preload))
 
 
 def materialize(runtime_plan):
@@ -177,7 +170,10 @@ def _plan_for(cache, environ):
 
 
 def prepare_in_process(cache, preload=True, environ=None):
-    """Candidate (a): prepare the OEq runtime in this process, before OpenEquivariance is imported."""
+    """Prepare the OEq runtime in this process, before OpenEquivariance is imported; returns (plan, handles).
+
+    The handles of the preloaded libraries must stay alive while the process uses OEq.
+    """
     environ = os.environ if environ is None else environ
     _check_not_too_late()
     runtime_plan = _plan_for(cache, environ)
@@ -185,38 +181,3 @@ def prepare_in_process(cache, preload=True, environ=None):
     environ.update(runtime_plan.environment)
     handles = preload_libraries(runtime_plan) if preload else []
     return runtime_plan, handles
-
-
-def prepare_by_reexec(cache):
-    """Candidate (b): re-execute the interpreter once with the OEq runtime environment and LD_LIBRARY_PATH."""
-    cache = os.path.realpath(os.path.expanduser(cache))
-    if os.environ.get(PREPARED_VARIABLE) == cache:
-        return
-    _check_not_too_late()
-    runtime_plan = _plan_for(cache, os.environ)
-    materialize(runtime_plan)
-    environment = dict(os.environ, **runtime_plan.environment)
-    environment["LD_LIBRARY_PATH"] = runtime_plan.loader_path
-    environment[PREPARED_VARIABLE] = cache
-    sys.stdout.flush()
-    sys.stderr.flush()
-    os.execve(sys.executable, [sys.executable] + sys.orig_argv[1:], environment)
-
-
-def main(argv=None):
-    """Candidate (c): ``python -m fastmace.kernels._oeq_runtime CACHE -- COMMAND [ARG ...]``."""
-    argv = sys.argv[1:] if argv is None else argv
-    if len(argv) < 3 or argv[1] != "--":
-        print("usage: python -m fastmace.kernels._oeq_runtime CACHE -- COMMAND [ARG ...]", file=sys.stderr)
-        return 2
-    cache = os.path.realpath(os.path.expanduser(argv[0]))
-    runtime_plan = _plan_for(cache, os.environ)
-    materialize(runtime_plan)
-    environment = dict(os.environ, **runtime_plan.environment)
-    environment["LD_LIBRARY_PATH"] = runtime_plan.loader_path
-    environment[PREPARED_VARIABLE] = cache
-    os.execvpe(argv[2], argv[2:], environment)
-
-
-if __name__ == "__main__":
-    sys.exit(main())
