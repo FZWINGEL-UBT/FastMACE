@@ -623,6 +623,27 @@ then T07 and T08.
   model only. Deep copies of hybrid models lose MACE's OEq adapters; T11
   re-applies them (`_restore_oeq_wrappers`), as the switch map notes.
 
+## Conductor decisions after T06 (17 October 2026)
+
+T06 merged. The registry is in `fastmace/rewrites/registry.py`; its module
+docstring is the API reference. T07 and T08 each add a family module whose
+`RECORDS` maps names to §6.1 records (or dicts plus an optional
+`config_field`), and place it in `RECORD_SOURCES` where the research engine
+applies that family. T15 resolves with `Registry.candidates` and
+`Registry.resolve`. An explicit "on" that cannot be honoured raises
+`RewriteRefusedError`; it is never silently downgraded. The polar records
+and the `polar_longrange` patch entry are registered.
+
+- **cuEq on CPU picks a CUDA-only kernel.** When `cuequivariance_ops_torch`
+  is importable, MACE's cuEq conversion builds the channel-wise tensor
+  product with the CUDA-only `uniform_1d` kernel even for `device="cpu"`, and
+  the first forward pass fails without a GPU. The tests force cuEq's `naive`
+  method during conversion (`HAS_CUE_OPS` off). **T11 and T15 must do the
+  same** for any CPU cuEq model, including the CPU float64 reference that
+  SPEC §12.3 allows as a fallback, or refuse that route with a reason.
+  `fastmace.model.loading.load(device="cpu", backend="cueq")` is the first
+  place to check.
+
 ## Risks specific to 1a
 
 | Risk | Mitigation |
