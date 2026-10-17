@@ -103,3 +103,37 @@ MACE 0.3.16, e3nn 0.4.4 and cuEquivariance 0.12.0 (pinned) or 0.13.0
 (newest) resolve on Python 3.10, 3.11 and 3.12 with torch 2.14.1 and
 2.13.0, so no cell is dropped. The newest resolution then was ASE 3.29.0,
 NumPy 2.5.4 and filelock 4.2.0.
+
+## NAS checkout
+
+The workstations (murphy, leto, coraline, ...) see FastMACE at
+`/mnt/homes/zwingel/FastMACE`. It is a plain directory, not a git
+repository, like ResearchModule's NAS copy. `.source_commit` holds the
+commit it was copied from. Caches and temporary files of runs there go to
+`/mnt/homes/zwingel/fastmace-cache/`. Results and other NAS-only files
+must never be deleted, so every sync only adds and overwrites tracked
+files. Nobody edits tracked files on the NAS; check first that the NAS
+copy matches its `.source_commit`, so an edit made there is not lost:
+
+```bash
+C=$(ssh murphy cat /mnt/homes/zwingel/FastMACE/.source_commit)
+git -c core.quotepath=false ls-tree -r $C | awk -F'\t' '{split($1,a," "); print a[3]"  "$2}' > local.txt
+cut -c43- local.txt | ssh murphy 'cd /mnt/homes/zwingel/FastMACE && git hash-object --stdin-paths' | paste -d' ' - <(cut -c43- local.txt) | diff <(sed 's/  / /' local.txt) -
+rm local.txt
+```
+
+No output means no NAS-side edits. Then copy `main` with LF line endings
+(a plain `git archive` on Windows writes CRLF) and record the commit:
+
+```bash
+git -c core.autocrlf=false archive --format=tar main | ssh murphy 'tar -x -C /mnt/homes/zwingel/FastMACE'
+ssh murphy "echo $(git rev-parse main) > /mnt/homes/zwingel/FastMACE/.source_commit"
+```
+
+`tar -x` never deletes, so a file removed from git stays on the NAS; remove
+it by hand after checking that it is not a result. Run tests there with the
+NAS environment's Python and `PYTHONPATH=/mnt/homes/zwingel/FastMACE`; the
+full command is in `docs/validation/phase-0.md`. pytest needs
+`--basetemp=/mnt/homes/zwingel/fastmace-cache/<name>`: under a `TMPDIR` on
+the NAS it refuses its `pytest-of-zwingel` directory, because NFS reports
+another owner uid (1024) than the workstation login (1012).
