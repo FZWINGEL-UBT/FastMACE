@@ -8,6 +8,10 @@ the research engine's results of 16–17 October 2026 (MACE-OFF, the fused
 plain-cuEq convolution, no NFS file locks; §19); draft 0.11 adds the
 adoption layer (§7.7), and draft 0.12 answers its review.
 
+Since 17 October 2026 FastMACE has its own repository (§18 decision 1).
+Paths in this document that start with `Experiments/`, `Structures/` or
+`environment/` refer to the ResearchModule repository.
+
 FastMACE is a standalone Python library that runs pretrained MACE models
 (MACE 0.3.x family, including PolarMACE) for atomistic simulation on NVIDIA
 GPUs, with exact model-level rewrites, a GPU-resident simulation state, CUDA
@@ -2218,9 +2222,17 @@ deterministic.
 | A fallback diagnosis that never ends, or ends nowhere | diagnosis budget and the terminal sequence: rewrites off, eager, reference, refuse (§9.4) |
 
 Open decisions for the owner:
-1. Repository — **decided (user, 16 October 2026): inside ResearchModule as
-   `FastMACE/` for now.** A separate repository (simpler CI and release) can
-   follow before the first public release.
+1. Repository — **decided (user, 17 October 2026): its own repository,
+   `FZWINGEL-UBT/FastMACE` (private), checked out on an NVMe drive.** This
+   replaces the decision of 16 October 2026 (inside ResearchModule as
+   `FastMACE/`). Reason: the ResearchModule checkout lives on a USB hard
+   disk, and four parallel worktrees of its 17,634 files did not finish
+   checking out within the app's five-minute start limit, so the parallel
+   worker sessions of phase 0 never started. The history of `FastMACE/` was
+   carried over with `git subtree split`. Paths starting with
+   `Experiments/`, `Structures/` or `environment/` in this specification
+   are paths in ResearchModule, which keeps the research engine and the
+   frozen baseline tag `research-engine-baseline-20261017`.
 2. Minimum MACE version to support beyond 0.3.16.
 3. Whether the gate on the user's structure is on by default (recommended) or
    opt-in, and whether an `unavailable` gate refuses the run by default
@@ -2529,3 +2541,7 @@ Estimates unchanged (§16).
 
 **Draft 0.12, amendment (17 October 2026):** owner decision 4 recorded,
 licence MIT (§14, §18). No other change.
+
+**Draft 0.12, second amendment (17 October 2026):** owner decision 1
+changed: FastMACE moved from `ResearchModule/FastMACE/` to its own
+repository `FZWINGEL-UBT/FastMACE` on an NVMe drive (§18). No content change.

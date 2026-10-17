@@ -10,7 +10,7 @@ passes its checks on your structure.
 ## Install (development)
 
 ```bash
-pip install -e "FastMACE[dev]"
+pip install -e ".[dev]"
 ```
 
 Extras: `[oeq]` (OpenEquivariance hybrid backend), `[polar]` (PolarMACE

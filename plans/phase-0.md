@@ -3,6 +3,12 @@
 Status: planned, 17 October 2026. Spec: [SPEC.md](../SPEC.md) §5, §12.2
 (CPU unit class), §12.4, §14, §16 row 0. Estimate: 1 week.
 
+Since 17 October 2026 FastMACE has its own repository (SPEC §18 decision 1).
+File paths below are relative to its root. Paths starting with
+`Experiments/` are in ResearchModule: read them from
+`G:\Margraf\ResearchModule`, never write there (AGENTS.md). 0-T01 was done
+inside ResearchModule before the move; its history came along.
+
 ## Goal
 
 An installable, empty-but-real `fastmace` package with its import-time
@@ -13,7 +19,7 @@ rules.
 **Acceptance (SPEC §16):** `pip install -e .` works; the CPU suite is green.
 In detail:
 
-1. `pip install -e "FastMACE[dev]"` succeeds in a fresh venv with CPU torch.
+1. `pip install -e ".[dev]"` succeeds in a fresh venv with CPU torch.
 2. `import fastmace` before `import torch` makes PyTorch's file locks soft
    locks, and the CUDA driver cache rule of §14 holds.
 3. The CPU suite passes locally (`-n 8`) and in CI on Python 3.10, 3.11 and
@@ -40,14 +46,14 @@ sections, files it owns, tests to write first, done-when.
 ### 0-T01 Package skeleton (M) — no dependencies
 
 - Spec: §5 (layout), §4.1 (dependency pins), §14 (name, extras).
-- Files: `FastMACE/pyproject.toml`, `FastMACE/README.md`, `FastMACE/LICENSE`
-  (MIT), `FastMACE/fastmace/__init__.py` (`__version__ =
+- Files: `pyproject.toml`, `README.md`, `LICENSE`
+  (MIT), `fastmace/__init__.py` (`__version__ =
   "0.0.1.dev0"`), one `__init__.py` with a one-line docstring per subpackage
   of §5 (`model`, `rewrites`, `kernels`, `neighbors`, `integrators`, `mc`,
   `optimize`, `engine`, `planner`, `reference`, `longrange`, `io`,
   `protocols`, `ase`, `cli`, `bench`), `fastmace/errors.py` with only the
   base class `FastMACEError` (the hierarchy of §7.6 comes in 1b),
-  `FastMACE/docs/index.md`, `FastMACE/docs/validation/.gitkeep`.
+  `docs/index.md`, `docs/validation/.gitkeep`.
 - Build backend: setuptools (`[tool.setuptools.packages.find]`), flat layout
   as §5 shows. Python `>=3.10`. Base dependencies: `torch`, `mace-torch` (pin
   `==0.3.16`), `ase>=3.23`, `numpy`, `cuequivariance-torch>=0.12`. Take the
@@ -67,14 +73,16 @@ sections, files it owns, tests to write first, done-when.
 
 ### 0-T02 CPU development venv (S) — after T01
 
-- Files: none in git except a short `FastMACE/docs/development.md` section
-  with the recipe.
+- Files: none in git except a short `docs/development.md` section with the
+  recipe.
 - In WSL: `python3.10 -m venv ~/environments/fastmace_cpu`, CPU torch
-  2.14.1 from the PyTorch CPU index, then `pip install -e "FastMACE[dev]"`
-  from the Linux view of the checkout (WSL reads `G:` as `/mnt/g`). Keep pip
-  caches in `~/pip-cache` and temporary files in `~/tmp` (root AGENTS.md).
+  2.14.1 from the PyTorch CPU index, then
+  `pip install -e "/mnt/d/Margraf/FastMACE[dev]"` (the main checkout, so the
+  venv outlives any worktree). Keep pip caches in `~/pip-cache` and
+  temporary files in `~/tmp` (ResearchModule's AGENTS.md, "Local PC").
   Run `pip check`, then export `~/environments/fastmace_cpu.requirements.txt`.
-- Record the venv in the root AGENTS.md list of local environments.
+- The conductor records the venv in ResearchModule's AGENTS.md list of local
+  environments after merging (the worker does not write to ResearchModule).
 - Done when: `python -c "import fastmace, torch; print(fastmace.__version__, torch.__version__)"`
   works and T01's tests pass in this venv.
 
@@ -149,9 +157,8 @@ sections, files it owns, tests to write first, done-when.
 ### 0-T06 CPU CI (M) — after T01, T04
 
 - Spec: §12.4 (CPU: Linux, Python 3.10–3.12, two torch versions).
-- Files: `.github/workflows/fastmace-cpu.yml` at the repository root
-  (`paths: FastMACE/**`), running `pip install -e "FastMACE[dev]"` with CPU
-  torch and `pytest -n auto tests/cpu`.
+- Files: `.github/workflows/cpu.yml`, running `pip install -e ".[dev]"`
+  with CPU torch and `pytest -n auto tests/cpu`.
 - Matrix: Python 3.10, 3.11, 3.12 × torch 2.14.1 and the newest 2.13.x.
   First check that MACE 0.3.16, cuEquivariance 0.12 and e3nn 0.4.4 install
   on 3.11 and 3.12. If one does not, drop that cell, record why in
@@ -167,13 +174,14 @@ sections, files it owns, tests to write first, done-when.
 
 ### 0-T07 NAS presence (S) — after T01–T06 are merged
 
-- `FastMACE/` is not yet in the NAS checkout (which holds `Experiments/`,
-  `Models/`, `Papers/` and `Structures/`). Add it with the fast-sync
-  recipe of the root AGENTS.md (LF files from `git archive`, one `rsync
-  --files-from`). Nothing on the NAS is overwritten because nothing exists
-  there yet. Check that first.
+- Create the NAS checkout `/mnt/homes/zwingel/FastMACE` (not a git
+  repository, like ResearchModule's NAS copy). Check first that the path
+  does not exist, then copy LF files with `git -c core.autocrlf=false
+  archive HEAD` and one `rsync`, following the fast-sync recipe in
+  ResearchModule's AGENTS.md ("NAS checkout"). Later syncs use the same
+  recipe against this directory.
 - Run `tests/cpu` there once with the NAS `mace_cueq_latest` Python and
-  `PYTHONPATH=/mnt/homes/zwingel/ResearchModule/FastMACE` (`-n 24` on a
+  `PYTHONPATH=/mnt/homes/zwingel/FastMACE` (`-n 24` on a
   workstation), and `tests/gpu` on one idle workstation GPU (murphy or
   leto).
 - Done when: both pass, and the result is recorded in

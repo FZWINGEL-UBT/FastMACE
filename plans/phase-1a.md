@@ -241,7 +241,7 @@ they start with `Experiments/`.
   `studies/other_models/probes/model_step_time.py`.
 - Files: `fastmace/bench/step_time.py`, `fastmace/bench/ab.py` (loads the
   baseline from an exported directory given by path, and FastMACE, in one
-  process, and alternates blocks), `FastMACE/tools/force_stress_gate.py`
+  process, and alternates blocks), `tools/force_stress_gate.py`
   (today's rule, both engines). Two hybrid engines in one process are
   allowed; never mix hybrid and plain-cuEq compilation in one process (root
   AGENTS.md).
@@ -410,7 +410,7 @@ they start with `Experiments/`.
   GPU, idle check first.
 - Report: `docs/validation/phase-1a.md` with run IDs, machines,
   environments, both commits and every number; JSON in
-  `FastMACE/results/<run-id>/`.
+  `results/<run-id>/`.
 
 ## Order and parallelism
 
