@@ -63,7 +63,15 @@ THRESHOLDS = MappingProxyType({"float64": 1e-10, "float32": 1e-4})
 
 # Families registered by default_registry(), in application order (the research engine applies
 # the MH-1 rewrites, then the GENERIC_* ones, then the block linears, then the merge).
-RECORD_SOURCES = ("fastmace.rewrites.linear", "fastmace.rewrites.polar")
+RECORD_SOURCES = (
+    # The research engine's order (compile_model): MH-1 package, then GENERIC_*, then the linear family.
+    "fastmace.rewrites.mh1",
+    "fastmace.rewrites.generic",
+    "fastmace.rewrites.linear",
+    "fastmace.rewrites.polar",
+    # Process-wide stress-path patch (MACE PR 1498), as a record so the planner gets a decision and reason.
+    "fastmace.rewrites.engine",
+)
 
 LOGGER = logging.getLogger("fastmace.rewrites")
 
@@ -451,6 +459,11 @@ class Registry:
         ``requested``: a RewriteConfig, or {name: "on" | "off" | "auto" | bool} (missing names are
         "auto"). ``strict``: raise RewriteRefusedError when an explicit "on" cannot be honoured;
         otherwise such a record is disabled with ``refused=True``.
+
+        Several records can share one config field, as the MH-1 and ``GENERIC_*`` variants of
+        ``reassociate_first``, ``streaming_conv`` and ``fused_folded_backward`` do. An explicit "on"
+        for such a field is honoured when at least one of its records is enabled; the records of
+        that field that do not fit the model are then disabled with their reason, not refused.
         """
         if isinstance(requested, RewriteConfig):
             requested = self.requested(requested)
@@ -459,7 +472,7 @@ class Registry:
         if unknown:
             raise ValueError(f"unknown rewrite(s) {sorted(unknown)}; registered: {list(self._records)}")
         requested = {name: _toggle(name, value) for name, value in requested.items()}
-        enabled, decisions, refusals = [], [], []
+        enabled, decisions, misfits = [], [], set()
         for candidate in self.candidates(model, mace_version):
             name = candidate.name
             want = requested.get(name, "auto")
@@ -468,13 +481,25 @@ class Registry:
                 enabled.append(name)
                 decisions.append(Decision(name, want, True, "on" if want == "on" else f"default {candidate.default}"))
                 continue
-            refused = want == "on" and reason != "off"
-            if refused:
-                refusals.append(f"{name}: {reason}")
-            decisions.append(Decision(name, want, False, reason, refused))
+            if want == "on" and candidate.qualified.supported and not candidate.support.supported:
+                misfits.add(name)  # the model is not this variant's kind; another variant may take the field
+            decisions.append(Decision(name, want, False, reason, want == "on" and reason != "off"))
+        # A field shared by several variants is honoured when one of them is enabled: the variants
+        # that do not fit the model are then off, not refused. Any other blocker still refuses.
+        decisions = [self._excuse_misfit(d, enabled) if d.name in misfits else d for d in decisions]
+        refusals = [f"{d.name}: {d.reason}" for d in decisions if d.refused]
         if refusals and strict:
             raise RewriteRefusedError("requested rewrites cannot be enabled: " + "; ".join(refusals))
         return Resolution(tuple(decisions))
+
+    def _excuse_misfit(self, decision, enabled):
+        """``decision`` (a variant that does not fit the model) unrefused if another variant of its field is on."""
+        field = self._fields[decision.name]
+        honoured_by = [name for name in enabled if name != decision.name and self._fields[name] == field]
+        if not honoured_by:
+            return decision
+        return dataclasses.replace(
+            decision, refused=False, reason=f"{decision.reason} (field {field} honoured by {', '.join(honoured_by)})")
 
     def _blocker(self, candidate, want, enabled):
         """Why ``candidate`` stays off given the records enabled so far, or None."""
@@ -505,7 +530,8 @@ class Registry:
         """Run one record's self-check and hold it to SPEC §6.4 (THRESHOLDS), whatever it claims."""
         context = context or Context()
         result = CheckResult.coerce(self._records[name].selfcheck(original, rewritten, context))
-        limit = THRESHOLDS[result.dtype] if result.dtype in THRESHOLDS else min(result.threshold, THRESHOLDS["float32"])
+        # A result without a known dtype is held to the strictest threshold (SPEC §6.4), never the loosest.
+        limit = THRESHOLDS[result.dtype] if result.dtype in THRESHOLDS else min(THRESHOLDS.values())
         error = result.max_relative_error
         passed = bool(result.passed) and error <= limit
         detail = result.detail

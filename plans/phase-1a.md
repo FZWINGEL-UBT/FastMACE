@@ -644,6 +644,64 @@ and the `polar_longrange` patch entry are registered.
   `fastmace.model.loading.load(device="cpu", backend="cueq")` is the first
   place to check.
 
+## Conductor decisions after T07/T08 (18 October 2026)
+
+T07 (MH-1 rewrites) and T08 (generic, strain and engine rewrites) are
+merged. Status: **merged, GPU confirmation pending** (see the last item).
+At the merge the conductor changed the following; an outside review of
+18 October 2026 prompted items 4–7:
+
+1. **`RECORD_SOURCES`** follows the research engine's order: `mh1`,
+   `generic`, `linear`, `polar`, then `engine`. `engine` contributes
+   `single_graph_strain`, so T15 gets a decision and reason for it too.
+2. **Shared config fields.** The MH-1 and `GENERIC_*` variants of
+   `reassociate_first`, `streaming_conv` and `fused_folded_backward` read
+   one field. An explicit "on" is honoured when one variant is enabled. The
+   variants that do not fit the model are then off, with the reason
+   "(field … honoured by …)", not refused. Any other blocker still refuses:
+   conflict, failed qualification, missing requirement. Tests are in
+   `tests/cpu/test_rewrites_shared_fields.py`.
+3. The **linear tests** turn the other families off explicitly, because
+   the default registry now holds them all.
+4. **Self-check threshold:** a `CheckResult` without a dtype is held to the
+   strictest §6.4 threshold, not the float32 one.
+5. **`inplace_block_linear`** is not carried over in 1a (§6.2 lists it as
+   an opt-in that is slower). The field stays, for CLI parity, without a
+   record. T15 refuses `True` with "not carried over in 1a", and it is
+   candidate 2 of the screens below if anyone wants it timed.
+6. **`.gitignore` and `.gitattributes`** (`* text=auto eol=lf`) now exist.
+   T18's `summary.json` was renormalised to LF.
+7. **Docs:** README, `plans/README.md` and `plans/CONDUCTOR.md` describe
+   the state of 18 October 2026.
+
+From the worker reports:
+- **Streaming needs receiver-sorted edges (T07).** With unsorted edges,
+  MH-1's energy was off by a factor of 2.5 while every self-check passed,
+  because the self-check builds its own sorted graph. So T15 makes
+  `sort_receivers` a hard requirement of `streaming_conv` (both variants).
+  T13 also asserts it at engine construction: the edge order is known
+  there, and the check costs nothing per step.
+- `reassociate_first` needs the structure's one-hot species in
+  `Context.inputs["node_attrs"]` (T07, T08). T11 supplies them.
+- **Process-wide conv fusion (T07, T08).** `loading.load(backend="cueq")`
+  turns MACE's fused cuEq convolution on for the whole process, and deep
+  copies of fused models then break. T11 re-applies MACE's adapter to its
+  copies (`_restore_cueq_conv_fusion`). Tests that load cuEq models restore
+  MACE's rule when they finish, as T07's do.
+- **MACE-OFF (T08):** its first block is not generic, so reassociation never
+  applies there; `rewrite_support`'s "ok" verdict is too optimistic. T15
+  takes the per-record `applies_to` result, which is correct, so the
+  verdict does no harm. `docs/rewrites.md` records it in phase 6.
+- **Reassociation probe tolerance (T07):** coefficients within a path are
+  compared at 1e-12 (float64) or 1e-5 (float32), because cuEq's CPU kernel
+  differs by up to 1e-15. Accepted.
+- **GPU confirmation (open).** T07 reported 17 GPU tests and real MH-1
+  float64 agreement to 1.4e-15 on the RTX 5060 Ti, but recorded no
+  results. T08's murphy agreement used a stand-in for T07's modules. The
+  conductor runs the full GPU suite on the merged tree and T08's agreement
+  probe on murphy, and records both in `docs/validation/1a-T07-T08-gpu.md`.
+  Until then T07/T08 are "merged, GPU confirmation pending".
+
 ## New optimisations: screens after T19 (owner, 17 October 2026)
 
 The owner welcomes trying new optimisations and adopting those that make

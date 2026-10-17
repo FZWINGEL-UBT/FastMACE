@@ -7,7 +7,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | Phase | Plan | Status |
 | --- | --- | --- |
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
-| 1a. Extraction | [phase-1a.md](phase-1a.md) | waves 0–1, T10 and T06 merged (17 October 2026); next T07 and T08 |
+| 1a. Extraction | [phase-1a.md](phase-1a.md) | 14 of 20 merged (T00–T10, T14, T16, T18; 18 October 2026); T07/T08 GPU confirmation pending; next T11 and T12 |
 | 1b. Contracts | — | written during 1a |
 | 2. Safety | — | |
 | 3. Dynamic topology and MC | — | |

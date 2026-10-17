@@ -4,8 +4,12 @@ Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs: exact
 model rewrites, CUDA graphs and a planner that picks the fastest engine that
 passes its checks on your structure.
 
-**Status:** phase 0 (package skeleton). Nothing runs yet. The design is in
-[SPEC.md](SPEC.md) and the phase plans are in [plans/](plans/).
+**Status (18 October 2026):** phase 1a, extraction of the research engine:
+14 of 20 tasks are merged. The model, kernels, rewrites, neighbour list,
+PolarMACE path, output and validation tools exist and match the research
+engine. The force field, integrators, graph engine and planner are not
+written yet, so there is no MD run yet. The design is in [SPEC.md](SPEC.md),
+and progress is in [plans/README.md](plans/README.md).
 
 ## Install (development)
 

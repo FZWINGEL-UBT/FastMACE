@@ -19,18 +19,19 @@ ask only for open SPEC §18 decisions, changes to scientific protocol,
 anything destructive outside your own branches and worktrees, and the
 phase 1a checkpoint 3 (after T19: `main.py` default and shims).
 
-## State on 17 October 2026
+## State on 18 October 2026
 
 - **Phase 0:** done (`docs/validation/phase-0.md`).
-- **Phase 1a:** waves 0 and 1 are merged (T00–T05, T09, T14, T16, T18).
-  Their decisions are in `plans/phase-1a.md`, in the sections "Conductor
-  decisions after wave 0", "after wave 1" and "after wave 1b". Read them
-  before briefing anyone.
-- **Next: wave 2.** T10 is merged (see "after T10" in the plan). T06 (rewrite registry and linear family) comes first,
-  then T07 and T08 in parallel. T10 (PolarMACE) needs only T03 and T05, so
-  it can start now. It also fixes the tiny polar model; see the wave 1
-  decisions. See "Order and parallelism" in the plan.
-- **Critical path:** T06 → T07 → T11 → T13 → T15 → T17 → T19.
+- **Phase 1a:** 14 of 20 tasks are merged: T00–T10, T14, T16 and T18.
+  Their decisions are in `plans/phase-1a.md`, in every "Conductor decisions
+  after …" section. Read them all before briefing anyone.
+- **T07/T08 GPU confirmation is open:** the GPU suite on the merged tree, and
+  T08's murphy agreement run repeated with T07's real modules. See "after
+  T07/T08" in the plan.
+- **Next: T11 (force field) and T12 (state and integrators) in parallel.**
+  All dependencies of both are merged. Then T13 (graph engine), T15
+  (planner), T17 (`main.py` on FastMACE) and T19 (acceptance).
+- **Critical path:** T11 → T13 → T15 → T17 → T19.
 
 ## Starting workers
 

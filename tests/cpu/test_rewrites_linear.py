@@ -214,6 +214,12 @@ def energy_and_forces(model, batch):
     return out["energy"].detach(), out["forces"].detach()
 
 
+def linear_only(registry, **requested):
+    """Requests with every record outside the linear family off (the default registry holds them all)."""
+    linear = {"block_linear", "grouped_linear", "merged_residual"}
+    return {name: "off" for name in registry.names() if name not in linear} | requested
+
+
 def relative(got, expected):
     return float((got - expected).abs().max()) / max(float(expected.abs().max()), 1e-300)
 
@@ -223,7 +229,8 @@ def test_rewritten_tiny_models_agree_with_the_originals(family):
     model, batch = tiny_cueq(family)
     registry = reg.default_registry()
     rewritten = copy.deepcopy(model)
-    resolution = registry.resolve(rewritten, {"block_linear": "on", "grouped_linear": "on"}, strict=False)
+    resolution = registry.resolve(rewritten, linear_only(registry, block_linear="on", grouped_linear="on"),
+                                  strict=False)
     assert resolution.enabled[:2] == ("block_linear", "grouped_linear")
     merged = resolution.decision("merged_residual")
     assert not merged.enabled
@@ -337,7 +344,8 @@ def test_tiny_model_rewrite_equals_the_baseline_bitwise(family):
     model, batch = tiny_cueq(family)
     ours, theirs = copy.deepcopy(model), copy.deepcopy(model)
     registry = reg.default_registry()
-    registry.apply(ours, registry.resolve(ours, {"block_linear": "on", "grouped_linear": "on"}, strict=False),
+    registry.apply(ours, registry.resolve(ours, linear_only(registry, block_linear="on", grouped_linear="on"),
+                                          strict=False),
                    original=model)
     with mock.patch.object(gl, "GROUPED_BLOCK_LINEAR", True):
         assert gl.block_linears(theirs) == sum(isinstance(m, lm.BlockLinear) for m in ours.modules())
