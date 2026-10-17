@@ -67,9 +67,11 @@ def test_default_makes_pytorch_locks_soft():
         from torch.utils._filelock import FileLock
         from torch.utils import cpp_extension
         info = fastmace.runtime_info()
+        # torch < 2.14 locks extension builds with its own FileBaton (an O_EXCL lock file, already soft).
+        extension_lock = getattr(cpp_extension, "FileLock", filelock.SoftFileLock)
         print(json.dumps(dict(mode=info.file_locks, late=info.file_lock_switch_late,
                               torch_soft=issubclass(FileLock, filelock.SoftFileLock),
-                              extension_soft=issubclass(cpp_extension.FileLock, filelock.SoftFileLock),
+                              extension_soft=issubclass(extension_lock, filelock.SoftFileLock),
                               async_soft=filelock.AsyncFileLock is filelock.AsyncSoftFileLock)))
     """)
     assert result == {"mode": "soft", "late": False, "torch_soft": True, "extension_soft": True, "async_soft": True}
