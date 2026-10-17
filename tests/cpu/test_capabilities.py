@@ -159,14 +159,13 @@ EXPECTED = {
         support={"factor_species": (True, "ok"), "fold_cutoff": (True, "ok"), "reassociate_first": (True, "ok"),
                  "streaming_conv": (True, "ok"), "species_skip": (False, NOT_GENERIC),
                  "fused_folded_backward": (True, "ok")}),
-    # The tiny polar family keeps MACE's default apply_cutoff=True, so (as ModelSupportTests' second
-    # case) it factors but does not fold, and its biased RadialMLP with species embeddings makes the
-    # padding inexact.
+    # The tiny polar family passes the cutoff to the interactions (apply_cutoff=False), as the
+    # released POLAR-1 models do, so it takes the MH-1 rewrites (SPEC §4.3) and its padding is exact.
     "polar": dict(
-        interactions=(MH1, MH1), apply_cutoff=True, joint=(), polar=True, exact=False, species_only=True,
-        support={"factor_species": (True, "ok"), "fold_cutoff": (False, APPLIES_CUTOFF),
-                 "reassociate_first": (False, APPLIES_CUTOFF), "streaming_conv": (False, APPLIES_CUTOFF),
-                 "species_skip": (False, NOT_GENERIC), "fused_folded_backward": (False, APPLIES_CUTOFF)}),
+        interactions=(MH1, MH1), apply_cutoff=False, joint=(), polar=True, exact=True, species_only=True,
+        support={"factor_species": (True, "ok"), "fold_cutoff": (True, "ok"), "reassociate_first": (True, "ok"),
+                 "streaming_conv": (True, "ok"), "species_skip": (False, NOT_GENERIC),
+                 "fused_folded_backward": (True, "ok")}),
     "residual": dict(
         interactions=("RealAgnosticResidualInteractionBlock",) * 2, apply_cutoff=True, joint=(), polar=False,
         exact=True, species_only=True,
