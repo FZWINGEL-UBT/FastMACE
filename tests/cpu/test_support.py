@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 import torch
+
 from _support.structures import STRUCTURES, nacl, nanbo3, nbcl5
 from _support.tiny_models import FAMILIES, polar_available, tiny_family_calculator
 

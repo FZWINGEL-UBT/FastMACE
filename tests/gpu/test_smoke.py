@@ -2,6 +2,7 @@
 
 import numpy as np
 import torch
+
 from _support.structures import nacl
 from _support.tiny_models import tiny_mace_calculator
 

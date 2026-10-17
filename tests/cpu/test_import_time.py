@@ -200,9 +200,9 @@ environ = dict(os.environ)
 import {order}
 from torch.utils._filelock import FileLock
 info = fastmace.runtime_info()
-print(json.dumps(dict(unchanged=(filelock.FileLock, filelock.AsyncFileLock) == classes, environ=dict(os.environ) == environ,
-                      torch_soft=issubclass(FileLock, filelock.SoftFileLock), mode=info.file_locks,
-                      late=info.file_lock_switch_late, source=info.file_lock_source)))
+print(json.dumps(dict(unchanged=(filelock.FileLock, filelock.AsyncFileLock) == classes,
+                      environ=dict(os.environ) == environ, torch_soft=issubclass(FileLock, filelock.SoftFileLock),
+                      mode=info.file_locks, late=info.file_lock_switch_late, source=info.file_lock_source)))
 """)
     assert result == {"unchanged": True, "environ": True, "torch_soft": True, "mode": "soft", "late": False,
                       "source": "start-up hook (nfs_soft_locks)"}
@@ -213,7 +213,8 @@ def test_opt_out_restores_kernel_locks_after_the_hook():
 import json, fastmace, torch
 from torch.utils._filelock import FileLock
 info = fastmace.runtime_info()
-print(json.dumps(dict(mode=info.file_locks, source=info.file_lock_source, torch_kernel=not issubclass(FileLock, filelock.SoftFileLock),
+print(json.dumps(dict(mode=info.file_locks, source=info.file_lock_source,
+                      torch_kernel=not issubclass(FileLock, filelock.SoftFileLock),
                       async_kernel=not issubclass(filelock.AsyncFileLock, filelock.AsyncSoftFileLock))))
 """, soft="0")
     assert result == {"mode": "kernel", "source": "opted out (FASTMACE_SOFT_FILE_LOCKS=0)",
@@ -224,7 +225,8 @@ def test_opt_out_after_torch_keeps_the_hooks_soft_locks_and_says_so():
     result = run_json(FAKE_HOOK + """
 import json, torch, fastmace
 info = fastmace.runtime_info()
-print(json.dumps(dict(mode=info.file_locks, source=info.file_lock_source, unchanged=filelock.FileLock is filelock.SoftFileLock)))
+print(json.dumps(dict(mode=info.file_locks, source=info.file_lock_source,
+                      unchanged=filelock.FileLock is filelock.SoftFileLock)))
 """, soft="0")
     assert result["mode"] == "soft"
     assert result["unchanged"] is True
@@ -233,8 +235,8 @@ print(json.dumps(dict(mode=info.file_locks, source=info.file_lock_source, unchan
 
 
 def hook_installed():
-    code, line, _ = run("import importlib.util, json; print(json.dumps(importlib.util.find_spec('nfs_soft_locks') is not None))",
-                        hook=True)
+    code, line, _ = run("import importlib.util, json; "
+                        "print(json.dumps(importlib.util.find_spec('nfs_soft_locks') is not None))", hook=True)
     return code == 0 and json.loads(line)
 
 
@@ -401,8 +403,10 @@ def test_cache_root_is_never_inside_sys_prefix():
         for name, environ in dict(
             explicit=dict(FASTMACE_CACHE=os.path.join(sys.prefix, "cache")),
             prefix_itself=dict(FASTMACE_CACHE=sys.prefix),
-            default_home=dict(HOME=os.path.join(sys.prefix, "home"), XDG_CACHE_HOME="", LOCALAPPDATA=os.path.join(sys.prefix, "home")),
-            default_xdg=dict(XDG_CACHE_HOME=os.path.join(sys.prefix, "xdg"), LOCALAPPDATA=os.path.join(sys.prefix, "xdg")),
+            default_home=dict(HOME=os.path.join(sys.prefix, "home"), XDG_CACHE_HOME="",
+                              LOCALAPPDATA=os.path.join(sys.prefix, "home")),
+            default_xdg=dict(XDG_CACHE_HOME=os.path.join(sys.prefix, "xdg"),
+                             LOCALAPPDATA=os.path.join(sys.prefix, "xdg")),
         ).items():
             try:
                 out[name] = str(_cache.cache_root(environ))

@@ -6,7 +6,7 @@ from fastmace import _file_locks
 
 _FILE_LOCK_SOURCE, _FILE_LOCK_SWITCH_LATE, _CUDA_DRIVER_CACHE = _file_locks.configure()
 
-from dataclasses import dataclass
+from dataclasses import dataclass  # noqa: E402  (after the lock switch above)
 
 __version__ = "0.0.1.dev0"
 

@@ -59,3 +59,47 @@ either of these:
 - run one throwaway evaluation in the process before comparing bitwise.
 
 Do not compare the first evaluation of a process bitwise against anything.
+
+## CI
+
+The CPU CI is `.github/workflows/cpu.yml` (SPEC §12.4). It runs on every
+branch push and by hand (`workflow_dispatch`); there is no separate
+`pull_request` trigger, because pull requests come from branches of this
+repository and would run the same commit twice. A newer push to the same
+branch cancels the running workflow (`concurrency`), and pip downloads are
+cached, since Actions minutes count on a private repository.
+
+Matrix, all on `ubuntu-latest` with CPU torch from the PyTorch CPU index:
+
+| Cell | Python | torch | Other packages |
+| --- | --- | --- | --- |
+| latest | 3.10, 3.11, 3.12 | 2.14.1 | newest the `pyproject.toml` floors allow |
+| previous minor | 3.10, 3.11, 3.12 | 2.13.0 (newest 2.13.x) | newest the floors allow |
+| qualified | 3.10 | 2.14.1 | `-c constraints/qualified.txt` (SPEC §4.1 pins) |
+
+`pyproject.toml` keeps the §4.1 floors, so the six plain cells test what a
+user gets from a fresh install today. `constraints/qualified.txt` pins the
+qualified stack (torch 2.14.1, mace-torch 0.3.16, cuequivariance and
+cuequivariance-torch 0.12.0, e3nn 0.4.4, ASE 3.27.0, NumPy 2.2.6); update it
+together with SPEC §4.1.
+
+Each cell installs torch first, then `pip install -e ".[dev]"`, runs
+`ruff check fastmace tests` and then
+`CUDA_VISIBLE_DEVICES='' pytest -n auto tests/cpu tests/gpu`; the GPU tests
+skip. The same checks locally, from the repository root:
+
+```bash
+~/environments/fastmace_cpu/bin/ruff check fastmace tests
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 tests/cpu tests/gpu
+```
+
+Ruff's rules are in `pyproject.toml` (`E`, `W`, `F`, `I`, line length 120).
+`fastmace` and `_support` are first-party for isort; a module that must
+import `fastmace` before `torch` marks that with `# isort: split`
+(`tests/conftest.py`).
+
+Install check, 17 October 2026 (`pip install --dry-run` in throwaway venvs):
+MACE 0.3.16, e3nn 0.4.4 and cuEquivariance 0.12.0 (pinned) or 0.13.0
+(newest) resolve on Python 3.10, 3.11 and 3.12 with torch 2.14.1 and
+2.13.0, so no cell is dropped. The newest resolution then was ASE 3.29.0,
+NumPy 2.5.4 and filelock 4.2.0.

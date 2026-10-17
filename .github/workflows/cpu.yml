@@ -1,0 +1,68 @@
+# CPU CI (SPEC §12.4, plan task 0-T06): Linux, Python 3.10-3.12 x the two newest torch minor
+# releases, CPU wheels. One extra cell installs the qualified stack of SPEC §4.1 through
+# constraints/qualified.txt; the other cells get the newest versions the pyproject floors allow.
+name: cpu
+
+on:
+  # Every branch push; pull requests come from branches of this repository, so a separate
+  # pull_request trigger would only run the same commit twice (private repository: minutes count).
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: py${{ matrix.python }} torch ${{ matrix.torch }}${{ matrix.constraints && ' qualified' || '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12"]
+        torch: ["2.14.1", "2.13.0"]
+        constraints: [""]
+        include:
+          - python: "3.10"
+            torch: "2.14.1"
+            constraints: constraints/qualified.txt
+    env:
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints/qualified.txt
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          # Torch from the PyTorch CPU index first, so the editable install keeps it and does not
+          # pull a CUDA build from PyPI (same recipe as the fastmace_cpu venv, docs/development.md).
+          python -m pip install "torch==${{ matrix.torch }}" --index-url https://download.pytorch.org/whl/cpu
+          if [ -n "${{ matrix.constraints }}" ]; then
+            python -m pip install -c "${{ matrix.constraints }}" -e ".[dev]"
+          else
+            python -m pip install -e ".[dev]"
+          fi
+          python -m pip check
+          python -m pip freeze
+
+      - name: Ruff
+        run: ruff check fastmace tests
+
+      - name: Tests
+        env:
+          CUDA_VISIBLE_DEVICES: ""
+        run: python -m pytest -n auto -rs tests/cpu tests/gpu
