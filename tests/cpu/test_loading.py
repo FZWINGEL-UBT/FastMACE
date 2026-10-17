@@ -513,6 +513,22 @@ def test_conv_fusion_patch_is_idempotent_recorded_and_restored(clean_patches):
     assert not _patches.restore("cueq_conv_fusion")
 
 
+def test_conv_fusion_scope_puts_back_the_rule_in_force(clean_patches):
+    """loading.load converts inside _patches.cueq_conv_fusion: the fusion rule must not outlive the block."""
+    convert, calculator_module, (run, alias) = clean_patches
+    with _patches.cueq_conv_fusion(True) as record:
+        assert record.value is True and convert.run.conv_fusion is True
+    assert convert.run is run and calculator_module.run_e3nn_to_cueq is alias and _patches.applied() == ()
+    outer = _patches.set_cueq_conv_fusion(False)
+    with pytest.raises(KeyError), _patches.cueq_conv_fusion(True):
+        assert convert.run.conv_fusion is True
+        raise KeyError("restored on errors too")
+    assert _patches.record_of("cueq_conv_fusion") == outer and convert.run.conv_fusion is False
+    with _patches.cueq_conv_fusion(None) as record:  # MACE's own rule inside, the outer one after
+        assert record is None and convert.run is run
+    assert _patches.record_of("cueq_conv_fusion") == outer
+
+
 def test_conv_fusion_patch_refuses_another_signature(clean_patches, monkeypatch):
     convert, _, _ = clean_patches
 

@@ -23,7 +23,7 @@ What ``load`` does, in order:
    plain cuEq.
 4. **Build** MACE's calculator (MACE's own loader and cuEq/OEq converters), with
    the fused cuEq convolution of MACE PR 1641 for plain cuEq
-   (``_patches.set_cueq_conv_fusion``) and, for the hybrid, the converter fix
+   (``_patches.cueq_conv_fusion``, in force for this conversion only) and, for the hybrid, the converter fix
    that keeps the last layer's irreps (``hybrid_keeps_last_layer_irreps``).
 5. **Check** that the backend asked for was built (no silent e3nn fallback), that
    cuEquivariance's fused kernels did not fall back to its naive ones
@@ -34,6 +34,7 @@ What ``load`` does, in order:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib
 import inspect
@@ -124,7 +125,7 @@ class LoadedModel:
     embedding_specs: dict | None
     charge: int | None
     spin_multiplicity: int | None
-    patches: tuple = field(default=())  # _patches.applied() after loading
+    patches: tuple = field(default=())  # _patches.applied() while the model was built
 
     @property
     def model(self):
@@ -518,7 +519,6 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
         check_cueq()
     fusion = None
     if backend == "cueq":
-        _patches.set_cueq_conv_fusion(cueq_conv_fusion)
         fusion = _patches.conv_fusion_for(cueq_conv_fusion, device)
 
     model_type = entry.model_type if entry is not None else "MACE"
@@ -532,7 +532,9 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
         kwargs["enable_cueq"] = True
     if backend == "hybrid":
         kwargs["enable_oeq"] = True
-    with checkpoint_warning_filter():
+    # The fusion rule acts on this conversion only; the rule in force before is back afterwards.
+    scope = _patches.cueq_conv_fusion(cueq_conv_fusion) if backend == "cueq" else contextlib.nullcontext()
+    with checkpoint_warning_filter(), scope:
         from mace.calculators import MACECalculator
         try:
             if backend == "hybrid":
@@ -544,6 +546,7 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
             if backend == "e3nn":
                 raise
             raise BackendError(f"{backend} initialization failed: {error}") from error
+        patches = _patches.applied()  # what was in force for the conversion
 
     heads = tuple(getattr(calculator, "available_heads", ()) or ())
     wanted = kwargs.get("head")
@@ -567,7 +570,7 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
         family=entry.family if entry is not None else None, functional=functional,
         licence=entry.licence if entry is not None else None, backend=backend, dtype=dtype, device=device,
         cueq_conv_fusion=fusion, fused_cueq=fused, embedding_specs=specs, charge=charge,
-        spin_multiplicity=spin_multiplicity, patches=_patches.applied())
+        spin_multiplicity=spin_multiplicity, patches=patches)
 
 
 __all__ = [

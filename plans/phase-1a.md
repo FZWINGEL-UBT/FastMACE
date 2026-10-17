@@ -728,6 +728,28 @@ reproduced and fixed, with regression tests:
   single-process GPU run, the MH-1 and linear GPU tests failed only after
   the loading tests; alone they passed.
 
+## Conductor decisions after T07b and T12 (18 October 2026)
+
+- **T07/T08 confirmed on the GPU** (`docs/validation/1a-T07-T08-gpu.md`). The
+  full GPU suite passes in one process: 187 passed, 2 skipped (the OEq-only
+  kernel tests).
+- **T07b: the conv-fusion leak.** `loading.load(backend="cueq")` left MACE's
+  fused-cuEq rule on for the whole process, and later conversions and deep
+  copies broke. `_patches.cueq_conv_fusion` is now a context manager, and
+  `load()` applies the rule only inside its own conversion. After `load()`,
+  `_patches.applied()` no longer lists `cueq_conv_fusion`; the model's own
+  provenance still records it. T16's run-level provenance therefore takes the
+  fusion setting from the loaded model, not from `applied()`. T11 and T15
+  must keep this in mind.
+- **T12 merged.** The integrators match the research engine bitwise over 20
+  eager steps in CPU float64, ASE over 300 steps to 1e-9, and captured
+  replay matches eager on leto. `externalstress` and `disable_cell_langevin`
+  stay constructor keywords in 1a. T15 passes them, mapped from `main.py`'s
+  `--pressure-GPa` and `--cell-mode` as `workflow.baoab_settings` does. They
+  join `IntegratorConfig` in 1b if the public API needs them. The engine
+  saves forces, energy and stress itself during capture warm-ups
+  (`integrator.buffers()` covers only what the half steps write).
+
 ## New optimisations: screens after T19 (owner, 17 October 2026)
 
 The owner welcomes trying new optimisations and adopting those that make

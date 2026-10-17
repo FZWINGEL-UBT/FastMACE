@@ -74,6 +74,8 @@ def test_mh1_plain_cueq_float64():
     assert loaded.fused_cueq["checked"] and not loaded.fused_cueq["naive"]
     assert all(getattr(i, "conv_fusion", False) for i in loaded.model.interactions)
     assert [r.name for r in loaded.patches] == ["cueq_conv_fusion"]
+    from fastmace import _patches
+    assert _patches.record_of("cueq_conv_fusion") is None  # the rule acted on this conversion only
     energy, forces = evaluate(loaded.calculator)
     assert np.isfinite(energy) and np.isfinite(forces).all() and forces.shape == (64, 3)
 
