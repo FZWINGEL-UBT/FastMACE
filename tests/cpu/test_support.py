@@ -64,14 +64,23 @@ def test_tiny_model_is_deterministic_in_float64(family):
     first = tiny_family_calculator(family, Z_VALUES)
     second = tiny_family_calculator(family, Z_VALUES)
     assert all(p.dtype == torch.float64 for p in first.models[0].parameters())
+    weights, again = first.models[0].state_dict(), second.models[0].state_dict()
+    assert weights.keys() == again.keys()
+    assert all(torch.equal(weights[k], again[k]) for k in weights)
     for name, build in STRUCTURES.items():
         atoms = build(rattle=0.05, seed=2)
         e1, f1 = evaluate(first, atoms)
         e1b, f1b = evaluate(first, atoms)
         e2, f2 = evaluate(second, atoms)
-        assert e1 == e1b and e1 == e2, (family, name)
+        # One model instance is bitwise repeatable. Two instances with bitwise-equal weights are
+        # not always: the first model evaluated in a process keeps a different TorchScript plan
+        # (profiling executor) from later instances for its whole life, and with more than one
+        # CPU thread its forces differ in the last bits (about 1e-17 relative). Single-threaded,
+        # with the profiling executor off, or after any warm-up evaluation they are bitwise equal.
+        assert e1 == e1b, (family, name)
         np.testing.assert_array_equal(f1, f1b)
-        np.testing.assert_array_equal(f1, f2)
+        assert e2 == pytest.approx(e1, rel=1e-12, abs=1e-12), (family, name)
+        np.testing.assert_allclose(f2, f1, rtol=1e-12, atol=1e-14)
 
 
 def test_omol_embedding_reads_total_charge():
