@@ -750,6 +750,41 @@ reproduced and fixed, with regression tests:
   saves forces, energy and stress itself during capture warm-ups
   (`integrator.buffers()` covers only what the half steps write).
 
+## Conductor decisions after T11 (18 October 2026)
+
+T11 is merged. `MACEForceField` (in `fastmace/model/forces.py`) is the
+force field T13 captures; its API is in the module and in T11's report:
+the stages call `set_cell`, `needs_rebuild`, `compact` and `ff(x)`, and
+the host calls `rebuild` and `use_edges`. Verified:
+- CPU: bitwise equal to the research engine's `MACEForces` for the tiny
+  mh1, residual, density and off models, with and without rewrites and
+  stress.
+- MH-1 NaCl 2×2×2 against `MACEForces`: 1.1e-15 eV/Å (plain cuEq
+  float64, compiled, production rewrites) and 3.6e-7 eV/Å (hybrid
+  float32 with streaming).
+- The whole GPU suite in one process on murphy: 200 passed, 2 skipped.
+- The streaming counter belongs to the force field; the old
+  `bind_streaming_count` failure has a regression test.
+
+- **CPU cuEq (T11 Q1).** The force field refuses a CPU cuEq model that was
+  converted with CUDA-only kernels, with a reason, which the decision after
+  T06 allows. Converting such models through `compile.naive_cueq()` inside
+  `loading.load(device="cpu", backend="cueq")` is a small follow-up, owned
+  by T15, because the planner chooses the CPU reference route. Until then,
+  CPU float64 references use e3nn or a fresh process without cuEq ops.
+- **Constraint spellings (T11 Q2).** `generic_streaming` uses
+  `sorted_receivers`/`edge_counter`; the MH-1 records use
+  `sort_receivers`/`per_engine_edge_counter`. T15 unifies them on the MH-1
+  spelling and changes `rewrites/generic` in the same commit.
+- **PolarMACE** runs only on cuEq or the hybrid (T10's route rule). Polar
+  force fields bypass the compile cache and reset dynamo first, because each
+  copy carries its structure's k-space state. That is the documented process
+  constraint T13 enforces.
+- **No reassociation on plain cuEq.** The reassociation probe refuses plain
+  cuEq ("coefficients differ within a path"), as in the research engine. So
+  T15's plan for `--backend cueq` leaves `reassociate_first` and
+  `segmented_first_sum` off, as today.
+
 ## New optimisations: screens after T19 (owner, 17 October 2026)
 
 The owner welcomes trying new optimisations and adopting those that make

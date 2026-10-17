@@ -28,7 +28,7 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
 - **T07/T08 GPU confirmation is open:** the GPU suite on the merged tree, and
   T08's murphy agreement run repeated with T07's real modules. See "after
   T07/T08" in the plan.
-- **Next: T11 (force field) and T12 (state and integrators) in parallel.**
+- **Next: T13 (graph engine).** T11 and T12 are merged (see "after T11" and "after T07b and T12").
   All dependencies of both are merged. Then T13 (graph engine), T15
   (planner), T17 (`main.py` on FastMACE) and T19 (acceptance).
 - **Critical path:** T11 → T13 → T15 → T17 → T19.
