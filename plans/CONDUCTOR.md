@@ -22,16 +22,14 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
 ## State on 17 October 2026
 
 - **Phase 0:** done (`docs/validation/phase-0.md`).
-- **Phase 1a:** waves 0 and 1 are merged (T00, T01, T02, T03, T04, T05,
-  T09). The decisions of both waves are in `plans/phase-1a.md` ("Conductor
-  decisions after wave 0" and "after wave 1"). Read them before briefing
-  anyone.
-- **Done since:** T14, T16, T18 (wave 1b, see the plan). **Not started (formerly listed here):** T14 (output and minimal restart), T16 (minimal
-  provenance) and T18 (validation and A/B tools). They are wave 1 tasks and
-  can start at once: they depend only on T01 and T02. Then wave 2: T06
-  (rewrite registry and linear family) first, then T07 and T08 in parallel,
-  and T10 (PolarMACE; needs T03 and T05; also fixes the tiny polar model, see
-  the wave 1 decisions). See "Order and parallelism" in the plan.
+- **Phase 1a:** waves 0 and 1 are merged (T00–T05, T09, T14, T16, T18).
+  Their decisions are in `plans/phase-1a.md`, in the sections "Conductor
+  decisions after wave 0", "after wave 1" and "after wave 1b". Read them
+  before briefing anyone.
+- **Next: wave 2.** T06 (rewrite registry and linear family) comes first,
+  then T07 and T08 in parallel. T10 (PolarMACE) needs only T03 and T05, so
+  it can start now. It also fixes the tiny polar model; see the wave 1
+  decisions. See "Order and parallelism" in the plan.
 - **Critical path:** T06 → T07 → T11 → T13 → T15 → T17 → T19.
 
 ## Starting workers
