@@ -1,12 +1,12 @@
 # FastMACE — Specification
 
-Status: draft 0.10, 17 October 2026. Owner: Fabian Zwingel. Written from the
+Status: draft 0.11, 17 October 2026. Owner: Fabian Zwingel. Written from the
 Langevin_Thermostat experiment (`Experiments/Langevin_Thermostat/`), whose GPU
 engine this library generalises. Drafts 0.2–0.6 and 0.8–0.10 answer eight
 reviews and record the owner's decisions 6–14 (§18, §19); draft 0.7 carried
-the research
-engine's results of 16–17 October 2026 (MACE-OFF, the fused plain-cuEq
-convolution, no NFS file locks; §19).
+the research engine's results of 16–17 October 2026 (MACE-OFF, the fused
+plain-cuEq convolution, no NFS file locks; §19); draft 0.11 adds the
+adoption layer (§7.7).
 
 FastMACE is a standalone Python library that runs pretrained MACE models
 (MACE 0.3.x family, including PolarMACE) for atomistic simulation on NVIDIA
@@ -354,8 +354,11 @@ fastmace/
     restart.py           checkpoint/restart format (§10.6)
   provenance.py          run metadata (§13)
   protocols/             schedule algebra (§7.6); heat/cool profiles, anneal, quench, melt–quench (from workflow.py profiles)
-  ase/calculator.py      FastMACECalculator (ASE drop-in)
-  cli/                   `fastmace run|relax|bench|check|info`
+  ase/calculator.py      FastMACECalculator (ASE drop-in) and fm.calc (§7.7 level 0)
+  ase/md.py              ASE-compatible integrator classes over Simulation, observer sync (§7.7 level 1)
+  quick.py               fm.md and RunResult (§7.7 level 2); no engine code
+  report.py              the one-screen run report and error-message shape (§7.7)
+  cli/                   `fastmace run|md|init|relax|quench|bench|check|info|doctor|models`
   bench/                 step_time, breakdown (from model_step_time / step_breakdown_probe)
 tests/  cpu/ gpu/ equivalence/ statistical/ transitions/ mc/ restart/
 docs/
@@ -575,15 +578,189 @@ atoms.calc = fm.ase.FastMACECalculator(model, rewrites="auto")   # compiled tier
 
 This front end has the same results contract as the reference (§12.1). ASE
 drives the integration, so the speed-up is smaller (no graph engine); document
-that.
+that. `fm.calc("mh1", ...)` is a one-line wrapper around it (§7.7, level 0).
 
 ### 7.5 CLI
 
 - `fastmace run CONFIG.toml`: protocols as today's `main.py` profiles.
+- `fastmace md --model mh1 --structure NaCl.cif --ensemble NVT
+  --temperature 300 --steps 1000000 [--repeat 3 3 3] --output run/`: the CLI
+  face of `fm.md` (§7.7).
+- `fastmace init > run.toml`: a commented TOML for `fastmace run` (model,
+  structure, ensemble, temperature or schedule, steps, repeat, output).
 - `fastmace relax` and `fastmace quench RUN_DIR`.
 - `fastmace check MODEL STRUCTURE`: gate plus self-checks.
-- `fastmace bench MODEL STRUCTURE`: step time, breakdown.
+- `fastmace bench MODEL STRUCTURE`: step time, breakdown; `--vs-ase` also
+  times stock ASE with MACE's calculator on the same structure and GPU, the
+  only source of a "× vs stock ASE" figure (§7.7).
 - `fastmace info`: environment, GPU, available rewrites and kernels.
+- `fastmace doctor`: `info` as a checklist (GPU and driver, torch, MACE,
+  cuEquivariance ops and whether its fused kernels load, OEq and which build
+  path, Triton, NVRTC, graph-longrange, torch-dftd, cache root, lock mode on
+  NFS, model files and their hashes), each failed item with the command or
+  document that fixes it. It changes nothing itself.
+- `fastmace models`: the versioned label table (labels, heads, file names,
+  SHA-256, licences, §7.6).
+
+The CLI prints `FastMACEError` messages (§7.7) without a traceback, exits
+non-zero, and points to the run's `metadata.json`; `--debug` shows the
+traceback.
+
+### 7.7 Adoption layer
+
+The ASE `Calculator` interface cannot deliver the graph engine's speed: ASE
+calls the calculator once per step, so a calculator gets the compiled-tier
+gain at most (§8.2). Full speed needs FastMACE to own the MD loop. Three thin
+levels over the same `ForceField`, `Workload`, `Simulation`, plan, gate and
+restart make that easy to adopt; none is a second engine, and each
+exposes the expert objects it built.
+
+**Level 2: one call (`fm.md`).**
+
+```python
+import fastmace as fm
+
+run = fm.md("NaCl.cif", model="mh1", ensemble="NVT", temperature_K=300,
+            timestep_fs=0.5, steps=1_000_000, repeat=(3, 3, 3), output="run/", seed=1)
+print(run.summary)                 # the one-screen report below
+run.plan, run.gate                 # the Plan and gate records (§9.5, §12.3)
+sim = run.simulation               # the expert handle, a normal Simulation
+```
+
+- Arguments: a structure (path or `Atoms`), `model` (label, path or URL, with
+  `head=`, `charge=`, `spin_multiplicity=`, `sha256=`/`trusted=` as for
+  `fm.load`), `ensemble` (`"NVE"`, `"NVT"`, `"NPT"`), `temperature_K` or
+  `schedule=`, `pressure_GPa` and `cell_mode` for NPT, `steps` (optional
+  with a schedule), `mc=` and `min_mc_temperature_K`, `dispersion=` (`None` or `"d3bj"`), `repeat`,
+  `output`, `seed`, `check` (as `Simulation`), and `integrator=` to choose
+  one explicitly. `ensemble="NVT"` means Langevin (§10.2), `"NPT"` the BAOAB
+  barostat.
+- It builds the `ForceField` (float32), `Workload`, integrator, `Output` and
+  `Simulation`, then runs. It infers what it can from the arguments, since
+  it knows the whole run before planning: the species superset (structure
+  plus every species in `mc=`); `max_temperature_K` (maximum of the
+  schedule, or `temperature_K`); `mc_moves` and `species_changes` from
+  `mc=`. An explicit argument always wins.
+- MC temperature window: with a constant `temperature_K`,
+  `min_mc_temperature_K` is that temperature. With a schedule and `mc=`,
+  `min_mc_temperature_K=` is required (`ValueError` naming it otherwise),
+  because no value can be inferred safely: the schedule minimum of an
+  anneal from 0 K would make the ΔE floor zero (§12.3), and every MC block
+  near the start would sit near 0 K. `fm.md` then attaches the move set
+  only over the step ranges whose target is at or above it, through
+  `run(mc=…)` and `run(mc=None)` (§7.6), and records the ranges.
+- Defaults are the production settings: timestep 0.5 fs, Langevin friction
+  0.02/fs, trajectory and thermo every 20 steps, restart every 10,000,
+  seed recorded, `reproducible=False`, D3 off (the report recommends it
+  where §11.2 does, as for the molecular chlorides in NPT). Engine, backend,
+  rewrites and precision come from the planner (§9). The gate follows
+  `Simulation`'s default (§12.3, open decision 3).
+- `repeat` defaults to `(1, 1, 1)`: the input cell is never expanded
+  silently. The report warns when the cell is small for the cutoff or the
+  atom count is small for the GPU.
+- Physics is never chosen silently: model, head, charge/spin, D3 and the
+  reference corrections are what the user passed or the documented default,
+  and the report shows them. Model licences are shown at load (§4.3).
+
+**Level 1: an existing ASE MD script (`fastmace.ase` integrators).**
+
+```python
+from ase import units
+from fastmace.ase import Langevin
+
+dyn = Langevin(atoms, 0.5 * units.fs, temperature_K=300, friction=0.02 / units.fs,
+               model="mh1", trajectory="run.traj", logfile="run.log", loginterval=20)
+dyn.attach(print_energy, interval=1000)
+dyn.run(1_000_000)
+```
+
+- Same signatures, argument names and **units as the ASE class**, plus
+  `model=` (or `force_field=`). `friction` is in ASE's inverse time units as
+  in ASE; `friction=0.02` without `/units.fs` would be about 0.002/fs, as
+  it is in ASE. The shim never reinterprets an ASE argument.
+- Mapping (ASE 3.27 class → FastMACE integrator): `Langevin` → Langevin and
+  `LangevinBAOAB` → BAOAB (phase 1b); `VelocityVerlet` → NVE,
+  `NoseHooverChainNVT` → NHC, `Bussi` → CSVR, the MTK classes → MTK, and
+  `NVTBerendsen`/`NPTBerendsen` → Berendsen (phase 4, with those
+  integrators, §10.2). An ASE class without a mapping raises with the list
+  of mapped ones; the shim never falls back to ASE's own loop silently.
+- Supported members: `run`, `step`, `atoms`, `nsteps`, `dt`, `attach`,
+  `observers`, `todict`, `get_time`, and the constructor's `trajectory`,
+  `logfile`, `loginterval`, `append_trajectory`. `run(n)` advances in graph
+  chunks between observer calls.
+- **Observers.** Before each observer call the shim writes the committed
+  state into `atoms` (positions, momenta, cell, species) and attaches a
+  results cache as `atoms.calc`, so `get_potential_energy()`, `get_forces()`
+  and `get_stress()` return the engine's values for that step without a new
+  evaluation. After the call it compares `atoms` with what it wrote. A
+  change of positions, momenta or species is applied as one event through
+  the transaction contract (§8.5; species must be in the superset, rule 2);
+  a change of atom count, cell (except through a barostat), constraints or
+  `atoms.calc` raises. Observers every few steps make the planner choose
+  the compiled tier (rule 9), and the report says so.
+- Constraints follow §4.4: `FixAtoms` is refused until the integrators
+  support it in phase 4, with that reason; no other tier is substituted.
+
+**Level 0: a calculator (`fm.calc`).** `atoms.calc = fm.calc("mh1")` wraps
+`FastMACECalculator` (§7.4). It records, and prints once, "compatibility
+tier: compiled, no CUDA graphs; use `fm.md` or `fastmace.ase` integrators for
+full speed". It is the right choice for phonopy, NEB, custom optimisers and
+any tool that needs only an ASE calculator.
+
+**The report.** `fm.md`, the `fastmace.ase` integrators and the CLI print one
+screen at setup and keep it in `run.summary` and `metadata.json`:
+
+```text
+FastMACE 1.0  |  mh1/matpes_r2scan  |  NaCl, 216 atoms (3×3×3), 3D PBC, NVT Langevin 0.5 fs
+plan:    graph, hybrid cuEq/OEq, float32, 14 rewrites on, 2 off (reasons in run.plan)
+gate:    passed (2 rattled; 0.04 meV/atom, 2e-6 eV/Å; floors §12.3)
+speed:   4.1 ms/step measured over steps 1,000–2,000 of this run
+setup:   42 s (load, rewrites, compile, capture, gate)
+output:  run/trajectory.000.traj, run/thermo.csv, run/metadata.json
+warn:    licence ASL (non-commercial); NPT barostat unqualified (§10.2)
+```
+
+- Speeds are **measured, never predicted**: the generality rule (§9.1)
+  forbids per-GPU tables, so there is no "expected speed-up" figure. The
+  speed line is the run's own steady-state step time, filled in once it is
+  measured; until runtime calibration (phase 5) there is no comparison
+  between tiers. A ratio against stock ASE appears only when the user
+  measured it with `fastmace bench --vs-ase`.
+- When the run did not get the graph engine, the report says why and what
+  would change it, without estimates: not 3D-periodic (reference tier with
+  `allow_reference=True`, or MACE's calculator); a constraint (refused until
+  phase 4); OEq unavailable (plain cuEq; `fastmace doctor` names the
+  missing piece); a model outside the rewrite registry (plain or reference
+  path); frequent host callbacks (compiled tier); a failed rewrite
+  self-check (that rewrite off); a fallback after a failed gate (§9.4).
+- NPT, MC and D3 carry an "experimental: not yet qualified" line until their
+  qualification studies are recorded (§10.2, §10.4, §11.2). `reproducible`
+  stays off; requesting it gives the refusal of §9.3.
+
+**Errors.** Python calls raise the exceptions of §7.6, never print-and-return:
+scripts must fail visibly and be able to catch them. Every `FastMACEError`
+message has the same shape, so no traceback needs reading: what happened;
+why, in one or two sentences; what to do next; where the record is
+(`run.plan`, `run.gate`, `metadata.json`); and `fastmace doctor` for
+environment problems. The CLI prints this message alone (§7.5).
+
+**Acceptance (phase 1b; phase 4 for the remaining integrators).**
+- An ASE Langevin script ported by changing the import and adding `model=`
+  runs on the graph engine, and gives the same plan as the equivalent
+  `Simulation`.
+- `fastmace doctor` then `fastmace md` on a structure and a model gives a
+  complete run with plan, gate and speed report, without Python.
+- `fm.md`, the `fastmace.ase` integrators and `Simulation` give the same plan
+  and gate for the same inputs, the same trajectory within the plan's
+  reproducibility (statistically for hybrid runs; bitwise where
+  `reproducible=True` is qualified, §9.3), and the same steady-state step
+  time within run-to-run noise in alternating A/B blocks (a gap is a bug:
+  the layer is thin).
+- An observer that changes positions, momenta or species gives the same
+  state as the same change made through `Simulation` events; one that
+  changes the atom count, cell or constraints raises.
+- Every path that does not reach the graph engine either runs and reports
+  the reason, or refuses with the reason; never silently.
 
 ### 7.6 API contracts
 
@@ -1777,7 +1954,13 @@ This is today's provenance block, made complete and schema-versioned.
   depend on them, do not vendor them. Model weights are never redistributed;
   `fm.load` downloads from official sources and shows the model licence.
 - **Extras:** `fastmace[oeq]`, `fastmace[polar]` (graph-longrange pinned per
-  MACE version), `fastmace[d3]` (the `torch-dftd` reference and the ASE front end; the native D3 path does not need it), `fastmace[dev]`.
+  MACE version), `fastmace[d3]` (the `torch-dftd` reference and the ASE front end; the native D3 path does not need it), `fastmace[dev]`,
+  and `fastmace[full]`, the union of `[oeq]`, `[polar]` and `[d3]` (no
+  packages of its own). The quick start uses `pip install "fastmace[full]"`
+  then `fastmace doctor`. Until the prebuilt OEq wheels exist (phase 6),
+  `[oeq]` needs the host toolchain below, and `doctor` says what is missing;
+  the base install still runs, on the plain backend, and the report says so
+  (§7.7).
 - **No `nvcc` at install or run time, and no compiler on the default path:**
   - The streaming kernels already compile through NVRTC.
   - "No `nvcc`" is not "no compiler". OEq's host extension today needs a
@@ -1818,7 +2001,22 @@ This is today's provenance block, made complete and schema-versioned.
 
 ## 15. Documentation
 
-- Quick start (ASE calculator; `Simulation`).
+- FastMACE in five minutes: `pip install "fastmace[full]"`, `fastmace
+  doctor`, `fastmace md`, `fm.md` (§7.7).
+- Port your ASE script: `fm.calc` (compatibility speed), then the
+  `fastmace.ase` integrators (full speed, ASE units unchanged, observer
+  rules), then `fm.md`.
+- Why is it not faster? Each reason the report gives (§7.7): not 3D
+  periodic, constraints, model outside the registry, OEq missing, frequent
+  callbacks, small system, fallback after a gate, memory.
+- What changes physically: float32 with float64 energies, the gate, the
+  reference corrections, D3, NPT, MC, the known model issues (§4.3).
+- Compatibility table: models × PBC, constraints, NPT, MC, D3, PolarMACE,
+  with the experimental labels.
+- Example gallery: ASE Langevin port, `fm.md`, NPT chlorides with D3, swap
+  MC in an anneal, phonopy and NEB with `fm.calc`, restart, PolarMACE with
+  charge, MACE-OFF in a periodic box.
+- Quick start for the expert API (`ForceField`, `Simulation`).
 - Concepts: tiers, plan and fallback, rewrites, reference policy, gate
   statuses, species superset and events, buckets, complete state and restart.
 - How-tos: melt–quench, swap MC at high T, NPT with D3, PolarMACE with charge,
@@ -1843,16 +2041,16 @@ workstation GPU.
 | --- | --- | --- | --- |
 | 0. Skeleton | repo layout, packaging, CI (CPU), licence, port CPU tests | `pip install -e .`; CPU suite green | 1 week |
 | 1a. Extraction | `model`, `rewrites` (registry with today's catalogue), `neighbors`, `state`, `engine.graph`, `integrators.langevin`/`baoab`, behind the planner interface with one fixed plan (today's `main.py` defaults); no globals, no NAS or experiment imports, no wrapper script | against a frozen research-engine revision on the same machine and configuration, in alternating A/B blocks: steady-state step time within 3%, setup time and peak memory reported; today's force/stress gate passes for all 19 labels of §12.5 (ten benchmark models plus POLAR-1 S/M/L, OMOL-0 XL and five MACE-OFF, the last on the organic set); `Experiments/Langevin_Thermostat/main.py` runs on top of FastMACE | 3–4 weeks |
-| 1b. Contracts | rule-based minimal planner (hard constraints, mode and backend choice, `Plan` record with revisions; no runtime adaptation); `Simulation` taking a `ForceField`, the reduced `Workload` and the `run` checks (§7.6, §9.2); float64 energy accumulation (§7.3); runtime-state registry and complete capture restore (§8.1); complete state and restart with canonical restart points and output chunks at restart points (§10.6); reference policy (§12.1) with the BAOAB integrator correction qualified against an independent corrected reference; gate with energy, floors and captured replay (§12.3); exceptions and checkpoint trust (§7.6) | gate passes for all 19 labels of §12.5, energy included (POLAR-1 and OMOL-0 energies within the gate instead of 45–102 meV/atom off, MACE-OFF instead of 0.1–12 meV/atom); registry and capture-state CI checks pass; restart round trip, interrupted vs uninterrupted with the same cadence (bitwise on CPU float64, statistical for hybrid); a crash between a restart write and the next flush resumes without duplicate frames | 3–4 weeks |
+| 1b. Contracts | rule-based minimal planner (hard constraints, mode and backend choice, `Plan` record with revisions; no runtime adaptation); `Simulation` taking a `ForceField`, the reduced `Workload` and the `run` checks (§7.6, §9.2); float64 energy accumulation (§7.3); runtime-state registry and complete capture restore (§8.1); complete state and restart with canonical restart points and output chunks at restart points (§10.6); reference policy (§12.1) with the BAOAB integrator correction qualified against an independent corrected reference; gate with energy, floors and captured replay (§12.3); exceptions and checkpoint trust (§7.6); adoption layer (§7.7): `fm.md` and `RunResult`, the run report and error-message shape, `fm.calc`, `fastmace.ase` `Langevin` and `LangevinBAOAB` with observer sync, CLI `md`, `init`, `doctor`, `models`, `fastmace[full]` | gate passes for all 19 labels of §12.5, energy included (POLAR-1 and OMOL-0 energies within the gate instead of 45–102 meV/atom off, MACE-OFF instead of 0.1–12 meV/atom); registry and capture-state CI checks pass; restart round trip, interrupted vs uninterrupted with the same cadence (bitwise on CPU float64, statistical for hybrid); a crash between a restart write and the next flush resumes without duplicate frames; the §7.7 acceptance tests for Langevin, BAOAB and the CLI | 4–6 weeks |
 | 2. Safety | self-checks, gate statuses and resource policy (§12.3), fallback algorithm with ddmin, diagnosis budget and terminal sequence (§9.4), subprocess runner through a restart write (§8.7), versioned registry, instance isolation (§8.7), provenance schema, GPU CI; qualification of `reproducible=True` for one family (plain cuEq, MH-1) | unknown MACE version runs the reference path cleanly; a deliberately broken rewrite, a broken pair of interacting rewrites and a broken capture each end in the correct validated fallback within the budget, and an exhausted budget ends in the terminal sequence; A → B → A passes; CI on two GPU architectures; reproducible mode bitwise on repeated and restarted runs, or recorded as not qualifiable with the blocking kernel named | 3–4 weeks |
 | 3. Dynamic topology and MC | species superset, derived-state registry, transactional events (§8.5; scheduled targets as device-scalar fills), overflow before commit, re-capture policy, adaptive skin and headroom (rule 11, displacement skin), compiled-tier path; energy-only graph; MC driver (swap, transmutation, displacement; MC-evaluator baseline per block; displacement trials rebuilt eagerly around the trial geometry; fixed-shape selection; `exchange`/`rescale`/`redraw`/`redraw_all`; charge/spin parity), move-energy gate with `min_mc_temperature_K` and MC energy precision, MC restart state | species-change events (no energy evaluation) every 100 steps at 1500 K keep ≥ 90% of fixed-species step speed; MC attempt cost reported separately as a fraction of an MD step, in float32 and float64, for swaps and for displacements with and without a trial rebuild; ΔE errors of float32 forwards measured on MH-1 and an all-electron model; first MD step after accept and reject equals fresh construction; exact-enumeration test passes; interrupted vs uninterrupted across accepted swaps; swap-MC annealing protocol runs end to end | 5–6 weeks |
 | 3b. NPT for the chlorides | GPU D3 in the force field (§11.2): own candidate list with its own skin and without per-step compaction, three-pass kernel with analytic derivatives (including the CN chain term) and stress, own deformation-aware rebuild test; D3 in the BAOAB NPT path; constant-pressure melt–quench protocol | D3 against `torch-dftd` and `dftd3`; GPU NPT + D3 against the independent implementation (§11.2); amortised D3 cost with builds included measured against the 10% target on the production ramp; the NbCl5 NPT melt–quench protocol runs end to end. Its physical outcome is recorded, not judged (decision 6, §18) | 3–4 weeks |
-| 4. Physics | NVE, CSVR, NHC, MTK, Berendsen; GPU FIRE/LBFGS, fixed and variable cell; `FixAtoms` | ASE-equivalence tests; GPU LBFGS reproduces the annealing-benchmark minima | 3–4 weeks |
+| 4. Physics | NVE, CSVR, NHC, MTK, Berendsen; GPU FIRE/LBFGS, fixed and variable cell; `FixAtoms`; their `fastmace.ase` classes (§7.7) | ASE-equivalence tests; GPU LBFGS reproduces the annealing-benchmark minima; §7.7 acceptance for the new classes | 3–4 weeks |
 | 5. Planner completion | remaining rules of §9.3 and their precedence, runtime adaptation (§9.6), optional calibration, `str(plan)` | each rule and the precedence order have a test | 1–2 weeks |
 | 6. Release | docs, examples, benchmark tables, PyPI, prebuilt OEq host-extension wheels (§14), upstream PRs (MACE: linear rewrites, reassociation; OEq: no-`nvcc` host build) | 1.0 tagged; docs build; `pip install fastmace[oeq]` on a clean machine without a compiler | 2–3 weeks |
 
-The total is about 24–32 weeks (6–8 months) to 1.0, up from 4–5 months in
-draft 0.1. The planner, restart and reference contracts and the MC driver
+The total is about 25–34 weeks (6–8 months) to 1.0, up from 4–5 months in
+draft 0.1; draft 0.11's adoption layer (§7.7) added 1–2 weeks to phase 1b. The planner, restart and reference contracts and the MC driver
 came before the dynamic-topology milestone in draft 0.2. Draft 0.3 added
 float64 energy accumulation, the runtime-state registry, the energy-only
 graph, the MC energy-precision measurement and a dedicated D3 kernel.
@@ -1864,7 +2062,7 @@ them, and the prebuilt OEq wheels fall into phase 6. **These estimates are
 floors** for one developer: they assume the research engine's code moves
 with few surprises.
 
-The first production deliverable is phases 0–3b (18–23 weeks, about 4.5–6
+The first production deliverable is phases 0–3b (19–25 weeks, about 4.5–6
 months): NVT and constant-pressure melt–quench and atom exchange on the
 fastest tier, including the chlorides with D3 (decision 6). The barostat
 settings still need their qualification study (an experiment, not library
@@ -1913,6 +2111,7 @@ deterministic.
 | A stale derived buffer after an event (masses, coefficients, species pairs) | derived-state registry checked against fresh construction (§8.5) |
 | The float64 reference does not fit where the FP32 production path does | sequential reference evaluation, CPU and reduced-cell options, explicit `unavailable` status (§12.3) |
 | A fault appears only inside CUDA graphs (as with Inductor's programmatic dependent launch) | gate and transition tests through captured replay (§12.2, §12.3) |
+| Users take the ASE calculator for the fast path, or a ported ASE script behaves differently from ASE | §7.7: the calculator says it is the compatibility tier; the `fastmace.ase` classes keep ASE's signatures and units, sync observers through events and refuse what they cannot honour; the run report states the tier and its reason |
 | Positioning vs existing tools (TorchSim batched MLIP MD; MACE's LAMMPS ML-IAP) | FastMACE's distinct value: exact model-level rewrites plus graph-speed single-structure MD with dynamic species; re-check competitors' feature sets before 1.0 and consider offering the force field as a backend to them |
 | Licensing of dependencies and models | §14; licence display at load |
 | Name clash on PyPI | check before phase 6 |
@@ -2190,3 +2389,26 @@ and adopted.
 | Note: `FastMACECalculator` raised `PlanRefused` without a plan | §7.4, §7.6 | §7.6: it builds a minimal plan through the same planner |
 
 Estimates unchanged (§16).
+
+**Draft 0.11 (17 October 2026)** adds the adoption layer (§7.7), from a
+proposal reviewed against draft 0.10. Its premise holds: ASE calls a
+calculator once per step, so only a layer that owns the MD loop reaches the
+graph engine. Adopted: `fm.md`, ASE-compatible integrator classes, `fm.calc`,
+the run report, the error-message shape, the CLI additions, `fastmace[full]`
+and the documentation pages. Changed on review:
+
+| Proposal item | Problem | Adopted form |
+| --- | --- | --- |
+| `min_mc_temperature_K` = schedule minimum | an anneal from 0 K gives a zero ΔE floor (§12.3) | §7.7: required with a schedule and `mc=`; MC attached only where the target is at or above it |
+| `Langevin(..., friction=0.02)` in the ASE shim | ASE's friction is per ASE time unit (≈ 0.002/fs) | §7.7: ASE signatures and units unchanged; example uses `0.02 / units.fs` |
+| `FixAtoms` "forces the compiled tier" | constraints belong to the integrators and are refused until phase 4 (§4.4) | §7.7: refused with that reason |
+| Callbacks "run between graph chunks" | ASE observers read and may change `atoms` | §7.7: state synced before, results cache, changes applied as §8.5 events or refused |
+| "Expected speed-up" from a 50-step calibration; "≈ 0.6×" and "≈ 1×" in messages | per-GPU tables are forbidden (§9.1); calibration is phase 5 | §7.7: measured step time of the run only; ratios only from `fastmace bench --vs-ase`; reasons without estimates |
+| `fastmace[full]` in phases 1a/1b without a compiler | prebuilt OEq wheels are phase 6 (§14) | §14: union extra; `doctor` reports the missing toolchain until then |
+| Catch exceptions and print a message | scripts must fail visibly and catch errors | §7.7: exceptions keep propagating with a fixed message shape; only the CLI prints without traceback |
+| "Gate on by default" | open decision 3 | `fm.md` follows `Simulation`'s default (§12.3); decision 3 stays open |
+| High-level path "within 3%" of the expert path | the layer is thin; a gap is a bug | §7.7: same plan and gate, same step time within noise |
+| ASE class names (`NoseHoover`, `MTK`, `Berendsen`) | ASE 3.27 names differ | §7.7 mapping to the ASE 3.27 classes |
+
+Estimates: phase 1b 4–6 weeks (was 3–4), total 25–34 weeks, first
+production deliverable 19–25 weeks (§16).
