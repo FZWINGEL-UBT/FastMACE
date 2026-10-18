@@ -879,12 +879,17 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
   (POLAR-1-S: NaCl; OMOL-0 XL: NaCl, NbCl5; POLAR-1-M/L as listed there).
   Elsewhere the result is "model-limited", shown by the same failure in the
   float64 reference. T19 records this in `docs/validation/phase-1a.md`.
-- **Open: POLAR stress in the compiled hybrid NPT path.** On NaCl, FastMACE's
-  POLAR-1-S production stress is off by 2.2–4.6e-5 eV/Å³, and on NbCl5 by
-  3.5–8.2e-3. That matches MACE 0.3.16's uncorrected k-space stress (issue
-  1642). The float32 reference agrees with float64, and T10 verified the fix
-  only for float64 cuEq. T19 checks the research engine's production path on
-  the same case. If that passes, a fix task T10b follows.
+- **POLAR stress: a gate-reference bug, not an engine bug (resolved).** The
+  POLAR-1 stress failures (NaCl 4.6e-5 eV/Å³) occurred identically in
+  FastMACE and in the research engine. The gate's fresh reference processes
+  called `workflow.configure_md_calculator`, which stores the bound
+  `model.forward`, before `polar_gpu.enable` installed the corrected
+  PolarMACE forward. So both references computed MACE 0.3.16's uncorrected
+  stress (issue 1642). The old gate passed only because the production
+  engine had patched the class first in the same process. Fixed in T19's
+  `tools/force_stress_gate.py` (5e5019d): enable first, then configure, and
+  the reference process refuses to run without the corrected forward. The
+  POLAR rows are rerun. No T10b.
 - **NaCl compile at the first new bucket: A/B artefact (T13b, 18 October
   2026).** In a same-process A/B the research engine reinstalls its
   capture-safe `mask_head` before every capture; FastMACE did not reinstall
