@@ -82,6 +82,19 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
   tests and source are accepted. T04 and T09 load the baseline through
   `FASTMACE_BASELINE` in their tests and were accepted. Keep new briefs close
   to those.
+- **Name the GPU in every follow-up brief too.** A message to a busy
+  session is queued until its turn ends, so a correction can come too late.
+  On 18 October 2026 a T13 follow-up was sent to leto while T19's gate ran
+  there. It interrupted the gate four times before the conductor stopped
+  its processes. While acceptance or timing runs, list the machines that
+  are reserved in every brief and follow-up. If a busy worker must change
+  course urgently, interrupt its turn (`stop_session`); its queued message
+  then runs next. Messages alone wait until the worker's current turn
+  ends, which can take hours.
+- **The local RTX 5060 Ti was reserved by the owner on 18 October 2026 and
+  released the same day.** If the owner reserves it again, GPU work goes to
+  leto and murphy only. coraline and leeloo were busy with another user's multi-day
+  jobs (user `kaifi`), and guybrush did not answer.
 - At most four workers at once. Give each GPU task its own machine:
   local RTX 5060 Ti (WSL), leto or murphy, both RTX 4000 Ada, after an idle
   check. Timing runs (T18 noise floor, T19) need an otherwise idle GPU and

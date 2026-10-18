@@ -871,6 +871,69 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
 - **A FastMACE checkout without a recorded commit is refused (T17 Q2):**
   accepted. Runs use `/mnt/d/Margraf/FastMACE` itself or the NAS copy with
   `.source_commit`; WSL's git cannot read Windows worktrees.
+- **Acceptance interpretation (conductor, 18 October 2026; for owner
+  review at checkpoint 3).** SPEC §4.3 treats model-level failures as
+  warnings, not engine failures. So "the gate passes for all 19 labels"
+  counts, for POLAR-1 S/M/L and OMOL-0 XL, only on the crystals where
+  ResearchModule's `studies/other_models/README.md` finds the model usable
+  (POLAR-1-S: NaCl; OMOL-0 XL: NaCl, NbCl5; POLAR-1-M/L as listed there).
+  Elsewhere the result is "model-limited", shown by the same failure in the
+  float64 reference. T19 records this in `docs/validation/phase-1a.md`.
+- **POLAR stress: a gate-reference bug, not an engine bug (resolved).** The
+  POLAR-1 stress failures (NaCl 4.6e-5 eV/Å³) occurred identically in
+  FastMACE and in the research engine. The gate's fresh reference processes
+  called `workflow.configure_md_calculator`, which stores the bound
+  `model.forward`, before `polar_gpu.enable` installed the corrected
+  PolarMACE forward. So both references computed MACE 0.3.16's uncorrected
+  stress (issue 1642). The old gate passed only because the production
+  engine had patched the class first in the same process. Fixed in T19's
+  `tools/force_stress_gate.py` (5e5019d): enable first, then configure, and
+  the reference process refuses to run without the corrected forward. The
+  POLAR rows are rerun. No T10b. With corrected references, POLAR-1-S
+  passes on NaCl (stress ratio 1.57) and POLAR-1-M on NaCl and NaNbO3
+  (0.69, 0.83). A finite-difference self-test on NaCl 3×3×3 confirms the
+  references (≤ 8.1e-9 eV/Å³) and FastMACE's production stress (≤ 1.1e-7).
+- **Open finding for NPT with PolarMACE (phase 3b or later).** On NbCl5
+  3×3×3, even the corrected float64 POLAR-1-S stress differs from finite
+  differences by 4.4e-4 eV/Å³, about 3% of the stress (uncorrected: 22%).
+  The research engine's own finite-difference check (6.3e-9) used NbCl5
+  2×2×2. This is probably a property of the model or of the long-range part
+  in the larger cell, such as k-vectors crossing the cutoff under strain or
+  a non-variational charge solve, not a missing correction. Investigate it
+  before PolarMACE NPT is recommended. T19's self-test therefore always runs
+  on NaCl 3×3×3.
+- **NaCl compile at the first new bucket: A/B artefact (T13b, 18 October
+  2026).** In a same-process A/B the research engine reinstalls its
+  capture-safe `mask_head` before every capture; FastMACE did not reinstall
+  its own, so its compiled model failed a guard at the next eager call, the
+  warm-up of its first capture at a new bucket. Each engine alone, with fresh
+  caches, compiles nothing there. The fix (`fastmace/1a-T13b`, ae3e758)
+  reinstalls before each capture. Its GPU validation is paused while the
+  owner uses the local GPU.
+- **Murphy speed suite done (T19, run `1a-T19-speed-murphy-20261018`).**
+  FastMACE/baseline step-time ratios, 12 blocks, same-process noise floor
+  0.16%:
+  - MH-1 NVT, NaNbO3 and NbCl5: 0.9996–1.0003;
+  - MH-1 NVT, NaCl: 1.0002 (r3; r1 and r2 invalid because of the
+    `mask_head` clash);
+  - MH-1 NPT: 1.0023;
+  - OMOL-0 XL, NbCl5: 0.9999;
+  - POLAR-1-S, alternating processes: 1.0003 (noise floor 0.29%);
+  - MP-0 medium: 1.014–1.016.
+  Two NaCl cases are rerun after T13b merges: the MH-1 hybrid A/B and the
+  plain-cuEq A/B (invalid: one compile per side, probably the same clash).
+  In the A/B process, every model's forces equal the FastMACE-only
+  control's within 3e-6 eV/Å, except OMOL-0 XL, where 0.9–2.0e-4 equals
+  OMOL's own process-to-process float32 scatter (1.2–1.8e-4). For OMOL the
+  tolerance is that scatter.
+- **Open: FastMACE setup 8–33 s longer** than the research engine (MH-1 37–45
+  s vs 27–29 s; OMOL-0 59–69 s vs 36–37 s), with equal or lower peak memory.
+  Setup is reported, not judged, in 1a. Diagnose it with MP-0's speed gap
+  after T19.
+- **Open: MP-0 medium 1.4–1.6% slower** than the research engine (murphy,
+  `species_skip` on both sides). That is within 3% but about ten times the
+  noise floor, so it is a real difference: diagnose it after T19 (generic
+  rewrite path).
 - **Not yet done:** the full 270 ps anneal through FastMACE. It belongs to
   T19's workflow check only if checkpoint 3 needs it; the shortened
   protocol already shows equality.
