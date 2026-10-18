@@ -12,7 +12,7 @@ switches to `--engine fastmace`.
 
 | Acceptance item (plans/phase-1a.md) | Criterion | Result |
 | --- | --- | --- |
-| 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | murphy: **passes** for every valid case (MH-1 within 0.03 %, NPT 0.23 %, MP-0 medium 1.4–1.6 % slower, POLAR-1-S 0.03 %, OMOL-0 XL NbCl5 0.01 %); MH-1 NaCl hybrid and cuEq to be confirmed after the 1a-T13b fix: … ; RTX 5060 Ti: **deferred: owner reserved the local GPU (18 October 2026)** |
+| 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | murphy: **passes** for every valid case (MH-1 within 0.03 %, NPT 0.23 %, MP-0 medium 1.4–1.6 % slower, POLAR-1-S 0.03 %, OMOL-0 XL NbCl5 0.01 %); MH-1 NaCl hybrid and cuEq to be confirmed after the 1a-T13b fix: … ; RTX 5060 Ti: **passes**, MH-1 NVT within 0.33 % on all three crystals in all three processes, NPT 0.16 % |
 | 1. Setup time and peak memory | reported, not judged | murphy: FastMACE's setup 4–33 s longer (self-checks), peak memory equal or lower |
 | 2. Accuracy | today's force/stress gate for all 19 labels | **passes** for all 19 labels on the structures that count (worst ratio 1.63, limit 2); long-range models model-limited on NaNbO3 (POLAR-1-S, OMOL-0 XL) |
 | 3. Compatibility | `main.py --engine fastmace`: smoke, `--profile anneal` on NaCl and `--quench` on its output, statistically equal to the baseline | **passes**: PC (1a-T17), smoke, shortened anneal (two seeds) and quench equal within seed scatter; leto smoke equal to FP32 divergence |
@@ -79,7 +79,7 @@ the gate and to the speed table on 18 October 2026:
 
 | Run ID | Machine | GPU, driver | Suites | FastMACE commit | Baseline | Dates (UTC) |
 | --- | --- | --- | --- | --- | --- | --- |
-| … | PC (WSL2) | RTX 5060 Ti 16 GB, … | speed | … | tag `research-engine-baseline-20261017`, commit `d2faa9fd`, export `~/fastmace-baseline/1a-T18` | … |
+| `1a-T19-speed-local-20261018` | PC (WSL2) | RTX 5060 Ti 16 GB, 610.88 | speed (primary set, NPT) | `6ec85b1` (main `ce8cf73` merged) | tag `research-engine-baseline-20261017`, commit `d2faa9fd`, export `~/fastmace-baseline/1a-T18` | 18 Oct, 14:54–15:26 |
 | `1a-T19-speed-murphy-20261018` | murphy | RTX 4000 Ada 20 GB, 595.58.03 | speed (A/B, alternating, controls) | `5de02c5`, `b084660`, `2f88d25`, `4791ec7` (same library code) | same tag, export `/mnt/homes/zwingel/fastmace-baseline/1a-T18` | 18 Oct, 11:33–15:10 |
 | `1a-T19-gate-leto-20261018` | leto | RTX 4000 Ada 20 GB, 595.58.03 | gate, 19 labels | `dd22757` … `096b47b` (same library code) | same | 18 Oct, 11:26–14:18 |
 | `1a-T19-workflow-leto-20261018` | leto | same | `main.py` smoke, both engines | NAS copy `43ce026` (main) | ResearchModule `fb81217b` | 18 Oct, 14:21–14:27 |
@@ -111,22 +111,34 @@ for 4 blocks, so the criterion is 3 %.
 
 ### RTX 5060 Ti (PC)
 
-**Deferred: owner reserved the local GPU (18 October 2026).** The local half
-of acceptance item 1 runs once the owner frees the RTX 5060 Ti, with the same
-suite (`tools/acceptance/launch.sh speed --machine local`). It has not failed and
-was not skipped for any other reason. The table below is filled then.
+Run `1a-T19-speed-local-20261018`, the PC: NVIDIA GeForce RTX 5060 Ti 16 GB, driver 610.88, WSL2,
+`~/environments/mace_cueq_oeq`. 18 October 2026, 14:54–15:26 UTC, after the owner released the
+local GPU. FastMACE `6ec85b1` (branch head with main `ce8cf73` merged, so 1a-T13b's fix is in).
+Baseline `d2faa9fd`, export `~/fastmace-baseline/1a-T18`; its benchmark CIFs were added from the
+tag with `git archive`. Data: `results/1a-T19-speed-local-20261018/`.
 
-| Job | Model | Ensemble | Structure | Atoms | Baseline (ms) | FastMACE (ms) | FastMACE/baseline | Pair ratios | Criterion | Pass |
-| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
-| ab-mh1-nvt-r1 (ABAB) | mh1-r2scan | NVT | NaCl 3×3×3 | 216 | … | … | … | … | ±3 % (noise floor 0.16 %) | … |
-| | | | NaNbO3 3×3×3 | 1080 | … | … | … | … | | … |
-| | | | NbCl5 3×3×3 | 1944 | … | … | … | … | | … |
-| ab-mh1-nvt-r2 (FastMACE built first) | mh1-r2scan | NVT | NaCl / NaNbO3 / NbCl5 | | … | … | … | … | | … |
-| ab-mh1-nvt-r3 (ABBA) | mh1-r2scan | NVT | NaCl / NaNbO3 / NbCl5 | | … | … | … | … | | … |
-| ab-mh1-npt | mh1-r2scan | NPT, hydrostatic | NaCl 3×3×3 | 216 | … | … | … | … | | … |
-| ab-mp0-medium-nvt | mp0-medium | NVT | NaCl / NbCl5 | | … | … | … | … | | … |
-| ab-polar1-s-nvt | polar1-s | NVT | NaCl / NbCl5 | | … | … | … | … | | … |
-| ab-omol0-xl-nvt | omol0-xl | NVT | NaCl / NbCl5 | | … | … | … | … | | … |
+Before every job, Windows' `nvidia-smi.exe` showed 0 % GPU utilization and no compute process.
+Desktop programs held about 8 GB of the 16 GB (graphics contexts only).
+
+| Job | Structure | Atoms | Baseline (ms) | FastMACE (ms) | FastMACE/baseline | Pair ratios | Valid | Pass (±3 %) |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
+| ab-mh1-nvt-r1 (ABAB, baseline first) | NaCl | 216 | 3.628 | 3.628 | 1.0000 | 0.9953–1.0065 | yes | yes |
+| | NaNbO3 | 1080 | 22.979 | 22.992 | 1.0006 | 0.9964–1.0025 | yes | yes |
+| | NbCl5 | 1944 | 27.035 | 27.060 | 1.0009 | 0.9985–1.0022 | yes | yes |
+| ab-mh1-nvt-r2 (ABAB, FastMACE first) | NaCl | 216 | 3.556 | 3.545 | 0.9967 | 0.9947–1.0049 | yes | yes |
+| | NaNbO3 | 1080 | 22.978 | 22.984 | 1.0003 | 0.9986–1.0022 | yes | yes |
+| | NbCl5 | 1944 | 27.058 | 27.042 | 0.9994 | 0.9986–1.0034 | yes | yes |
+| ab-mh1-nvt-r3 (ABBA, baseline first) | NaCl | 216 | 3.563 | 3.558 | 0.9984 | 0.9866–1.0159 | yes | yes |
+| | NaNbO3 | 1080 | 23.053 | 23.050 | 0.9998 | 0.9988–1.0013 | yes | yes |
+| | NbCl5 | 1944 | 27.220 | 27.219 | 1.0000 | 0.9995–1.0015 | yes | yes |
+| ab-mh1-npt (hydrostatic) | NaCl | 216 | 3.922 | 3.928 | 1.0016 | 0.9707–1.0136 | yes | yes |
+
+MH-1, hybrid FP32, NVT at 300 K. The protocol is the same as on murphy: 300 warm-up steps per side
+right after its build, then 12 alternating timed blocks of 300 steps. Every ratio lies within
+0.33 % of 1, nothing compiled while timed, and the two sides' temperatures differ by at most
+1.0e-4 K at the end. The RTX 5060 Ti half of acceptance item 1 **passes**. The PC's block-to-block
+spread (pair ratios 0.97–1.02 on NaCl) is wider than murphy's, as expected with a running desktop,
+but the alternation removes it from the medians.
 
 ### Workstation: murphy
 

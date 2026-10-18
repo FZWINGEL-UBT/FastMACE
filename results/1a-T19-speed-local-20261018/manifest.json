@@ -1,0 +1,360 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-18T14:54:39.326787+00:00",
+      "host": "Fabi-PC",
+      "machine": "local",
+      "suites": [
+        "primary"
+      ],
+      "run_root": "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018",
+      "environment": {
+        "PYTHONPATH": "/home/fzwin/fastmace-t19/6ec85b1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/home/fzwin/fastmace-cache/acceptance",
+        "FASTMACE_MODELS": "/home/fzwin/models",
+        "FASTMACE_STRUCTURES": "/home/fzwin/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/inductor",
+        "TRITON_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/triton",
+        "MACE_COMPILE_CACHE": "/home/fzwin/fastmace-cache/acceptance/compile",
+        "XDG_CACHE_HOME": "/home/fzwin/fastmace-cache/acceptance/xdg",
+        "TMPDIR": "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/tmp",
+        "TMP": "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/tmp",
+        "TEMP": "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "6ec85b1ca21216f7191c5a831a0a26883e9017e3",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/home/fzwin/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "ab-mh1-nvt-r1",
+          "argv": [
+            "bash",
+            "/home/fzwin/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh",
+            "/home/fzwin/environments/mace_cueq_oeq",
+            "/home/fzwin/fastmace-cache/acceptance/oeq-launcher",
+            "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+            "/home/fzwin/fastmace-t19/6ec85b1/tools/ab_step_time.py",
+            "--output",
+            "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/ab-mh1-nvt-r1",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/home/fzwin/models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--sides",
+            "baseline",
+            "fastmace",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "hybrid",
+            "--dump-forces",
+            "--baseline",
+            "/home/fzwin/fastmace-baseline/1a-T18"
+          ],
+          "output": "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/ab-mh1-nvt-r1",
+          "timing": true,
+          "note": "ABAB, baseline built first",
+          "idle_check": {
+            "utc": "2026-10-18T14:54:39.663883+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 8072.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "windows_gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 8072.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "load_average": [
+              0.54638671875,
+              1.96142578125,
+              1.92529296875
+            ],
+            "users": [
+              "fzwin    pts/1        2026-10-16 14:15"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:54:39.667218+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:05:33.196608+00:00",
+          "wall_s": 653.5292361159809,
+          "status": "complete"
+        },
+        {
+          "name": "ab-mh1-nvt-r2",
+          "argv": [
+            "bash",
+            "/home/fzwin/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh",
+            "/home/fzwin/environments/mace_cueq_oeq",
+            "/home/fzwin/fastmace-cache/acceptance/oeq-launcher",
+            "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+            "/home/fzwin/fastmace-t19/6ec85b1/tools/ab_step_time.py",
+            "--output",
+            "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/ab-mh1-nvt-r2",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/home/fzwin/models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--sides",
+            "fastmace",
+            "baseline",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "hybrid",
+            "--dump-forces",
+            "--baseline",
+            "/home/fzwin/fastmace-baseline/1a-T18"
+          ],
+          "output": "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/ab-mh1-nvt-r2",
+          "timing": true,
+          "note": "ABAB, FastMACE built first (build-order swap, decision after wave 1b)",
+          "idle_check": {
+            "utc": "2026-10-18T15:05:34.003375+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 8051.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "windows_gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 8051.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "load_average": [
+              1.0,
+              1.14306640625,
+              1.49560546875
+            ],
+            "users": [
+              "fzwin    pts/1        2026-10-16 14:15"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T15:05:34.004406+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:14:39.894347+00:00",
+          "wall_s": 545.8897631769942,
+          "status": "complete"
+        },
+        {
+          "name": "ab-mh1-nvt-r3",
+          "argv": [
+            "bash",
+            "/home/fzwin/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh",
+            "/home/fzwin/environments/mace_cueq_oeq",
+            "/home/fzwin/fastmace-cache/acceptance/oeq-launcher",
+            "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+            "/home/fzwin/fastmace-t19/6ec85b1/tools/ab_step_time.py",
+            "--output",
+            "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/ab-mh1-nvt-r3",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/home/fzwin/models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--sides",
+            "baseline",
+            "fastmace",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abba",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "hybrid",
+            "--dump-forces",
+            "--baseline",
+            "/home/fzwin/fastmace-baseline/1a-T18"
+          ],
+          "output": "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/ab-mh1-nvt-r3",
+          "timing": true,
+          "note": "ABBA, baseline built first",
+          "idle_check": {
+            "utc": "2026-10-18T15:14:40.613198+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 8069.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "windows_gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 8069.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "load_average": [
+              1.0166015625,
+              1.0458984375,
+              1.2744140625
+            ],
+            "users": [
+              "fzwin    pts/1        2026-10-16 14:15"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T15:14:40.614220+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:23:39.778896+00:00",
+          "wall_s": 539.1644806320255,
+          "status": "complete"
+        },
+        {
+          "name": "ab-mh1-npt",
+          "argv": [
+            "bash",
+            "/home/fzwin/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh",
+            "/home/fzwin/environments/mace_cueq_oeq",
+            "/home/fzwin/fastmace-cache/acceptance/oeq-launcher",
+            "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+            "/home/fzwin/fastmace-t19/6ec85b1/tools/ab_step_time.py",
+            "--output",
+            "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/ab-mh1-npt",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/home/fzwin/models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "baseline",
+            "fastmace",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "npt",
+            "--backend",
+            "hybrid",
+            "--cell-mode",
+            "hydrostatic",
+            "--dump-forces",
+            "--baseline",
+            "/home/fzwin/fastmace-baseline/1a-T18"
+          ],
+          "output": "/home/fzwin/fastmace-acceptance/1a-T19-speed-local-20261018/ab-mh1-npt",
+          "timing": true,
+          "note": "NPT BAOAB, hydrostatic",
+          "idle_check": {
+            "utc": "2026-10-18T15:23:40.723889+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 8055.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "windows_gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 8055.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "load_average": [
+              1.0,
+              1.0,
+              1.1376953125
+            ],
+            "users": [
+              "fzwin    pts/1        2026-10-16 14:15"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T15:23:40.726266+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:25:46.780696+00:00",
+          "wall_s": 126.05418161698617,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-18T15:25:46.781013+00:00"
+    }
+  ]
+}
