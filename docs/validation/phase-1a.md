@@ -179,22 +179,35 @@ count as provisional ("Second outside review").
 
 ## 3. Compatibility: `main.py` on FastMACE
 
-After 1a-T17. Each step runs once with `--engine gpu` and once with
-`--engine fastmace`, the same seed and checkpoint, as steps 4 and 5 of
-ResearchModule's `qualify_workstation.sh`:
+**RTX 5060 Ti (PC): from 1a-T17.** Following the conductor decision after
+T17, these runs are not repeated here. ResearchModule main `fb81217b` ran
+`main.py --engine fastmace` against FastMACE main `43ce026`, on the RTX
+5060 Ti (WSL2, `mace_cueq_oeq`). The workload was hybrid FP32 MH-1
+(`matpes_r2scan`) on NaCl 3×3×3: a shortened anneal (2 ps heat, 25 ps
+cool, 54,000 steps) and `--quench` on its output, two seeds per engine,
+each against `--engine gpu`.
 
-- smoke: NaNbO3, 0.5 ps to 400 K and 0.5 ps back;
-- `--profile anneal` on NaCl, 1 ps ramps;
-- `--quench` on the anneal output.
+The data are in `results/1a-T17-workflow-20261018/`: T17's `run.json`,
+metadata, temperature and quench CSVs, logs and scripts, without the
+trajectories. `comparison.txt` is the output of `scripts/t17_compare.py`,
+which uses the measures of ResearchModule's `studies/annealing/README.md`.
 
-They are compared with the measures of ResearchModule's
-`studies/annealing/README.md`: …
+| Measure | `--engine gpu` | `--engine fastmace` | Equal? |
+| --- | --- | --- | --- |
+| smoke (60 steps), largest position / energy difference | – | 7e-9 Å, 2.3e-6 eV/atom; wall time 23.2 s against 23.1 s | yes |
+| MD potential energy per 100 K bin, both ramps (16 bins), max \|Δ\| between engines, same seed | – | 0.01 meV/atom (both seeds) | yes: between seeds 5.93 meV/atom for either engine |
+| peak (meV/atom, at target K), seed 20261001 / 20261101 | +143.6 (961) / +135.0 (923) | +143.6 (961) / +135.0 (923) | yes |
+| neighbour rebuilds, seed 20261001 / 20261101 | 3522 / 3556 | 3522 / 3556 | identical |
+| quench, heating ramp (eV/atom over the relaxed start, n = 10) | +0.0140 ± 0.0039 / +0.0124 ± 0.0018 | +0.0140 ± 0.0038 / +0.0125 ± 0.0016 | within errors |
+| quench, cooling ramp | +0.0119 ± 0.0013 / +0.0122 ± 0.0019 | +0.0121 ± 0.0014 / +0.0123 ± 0.0024 | within errors |
+| MD wall time (s) | 211 / 210 | 212 / 212 | – |
+| peak GPU memory (GB) | 0.46 | 0.49 | reported |
 
-| Step | Measure | Baseline | FastMACE | Equal? |
-| --- | --- | --- | --- | --- |
-| smoke NaNbO3 | … | … | … | … |
-| anneal NaCl | … | … | … | … |
-| quench NaCl | … | … | … | … |
+The full 270 ps anneal through FastMACE was not run. The conductor decision
+after T17 leaves it to checkpoint 3, if the owner asks for it.
+
+**Workstation half:** one `main.py --engine fastmace` smoke run on leto,
+after the gate, with the NAS FastMACE copy and its `.source_commit`: …
 
 ## 4. Rules
 

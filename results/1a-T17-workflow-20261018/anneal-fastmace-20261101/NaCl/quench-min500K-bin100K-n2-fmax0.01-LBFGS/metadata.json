@@ -1,0 +1,186 @@
+{
+  "settings": {
+    "min_K": 500.0,
+    "bin_K": 100.0,
+    "per_bin": 2,
+    "fmax_eV_A": 0.01,
+    "optimizer": "LBFGS",
+    "fixed_cell": true,
+    "max_steps": 5000,
+    "blas_threads": 16,
+    "dtype": "float32",
+    "backend": "hybrid",
+    "selection": "thermostat target temperature; each ramp separately; evenly spaced within each bin; plus the final frame"
+  },
+  "run": "/home/fzwin/runs/1a-T17-20261018/anneal-fastmace-20261101",
+  "crystal": "NaCl",
+  "reference": {
+    "label": "relaxed start",
+    "eV_atom": -6.887299714265047
+  },
+  "initial_relaxation": {
+    "optimizer": "LBFGS",
+    "fixed_cell": true,
+    "fmax_target_eV_A": 0.01,
+    "max_steps": 5000,
+    "converged": true,
+    "steps": 0,
+    "seconds": 2.5026964909920935,
+    "initial_eV_atom": -6.887299714265047,
+    "energy_eV_atom": -6.887299714265047,
+    "fmax_eV_A": 2.675302994248341e-06
+  },
+  "md_wall_s": 211.52045786500094,
+  "quench_wall_s": 43.194593228021404,
+  "quench_seconds_sum": 42.91345288197044,
+  "recovered_rows": 0,
+  "not_converged": 0,
+  "heating": {
+    "n": 10,
+    "mean_eV_atom": -6.887287168149595,
+    "sd_eV_atom": 1.5715914966161368e-06
+  },
+  "cooling": {
+    "n": 10,
+    "mean_eV_atom": -6.88728739420573,
+    "sd_eV_atom": 2.394725444427109e-06
+  },
+  "final_quenched_eV_atom": -6.887287281177662,
+  "model": {
+    "path": "/home/fzwin/models/mace-mh-1.model",
+    "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+    "trust": "label",
+    "checkpoint_source": "explicit",
+    "label": "mh1-r2scan",
+    "head": "matpes_r2scan",
+    "heads": [
+      "matpes_r2scan",
+      "mp_pbe_refit_add",
+      "spice_wB97M",
+      "oc20_usemppbe",
+      "omol",
+      "omat_pbe"
+    ],
+    "model_type": "MACE",
+    "family": "mh1",
+    "functional": "r2scan",
+    "licence": "ASL",
+    "backend": "hybrid",
+    "dtype": "float32",
+    "device": "cuda:0",
+    "cueq_conv_fusion": null,
+    "fused_cueq": {
+      "device": "cuda",
+      "fused_cueq_modules": 2,
+      "checked": true,
+      "cuequivariance_ops_torch_imports": true,
+      "naive": [],
+      "allowed_naive": false
+    },
+    "embedding_specs": null,
+    "charge": null,
+    "spin_multiplicity": null,
+    "patches": [
+      {
+        "name": "oeq_runtime",
+        "value": "/home/fzwin/.cache/fastmace/oeq/cuda-runtime",
+        "targets": [
+          "env:CMAKE_CUDA_COMPILER",
+          "env:CPATH",
+          "env:CUDACXX",
+          "env:CUDA_HOME",
+          "env:CUDA_PATH",
+          "env:MAX_JOBS",
+          "env:OEQ_JIT_EXTENSION",
+          "env:OEQ_NVCC_ATTEMPTS",
+          "env:PATH",
+          "env:PYTORCH_NVCC",
+          "env:TORCH_EXTENSIONS_DIR"
+        ],
+        "detail": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13"
+      }
+    ],
+    "fastmace": {
+      "version": "0.0.1.dev0",
+      "git_commit": "43ce026ef45c14977e33e84d88382c7ddbf2548a",
+      "git_dirty": false,
+      "patches": [
+        {
+          "name": "oeq_runtime",
+          "value": "/home/fzwin/.cache/fastmace/oeq/cuda-runtime",
+          "targets": [
+            "env:CMAKE_CUDA_COMPILER",
+            "env:CPATH",
+            "env:CUDACXX",
+            "env:CUDA_HOME",
+            "env:CUDA_PATH",
+            "env:MAX_JOBS",
+            "env:OEQ_JIT_EXTENSION",
+            "env:OEQ_NVCC_ATTEMPTS",
+            "env:PATH",
+            "env:PYTORCH_NVCC",
+            "env:TORCH_EXTENSIONS_DIR"
+          ],
+          "detail": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13"
+        }
+      ],
+      "runtime": {
+        "file_locks": "soft",
+        "file_lock_source": "start-up hook (nfs_soft_locks)",
+        "file_lock_switch_late": false,
+        "cuda_driver_cache": "enabled"
+      },
+      "kernels": {
+        "triton": {
+          "available": true,
+          "reason": "triton 3.8.0 is importable"
+        },
+        "nvrtc": {
+          "available": true,
+          "reason": "NVRTC 13.0 loads through cuda.bindings"
+        },
+        "streaming": {
+          "available": true,
+          "reason": "NVRTC 13.0 loads through cuda.bindings; jinja2 and openequivariance are installed"
+        }
+      },
+      "versions": {
+        "python": "3.10.12",
+        "torch": "2.14.1+cu130",
+        "numpy": "2.2.6",
+        "ase": "3.27.0",
+        "mace-torch": "0.3.16",
+        "e3nn": "0.4.4",
+        "triton": "3.8.0",
+        "cuequivariance": "0.12.0",
+        "cuequivariance-torch": "0.12.0",
+        "cuequivariance-ops-torch-cu13": "0.12.0",
+        "openequivariance": "0.7.0",
+        "cuda-bindings": "13.3.1",
+        "jinja2": "3.1.6",
+        "filelock": "3.32.3"
+      },
+      "gpu": null,
+      "checkout": {
+        "path": "/mnt/d/Margraf/FastMACE",
+        "commit": "43ce026ef45c14977e33e84d88382c7ddbf2548a",
+        "dirty": false,
+        "source": "git"
+      }
+    }
+  },
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "code_sha256": {
+    "Experiments/Langevin_Thermostat/langevin/workflow.py": "fb22d1863b919b62ea0efef840ce7b74c055810caeb6e27f0c7126733ef2ee9b",
+    "Experiments/Langevin_Thermostat/langevin/gpu_langevin.py": "0c1bb5f1914160438059e977f3ba3f5e6400f446be6567153f93519246b9c696",
+    "Experiments/Langevin_Thermostat/langevin/edge_outer_sum.py": "2ded8400a7f8e2ebf5cea333d2eebb01d1c3197faf0db45d24f65f5382c0ce6e",
+    "Experiments/Langevin_Thermostat/langevin/quench.py": "60ca1eb5fc22ad0a5cfcd1c2096c955f5d208c41834d26f5e38399044aec8604",
+    "Experiments/Langevin_Thermostat/langevin/gpu_npt.py": "d02047a1ea50fe0850e01d8059a6be11aeec58d313da18d22b64985b130d031a",
+    "Experiments/Langevin_Thermostat/langevin/upstream_mace.py": "b39b3b8e144ee934a54a4ecce2ca810d33c01dbc153a4162dfb144462e167d3c",
+    "Experiments/Langevin_Thermostat/langevin/file_locks.py": "e214df977dc11858e45c03ba3f5e4cf996c05a31f58bee7628a183a1ff4f1629",
+    "Experiments/Langevin_Thermostat/langevin/compile_cache.py": "390e9bd9e21a07152946209344e8ebd2ee4cdb601ea05c59ab6059ac52c24e35",
+    "Experiments/Benchmark_MACE_GPU_OPTIMIZATIONS/scripts/common.py": "1ab9de8b8dd02a44972c443bcac1341344d7092c978519dcb6a418c2c58f3e4b",
+    "Experiments/Langevin_Thermostat/langevin/fastmace_engine.py": "923c0ba1c604267886e556b7c2ed3b4706cf92a8453139755f8aff7061e5ba36"
+  },
+  "created_utc": "2026-10-18T11:43:49.324785+00:00"
+}

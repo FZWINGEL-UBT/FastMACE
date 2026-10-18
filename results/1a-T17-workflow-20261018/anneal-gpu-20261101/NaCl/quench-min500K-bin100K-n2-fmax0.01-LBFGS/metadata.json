@@ -1,0 +1,95 @@
+{
+  "settings": {
+    "min_K": 500.0,
+    "bin_K": 100.0,
+    "per_bin": 2,
+    "fmax_eV_A": 0.01,
+    "optimizer": "LBFGS",
+    "fixed_cell": true,
+    "max_steps": 5000,
+    "blas_threads": 16,
+    "dtype": "float32",
+    "backend": "hybrid",
+    "selection": "thermostat target temperature; each ramp separately; evenly spaced within each bin; plus the final frame"
+  },
+  "run": "/home/fzwin/runs/1a-T17-20261018/anneal-gpu-20261101",
+  "crystal": "NaCl",
+  "reference": {
+    "label": "relaxed start",
+    "eV_atom": -6.887299714265047
+  },
+  "initial_relaxation": {
+    "optimizer": "LBFGS",
+    "fixed_cell": true,
+    "fmax_target_eV_A": 0.01,
+    "max_steps": 5000,
+    "converged": true,
+    "steps": 0,
+    "seconds": 2.5038841319910716,
+    "initial_eV_atom": -6.887299714265047,
+    "energy_eV_atom": -6.887299714265047,
+    "fmax_eV_A": 2.5796941827138653e-06
+  },
+  "md_wall_s": 210.36605313100154,
+  "quench_wall_s": 45.47886938400916,
+  "quench_seconds_sum": 45.07583146492834,
+  "recovered_rows": 0,
+  "not_converged": 0,
+  "heating": {
+    "n": 10,
+    "mean_eV_atom": -6.887287281177661,
+    "sd_eV_atom": 1.8264129476898995e-06
+  },
+  "cooling": {
+    "n": 10,
+    "mean_eV_atom": -6.88728756374783,
+    "sd_eV_atom": 1.869619227205337e-06
+  },
+  "final_quenched_eV_atom": -6.8872861508969905,
+  "model": {
+    "model": "mh1-r2scan",
+    "mace_mp_name": "mh-1",
+    "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+    "heads": [
+      "matpes_r2scan",
+      "mp_pbe_refit_add",
+      "spice_wB97M",
+      "oc20_usemppbe",
+      "omol",
+      "omat_pbe"
+    ],
+    "head": "matpes_r2scan",
+    "dtype": "float32",
+    "device": "cuda:0",
+    "setting": "float32_fmax_0.01_hybrid",
+    "fmax_eV_A": 0.01,
+    "torch": "2.14.1+cu130",
+    "cuda_version": "13.0",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "threads": 1,
+    "dispersion_d3": false,
+    "mace_torch": "0.3.16",
+    "ase": "3.27.0",
+    "host": "Fabi-PC",
+    "enable_cueq": true,
+    "enable_oeq": true,
+    "equivariance_backend": "hybrid",
+    "cuequivariance": "0.12.0",
+    "cuequivariance_torch": "0.12.0",
+    "cuequivariance_ops_torch": "0.12.0 (cu13)",
+    "openequivariance": "0.7.0"
+  },
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "code_sha256": {
+    "Experiments/Langevin_Thermostat/langevin/workflow.py": "fb22d1863b919b62ea0efef840ce7b74c055810caeb6e27f0c7126733ef2ee9b",
+    "Experiments/Langevin_Thermostat/langevin/gpu_langevin.py": "0c1bb5f1914160438059e977f3ba3f5e6400f446be6567153f93519246b9c696",
+    "Experiments/Langevin_Thermostat/langevin/edge_outer_sum.py": "2ded8400a7f8e2ebf5cea333d2eebb01d1c3197faf0db45d24f65f5382c0ce6e",
+    "Experiments/Langevin_Thermostat/langevin/quench.py": "60ca1eb5fc22ad0a5cfcd1c2096c955f5d208c41834d26f5e38399044aec8604",
+    "Experiments/Langevin_Thermostat/langevin/gpu_npt.py": "d02047a1ea50fe0850e01d8059a6be11aeec58d313da18d22b64985b130d031a",
+    "Experiments/Langevin_Thermostat/langevin/upstream_mace.py": "b39b3b8e144ee934a54a4ecce2ca810d33c01dbc153a4162dfb144462e167d3c",
+    "Experiments/Langevin_Thermostat/langevin/file_locks.py": "e214df977dc11858e45c03ba3f5e4cf996c05a31f58bee7628a183a1ff4f1629",
+    "Experiments/Langevin_Thermostat/langevin/compile_cache.py": "390e9bd9e21a07152946209344e8ebd2ee4cdb601ea05c59ab6059ac52c24e35",
+    "Experiments/Benchmark_MACE_GPU_OPTIMIZATIONS/scripts/common.py": "1ab9de8b8dd02a44972c443bcac1341344d7092c978519dcb6a418c2c58f3e4b"
+  },
+  "created_utc": "2026-10-18T11:37:26.880244+00:00"
+}
