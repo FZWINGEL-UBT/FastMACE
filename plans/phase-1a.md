@@ -850,6 +850,31 @@ research engine, with the same result for every accepted run.
 
 Next: T17 and T19, both prepared, get their go messages.
 
+## Conductor decisions after T17 (18 October 2026)
+
+T17 is merged into **ResearchModule** main (`fb81217b`, pushed, NAS synced):
+`main.py --engine fastmace` is opt-in, and the default stays `gpu` until
+the owner's checkpoint 3. Built against FastMACE main `43ce026`. On the
+RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
+- smoke over 60 steps: 7e-9 Å, 2.3e-6 eV/atom, wall time 23.2 s against
+  23.1 s;
+- shortened anneal (2 ps heat, 25 ps cool), two seeds per engine: the bin
+  means differ by at most 0.01 meV/atom between engines against 5.9
+  meV/atom between seeds, with identical rebuild counts;
+- the quench means agree within their errors;
+- CPU: the experiment suite passes, 332 without FastMACE and 345 with it.
+
+- **Run summaries (T17 Q1).** T19 copies T17's summaries from WSL
+  `~/runs/1a-T17-20261018/` into `results/1a-T17-workflow-20261018/` here and
+  cites them in `docs/validation/phase-1a.md`. ResearchModule's README
+  already describes the comparison.
+- **A FastMACE checkout without a recorded commit is refused (T17 Q2):**
+  accepted. Runs use `/mnt/d/Margraf/FastMACE` itself or the NAS copy with
+  `.source_commit`; WSL's git cannot read Windows worktrees.
+- **Not yet done:** the full 270 ps anneal through FastMACE. It belongs to
+  T19's workflow check only if checkpoint 3 needs it; the shortened
+  protocol already shows equality.
+
 ## New optimisations: screens after T19 (owner, 17 October 2026)
 
 The owner welcomes trying new optimisations and adopting those that make
