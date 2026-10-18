@@ -91,6 +91,10 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
   course urgently, interrupt its turn (`stop_session`); its queued message
   then runs next. Messages alone wait until the worker's current turn
   ends, which can take hours.
+- **The local RTX 5060 Ti is reserved by the owner (18 October 2026):**
+  keep it free until the owner says otherwise. GPU work goes to leto and
+  murphy only. coraline and leeloo were busy with another user's multi-day
+  jobs (user `kaifi`), and guybrush did not answer.
 - At most four workers at once. Give each GPU task its own machine:
   local RTX 5060 Ti (WSL), leto or murphy, both RTX 4000 Ada, after an idle
   check. Timing runs (T18 noise floor, T19) need an otherwise idle GPU and
