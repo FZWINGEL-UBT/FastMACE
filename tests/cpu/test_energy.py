@@ -243,6 +243,11 @@ def one_thread():
 @pytest.mark.slow
 @pytest.mark.parametrize("dtype", ["float32", "float64"])
 def test_compiled_forces_and_stress_are_bitwise_unchanged(dtype, one_thread):
+    """Compiled, with and without the float64 sum: forces and stress bitwise equal.
+
+    Runs with one intra-op thread (``one_thread``): with two, already two compilations of the same
+    model differ by about 3e-18 eV/Å, so bitwise equality is defined only single-threaded.
+    """
     pytest.importorskip("torch._inductor")
     model, atoms = model64("mh1"), structure("mh1")
     calc = calculator(model, dtype)
