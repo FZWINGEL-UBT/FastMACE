@@ -48,9 +48,24 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
   reason. In that case create their worktrees yourself
   (`git worktree add -b fastmace/1a-Tnn D:/Margraf/FastMACE-wt/1a-Tnn main`),
   and say "work only there" in the brief.
-- **Never create worktrees of ResearchModule.** It is on a USB hard disk,
-  and parallel worktrees there time out. Workers only read it, at
-  `G:\Margraf\ResearchModule`.
+- **Prepare, then wait.** Start a dependent task early, in the owner's
+  turn. It does its preparation, reports "prepared, waiting", and gets a go
+  message after its dependency merges; messaging an existing session works
+  from any turn. T17 and T19 run this way.
+- **ResearchModule worktrees go on NVMe.** ResearchModule is on a USB hard
+  disk: an app worktree there took more than 5 minutes and got stuck. For a
+  task that must change ResearchModule (such as T17), the conductor creates
+  the worktree on D: itself:
+  `git -C G:/Margraf/ResearchModule -c safe.directory='*' worktree add -b fastmace/1a-Tnn D:/Margraf/ResearchModule-wt/1a-Tnn main`
+  (about 2.5 minutes). It then starts the session with `cwd` that folder and
+  `use_worktree: false`. Every git command there needs
+  `-c safe.directory='*'`, because the repository's `.git` is on a file
+  system without ownership. Never create app worktrees of ResearchModule,
+  and never several in parallel. Workers that only read the research engine
+  read it at `G:\Margraf\ResearchModule`.
+- The app setting "When you ask for an unrelated task → Always start in a
+  new session" (owner, 18 October 2026) concerns the owner's own requests.
+  It does not let report-driven turns start sessions.
 - **The permission classifier refused one brief** that had a test import
   research-engine code from a path in an environment variable ("Create RCE
   Surface"). Briefs that copy expected values from the research engine's
