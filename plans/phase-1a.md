@@ -885,6 +885,14 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
   1642). The float32 reference agrees with float64, and T10 verified the fix
   only for float64 cuEq. T19 checks the research engine's production path on
   the same case. If that passes, a fix task T10b follows.
+- **NaCl compile at the first new bucket: A/B artefact (T13b, 18 October
+  2026).** In a same-process A/B the research engine reinstalls its
+  capture-safe `mask_head` before every capture; FastMACE did not reinstall
+  its own, so its compiled model failed a guard at the next eager call, the
+  warm-up of its first capture at a new bucket. Each engine alone, with fresh
+  caches, compiles nothing there. The fix (`fastmace/1a-T13b`, ae3e758)
+  reinstalls before each capture. Its GPU validation is paused while the
+  owner uses the local GPU.
 - **Open: MP-0 medium 1.4–1.6% slower** than the research engine (murphy,
   `species_skip` on both sides). That is within 3% but about ten times the
   noise floor, so it is a real difference: diagnose it after T19 (generic
