@@ -554,14 +554,21 @@ def reference_child(job, result):
     upstream_mace.use_cueq_conv_fusion(None)
     started = time.perf_counter()
     calc = common.load_calculator(job["model"], dtype=job["dtype"], enable_cueq=True)
-    experiment.configure_md_calculator(calc, compute_stress=True)
-    result["load_s"] = time.perf_counter() - started
     base, configs = read_configurations(job["configurations"])
-    if polar_gpu.is_polar(calc.models[0]):
+    model = calc.models[0]
+    if polar_gpu.is_polar(model):
         # MACE 0.3.16's PolarMACE stress misses the k-space cell dependence (MACE issue 1642); the
-        # references take the corrected long-range path, sized for the unstrained cell.
-        polar_gpu.enable(calc.models[0], base.cell.array, headroom=0.1)
-        result["polar_reference"] = "polar_gpu (corrected stress)"
+        # references take the corrected long-range path, sized for the unstrained cell. Enable it
+        # before configure_md_calculator: that stores each model's bound forward, and polar_gpu's
+        # corrected forward is installed on the class by the first enable(). The other way round the
+        # references silently ran MACE 0.3.16's own stress (1a-T19, 18 October 2026).
+        polar_gpu.enable(model, base.cell.array, headroom=0.1)
+    experiment.configure_md_calculator(calc, compute_stress=True)
+    if polar_gpu.is_polar(model):
+        if getattr(model.forward, "__func__", None) is not type(model).forward:
+            raise GateJobError("the polar reference does not run polar_gpu's corrected forward")
+        result["polar_reference"] = "polar_gpu (corrected stress), active forward checked"
+    result["load_s"] = time.perf_counter() - started
     values = {}
     for key in job["keys"]:
         values[f"{job['structure']}/{key}"] = calculator_values(configs[key], calc)
