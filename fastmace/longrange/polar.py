@@ -35,6 +35,11 @@ for one model instance (process-local; the installed packages are not modified):
   SPEC §6.3 "Source rewrites"). It acts on every model instance whose options ask for it
   (``configure()``), with or without the GPU path, so reference calculators can take the same
   model. The research engine's spin restriction is not carried over (SPEC §6.2 "Never enable").
+- float64 energy (SPEC §7.3, plan task 1b-T03; ``set_float64_energy``): a second source rewrite
+  of the same forward (``FLOAT64_ENERGY_EDITS``, composable with PR 1762) reduces E0, the
+  interaction and local electron energies, the electrostatic energy (per-k and self terms,
+  ``coulomb_energy_pbc(with_float64=True)``) and the field term into float64. Forces and stress
+  still come from MACE's autograd of its own scalar, so they keep every bit.
 - ``mace.modules.extensions._permute_to_e3nn_convention``, graph_longrange's external/internal
   field blocks and MACE's ``compute_total_charge_dipole_permuted`` without their per-call CPU index
   tensors (list indexing) and without a scatter that sizes its output by ``index.max()``.
@@ -276,11 +281,13 @@ class PolarHolder:
     """Per-instance polar settings of one PolarMACE module: its k-space state and its PR 1762 options.
 
     ``state`` None means MACE's own long-range code (with the PR 1762 options still applied).
+    ``float64_energy``: the forward reduces the energy into float64 (``fastmace.model.energy``).
     A deep copy of the model copies the holder and the state with it.
     """
 
     state: PolarState | None = None
     config: PolarConfig = PolarConfig()
+    float64_energy: bool = False
 
 
 class _Call:
@@ -401,11 +408,13 @@ def precompute_geometry_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, n
 
 
 def coulomb_energy_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, source_feats, node_positions, batch,
-                       volume, pbc, force_pbc_evaluator=False):
+                       volume, pbc, force_pbc_evaluator=False, with_float64=False):
     """GTOElectrostaticEnergy._pbc_energy_batch without host synchronisation (one graph, full PBC).
 
     The monopole/dipole and slab corrections are selected by torch.where only for molecules and
-    slabs, so for full PBC they add exactly zero and are skipped.
+    slabs, so for full PBC they add exactly zero and are skipped. ``with_float64``: return
+    ``(energy, energy64)``, the second with the per-k and self terms reduced into float64
+    (SPEC §7.3); ``energy`` is unchanged.
     """
     import torch
     from graph_longrange.features import apply_coulomb_kernel_batch, assemble_fourier_series_batch
@@ -419,6 +428,8 @@ def coulomb_energy_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, source
     potential = apply_coulomb_kernel_batch(k_norm2=k_norm2, density=density, k_factor_coulomb=k_factor_coulomb)
     per_k = 2.0 * torch.sum(density * potential, dim=-1)
     energy = 0.5 * volume.reshape(-1) * per_k.sum().reshape(1) / (2 * math.pi) ** 6
+    if with_float64:
+        energy64 = 0.5 * volume.reshape(-1).double() * per_k.double().sum().reshape(1) / (2 * math.pi) ** 6
     source_feats_lm = source_feats.squeeze(-2) if source_feats.dim() == 3 else source_feats
     if not self.include_self_interaction:
         self_fields = self.self_interaction_terms(source_feats_lm)
@@ -426,7 +437,26 @@ def coulomb_energy_pbc(self, k_vectors, k_norm2, k_vector_batch, k0_mask, source
         self_energy = torch.zeros(1, dtype=node_energies.dtype, device=node_energies.device)
         self_energy.index_add_(0, batch, node_energies)
         energy = energy - self_energy * 0.5
+        if with_float64:
+            self_energy64 = torch.zeros(1, dtype=torch.float64, device=node_energies.device)
+            self_energy64.index_add_(0, batch, node_energies.double())
+            energy64 = energy64 - self_energy64 * 0.5
+    if with_float64:
+        return energy, energy64
     return energy
+
+
+def coulomb_energy_float64(module, **kwargs):
+    """``(energy, energy64)`` of a ``GTOElectrostaticEnergy``: the energy MACE differentiates, and float64.
+
+    On the GPU-only path the per-k and self terms are reduced into float64. MACE's own long-range
+    code (an instance without a k-space state, as in a reference calculator) returns its total,
+    upcast.
+    """
+    if _ACTIVE:
+        return coulomb_energy_pbc(module, with_float64=True, **kwargs)
+    energy = module(**kwargs)
+    return energy, energy.double()
 
 
 def radial_direct_forward(self, k_mods):
@@ -636,6 +666,59 @@ def pr1762_forward(original_forward):
     return namespace["forward"]
 
 
+# MACE 0.3.16's PolarMACE.forward blocks that the float64 energy reduction (SPEC §7.3,
+# fastmace.model.energy) changes. Disjoint from PR1762_EDITS, so both apply to one source. The
+# electrostatic energy MACE differentiates is unchanged; its float64 twin goes into the energy.
+FLOAT64_ENERGY_EDITS = (
+    ("""        electro_energy = self.coulomb_energy(
+""", """        electro_energy, electro_energy64 = _fastmace_coulomb_energy_float64(
+            self.coulomb_energy,
+"""),
+    ("""        forces, virials, stress, hessian, edge_forces = get_outputs(
+""", """        node_energy64 = _fastmace_node_e0(data, node_e0) + node_inter_es.double()
+        if getattr(self, "add_local_electron_energy", False):
+            node_energy64 = node_energy64 + local_q_e.double()
+        unresolved64 = electro_energy64 + torch.sum(
+            external_potential[:, 1:].double() * total_dipole.double(), dim=-1
+        )
+        energy64 = scatter_sum(node_energy64, data["batch"], dim=-1, dim_size=num_graphs) + unresolved64
+        forces, virials, stress, hessian, edge_forces = get_outputs(
+"""),
+    ("""            "energy": total_energy,
+""", """            "energy": energy64,
+            "node_energy_float64": node_energy64,
+            "energy_unresolved_float64": unresolved64,
+"""),
+)
+
+
+def polar_forward(original_forward, stabilise=False, float64_energy=False):
+    """MACE 0.3.16's PolarMACE.forward with PR 1762 (``stabilise``) and/or the float64 energy reduction.
+
+    Neither: ``original_forward`` itself. Otherwise built from its source like ``pr1762_forward``.
+    An unqualified source raises ``PolarUnavailableError`` (PR 1762) or
+    ``fastmace.model.energy.EnergyReductionError``.
+    """
+    if not float64_energy:
+        return pr1762_forward(original_forward) if stabilise else original_forward
+    import mace.modules.extensions as extensions
+
+    from fastmace.model import energy
+
+    source = inspect.getsource(original_forward)
+    if stabilise:
+        for old, new in PR1762_EDITS:
+            if source.count(old) != 1:
+                raise PolarUnavailableError("PolarMACE.forward is not MACE 0.3.16's; the PR 1762 port does not apply")
+            source = source.replace(old, new)
+    source = energy.apply_edits(source, FLOAT64_ENERGY_EDITS, "PolarMACE.forward")
+    namespace = dict(vars(extensions))
+    namespace.update(_fastmace_normalise_fukui=_model_normalise_fukui,
+                     _fastmace_cap_charge_dipole=_model_cap_charge_dipole,
+                     _fastmace_coulomb_energy_float64=coulomb_energy_float64)
+    return energy.compile_forward(source, namespace, "<fastmace PolarMACE.forward, float64 energy>")
+
+
 # --------------------------------------------------------------------------- process-wide install
 
 
@@ -737,21 +820,22 @@ def install():
     original_internal = gto_utils.GTOInternalFieldtoFeaturesBlock.forward
     original_radial = gto_utils.RadialIntegralDirect.forward
     original_moduli = gto_utils.GTOBasis._prepare_k_moduli
-    rewritten = []  # the PR 1762 forward, built on first use
+    rewritten = {}  # (PR 1762, float64 energy) -> forward, built on first use
 
-    def model_forward(config):
-        if not stabilised(config):
+    def model_forward(holder):
+        key = (stabilised(holder.config), bool(holder.float64_energy))
+        if key == (False, False):
             return original_forward
-        if not rewritten:
-            rewritten.append(pr1762_forward(original_forward))
-        return rewritten[0]
+        if key not in rewritten:
+            rewritten[key] = polar_forward(original_forward, *key)
+        return rewritten[key]
 
     def forward(self, data, *args, **kwargs):
         holder = self.__dict__.get(HOLDER_ATTRIBUTE)
         if holder is None:
             return original_forward(self, data, *args, **kwargs)
         if holder.state is None:
-            return model_forward(holder.config)(self, data, *args, **kwargs)
+            return model_forward(holder)(self, data, *args, **kwargs)
         strained = bool(kwargs.get("compute_stress") or kwargs.get("compute_virials"))
         if strained and data.get("displacement") is None:
             # The strain leaf the stress differentiates by (prepare_graph uses it); the long-range
@@ -761,7 +845,7 @@ def install():
                                                device=data["positions"].device, requires_grad=True)
         _ACTIVE.append(_Call(holder.state, data, strained))
         try:
-            return model_forward(holder.config)(self, data, *args, **kwargs)
+            return model_forward(holder)(self, data, *args, **kwargs)
         finally:
             _ACTIVE.pop()
 
@@ -885,6 +969,18 @@ def set_state(model, state):
     _holder(model, create=True).state = state
 
 
+def set_float64_energy(model, enabled=True):
+    """Let this PolarMACE instance reduce its energy into float64 (SPEC §7.3); installs the wrappers.
+
+    Works with or without the GPU-only path. Call it after the rewrites' self-checks, which
+    compare against MACE's own energy.
+    """
+    if not is_polar(model):
+        raise TypeError(f"{type(model).__name__} is not PolarMACE")
+    install()
+    _holder(model, create=True).float64_energy = bool(enabled)
+
+
 def get_config(model):
     """The instance's ``PolarConfig`` (the default when none was set)."""
     return _instance_config(model)
@@ -917,10 +1013,11 @@ def no_sync_check():
 
 
 __all__ = [
-    "HOLDER_ATTRIBUTE", "PATCH_NAME", "PR1762_EDITS", "PROCESS_CONSTRAINTS", "SOURCE_HASHES", "ZERO_FORCE_REASON",
-    "PolarHolder", "PolarState", "PolarUnavailableError", "cap_charge_dipole", "compute_k_vectors_fixed",
-    "configure", "disable", "enable", "get_config", "get_state", "install", "installed", "is_polar",
-    "no_sync_check", "normalise_fukui", "overflowed", "pr1762_forward", "require_route", "reset_overflow",
-    "resolve_kspace_headroom", "route_support", "set_state", "source_digest", "source_problems", "stabilised",
+    "FLOAT64_ENERGY_EDITS", "HOLDER_ATTRIBUTE", "PATCH_NAME", "PR1762_EDITS", "PROCESS_CONSTRAINTS", "SOURCE_HASHES",
+    "ZERO_FORCE_REASON", "PolarHolder", "PolarState", "PolarUnavailableError", "cap_charge_dipole",
+    "compute_k_vectors_fixed", "configure", "coulomb_energy_float64", "coulomb_energy_pbc", "disable", "enable",
+    "get_config", "get_state", "install", "installed", "is_polar", "no_sync_check", "normalise_fukui",
+    "overflowed", "polar_forward", "pr1762_forward", "require_route", "reset_overflow", "resolve_kspace_headroom",
+    "route_support", "set_float64_energy", "set_state", "source_digest", "source_problems", "stabilised",
     "validate_charge_spin",
 ]

@@ -20,6 +20,7 @@ Two levels:
 
 from __future__ import annotations
 
+import functools
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, runtime_checkable
 
@@ -31,14 +32,29 @@ if TYPE_CHECKING:
 class ForceOutput(NamedTuple):
     """One evaluation: ``energy`` ``(1,)`` eV, ``forces`` ``(N, 3)`` eV/Å, ``stress`` ``(3, 3)`` eV/Å³ or ``None``.
 
-    Tensors in the force field's precision, owned by the model's output (copy them out before
-    the next call). ``stress`` is MACE's: ASE sign convention, no kinetic part, ``None`` unless
-    the force field was built with ``compute_stress``.
+    Forces and stress in the force field's precision; the energy accumulated in float64 (SPEC
+    §7.3), or in the force precision when the force field was built with ``float64_energy=False``.
+    Owned by the model's output (copy them out before the next call). ``stress`` is MACE's: ASE
+    sign convention, no kinetic part, ``None`` unless the force field was built with
+    ``compute_stress``.
     """
 
     energy: torch.Tensor
     forces: torch.Tensor
     stress: torch.Tensor | None
+
+
+class PerAtomEnergies(NamedTuple):
+    """Per-atom float64 energies (eV) of the atom-resolved terms, and the rest of the total.
+
+    ``energies.sum() + unresolved`` is the potential energy. ``terms`` names the terms each part
+    holds: ``{"resolved": (...), "unresolved": (...)}`` (k-space electrostatics and the field term of
+    PolarMACE are not atom-resolved).
+    """
+
+    energies: np.ndarray
+    unresolved: float
+    terms: dict
 
 
 @runtime_checkable
@@ -191,6 +207,11 @@ class MACEForceField:
     - ``charge``, ``spin_multiplicity``: OMOL-0's joint embedding (checked against it) or
       PolarMACE's total charge and spin (``validate_charge_spin``); a ``LoadedModel``'s values are
       the default.
+    - ``float64_energy`` (``PrecisionConfig.float64_energy``): the energy is accumulated in float64
+      (``fastmace.model.energy``, SPEC §7.3); forces and stress are MACE's either way. False
+      reproduces 1a's energy, for A/B against the research engine only. ``atomic_energies``: the
+      exact float64 E0 table; default the ``LoadedModel``'s (captured from the checkpoint before
+      MACE converted the model), else the model's own table upcast.
 
     The streaming edge counter is this instance's neighbour-list count. Every call points the
     model's streaming interactions at it, so two force fields from one compiled model each read
@@ -200,12 +221,13 @@ class MACEForceField:
 
     def __init__(self, model, atoms, *, rewrites=None, engine=None, neighbours=None, polar=None,
                  compute_stress=False, compile_cache=None, registry=None, charge=None, spin_multiplicity=None,
-                 check=True):
+                 check=True, float64_energy=True, atomic_energies=None):
         import torch
 
         from fastmace.config import EngineConfig, NeighbourConfig, RewriteConfig
         from fastmace.longrange import polar as longrange
         from fastmace.model import compile as compiling
+        from fastmace.model import energy as energy64
         from fastmace.model import loading
         from fastmace.model.capabilities import padding_is_exact
         from fastmace.neighbors.skin import SkinNeighbourList
@@ -246,6 +268,9 @@ class MACEForceField:
         self.is_polar = longrange.is_polar(source)
         if self.is_polar:
             longrange.require_route(self.backend, self.compile_mode)
+        self.float64_energy = bool(float64_energy)
+        # The float64 forward of a non-polar model (refused here if its source is not qualified).
+        energy_forward = energy64.float64_forward(source) if self.float64_energy and not self.is_polar else None
 
         # The input batch, built once (charge and spin as MACE's calculator reads them from atoms.info).
         if loaded is not None:
@@ -295,6 +320,12 @@ class MACEForceField:
                 self.polar_info = longrange.enable(private, cell, polar, variable_cell=self._compute_stress)
                 self._polar_model = private
             self.applied = registry.apply(private, resolution, context, original=source, check=check)
+            # After the self-checks, which compare against MACE's own energy.
+            if self.float64_energy:
+                if self.is_polar:
+                    longrange.set_float64_energy(private)
+                else:
+                    energy64.install(private)
             return private
 
         if self.compile_mode != "none":
@@ -304,7 +335,7 @@ class MACEForceField:
             key = None if self.is_polar else (
                 id(source), self.compile_mode, self.backend, self.oeq, accelerated, tuple(enabled),
                 self.species_columns if species_dependent else None, engine.first_derivative_only,
-                engine.unfuse_full_addmm)
+                engine.unfuse_full_addmm, self.float64_energy)
             entry = cache.get(key, source) if key is not None else None
             if entry is None:
                 if self.is_polar:
@@ -337,6 +368,25 @@ class MACEForceField:
 
         self.data = {key: (value.to(self._device, self._dtype) if value.is_floating_point() else value.to(self._device))
                      if torch.is_tensor(value) else value for key, value in batch.items()}
+        # The calculator's own model (eager, no private copy) is never changed: its float64 forward
+        # is called as a function.
+        self._model_call = self.model
+        if energy_forward is not None and self.model is source:
+            self._model_call = functools.partial(energy_forward, self.model)
+        self.atomic_energies = None
+        if self.float64_energy:
+            if atomic_energies is None:
+                atomic_energies = getattr(loaded, "atomic_energies", None)
+            if atomic_energies is None:
+                atomic_energies = energy64.model_atomic_energies(source)
+            atomic_energies = torch.as_tensor(atomic_energies, dtype=torch.float64).cpu().clone()
+            expected = tuple(source.atomic_energies_fn.atomic_energies.shape)
+            if tuple(atomic_energies.shape) != expected:
+                raise ValueError(f"atomic_energies has shape {tuple(atomic_energies.shape)}, the model's E0 table "
+                                 f"{expected}")
+            self.atomic_energies = atomic_energies
+            head = int(batch["head"].reshape(-1)[0]) if "head" in batch else 0
+            self.data[energy64.NODE_E0_KEY] = energy64.node_e0_float64(atomic_energies, node_attrs, head)
         segmented = "segmented_first_sum" in enabled
         self.neighbours = SkinNeighbourList(
             cell, calc.r_max, self._device, self._dtype, neighbours,
@@ -407,18 +457,22 @@ class MACEForceField:
         respect to a symmetric strain of positions and cell, taken in the same backward pass as
         the forces.
         """
+        out = self._outputs(positions)
+        stress = out["stress"].reshape(3, 3) if self._compute_stress else None
+        return ForceOutput(out["energy"], out["forces"], stress)
+
+    def _outputs(self, positions):
+        """The model's output dict at float64 ``positions`` on the current edges."""
         import torch
 
         self._bind_streaming_count()
         with torch.no_grad():
             self.positions.copy_(positions)
         if not self._compute_stress:
-            out = self.model(self.data, training=self.training, compute_force=True, compute_stress=False)
-            return ForceOutput(out["energy"], out["forces"], None)
+            return self._model_call(self.data, training=self.training, compute_force=True, compute_stress=False)
         # MACE's stress path replaces "positions" and "shifts" in the dict it gets (strained
         # copies); a shallow copy keeps ours bound to the buffers.
-        out = self.model(dict(self.data), training=self.training, compute_force=True, compute_stress=True)
-        return ForceOutput(out["energy"], out["forces"], out["stress"].reshape(3, 3))
+        return self._model_call(dict(self.data), training=self.training, compute_force=True, compute_stress=True)
 
     def set_cell(self, cell):
         """compute_stress: the current float64 cell for the neighbour list and the model inputs; graph safe."""
@@ -467,11 +521,35 @@ class MACEForceField:
         at construction); a fixed-cell force field takes only its own cell. Synchronises and
         rebuilds the neighbour list: not for the MD loop.
         """
-        import numpy as np
         import torch
 
         if stress and not self._compute_stress:
             raise ValueError("stress=True needs a force field built with compute_stress=True")
+        out = self(self._prepare_one_off(atoms))
+        energy = float(out.energy.detach().reshape(-1)[0])
+        forces = out.forces.detach().to(torch.float64).cpu().numpy()
+        values = out.stress.detach().to(torch.float64).cpu().numpy() if stress else None
+        return energy, forces, values
+
+    def per_atom_energies(self, atoms):
+        """Per-atom float64 energies of ``atoms`` and what they omit (``PerAtomEnergies``; SPEC §7.3).
+
+        Same conditions as ``evaluate`` (synchronises, rebuilds the list); needs ``float64_energy``.
+        """
+        from fastmace.model import energy as energy64
+
+        if not self.float64_energy:
+            raise ValueError("per-atom energies need a force field built with float64_energy=True")
+        out = self._outputs(self._prepare_one_off(atoms))
+        return PerAtomEnergies(out["node_energy_float64"].detach().cpu().numpy().copy(),
+                               float(out["energy_unresolved_float64"].detach().reshape(-1)[0]),
+                               energy64.terms(self.source_model))
+
+    def _prepare_one_off(self, atoms):
+        """Check ``atoms``, set its cell, rebuild and compact the list; its float64 device positions."""
+        import numpy as np
+        import torch
+
         if len(atoms) != len(self.numbers) or not np.array_equal(atoms.numbers, self.numbers):
             raise ValueError("evaluate needs the force field's species in the same order (the input batch is fixed)")
         if not all(atoms.pbc):
@@ -486,11 +564,7 @@ class MACEForceField:
         self.rebuild(positions)
         self.compact(positions)
         self.use_edges(int(self.neighbours.count))
-        out = self(positions)
-        energy = float(out.energy.detach().reshape(-1)[0])
-        forces = out.forces.detach().to(torch.float64).cpu().numpy()
-        values = out.stress.detach().to(torch.float64).cpu().numpy() if stress else None
-        return energy, forces, values
+        return positions
 
     # ------------------------------------------------------------------ state and provenance
 
@@ -528,5 +602,5 @@ class MACEForceField:
             "edge_capacity": self.neighbours.capacity, "candidates": self.neighbours.num_candidates,
             "species_columns": list(self.species_columns), "charge": self.charge,
             "spin_multiplicity": self.spin_multiplicity, "dynamo_reset": self.dynamo_reset,
-            "polar": None if state is None else state.info(),
+            "polar": None if state is None else state.info(), "float64_energy": self.float64_energy,
         }

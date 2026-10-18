@@ -126,6 +126,8 @@ class LoadedModel:
     charge: int | None
     spin_multiplicity: int | None
     patches: tuple = field(default=())  # _patches.applied() while the model was built
+    # The checkpoint's E0 table as float64, copied before MACE's dtype conversion (SPEC §7.3).
+    atomic_energies: object = None
 
     @property
     def model(self):
@@ -444,6 +446,34 @@ def checkpoint_warning_filter():
         yield
 
 
+@contextmanager
+def capture_atomic_energies():
+    """Keep an exact float64 copy of the E0 table of every model ``torch.load`` returns in the block.
+
+    MACE's calculator converts the loaded model to its ``default_dtype``, which rounds a float64 E0
+    table to float32 (Cl −12,522 eV by up to 0.5 meV). The float64 energy (SPEC §7.3) needs the
+    checkpoint's table, so it is copied as the checkpoint is unpickled, before the conversion.
+    Yields the list the copies go to. ``torch.load`` is wrapped for the block only.
+    """
+    import torch
+
+    original = torch.load
+    found = []
+
+    def load(*args, **kwargs):
+        value = original(*args, **kwargs)
+        block = getattr(value, "atomic_energies_fn", None)
+        if block is not None and torch.is_tensor(getattr(block, "atomic_energies", None)):
+            found.append(block.atomic_energies.detach().to("cpu", torch.float64).clone())
+        return value
+
+    torch.load = load
+    try:
+        yield found
+    finally:
+        torch.load = original
+
+
 # ------------------------------------------------------------------------ heads, embeddings, licence
 
 
@@ -546,7 +576,7 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
     if naive:
         from fastmace.model import compile as compiling
     naive_scope = compiling.naive_cueq() if naive else contextlib.nullcontext()
-    with checkpoint_warning_filter(), scope, naive_scope:
+    with checkpoint_warning_filter(), scope, naive_scope, capture_atomic_energies() as tables:
         from mace.calculators import MACECalculator
         try:
             if backend == "hybrid":
@@ -582,12 +612,12 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
         family=entry.family if entry is not None else None, functional=functional,
         licence=entry.licence if entry is not None else None, backend=backend, dtype=dtype, device=device,
         cueq_conv_fusion=fusion, fused_cueq=fused, embedding_specs=specs, charge=charge,
-        spin_multiplicity=spin_multiplicity, patches=patches)
+        spin_multiplicity=spin_multiplicity, patches=patches, atomic_energies=tables[0] if tables else None)
 
 
 __all__ = [
     "BACKENDS", "BackendError", "CheckpointTrustError", "HybridUnavailableError", "LoadedModel",
-    "ModelLicenceWarning", "NaiveCueqError", "ResolvedCheckpoint", "check_trust", "download_checkpoint",
-    "fused_cueq_problems", "hybrid_keeps_last_layer_irreps", "load", "require_fused_cueq", "resolve_checkpoint",
-    "sha256_of",
+    "ModelLicenceWarning", "NaiveCueqError", "ResolvedCheckpoint", "capture_atomic_energies", "check_trust",
+    "download_checkpoint", "fused_cueq_problems", "hybrid_keeps_last_layer_irreps", "load", "require_fused_cueq",
+    "resolve_checkpoint", "sha256_of",
 ]
