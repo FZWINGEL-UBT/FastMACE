@@ -871,6 +871,24 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
 - **A FastMACE checkout without a recorded commit is refused (T17 Q2):**
   accepted. Runs use `/mnt/d/Margraf/FastMACE` itself or the NAS copy with
   `.source_commit`; WSL's git cannot read Windows worktrees.
+- **Acceptance interpretation (conductor, 18 October 2026; for owner
+  review at checkpoint 3).** SPEC §4.3 treats model-level failures as
+  warnings, not engine failures. So "the gate passes for all 19 labels"
+  counts, for POLAR-1 S/M/L and OMOL-0 XL, only on the crystals where
+  ResearchModule's `studies/other_models/README.md` finds the model usable
+  (POLAR-1-S: NaCl; OMOL-0 XL: NaCl, NbCl5; POLAR-1-M/L as listed there).
+  Elsewhere the result is "model-limited", shown by the same failure in the
+  float64 reference. T19 records this in `docs/validation/phase-1a.md`.
+- **Open: POLAR stress in the compiled hybrid NPT path.** On NaCl, FastMACE's
+  POLAR-1-S production stress is off by 2.2–4.6e-5 eV/Å³, and on NbCl5 by
+  3.5–8.2e-3. That matches MACE 0.3.16's uncorrected k-space stress (issue
+  1642). The float32 reference agrees with float64, and T10 verified the fix
+  only for float64 cuEq. T19 checks the research engine's production path on
+  the same case. If that passes, a fix task T10b follows.
+- **Open: MP-0 medium 1.4–1.6% slower** than the research engine (murphy,
+  `species_skip` on both sides). That is within 3% but about ten times the
+  noise floor, so it is a real difference: diagnose it after T19 (generic
+  rewrite path).
 - **Not yet done:** the full 270 ps anneal through FastMACE. It belongs to
   T19's workflow check only if checkpoint 3 needs it; the shortened
   protocol already shows equality.
