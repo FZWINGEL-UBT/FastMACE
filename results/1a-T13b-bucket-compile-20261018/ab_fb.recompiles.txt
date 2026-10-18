@@ -1,0 +1,32 @@
+Recompiling function forward in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:455
+    triggered by the following guard failure(s):
+    - 0/0: tensor 'data['shifts']' size mismatch at index 0. expected 6912, actual 7168
+Recompiling function forward in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:455
+    triggered by the following guard failure(s):
+    - 0/1: ___check_obj_id(G['__import_mace_dot_modules_dot_blocks'].mask_head.__code__, 133701144116048), type=<class 'code'>  # x = mask_head(x, heads, self.num_heads)  # mace/modules/blocks.py:114 in forward
+    - User stack trace:
+    -   File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py", line 570, in forward
+    -     readout(node_feats_list[feat_idx], node_heads)[
+    -   File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py", line 114, in forward
+    -     x = mask_head(x, heads, self.num_heads)
+    - 0/0: ___check_obj_id(G['__import_mace_dot_modules_dot_blocks'].mask_head.__code__, 133701144116048), type=<class 'code'>  # x = mask_head(x, heads, self.num_heads)  # mace/modules/blocks.py:114 in forward
+    - User stack trace:
+    -   File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py", line 570, in forward
+    -     readout(node_feats_list[feat_idx], node_heads)[
+    -   File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py", line 114, in forward
+    -     x = mask_head(x, heads, self.num_heads)
+Recompiling function forward in /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:455
+    triggered by the following guard failure(s):
+    - 0/2: ___check_type_id(self._modules['products']._modules['0']._modules['linear'], 102650481061536), type=<class 'langevin.gpu_langevin._BlockLinear'>  # return self.linear(node_feats) + sc  # mace/modules/blocks.py:507 in forward (HINT: type _BlockLinear)
+    - User stack trace:
+    -   File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py", line 562, in forward
+    -     node_feats = product(
+    -   File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py", line 507, in forward
+    -     return self.linear(node_feats) + sc
+    - 0/1: ___check_obj_id(G['__import_mace_dot_modules_dot_blocks'].mask_head.__code__, 133701144116048), type=<class 'code'>  # x = mask_head(x, heads, self.num_heads)  # mace/modules/blocks.py:114 in forward
+    - User stack trace:
+    -   File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py", line 570, in forward
+    -     readout(node_feats_list[feat_idx], node_heads)[
+    -   File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/blocks.py", line 114, in forward
+    -     x = mask_head(x, heads, self.num_heads)
+    - 0/0: tensor 'data['shifts']' size mismatch at index 0. expected 6912, actual 7680

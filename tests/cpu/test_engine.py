@@ -497,3 +497,26 @@ def test_streaming_needs_receiver_sorted_edges():
         constraints.check_receiver_sorting(_SortedField([0, 1, 2, 0], sort=False))
     with pytest.raises(constraints.ProcessConstraintError, match="not sorted"):
         constraints.check_receiver_sorting(_SortedField([0, 2, 1, 0]))
+
+
+def test_capture_safe_mask_head_is_put_back_after_another_install():
+    """The research engine installs its own mask_head before every capture; FastMACE puts its own back.
+
+    Compiled models guard on ``mace.modules.blocks.mask_head``. With another function in place, the
+    warm-up of the next capture (a new edge bucket) compiled the model again (1a-T13b).
+    """
+    pytest.importorskip("mace")
+    from mace.modules import blocks
+
+    from fastmace import _patches
+    from fastmace.rewrites import engine as engine_rewrites
+
+    record = _patches.set_capture_safe_mask_head(True)
+    assert blocks.mask_head is engine_rewrites.capture_safe_mask_head
+
+    def other_copy(*args, **kwargs):  # what the research engine's use_capture_safe_mask_head installs
+        return engine_rewrites.capture_safe_mask_head(*args, **kwargs)
+
+    blocks.mask_head = other_copy
+    assert _patches.set_capture_safe_mask_head(True) is record
+    assert blocks.mask_head is engine_rewrites.capture_safe_mask_head
