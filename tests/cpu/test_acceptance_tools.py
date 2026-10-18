@@ -400,6 +400,12 @@ def test_long_range_gates_count_only_where_the_model_is_usable():
     assert names["gate-omol0-xl-NaNbO3-model-limited"].note == "model-limited"
 
 
+def test_off23_large_gates_paracetamol_reduced():
+    (job,) = [j for j in suites.gate_jobs(suites.MACHINES["leto"], Path("/mnt/homes/zwingel/x"), ("off23-large",))]
+    structures = _flag_values(job.argv, "--structures")
+    assert structures[2].endswith("paracetamol_cod2104364.cif@2x2x2") and structures[3].endswith("@1x1x1")
+
+
 def test_gate_check_on_given_structures_with_the_baseline_engine():
     jobs = suites.gate_jobs(suites.MACHINES["leto"], Path("/mnt/homes/zwingel/x"), ("polar1-s", "polar1-m"),
                             engine="baseline", structures=("NaCl",))

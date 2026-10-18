@@ -273,10 +273,20 @@ LONG_RANGE_GATES = {
 # POLAR-1-S on NaNbO3 is already shown model-limited by its first gate run (references at 86-75,347 GPa).
 
 
+# MACE-OFF23 large's float64 reference needs one 14.8 GiB allocation on paracetamol 3x3x3 (leto, 20 GB,
+# 18 October 2026): that crystal is gated on 2x2x2 (SPEC §12.3 passed-reduced).
+REDUCED_GATES = {
+    "off23-large": (("", tuple(spec + "@2x2x2" if "paracetamol" in spec else spec for spec in ORGANIC_STRUCTURES), 3,
+                     "counts (paracetamol reduced: the float64 reference does not fit)"),),
+}
+
+
 def gate_cases(label):
     """(job suffix, structures, configs, role) of each gate run of ``label``."""
     if label in LONG_RANGE_GATES:
         return LONG_RANGE_GATES[label]
+    if label in REDUCED_GATES:
+        return REDUCED_GATES[label]
     if label in MACE_OFF_LABELS:
         return (("", tuple(ORGANIC_STRUCTURES), 3, "counts"),)
     return (("", CRYSTALS, 3, "counts"),)
