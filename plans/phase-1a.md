@@ -889,7 +889,19 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
   engine had patched the class first in the same process. Fixed in T19's
   `tools/force_stress_gate.py` (5e5019d): enable first, then configure, and
   the reference process refuses to run without the corrected forward. The
-  POLAR rows are rerun. No T10b.
+  POLAR rows are rerun. No T10b. With corrected references, POLAR-1-S
+  passes on NaCl (stress ratio 1.57) and POLAR-1-M on NaCl and NaNbO3
+  (0.69, 0.83). A finite-difference self-test on NaCl 3×3×3 confirms the
+  references (≤ 8.1e-9 eV/Å³) and FastMACE's production stress (≤ 1.1e-7).
+- **Open finding for NPT with PolarMACE (phase 3b or later).** On NbCl5
+  3×3×3, even the corrected float64 POLAR-1-S stress differs from finite
+  differences by 4.4e-4 eV/Å³, about 3% of the stress (uncorrected: 22%).
+  The research engine's own finite-difference check (6.3e-9) used NbCl5
+  2×2×2. This is probably a property of the model or of the long-range part
+  in the larger cell, such as k-vectors crossing the cutoff under strain or
+  a non-variational charge solve, not a missing correction. Investigate it
+  before PolarMACE NPT is recommended. T19's self-test therefore always runs
+  on NaCl 3×3×3.
 - **NaCl compile at the first new bucket: A/B artefact (T13b, 18 October
   2026).** In a same-process A/B the research engine reinstalls its
   capture-safe `mask_head` before every capture; FastMACE did not reinstall
