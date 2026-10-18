@@ -28,10 +28,10 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
 - **T07/T08 GPU confirmation is open:** the GPU suite on the merged tree, and
   T08's murphy agreement run repeated with T07's real modules. See "after
   T07/T08" in the plan.
-- **Next: T15 (fixed planner).** T13 is merged (see "after T13"); then T17 and T19.
+- **Next: T17 and T19** (prepare-then-wait, given their go after T15; see "after T15").
   All dependencies of both are merged. Then T13 (graph engine), T15
   (planner), T17 (`main.py` on FastMACE) and T19 (acceptance).
-- **Critical path:** T15 → T17 → T19.
+- **Critical path:** T17 → T19.
 
 ## Starting workers
 
@@ -48,9 +48,34 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
   reason. In that case create their worktrees yourself
   (`git worktree add -b fastmace/1a-Tnn D:/Margraf/FastMACE-wt/1a-Tnn main`),
   and say "work only there" in the brief.
-- **Never create worktrees of ResearchModule.** It is on a USB hard disk,
-  and parallel worktrees there time out. Workers only read it, at
-  `G:\Margraf\ResearchModule`.
+- **Ready list, one batch start (owner decision, 18 October 2026).** In
+  every report-driven turn, review, merge and then update the "Ready to
+  start" list in `plans/README.md`: each task whose dependencies are merged,
+  with its brief ready. End the turn with one question, "Start all ready?".
+  The owner's single reply ("start all ready") starts every task on the
+  list in that turn, at most four at once, one GPU per task. No supported
+  setting lets report-driven turns start sessions (research of 18 October
+  2026; anthropics/claude-code#100913 and #89783 track it). A watcher script
+  with an owner-written queue (`claude --bg`) is the hands-off alternative,
+  to reconsider for phase 1b.
+- **Prepare, then wait.** Start a dependent task early, in the owner's
+  turn. It does its preparation, reports "prepared, waiting", and gets a go
+  message after its dependency merges; messaging an existing session works
+  from any turn. T17 and T19 run this way.
+- **ResearchModule worktrees go on NVMe.** ResearchModule is on a USB hard
+  disk: an app worktree there took more than 5 minutes and got stuck. For a
+  task that must change ResearchModule (such as T17), the conductor creates
+  the worktree on D: itself:
+  `git -C G:/Margraf/ResearchModule -c safe.directory='*' worktree add -b fastmace/1a-Tnn D:/Margraf/ResearchModule-wt/1a-Tnn main`
+  (about 2.5 minutes). It then starts the session with `cwd` that folder and
+  `use_worktree: false`. Every git command there needs
+  `-c safe.directory='*'`, because the repository's `.git` is on a file
+  system without ownership. Never create app worktrees of ResearchModule,
+  and never several in parallel. Workers that only read the research engine
+  read it at `G:\Margraf\ResearchModule`.
+- The app setting "When you ask for an unrelated task → Always start in a
+  new session" (owner, 18 October 2026) concerns the owner's own requests.
+  It does not let report-driven turns start sessions.
 - **The permission classifier refused one brief** that had a test import
   research-engine code from a path in an environment variable ("Create RCE
   Surface"). Briefs that copy expected values from the research engine's

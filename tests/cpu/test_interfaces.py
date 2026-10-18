@@ -114,13 +114,13 @@ def test_engine_methods_are_abstract():
     assert {"step", "flush", "snapshot", "sync", "potential_energy", "info"} <= Engine.__abstractmethods__
 
 
-def test_stubs_raise_not_implemented():
+def test_plan_describes_itself():
     from fastmace.planner.plan import Plan
 
-    # SimulationState.from_atoms is filled by 1a-T12 (tests/cpu/test_integrators.py).
+    # SimulationState.from_atoms is filled by 1a-T12 (tests/cpu/test_integrators.py), Plan.describe by
+    # 1a-T15 (tests/cpu/test_planner.py).
     plan = Plan(tier="graph")
-    with pytest.raises(NotImplementedError):
-        plan.describe()
+    assert plan.describe() == str(plan) == "Plan revision 0, tier graph: initial plan"
 
 
 def test_plan_is_a_frozen_record():
