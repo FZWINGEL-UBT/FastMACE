@@ -13,14 +13,10 @@ import os
 import sys
 from pathlib import Path
 
-from fastmace.errors import FastMACEError
+from fastmace.errors import CacheLocationError  # noqa: F401 (re-exported: the 1a names)
 
 ENVIRONMENT_VARIABLE = "FASTMACE_CACHE"
 CACHE_KINDS = ("triton", "inductor", "oeq", "compile")
-
-
-class CacheLocationError(FastMACEError):
-    """The cache root is not usable (inside sys.prefix)."""
 
 
 def _user_cache_directory(environ):

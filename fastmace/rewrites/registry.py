@@ -49,7 +49,7 @@ from types import MappingProxyType
 from typing import Any, Literal
 
 from fastmace.config import RewriteConfig
-from fastmace.errors import FastMACEError
+from fastmace.errors import RewriteError, RewriteRefusedError, SelfCheckError  # noqa: F401 (re-exported: the 1a names)
 from fastmace.model.capabilities import RewriteSupport
 
 Support = RewriteSupport
@@ -76,18 +76,6 @@ RECORD_SOURCES = (
 LOGGER = logging.getLogger("fastmace.rewrites")
 
 _CONFIG_FIELDS = tuple(f.name for f in dataclasses.fields(RewriteConfig))
-
-
-class RewriteError(FastMACEError):
-    """A rewrite could not be resolved or applied."""
-
-
-class RewriteRefusedError(RewriteError):
-    """An explicitly requested rewrite (``"on"``) cannot be enabled; the message gives the reasons."""
-
-
-class SelfCheckError(RewriteError):
-    """A rewrite's self-check failed at setup (SPEC §6.4)."""
 
 
 @dataclass(frozen=True)

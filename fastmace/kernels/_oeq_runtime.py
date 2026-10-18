@@ -32,6 +32,8 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from fastmace.errors import OEqRuntimeError  # noqa: F401 (re-exported: the 1a names)
+
 RUNTIME_LIBRARIES = ("cudart", "nvrtc", "cublasLt", "cublas")  # soname major 13, as oeq_no_nvcc.sh
 DRIVER_CANDIDATES = ("/usr/lib/wsl/lib/libcuda.so.1", "/lib/x86_64-linux-gnu/libcuda.so.1",
                      "/usr/lib/x86_64-linux-gnu/libcuda.so.1", "/usr/lib64/libcuda.so.1")
@@ -41,10 +43,6 @@ printf 'nvcc invocation blocked: %s\\n' "$*" >> "${OEQ_NVCC_ATTEMPTS:?}"
 printf 'nvcc intentionally unavailable: FastMACE builds the OEq host extension without it\\n' >&2
 exit 97
 """
-
-
-class OEqRuntimeError(RuntimeError):
-    """The OEq host-extension runtime cannot be prepared."""
 
 
 @dataclass(frozen=True)
