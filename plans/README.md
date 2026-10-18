@@ -16,6 +16,17 @@ phase before it is under way, not all in advance. Worker rules are in
 | 5. Planner completion | — | |
 | 6. Release | — | |
 
+## Ready to start
+
+Tasks whose dependencies are merged and whose brief is ready. The owner
+starts all of them with one message, "start all ready" (see
+[CONDUCTOR.md](CONDUCTOR.md)).
+
+- none. T15, T17 (prepare-then-wait) and T19 (prepare-then-wait) are
+  running.
+
+## Open owner decisions
+
 Open owner decisions that phases wait on (SPEC §18; licence decided: MIT):
 minimum MACE version (2, by phase 2), gate default (3, phase 1b), CI GPU
 runners (5, phase 2).

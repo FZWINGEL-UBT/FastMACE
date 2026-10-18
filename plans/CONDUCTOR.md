@@ -48,6 +48,16 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
   reason. In that case create their worktrees yourself
   (`git worktree add -b fastmace/1a-Tnn D:/Margraf/FastMACE-wt/1a-Tnn main`),
   and say "work only there" in the brief.
+- **Ready list, one batch start (owner decision, 18 October 2026).** In
+  every report-driven turn, review, merge and then update the "Ready to
+  start" list in `plans/README.md`: each task whose dependencies are merged,
+  with its brief ready. End the turn with one question, "Start all ready?".
+  The owner's single reply ("start all ready") starts every task on the
+  list in that turn, at most four at once, one GPU per task. No supported
+  setting lets report-driven turns start sessions (research of 18 October
+  2026; anthropics/claude-code#100913 and #89783 track it). A watcher script
+  with an owner-written queue (`claude --bg`) is the hands-off alternative,
+  to reconsider for phase 1b.
 - **Prepare, then wait.** Start a dependent task early, in the owner's
   turn. It does its preparation, reports "prepared, waiting", and gets a go
   message after its dependency merges; messaging an existing session works
