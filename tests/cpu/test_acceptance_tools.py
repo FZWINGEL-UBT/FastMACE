@@ -485,6 +485,16 @@ def test_speed_controls_are_single_engine_processes_and_fastmace_needs_no_launch
             assert job.argv[0].endswith("mace_cueq_latest/bin/python") == (not hybrid)
 
 
+def test_nacl_rerun_and_primary_suites():
+    m = suites.MACHINES["murphy"]
+    rerun = {job.name: job for job in suites.nacl_rerun_jobs(m, m.path(m.root) / "run")}
+    assert set(rerun) == {"ab-mh1-nvt-NaCl-r1", "ab-mh1-nvt-NaCl-r2", "ab-mh1-cueq-nvt"}
+    assert _flag_values(rerun["ab-mh1-nvt-NaCl-r2"].argv, "--sides") == ["fastmace", "baseline"]
+    assert all(_flag_values(job.argv, "--structures") == ["NaCl"] for job in rerun.values())
+    primary = [job.name for job in suites.primary_jobs(m, m.path(m.root) / "run")]
+    assert primary == ["ab-mh1-nvt-r1", "ab-mh1-nvt-r2", "ab-mh1-nvt-r3", "ab-mh1-npt"]
+
+
 def test_speed_measures_the_real_cueq_plan():
     job = _jobs_by_name()["ab-mh1-cueq-nvt"]
     assert _flag_values(job.argv, "--backend") == ["cueq"]

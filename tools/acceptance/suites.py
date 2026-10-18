@@ -352,4 +352,28 @@ def workflow_jobs(machine: Machine, run_root: Path, research_module=None, engine
     return jobs
 
 
-SUITES = {"speed": speed_jobs, "alternating": alternating_jobs, "gate": gate_jobs, "workflow": workflow_jobs}
+def nacl_rerun_jobs(machine: Machine, run_root: Path) -> list:
+    """MH-1 NaCl again after 1a-T13b's mask_head fix: hybrid NVT in both build orders, and plain cuEq float64.
+
+    The first runs compiled while timed at NaCl's first new edge bucket (7168 -> 7680) because both engines
+    patch mask_head process-wide; FastMACE now reinstalls its function before each capture.
+    """
+    run_root = Path(run_root)
+    note = "rerun after 1a-T13b (mask_head reinstalled before each capture)"
+    return [
+        _ab_job(machine, run_root, "ab-mh1-nvt-NaCl-r1", PRIMARY_MODEL, ("NaCl",), ("baseline", "fastmace"),
+                blocks=AB_BLOCKS, note=note + "; baseline built first"),
+        _ab_job(machine, run_root, "ab-mh1-nvt-NaCl-r2", PRIMARY_MODEL, ("NaCl",), ("fastmace", "baseline"),
+                blocks=AB_BLOCKS, note=note + "; FastMACE built first"),
+        _ab_job(machine, run_root, "ab-mh1-cueq-nvt", PRIMARY_MODEL, CUEQ_CASE["structures"], ("baseline", "fastmace"),
+                blocks=AB_BLOCKS, backend="cueq", note=note + "; plain cuEq float64"),
+    ]
+
+
+def primary_jobs(machine: Machine, run_root: Path) -> list:
+    """The primary set only (MH-1 NVT on the three crystals, three A/B processes) and the NPT case."""
+    return [job for job in speed_jobs(machine, run_root) if job.name.startswith(("ab-mh1-nvt-r", "ab-mh1-npt"))]
+
+
+SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun_jobs, "alternating": alternating_jobs,
+          "gate": gate_jobs, "workflow": workflow_jobs}
