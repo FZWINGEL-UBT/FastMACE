@@ -577,7 +577,10 @@ Without any schedule, the thermostat target stays at its current value.
   atom-resolved (k-space electrostatics) are reported separately.
 - **Energy and forces are one scalar.** Forces are −∂E/∂x and stress is the
   strain derivative of this same float64-reduced energy, by autograd through
-  the reduction. The gradient of a sum is 1 for every term whatever the
+  the reduction. Taking forces and stress from the autograd of the float32
+  sum and reducing the same terms separately into float64 for the energy is
+  equivalent and is the implementation (1b-T03): it keeps forces and stress
+  bitwise equal to 1a by construction. The gradient of a sum is 1 for every term whatever the
   precision of the accumulator, so the float64 reduction changes no force
   or stress bit compared with a float32 sum. E0 is a constant per species
   and contributes no gradient. What remains is the float32 rounding of the
@@ -710,7 +713,7 @@ sim = run.simulation               # the expert handle, a normal Simulation
   only over the step ranges whose target is at or above it, through
   `run(mc=…)` and `run(mc=None)` (§7.6), and records the ranges.
 - Defaults are the production settings: timestep 0.5 fs, Langevin friction
-  0.02/fs, trajectory and thermo every 20 steps, restart every 10,000,
+  0.02 per ASE time unit (about 0.001965/fs, `main.py`'s `--friction 0.02`), trajectory and thermo every 20 steps, restart every 10,000,
   seed recorded, `reproducible=False`, D3 off (the report recommends it
   where §11.2 does, as for the molecular chlorides in NPT). Engine, backend,
   rewrites and precision come from the planner (§9). The gate follows
@@ -742,8 +745,8 @@ print(dyn.summary)                 # the same report as fm.md
   `Langevin`: `atoms`, `timestep`, `temperature` or `temperature_K`,
   `friction`, `fixcm`, `trajectory`, `logfile`, `loginterval`,
   `append_trajectory`. Refused: `rng` (the noise comes from FastMACE's
-  device generator; pass `seed=`), and `communicator` other than ASE's
-  default (FastMACE runs one process per structure). The other classes list
+  device generator; pass `seed=`), and `communicator` (`comm`) other than ASE's
+  default, and `master` (FastMACE runs one process per structure). The other classes list
   theirs in the API reference, and a CPU test compares each list with
   `inspect.signature` of the ASE class, so an ASE argument that is neither
   supported nor refused fails CI. FastMACE additions are keyword-only:
@@ -2594,3 +2597,10 @@ is not bitwise reproducible (1a-T13). No other change.
 
 **Draft 0.12, fifth amendment (19 October 2026):** owner decisions 3 (gate opt-in,
 §12.3) and 15–21 (the phase 1b plan's D2–D8) recorded in §18. No other change.
+
+**Draft 0.12, sixth amendment (19 October 2026, conductor, from the phase 1b
+prestart reports):** §7.7 `fm.md` friction default stated in ASE units as in
+`main.py` (0.02 per ASE time unit, not 0.02/fs); §7.3 energy: the float64
+energy may be a separate reduction of the float32 terms while forces come
+from the float32 autograd (equivalent, 1b-T03); §7.7 ASE shim also refuses
+`comm` and `master`. Listed for the owner's review in `plans/phase-1b.md`.

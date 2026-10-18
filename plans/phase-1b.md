@@ -1122,6 +1122,223 @@ default; D2–D8 as recommended below. All are recorded in SPEC §18 (3,
   worked through 1a with at most four workers, and a watcher would start
   sessions the classifier may treat as a bypass.
 
+## Conductor answers to the prestart reports (19 October 2026)
+
+All 21 waiting workers reported. These answers are binding. Each go message
+points here.
+
+**Changed dependencies:**
+- **T06 also after T02:** it raises `RestartMismatch`.
+- **T12 also after T05:** it holds T05's identity, with no placeholder.
+- **T21 also after T20:** its `summary` test compares with `fm.md`.
+
+**T01 contracts, the five points.**
+- Points 1–4 are accepted as written: optional `atoms`; `force_field`;
+  required `seed`; `mc=...` keeps the move set and `mc=None` detaches it.
+- Point 5: `fm.md`'s friction default is `main.py`'s, 0.02 per ASE time
+  unit (about 0.001965/fs). SPEC §7.7 is amended (sixth amendment).
+
+### Shared API agreements
+
+- **Reason codes (T02, T12, T15).**
+  - T02 adds `Reason(str)` with `.rule` and a stable `.code`, and
+    `PlanRefused.from_reasons(reasons)`. That function returns
+    `SpeciesNotInSuperset` when a reason has `rule == 2`.
+  - T12 raises refusals only through it, and gives every `plan.decisions`
+    entry a stable key.
+  - T15 matches codes, never text.
+- **Errors (T02).**
+  - `gate_record` holds the object and `record` the location.
+  - The `doctor` line is on by default for the five environment errors.
+  - `PolarUnavailableError`, `CacheLocationError` and `BaselineExportError`
+    move into `errors.py`, with re-exports where they were.
+  - `OEqRuntimeError` becomes `class OEqRuntimeError(FastMACEError,
+    RuntimeError)` in `errors.py`, re-exported from
+    `kernels/_oeq_runtime.py`.
+  - T02 edits only the re-export lines of those files. "Three modules"
+    means all four.
+- **Restart content (T05, T06, T07, T14, T17).**
+  - T05: `ForceFieldIdentity` goes in `state.py`. `plan=` is a JSON
+    mapping until T12's `Plan.to_restart()` exists.
+  - T07: `state.protocol` is an object with `to_restart() -> dict` and
+    `from_restart`. The dict is JSON-safe and holds the segments, the
+    resolved timestep, the step and the target.
+  - T06: T05 stores T06's `output_chunk`, `output_rows` and
+    `output_frames`.
+  - T14: T05 also stores the edge bucket and the neighbour capacity under
+    the plan record (§10.6, "edge and capacity buckets"). T14 builds a
+    resumed engine with them, and may add the capacity option to
+    `neighbors/skin.py` after T04 merges.
+  - Versions stay in the identity digest, as SPEC §10.6 says. In 1b, resume
+    refuses another FastMACE or MACE version (listed for the owner below).
+  - `main.py` files are version 2 without `identity`, and
+    `Simulation.resume` refuses them.
+  - T17 writes `simulation.json` next to the restart, for what T05's format
+    does not hold:
+    - the model source: label or path, head, SHA-256 and trust;
+    - the integrator record, workload, `Output`, seed and
+      `allow_naive_cueq`;
+    - species, masses and PBC.
+- **`output_steps`.** The canonical copy is in `fastmace.protocols` (T07).
+  T06 re-exports it in `io/trajectory.py`.
+- **TOML.** The conductor adds `tomli; python_version < "3.11"` to
+  `pyproject.toml`. T07 and T22 use `tomllib`, falling back to `tomli`.
+  PyYAML stays optional: it is imported lazily, only `safe_load` is used,
+  and a missing PyYAML raises a clear `ImportError`.
+- **Registry (T04, T16).**
+  - The policy table lives in `registry.py`, keyed by attribute path. The
+    test fails for any buffer without a policy.
+  - The host mirrors are engine-owned `derived` buffers with
+    `capture=False`. T04 adds that row to `contracts-1b.md`.
+  - `p_eps` and `force_eps`: whichever of T04 and T05 merges second renames
+    them.
+  - For 1b, a sticky polar overflow flag is enough, and it is recorded.
+  - `runtime_state` is removed.
+  - T04 adds a process-wide `engine.base.production_engine_built()` record,
+    set when a `GraphEngine` is built. T16 reads it.
+- **Planner entry points (T12, T18).**
+  - T12 provides `MinimalPlanner.plan_evaluation(...)`: compiled mode, no
+    workload. `fm.calc` and `ForceField.evaluate` use it.
+  - Rule 6 is checked when the model is plain cuEq: in `build`, or already
+    in `plan` if the model is loaded.
+  - Stress uses `effective_external_stress_GPa()` only if the test shows it
+    is bitwise equal to 1a.
+  - Species are compared as sets.
+  - T12 may edit the note's wording in `engine/constraints.py`. If T11's
+    docstring edit in `fixed.py` lands first, T12 rebases.
+  - Publish the `Plan` shape in `docs/design/` on the branch, not in a
+    notes folder.
+- **Gate (T13, T16, T17).**
+  - T13 exposes `record.id` and tests that it changes; the identity test
+    comes with T17.
+  - The record states 1a-T19's "stock" exactly: MACE's own cuEq conversion,
+    conv fusion off, one-graph strain on.
+  - T13 compares against the stored references of run
+    `1a-T19-gate-leto-20261018`.
+  - T09 exports its qualification results as a constant, and T13 reads that
+    constant.
+  - T16's proposal is accepted:
+    - load the copy, rebuild its list, replay C then B, and read the state;
+      the registry then restores it;
+    - NVT checks energy and forces only, recording "stress: not in plan";
+    - the child entry point is in `selfcheck.py`;
+    - a monkeypatched broken kernel in the test is fine.
+  - Signatures: `selfcheck.references(plan, force_field, atoms, integrator,
+    *, check, seed)` and `selfcheck.production(engine, references, *,
+    check) -> GateRecord`.
+  - Until T16 merges, `sim.gate` is
+    `{status: "skipped", reason: 'opt-in: check="gate"'}`.
+- **Simulation (T14, T17, T21).**
+  - T14 exposes `canonicalise(reevaluate=True)` for D4's host writes.
+  - T17 provides `sim.committed()`: a read-only snapshot of positions,
+    momenta, cell, energy, forces, stress and step. It also provides a hook
+    that submits a frame to the async writer. T21 uses both.
+  - `Simulation` takes a `LoadedModel`, a `ForceField` or a label. A path
+    raises `TypeError` pointing to `fm.load`, because the trust decision
+    needs one.
+  - T17 may delete `test_simulation_stub_says_which_task_fills_it`.
+  - `mc` is duck-typed.
+  - Energy is checked at every thermo row, and at the end of `run()` when
+    there is no output.
+- **Report (T15, T20, T21).**
+  - T15's object has `setup_text()`, `record_speed(...)`, `finish(mean)`
+    and `to_metadata()`, and accepts extra warnings. T17 owns the step
+    timing.
+  - The speed window is given as arguments. The defaults are 1,000 warm-up
+    steps, then 1,000 timed steps. The end-of-run wording is as proposed.
+  - In 1b, the §4.3 model warnings are a data table in `report.py`.
+  - Setup stages use §12.5's names.
+  - The metadata key is `"report"`, written by T10's `write_metadata`.
+- **Provenance (T08, T10).**
+  - T10 writes the builder and `write_metadata`, and T17 and T20 call them.
+  - Inputs are plain mappings with documented keys.
+  - `main.py`'s layout stays, and the 1a block nests under `"model"`.
+  - The self-check results are part of the gate record.
+  - T10 adds `trust` to `model_block`, taken from
+    `LoadedModel.provenance()`.
+- **Loading (T03, T08).**
+  - The internal `load(...)` keeps its signature.
+  - Public `fm.load` returns a pristine `LoadedModel` (e3nn, float64, CPU),
+    and the plan converts it.
+  - A URL downloads only with `download=True`.
+  - T03 may add the float64 E0 capture in `loading.py`. Whichever of T03
+    and T08 merges second rebases.
+- **Energy (T03).**
+  - Design A is accepted, and SPEC §7.3 is amended.
+  - T03 adds `float64_energy` to `MACEForceField` and the narrow
+    pass-through in `planner/fixed.py`; T12 rebases.
+  - The conductor adapts ResearchModule's adapter tolerance later, in a
+    cross-repository change.
+
+### Per task, the rest
+
+- **T06.** All four proposals are accepted. Every restart write is a chunk
+  boundary, the stop request included. An empty chunk still gets its files.
+- **T07.**
+  - Round half up, refuse 0-step segments and record the rounding.
+  - The rate sign rule is as proposed.
+  - Pre-relaxation and quench are data only.
+- **T09.**
+  - Test the installed ASE, with a source guard.
+  - The calculator fallback is acceptable.
+  - The GPU test runs in float64 and is marked for T24's slow tier.
+- **T18.**
+  - Always build with stress.
+  - When the species or the atom count change, replan and reuse the
+    compile cache, so a new species gets a fresh plan.
+  - Keep `calc.plan` and `calc.notes`.
+  - Until T13 is merged, compare against stock MACE in float64.
+- **T19.**
+  - Only `find_spec` for OEq, never an import.
+  - Set `CUDA_CACHE_DISABLE=1` in the doctor process before CUDA starts.
+  - Exit codes as proposed, plus `--no-hash`.
+  - Provide a subcommand table. T22 is the second editor of
+    `cli/__init__.py`.
+- **T20.**
+  - Draw and record the seed.
+  - The output default is `./<structure stem>.fastmace/`, or
+    `./fastmace-run/` for an in-memory `Atoms`; T21 uses the same.
+  - "D3: phase 3b" is a `PlanRefused` raised in `fm.md` after the
+    expansion. NVE raises `PlanRefused`.
+  - An explicit `integrator=` wins. A conflicting non-default `ensemble`
+    raises `ValueError`.
+  - Skip the gate test if T16 is not merged.
+- **T21.**
+  - Refuse a non-default `comm` or `communicator`, and `master` (SPEC
+    amended). Walk the whole class chain.
+  - Refuse fixed-cell BAOAB ("use `Langevin`"), NVE/NPH ("phase 4") and an
+    explicit `P_mass`.
+  - `hydrostatic=False` maps to `"full"`.
+  - Convert the stress shapes, and refuse a non-symmetric 3×3.
+  - A 1-ulp difference in friction is acceptable: compare plans with that
+    tolerance.
+- **T22.**
+  - Second editor of `cli/__init__.py`.
+  - The `schedule`, `integrator` and `mc` tables as proposed.
+  - `run` reads a TOML of `fm.md` arguments (D5).
+  - The conductor writes the CI job; T22 documents the commands.
+- **T23.**
+  - A renamed `fastmace_1a` package in one process is accepted only if the
+    tool handles the duplicated process-wide patches (the custom-pass slot,
+    `mask_head`) the way `bench.ab` does. Otherwise use alternating
+    processes and say so.
+  - The tag `fastmace-1a` is set on `bb35363` by the conductor.
+  - POLAR-1-S on NbCl5 stays supplementary.
+  - The tool may go in `tools/` and `fastmace/bench/`.
+  - Adapter pytest runs in ResearchModule with `PYTHONDONTWRITEBYTECODE=1`,
+    `-p no:cacheprovider` and `--basetemp` outside the tree.
+  - Machines as listed; the go message confirms the reserved list.
+
+### For the owner's review (not blocking)
+
+1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
+   former "0.02/fs".
+2. Resume refuses a different FastMACE or MACE version, reading SPEC §10.6
+   literally. A later relaxation could allow version changes with a
+   recorded warning.
+3. Public `fm.load` returns a pristine model, and the planner chooses the
+   backend.
+
 ## 1a items deferred to 1b
 
 | Item (where decided) | 1b task |
