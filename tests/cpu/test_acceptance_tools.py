@@ -410,13 +410,24 @@ def test_speed_controls_are_single_engine_processes_and_fastmace_needs_no_launch
         assert len(sides) == 1
         assert _flag_values(job.argv, "--blocks") == ["4"]
         uses_launcher = any(word.endswith("oeq_no_nvcc.sh") for word in job.argv)
-        assert uses_launcher == (sides == ["baseline"])
+        cueq = _flag_values(job.argv, "--backend") == ["cueq"]
+        assert uses_launcher == (sides == ["baseline"] and not cueq)
         assert ("--dump-forces" in job.argv) == (sides == ["fastmace"])
         if sides == ["fastmace"]:
             assert "--baseline" not in job.argv
     for name, job in jobs.items():
         if name.startswith("ab-"):
-            assert any(word.endswith("oeq_no_nvcc.sh") for word in job.argv)  # the research engine needs it
+            hybrid = _flag_values(job.argv, "--backend") == ["hybrid"]
+            # the research engine's hybrid needs the launcher; plain cuEq runs in its own environment
+            assert any(word.endswith("oeq_no_nvcc.sh") for word in job.argv) == hybrid
+            assert job.argv[0].endswith("mace_cueq_latest/bin/python") == (not hybrid)
+
+
+def test_speed_measures_the_real_cueq_plan():
+    job = _jobs_by_name()["ab-mh1-cueq-nvt"]
+    assert _flag_values(job.argv, "--backend") == ["cueq"]
+    assert _flag_values(job.argv, "--sides") == ["baseline", "fastmace"]
+    assert "--main-args" not in job.argv  # main.py's plan for --backend cueq, nothing added
 
 
 def test_speed_jobs_run_a_b_before_controls():

@@ -43,6 +43,8 @@ SECONDARY_CRYSTALS = ("NaCl", "NbCl5")
 PRIMARY_MODEL = "mh1-r2scan"
 SECONDARY_MODELS = ("mp0-medium", "polar1-s", "omol0-xl")
 NPT_CASE = dict(model=PRIMARY_MODEL, structures=("NaCl",), cell_mode="hydrostatic")
+# Plain cuEq float64 is about 20x slower per step than the hybrid (1a-T13: 78 ms on NaCl), so NaCl only.
+CUEQ_CASE = dict(structures=("NaCl",))
 # The organic set of SPEC §12.5 (ResearchModule Structures/Organic): three COD crystals 3x3x3 and the
 # 648-atom water box as it is (the plan's "--repeat 1 1 1", written as the structure's own repeat).
 ORGANIC_STRUCTURES = ("Structures/Organic/urea_cod1008787.cif", "Structures/Organic/naphthalene_cod2311090.cif",
@@ -172,18 +174,21 @@ def _tool(machine: Machine, name: str) -> str:
 
 
 def _ab_job(machine, run_root, name, model, structures, sides, *, blocks, pattern="abab", ensemble="nvt",
-            dump=True, note=""):
+            backend="hybrid", dump=True, note=""):
     output = check_location(machine, run_root / name)
     args = [_tool(machine, "ab_step_time.py"), "--output", str(output), "--model", model,
             "--checkpoint", checkpoint_path(machine, model), "--structures", *structures, "--sides", *sides,
             "--warmup", str(WARMUP), "--block", str(BLOCK), "--blocks", str(blocks), "--pattern", pattern,
-            "--ensemble", ensemble]
+            "--ensemble", ensemble, "--backend", backend]
     if ensemble == "npt":
         args += ["--cell-mode", NPT_CASE["cell_mode"]]
     if dump:
         args.append("--dump-forces")
     if "baseline" in sides:
         args += ["--baseline", str(machine.path(machine.baseline))]
+    if backend == "cueq":
+        argv = [machine.python("mace_cueq_latest")] + args  # plain cuEq: its own environment, no launcher
+    elif "baseline" in sides:
         argv = hybrid_launcher(machine, run_root) + args
     else:
         argv = [machine.python("mace_cueq_oeq")] + args  # FastMACE alone: no launcher (acceptance item 4)
@@ -191,10 +196,11 @@ def _ab_job(machine, run_root, name, model, structures, sides, *, blocks, patter
 
 
 def speed_configurations():
-    """(slug, model, structures, ensemble) of every A/B configuration."""
-    out = [("mh1-nvt", PRIMARY_MODEL, CRYSTALS, "nvt"),
-           ("mh1-npt", NPT_CASE["model"], NPT_CASE["structures"], "npt")]
-    out += [(f"{model}-nvt", model, SECONDARY_CRYSTALS, "nvt") for model in SECONDARY_MODELS]
+    """(slug, model, structures, ensemble, backend) of every A/B configuration."""
+    out = [("mh1-nvt", PRIMARY_MODEL, CRYSTALS, "nvt", "hybrid"),
+           ("mh1-npt", NPT_CASE["model"], NPT_CASE["structures"], "npt", "hybrid")]
+    out += [(f"{model}-nvt", model, SECONDARY_CRYSTALS, "nvt", "hybrid") for model in SECONDARY_MODELS]
+    out.append(("mh1-cueq-nvt", PRIMARY_MODEL, CUEQ_CASE["structures"], "nvt", "cueq"))
     return out
 
 
@@ -213,10 +219,13 @@ def speed_jobs(machine: Machine, run_root: Path) -> list:
     ]
     jobs += [_ab_job(machine, run_root, f"ab-{model}-nvt", model, SECONDARY_CRYSTALS, ("baseline", "fastmace"),
                      blocks=AB_BLOCKS, note="secondary set") for model in SECONDARY_MODELS]
-    for slug, model, structures, ensemble in speed_configurations():
+    jobs.append(_ab_job(machine, run_root, "ab-mh1-cueq-nvt", PRIMARY_MODEL, CUEQ_CASE["structures"],
+                        ("baseline", "fastmace"), blocks=AB_BLOCKS, backend="cueq",
+                        note="plain cuEq float64, the plan --backend cueq gets (decision 5 after T15)"))
+    for slug, model, structures, ensemble, backend in speed_configurations():
         for side in ("baseline", "fastmace"):
             jobs.append(_ab_job(machine, run_root, f"control-{slug}-{side}", model, structures, (side,),
-                                blocks=CONTROL_BLOCKS, ensemble=ensemble, dump=side == "fastmace",
+                                blocks=CONTROL_BLOCKS, ensemble=ensemble, backend=backend, dump=side == "fastmace",
                                 note="single engine: setup time, peak memory, FastMACE-only forces"))
     return jobs
 

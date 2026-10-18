@@ -140,10 +140,10 @@ def prepare_fastmace_hybrid():
 
 
 def fastmace_planner(args):
-    """The fixed-plan planner of main.py's defaults: the hybrid backend, float32, every option on auto."""
+    """The fixed-plan planner of main.py's defaults for --backend: dtype and every option on auto."""
     from fastmace import config
     from fastmace.planner.fixed import FixedPlanner
-    return FixedPlanner(engine=config.EngineConfig(backend="hybrid"), precision=config.PrecisionConfig(dtype="float32"))
+    return FixedPlanner(engine=config.EngineConfig(backend=args.backend))
 
 
 def fastmace_integrator(args):
@@ -167,6 +167,8 @@ def parse_args(argv=None):
     p.add_argument("--blocks", type=int, default=4, help="Timed blocks per side")
     p.add_argument("--pattern", choices=ab.PATTERNS, default="abab")
     p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--backend", choices=("hybrid", "cueq"), default="hybrid",
+                   help="hybrid: main.py's gpu default (FP32); cueq: plain cuEquivariance float64 (no launcher)")
     p.add_argument("--ensemble", choices=("nvt", "npt"), default="nvt")
     p.add_argument("--cell-mode", choices=("hydrostatic", "full"), default="hydrostatic", help="NPT cell mode")
     p.add_argument("--dump-forces", action="store_true",
@@ -184,7 +186,8 @@ def main(argv=None):
     args = parse_args(argv)
     protocol = step_time.TimingProtocol(warmup=args.warmup, block=args.block, blocks=args.blocks)
     has_baseline, has_fastmace = "baseline" in args.sides, "fastmace" in args.sides
-    oeq_runtime = prepare_fastmace_hybrid() if has_fastmace else None  # before anything imports MACE
+    hybrid = args.backend == "hybrid"
+    oeq_runtime = prepare_fastmace_hybrid() if has_fastmace and hybrid else None  # before anything imports MACE
     export = experiment = compile_cache = None
     if has_baseline:
         export = ab.load_baseline(args.baseline)
@@ -196,7 +199,7 @@ def main(argv=None):
 
     if gpu_processes():
         raise RuntimeError("GPU must be idle")
-    if has_baseline:
+    if has_baseline and hybrid:
         experiment.require_hybrid_wrapper()
     args.output.mkdir(parents=True, exist_ok=False)
     cache_info = {}
@@ -212,8 +215,9 @@ def main(argv=None):
     checkpoint = args.checkpoint.expanduser().resolve(strict=True)
     md = None
     if has_baseline:
-        md = experiment.parse_args(["--model", args.model, "--checkpoint", str(checkpoint), "--ensemble",
-                                    args.ensemble, "--cell-mode", args.cell_mode] + args.main_args.split())
+        md = experiment.parse_args(["--model", args.model, "--checkpoint", str(checkpoint), "--backend", args.backend,
+                                    "--ensemble", args.ensemble, "--cell-mode", args.cell_mode]
+                                   + args.main_args.split())
         experiment.apply_polar_options(md)
         if args.ensemble == "npt":
             from langevin import upstream_mace
@@ -225,7 +229,8 @@ def main(argv=None):
                 created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 python=sys.executable, fastmace_commit=fastmace_commit(),
                 baseline=export.as_dict() if export else None, model=args.model, checkpoint=str(checkpoint),
-                checkpoint_sha256=_sha256(checkpoint), backend="hybrid", dtype="float32", tf32=False,
+                checkpoint_sha256=_sha256(checkpoint), backend=args.backend,
+                dtype="float32" if hybrid else "float64", tf32=False,
                 ensemble=args.ensemble, cell_mode=args.cell_mode if args.ensemble == "npt" else None,
                 temperature_K=args.temperature_K, protocol=protocol.as_dict(), pattern=args.pattern, sides=names,
                 side_kinds=kinds, build_order=names, oeq_runtime=oeq_runtime,
@@ -250,8 +255,10 @@ def main(argv=None):
                                                  dtype=loaded[name].dtype, sha256=loaded[name].sha256)
                 continue
             if common is None:
-                common, calc = experiment.load_md_calculator("float32", True, "cuda:0", checkpoint,
-                                                             label=args.model)
+                common, calc = experiment.load_md_calculator(md.dtype, hybrid, "cuda:0", checkpoint, label=args.model,
+                                                             cueq_conv_fusion=None if hybrid else md.cueq_conv_fusion)
+            elif not hybrid:
+                raise SystemExit("two baseline sides are implemented for the hybrid only")
             else:
                 # load_md_calculator sets the process-wide thread settings, which works once per
                 # process; later loads go to common directly, with its checks.
@@ -262,7 +269,7 @@ def main(argv=None):
             calcs[name], flags[name] = calc, {flag: getattr(options, flag) for flag in FLAGS}
             meta["calculators"][name] = dict(load_s=time.perf_counter() - started, auto_options_off=off,
                                              flags=flags[name])
-        if has_baseline:
+        if has_baseline and hybrid:
             torch.set_default_dtype(torch.float32)  # as before: the research engine's float32 calculator
         meta.update(gpu=torch.cuda.get_device_name(0), torch=torch.__version__)
         save()

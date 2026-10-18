@@ -18,6 +18,7 @@ Standard library only; it imports neither FastMACE nor torch.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import socket
@@ -137,6 +138,7 @@ def parse_args(argv=None):
     p.add_argument("--gate-labels", nargs="+", choices=suites.GATE_LABELS)
     p.add_argument("--gate-engine", choices=("fastmace", "baseline"), default="fastmace")
     p.add_argument("--research-module", help="workflow: the ResearchModule tree with 1a-T17's main.py")
+    p.add_argument("--fastmace", help="The FastMACE checkout the jobs use (default: the machine's)")
     p.add_argument("--max-utilization", type=float, default=5.0, help="Idle limit for timing jobs, percent")
     p.add_argument("--dry-run", action="store_true", help="Print the jobs and write nothing")
     return p.parse_args(argv)
@@ -146,6 +148,8 @@ def main(argv=None, execute=None, check=None):
     """``execute(job, env, log_path)`` runs a job and returns its exit code; ``check(job)`` returns an idle record."""
     args = parse_args(argv)
     machine = suites.MACHINES[args.machine]
+    if args.fastmace:
+        machine = dataclasses.replace(machine, fastmace=args.fastmace)
     run_root = suites.check_location(machine, machine.path(machine.root) / args.run_id)
     jobs = build_jobs(machine, run_root, args.suites, args.research_module, args.gate_labels, args.gate_engine)
     if args.only:

@@ -159,7 +159,7 @@ def summarize_run(run_root):
 
 def _slug(name):
     """The configuration of an A/B job name: "ab-mh1-nvt-r2" -> "mh1-nvt", "ab-mp0-medium-nvt" -> "mp0-medium-nvt"."""
-    slug = name.removeprefix("ab-")
+    slug = name.removeprefix("ab-")  # "ab-mh1-cueq-nvt" -> "mh1-cueq-nvt"
     head, _, tail = slug.rpartition("-")
     return head if tail.startswith("r") and tail[1:].isdigit() else slug
 
