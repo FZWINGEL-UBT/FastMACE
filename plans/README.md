@@ -8,7 +8,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | --- | --- | --- |
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
 | 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phase-1a.md`); owner checkpoint 3 decided (19 October: `main.py` defaults to FastMACE) |
-| 1b. Contracts | [phase-1b.md](phase-1b.md) | planned (owner decisions D1–D8 taken 19 October 2026) |
+| 1b. Contracts | [phase-1b.md](phase-1b.md) | under way (19 October 2026): T01 merged, all workers prestarted |
 | 2. Safety | — | |
 | 3. Dynamic topology and MC | — | |
 | 3b. NPT for the chlorides | — | |
@@ -26,8 +26,11 @@ All remaining 1b tasks were prestarted on 19 October 2026 (owner request)
 and wait for the conductor's go message (`CONDUCTOR.md`, "Prestarted phase
 workers"). No "start all ready" is needed in phase 1b.
 
-- Working: 1b-T01 (review), 1b-T11 (murphy), 1b-T24 (local GPU).
-- Waiting for go: 1b-T02 to T10, T12 to T23.
+- Merged: 1b-T01 (19 October 2026).
+- Working: 1b-T02, 1b-T03, 1b-T11 (murphy), 1b-T24 (local GPU).
+- Waiting for go: 1b-T04 to T10, T12 to T23. Answers to their prestart
+  reports, and three items for the owner's review, are in `phase-1b.md`,
+  "Conductor answers to the prestart reports".
 
 ## Open owner decisions
 
