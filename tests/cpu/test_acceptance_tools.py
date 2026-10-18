@@ -480,6 +480,18 @@ def test_idle_verdict():
     assert not idle and "Windows" in reasons[0]
 
 
+def test_idle_check_waits_for_utilization_to_settle_but_not_for_a_process():
+    busy_then_idle = [dict(idle=False, compute_pids=[]), dict(idle=False, compute_pids=[]), dict(idle=True, compute_pids=[])]
+    records = iter(busy_then_idle)
+    slept = []
+    record = run.settled_idle_check(lambda: next(records), sleep=slept.append)
+    assert record["idle"] and record["attempts"] == 3 and slept == [5.0, 5.0]
+    busy = run.settled_idle_check(lambda: dict(idle=False, compute_pids=[42]), sleep=slept.append)
+    assert not busy["idle"] and busy["attempts"] == 1
+    never = run.settled_idle_check(lambda: dict(idle=False, compute_pids=[]), settle_s=10, sleep=lambda s: None)
+    assert not never["idle"] and never["attempts"] == 3
+
+
 def test_run_stops_at_a_busy_gpu_and_records_everything(tmp_path, monkeypatch):
     machine = suites.Machine(name="test", kind="local", root=str(tmp_path / "root"), fastmace=str(REPOSITORY_ROOT),
                              baseline=str(tmp_path / "export"), models=str(tmp_path / "models"),

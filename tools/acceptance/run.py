@@ -84,6 +84,20 @@ def _run(argv):
         return None
 
 
+def settled_idle_check(check, settle_s=60.0, interval_s=5.0, sleep=time.sleep):
+    """``check()`` until the GPU is idle, for at most ``settle_s``: utilization is averaged over the last
+    sample period, so right after the previous job exits it can still read high with no process on the
+    GPU. A compute process is never waited out. Returns the last record, with the attempts made."""
+    record, attempts = check(), 1
+    waited = 0.0
+    while not record["idle"] and not record.get("compute_pids") and waited < settle_s:
+        sleep(interval_s)
+        waited += interval_s
+        record, attempts = check(), attempts + 1
+    record["attempts"] = attempts
+    return record
+
+
 def idle_check(machine, timing, max_utilization):
     """The idle record of this moment (nvidia-smi, and on the PC Windows' view too) and its verdict."""
     pids = parse_pids(_run(["nvidia-smi", "--query-compute-apps=pid", "--format=csv,noheader"]) or "")
@@ -180,7 +194,7 @@ def main(argv=None, execute=None, check=None):
 
     save()
     execute = execute or _execute
-    check = check or (lambda job: idle_check(machine, job.timing, args.max_utilization))
+    check = check or (lambda job: settled_idle_check(lambda: idle_check(machine, job.timing, args.max_utilization)))
     stopped, failures = None, []
     for job in jobs:
         entry = dict(name=job.name, argv=list(job.argv), output=job.output, timing=job.timing, note=job.note)
