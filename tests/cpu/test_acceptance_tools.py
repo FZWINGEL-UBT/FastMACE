@@ -736,6 +736,15 @@ def test_alternating_jobs_order_and_flags():
         assert _flag_values(job.argv, "--structures") == ["NaCl", "NbCl5"]
 
 
+def test_alternating_cueq_case():
+    m = suites.MACHINES["murphy"]
+    jobs = suites.alternating_jobs(m, m.path(m.root) / "run", models=("mh1-cueq",))
+    assert len(jobs) == 6 and jobs[0].name == "alt-mh1-cueq-nvt-p1-baseline"
+    for job in jobs:
+        assert _flag_values(job.argv, "--backend") == ["cueq"] and _flag_values(job.argv, "--structures") == ["NaCl"]
+        assert job.argv[0].endswith("mace_cueq_latest/bin/python")
+
+
 def test_alternating_rows():
     def meta(side, median, valid=True):
         return dict(sides=[side], side_kinds={side: side},

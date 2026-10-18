@@ -238,18 +238,29 @@ ALTERNATING_MODELS = ("polar1-s",)
 ALTERNATING_ROUNDS = 3
 
 
+# Plain cuEq float64 MH-1 NaCl compiled while timed in the same-process A/B even after 1a-T13b's fix (the
+# research engine's side this time, at the 7168 -> 7680 transition), but not in either single-engine
+# process: it falls back to alternating processes too (conductor's condition 1).
+ALTERNATING_CASES = {"polar1-s": ("polar1-s", SECONDARY_CRYSTALS, "hybrid"),
+                     "mh1-cueq": (PRIMARY_MODEL, ("NaCl",), "cueq")}
+
+
 def alternating_jobs(machine: Machine, run_root: Path, models=ALTERNATING_MODELS, rounds=ALTERNATING_ROUNDS) -> list:
-    """Alternating single-engine processes, ``rounds`` per engine, 12 blocks each, in the order b f f b b f ..."""
+    """Alternating single-engine processes, ``rounds`` per engine, 12 blocks each, in the order b f f b b f ...
+
+    ``models`` are keys of ALTERNATING_CASES (a model label, or "mh1-cueq" for MH-1 on plain cuEq).
+    """
     run_root = Path(run_root)
     jobs = []
-    for model in models:
+    for slug in models:
+        model, structures, backend = ALTERNATING_CASES[slug]
         order = [side for index in range(rounds)
                  for side in (("baseline", "fastmace") if index % 2 == 0 else ("fastmace", "baseline"))]
         counts = {"baseline": 0, "fastmace": 0}
         for side in order:
             counts[side] += 1
-            jobs.append(_ab_job(machine, run_root, f"alt-{model}-nvt-p{counts[side]}-{side}", model, SECONDARY_CRYSTALS,
-                                (side,), blocks=AB_BLOCKS, dump=side == "fastmace",
+            jobs.append(_ab_job(machine, run_root, f"alt-{slug}-nvt-p{counts[side]}-{side}", model, structures,
+                                (side,), blocks=AB_BLOCKS, backend=backend, dump=side == "fastmace",
                                 note="alternating single-engine processes: the engines cannot share a process"))
     return jobs
 
