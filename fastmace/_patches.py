@@ -294,16 +294,23 @@ def set_capture_safe_mask_head(enabled=True):
 
     MACE's mask_head builds the multi-head mask with indexed assignment, which CUDA graph capture
     rejects; mace.modules.blocks imports it by name. Returns the record in force (None after False).
+
+    Applied again, it puts the function back if something replaced it since (the research engine
+    installs its own copy before every capture). Compiled models guard on the function in
+    ``blocks.mask_head``; with another one in place, the next eager call of a compiled model,
+    such as the warm-up of a capture at a new edge size, would compile again (1a-T13b).
     """
     name = "capture_safe_mask_head"
     if not enabled:
         restore(name)
         return None
-    if name in _RECORDS:
-        return _RECORDS[name]
     from mace.modules import blocks
 
     from fastmace.rewrites import engine
+    if name in _RECORDS:
+        if blocks.mask_head is not engine.capture_safe_mask_head:
+            _put(blocks, "mask_head", engine.capture_safe_mask_head)
+        return _RECORDS[name]
     _check_parameters(_original(blocks, "mask_head"), MASK_HEAD_PARAMETERS, "mace.modules.blocks.mask_head")
     return _install(name, [_put(blocks, "mask_head", engine.capture_safe_mask_head)],
                     "multi-head readout mask without indexed assignment (CUDA graph capture)")

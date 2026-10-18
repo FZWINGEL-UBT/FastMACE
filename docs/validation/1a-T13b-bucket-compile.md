@@ -2,92 +2,111 @@
 
 Follow-up to 1a-T13, 18 October 2026. Branch `fastmace/1a-T13b` from main
 `43ce026`. The research engine is ResearchModule tag
-`research-engine-baseline-20261017` (`d2faa9fd`, NAS export
-`/mnt/homes/zwingel/fastmace-baseline/1a-T18`). The machine is leto: RTX 4000
-Ada, driver 595.58.03, NAS `mace_cueq_oeq` (torch 2.14.1+cu130, MACE 0.3.16,
+`research-engine-baseline-20261017` (`d2faa9fd`, export `1a-T18`). The
+environment is `mace_cueq_oeq` (torch 2.14.1+cu130, MACE 0.3.16,
 cuEquivariance 0.12.0, OEq 0.7.0). Reproducers and their outputs are in
 `results/1a-T13b-bucket-compile-20261018/`.
+
+Runs:
+- `fmc`, `blc`, `abc_before`, `abc_after`: the PC's RTX 5060 Ti, each with
+  fresh Inductor, Triton and FastMACE caches (`repro_local.sh`).
+- `fm1`, `bl1`, `fm2`, `bl2`, `ab_fb`: leto, sharing a warm cache, before the
+  GPU was given back to T19.
 
 ## What T19 saw
 
 On murphy, in a same-process A/B with MH-1 `matpes_r2scan` (hybrid FP32,
-NVT, NaCl 3×3×3), the edge count grew from 7168 into the next bucket (7680)
-in timed block 4. FastMACE's block then took 38 ms/step, against 3.5 ms in
-the other blocks. Dynamo counted one new graph (unique_graphs 5→6). The
-research engine's block took 3.67 ms/step: a recapture, no compile.
+NVT, NaCl 3×3×3), the edge count grew from 7168 into the next bucket (7680).
+FastMACE's block then took 38–80 ms/step, against 3.5 ms in the other
+blocks, and dynamo counted one new graph (5→6). The research engine's block
+only recaptured.
 
-## Cause: the research engine's process-wide `mask_head` patch, not the engine
+## Cause: FastMACE did not put back its `mask_head` patch after the research engine replaced it
 
-**FastMACE alone does not compile at a later bucket.** Each engine below ran
-alone in its own process, at 900 K so that the edge count grows quickly. The
-initial exact count is 6912 (216 atoms × 32 neighbours on the ideal
-lattice).
+Compiled MACE models guard on the function in `mace.modules.blocks.mask_head`
+(`___check_obj_id(G[...blocks].mask_head.__code__)`). Both engines replace
+MACE's `mask_head` with a capture-safe copy of their own, but differently:
 
-| Run | Bucket | Warm-up graphs | New sizes after warm-up (step) | Graphs at the end | Step at the new size |
-| --- | --- | --- | --- | --- | --- |
-| FastMACE (planner), `fm2` | 512 (5 %) | 4 | 7680 (66) | 4 | 57 ms (capture) |
-| research engine, `bl2` | 512 (5 %) | 4 | 7680 (66) | 4 | 53 ms (capture) |
-| FastMACE, `fm1` | 256 | 4 | 7168 (29), 7424, 7680 | 5 | 16.4 s at 7168 |
-| research engine, `bl1` | 256 | 4 | 7168 (29), 7424, 7680 | 5 | 22.7 s at 7168 |
+- **The research engine** installs its copy before *every* capture
+  (`GPULangevin._capture` calls `use_capture_safe_mask_head()`).
+- **FastMACE** installed its copy once. `_patches.set_capture_safe_mask_head`
+  returned early when its record existed, even when another function had
+  replaced it since.
 
-With the production 5 % bucket, warm-up sees two edge counts: the exact
-6912 for the initial forces and the padded 7168 for the first capture. Dynamo
-then makes the edge dimension dynamic. On both sides the next bucket needs a
-capture but no compile. With a 256-edge bucket, 6912 is itself a padded size,
+In one process, every capture of the research engine leaves its own
+function in place. FastMACE's compiled entries then fail their guard, but a
+CUDA-graph replay never enters dynamo, so nothing happens while FastMACE
+only replays. The failure surfaces at FastMACE's next eager call of the
+model: the warm-up of the first capture at a new padded size, which is
+T19's first new bucket. Build order does not matter, because the research
+engine reinstalls its function at each of its own captures.
+
+### Evidence
+
+**Each engine alone (fresh caches, PC; 900 K, 5 % buckets, 300 steps).**
+Both engines pass the same edge counts to the force call. The initial
+forces run at the exact 6912 (216 atoms × 32 neighbours on the ideal
+lattice). Then come three warm-up calls and a capture at 7168, again for the
+first pipelined step, then three warm-up calls and a capture at 7680 (step
+66).
+
+| Run | Graphs after warm-up | Graphs at the end | Step at 7680 |
+| --- | --- | --- | --- |
+| FastMACE (planner), `fmc` | 4 | 4 | 47 ms (capture) |
+| research engine, `blc` | 4 | 4 | 53 ms (capture) |
+
+Warm-up sees 6912 and 7168, so dynamo makes the edge dimension dynamic in
+both engines. The exact initial count does not equal the padded size. A cold
+cache does not make FastMACE compile at the next bucket.
+
+**Same-process A/B (fresh caches, PC; FastMACE built first, as the hybrid
+requires).** The research engine's set-up then refuses to install its addmm
+pass over FastMACE's in `post_grad_custom_pre_pass`, so the reproducer
+clears that slot between the builds, as T19's harness does. Blocks of 150
+steps alternate.
+
+| Run | FastMACE block at 7680 | Research engine block at 7680 | Graphs |
+| --- | --- | --- | --- |
+| before the fix, `abc_before` | 142.8 ms/step | 4.13 ms/step | 5 → 6 (FastMACE) |
+| after the fix, `abc_after` | 4.03 ms/step | 3.98 ms/step | 5 → 5 |
+
+The recompile log (`abc_before.recompiles.txt`) names the failed guard: the
+`mask_head.__code__` check of FastMACE's entries.
+
+**Other candidates, ruled out:**
+- **Dynamo settings:** the same on both sides. `cache_size_limit` is raised
+  to 64, as the research engine does; nothing uses `mark_static`.
+- **Warm-up shapes:** the same on both sides (above).
+- **The compiled-model cache:** each side loads its own model.
+- **Cold or warm Inductor cache:** single-engine runs with fresh caches
+  behave like the warm ones.
+- **The cleared `post_grad_custom_pre_pass`:** it is not a dynamo guard.
+
+With a 256-edge bucket (leto, `fm1`/`bl1`), 6912 is itself a padded size,
 so warm-up sees only one shape. Both engines then compile once at the first
-new size, the same way.
+new size, alike.
 
-**In one process, the second engine's build breaks the first's guards.**
-`repro_ab.py` builds FastMACE first and the research engine second. The
-hybrid must load before MACE is imported, so this is the only possible
-order. Like T19's harness, it clears FastMACE's `post_grad_custom_pre_pass`
-before the research engine installs its own. Then the two engines alternate
-blocks of 150 steps. In the first block that reaches 7680, FastMACE takes
-159 ms/step and dynamo goes from 5 to 6 graphs. The research engine stays at
-3.7 ms/step with no new graph. Dynamo's recompile log
-(`ab_fb.recompiles.txt`) shows two guard failures:
+## Fix
 
-- `___check_obj_id(G['__import_mace_dot_modules_dot_blocks'].mask_head.__code__, …)`.
-  The research engine's set-up installs its own capture-safe `mask_head` into
-  `mace.modules.blocks`, replacing the one FastMACE's `_patches` installed.
-  FastMACE's compiled entries guard on that function.
-- The size guard of the static entry, `data['shifts']` 6912 vs 7680, which is
-  expected.
+`fastmace._patches.set_capture_safe_mask_head(True)` now puts FastMACE's
+function back when another one is in place, keeping its record and MACE's
+preserved original. The graph engine calls it before every capture, so
+FastMACE now does what the research engine does.
 
-A CUDA-graph replay never enters dynamo, so the failed guard has no effect
-while FastMACE replays its graphs. It surfaces at FastMACE's next eager call
-of the model, the warm-up of the first capture at a new padded size. That is
-T19's first new bucket. The research engine, built second, compiled under
-the final `mask_head`, so its guards still hold.
+Tests:
+- `tests/cpu/test_engine.py::test_capture_safe_mask_head_is_put_back_after_another_install`.
+- `tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_{plain_cueq,hybrid}`:
+  MH-1 NaCl 3×3×3 at 900 K through the planner in a fresh process with fresh
+  compiler caches. After warm-up it installs a foreign `mask_head`, as the
+  research engine does, and crosses into the next bucket. It asserts that no
+  graph is compiled after warm-up.
+  **This test has not run yet:** the local GPU run was stopped when the owner
+  needed the GPU. The earlier leto version of the test, without the foreign
+  `mask_head`, passed for both backends.
 
-The other candidates were checked:
+## For T19
 
-- **Dynamo settings and the cache limit:** the same on both sides. FastMACE
-  only raises `cache_size_limit` to 64, as the research engine does.
-- **Shapes in warm-up and captures:** the same on both sides (6912, then
-  7168).
-- **`mark_static`:** not used anywhere.
-- **The compiled-model cache:** each A/B side loads its own model, so the
-  cache shares nothing between them.
-- **The cleared `post_grad_custom_pre_pass`:** it is not a dynamo guard, so it
-  does not cause the recompile. It does mean that FastMACE's recompiled graph
-  at 7680 is built with the research engine's addmm pass, not FastMACE's.
-
-## Consequences
-
-- **FastMACE is unchanged.** Its behaviour equals the research engine's in
-  production, one engine per process.
-- **Regression test:** `test_no_compile_at_a_later_edge_bucket_{plain_cueq,hybrid}`
-  in `tests/gpu/test_engine_gpu.py`. It runs MH-1 NaCl 3×3×3 at 900 K through
-  the planner, each case in a fresh process. The edge count crosses from 7168
-  into 7680 at step 66, and the dynamo counters stay at their warm-up values
-  (2 graphs for plain cuEq float64, 4 for the hybrid).
-- **For T19's same-process A/B,** any block in which a side captures a new
-  padded size after the other side's build is affected. Two ways out:
-  - make both sides share one `mask_head` object (install FastMACE's
-    capture-safe function where the research engine's set-up installs its
-    own); or
-  - treat steps with a first capture as warm-up, and compare only blocks
-    without one.
-  Setup costs and memory already come from single-engine processes
-  (decisions after wave 1b).
+With the fix, same-process A/B blocks that capture a new padded size no
+longer compile on FastMACE's side. The research engine still recompiles once
+during its own build, when it replaces FastMACE's `mask_head`. That falls in
+its warm-up, as before.

@@ -742,6 +742,15 @@ def compiled():
 for _ in range({warmup}):
     engine.step()
 engine.flush()
+if {foreign_mask_head}:
+    # What the research engine's use_capture_safe_mask_head does before each of its captures in a
+    # shared process: another capture-safe mask_head in mace.modules.blocks.
+    from mace.modules import blocks
+    from fastmace.rewrites import engine as engine_rewrites
+
+    def foreign_mask_head(x, heads, num_heads):
+        return engine_rewrites.capture_safe_mask_head(x, heads, num_heads)
+    blocks.mask_head = foreign_mask_head
 after_warmup, sizes_after_warmup = compiled(), sorted(engine.edge_sizes_used)
 events, seen = [], set(engine.edge_sizes_used)
 for n in range({warmup} + 1, {steps} + 1):
@@ -759,22 +768,29 @@ print(json.dumps({{"after_warmup": after_warmup, "end": compiled(), "sizes_after
 """
 
 
-def _bucket_crossing(backend, python):
-    out = run_fresh(BUCKET_CHILD.format(backend=backend, warmup=20, steps=200), python=python)
+def _bucket_crossing(backend, python, directory):
+    # Fresh compiler caches: dynamo's automatic-dynamic profile persists in the Inductor cache
+    # directory, and a warm one would hide a compile that a cold process does.
+    caches = {"TORCHINDUCTOR_CACHE_DIR": str(directory / "inductor"), "TRITON_CACHE_DIR": str(directory / "triton"),
+              "FASTMACE_CACHE": str(directory / "fastmace")}
+    out = run_fresh(BUCKET_CHILD.format(backend=backend, warmup=20, steps=200, foreign_mask_head=True),
+                    python=python, extra_env=caches)
     print(json.dumps(out, indent=1))
     # At 900 K the edge count of NaCl 3x3x3 grows from 6912 (padded to 7168 in warm-up) into the
     # next bucket (7680) within 200 steps; a new padded size needs a capture, but no compile:
     # warm-up saw the exact initial count and a padded size, so the edge dimension is dynamic.
+    # The compiled model guards on mace.modules.blocks.mask_head, which another engine in the
+    # process (the research engine in T19's A/B) replaces; the capture puts FastMACE's back first.
     assert out["events"], "the run never reached a new edge bucket after warm-up"
     assert out["end"] == out["after_warmup"], out
 
 
 @pytest.mark.skipif(not _mh1_path(), reason="needs FASTMACE_MODELS with MH-1")
-def test_no_compile_at_a_later_edge_bucket_plain_cueq():
-    _bucket_crossing("cueq", sys.executable)
+def test_no_compile_at_a_later_edge_bucket_plain_cueq(tmp_path):
+    _bucket_crossing("cueq", sys.executable, tmp_path)
 
 
 @needs_oeq
 @pytest.mark.skipif(not _mh1_path(), reason="needs FASTMACE_MODELS with MH-1")
-def test_no_compile_at_a_later_edge_bucket_hybrid():
-    _bucket_crossing("hybrid", HYBRID_PYTHON)
+def test_no_compile_at_a_later_edge_bucket_hybrid(tmp_path):
+    _bucket_crossing("hybrid", HYBRID_PYTHON, tmp_path)
