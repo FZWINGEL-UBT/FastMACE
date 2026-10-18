@@ -48,7 +48,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fastmace import _cache, _patches
-from fastmace.errors import FastMACEError
+from fastmace.errors import (  # noqa: F401 (re-exported: the 1a names)
+    BackendError,
+    CheckpointTrustError,
+    HybridUnavailableError,
+    ModelLicenceWarning,
+    NaiveCueqError,
+)
 from fastmace.model import labels as label_table
 
 MODELS_VARIABLE = "FASTMACE_MODELS"
@@ -60,30 +66,6 @@ FUSED_CUEQ_TYPES = ("SymmetricContraction", "ChannelWiseTensorProduct")
 # Modules whose import fixes the OEq build environment: after any of them, the hybrid is too late.
 HYBRID_BLOCKING_MODULES = ("mace", "openequivariance", "torch.utils.cpp_extension")
 _CHUNK = 1 << 20
-
-
-class CheckpointTrustError(FastMACEError):
-    """A checkpoint would be unpickled without a matching SHA-256 or ``trusted=True`` (SPEC §7.6)."""
-
-
-class HybridUnavailableError(FastMACEError):
-    """The cuEq/OEq hybrid cannot be built in this process; ``reason`` says why (SPEC §9.4 falls back)."""
-
-    def __init__(self, reason):
-        super().__init__(f"the cuEquivariance/OpenEquivariance hybrid is unavailable: {reason}")
-        self.reason = reason
-
-
-class BackendError(FastMACEError):
-    """The requested backend was not built as asked (missing package, failed conversion)."""
-
-
-class NaiveCueqError(FastMACEError):
-    """cuEquivariance fell back to its naive kernels (MACE PR 1614; SPEC §9.2, §9.3 rule 6)."""
-
-
-class ModelLicenceWarning(UserWarning):
-    """The licence of a loaded model (SPEC §4.3: shown at load time)."""
 
 
 # Checkpoints whose licence has been shown in this process (by SHA-256): a record of

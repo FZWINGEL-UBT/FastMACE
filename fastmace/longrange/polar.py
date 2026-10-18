@@ -77,7 +77,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from fastmace.config import PolarConfig
-from fastmace.errors import FastMACEError
+from fastmace.errors import PolarUnavailableError  # noqa: F401 (re-exported: the 1a names)
 
 # Where the per-instance holder lives on a PolarMACE module.
 HOLDER_ATTRIBUTE = "_fastmace_polar"
@@ -122,14 +122,6 @@ SOURCE_HASHES = {
     "graph_longrange.gto_utils:GTOBasis._prepare_k_moduli":
         "64f77d42b3c6006cdab01311017dfff2bb72e82589c97af820355f1a794650df",
 }
-
-
-class PolarUnavailableError(FastMACEError):
-    """The GPU-only PolarMACE path cannot be used here; ``reason`` says why."""
-
-    def __init__(self, reason):
-        super().__init__(f"the GPU-only PolarMACE path is unavailable: {reason}")
-        self.reason = reason
 
 
 # --------------------------------------------------------------------------- routes and options
