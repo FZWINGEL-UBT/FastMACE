@@ -91,6 +91,13 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
   course urgently, interrupt its turn (`stop_session`); its queued message
   then runs next. Messages alone wait until the worker's current turn
   ends, which can take hours.
+- **Never use a workstation GPU while anyone else uses it (owner, 19 October
+  2026).** Before every GPU job, list the GPU's compute processes and their
+  users (`nvidia-smi --query-compute-apps=pid` plus `ps -o user= -p`). Start
+  only if there are none. If another user's process appears while a job of
+  ours waits, wait; never start alongside it. This applies to leto and
+  murphy too (on 19 October leto ran another user's training). Briefs say
+  so explicitly.
 - **The local RTX 5060 Ti was reserved by the owner on 18 October 2026 and
   released the same day.** If the owner reserves it again, GPU work goes to
   leto and murphy only. coraline and leeloo were busy with another user's multi-day
