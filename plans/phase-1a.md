@@ -459,7 +459,12 @@ reviews, reported to the owner. Checkpoint 3 stays the owner's call.
    and accepted by the conductor.
 3. After T19: the acceptance report; whether `main.py` switches its default
    to `--engine fastmace`, and whether the `langevin` modules become shims
-   (they stay as they are until then).
+   (they stay as they are until then). **Decided (owner, 19 October 2026):**
+   `main.py` defaults to `--engine fastmace`; `--engine gpu` stays
+   available; the `langevin` modules stay as they are (no shims), because
+   later phases still compare against the research engine. Coraline keeps
+   `--engine gpu` until the soft-lock check has run there. Implemented in
+   ResearchModule branch `fastmace/1a-T17b`.
 
 ## Conductor decisions after wave 0 (17 October 2026)
 
