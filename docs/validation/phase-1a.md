@@ -11,7 +11,7 @@ runs. The owner then decides at checkpoint 3 whether `main.py` switches to
 
 | Acceptance item (plans/phase-1a.md) | Criterion | Result |
 | --- | --- | --- |
-| 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | … |
+| 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | workstation (murphy): … ; RTX 5060 Ti: **deferred: owner reserved the local GPU (18 October 2026)** |
 | 1. Setup time and peak memory | reported, not judged | … |
 | 2. Accuracy | today's force/stress gate for all 19 labels | … |
 | 3. Compatibility | `main.py --engine fastmace`: smoke, `--profile anneal` on NaCl and `--quench` on its output, statistically equal to the baseline | … |
@@ -49,6 +49,11 @@ the thermostat at 300 K. Ratio = FastMACE median / baseline median. Pass:
 for 4 blocks, so the criterion is 3 %.
 
 ### RTX 5060 Ti (PC)
+
+**Deferred: owner reserved the local GPU (18 October 2026).** The local half
+of acceptance item 1 runs once the owner frees the RTX 5060 Ti, with the same
+suite (`tools/acceptance/launch.sh speed --machine local`). It has not failed and
+was not skipped for any other reason. The table below is filled then.
 
 | Job | Model | Ensemble | Structure | Atoms | Baseline (ms) | FastMACE (ms) | FastMACE/baseline | Pair ratios | Criterion | Pass |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
