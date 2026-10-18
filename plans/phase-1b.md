@@ -953,6 +953,44 @@ asks the conductor for that GPU.
   control there (below) and records it in this report. That control is not
   an acceptance item.
 
+#### 1b-T24 Test-suite speed (M, GPU: local RTX 5060 Ti) — no dependencies (owner, 19 October 2026)
+
+- **Why:** the whole GPU suite takes 38–40 minutes in one process (221 tests; T15 37.9 min, T13b
+  40.1 min), and most engine tasks run it two or three times on one GPU. Likely causes:
+  - every hybrid test runs in a fresh child process that rebuilds the OEq host extension
+    (about 15 s each, 1a-T00);
+  - `torch.compile` from scratch in many tests;
+  - real-checkpoint agreement tests with research-engine children;
+  - 500-step trajectory tests (16 engine tests took 17.5 min on leto);
+  - fresh compile caches where only the regression tests need them.
+- **Do, in this order:**
+  1. **Measure:** run the GPU suite once in one process with `--durations=40` and record the
+     table. Do the same for both CPU suites.
+  2. **Tiers:** mark the expensive GPU tests `slow` (pyproject's marker already exists): real
+     checkpoints, research-engine comparisons, long trajectories, cold-cache regression tests.
+     `pytest tests/gpu -m "not slow"` is the worker tier, with a target under 5 minutes. The full
+     suite stays the merge and acceptance tier. Every GPU-tested behaviour must keep at least
+     one test in the fast tier, for example a short trajectory or a tiny model.
+  3. **Persistent OEq extension:** build once per (torch, CUDA, OEq, compiler) key in the
+     FastMACE cache and reuse it in later processes, instead of a fresh `TORCH_EXTENSIONS_DIR`
+     per process. The key is a build identity, not a shape, so the generality rule allows it
+     (decision after wave 0). Concurrent processes must not corrupt it: build into a temporary
+     directory, then rename it into place. Respect the soft-lock rules (no kernel locks on NFS).
+  4. **Shared compile caches:** test child processes reuse one Inductor/FX cache root per run.
+     Only tests that need a cold cache (T13b's bucket regression) get a fresh one, explicitly.
+- **Files:** `tests/conftest.py`, `pyproject.toml` (markers, `addopts` only if needed),
+  `slow` markers in `tests/gpu/*.py`, `fastmace/kernels/_oeq_runtime.py` (the persistent build),
+  `tests/cpu/test_oeq_runtime.py`, `docs/development.md` (a "Test tiers" section). Change no
+  test's assertions; only markers, fixtures and cache handling.
+- **Tests first:** the persistent extension is reused by a second process with no rebuild, and
+  the key changes when torch, CUDA or OEq changes (CPU, faked). Two concurrent first builds both
+  succeed with one result.
+- **Done when:** the duration tables before and after; the fast GPU tier under about 5 minutes
+  locally; the full suite still green in one process and faster than 38 minutes; both CPU
+  suites green; and `docs/development.md` tells workers which tier to run when. Workers' briefs
+  from then on use the fast tier, and the conductor runs the full suite at merges that touch
+  `model/`, `rewrites/`, `kernels/` or `engine/`.
+
 ## Order and parallelism
 
 ```text

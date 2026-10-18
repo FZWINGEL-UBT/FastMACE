@@ -25,6 +25,7 @@ starts all of them with one message, "start all ready" (see
 - **1b-T01** contracts: public names, config fields, stubs (wave 0; conductor task, delegated).
 - **1b-T11** MP-0 speed gap and setup-time diagnosis (murphy, idle check first).
 - 1b-T02 (exceptions) follows T01 and is started once T01 is merged.
+- Running: 1b-T01, 1b-T11 (murphy), 1b-T24 test-suite speed (local GPU).
 
 ## Open owner decisions
 
