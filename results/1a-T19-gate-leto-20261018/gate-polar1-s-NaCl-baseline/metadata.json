@@ -1,0 +1,526 @@
+{
+  "status": "complete",
+  "created_utc": "2026-10-18T14:18:06.366137+00:00",
+  "host": "leto",
+  "engine": "baseline",
+  "baseline": {
+    "root": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd"
+  },
+  "fastmace_commit": "096b47b0afeeee9fa8191a915ccebbfab8b0cbb2",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+  "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+  "checkpoint_sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+  "tf32": false,
+  "model": "polar1-s",
+  "backend": "auto",
+  "dtype": "auto",
+  "rule": {
+    "ratio": 2.0,
+    "floors": {
+      "forces": 1e-05,
+      "stress": 1e-07
+    }
+  },
+  "processes_rule": "every reference in a fresh process that builds no production engine, before the production process (scope 'calculator'); conductor decision after T10",
+  "protocol": "unrelaxed 3x3x3 supercells, symmetric strain +-0.02 (hydrostatic: isotropic; full: anisotropic and shear), Gaussian rattle 0.05 A; float64 calculator as reference; gate: max error <= max(2 x that of the float32 calculator, floor)",
+  "args": {
+    "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NaCl-baseline",
+    "engine": "baseline",
+    "baseline": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+    "model": "polar1-s",
+    "structures": [
+      "NaCl"
+    ],
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "configs": 3,
+    "rattle_A": 0.05,
+    "strain": 0.02,
+    "backend": "auto",
+    "dtype": "auto",
+    "main_args": "",
+    "seed": 20261015,
+    "reference_scope": "calculator",
+    "reference_command": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+    "production_command": "bash /mnt/homes/zwingel/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh /mnt/homes/zwingel/environments/mace_cueq_oeq /mnt/homes/zwingel/fastmace-cache/acceptance-leto/oeq-launcher /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "source": "/mnt/homes/zwingel/fastmace-baseline/1a-T18/Structures/Benchmark/R2SCAN/NaCl.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "087450f068b69d8cb848e91ea2b888e8b2e4a451160c0c1de8d2efd1c1b29d9e",
+      "configurations": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NaCl-baseline/configs/NaCl.npz",
+      "configs": [
+        {
+          "cell_mode": "hydrostatic",
+          "index": 0,
+          "edges": {
+            "edges": 6920,
+            "padded_edges": 7168
+          },
+          "reference_pressure_GPa": 2.1870189369803192,
+          "ase_f32": {
+            "forces": {
+              "max_abs": 5.139197357117986e-06,
+              "rms": 1.268068646589156e-06,
+              "reference_max_abs": 0.4552170786692877
+            },
+            "stress": {
+              "max_abs": 6.564292290463236e-08,
+              "rms": 3.628814637857128e-08,
+              "reference_max_abs": 0.013707848101396901
+            },
+            "energy_meV_atom": 1.9466670917743747
+          },
+          "production": {
+            "forces": {
+              "max_abs": 4.477745971231961e-06,
+              "rms": 1.414099498029631e-06,
+              "reference_max_abs": 0.4552170786692877
+            },
+            "stress": {
+              "max_abs": 1.1233281123346206e-07,
+              "rms": 6.04117887931053e-08,
+              "reference_max_abs": 0.013707848101396901
+            },
+            "energy_meV_atom": 1.9466670917743747
+          }
+        },
+        {
+          "cell_mode": "hydrostatic",
+          "index": 1,
+          "edges": {
+            "edges": 6912,
+            "padded_edges": 7168
+          },
+          "reference_pressure_GPa": -1.3540896451169062,
+          "ase_f32": {
+            "forces": {
+              "max_abs": 3.99611477480688e-06,
+              "rms": 1.112094528258893e-06,
+              "reference_max_abs": 0.492911684084522
+            },
+            "stress": {
+              "max_abs": 3.407756471625334e-08,
+              "rms": 1.3671184448421414e-08,
+              "reference_max_abs": 0.008522107222679093
+            },
+            "energy_meV_atom": 2.3623949651934066
+          },
+          "production": {
+            "forces": {
+              "max_abs": 4.387899494105729e-06,
+              "rms": 1.1232035560234201e-06,
+              "reference_max_abs": 0.492911684084522
+            },
+            "stress": {
+              "max_abs": 9.133884110168466e-08,
+              "rms": 4.6270909281997364e-08,
+              "reference_max_abs": 0.008522107222679093
+            },
+            "energy_meV_atom": 2.3623949651934066
+          }
+        },
+        {
+          "cell_mode": "hydrostatic",
+          "index": 2,
+          "edges": {
+            "edges": 6918,
+            "padded_edges": 7168
+          },
+          "reference_pressure_GPa": 1.690894468858291,
+          "ase_f32": {
+            "forces": {
+              "max_abs": 4.225695355353221e-06,
+              "rms": 1.3138715305310758e-06,
+              "reference_max_abs": 0.5941139240900463
+            },
+            "stress": {
+              "max_abs": 2.665892655934199e-09,
+              "rms": 1.7721757212338393e-09,
+              "reference_max_abs": 0.01064876585269593
+            },
+            "energy_meV_atom": 2.0200055581948684
+          },
+          "production": {
+            "forces": {
+              "max_abs": 4.512080374774463e-06,
+              "rms": 1.3200784383579222e-06,
+              "reference_max_abs": 0.5941139240900463
+            },
+            "stress": {
+              "max_abs": 4.352068282316435e-08,
+              "rms": 2.198734264760942e-08,
+              "reference_max_abs": 0.01064876585269593
+            },
+            "energy_meV_atom": 2.0200055581948684
+          }
+        },
+        {
+          "cell_mode": "full",
+          "index": 0,
+          "edges": {
+            "edges": 6958,
+            "padded_edges": 7168
+          },
+          "reference_pressure_GPa": 1.701757438755633,
+          "ase_f32": {
+            "forces": {
+              "max_abs": 3.5657031485884783e-06,
+              "rms": 1.1500816540620174e-06,
+              "reference_max_abs": 0.5394649447391988
+            },
+            "stress": {
+              "max_abs": 7.347801239676599e-08,
+              "rms": 3.936310453390262e-08,
+              "reference_max_abs": 0.015023541733236001
+            },
+            "energy_meV_atom": 2.1172969847814076
+          },
+          "production": {
+            "forces": {
+              "max_abs": 4.824851269468605e-06,
+              "rms": 1.272977581831874e-06,
+              "reference_max_abs": 0.5394649447391988
+            },
+            "stress": {
+              "max_abs": 1.0979959280676965e-07,
+              "rms": 6.11868701140208e-08,
+              "reference_max_abs": 0.015023541733236001
+            },
+            "energy_meV_atom": 2.1172969847814076
+          }
+        },
+        {
+          "cell_mode": "full",
+          "index": 1,
+          "edges": {
+            "edges": 6960,
+            "padded_edges": 7168
+          },
+          "reference_pressure_GPa": 1.8727477920211646,
+          "ase_f32": {
+            "forces": {
+              "max_abs": 3.3859816952683253e-06,
+              "rms": 1.1496761711153225e-06,
+              "reference_max_abs": 0.6630882054081412
+            },
+            "stress": {
+              "max_abs": 1.8808354484978196e-08,
+              "rms": 7.13849579119156e-09,
+              "reference_max_abs": 0.01573574002396022
+            },
+            "energy_meV_atom": 1.9634173023169517
+          },
+          "production": {
+            "forces": {
+              "max_abs": 4.708841305101075e-06,
+              "rms": 1.3763196155741674e-06,
+              "reference_max_abs": 0.6630882054081412
+            },
+            "stress": {
+              "max_abs": 1.1185542424328038e-07,
+              "rms": 5.886939419082085e-08,
+              "reference_max_abs": 0.01573574002396022
+            },
+            "energy_meV_atom": 1.9634173023169517
+          }
+        },
+        {
+          "cell_mode": "full",
+          "index": 2,
+          "edges": {
+            "edges": 7000,
+            "padded_edges": 7168
+          },
+          "reference_pressure_GPa": 1.6850334160871645,
+          "ase_f32": {
+            "forces": {
+              "max_abs": 5.02271661995124e-06,
+              "rms": 1.17577676829506e-06,
+              "reference_max_abs": 0.5355368276866866
+            },
+            "stress": {
+              "max_abs": 7.963617927424227e-08,
+              "rms": 3.9935483651497296e-08,
+              "reference_max_abs": 0.01444400272188216
+            },
+            "energy_meV_atom": 2.352444062664829
+          },
+          "production": {
+            "forces": {
+              "max_abs": 3.746713783912836e-06,
+              "rms": 1.2092712464231452e-06,
+              "reference_max_abs": 0.5355368276866866
+            },
+            "stress": {
+              "max_abs": 1.299275983034781e-07,
+              "rms": 7.144922338668908e-08,
+              "reference_max_abs": 0.01444400272188216
+            },
+            "energy_meV_atom": 2.352444062664829
+          }
+        }
+      ]
+    }
+  },
+  "processes": [
+    {
+      "name": "reference-NaCl-f64",
+      "kind": "reference",
+      "argv": [
+        "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+        "/mnt/homes/zwingel/fastmace-t19/096b47b/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NaCl-baseline/jobs/reference-NaCl-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 13.64224662259221,
+      "result": {
+        "name": "reference-NaCl-f64",
+        "kind": "reference",
+        "pid": 1959915,
+        "host": "leto",
+        "python": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-18T14:18:06.567837+00:00",
+        "hybrid_launcher": false,
+        "polar_reference": "polar_gpu (corrected stress), active forward checked",
+        "load_s": 2.864702058956027,
+        "fd_stress_check": {
+          "structure": "NaCl 3x3x3",
+          "key": "hydrostatic-0",
+          "strain": 0.0001,
+          "tolerance": 1e-06,
+          "max_abs": 6.928687559457081e-09,
+          "fd_stress": [
+            [
+              -0.01355449758104029,
+              3.8475839374079025e-05,
+              -2.8497135760069726e-05
+            ],
+            [
+              3.8475839374079025e-05,
+              -0.013707854980430756,
+              -7.133226794678755e-06
+            ],
+            [
+              -2.8497135760069726e-05,
+              -7.133226794678755e-06,
+              -0.013688563784162755
+            ]
+          ],
+          "passed": true,
+          "production_max_abs": 1.057558252862828e-07
+        },
+        "single_graph_strain": true,
+        "dtype": "float64",
+        "gpu": "NVIDIA RTX 4000 Ada Generation",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 1086324736,
+        "status": "complete",
+        "wall_s": 12.640233740210533
+      }
+    },
+    {
+      "name": "reference-NaCl-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+        "/mnt/homes/zwingel/fastmace-t19/096b47b/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NaCl-baseline/jobs/reference-NaCl-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 11.529794773086905,
+      "result": {
+        "name": "reference-NaCl-ase_f32",
+        "kind": "reference",
+        "pid": 1960369,
+        "host": "leto",
+        "python": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-18T14:18:20.233609+00:00",
+        "hybrid_launcher": false,
+        "polar_reference": "polar_gpu (corrected stress), active forward checked",
+        "load_s": 3.8398559372872114,
+        "single_graph_strain": true,
+        "dtype": "float32",
+        "gpu": "NVIDIA RTX 4000 Ada Generation",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 559939584,
+        "status": "complete",
+        "wall_s": 10.559118121862411
+      }
+    },
+    {
+      "name": "production-baseline",
+      "kind": "production",
+      "argv": [
+        "bash",
+        "/mnt/homes/zwingel/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh",
+        "/mnt/homes/zwingel/environments/mace_cueq_oeq",
+        "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/oeq-launcher",
+        "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "/mnt/homes/zwingel/fastmace-t19/096b47b/tools/force_stress_gate.py",
+        "production",
+        "--job",
+        "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NaCl-baseline/jobs/production-baseline.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 62.16223227605224,
+      "result": {
+        "name": "production-baseline",
+        "kind": "production",
+        "pid": 1960715,
+        "host": "leto",
+        "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "started_utc": "2026-10-18T14:18:31.867032+00:00",
+        "hybrid_launcher": true,
+        "compile_cache": {
+          "directory": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/oeq-launcher/mace",
+          "shared": true,
+          "cuda_allocator": "expandable_segments:True",
+          "stats": {
+            "inductor.async_compile_cache_miss": 1944,
+            "inductor.async_compile_cache_hit": 1288,
+            "inductor.fxgraph_cache_hit": 76,
+            "aot_autograd.autograd_cache_bypass": 4,
+            "aot_autograd.autograd_cache_hit": 34,
+            "aot_autograd.autograd_cache_miss": 4
+          }
+        },
+        "auto_options_off": {
+          "species_skip": "no MACE-MP-0 or density-family interaction"
+        },
+        "flags": {
+          "factor_species": true,
+          "fold_cutoff": true,
+          "sort_receivers": true,
+          "density_first": true,
+          "reassociate_first": true,
+          "joint_radial_input": true,
+          "fused_folded_backward": true,
+          "segmented_first_sum": true,
+          "gpu_neighbour_list": true,
+          "block_linear": true,
+          "grouped_linear": true,
+          "merged_residual": true,
+          "species_skip": false,
+          "streaming_conv": true,
+          "fused_radial_hidden": false,
+          "speculative_graph": false,
+          "pipelined": true
+        },
+        "load_s": 3.979521980509162,
+        "backend": "hybrid",
+        "dtype": "float32",
+        "compile_mode": "default",
+        "skin": 0.3,
+        "edges": {
+          "NaCl/hydrostatic-0": {
+            "edges": 6920,
+            "padded_edges": 7168
+          },
+          "NaCl/hydrostatic-1": {
+            "edges": 6912,
+            "padded_edges": 7168
+          },
+          "NaCl/hydrostatic-2": {
+            "edges": 6918,
+            "padded_edges": 7168
+          },
+          "NaCl/full-0": {
+            "edges": 6958,
+            "padded_edges": 7168
+          },
+          "NaCl/full-1": {
+            "edges": 6960,
+            "padded_edges": 7168
+          },
+          "NaCl/full-2": {
+            "edges": 7000,
+            "padded_edges": 7168
+          }
+        },
+        "setup_s": {
+          "NaCl/hydrostatic": 14.480541579425335,
+          "NaCl/full": 8.00171273201704
+        },
+        "gpu": "NVIDIA RTX 4000 Ada Generation",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 241172480,
+        "status": "complete",
+        "wall_s": 59.553975235670805
+      }
+    }
+  ],
+  "summary": {
+    "NaCl": {
+      "forces": {
+        "production_max_abs": 4.824851269468605e-06,
+        "ase_f32_max_abs": 5.139197357117986e-06,
+        "ratio": 0.9388336220997624,
+        "floor": 1e-05,
+        "limit": 1.0278394714235972e-05,
+        "passed": true
+      },
+      "stress": {
+        "production_max_abs": 1.299275983034781e-07,
+        "ase_f32_max_abs": 7.963617927424227e-08,
+        "ratio": 1.6315147146380267,
+        "floor": 1e-07,
+        "limit": 1.5927235854848454e-07,
+        "passed": true
+      },
+      "energy_meV_atom": {
+        "production": 2.3623949651934066,
+        "ase_f32": 2.3623949651934066
+      },
+      "passed": true
+    }
+  },
+  "fd_stress_checks": {
+    "NaCl/hydrostatic-0": {
+      "structure": "NaCl 3x3x3",
+      "key": "hydrostatic-0",
+      "strain": 0.0001,
+      "tolerance": 1e-06,
+      "max_abs": 6.928687559457081e-09,
+      "fd_stress": [
+        [
+          -0.01355449758104029,
+          3.8475839374079025e-05,
+          -2.8497135760069726e-05
+        ],
+        [
+          3.8475839374079025e-05,
+          -0.013707854980430756,
+          -7.133226794678755e-06
+        ],
+        [
+          -2.8497135760069726e-05,
+          -7.133226794678755e-06,
+          -0.013688563784162755
+        ]
+      ],
+      "passed": true,
+      "production_max_abs": 1.057558252862828e-07
+    }
+  },
+  "passed": true,
+  "finished_utc": "2026-10-18T14:19:33.852971+00:00"
+}

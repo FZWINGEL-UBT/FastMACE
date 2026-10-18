@@ -1,0 +1,2804 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-18T11:26:56.662451+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/dd22757",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "dd22757429db454d9060dd2ccdd8c92fd80ffc0b",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-mp0-medium",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mp0-medium",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/2023-12-03-mace-128-L1_epoch-199.model",
+            "--model",
+            "mp0-medium",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mp0-medium",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T11:26:56.722153+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.0,
+              0.14990234375,
+              0.20361328125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T11:26:56.725015+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T11:30:43.157844+00:00",
+          "wall_s": 226.42944252863526,
+          "status": "complete"
+        },
+        {
+          "name": "gate-mp0-large",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mp0-large",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE_MPtrj_2022.9.model",
+            "--model",
+            "mp0-large",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mp0-large",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T11:30:43.196974+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 6.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.39013671875,
+              1.271484375,
+              0.7119140625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T11:30:43.199500+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T11:34:23.601459+00:00",
+          "wall_s": 220.4000496417284,
+          "status": "complete"
+        },
+        {
+          "name": "gate-mp0b3-medium",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mp0b3-medium",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mp-0b3-medium.model",
+            "--model",
+            "mp0b3-medium",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mp0b3-medium",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T11:34:23.645797+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 8.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.90673828125,
+              2.37744140625,
+              1.37451171875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T11:34:23.648183+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T11:38:24.746151+00:00",
+          "wall_s": 241.0957863908261,
+          "status": "complete"
+        },
+        {
+          "name": "gate-mpa0-medium",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mpa0-medium",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mpa-0-medium.model",
+            "--model",
+            "mpa0-medium",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mpa0-medium",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T11:38:24.785211+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.85107421875,
+              2.06201171875,
+              1.4580078125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T11:38:24.785982+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T11:41:24.979189+00:00",
+          "wall_s": 180.19121550768614,
+          "status": "complete"
+        },
+        {
+          "name": "gate-omat0-medium",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-omat0-medium",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-omat-0-medium.model",
+            "--model",
+            "omat0-medium",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-omat0-medium",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T11:41:25.019331+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.0390625,
+              1.57470703125,
+              1.369140625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T11:41:25.022233+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T11:44:21.455430+00:00",
+          "wall_s": 176.43135496415198,
+          "status": "complete"
+        },
+        {
+          "name": "gate-matpes-pbe",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-pbe",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-matpes-pbe-omat-ft.model",
+            "--model",
+            "matpes-pbe",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-pbe",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T11:44:21.496296+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.9990234375,
+              1.98193359375,
+              1.564453125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T11:44:21.499259+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T11:47:50.850781+00:00",
+          "wall_s": 209.34892222471535,
+          "status": "complete"
+        },
+        {
+          "name": "gate-matpes-r2scan",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-r2scan",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-matpes-r2scan-omat-ft.model",
+            "--model",
+            "matpes-r2scan",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-r2scan",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T11:47:50.892948+00:00",
+            "compute_pids": [
+              1769883
+            ],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 7.0,
+                "memory_used_MiB": 272.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.5400390625,
+              2.009765625,
+              1.701171875
+            ],
+            "users": [],
+            "idle": false,
+            "reasons": [
+              "compute processes on the GPU: [1769883]"
+            ]
+          },
+          "status": "gpu-busy"
+        }
+      ],
+      "status": "stopped",
+      "stopped": "GPU busy before gate-matpes-r2scan",
+      "failed": [],
+      "finished_utc": "2026-10-18T11:47:50.898244+00:00"
+    },
+    {
+      "started_utc": "2026-10-18T11:53:51.210638+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/dd22757",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "dd22757429db454d9060dd2ccdd8c92fd80ffc0b",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-matpes-r2scan",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-r2scan",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-matpes-r2scan-omat-ft.model",
+            "--model",
+            "matpes-r2scan",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-r2scan",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T11:53:51.272567+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.72900390625,
+              1.41064453125,
+              1.54150390625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T11:53:51.275805+00:00",
+          "exit_code": 1,
+          "finished_utc": "2026-10-18T11:54:40.610218+00:00",
+          "wall_s": 49.331168150529265,
+          "status": "failed"
+        },
+        {
+          "name": "gate-mh1-omat",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mh1-omat",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--model",
+            "mh1-omat",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mh1-omat",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T11:54:40.654006+00:00",
+            "compute_pids": [
+              1776563
+            ],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 63.0,
+                "memory_used_MiB": 272.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.4326171875,
+              1.4892578125,
+              1.56201171875
+            ],
+            "users": [],
+            "idle": false,
+            "reasons": [
+              "compute processes on the GPU: [1776563]"
+            ]
+          },
+          "status": "gpu-busy"
+        }
+      ],
+      "status": "stopped",
+      "stopped": "GPU busy before gate-mh1-omat",
+      "failed": [
+        "gate-matpes-r2scan"
+      ],
+      "finished_utc": "2026-10-18T11:54:40.659853+00:00"
+    },
+    {
+      "started_utc": "2026-10-18T12:08:58.587684+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/dd22757",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "dd22757429db454d9060dd2ccdd8c92fd80ffc0b",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-matpes-r2scan",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-r2scan",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-matpes-r2scan-omat-ft.model",
+            "--model",
+            "matpes-r2scan",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-r2scan",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T12:08:58.632836+00:00",
+            "compute_pids": [
+              1787898
+            ],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 2.0,
+                "memory_used_MiB": 228.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.15576171875,
+              0.44140625,
+              0.97021484375
+            ],
+            "users": [],
+            "idle": false,
+            "reasons": [
+              "compute processes on the GPU: [1787898]"
+            ]
+          },
+          "status": "gpu-busy"
+        }
+      ],
+      "status": "stopped",
+      "stopped": "GPU busy before gate-matpes-r2scan",
+      "failed": [],
+      "finished_utc": "2026-10-18T12:08:58.638760+00:00"
+    },
+    {
+      "started_utc": "2026-10-18T12:17:01.783966+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/dd22757",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "dd22757429db454d9060dd2ccdd8c92fd80ffc0b",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-matpes-r2scan",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-r2scan",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-matpes-r2scan-omat-ft.model",
+            "--model",
+            "matpes-r2scan",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-matpes-r2scan",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T12:17:01.840776+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.0048828125,
+              0.443359375,
+              0.88916015625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T12:17:01.843944+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T12:20:32.288103+00:00",
+          "wall_s": 210.4401537720114,
+          "status": "complete"
+        },
+        {
+          "name": "gate-mh1-omat",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mh1-omat",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--model",
+            "mh1-omat",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mh1-omat",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T12:20:32.327299+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.0,
+              0.771484375,
+              0.93603515625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T12:20:32.330392+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T12:25:12.984124+00:00",
+          "wall_s": 280.6503619365394,
+          "status": "complete"
+        },
+        {
+          "name": "gate-mh1-mp",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mh1-mp",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--model",
+            "mh1-mp",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mh1-mp",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T12:25:13.025255+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              3.05078125,
+              2.505859375,
+              1.70166015625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T12:25:13.028335+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T12:28:27.917506+00:00",
+          "wall_s": 194.88645581528544,
+          "status": "complete"
+        },
+        {
+          "name": "gate-mh1-r2scan",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mh1-r2scan",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--model",
+            "mh1-r2scan",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-mh1-r2scan",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T12:28:27.961224+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 8.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              2.58154296875,
+              2.7763671875,
+              1.984375
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T12:28:27.962025+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T12:31:38.405403+00:00",
+          "wall_s": 190.43913484737277,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-s",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+            "--model",
+            "polar1-s",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T12:31:38.448933+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 9.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              2.65380859375,
+              2.71533203125,
+              2.10791015625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T12:31:38.449721+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T12:38:24.762785+00:00",
+          "wall_s": 406.3088112846017,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-m",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+            "--model",
+            "polar1-m",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T12:38:24.806057+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              2.25634765625,
+              2.9013671875,
+              2.4267578125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T12:38:24.806838+00:00",
+          "exit_code": 1,
+          "finished_utc": "2026-10-18T12:39:23.539069+00:00",
+          "wall_s": 58.728820426389575,
+          "status": "failed"
+        },
+        {
+          "name": "gate-polar1-l",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-L.model",
+            "--model",
+            "polar1-l",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T12:39:23.585426+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 79.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.529296875,
+              2.58056640625,
+              2.3447265625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": []
+          },
+          "started_utc": "2026-10-18T12:39:23.588405+00:00",
+          "exit_code": 1,
+          "finished_utc": "2026-10-18T12:40:31.769914+00:00",
+          "wall_s": 68.17779021523893,
+          "status": "failed"
+        },
+        {
+          "name": "gate-omol0-xl",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/dd22757/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-omol0-xl",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-omol-0-extra-large-1024.model",
+            "--model",
+            "omol0-xl",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "NbCl5",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-omol0-xl",
+          "timing": false,
+          "note": "benchmark crystals",
+          "idle_check": {
+            "utc": "2026-10-18T12:40:31.812144+00:00",
+            "compute_pids": [
+              1827516,
+              1827854
+            ],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 12.0,
+                "memory_used_MiB": 579.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              2.12744140625,
+              2.56640625,
+              2.3564453125
+            ],
+            "users": [],
+            "idle": false,
+            "reasons": [
+              "compute processes on the GPU: [1827516, 1827854]"
+            ]
+          },
+          "status": "gpu-busy"
+        }
+      ],
+      "status": "stopped",
+      "stopped": "GPU busy before gate-omol0-xl",
+      "failed": [
+        "gate-polar1-m",
+        "gate-polar1-l"
+      ],
+      "finished_utc": "2026-10-18T12:40:31.819358+00:00"
+    },
+    {
+      "started_utc": "2026-10-18T12:48:49.573406+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/5b06d09",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "5b06d09df4cd5a3419cc67f15a405051b1e840eb",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-polar1-s",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+            "--model",
+            "polar1-s",
+            "--structures",
+            "NaCl",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T12:48:49.625915+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.0859375,
+              0.55712890625,
+              1.42041015625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T12:48:49.627720+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T12:50:18.466486+00:00",
+          "wall_s": 88.834947001189,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-s-NbCl5x4",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NbCl5x4",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+            "--model",
+            "polar1-s",
+            "--structures",
+            "NbCl5",
+            "--configs",
+            "4",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NbCl5x4",
+          "timing": false,
+          "note": "supplementary: float32-sensitive model, NaCl only counts",
+          "idle_check": {
+            "utc": "2026-10-18T12:50:18.508685+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 8.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.904296875,
+              0.71875,
+              1.39404296875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T12:50:18.511513+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T12:52:04.480433+00:00",
+          "wall_s": 105.96532404236495,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-m",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+            "--model",
+            "polar1-m",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T12:52:04.522161+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.0146484375,
+              0.82080078125,
+              1.3515625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T12:52:04.525519+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T12:58:29.089131+00:00",
+          "wall_s": 384.55880595743656,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-m-NbCl5x4",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m-NbCl5x4",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+            "--model",
+            "polar1-m",
+            "--structures",
+            "NbCl5",
+            "--configs",
+            "4",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m-NbCl5x4",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T12:58:29.129710+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.1044921875,
+              1.26953125,
+              1.439453125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T12:58:29.132626+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:02:26.185472+00:00",
+          "wall_s": 237.04920943267643,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-l",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-L.model",
+            "--model",
+            "polar1-l",
+            "--structures",
+            "NaCl",
+            "NaNbO3@2x2x2",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l",
+          "timing": false,
+          "note": "counts (NaNbO3 reduced)",
+          "idle_check": {
+            "utc": "2026-10-18T13:02:26.230129+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 10.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              2.396484375,
+              1.9873046875,
+              1.71923828125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:02:26.233025+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:12:31.570549+00:00",
+          "wall_s": 605.3334826622158,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-l-NbCl5x4",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l-NbCl5x4",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-L.model",
+            "--model",
+            "polar1-l",
+            "--structures",
+            "NbCl5@2x2x2",
+            "--configs",
+            "4",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l-NbCl5x4",
+          "timing": false,
+          "note": "counts (reduced)",
+          "idle_check": {
+            "utc": "2026-10-18T13:12:31.616813+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 13.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.12939453125,
+              1.49853515625,
+              1.57861328125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:12:31.619718+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:18:21.180298+00:00",
+          "wall_s": 349.5565894972533,
+          "status": "complete"
+        },
+        {
+          "name": "gate-omol0-xl",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-omol0-xl",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-omol-0-extra-large-1024.model",
+            "--model",
+            "omol0-xl",
+            "--structures",
+            "NaCl",
+            "NbCl5@2x2x2",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-omol0-xl",
+          "timing": false,
+          "note": "counts (NbCl5 reduced)",
+          "idle_check": {
+            "utc": "2026-10-18T13:18:21.222001+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 12.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.0732421875,
+              1.529296875,
+              1.619140625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:18:21.222780+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:22:16.009844+00:00",
+          "wall_s": 234.78236736357212,
+          "status": "complete"
+        },
+        {
+          "name": "gate-omol0-xl-NaNbO3-model-limited",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-omol0-xl-NaNbO3-model-limited",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-omol-0-extra-large-1024.model",
+            "--model",
+            "omol0-xl",
+            "--structures",
+            "NaNbO3@2x2x2",
+            "--configs",
+            "1",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-omol0-xl-NaNbO3-model-limited",
+          "timing": false,
+          "note": "model-limited",
+          "idle_check": {
+            "utc": "2026-10-18T13:22:16.052114+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 30.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.45361328125,
+              1.4853515625,
+              1.56982421875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:22:16.055153+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:24:29.737345+00:00",
+          "wall_s": 133.6775777451694,
+          "status": "complete"
+        },
+        {
+          "name": "gate-off23-small",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23-small",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-OFF23_small.model",
+            "--model",
+            "off23-small",
+            "--structures",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/water_216.extxyz@1x1x1",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23-small",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T13:24:29.784082+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 20.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.1884765625,
+              1.34912109375,
+              1.50439453125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:24:29.787127+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:28:19.857101+00:00",
+          "wall_s": 230.06592682376504,
+          "status": "complete"
+        },
+        {
+          "name": "gate-off23-medium",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23-medium",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-OFF23_medium.model",
+            "--model",
+            "off23-medium",
+            "--structures",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/water_216.extxyz@1x1x1",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23-medium",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T13:28:19.901240+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.78369140625,
+              1.51123046875,
+              1.52099609375
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:28:19.904262+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:33:11.902708+00:00",
+          "wall_s": 291.9939669519663,
+          "status": "complete"
+        },
+        {
+          "name": "gate-off23-large",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23-large",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-OFF23_large.model",
+            "--model",
+            "off23-large",
+            "--structures",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/water_216.extxyz@1x1x1",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23-large",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T13:33:11.941505+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 6.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.056640625,
+              1.21044921875,
+              1.37939453125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:33:11.944590+00:00",
+          "exit_code": 1,
+          "finished_utc": "2026-10-18T13:35:00.629579+00:00",
+          "wall_s": 108.67982102744281,
+          "status": "failed"
+        },
+        {
+          "name": "gate-off23b-medium",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23b-medium",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-OFF23b_medium.model",
+            "--model",
+            "off23b-medium",
+            "--structures",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/water_216.extxyz@1x1x1",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23b-medium",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T13:35:00.670581+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 100.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.201171875,
+              1.234375,
+              1.365234375
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:35:00.673560+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:39:47.847499+00:00",
+          "wall_s": 287.1692778915167,
+          "status": "complete"
+        },
+        {
+          "name": "gate-off24-medium",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off24-medium",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-OFF24_medium.model",
+            "--model",
+            "off24-medium",
+            "--structures",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/water_216.extxyz@1x1x1",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off24-medium",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T13:39:47.895369+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 6.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.0595703125,
+              1.13916015625,
+              1.28173828125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:39:47.898126+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:44:28.070294+00:00",
+          "wall_s": 280.16710647009313,
+          "status": "complete"
+        }
+      ],
+      "status": "failed",
+      "stopped": null,
+      "failed": [
+        "gate-off23-large"
+      ],
+      "finished_utc": "2026-10-18T13:44:28.074833+00:00"
+    },
+    {
+      "started_utc": "2026-10-18T13:44:28.118151+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/5b06d09",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "5b06d09df4cd5a3419cc67f15a405051b1e840eb",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-polar1-s-NaCl-baseline",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NaCl-baseline",
+            "--engine",
+            "baseline",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+            "--model",
+            "polar1-s",
+            "--structures",
+            "NaCl",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "bash /mnt/homes/zwingel/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh /mnt/homes/zwingel/environments/mace_cueq_oeq /mnt/homes/zwingel/fastmace-cache/acceptance-leto/oeq-launcher /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NaCl-baseline",
+          "timing": false,
+          "note": "check",
+          "idle_check": {
+            "utc": "2026-10-18T13:44:28.166047+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.15771484375,
+              1.166015625,
+              1.25439453125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:44:28.168903+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:46:58.168279+00:00",
+          "wall_s": 149.99425963312387,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-m-NaCl-baseline",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5b06d09/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m-NaCl-baseline",
+            "--engine",
+            "baseline",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+            "--model",
+            "polar1-m",
+            "--structures",
+            "NaCl",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "bash /mnt/homes/zwingel/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh /mnt/homes/zwingel/environments/mace_cueq_oeq /mnt/homes/zwingel/fastmace-cache/acceptance-leto/oeq-launcher /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m-NaCl-baseline",
+          "timing": false,
+          "note": "check",
+          "idle_check": {
+            "utc": "2026-10-18T13:46:58.210620+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 8.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.10400390625,
+              1.14697265625,
+              1.23291015625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:46:58.213713+00:00"
+        }
+      ]
+    },
+    {
+      "started_utc": "2026-10-18T13:49:59.002395+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/5e5019d",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "5e5019d532d1a47c4f4f18b044adf889ee8c45dd",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-off23-large",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/5e5019d/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23-large",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-OFF23_large.model",
+            "--model",
+            "off23-large",
+            "--structures",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif@2x2x2",
+            "/mnt/homes/zwingel/ResearchModule/Structures/Organic/water_216.extxyz@1x1x1",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-off23-large",
+          "timing": false,
+          "note": "counts (paracetamol reduced: the float64 reference does not fit)",
+          "idle_check": {
+            "utc": "2026-10-18T13:49:59.061327+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.17236328125,
+              1.37353515625,
+              1.31494140625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:49:59.064520+00:00"
+        }
+      ]
+    },
+    {
+      "started_utc": "2026-10-18T13:57:17.001324+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/e05dd55",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "e05dd55bc09030e60c319f8b0855e847e0e5a9ea",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-polar1-s",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/e05dd55/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+            "--model",
+            "polar1-s",
+            "--structures",
+            "NaCl",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T13:57:17.064768+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.7724609375,
+              1.19873046875,
+              1.2568359375
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:57:17.067314+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T13:58:46.533772+00:00",
+          "wall_s": 89.46031384542584,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-s-NbCl5x4",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/e05dd55/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NbCl5x4",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+            "--model",
+            "polar1-s",
+            "--structures",
+            "NbCl5",
+            "--configs",
+            "4",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NbCl5x4",
+          "timing": false,
+          "note": "supplementary: float32-sensitive model, NaCl only counts",
+          "idle_check": {
+            "utc": "2026-10-18T13:58:46.578396+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 8.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.95166015625,
+              1.14306640625,
+              1.23046875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:58:46.581366+00:00",
+          "exit_code": 1,
+          "finished_utc": "2026-10-18T13:59:14.837174+00:00",
+          "wall_s": 28.25060746446252,
+          "status": "failed"
+        },
+        {
+          "name": "gate-polar1-m",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/e05dd55/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+            "--model",
+            "polar1-m",
+            "--structures",
+            "NaCl",
+            "NaNbO3",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T13:59:14.883211+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 56.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.97216796875,
+              1.12841796875,
+              1.2216796875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T13:59:14.886319+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:02:52.494992+00:00",
+          "wall_s": 217.60214076191187,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-m-NbCl5x4",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/e05dd55/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m-NbCl5x4",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+            "--model",
+            "polar1-m",
+            "--structures",
+            "NbCl5",
+            "--configs",
+            "4",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m-NbCl5x4",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T14:02:52.537448+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.18212890625,
+              1.52880859375,
+              1.404296875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:02:52.540555+00:00"
+        }
+      ]
+    },
+    {
+      "started_utc": "2026-10-18T14:03:46.427474+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/096b47b",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "096b47b0afeeee9fa8191a915ccebbfab8b0cbb2",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-polar1-s-NbCl5x4",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/096b47b/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NbCl5x4",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+            "--model",
+            "polar1-s",
+            "--structures",
+            "NbCl5",
+            "--configs",
+            "4",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NbCl5x4",
+          "timing": false,
+          "note": "supplementary: float32-sensitive model, NaCl only counts",
+          "idle_check": {
+            "utc": "2026-10-18T14:03:46.476486+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.0322265625,
+              1.43603515625,
+              1.3779296875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:03:46.479400+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:05:25.435512+00:00",
+          "wall_s": 98.94979463145137,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-m-NbCl5x4",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/096b47b/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m-NbCl5x4",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+            "--model",
+            "polar1-m",
+            "--structures",
+            "NbCl5",
+            "--configs",
+            "4",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-m-NbCl5x4",
+          "timing": false,
+          "note": "counts",
+          "idle_check": {
+            "utc": "2026-10-18T14:05:25.481864+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.0517578125,
+              1.3232421875,
+              1.341796875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:05:25.484816+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:07:42.075131+00:00",
+          "wall_s": 136.58513067662716,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-l",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/096b47b/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-L.model",
+            "--model",
+            "polar1-l",
+            "--structures",
+            "NaCl",
+            "NaNbO3@2x2x2",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l",
+          "timing": false,
+          "note": "counts (NaNbO3 reduced)",
+          "idle_check": {
+            "utc": "2026-10-18T14:07:42.118244+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 10.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.07275390625,
+              1.24951171875,
+              1.31201171875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:07:42.121156+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:14:20.560306+00:00",
+          "wall_s": 398.43134080432355,
+          "status": "complete"
+        },
+        {
+          "name": "gate-polar1-l-NbCl5x4",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/096b47b/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l-NbCl5x4",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-L.model",
+            "--model",
+            "polar1-l",
+            "--structures",
+            "NbCl5@2x2x2",
+            "--configs",
+            "4",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-l-NbCl5x4",
+          "timing": false,
+          "note": "counts (reduced)",
+          "idle_check": {
+            "utc": "2026-10-18T14:14:20.604895+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 13.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.01806640625,
+              1.22216796875,
+              1.2861328125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:14:20.607769+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:18:05.658853+00:00",
+          "wall_s": 225.04557017982006,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-18T14:18:05.663865+00:00"
+    },
+    {
+      "started_utc": "2026-10-18T14:18:05.710316+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/096b47b",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "096b47b0afeeee9fa8191a915ccebbfab8b0cbb2",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-polar1-s-NaCl-baseline",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/096b47b/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NaCl-baseline",
+            "--engine",
+            "baseline",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+            "--model",
+            "polar1-s",
+            "--structures",
+            "NaCl",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "bash /mnt/homes/zwingel/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh /mnt/homes/zwingel/environments/mace_cueq_oeq /mnt/homes/zwingel/fastmace-cache/acceptance-leto/oeq-launcher /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s-NaCl-baseline",
+          "timing": false,
+          "note": "check",
+          "idle_check": {
+            "utc": "2026-10-18T14:18:05.752632+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.19189453125,
+              1.1884765625,
+              1.25634765625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:18:05.754803+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:19:33.943312+00:00",
+          "wall_s": 88.18271980248392,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-18T14:19:33.950768+00:00"
+    }
+  ]
+}

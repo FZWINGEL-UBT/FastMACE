@@ -13,7 +13,7 @@ runs. The owner then decides at checkpoint 3 whether `main.py` switches to
 | --- | --- | --- |
 | 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | murphy: **passes** for every valid case (MH-1 within 0.03 %, NPT 0.23 %, MP-0 medium 1.4–1.6 % slower, POLAR-1-S 0.03 %, OMOL-0 XL NbCl5 0.01 %); MH-1 NaCl hybrid and cuEq to be confirmed after the 1a-T13b fix: … ; RTX 5060 Ti: **deferred: owner reserved the local GPU (18 October 2026)** |
 | 1. Setup time and peak memory | reported, not judged | murphy: FastMACE's setup 4–33 s longer (self-checks), peak memory equal or lower |
-| 2. Accuracy | today's force/stress gate for all 19 labels | … |
+| 2. Accuracy | today's force/stress gate for all 19 labels | **passes** for all 19 labels on the structures that count (worst ratio 1.63, limit 2); long-range models model-limited on NaNbO3 (POLAR-1-S, OMOL-0 XL) |
 | 3. Compatibility | `main.py --engine fastmace`: smoke, `--profile anneal` on NaCl and `--quench` on its output, statistically equal to the baseline | … |
 | 4. Rules | layering test; no `gpu_langevin`-style globals; no `oeq_no_nvcc.sh` for FastMACE | … |
 
@@ -331,31 +331,70 @@ production stress against the same finite differences:
 
 | Run | Configuration | Reference − FD (eV/Å³) | Production − FD (eV/Å³) |
 | --- | --- | ---: | ---: |
-| … | … | … | … |
+| gate-polar1-l | NaCl 3×3×3 hydrostatic-0 | 9.4e-09 | 1.3e-08 |
+| gate-polar1-l-NbCl5x4 | NaCl 3×3×3 hydrostatic-0 | 9.4e-09 | – |
+| gate-polar1-m | NaCl 3×3×3 hydrostatic-0 | 8.1e-09 | 2.3e-08 |
+| gate-polar1-m-NbCl5x4 | NaCl 3×3×3 hydrostatic-0 | 8.1e-09 | – |
+| gate-polar1-s | NaCl 3×3×3 hydrostatic-0 | 6.9e-09 | 1.1e-07 |
+| gate-polar1-s-NaCl-baseline (research engine as production) | NaCl 3×3×3 hydrostatic-0 | 6.9e-09 | 1.1e-07 |
 
 The invalid runs are kept as `*.uncorrected-reference`.
 
-| Label | Structures | Worst force ratio | Worst stress ratio | Max energy error, production / float32 (meV/atom) | Pass |
+| Label | Structures (3×3×3 unless stated) | Worst force ratio | Worst stress ratio | Max energy error, production / float32 (meV/atom) | Pass |
 | --- | --- | ---: | ---: | --- | --- |
-| mp0-medium | NaCl, NaNbO3, NbCl5 (3×3×3) | … | … | … | … |
-| mp0-large | | … | … | … | … |
-| mp0b3-medium | | … | … | … | … |
-| mpa0-medium | | … | … | … | … |
-| omat0-medium | | … | … | … | … |
-| matpes-pbe | | … | … | … | … |
-| matpes-r2scan | | … | … | … | … |
-| mh1-omat | | … | … | … | … |
-| mh1-mp | | … | … | … | … |
-| mh1-r2scan | | … | … | … | … |
-| polar1-s | | … | … | … | … |
-| polar1-m | | … | … | … | … |
-| polar1-l | | … | … | … | … |
-| omol0-xl | | … | … | … | … |
-| off23-small | urea, naphthalene, paracetamol (3×3×3), water box (648 atoms, unrepeated) | … | … | … | … |
-| off23-medium | | … | … | … | … |
-| off23-large | | … | … | … | … |
-| off23b-medium | | … | … | … | … |
-| off24-medium | | … | … | … | … |
+| mp0-medium | NaCl, NaNbO3, NbCl5 | 1.05 | 1.17 | 0.0853 / 0.0824 | yes |
+| mp0-large | NaCl, NaNbO3, NbCl5 | 1.23 | 1.11 | 0.076 / 0.0762 | yes |
+| mp0b3-medium | NaCl, NaNbO3, NbCl5 | 1.09 | 1.33 | 0.0125 / 0.0121 | yes |
+| mpa0-medium | NaCl, NaNbO3, NbCl5 | 1.09 | 1.33 | 0.00933 / 0.0126 | yes |
+| omat0-medium | NaCl, NaNbO3, NbCl5 | 1.14 | 1.10 | 0.0114 / 0.0135 | yes |
+| matpes-pbe | NaCl, NaNbO3, NbCl5 | 1.54 | 1.37 | 0.00774 / 0.00897 | yes |
+| matpes-r2scan | NaCl, NaNbO3, NbCl5 | 1.29 | 1.35 | 0.133 / 0.122 | yes |
+| mh1-omat | NaCl, NaNbO3, NbCl5 | 1.17 | 0.85 | 0.0239 / 0.0234 | yes |
+| mh1-mp | NaCl, NaNbO3, NbCl5 | 1.22 | 0.93 | 0.0149 / 0.014 | yes |
+| mh1-r2scan | NaCl, NaNbO3, NbCl5 | 1.14 | 0.88 | 0.15 / 0.137 | yes |
+| polar1-s | NaCl | 1.04 | 1.57 | 2.36 / 2.36 | yes |
+| polar1-m | NaCl, NaNbO3, NbCl5, 4 configs | 1.27 | 0.83 | 94.9 / 94.7 | yes |
+| polar1-l | NaCl, NaNbO3 2×2×2, NbCl5 2×2×2, 4 configs | 1.07 | 1.08 | 62.9 / 59.6 | yes |
+| omol0-xl | NaCl, NbCl5 2×2×2 | 1.10 | 1.34 | 52.2 / 45.3 | yes |
+| off23-small | urea, naphthalene, paracetamol, water box (648 atoms) | 1.28 | 0.90 | 12.6 / 9.78 | yes |
+| off23-medium | urea, naphthalene, paracetamol, water box (648 atoms) | 1.02 | 1.33 | 12.9 / 9.33 | yes |
+| off23-large | urea, naphthalene, paracetamol 2×2×2, water box (648 atoms) | 1.02 | 1.24 | 3.85 / 3.69 | yes |
+| off23b-medium | urea, naphthalene, paracetamol, water box (648 atoms) | 1.04 | 1.09 | 13.8 / 9.56 | yes |
+| off24-medium | urea, naphthalene, paracetamol, water box (648 atoms) | 1.06 | 1.15 | 15.2 / 9.91 | yes |
+
+Run `1a-T19-gate-leto-20261018`, leto, RTX 4000 Ada 20 GB, driver 595.58.03, 18 October 2026,
+11:26–14:18 UTC. References in NAS `mace_cueq_latest`, FastMACE production in `mace_cueq_oeq`
+without the launcher; FastMACE checkouts `dd22757` (benchmark labels), `5b06d09`/`5e5019d`
+(MACE-OFF, OMOL-0), `e05dd55`/`096b47b` (POLAR-1). The library code is identical in all of them;
+only the gate driver changed, and its reference fix concerns PolarMACE alone. Baseline `d2faa9fd`.
+Data: `results/1a-T19-gate-leto-20261018/` (each run's `metadata.json` and every child's result).
+
+**All 19 labels pass on the structures that count.** Notes:
+- The structures that count for the long-range labels follow the conductor's decision of 18 October
+  2026 (SPEC §4.3: model-level failures are warnings, not engine verdicts). They are the crystals where
+  ResearchModule's own screen (`studies/other_models/README.md`) finds the model usable: POLAR-1-S on
+  NaCl; POLAR-1-M on NaCl, NaNbO3 and NbCl5; POLAR-1-L on NaCl and, reduced, NaNbO3 and NbCl5;
+  OMOL-0 XL on NaCl and, reduced, NbCl5.
+- For POLAR, NbCl5 takes 4 configurations per cell mode, as in that screen (POLAR-1-S is
+  float32-sensitive there).
+- "2×2×2" marks a reduced cell (SPEC §12.3 `passed-reduced`), where the float64 reference does not
+  fit 20 GB. For POLAR-1-L and OMOL-0 XL those are the cells the screen used. For MACE-OFF23 large,
+  paracetamol 3×3×3 needed one 14.8 GiB allocation in cuEq's `uniform_1d` kernel.
+- Energy per atom is reported, not gated (1b). For the long-range labels and MACE-OFF, the
+  production and float32 errors against float64 are large but equal: NaCl POLAR 2.0–2.8 meV/atom for
+  both. A float32 offset of the models' energy, not of the engine.
+
+Outside the count:
+
+| Run | Structure | Force ratio | Stress ratio | Reference pressure (GPa) | Role |
+| --- | --- | ---: | ---: | --- | --- |
+| gate-polar1-s-NbCl5x4 | NbCl5 3×3×3 | 2.55 | 1.11 | -5.02 to 0.785 | supplementary (NaCl only counts): float32-sensitive model |
+| gate-omol0-xl-NaNbO3-model-limited | NaNbO3 2×2×2 | 0.92 | 3.56 | 1.45e+07 to 1.06e+08 | model-limited |
+| gate-polar1-s-NaCl-baseline | NaCl 3×3×3 | 0.94 | 1.63 | -1.35 to 2.19 | the research engine as production, against the same references |
+| gate-polar1-s.first-run-3-crystals | NaNbO3 3×3×3 | – | – | 86.2 to 7.53e+04 | model-limited (reference pressures; this run's stress verdict used the uncorrected reference) |
+
+The two engines agree: with the research engine as the production path, against the same corrected
+references, POLAR-1-S on NaCl gives 0.94 / 1.63, and FastMACE gives 1.04 / 1.57.
 
 ## 3. Compatibility: `main.py` on FastMACE
 
