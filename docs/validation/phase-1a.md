@@ -464,7 +464,12 @@ run (7e-9 Å, 2.3e-6 eV/atom over 60 steps). The full 270 ps anneal through Fast
   FastMACE-only hybrid process on coraline and on leto, before T17's
   default switch. **leto:** every gate production process and the `main.py --engine fastmace` smoke
   run used the in-process runtime, with no launcher. **murphy:** every FastMACE-only control and
-  alternating process. **coraline:** not run; the conductor allocated only murphy and leto.
+  alternating process. **coraline: open, not a 1a acceptance item** (conductor, 18 October 2026). Its GPU has run another
+  user's multi-day job since 11 October, so it was not idle and was not used; leto and murphy count for
+  the in-process OEq runtime. Coraline is where NFS file locks broke (10 October 2026), so it is the real
+  test of FastMACE's soft-lock behaviour (SPEC §14). Run one FastMACE-only process there when its GPU is
+  idle, before anyone runs FastMACE production on it
+  (`tools/acceptance/launch.sh speed --machine coraline --only control-mh1-nvt-fastmace`).
 
 ## Reproducing
 
