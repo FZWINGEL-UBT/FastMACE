@@ -909,7 +909,7 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
   warm-up of its first capture at a new bucket. Each engine alone, with fresh
   caches, compiles nothing there. The fix (`fastmace/1a-T13b`, ae3e758)
   reinstalls before each capture. Its GPU validation is paused while the
-  owner uses the local GPU.
+  owner uses the local GPU. **Merged 18 October 2026: full GPU suite 221 passed, 2 skipped.**
 - **Murphy speed suite done (T19, run `1a-T19-speed-murphy-20261018`).**
   FastMACE/baseline step-time ratios, 12 blocks, same-process noise floor
   0.16%:
@@ -926,6 +926,18 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
   control's within 3e-6 eV/Å, except OMOL-0 XL, where 0.9–2.0e-4 equals
   OMOL's own process-to-process float32 scatter (1.2–1.8e-4). For OMOL the
   tolerance is that scatter.
+- **Gate and workflow done (T19).** The 19-label gate passes on every
+  counting structure (worst ratio 1.63; references in fresh processes; run
+  `1a-T19-gate-leto-20261018`). The workstation `main.py --engine fastmace`
+  smoke run on leto, from the NAS copy, matches `--engine gpu` within 1.4e-4
+  K and 1.6e-5 eV/atom over 2000 steps of NaNbO3. Acceptance items 2, 3 and
+  4 pass. Item 1 is done on murphy; open are its NaCl reruns after T13b and
+  the RTX 5060 Ti half.
+- **Open, not a 1a item: coraline.** The in-process OEq runtime is checked on
+  leto and murphy. Coraline, where NFS locks broke on 10 October, is the real
+  test of the soft-lock rule. It was occupied by another user's multi-day job
+  (user kaifi). Run one FastMACE-only control there when it is idle, before
+  FastMACE production runs on coraline.
 - **Open: FastMACE setup 8–33 s longer** than the research engine (MH-1 37–45
   s vs 27–29 s; OMOL-0 59–69 s vs 36–37 s), with equal or lower peak memory.
   Setup is reported, not judged, in 1a. Diagnose it with MP-0's speed gap
