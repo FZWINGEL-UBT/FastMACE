@@ -367,7 +367,8 @@ def test_gate_jobs(machine):
     m = suites.MACHINES[machine]
     root = m.path(m.root) / "run"
     jobs = suites.gate_jobs(m, root)
-    assert len(jobs) == 19
+    labels = {_flag_values(job.argv, "--model")[0] for job in jobs}
+    assert labels == set(suites.GATE_LABELS)
     for job in jobs:
         label = _flag_values(job.argv, "--model")[0]
         structures = _flag_values(job.argv, "--structures")
@@ -377,12 +378,29 @@ def test_gate_jobs(machine):
                 "urea_cod1008787.cif", "naphthalene_cod2311090.cif", "paracetamol_cod2104364.cif",
                 "water_216.extxyz"]
             assert structures[-1].endswith("@1x1x1")
-        else:
+        elif label not in suites.LONG_RANGE_GATES:
             assert structures == ["NaCl", "NaNbO3", "NbCl5"]
+        if any(s.startswith("NbCl5") for s in structures) and label.startswith("polar"):
+            assert _flag_values(job.argv, "--configs") == ["4"]  # conductor decision 3
         # references in the plain environment, production in the hybrid one, without the launcher
         assert _flag_values(job.argv, "--reference-command")[0].endswith("mace_cueq_latest/bin/python")
         assert _flag_values(job.argv, "--production-command")[0].endswith("mace_cueq_oeq/bin/python")
         assert job.output.startswith(str(root))
+
+
+def test_long_range_gates_count_only_where_the_model_is_usable():
+    names = {job.name: job for job in suites.gate_jobs(suites.MACHINES["leto"], Path("/mnt/homes/zwingel/x"))}
+    assert _flag_values(names["gate-polar1-s"].argv, "--structures") == ["NaCl"]
+    assert _flag_values(names["gate-omol0-xl"].argv, "--structures") == ["NaCl", "NbCl5@2x2x2"]
+    assert names["gate-omol0-xl-NaNbO3-model-limited"].note == "model-limited"
+
+
+def test_gate_check_on_given_structures_with_the_baseline_engine():
+    jobs = suites.gate_jobs(suites.MACHINES["leto"], Path("/mnt/homes/zwingel/x"), ("polar1-s", "polar1-m"),
+                            engine="baseline", structures=("NaCl",))
+    assert [job.name for job in jobs] == ["gate-polar1-s-NaCl-baseline", "gate-polar1-m-NaCl-baseline"]
+    # the research engine's hybrid production child needs the launcher (one shell-words argument)
+    assert all("oeq_no_nvcc.sh" in _flag_values(job.argv, "--production-command")[0] for job in jobs)
 
 
 def _jobs_by_name(machine="murphy"):

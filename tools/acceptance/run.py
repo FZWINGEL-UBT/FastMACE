@@ -131,11 +131,13 @@ def commit_of(path):
     return None
 
 
-def build_jobs(machine, run_root, names, research_module=None, gate_labels=None, gate_engine="fastmace"):
+def build_jobs(machine, run_root, names, research_module=None, gate_labels=None, gate_engine="fastmace",
+               gate_structures=None):
     jobs = []
     for name in names:
         if name == "gate":
-            jobs += suites.gate_jobs(machine, run_root, gate_labels or suites.GATE_LABELS, gate_engine)
+            jobs += suites.gate_jobs(machine, run_root, gate_labels or suites.GATE_LABELS, gate_engine,
+                                     gate_structures)
         elif name == "workflow":
             jobs += suites.workflow_jobs(machine, run_root, research_module)
         else:
@@ -151,6 +153,7 @@ def parse_args(argv=None):
     p.add_argument("--only", nargs="+", help="Run only these jobs (names as --dry-run lists them)")
     p.add_argument("--gate-labels", nargs="+", choices=suites.GATE_LABELS)
     p.add_argument("--gate-engine", choices=("fastmace", "baseline"), default="fastmace")
+    p.add_argument("--gate-structures", nargs="+", help="Gate every label on these structures only (checks)")
     p.add_argument("--research-module", help="workflow: the ResearchModule tree with 1a-T17's main.py")
     p.add_argument("--fastmace", help="The FastMACE checkout the jobs use (default: the machine's)")
     p.add_argument("--max-utilization", type=float, default=5.0, help="Idle limit for timing jobs, percent")
@@ -165,7 +168,8 @@ def main(argv=None, execute=None, check=None):
     if args.fastmace:
         machine = dataclasses.replace(machine, fastmace=args.fastmace)
     run_root = suites.check_location(machine, machine.path(machine.root) / args.run_id)
-    jobs = build_jobs(machine, run_root, args.suites, args.research_module, args.gate_labels, args.gate_engine)
+    jobs = build_jobs(machine, run_root, args.suites, args.research_module, args.gate_labels, args.gate_engine,
+                      args.gate_structures)
     if args.only:
         unknown = sorted(set(args.only) - {job.name for job in jobs})
         if unknown:

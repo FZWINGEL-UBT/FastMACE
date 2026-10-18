@@ -534,6 +534,9 @@ def _torch_record(torch, result):
 
 def reference_child(job, result):
     """One reference calculator on its configurations, one at a time; this process builds no production engine."""
+    # Expandable segments only place memory differently: a float64 POLAR-1-M reference on NaNbO3 3x3x3 ran
+    # out of memory with 12.5 GiB reserved but unallocated (leto, 18 October 2026).
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     experiment, md = _activate_baseline(job)
     from langevin import polar_gpu, upstream_mace
     # main.py's stress path, before any model is built: the references take the same one-graph strain

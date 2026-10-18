@@ -254,31 +254,60 @@ def alternating_jobs(machine: Machine, run_root: Path, models=ALTERNATING_MODELS
     return jobs
 
 
-def gate_structures(machine: Machine, label: str) -> list:
+# Long-range labels: the crystals where ResearchModule's own screen finds the model usable
+# (studies/other_models/README.md, "Accuracy gate" and "NaNbO3"; conductor decision of 18 October 2026,
+# SPEC §4.3: model-level failures are warnings, not engine failures). Each entry is one gate run:
+# (job suffix, structures, configurations per cell mode, role). NbCl5 takes 4 configurations for every
+# POLAR size (POLAR-1-S is float32-sensitive there; the screen used 4). "@2x2x2" is the screen's reduced
+# cell where float64 does not fit (SPEC §12.3 passed-reduced). Role "model-limited" runs only to show
+# the reference failing too (absurd pressures); it is no engine verdict.
+LONG_RANGE_GATES = {
+    "polar1-s": (("", ("NaCl",), 3, "counts"),
+                 ("-NbCl5x4", ("NbCl5",), 4, "supplementary: float32-sensitive model, NaCl only counts")),
+    "polar1-m": (("", ("NaCl", "NaNbO3"), 3, "counts"), ("-NbCl5x4", ("NbCl5",), 4, "counts")),
+    "polar1-l": (("", ("NaCl", "NaNbO3@2x2x2"), 3, "counts (NaNbO3 reduced)"),
+                 ("-NbCl5x4", ("NbCl5@2x2x2",), 4, "counts (reduced)")),
+    "omol0-xl": (("", ("NaCl", "NbCl5@2x2x2"), 3, "counts (NbCl5 reduced)"),
+                 ("-NaNbO3-model-limited", ("NaNbO3@2x2x2",), 1, "model-limited")),
+}
+# POLAR-1-S on NaNbO3 is already shown model-limited by its first gate run (references at 86-75,347 GPa).
+
+
+def gate_cases(label):
+    """(job suffix, structures, configs, role) of each gate run of ``label``."""
+    if label in LONG_RANGE_GATES:
+        return LONG_RANGE_GATES[label]
     if label in MACE_OFF_LABELS:
-        return [str(machine.path(machine.research_module) / spec) for spec in ORGANIC_STRUCTURES]
-    return list(CRYSTALS)
+        return (("", tuple(ORGANIC_STRUCTURES), 3, "counts"),)
+    return (("", CRYSTALS, 3, "counts"),)
 
 
-def gate_jobs(machine: Machine, run_root: Path, labels=GATE_LABELS, engine="fastmace") -> list:
-    """One gate process (a driver with its reference and production children) per label."""
+def gate_jobs(machine: Machine, run_root: Path, labels=GATE_LABELS, engine="fastmace", structures=None) -> list:
+    """The gate runs (a driver with its reference and production children each) of every label.
+
+    ``structures`` replaces each label's cases by one run on those structures (the polar stress check).
+    """
     run_root = Path(run_root)
     jobs = []
     for label in labels:
         if label not in GATE_LABELS:
             raise ValueError(f"{label!r} is not one of the 19 labels")
-        name = f"gate-{label}" + ("" if engine == "fastmace" else f"-{engine}")
-        output = check_location(machine, run_root / name)
-        production = (machine.python("mace_cueq_oeq") if engine == "fastmace"
-                      else shlex.join(hybrid_launcher(machine, run_root)))
-        argv = [machine.python("mace_cueq_latest"), _tool(machine, "force_stress_gate.py"), "run",
-                "--output", str(output), "--engine", engine, "--baseline", str(machine.path(machine.baseline)),
-                "--checkpoint", checkpoint_path(machine, label), "--model", label,
-                "--structures", *gate_structures(machine, label),
-                # references without OEq (plain cuEq), in the plain environment; production in the hybrid one
-                "--reference-command", machine.python("mace_cueq_latest"), "--production-command", production]
-        jobs.append(Job(name=name, argv=tuple(argv), output=str(output),
-                        note="MACE-OFF: organic set" if label in MACE_OFF_LABELS else "benchmark crystals"))
+        cases = gate_cases(label) if structures is None else (
+            ("-" + "-".join(structures), tuple(structures), 3, "check"),)
+        for suffix, specs, configs, role in cases:
+            name = f"gate-{label}{suffix}" + ("" if engine == "fastmace" else f"-{engine}")
+            output = check_location(machine, run_root / name)
+            production = (machine.python("mace_cueq_oeq") if engine == "fastmace"
+                          else shlex.join(hybrid_launcher(machine, run_root)))
+            paths = [str(machine.path(machine.research_module) / spec) if spec.startswith("Structures/") else spec
+                     for spec in specs]
+            argv = [machine.python("mace_cueq_latest"), _tool(machine, "force_stress_gate.py"), "run",
+                    "--output", str(output), "--engine", engine, "--baseline", str(machine.path(machine.baseline)),
+                    "--checkpoint", checkpoint_path(machine, label), "--model", label, "--structures", *paths,
+                    "--configs", str(configs),
+                    # references without OEq (plain cuEq), in the plain environment; production in the hybrid one
+                    "--reference-command", machine.python("mace_cueq_latest"), "--production-command", production]
+            jobs.append(Job(name=name, argv=tuple(argv), output=str(output), note=role))
     return jobs
 
 
