@@ -66,6 +66,40 @@ for 4 blocks, so the criterion is 3 %.
 
 Same table.
 
+### The two engines clash on Inductor's custom-pass slot
+
+Both engines keep Inductor's `mm + full-matrix add` unfused on the GPU.
+Each also puts a no-op pass into Inductor's single
+`post_grad_custom_pre_pass` config slot, where the pass's uuid keys the
+compiler cache:
+- the research engine: `gpu_langevin`, "langevin-unfused-full-addmm-v2";
+- FastMACE: `_patches.set_unfuse_full_addmm`,
+  "fastmace-unfused-full-addmm-v1".
+
+Each engine refuses a slot that holds the other's key. The engines
+therefore **cannot share a process unchanged**, in either build order. The
+first A/B smoke run on murphy (18 October 2026) failed with "Inductor's
+post_grad_custom_pre_pass is already in use".
+
+The conductor chose a fix in the measuring tool only, with no library
+change ("option (a)"). `tools/ab_step_time.CustomPassSlot` puts each side's
+own key into the slot before that side loads, builds and warms up, and
+keeps what the side left there:
+- Each side's 300 warm-up steps, where it compiles and captures, run right
+  after its build.
+- The 12 timed blocks then alternate with no warm-up of their own.
+- The key matters only at compile time. Dynamo's compile counters are
+  therefore recorded before and after the timed blocks
+  (`compile_during_timing`). A run in which anything compiled while timed
+  is invalid; it is rerun, or that crystal falls back to alternating
+  processes.
+- Because the second engine's key differs from a production run's, the
+  build order is swapped in one repeat per crystal (`ab-mh1-nvt-r2`).
+
+| Job | Structure | Keys (baseline / FastMACE) | Counters changed while timed | Valid |
+| --- | --- | --- | --- | --- |
+| … | … | … | … | … |
+
 ### Interference checks in the A/B processes
 
 - **Same trajectory.** Final temperature and potential energy of the two
