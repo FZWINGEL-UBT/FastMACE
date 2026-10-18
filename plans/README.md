@@ -7,7 +7,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | Phase | Plan | Status |
 | --- | --- | --- |
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
-| 1a. Extraction | [phase-1a.md](phase-1a.md) | 17 of 20 merged (T00–T14, T16, T18; 18 October 2026); next T15 (planner) |
+| 1a. Extraction | [phase-1a.md](phase-1a.md) | 18 of 20 merged (T00–T16, T18; 18 October 2026); T17 and T19 running |
 | 1b. Contracts | — | written during 1a |
 | 2. Safety | — | |
 | 3. Dynamic topology and MC | — | |
@@ -22,8 +22,7 @@ Tasks whose dependencies are merged and whose brief is ready. The owner
 starts all of them with one message, "start all ready" (see
 [CONDUCTOR.md](CONDUCTOR.md)).
 
-- none. T15, T17 (prepare-then-wait) and T19 (prepare-then-wait) are
-  running.
+- none. T17 and T19 are running (go given after T15).
 
 ## Open owner decisions
 

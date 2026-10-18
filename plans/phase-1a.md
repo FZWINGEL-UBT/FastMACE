@@ -817,6 +817,39 @@ The whole GPU suite passes in one process (216 passed).
   when `expandable_segments` is on. `async_output` is the run loop's
   choice (T17), not the engine's.
 
+## Conductor decisions after T15 (18 October 2026)
+
+T15 (`fastmace/planner/fixed.py`, `FixedPlanner`) is merged
+(`docs/validation/1a-T15-planner.md`). For every one of the 19 labels and
+31 `main.py` argument sets, the plan equals the research engine's own
+`parse_args` + `adapt_options_to_model`, refusals included, and
+`auto_options_off` equals the baseline's dict. Plan → build → `run(500)` on
+MH-1 NaCl 3×3×3 matches T13's hand-built engine: 3.9e-13 Å (cuEq float64)
+and 8.8e-8 Å against a scatter of 8.6e-8 Å (hybrid), at the same ms/step.
+The whole GPU suite passes in one process (219 passed). Its follow-ups are
+done: CPU cuEq through the naive kernels, the constraint spellings,
+streaming requiring receiver sorting, `inplace_block_linear` refused, and
+the BAOAB keywords.
+
+Accepted deviations: each refuses earlier or more clearly than the
+research engine, with the same result for every accepted run.
+1. Plain-cuEq reassociation is off ("auto") or refused ("on") at plan time;
+   the research engine's probe refuses it later, at engine construction.
+2. Compiled plain-cuEq PolarMACE is refused at plan time (zero forces).
+3. An explicit "on" that no record can apply (for example `merged_residual`
+   on MP-0) is refused at build; the research engine accepted it silently,
+   as a no-op. **T17 must not pass explicit "on" values for options the
+   user left at "auto"**, or such runs would now fail.
+4. The plan records `cueq_conv_fusion` as "off (not applicable)" for the
+   hybrid, where the research engine writes `None`. T17 maps it back to
+   `None` in `run.json`.
+5. T13's plain-cuEq trajectory test ran with MH-1 and linear rewrites that
+   `--backend cueq` never uses. Its equivalence result stands; only its
+   label "as `main.py` runs them" was wrong. T19 measures the real
+   `--backend cueq` plan.
+
+Next: T17 and T19, both prepared, get their go messages.
+
 ## New optimisations: screens after T19 (owner, 17 October 2026)
 
 The owner welcomes trying new optimisations and adopting those that make
