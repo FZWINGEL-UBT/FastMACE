@@ -1948,7 +1948,10 @@ defective behaviour.
 
 ### 12.3 Gate on the user's structure
 
-`Simulation` by default runs a reduced gate before the first step:
+The gate is **opt-in** (owner decision 3, 19 October 2026). It is off by
+default: the status is `skipped`, recorded and named in the run report.
+With `check="gate"`, `Simulation`, `fm.md`, `fastmace.ase` and
+`fastmace md --check` run a reduced gate before the first step:
 - 2 rattled copies (0.05 Å) and, for NPT, 2 strained copies (±2%);
 - production path, **in the mode it will run** (captured replay in graph
   mode), against the reference of §12.1;
@@ -1990,7 +1993,8 @@ It takes seconds to a minute. A failing gate triggers the fallback algorithm
   reference, and therefore always run on the production cell;
 - `failed`: triggers §9.4;
 - `unavailable`: the reference could not run on any allowed device;
-- `skipped`: by the user (`check="skip"`).
+- `skipped`: the default when the gate is not requested (decision 3), or
+  explicitly with `check="skip"`.
 
 **Resources.** An FP32 production workload can fit where its unoptimised
 float64 reference does not (today: NbCl5 3×3×3 PolarMACE in float64 exceeds
@@ -1999,8 +2003,9 @@ evaluates the references first, one configuration and one calculator at a
 time, frees them, and only then builds the production engine. On GPU memory
 exhaustion it tries CPU float64 if the estimated time is within a
 configurable limit, then a reduced cell. If all fail, the status is
-`unavailable`: the run is refused unless the user passes
-`check="allow_unavailable"`, which is recorded. A more memory-hungry
+`unavailable`: a requested gate refuses the run unless the user passes
+`check="allow_unavailable"` (which also requests the gate), and that is
+recorded. A more memory-hungry
 reference is never a fallback for a plan that failed for memory.
 
 ### 12.4 CI matrix
@@ -2251,9 +2256,27 @@ Open decisions for the owner:
    are paths in ResearchModule, which keeps the research engine and the
    frozen baseline tag `research-engine-baseline-20261017`.
 2. Minimum MACE version to support beyond 0.3.16.
-3. Whether the gate on the user's structure is on by default (recommended) or
-   opt-in, and whether an `unavailable` gate refuses the run by default
-   (proposed, §12.3) or only warns.
+3. Gate on the user's structure — **decided (user, 19 October 2026): opt-in**
+   (`check="gate"`), off by default and then recorded as `skipped`. A
+   requested gate that is `unavailable` refuses the run unless
+   `check="allow_unavailable"` is passed (§12.3).
+15–21. Decided (user, 19 October 2026, the phase 1b plan's D2–D8):
+   - float64 energy accumulation everywhere, including the path `main.py`
+     uses (15);
+   - a species superset larger than the structure's species is refused until
+     phase 3 (16);
+   - `fastmace.ase` observers: position and momentum changes are applied as
+     a host write at a canonical point, while species, mass and charge
+     changes raise until phase 3's events. The §7.7 observer acceptance item
+     covers positions and momenta in 1b; the rest moves to phase 3 (17);
+   - `fastmace run` is part of 1b (18);
+   - without the compiled MD tier (phase 3): inexact padding and
+     `allow_reference` are refused; frequent host callbacks stay on the
+     graph tier with a sync at each callback, reported (19);
+   - `Simulation` without `workload=` uses the integrator's temperature as
+     `max_temperature_K` (20);
+   - the independent BAOAB reference is ASE 3.27's class with only the drag
+     line patched, plus a float64 single-step check from the paper (21).
 4. Licence — **decided (user, 17 October 2026): MIT** (§14).
 5. Which GPUs to provide as CI runners (local RTX 5060 Ti, a workstation
    RTX 4000 Ada).
@@ -2568,3 +2591,6 @@ driver cache directory the NFS rule checks (task 0-T03). No other change.
 
 **Draft 0.12, fourth amendment (18 October 2026):** §18 risk table: plain cuEq float64
 is not bitwise reproducible (1a-T13). No other change.
+
+**Draft 0.12, fifth amendment (19 October 2026):** owner decisions 3 (gate opt-in,
+§12.3) and 15–21 (the phase 1b plan's D2–D8) recorded in §18. No other change.

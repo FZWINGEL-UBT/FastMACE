@@ -1010,18 +1010,26 @@ reviews and merges, and the owner decides:
 
 Each is needed by the task named. The recommendation comes first.
 
+**Decided by the owner on 19 October 2026:** D1 as an opt-in, not on by
+default; D2–D8 as recommended below. All are recorded in SPEC §18 (3,
+15–21) and §12.3.
+
 - **D1, SPEC §18 open decision 3: gate default and `unavailable` (T16, T17,
-  T20, T21).**
-  - Gate on by default in `Simulation`, `fm.md`, `fastmace.ase` and
-    `fastmace md` (`check="auto"`).
-  - An `unavailable` gate **refuses** by default with `GateUnavailable`,
-    whose message names `check="allow_unavailable"` (recorded) and
-    `check="skip"`.
-  Reason: the gate is what separates model faults from engine faults
-  (§18), and in 1b, without the phase-2 CPU and reduced-cell fallbacks,
-  `unavailable` means the reference did not run at all. The cost (seconds
-  to a minute) is reported in the setup line. `main.py`'s adapter is not
-  affected: it builds through `FixedPlanner` and has no gate.
+  T20, T21).** **Decided: opt-in.**
+  - The gate is off by default in `Simulation`, `fm.md`, `fastmace.ase` and
+    `fastmace md`. Its status is then `skipped`, recorded, and the run
+    report says "gate not run (opt-in: check="gate")".
+  - `check="gate"` requests it. A requested gate that is `unavailable`
+    refuses with `GateUnavailable`, whose message names
+    `check="allow_unavailable"` (recorded, and it also requests the gate).
+  - T16 builds and tests the gate fully, on the opt-in path. T17, T20 and
+    T21 pass `check` through and test both the default (`skipped`) and
+    `check="gate"`.
+  - The owner's original recommendation (on by default) is kept here for
+    the record: the gate separates model faults from engine faults, and in
+    1b an `unavailable` gate means no reference ran at all.
+  - `main.py`'s adapter is not affected: it builds through `FixedPlanner`
+    and has no gate.
 - **D2, float64 energy on the `main.py` path (T03).**
   - Yes: `float64_energy=True` everywhere, `FixedPlanner` included, so
     `main.py --engine fastmace` writes float64-accumulated energies from

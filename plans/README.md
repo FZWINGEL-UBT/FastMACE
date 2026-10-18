@@ -8,7 +8,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | --- | --- | --- |
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
 | 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phase-1a.md`); owner checkpoint 3 decided (19 October: `main.py` defaults to FastMACE) |
-| 1b. Contracts | [phase-1b.md](phase-1b.md) | planned (draft; owner decisions D1–D8 open) |
+| 1b. Contracts | [phase-1b.md](phase-1b.md) | planned (owner decisions D1–D8 taken 19 October 2026) |
 | 2. Safety | — | |
 | 3. Dynamic topology and MC | — | |
 | 3b. NPT for the chlorides | — | |
@@ -22,7 +22,9 @@ Tasks whose dependencies are merged and whose brief is ready. The owner
 starts all of them with one message, "start all ready" (see
 [CONDUCTOR.md](CONDUCTOR.md)).
 
-- none. The phase 1b plan is being drafted.
+- **1b-T01** contracts: public names, config fields, stubs (wave 0; conductor task, delegated).
+- **1b-T11** MP-0 speed gap and setup-time diagnosis (murphy, idle check first).
+- 1b-T02 (exceptions) follows T01 and is started once T01 is merged.
 
 ## Open owner decisions
 
