@@ -1,11 +1,12 @@
 # Phase 1a acceptance report
 
-**Status: prepared, not run.** Plan task 1a-T19. The run scripts and the
-gate driver are on branch `fastmace/1a-T19`. The speed and accuracy runs
-start after the planner (1a-T15) merges, and the workflow checks after
-`main.py` on FastMACE (1a-T17) merges. Every "…" below is filled from the
-runs. The owner then decides at checkpoint 3 whether `main.py` switches to
-`--engine fastmace`.
+**Status: workstation runs done; two items open.** Plan task 1a-T19, branch `fastmace/1a-T19`,
+18 October 2026. Open:
+(1) the MH-1 NaCl hybrid and plain-cuEq A/B reruns on murphy with 1a-T13b's `mask_head` fix, after
+it merges;
+(2) the RTX 5060 Ti half of the speed criterion, once the conductor hands over the local GPU.
+Every remaining "…" is one of these two. The owner then decides at checkpoint 3 whether `main.py`
+switches to `--engine fastmace`.
 
 ## Verdict
 
@@ -14,15 +15,18 @@ runs. The owner then decides at checkpoint 3 whether `main.py` switches to
 | 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | murphy: **passes** for every valid case (MH-1 within 0.03 %, NPT 0.23 %, MP-0 medium 1.4–1.6 % slower, POLAR-1-S 0.03 %, OMOL-0 XL NbCl5 0.01 %); MH-1 NaCl hybrid and cuEq to be confirmed after the 1a-T13b fix: … ; RTX 5060 Ti: **deferred: owner reserved the local GPU (18 October 2026)** |
 | 1. Setup time and peak memory | reported, not judged | murphy: FastMACE's setup 4–33 s longer (self-checks), peak memory equal or lower |
 | 2. Accuracy | today's force/stress gate for all 19 labels | **passes** for all 19 labels on the structures that count (worst ratio 1.63, limit 2); long-range models model-limited on NaNbO3 (POLAR-1-S, OMOL-0 XL) |
-| 3. Compatibility | `main.py --engine fastmace`: smoke, `--profile anneal` on NaCl and `--quench` on its output, statistically equal to the baseline | … |
-| 4. Rules | layering test; no `gpu_langevin`-style globals; no `oeq_no_nvcc.sh` for FastMACE | … |
+| 3. Compatibility | `main.py --engine fastmace`: smoke, `--profile anneal` on NaCl and `--quench` on its output, statistically equal to the baseline | **passes**: PC (1a-T17), smoke, shortened anneal (two seeds) and quench equal within seed scatter; leto smoke equal to FP32 divergence |
+| 4. Rules | layering test; no `gpu_langevin`-style globals; no `oeq_no_nvcc.sh` for FastMACE | **passes**: layering and switch checks pass; no FastMACE process needed the launcher (PC, murphy, leto; coraline not run) |
 
 ## Runs
 
 | Run ID | Machine | GPU, driver | Suites | FastMACE commit | Baseline | Dates (UTC) |
 | --- | --- | --- | --- | --- | --- | --- |
 | … | PC (WSL2) | RTX 5060 Ti 16 GB, … | speed | … | tag `research-engine-baseline-20261017`, commit `d2faa9fd`, export `~/fastmace-baseline/1a-T18` | … |
-| … | murphy or leto | RTX 4000 Ada 20 GB, 595.58.03 | speed, gate, workflow | … | same tag, export `/mnt/homes/zwingel/fastmace-baseline/1a-T18` | … |
+| `1a-T19-speed-murphy-20261018` | murphy | RTX 4000 Ada 20 GB, 595.58.03 | speed (A/B, alternating, controls) | `5de02c5`, `b084660`, `2f88d25`, `4791ec7` (same library code) | same tag, export `/mnt/homes/zwingel/fastmace-baseline/1a-T18` | 18 Oct, 11:33–15:10 |
+| `1a-T19-gate-leto-20261018` | leto | RTX 4000 Ada 20 GB, 595.58.03 | gate, 19 labels | `dd22757` … `096b47b` (same library code) | same | 18 Oct, 11:26–14:18 |
+| `1a-T19-workflow-leto-20261018` | leto | same | `main.py` smoke, both engines | NAS copy `43ce026` (main) | ResearchModule `fb81217b` | 18 Oct, 14:21–14:27 |
+| `1a-T17-20261018` (1a-T17's runs) | PC (WSL2) | RTX 5060 Ti 16 GB, 610.88 | `main.py` smoke, anneal, quench | `43ce026` | ResearchModule `fb81217b` | 18 Oct, 11:15–11:44 |
 
 Environments: `mace_cueq_oeq` (torch 2.14.1+cu130, MACE 0.3.16,
 cuEquivariance 0.12.0, OEq 0.7.0) for every process that builds a hybrid
@@ -445,12 +449,17 @@ run (7e-9 Å, 2.3e-6 eV/atom over 60 steps). The full 270 ps anneal through Fast
 
 ## 4. Rules
 
-- Layering test (`tests/cpu/test_layering.py`) on the tested commit: …
-- No module-level switches: …
-- No launcher: every FastMACE-only process above (controls, gate
-  production) ran without `oeq_no_nvcc.sh` (`hybrid_launcher: false` in
-  their `metadata.json`). The A/B processes use the launcher only because
-  the research engine needs it.
+- Layering test (`tests/cpu/test_layering.py`), on this branch with main `277be00` merged: 32 passed.
+  It includes `test_fastmace_obeys` (no `fastmace.engine` import from `fastmace.model` or
+  `fastmace.rewrites`, no research-engine or NAS imports) and `test_switch_allow_list_is_current`.
+- No module-level switches: the layering test's switch check passes, with its allow list of named
+  constants unchanged. The whole CPU suite on the same tree: 864 passed, 200 skipped (`fastmace_cpu`,
+  `-n 4`); `ruff check fastmace tests tools` is clean.
+- No launcher: every FastMACE-only process above ran without `oeq_no_nvcc.sh`: the controls, the
+  alternating POLAR processes, every gate production process and the `main.py --engine fastmace` smoke
+  run. Their commands are in each run's `manifest.json`. The `hybrid_launcher` flag in the speed
+  controls' `metadata.json` is unreliable before `d7773c6` (see "Setup time and peak memory"). The A/B
+  processes use the launcher only because the research engine needs it.
 - In-process OEq runtime on the workstations (decision after wave 0): a
   FastMACE-only hybrid process on coraline and on leto, before T17's
   default switch. **leto:** every gate production process and the `main.py --engine fastmace` smoke
