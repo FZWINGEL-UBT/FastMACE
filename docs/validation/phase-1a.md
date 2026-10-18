@@ -1,18 +1,15 @@
 # Phase 1a acceptance report
 
-**Status: workstation runs done; two items open.** Plan task 1a-T19, branch `fastmace/1a-T19`,
-18 October 2026. Open:
-(1) the MH-1 NaCl hybrid and plain-cuEq A/B reruns on murphy with 1a-T13b's `mask_head` fix, after
-it merges;
-(2) the RTX 5060 Ti half of the speed criterion, once the conductor hands over the local GPU.
-Every remaining "…" is one of these two. The owner then decides at checkpoint 3 whether `main.py`
-switches to `--engine fastmace`.
+**Status: complete. All four acceptance items pass.** Plan task 1a-T19, branch `fastmace/1a-T19`,
+18 October 2026. The findings below are not acceptance failures; they go to the owner with this
+report. The owner now decides at checkpoint 3 whether `main.py` switches to `--engine fastmace`,
+and whether the `langevin` modules become shims.
 
 ## Verdict
 
 | Acceptance item (plans/phase-1a.md) | Criterion | Result |
 | --- | --- | --- |
-| 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | murphy: **passes** for every valid case (MH-1 within 0.03 %, NPT 0.23 %, MP-0 medium 1.4–1.6 % slower, POLAR-1-S 0.03 %, OMOL-0 XL NbCl5 0.01 %); MH-1 NaCl hybrid and cuEq to be confirmed after the 1a-T13b fix: … ; RTX 5060 Ti: **passes**, MH-1 NVT within 0.33 % on all three crystals in all three processes, NPT 0.16 % |
+| 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | murphy: **passes** for every valid case. MH-1 NVT within 0.5 % (NaCl after the 1a-T13b fix 0.9996 and 0.9950), NPT 0.23 %, plain cuEq NaCl 0.06 % (alternating processes), MP-0 medium 1.4–1.6 % slower, POLAR-1-S 0.03 %, OMOL-0 XL NbCl5 0.01 %; RTX 5060 Ti: **passes**, MH-1 NVT within 0.33 % on all three crystals in all three processes, NPT 0.16 % |
 | 1. Setup time and peak memory | reported, not judged | murphy: FastMACE's setup 4–33 s longer (self-checks), peak memory equal or lower |
 | 2. Accuracy | today's force/stress gate for all 19 labels | **passes** for all 19 labels on the structures that count (worst ratio 1.63, limit 2); long-range models model-limited on NaNbO3 (POLAR-1-S, OMOL-0 XL) |
 | 3. Compatibility | `main.py --engine fastmace`: smoke, `--profile anneal` on NaCl and `--quench` on its output, statistically equal to the baseline | **passes**: PC (1a-T17), smoke, shortened anneal (two seeds) and quench equal within seed scatter; leto smoke equal to FP32 divergence |
@@ -76,6 +73,9 @@ the gate and to the speed table on 18 October 2026:
    is 100 times MH-1's, and the in-process force check uses it as OMOL-0's tolerance.
 
 ## Runs
+
+Speed: `1a-T19-speed-murphy-rerun-20261018` (murphy, NaCl reruns and alternating plain cuEq,
+FastMACE `6ec85b1`, 18 Oct 14:54–15:54 UTC) adds to the rows below.
 
 | Run ID | Machine | GPU, driver | Suites | FastMACE commit | Baseline | Dates (UTC) |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -189,8 +189,23 @@ Reading:
 - **Plain cuEq float64** gives 1.0000 but is invalid: each side compiled once while timed
   (`stats.unique_graphs` 3 → 5), probably the same `mask_head` interaction. Its rerun belongs with
   the post-fix NaCl rerun.
-- **Still open:** the MH-1 hybrid NaCl NVT A/B and the plain cuEq NaCl A/B, rerun on murphy with
-  1a-T13b's `mask_head` fix, after it merges: …
+- **NaCl after the fix.** Run `1a-T19-speed-murphy-rerun-20261018`, FastMACE `6ec85b1`, which has
+  main `ce8cf73` with 1a-T13b's `mask_head` fix merged. Data:
+  `results/1a-T19-speed-murphy-rerun-20261018/`.
+
+  | Job | Structure | Baseline (ms) | FastMACE (ms) | FastMACE/baseline | Valid | Pass |
+  | --- | --- | ---: | ---: | ---: | --- | --- |
+  | ab-mh1-nvt-NaCl-r1 (ABAB, baseline first) | NaCl | 3.573 | 3.571 | 0.9996 | yes | yes |
+  | ab-mh1-nvt-NaCl-r2 (ABAB, FastMACE first) | NaCl | 3.611 | 3.593 | 0.9950 | yes | yes |
+  | ab-mh1-cueq-nvt (plain cuEq float64, same process) | NaCl | 96.951 | 96.943 | 0.9999 | **no**: one compile while timed, now the research engine's | – |
+  | alt-mh1-cueq-nvt (alternating, b f f b b f, 12 blocks) | NaCl | 96.896, 96.904, 96.943 | 96.826, 96.843, 96.872 | 0.9994 | yes (process noise floor 0.05 %) | yes |
+
+  With the fix, the hybrid A/B compiles nothing at NaCl's 7168 → 7680 transition, in either build
+  order. The plain-cuEq A/B in one process still compiles once there, this time on the research
+  engine's side (its slowest block 116 ms against FastMACE's 97.9). Neither single-engine process
+  compiles there (`control-mh1-cueq-nvt-*`, all blocks valid). So it is the same kind of
+  same-process `mask_head` interaction, and plain cuEq is timed in alternating processes, as POLAR-1-S
+  is.
 
 ### The two engines clash on Inductor's custom-pass slot
 
@@ -254,7 +269,9 @@ nothing while timed.
     dimension dynamic during warm-up.
   - Root cause found by 1a-T13b. The fix, branch `fastmace/1a-T13b`
     `ae3e758`, makes FastMACE reinstall its function before each capture.
-    One NaCl A/B rerun on murphy with that fix follows its merge: …
+    The NaCl reruns with the merged fix (above) are valid: 0.9996 and 0.9950. The
+    plain-cuEq A/B still interacts in one process, now on the research engine's
+    side, and is timed in alternating processes instead (0.9994).
 - **PolarMACE patches (POLAR-1-S A/B impossible in one process).** The
   research engine's `polar_gpu` replaces MACE's and graph_longrange's
   PolarMACE functions process-wide. FastMACE's source qualification then

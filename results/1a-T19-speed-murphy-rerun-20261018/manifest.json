@@ -1,0 +1,651 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-18T14:54:10.921725+00:00",
+      "host": "murphy",
+      "machine": "murphy",
+      "suites": [
+        "nacl-rerun"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/6ec85b1",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "6ec85b1ca21216f7191c5a831a0a26883e9017e3",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "ab-mh1-nvt-NaCl-r1",
+          "argv": [
+            "bash",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq",
+            "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq-launcher",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/6ec85b1/tools/ab_step_time.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/ab-mh1-nvt-NaCl-r1",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "baseline",
+            "fastmace",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "hybrid",
+            "--dump-forces",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/ab-mh1-nvt-NaCl-r1",
+          "timing": true,
+          "note": "rerun after 1a-T13b (mask_head reinstalled before each capture); baseline built first",
+          "idle_check": {
+            "utc": "2026-10-18T14:54:10.983294+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.03564453125,
+              0.02294921875,
+              0.05126953125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:54:10.986570+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:55:50.630161+00:00",
+          "wall_s": 99.64122286066413,
+          "status": "complete"
+        },
+        {
+          "name": "ab-mh1-nvt-NaCl-r2",
+          "argv": [
+            "bash",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq",
+            "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq-launcher",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/6ec85b1/tools/ab_step_time.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/ab-mh1-nvt-NaCl-r2",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "fastmace",
+            "baseline",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "hybrid",
+            "--dump-forces",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/ab-mh1-nvt-NaCl-r2",
+          "timing": true,
+          "note": "rerun after 1a-T13b (mask_head reinstalled before each capture); FastMACE built first",
+          "idle_check": {
+            "utc": "2026-10-18T14:55:55.723058+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.9755859375,
+              0.3837890625,
+              0.18359375
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 2
+          },
+          "started_utc": "2026-10-18T14:55:55.726180+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:57:33.654813+00:00",
+          "wall_s": 97.92687211558223,
+          "status": "complete"
+        },
+        {
+          "name": "ab-mh1-cueq-nvt",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/6ec85b1/tools/ab_step_time.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/ab-mh1-cueq-nvt",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "baseline",
+            "fastmace",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "cueq",
+            "--dump-forces",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/ab-mh1-cueq-nvt",
+          "timing": true,
+          "note": "rerun after 1a-T13b (mask_head reinstalled before each capture); plain cuEq float64",
+          "idle_check": {
+            "utc": "2026-10-18T14:57:33.694525+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.01025390625,
+              0.568359375,
+              0.2724609375
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:57:33.695327+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:10:57.064750+00:00",
+          "wall_s": 803.3670269455761,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-18T15:10:57.066429+00:00"
+    },
+    {
+      "started_utc": "2026-10-18T15:12:51.645594+00:00",
+      "host": "murphy",
+      "machine": "murphy",
+      "suites": [
+        "alternating-cueq"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t19/f69859b",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "f69859bf4d54ff94edcb9738b21e1d648e4af37e",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "alt-mh1-cueq-nvt-p1-baseline",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/f69859b/tools/ab_step_time.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p1-baseline",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "baseline",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "cueq",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p1-baseline",
+          "timing": true,
+          "note": "alternating single-engine processes: the engines cannot share a process",
+          "idle_check": {
+            "utc": "2026-10-18T15:12:51.708323+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.224609375,
+              0.69287109375,
+              0.6533203125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T15:12:51.710931+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:19:45.262314+00:00",
+          "wall_s": 413.5488744825125,
+          "status": "complete"
+        },
+        {
+          "name": "alt-mh1-cueq-nvt-p1-fastmace",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/f69859b/tools/ab_step_time.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p1-fastmace",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "fastmace",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "cueq",
+            "--dump-forces"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p1-fastmace",
+          "timing": true,
+          "note": "alternating single-engine processes: the engines cannot share a process",
+          "idle_check": {
+            "utc": "2026-10-18T15:19:50.349340+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.919921875,
+              0.93212890625,
+              0.7998046875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 2
+          },
+          "started_utc": "2026-10-18T15:19:50.352432+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:26:44.793119+00:00",
+          "wall_s": 414.43868289142847,
+          "status": "complete"
+        },
+        {
+          "name": "alt-mh1-cueq-nvt-p2-fastmace",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/f69859b/tools/ab_step_time.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p2-fastmace",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "fastmace",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "cueq",
+            "--dump-forces"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p2-fastmace",
+          "timing": true,
+          "note": "alternating single-engine processes: the engines cannot share a process",
+          "idle_check": {
+            "utc": "2026-10-18T15:26:44.835419+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.0,
+              1.0,
+              0.890625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T15:26:44.836427+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:33:38.300602+00:00",
+          "wall_s": 413.46152829378843,
+          "status": "complete"
+        },
+        {
+          "name": "alt-mh1-cueq-nvt-p2-baseline",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/f69859b/tools/ab_step_time.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p2-baseline",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "baseline",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "cueq",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p2-baseline",
+          "timing": true,
+          "note": "alternating single-engine processes: the engines cannot share a process",
+          "idle_check": {
+            "utc": "2026-10-18T15:33:38.337945+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.23291015625,
+              1.0615234375,
+              0.96484375
+            ],
+            "users": [
+              "song     pts/0        2026-10-18 17:32 (132.180.234.233)"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T15:33:38.341030+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:40:31.773491+00:00",
+          "wall_s": 413.4301428627223,
+          "status": "complete"
+        },
+        {
+          "name": "alt-mh1-cueq-nvt-p3-baseline",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/f69859b/tools/ab_step_time.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p3-baseline",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "baseline",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "cueq",
+            "--baseline",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p3-baseline",
+          "timing": true,
+          "note": "alternating single-engine processes: the engines cannot share a process",
+          "idle_check": {
+            "utc": "2026-10-18T15:40:36.865090+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.919921875,
+              1.00341796875,
+              0.99462890625
+            ],
+            "users": [
+              "song     pts/0        2026-10-18 17:32 (132.180.234.233)"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 2
+          },
+          "started_utc": "2026-10-18T15:40:36.867933+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:47:30.565576+00:00",
+          "wall_s": 413.6941815968603,
+          "status": "complete"
+        },
+        {
+          "name": "alt-mh1-cueq-nvt-p3-fastmace",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-t19/f69859b/tools/ab_step_time.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p3-fastmace",
+            "--model",
+            "mh1-r2scan",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--structures",
+            "NaCl",
+            "--sides",
+            "fastmace",
+            "--warmup",
+            "300",
+            "--block",
+            "300",
+            "--blocks",
+            "12",
+            "--pattern",
+            "abab",
+            "--ensemble",
+            "nvt",
+            "--backend",
+            "cueq",
+            "--dump-forces"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p3-fastmace",
+          "timing": true,
+          "note": "alternating single-engine processes: the engines cannot share a process",
+          "idle_check": {
+            "utc": "2026-10-18T15:47:35.652583+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.919921875,
+              0.9833984375,
+              0.99462890625
+            ],
+            "users": [
+              "song     pts/0        2026-10-18 17:32 (132.180.234.233)"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 2
+          },
+          "started_utc": "2026-10-18T15:47:35.655737+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T15:54:29.151344+00:00",
+          "wall_s": 413.4930204562843,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-18T15:54:29.154746+00:00"
+    }
+  ]
+}

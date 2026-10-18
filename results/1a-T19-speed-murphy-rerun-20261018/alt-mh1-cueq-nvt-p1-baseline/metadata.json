@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "created_utc": "2026-10-18T15:12:54.812136+00:00",
+  "host": "murphy",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+  "fastmace_commit": "f69859bf4d54ff94edcb9738b21e1d648e4af37e",
+  "baseline": {
+    "root": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd"
+  },
+  "model": "mh1-r2scan",
+  "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "backend": "cueq",
+  "dtype": "float64",
+  "tf32": false,
+  "ensemble": "nvt",
+  "cell_mode": null,
+  "temperature_K": 300.0,
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "sides": [
+    "baseline"
+  ],
+  "side_kinds": {
+    "baseline": "baseline"
+  },
+  "build_order": [
+    "baseline"
+  ],
+  "oeq_runtime": null,
+  "hybrid_launcher": false,
+  "args": {
+    "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/alt-mh1-cueq-nvt-p1-baseline",
+    "baseline": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "sides": [
+      "baseline"
+    ],
+    "model": "mh1-r2scan",
+    "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+    "structures": [
+      "NaCl"
+    ],
+    "temperature_K": 300.0,
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12,
+    "pattern": "abab",
+    "seed": 1,
+    "backend": "cueq",
+    "ensemble": "nvt",
+    "cell_mode": "hydrostatic",
+    "dump_forces": false,
+    "main_args": ""
+  },
+  "compile_cache": {
+    "directory": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+    "shared": true,
+    "cuda_allocator": "expandable_segments:True",
+    "stats": {
+      "inductor.async_compile_cache_miss": 750,
+      "inductor.async_compile_cache_hit": 494,
+      "inductor.fxgraph_cache_hit": 3,
+      "aot_autograd.autograd_cache_miss": 1,
+      "aot_autograd.autograd_cache_hit": 1
+    }
+  },
+  "calculators": {
+    "baseline": {
+      "load_s": 6.231889931485057,
+      "auto_options_off": {
+        "species_skip": "no MACE-MP-0 or density-family interaction"
+      },
+      "flags": {
+        "factor_species": false,
+        "fold_cutoff": false,
+        "sort_receivers": false,
+        "density_first": false,
+        "reassociate_first": false,
+        "joint_radial_input": false,
+        "fused_folded_backward": false,
+        "segmented_first_sum": false,
+        "gpu_neighbour_list": true,
+        "block_linear": false,
+        "grouped_linear": false,
+        "merged_residual": false,
+        "species_skip": false,
+        "streaming_conv": false,
+        "fused_radial_hidden": false,
+        "speculative_graph": false,
+        "pipelined": true
+      }
+    }
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "structure": "NaCl",
+      "sides": {
+        "baseline": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T15:19:43.101819+00:00",
+          "median_ms": 96.89552979543805,
+          "mean_ms": 96.62049092507611,
+          "min_ms": 94.92665546635787,
+          "max_ms": 97.77754190688331,
+          "stdev_ms": 1.0340922934048884,
+          "spread": 0.029422270011259754,
+          "block_ms": [
+            94.92665546635787,
+            95.05222108835976,
+            95.05414265518387,
+            97.41554269567132,
+            96.50008258099358,
+            97.77754190688331,
+            97.57904993370175,
+            96.8679091706872,
+            97.02356828997533,
+            97.45811772222321,
+            96.89293724174301,
+            96.8981223491331
+          ],
+          "setup_s": 20.376522690057755,
+          "peak_memory_bytes": 895483904,
+          "observables": {
+            "temperature_K": 311.6264185444301,
+            "potential_eV_atom": -6.853655612666937,
+            "kinetic_eV_atom": 0.040280816856018996
+          },
+          "info": {
+            "edge_bucket": 512,
+            "edge_sizes_used": [
+              7168,
+              7680
+            ],
+            "neighbour_rebuilds": 155,
+            "pool_resets": 0,
+            "oeq": false,
+            "factored_interactions": 0,
+            "fold_cutoff": false,
+            "sort_receivers": false,
+            "density_first": false,
+            "reassociate_first": false,
+            "joint_radial_input": false,
+            "fused_folded_backward": false,
+            "segmented_first_sum": false,
+            "gpu_neighbour_list": true,
+            "block_linear": false,
+            "species_skip": false,
+            "generic_fused_radial_backward": false,
+            "streaming_conv": false,
+            "generic_reassociate": false,
+            "fused_radial_hidden": false,
+            "speculative_graph": false,
+            "polar_gpu": null,
+            "pipelined": true,
+            "pipelined_redos": 15,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 154,
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "peak_reserved_bytes": 895483904
+          }
+        }
+      },
+      "plans": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2"
+      },
+      "timing_wall_s": 347.8340647201985,
+      "warmup_s": {
+        "baseline": 33.769089894369245
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false,
+        "valid": true
+      },
+      "dynamo_counters": {
+        "stats": {
+          "calls_captured": 1678,
+          "unique_graphs": 2
+        }
+      },
+      "other_gpu_processes": []
+    }
+  },
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "finished_utc": "2026-10-18T15:19:43.137948+00:00"
+}

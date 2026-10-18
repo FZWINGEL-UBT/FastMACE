@@ -1,0 +1,189 @@
+{
+  "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018",
+  "speed": [
+    {
+      "job": "ab-mh1-cueq-nvt",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 96.95101109954217,
+      "fastmace_ms": 96.9430542550981,
+      "pair_ratio_min": 0.8405114450686249,
+      "pair_ratio_max": 1.0011873539218983,
+      "observables_difference": {
+        "temperature_K": 7.071321306284517e-11,
+        "potential_eV_atom": 2.4868995751603507e-14,
+        "kinetic_eV_atom": 9.145462165349727e-15
+      },
+      "valid": false,
+      "compile_changes": {
+        "aot_autograd.autograd_cache_hit": [
+          2,
+          3
+        ],
+        "aot_autograd.ok": [
+          3,
+          4
+        ],
+        "aot_autograd.total": [
+          3,
+          4
+        ],
+        "frames.ok": [
+          4,
+          5
+        ],
+        "frames.total": [
+          4,
+          5
+        ],
+        "inductor.async_compile_cache_hit": [
+          784,
+          1074
+        ],
+        "inductor.async_compile_cache_miss": [
+          1191,
+          1632
+        ],
+        "inductor.extern_calls": [
+          472,
+          648
+        ],
+        "inductor.fxgraph_cache_hit": [
+          5,
+          7
+        ],
+        "inductor.triton_bundler_load_static_autotuner": [
+          387,
+          530
+        ],
+        "stats.calls_captured": [
+          2517,
+          3356
+        ],
+        "stats.unique_graphs": [
+          3,
+          4
+        ]
+      },
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 0.9999179292267938,
+      "deviation": -8.207077320621092e-05,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": false
+    },
+    {
+      "job": "ab-mh1-nvt-NaCl-r1",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 3.5726027501126127,
+      "fastmace_ms": 3.57108143158257,
+      "pair_ratio_min": 0.9992084583359454,
+      "pair_ratio_max": 1.0049160042235896,
+      "observables_difference": {
+        "temperature_K": 1.1301564313725976e-05,
+        "potential_eV_atom": 1.1302806717239378e-06,
+        "kinetic_eV_atom": 1.4608396992077388e-09
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 0.9995741708114638,
+      "deviation": -0.00042582918853617535,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mh1-nvt-NaCl-r2",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "fastmace",
+        "baseline"
+      ],
+      "baseline_ms": 3.610804850856463,
+      "fastmace_ms": 3.592783324420452,
+      "pair_ratio_min": 0.9921763124741931,
+      "pair_ratio_max": 0.9989837771858238,
+      "observables_difference": {
+        "temperature_K": 3.971424428073078e-05,
+        "potential_eV_atom": 5.651403363060581e-07,
+        "kinetic_eV_atom": 5.13346143371507e-09
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "fastmace": "fastmace-unfused-full-addmm-v1",
+        "baseline": "langevin-unfused-full-addmm-v2"
+      },
+      "ratio": 0.9950090001591373,
+      "deviation": -0.004990999840862709,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    }
+  ],
+  "alternating": [
+    {
+      "job": "alt-mh1-cueq-nvt",
+      "structure": "NaCl",
+      "processes": {
+        "baseline": [
+          96.89552979543805,
+          96.90381736494601,
+          96.94274508704743
+        ],
+        "fastmace": [
+          96.82602941369016,
+          96.84304934926331,
+          96.87236160971224
+        ]
+      },
+      "baseline_ms": 96.90381736494601,
+      "fastmace_ms": 96.84304934926331,
+      "ratio": 0.9993729037995083,
+      "deviation": -0.000627096200491728,
+      "limit": 0.03,
+      "noise_floor": 0.00048723871662929836,
+      "criterion": 0.03,
+      "valid": true,
+      "passed": true
+    }
+  ],
+  "controls": [],
+  "forces": [],
+  "gate": [],
+  "passed": {
+    "speed": false,
+    "forces": null,
+    "gate": null,
+    "gate_labels": 0
+  }
+}
