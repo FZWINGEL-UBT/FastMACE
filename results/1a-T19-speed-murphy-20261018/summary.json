@@ -1,0 +1,1213 @@
+{
+  "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-20261018",
+  "speed": [
+    {
+      "job": "ab-mh1-cueq-nvt",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 96.98137721667686,
+      "fastmace_ms": 96.98011044102411,
+      "pair_ratio_min": 0.8036208526655572,
+      "pair_ratio_max": 1.0000319257009374,
+      "observables_difference": {
+        "temperature_K": 1.1647216524579562e-10,
+        "potential_eV_atom": 7.993605777301127e-15,
+        "kinetic_eV_atom": 1.5057399771478686e-14
+      },
+      "valid": false,
+      "compile_changes": {
+        "aot_autograd.autograd_cache_hit": [
+          0,
+          1
+        ],
+        "aot_autograd.autograd_cache_miss": [
+          3,
+          4
+        ],
+        "aot_autograd.autograd_cache_saved": [
+          2,
+          3
+        ],
+        "aot_autograd.ok": [
+          3,
+          5
+        ],
+        "aot_autograd.total": [
+          3,
+          5
+        ],
+        "frames.ok": [
+          4,
+          6
+        ],
+        "frames.total": [
+          4,
+          6
+        ],
+        "inductor.async_compile_cache_hit": [
+          397,
+          977
+        ],
+        "inductor.async_compile_cache_miss": [
+          794,
+          1676
+        ],
+        "inductor.decompose_mm": [
+          12,
+          16
+        ],
+        "inductor.extern_calls": [
+          472,
+          824
+        ],
+        "inductor.fxgraph_cache_hit": [
+          0,
+          4
+        ],
+        "inductor.pattern_matcher_count": [
+          3249,
+          4332
+        ],
+        "inductor.pattern_matcher_nodes": [
+          4008,
+          5344
+        ],
+        "inductor.triton_bundler_load_static_autotuner": [
+          0,
+          286
+        ],
+        "stats.calls_captured": [
+          2517,
+          4195
+        ],
+        "stats.unique_graphs": [
+          3,
+          5
+        ]
+      },
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 0.9999869379494383,
+      "deviation": -1.3062050561729599e-05,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": false
+    },
+    {
+      "job": "ab-mh1-npt",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "npt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 3.876700460289915,
+      "fastmace_ms": 3.8855093996971846,
+      "pair_ratio_min": 1.0016338756330299,
+      "pair_ratio_max": 1.0039536352339253,
+      "observables_difference": {
+        "temperature_K": 2.8523173284611403e-05,
+        "potential_eV_atom": 0.0,
+        "kinetic_eV_atom": 3.6869041014631065e-09
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 1.0022722775456865,
+      "deviation": 0.002272277545686485,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mh1-nvt-r1",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 3.560416419059038,
+      "fastmace_ms": 3.5618663672357798,
+      "pair_ratio_min": 0.9994543075796767,
+      "pair_ratio_max": 10.356911830383057,
+      "observables_difference": {
+        "temperature_K": 1.2963023607426294e-05,
+        "potential_eV_atom": 2.260561342559697e-06,
+        "kinetic_eV_atom": 1.6755998463735544e-09
+      },
+      "valid": false,
+      "compile_changes": {
+        "aot_autograd.autograd_cache_bypass": [
+          3,
+          4
+        ],
+        "aot_autograd.ok": [
+          5,
+          6
+        ],
+        "aot_autograd.total": [
+          5,
+          6
+        ],
+        "frames.ok": [
+          10,
+          11
+        ],
+        "frames.total": [
+          10,
+          11
+        ],
+        "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x76789ff4dcf0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+          5,
+          6
+        ],
+        "inductor.async_compile_cache_hit": [
+          586,
+          780
+        ],
+        "inductor.async_compile_cache_miss": [
+          888,
+          1182
+        ],
+        "inductor.decompose_mm": [
+          6,
+          8
+        ],
+        "inductor.extern_calls": [
+          327,
+          436
+        ],
+        "inductor.fxgraph_cache_hit": [
+          8,
+          10
+        ],
+        "inductor.pattern_matcher_count": [
+          507,
+          676
+        ],
+        "inductor.pattern_matcher_nodes": [
+          540,
+          720
+        ],
+        "inductor.removed_pointless_view_pair": [
+          6,
+          8
+        ],
+        "inductor.triton_bundler_load_static_autotuner": [
+          290,
+          386
+        ],
+        "stats.calls_captured": [
+          2012,
+          2682
+        ],
+        "stats.unique_graphs": [
+          5,
+          6
+        ]
+      },
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 1.0004072411780207,
+      "deviation": 0.0004072411780207119,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": false
+    },
+    {
+      "job": "ab-mh1-nvt-r1",
+      "structure": "NaNbO3",
+      "natoms": 1080,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 26.03054936354359,
+      "fastmace_ms": 26.02052642032504,
+      "pair_ratio_min": 0.9991518310604186,
+      "pair_ratio_max": 1.0024790344551668,
+      "observables_difference": {
+        "temperature_K": 3.607048455478434e-05,
+        "potential_eV_atom": 1.8084490740477577e-06,
+        "kinetic_eV_atom": 4.6624692162655634e-09
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 0.9996149546028181,
+      "deviation": -0.00038504539718187125,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mh1-nvt-r1",
+      "structure": "NbCl5",
+      "natoms": 1944,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 31.30459755038222,
+      "fastmace_ms": 31.314529860392213,
+      "pair_ratio_min": 0.9999900103769115,
+      "pair_ratio_max": 1.0031000333840192,
+      "observables_difference": {
+        "temperature_K": 6.533761620630685e-05,
+        "potential_eV_atom": 2.0093878600135895e-05,
+        "kinetic_eV_atom": 8.445537338919173e-09
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 1.0003172795942834,
+      "deviation": 0.0003172795942834039,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mh1-nvt-r2",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "fastmace",
+        "baseline"
+      ],
+      "baseline_ms": 3.6161570188899836,
+      "fastmace_ms": 3.608299757664402,
+      "pair_ratio_min": 0.9964198533238412,
+      "pair_ratio_max": 21.803411006796683,
+      "observables_difference": {
+        "temperature_K": 6.9569057359331055e-06,
+        "potential_eV_atom": 1.1302806717239378e-06,
+        "kinetic_eV_atom": 8.992493208404007e-10
+      },
+      "valid": false,
+      "compile_changes": {
+        "aot_autograd.autograd_cache_bypass": [
+          3,
+          4
+        ],
+        "aot_autograd.ok": [
+          5,
+          6
+        ],
+        "aot_autograd.total": [
+          5,
+          6
+        ],
+        "frames.ok": [
+          10,
+          11
+        ],
+        "frames.total": [
+          10,
+          11
+        ],
+        "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x718a4be55cf0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+          5,
+          6
+        ],
+        "inductor.async_compile_cache_hit": [
+          488,
+          586
+        ],
+        "inductor.async_compile_cache_miss": [
+          788,
+          984
+        ],
+        "inductor.benchmarking.InductorBenchmarker.benchmark": [
+          0,
+          50
+        ],
+        "inductor.benchmarking.InductorBenchmarker.benchmark_gpu": [
+          0,
+          50
+        ],
+        "inductor.decompose_mm": [
+          6,
+          8
+        ],
+        "inductor.extern_calls": [
+          327,
+          436
+        ],
+        "inductor.fxgraph_cache_miss": [
+          4,
+          6
+        ],
+        "inductor.pattern_matcher_count": [
+          507,
+          676
+        ],
+        "inductor.pattern_matcher_nodes": [
+          540,
+          720
+        ],
+        "inductor.removed_pointless_view_pair": [
+          6,
+          8
+        ],
+        "inductor.triton_bundler_save_kernel": [
+          800,
+          1840
+        ],
+        "inductor.triton_bundler_save_static_autotuner": [
+          4,
+          6
+        ],
+        "stats.calls_captured": [
+          2012,
+          2682
+        ],
+        "stats.unique_graphs": [
+          5,
+          6
+        ]
+      },
+      "custom_pass_uuids": {
+        "fastmace": "fastmace-unfused-full-addmm-v1",
+        "baseline": "langevin-unfused-full-addmm-v2"
+      },
+      "ratio": 0.9978271791892506,
+      "deviation": -0.002172820810749432,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": false
+    },
+    {
+      "job": "ab-mh1-nvt-r2",
+      "structure": "NaNbO3",
+      "natoms": 1080,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "fastmace",
+        "baseline"
+      ],
+      "baseline_ms": 26.08650370811423,
+      "fastmace_ms": 26.08137563802302,
+      "pair_ratio_min": 0.9975502229772935,
+      "pair_ratio_max": 1.000256254263752,
+      "observables_difference": {
+        "temperature_K": 0.00016248987606104492,
+        "potential_eV_atom": 3.6168981480955154e-06,
+        "kinetic_eV_atom": 2.100343408223404e-08
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "fastmace": "fastmace-unfused-full-addmm-v1",
+        "baseline": "langevin-unfused-full-addmm-v2"
+      },
+      "ratio": 0.9998034205676395,
+      "deviation": -0.00019657943236051079,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mh1-nvt-r2",
+      "structure": "NbCl5",
+      "natoms": 1944,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abab",
+      "build_order": [
+        "fastmace",
+        "baseline"
+      ],
+      "baseline_ms": 31.311872635657586,
+      "fastmace_ms": 31.312432664756972,
+      "pair_ratio_min": 0.9961667071913847,
+      "pair_ratio_max": 1.000446502579571,
+      "observables_difference": {
+        "temperature_K": 4.270185229415802e-06,
+        "potential_eV_atom": 1.607510288081926e-05,
+        "kinetic_eV_atom": 5.519639467710391e-10
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "fastmace": "fastmace-unfused-full-addmm-v1",
+        "baseline": "langevin-unfused-full-addmm-v2"
+      },
+      "ratio": 1.0000178855192055,
+      "deviation": 1.7885519205451672e-05,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mh1-nvt-r3",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abba",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 3.640234274789691,
+      "fastmace_ms": 3.640924170613289,
+      "pair_ratio_min": 0.995588196643041,
+      "pair_ratio_max": 1.0030265793961088,
+      "observables_difference": {
+        "temperature_K": 2.5366685576955206e-05,
+        "potential_eV_atom": 5.651403363060581e-07,
+        "kinetic_eV_atom": 3.2788966333741065e-09
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 1.0001895196219583,
+      "deviation": 0.00018951962195834504,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mh1-nvt-r3",
+      "structure": "NaNbO3",
+      "natoms": 1080,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abba",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 26.104547614231706,
+      "fastmace_ms": 26.096688167502485,
+      "pair_ratio_min": 0.9979004637837442,
+      "pair_ratio_max": 1.0017375266648365,
+      "observables_difference": {
+        "temperature_K": 0.000242510884334024,
+        "potential_eV_atom": 9.042245370238788e-07,
+        "kinetic_eV_atom": 3.134694601114596e-08
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 0.9996989242316946,
+      "deviation": -0.0003010757683054033,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mh1-nvt-r3",
+      "structure": "NbCl5",
+      "natoms": 1944,
+      "ensemble": "nvt",
+      "model": "mh1-r2scan",
+      "pattern": "abba",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 31.43510965319971,
+      "fastmace_ms": 31.443625505392745,
+      "pair_ratio_min": 0.9982049520525126,
+      "pair_ratio_max": 1.002506099517435,
+      "observables_difference": {
+        "temperature_K": 1.8682545032788767e-05,
+        "potential_eV_atom": 0.0,
+        "kinetic_eV_atom": 2.4149049288046953e-09
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 1.0002709025763543,
+      "deviation": 0.0002709025763543149,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mp0-medium-nvt",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "nvt",
+      "model": "mp0-medium",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 1.4877468782166638,
+      "fastmace_ms": 1.5084742785741887,
+      "pair_ratio_min": 0.9937508009593705,
+      "pair_ratio_max": 1.0148484335292984,
+      "observables_difference": {
+        "temperature_K": 3.0421587439377618e-05,
+        "potential_eV_atom": 0.0,
+        "kinetic_eV_atom": 3.93229302592113e-09
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 1.0139320745087836,
+      "deviation": 0.013932074508783643,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-mp0-medium-nvt",
+      "structure": "NbCl5",
+      "natoms": 1944,
+      "ensemble": "nvt",
+      "model": "mp0-medium",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 10.064817328626912,
+      "fastmace_ms": 10.230185349161427,
+      "pair_ratio_min": 1.0148730409501816,
+      "pair_ratio_max": 1.0236817716936963,
+      "observables_difference": {
+        "temperature_K": 4.0543865907238796e-05,
+        "potential_eV_atom": 1.5070408947437386e-06,
+        "kinetic_eV_atom": 5.240698285058354e-09
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 1.016430305204265,
+      "deviation": 0.016430305204264917,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-omol0-xl-nvt",
+      "structure": "NaCl",
+      "natoms": 216,
+      "ensemble": "nvt",
+      "model": "omol0-xl",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 14.636222729459405,
+      "fastmace_ms": 14.554845575864118,
+      "pair_ratio_min": 0.9929976161728493,
+      "pair_ratio_max": 0.9985001382517994,
+      "observables_difference": {
+        "temperature_K": NaN,
+        "potential_eV_atom": NaN,
+        "kinetic_eV_atom": NaN
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 0.994440016724295,
+      "deviation": -0.0055599832757049494,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    },
+    {
+      "job": "ab-omol0-xl-nvt",
+      "structure": "NbCl5",
+      "natoms": 1944,
+      "ensemble": "nvt",
+      "model": "omol0-xl",
+      "pattern": "abab",
+      "build_order": [
+        "baseline",
+        "fastmace"
+      ],
+      "baseline_ms": 161.75881037178138,
+      "fastmace_ms": 161.74424704474708,
+      "pair_ratio_min": 0.9995803195409831,
+      "pair_ratio_max": 1.0016223374046118,
+      "observables_difference": {
+        "temperature_K": 0.014821584772846563,
+        "potential_eV_atom": 0.0010288065841450589,
+        "kinetic_eV_atom": 1.915837381634422e-06
+      },
+      "valid": true,
+      "compile_changes": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ratio": 0.9999099688789698,
+      "deviation": -9.003112103023181e-05,
+      "limit": 0.03,
+      "noise_floor": 0.0016,
+      "criterion": 0.03,
+      "passed": true
+    }
+  ],
+  "alternating": [
+    {
+      "job": "alt-polar1-s-nvt",
+      "structure": "NaCl",
+      "processes": {
+        "baseline": [
+          3.9948860245446363,
+          4.0066580226024,
+          4.006160901238521
+        ],
+        "fastmace": [
+          4.0075055199364815,
+          4.006260698661208,
+          4.0076385376354065
+        ]
+      },
+      "baseline_ms": 4.006160901238521,
+      "fastmace_ms": 4.0075055199364815,
+      "ratio": 1.000335637716784,
+      "deviation": 0.00033563771678402077,
+      "limit": 0.03,
+      "noise_floor": 0.00293847360302582,
+      "criterion": 0.03,
+      "valid": true,
+      "passed": true
+    },
+    {
+      "job": "alt-polar1-s-nvt",
+      "structure": "NbCl5",
+      "processes": {
+        "baseline": [
+          31.558984462171793,
+          31.633315756917,
+          31.65027900288502
+        ],
+        "fastmace": [
+          31.625394880150758,
+          31.64316721881429,
+          31.652861827363573
+        ]
+      },
+      "baseline_ms": 31.633315756917,
+      "fastmace_ms": 31.64316721881429,
+      "ratio": 1.0003114267872832,
+      "deviation": 0.00031142678728324213,
+      "limit": 0.03,
+      "noise_floor": 0.002886025019152972,
+      "criterion": 0.03,
+      "valid": true,
+      "passed": true
+    }
+  ],
+  "controls": [
+    {
+      "job": "control-mh1-cueq-nvt-baseline",
+      "side": "baseline",
+      "model": "mh1-r2scan",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 6.328173337504268,
+      "setup_s": 20.79548292607069,
+      "peak_memory_bytes": 895483904,
+      "median_ms": 95.5045830986152
+    },
+    {
+      "job": "control-mh1-cueq-nvt-fastmace",
+      "side": "fastmace",
+      "model": "mh1-r2scan",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 6.228256681933999,
+      "setup_s": 41.25758123584092,
+      "peak_memory_bytes": 895483904,
+      "median_ms": 95.25529383681715
+    },
+    {
+      "job": "control-mh1-npt-baseline",
+      "side": "baseline",
+      "model": "mh1-r2scan",
+      "structure": "NaCl",
+      "ensemble": "npt",
+      "load_s": 4.491777818650007,
+      "setup_s": 27.599773870781064,
+      "peak_memory_bytes": 369098752,
+      "median_ms": 3.806716989104946
+    },
+    {
+      "job": "control-mh1-npt-fastmace",
+      "side": "fastmace",
+      "model": "mh1-r2scan",
+      "structure": "NaCl",
+      "ensemble": "npt",
+      "load_s": 23.433632535859942,
+      "setup_s": 31.524809101596475,
+      "peak_memory_bytes": 348127232,
+      "median_ms": 3.823000366489093
+    },
+    {
+      "job": "control-mh1-nvt-baseline",
+      "side": "baseline",
+      "model": "mh1-r2scan",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 23.798186322674155,
+      "setup_s": 27.31625376828015,
+      "peak_memory_bytes": 369098752,
+      "median_ms": 3.4921968790392084
+    },
+    {
+      "job": "control-mh1-nvt-baseline",
+      "side": "baseline",
+      "model": "mh1-r2scan",
+      "structure": "NaNbO3",
+      "ensemble": "nvt",
+      "load_s": 23.798186322674155,
+      "setup_s": 28.823328003287315,
+      "peak_memory_bytes": 1650458624,
+      "median_ms": 25.716567989438772
+    },
+    {
+      "job": "control-mh1-nvt-baseline",
+      "side": "baseline",
+      "model": "mh1-r2scan",
+      "structure": "NbCl5",
+      "ensemble": "nvt",
+      "load_s": 23.798186322674155,
+      "setup_s": 28.488344011828303,
+      "peak_memory_bytes": 1411383296,
+      "median_ms": 30.934066362679005
+    },
+    {
+      "job": "control-mh1-nvt-fastmace",
+      "side": "fastmace",
+      "model": "mh1-r2scan",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 23.976488472893834,
+      "setup_s": 45.246242294088006,
+      "peak_memory_bytes": 348127232,
+      "median_ms": 3.5190275156249604
+    },
+    {
+      "job": "control-mh1-nvt-fastmace",
+      "side": "fastmace",
+      "model": "mh1-r2scan",
+      "structure": "NaNbO3",
+      "ensemble": "nvt",
+      "load_s": 23.976488472893834,
+      "setup_s": 42.46415649726987,
+      "peak_memory_bytes": 1629487104,
+      "median_ms": 25.832381518557668
+    },
+    {
+      "job": "control-mh1-nvt-fastmace",
+      "side": "fastmace",
+      "model": "mh1-r2scan",
+      "structure": "NbCl5",
+      "ensemble": "nvt",
+      "load_s": 23.976488472893834,
+      "setup_s": 36.90278437919915,
+      "peak_memory_bytes": 1411383296,
+      "median_ms": 30.989026517296832
+    },
+    {
+      "job": "control-mp0-medium-nvt-baseline",
+      "side": "baseline",
+      "model": "mp0-medium",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 23.645858880132437,
+      "setup_s": 20.78487885557115,
+      "peak_memory_bytes": 272629760,
+      "median_ms": 1.452526869252324
+    },
+    {
+      "job": "control-mp0-medium-nvt-baseline",
+      "side": "baseline",
+      "model": "mp0-medium",
+      "structure": "NbCl5",
+      "ensemble": "nvt",
+      "load_s": 23.645858880132437,
+      "setup_s": 19.236016273498535,
+      "peak_memory_bytes": 1033895936,
+      "median_ms": 9.879987590635817
+    },
+    {
+      "job": "control-mp0-medium-nvt-fastmace",
+      "side": "fastmace",
+      "model": "mp0-medium",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 22.75229286029935,
+      "setup_s": 29.08071287162602,
+      "peak_memory_bytes": 249561088,
+      "median_ms": 1.4688922402759395
+    },
+    {
+      "job": "control-mp0-medium-nvt-fastmace",
+      "side": "fastmace",
+      "model": "mp0-medium",
+      "structure": "NbCl5",
+      "ensemble": "nvt",
+      "load_s": 22.75229286029935,
+      "setup_s": 24.11921752989292,
+      "peak_memory_bytes": 1012924416,
+      "median_ms": 10.114688190321129
+    },
+    {
+      "job": "control-omol0-xl-nvt-baseline",
+      "side": "baseline",
+      "model": "omol0-xl",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 22.201248506084085,
+      "setup_s": 35.99176592938602,
+      "peak_memory_bytes": 1449132032,
+      "median_ms": 14.450274854898453
+    },
+    {
+      "job": "control-omol0-xl-nvt-baseline",
+      "side": "baseline",
+      "model": "omol0-xl",
+      "structure": "NbCl5",
+      "ensemble": "nvt",
+      "load_s": 22.201248506084085,
+      "setup_s": 36.8459787722677,
+      "peak_memory_bytes": 5024776192,
+      "median_ms": 162.64282561528185
+    },
+    {
+      "job": "control-omol0-xl-nvt-fastmace",
+      "side": "fastmace",
+      "model": "omol0-xl",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 21.96591119468212,
+      "setup_s": 68.55991888418794,
+      "peak_memory_bytes": 1367343104,
+      "median_ms": 14.323250300561389
+    },
+    {
+      "job": "control-omol0-xl-nvt-fastmace",
+      "side": "fastmace",
+      "model": "omol0-xl",
+      "structure": "NbCl5",
+      "ensemble": "nvt",
+      "load_s": 21.96591119468212,
+      "setup_s": 58.991407841444016,
+      "peak_memory_bytes": 5003804672,
+      "median_ms": 161.70961435884237
+    },
+    {
+      "job": "control-polar1-s-nvt-baseline",
+      "side": "baseline",
+      "model": "polar1-s",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 23.241812909021974,
+      "setup_s": 25.085903830826283,
+      "peak_memory_bytes": 285212672,
+      "median_ms": 3.9519149530678983
+    },
+    {
+      "job": "control-polar1-s-nvt-baseline",
+      "side": "baseline",
+      "model": "polar1-s",
+      "structure": "NbCl5",
+      "ensemble": "nvt",
+      "load_s": 23.241812909021974,
+      "setup_s": 48.02879807539284,
+      "peak_memory_bytes": 887095296,
+      "median_ms": 31.422389155874647
+    },
+    {
+      "job": "control-polar1-s-nvt-fastmace",
+      "side": "fastmace",
+      "model": "polar1-s",
+      "structure": "NaCl",
+      "ensemble": "nvt",
+      "load_s": 23.21866694279015,
+      "setup_s": 50.89123206958175,
+      "peak_memory_bytes": 270532608,
+      "median_ms": 3.9479107533891997
+    },
+    {
+      "job": "control-polar1-s-nvt-fastmace",
+      "side": "fastmace",
+      "model": "polar1-s",
+      "structure": "NbCl5",
+      "ensemble": "nvt",
+      "load_s": 23.21866694279015,
+      "setup_s": 47.948546674102545,
+      "peak_memory_bytes": 874512384,
+      "median_ms": 31.454187793036304
+    }
+  ],
+  "forces": [
+    {
+      "job": "ab-mh1-cueq-nvt",
+      "control": "control-mh1-cueq-nvt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 6.999134411023675e-16,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-npt",
+      "control": "control-mh1-npt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 6.248685622267658e-07,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-nvt-r1",
+      "control": "control-mh1-nvt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 2.8050271794199944e-07,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-nvt-r1",
+      "control": "control-mh1-nvt-fastmace",
+      "structure": "NaNbO3",
+      "max_abs": 2.4437904357910156e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-nvt-r1",
+      "control": "control-mh1-nvt-fastmace",
+      "structure": "NbCl5",
+      "max_abs": 1.7881393432617188e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-nvt-r2",
+      "control": "control-mh1-nvt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 3.114480477961479e-07,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-nvt-r2",
+      "control": "control-mh1-nvt-fastmace",
+      "structure": "NaNbO3",
+      "max_abs": 2.0712614059448242e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-nvt-r2",
+      "control": "control-mh1-nvt-fastmace",
+      "structure": "NbCl5",
+      "max_abs": 1.5497207641601562e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-nvt-r3",
+      "control": "control-mh1-nvt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 2.590101075838902e-07,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-nvt-r3",
+      "control": "control-mh1-nvt-fastmace",
+      "structure": "NaNbO3",
+      "max_abs": 2.5033950805664062e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mh1-nvt-r3",
+      "control": "control-mh1-nvt-fastmace",
+      "structure": "NbCl5",
+      "max_abs": 1.7881393432617188e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mp0-medium-nvt",
+      "control": "control-mp0-medium-nvt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 3.574930360628059e-07,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-mp0-medium-nvt",
+      "control": "control-mp0-medium-nvt-fastmace",
+      "structure": "NbCl5",
+      "max_abs": 1.7285346984863281e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-omol0-xl-nvt",
+      "control": "control-omol0-xl-nvt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 9.061885066330433e-05,
+      "bitwise": false,
+      "passed": false,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "ab-omol0-xl-nvt",
+      "control": "control-omol0-xl-nvt-fastmace",
+      "structure": "NbCl5",
+      "max_abs": 0.00016487421817146242,
+      "bitwise": false,
+      "passed": false,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "alt-polar1-s-nvt-p1-fastmace",
+      "control": "control-polar1-s-nvt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 1.6231564075042115e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "alt-polar1-s-nvt-p1-fastmace",
+      "control": "control-polar1-s-nvt-fastmace",
+      "structure": "NbCl5",
+      "max_abs": 5.050096660852432e-07,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "alt-polar1-s-nvt-p2-fastmace",
+      "control": "control-polar1-s-nvt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 2.021908642291237e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "alt-polar1-s-nvt-p2-fastmace",
+      "control": "control-polar1-s-nvt-fastmace",
+      "structure": "NbCl5",
+      "max_abs": 4.172325134277344e-07,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "alt-polar1-s-nvt-p3-fastmace",
+      "control": "control-polar1-s-nvt-fastmace",
+      "structure": "NaCl",
+      "max_abs": 1.6199728349874931e-06,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    },
+    {
+      "job": "alt-polar1-s-nvt-p3-fastmace",
+      "control": "control-polar1-s-nvt-fastmace",
+      "structure": "NbCl5",
+      "max_abs": 3.707828000187874e-07,
+      "bitwise": false,
+      "passed": true,
+      "tolerance": 1e-05
+    }
+  ],
+  "gate": [],
+  "passed": {
+    "speed": false,
+    "forces": false,
+    "gate": null,
+    "gate_labels": 0
+  }
+}

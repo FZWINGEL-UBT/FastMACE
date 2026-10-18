@@ -1,0 +1,1242 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "created_utc": "2026-10-18T11:33:31.284995+00:00",
+  "host": "murphy",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "5de02c53fbfbaac7cd94b4f43750bb38d92eef04",
+  "baseline": {
+    "root": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd"
+  },
+  "model": "mh1-r2scan",
+  "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "tf32": false,
+  "ensemble": "nvt",
+  "cell_mode": null,
+  "temperature_K": 300.0,
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "sides": [
+    "baseline",
+    "fastmace"
+  ],
+  "side_kinds": {
+    "baseline": "baseline",
+    "fastmace": "fastmace"
+  },
+  "build_order": [
+    "baseline",
+    "fastmace"
+  ],
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:CXX', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "hybrid_launcher": true,
+  "args": {
+    "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-20261018/ab-mh1-nvt-r1",
+    "baseline": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "sides": [
+      "baseline",
+      "fastmace"
+    ],
+    "model": "mh1-r2scan",
+    "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+    "structures": [
+      "NaCl",
+      "NaNbO3",
+      "NbCl5"
+    ],
+    "temperature_K": 300.0,
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12,
+    "pattern": "abab",
+    "seed": 1,
+    "backend": "hybrid",
+    "ensemble": "nvt",
+    "cell_mode": "hydrostatic",
+    "dump_forces": true,
+    "main_args": ""
+  },
+  "compile_cache": {
+    "directory": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq-launcher/mace",
+    "shared": true,
+    "cuda_allocator": "expandable_segments:True",
+    "stats": {
+      "inductor.async_compile_cache_miss": 2000,
+      "inductor.async_compile_cache_hit": 1190,
+      "inductor.fxgraph_cache_hit": 12,
+      "inductor.fxgraph_cache_miss": 8,
+      "aot_autograd.autograd_cache_bypass": 8,
+      "aot_autograd.autograd_cache_hit": 4
+    }
+  },
+  "calculators": {
+    "baseline": {
+      "load_s": 23.866759669035673,
+      "auto_options_off": {
+        "species_skip": "no MACE-MP-0 or density-family interaction"
+      },
+      "flags": {
+        "factor_species": true,
+        "fold_cutoff": true,
+        "sort_receivers": true,
+        "density_first": true,
+        "reassociate_first": true,
+        "joint_radial_input": true,
+        "fused_folded_backward": true,
+        "segmented_first_sum": true,
+        "gpu_neighbour_list": true,
+        "block_linear": true,
+        "grouped_linear": true,
+        "merged_residual": true,
+        "streaming_conv": true,
+        "fused_radial_hidden": false,
+        "pipelined": true
+      }
+    },
+    "fastmace": {
+      "load_s": 0.6838166769593954,
+      "backend": "hybrid",
+      "dtype": "float32",
+      "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47"
+    }
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "structure": "NaCl",
+      "sides": {
+        "baseline": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T11:35:15.761039+00:00",
+          "median_ms": 3.560416419059038,
+          "mean_ms": 3.5365331969741316,
+          "min_ms": 3.4228629246354103,
+          "max_ms": 3.670934345573187,
+          "stdev_ms": 0.07241080100285487,
+          "spread": 0.0696748334295509,
+          "block_ms": [
+            3.4228629246354103,
+            3.4324034365514913,
+            3.4430986146132154,
+            3.670934345573187,
+            3.51159755140543,
+            3.563565208266179,
+            3.5641905541221304,
+            3.547474450121323,
+            3.5572676298518973,
+            3.5773504028717675,
+            3.57237392415603,
+            3.5752793215215206
+          ],
+          "setup_s": 16.958819407969713,
+          "peak_memory_bytes": 668991488,
+          "observables": {
+            "temperature_K": 311.6264154114087,
+            "potential_eV_atom": -6.853661431206597,
+            "kinetic_eV_atom": 0.04028081645104478
+          },
+          "info": {
+            "edge_bucket": 512,
+            "edge_sizes_used": [
+              7168,
+              7680
+            ],
+            "neighbour_rebuilds": 155,
+            "pool_resets": 0,
+            "oeq": true,
+            "factored_interactions": 2,
+            "fold_cutoff": true,
+            "sort_receivers": true,
+            "density_first": true,
+            "reassociate_first": true,
+            "joint_radial_input": true,
+            "fused_folded_backward": true,
+            "segmented_first_sum": true,
+            "gpu_neighbour_list": true,
+            "block_linear": true,
+            "species_skip": false,
+            "generic_fused_radial_backward": false,
+            "streaming_conv": true,
+            "generic_reassociate": false,
+            "fused_radial_hidden": false,
+            "speculative_graph": false,
+            "polar_gpu": null,
+            "pipelined": true,
+            "pipelined_redos": 15,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 154,
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "peak_reserved_bytes": 668991488
+          }
+        },
+        "fastmace": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T11:35:15.761175+00:00",
+          "median_ms": 3.5618663672357798,
+          "mean_ms": 6.402391996234655,
+          "min_ms": 3.432285475234191,
+          "max_ms": 38.01954335222642,
+          "stdev_ms": 9.956978260745279,
+          "spread": 9.71043108049952,
+          "block_ms": [
+            3.432285475234191,
+            3.4414041973650455,
+            3.4496422732869783,
+            38.01954335222642,
+            3.5151232406497,
+            3.568064092348019,
+            3.5652300901710987,
+            3.5484455650051436,
+            3.558502644300461,
+            3.5853507990638414,
+            3.5717839064697423,
+            3.5733283186952276
+          ],
+          "setup_s": 13.813976937904954,
+          "peak_memory_bytes": 668991488,
+          "observables": {
+            "temperature_K": 311.6264283744323,
+            "potential_eV_atom": -6.853659170645255,
+            "kinetic_eV_atom": 0.04028081812664463
+          },
+          "info": {
+            "engine": "graph",
+            "mode": "pipelined",
+            "capture": true,
+            "pad_edges": true,
+            "variable_cell": false,
+            "initial_edges": 6912,
+            "edge_bucket": 512,
+            "edge_sizes_used": [
+              7168,
+              7680
+            ],
+            "neighbour_rebuilds": 154,
+            "graphs": [
+              "ACP",
+              "('B', 7168)",
+              "('B', 7680)"
+            ],
+            "pool_resets": 0,
+            "capture_memory": [
+              {
+                "key": "ACP",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 588.0,
+                "max_reserved_after_capture_MiB": 588.0
+              },
+              {
+                "key": "('B', 7168)",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 600.0,
+                "max_reserved_after_capture_MiB": 638.0
+              },
+              {
+                "key": "('B', 7680)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 638.0,
+                "max_reserved_after_capture_MiB": 638.0
+              }
+            ],
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "pipelined_redos": 15,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 154,
+            "process": {
+              "allocator": "expandable_segments:True",
+              "dynamo_cache_size_limit": 64,
+              "compile_family": "oeq"
+            },
+            "force_field": {
+              "backend": "hybrid",
+              "dtype": "float32",
+              "device": "cuda:0",
+              "compile_mode": "default",
+              "training": false,
+              "compute_stress": false,
+              "padding_exact": true,
+              "rewrites": [
+                "factor_species",
+                "fold_cutoff",
+                "density_first",
+                "joint_radial_input",
+                "fused_folded_backward",
+                "streaming_conv",
+                "reassociate_first",
+                "segmented_first_sum",
+                "block_linear",
+                "grouped_linear",
+                "merged_residual",
+                "single_graph_strain"
+              ],
+              "decisions": {
+                "factor_species": "on",
+                "fold_cutoff": "on",
+                "density_first": "on",
+                "joint_radial_input": "on",
+                "fused_folded_backward": "on",
+                "fused_radial_hidden": "off",
+                "streaming_conv": "on",
+                "reassociate_first": "on",
+                "segmented_first_sum": "on",
+                "generic_species_skip": "off",
+                "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+                "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+                "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+                "block_linear": "on",
+                "grouped_linear": "on",
+                "merged_residual": "on",
+                "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+                "single_graph_strain": "on"
+              },
+              "selfchecks": {
+                "factor_species": 8.788595262572173e-07,
+                "fold_cutoff": 6.737922245080379e-07,
+                "density_first": 6.665433271709953e-07,
+                "joint_radial_input": 6.665433271709953e-07,
+                "fused_folded_backward": 7.534837611498209e-07,
+                "streaming_conv": 7.169226503328892e-07,
+                "reassociate_first": 3.2605050029551043e-06,
+                "segmented_first_sum": 3.332960186703735e-06,
+                "block_linear": 6.039514733043886e-07,
+                "grouped_linear": 6.039514733043886e-07,
+                "merged_residual": 2.7917198334199386e-07,
+                "single_graph_strain": 0.0
+              },
+              "streaming_interactions": 2,
+              "sort_receivers": true,
+              "gpu_neighbour_list": true,
+              "neighbour_rebuilds": 155,
+              "edge_capacity": 14080,
+              "candidates": 10076,
+              "species_columns": [
+                10,
+                16
+              ],
+              "charge": null,
+              "spin_multiplicity": null,
+              "dynamo_reset": false,
+              "polar": null
+            }
+          }
+        }
+      },
+      "plans": {
+        "fastmace": "Plan revision 0, tier graph: fixed plan of phase 1a (main.py)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid': graph engine)\n  PrecisionConfig.dtype = float32  (auto (float32_for_hybrid_float64_for_cueq): hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=hybrid"
+      },
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ab": {
+        "names": [
+          "baseline",
+          "fastmace"
+        ],
+        "pattern": "abab",
+        "order": [
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace"
+        ],
+        "sides": {
+          "baseline": {
+            "median_ms": 3.560416419059038,
+            "mean_ms": 3.5365331969741316,
+            "min_ms": 3.4228629246354103,
+            "max_ms": 3.670934345573187,
+            "stdev_ms": 0.07241080100285487,
+            "spread": 0.0696748334295509,
+            "block_ms": [
+              3.4228629246354103,
+              3.4324034365514913,
+              3.4430986146132154,
+              3.670934345573187,
+              3.51159755140543,
+              3.563565208266179,
+              3.5641905541221304,
+              3.547474450121323,
+              3.5572676298518973,
+              3.5773504028717675,
+              3.57237392415603,
+              3.5752793215215206
+            ]
+          },
+          "fastmace": {
+            "median_ms": 3.5618663672357798,
+            "mean_ms": 6.402391996234655,
+            "min_ms": 3.432285475234191,
+            "max_ms": 38.01954335222642,
+            "stdev_ms": 9.956978260745279,
+            "spread": 9.71043108049952,
+            "block_ms": [
+              3.432285475234191,
+              3.4414041973650455,
+              3.4496422732869783,
+              38.01954335222642,
+              3.5151232406497,
+              3.568064092348019,
+              3.5652300901710987,
+              3.5484455650051436,
+              3.558502644300461,
+              3.5853507990638414,
+              3.5717839064697423,
+              3.5733283186952276
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0004072411780207,
+        "pair_ratios_b_over_a": [
+          1.0027528273279551,
+          1.0026222910505524,
+          1.0019005144511373,
+          10.356911830383057,
+          1.0010040129008688,
+          1.001262467169509,
+          1.0002916611873531,
+          1.0002737482390571,
+          1.0003471806389261,
+          1.002236402725786,
+          0.9998348387658139,
+          0.9994543075796767
+        ]
+      },
+      "timing_wall_s": 35.78689565882087,
+      "warmup_s": {
+        "baseline": 12.197471000254154,
+        "fastmace": 1.0862052198499441
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            3,
+            4
+          ],
+          "aot_autograd.ok": [
+            5,
+            6
+          ],
+          "aot_autograd.total": [
+            5,
+            6
+          ],
+          "frames.ok": [
+            10,
+            11
+          ],
+          "frames.total": [
+            10,
+            11
+          ],
+          "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x76789ff4dcf0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+            5,
+            6
+          ],
+          "inductor.async_compile_cache_hit": [
+            586,
+            780
+          ],
+          "inductor.async_compile_cache_miss": [
+            888,
+            1182
+          ],
+          "inductor.decompose_mm": [
+            6,
+            8
+          ],
+          "inductor.extern_calls": [
+            327,
+            436
+          ],
+          "inductor.fxgraph_cache_hit": [
+            8,
+            10
+          ],
+          "inductor.pattern_matcher_count": [
+            507,
+            676
+          ],
+          "inductor.pattern_matcher_nodes": [
+            540,
+            720
+          ],
+          "inductor.removed_pointless_view_pair": [
+            6,
+            8
+          ],
+          "inductor.triton_bundler_load_static_autotuner": [
+            290,
+            386
+          ],
+          "stats.calls_captured": [
+            2012,
+            2682
+          ],
+          "stats.unique_graphs": [
+            5,
+            6
+          ]
+        },
+        "recompiled": true,
+        "valid": false
+      },
+      "observables_difference": {
+        "temperature_K": 1.2963023607426294e-05,
+        "potential_eV_atom": 2.260561342559697e-06,
+        "kinetic_eV_atom": 1.6755998463735544e-09
+      },
+      "dynamo_counters": {
+        "stats": {
+          "calls_captured": 2682,
+          "unique_graphs": 6
+        }
+      },
+      "other_gpu_processes": []
+    },
+    "NaNbO3": {
+      "natoms": 1080,
+      "structure": "NaNbO3",
+      "sides": {
+        "baseline": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T11:39:44.637350+00:00",
+          "median_ms": 26.03054936354359,
+          "mean_ms": 25.989252261610492,
+          "min_ms": 25.661764138688643,
+          "max_ms": 26.13303417339921,
+          "stdev_ms": 0.141129167135978,
+          "spread": 0.018104498223560063,
+          "block_ms": [
+            25.661764138688643,
+            25.807800038407244,
+            25.89024847994248,
+            25.95876927177111,
+            25.991755096862715,
+            26.020520174254973,
+            26.040578552832205,
+            26.059550860275824,
+            26.08364576473832,
+            26.105906516313553,
+            26.11745407183965,
+            26.13303417339921
+          ],
+          "setup_s": 38.028449604287744,
+          "peak_memory_bytes": 3206545408,
+          "observables": {
+            "temperature_K": 290.3959285335525,
+            "potential_eV_atom": -11.839579716435185,
+            "kinetic_eV_atom": 0.037536564671348145
+          },
+          "info": {
+            "edge_bucket": 4352,
+            "edge_sizes_used": [
+              87040
+            ],
+            "neighbour_rebuilds": 207,
+            "pool_resets": 0,
+            "oeq": true,
+            "factored_interactions": 2,
+            "fold_cutoff": true,
+            "sort_receivers": true,
+            "density_first": true,
+            "reassociate_first": true,
+            "joint_radial_input": true,
+            "fused_folded_backward": true,
+            "segmented_first_sum": true,
+            "gpu_neighbour_list": true,
+            "block_linear": true,
+            "species_skip": false,
+            "generic_fused_radial_backward": false,
+            "streaming_conv": true,
+            "generic_reassociate": false,
+            "fused_radial_hidden": false,
+            "speculative_graph": false,
+            "polar_gpu": null,
+            "pipelined": true,
+            "pipelined_redos": 0,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 206,
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "peak_reserved_bytes": 3206545408
+          }
+        },
+        "fastmace": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T11:39:44.637502+00:00",
+          "median_ms": 26.02052642032504,
+          "mean_ms": 25.987156310325698,
+          "min_ms": 25.725380536168814,
+          "max_ms": 26.11400474483768,
+          "stdev_ms": 0.1203159214508486,
+          "spread": 0.014935293867279523,
+          "block_ms": [
+            25.725380536168814,
+            25.815989704181753,
+            25.903890797247488,
+            25.954447084416945,
+            25.9795553671817,
+            26.014949555198353,
+            26.02610328545173,
+            26.043667389700808,
+            26.07734580213825,
+            26.0837642972668,
+            26.106777160118025,
+            26.11400474483768
+          ],
+          "setup_s": 27.995187375694513,
+          "peak_memory_bytes": 3206545408,
+          "observables": {
+            "temperature_K": 290.39596460403703,
+            "potential_eV_atom": -11.839577907986111,
+            "kinetic_eV_atom": 0.03753656933381736
+          },
+          "info": {
+            "engine": "graph",
+            "mode": "pipelined",
+            "capture": true,
+            "pad_edges": true,
+            "variable_cell": false,
+            "initial_edges": 83808,
+            "edge_bucket": 4352,
+            "edge_sizes_used": [
+              87040
+            ],
+            "neighbour_rebuilds": 206,
+            "graphs": [
+              "ACP",
+              "('B', 87040)"
+            ],
+            "pool_resets": 0,
+            "capture_memory": [
+              {
+                "key": "ACP",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 2978.0,
+                "max_reserved_after_capture_MiB": 2978.0
+              },
+              {
+                "key": "('B', 87040)",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 3058.0,
+                "max_reserved_after_capture_MiB": 3058.0
+              }
+            ],
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "pipelined_redos": 0,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 206,
+            "process": {
+              "allocator": "expandable_segments:True",
+              "dynamo_cache_size_limit": 64,
+              "compile_family": "oeq"
+            },
+            "force_field": {
+              "backend": "hybrid",
+              "dtype": "float32",
+              "device": "cuda:0",
+              "compile_mode": "default",
+              "training": false,
+              "compute_stress": false,
+              "padding_exact": true,
+              "rewrites": [
+                "factor_species",
+                "fold_cutoff",
+                "density_first",
+                "joint_radial_input",
+                "fused_folded_backward",
+                "streaming_conv",
+                "reassociate_first",
+                "segmented_first_sum",
+                "block_linear",
+                "grouped_linear",
+                "merged_residual",
+                "single_graph_strain"
+              ],
+              "decisions": {
+                "factor_species": "on",
+                "fold_cutoff": "on",
+                "density_first": "on",
+                "joint_radial_input": "on",
+                "fused_folded_backward": "on",
+                "fused_radial_hidden": "off",
+                "streaming_conv": "on",
+                "reassociate_first": "on",
+                "segmented_first_sum": "on",
+                "generic_species_skip": "off",
+                "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+                "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+                "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+                "block_linear": "on",
+                "grouped_linear": "on",
+                "merged_residual": "on",
+                "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+                "single_graph_strain": "on"
+              },
+              "selfchecks": {
+                "factor_species": 5.158210334852675e-07,
+                "fold_cutoff": 6.2352458495086e-07,
+                "density_first": 5.981716850962313e-07,
+                "joint_radial_input": 8.023883662857041e-07,
+                "fused_folded_backward": 9.170151706404755e-07,
+                "streaming_conv": 9.737143854226388e-07,
+                "reassociate_first": 1.209700782239657e-06,
+                "segmented_first_sum": 8.594389711312301e-07,
+                "block_linear": 6.039514733043886e-07,
+                "grouped_linear": 6.039514733043886e-07,
+                "merged_residual": 2.7917198334199386e-07,
+                "single_graph_strain": 0.0
+              },
+              "streaming_interactions": 2,
+              "sort_receivers": true,
+              "gpu_neighbour_list": true,
+              "neighbour_rebuilds": 207,
+              "edge_capacity": 104448,
+              "candidates": 91518,
+              "species_columns": [
+                7,
+                10,
+                40
+              ],
+              "charge": null,
+              "spin_multiplicity": null,
+              "dynamo_reset": false,
+              "polar": null
+            }
+          }
+        }
+      },
+      "plans": {
+        "fastmace": "Plan revision 0, tier graph: fixed plan of phase 1a (main.py)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (1080 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid': graph engine)\n  PrecisionConfig.dtype = float32  (auto (float32_for_hybrid_float64_for_cueq): hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=hybrid"
+      },
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ab": {
+        "names": [
+          "baseline",
+          "fastmace"
+        ],
+        "pattern": "abab",
+        "order": [
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace"
+        ],
+        "sides": {
+          "baseline": {
+            "median_ms": 26.03054936354359,
+            "mean_ms": 25.989252261610492,
+            "min_ms": 25.661764138688643,
+            "max_ms": 26.13303417339921,
+            "stdev_ms": 0.141129167135978,
+            "spread": 0.018104498223560063,
+            "block_ms": [
+              25.661764138688643,
+              25.807800038407244,
+              25.89024847994248,
+              25.95876927177111,
+              25.991755096862715,
+              26.020520174254973,
+              26.040578552832205,
+              26.059550860275824,
+              26.08364576473832,
+              26.105906516313553,
+              26.11745407183965,
+              26.13303417339921
+            ]
+          },
+          "fastmace": {
+            "median_ms": 26.02052642032504,
+            "mean_ms": 25.987156310325698,
+            "min_ms": 25.725380536168814,
+            "max_ms": 26.11400474483768,
+            "stdev_ms": 0.1203159214508486,
+            "spread": 0.014935293867279523,
+            "block_ms": [
+              25.725380536168814,
+              25.815989704181753,
+              25.903890797247488,
+              25.954447084416945,
+              25.9795553671817,
+              26.014949555198353,
+              26.02610328545173,
+              26.043667389700808,
+              26.07734580213825,
+              26.0837642972668,
+              26.106777160118025,
+              26.11400474483768
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9996149546028181,
+        "pair_ratios_b_over_a": [
+          1.0024790344551668,
+          1.0003173329676425,
+          1.000526928790026,
+          0.9998334979864062,
+          0.9995306307852028,
+          0.9997859143852884,
+          0.99944412650621,
+          0.999390493310488,
+          0.9997584707806227,
+          0.9991518310604186,
+          0.9995911963052656,
+          0.9992718247550106
+        ]
+      },
+      "timing_wall_s": 187.12298901192844,
+      "warmup_s": {
+        "baseline": 7.840141011402011,
+        "fastmace": 7.836908923462033
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false,
+        "valid": true
+      },
+      "observables_difference": {
+        "temperature_K": 3.607048455478434e-05,
+        "potential_eV_atom": 1.8084490740477577e-06,
+        "kinetic_eV_atom": 4.6624692162655634e-09
+      },
+      "dynamo_counters": {
+        "stats": {
+          "calls_captured": 4034,
+          "unique_graphs": 10
+        }
+      },
+      "other_gpu_processes": []
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "structure": "NbCl5",
+      "sides": {
+        "baseline": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T11:44:45.977750+00:00",
+          "median_ms": 31.30459755038222,
+          "mean_ms": 31.22583947247929,
+          "min_ms": 30.419689988096557,
+          "max_ms": 31.686325296759605,
+          "stdev_ms": 0.36742980997841496,
+          "spread": 0.04046163847417303,
+          "block_ms": [
+            30.419689988096557,
+            30.56286545470357,
+            31.686325296759605,
+            31.23942355935772,
+            31.276317592710253,
+            31.298081719626982,
+            31.304164597143732,
+            31.305030503620706,
+            31.309556451936558,
+            31.319105979055163,
+            31.5328047486643,
+            31.456707778076332
+          ],
+          "setup_s": 28.65688182413578,
+          "peak_memory_bytes": 2782920704,
+          "observables": {
+            "temperature_K": 295.49835770962005,
+            "potential_eV_atom": -10.586982381687243,
+            "kinetic_eV_atom": 0.03819610443733459
+          },
+          "info": {
+            "edge_bucket": 2560,
+            "edge_sizes_used": [
+              51200,
+              53760,
+              56320
+            ],
+            "neighbour_rebuilds": 150,
+            "pool_resets": 0,
+            "oeq": true,
+            "factored_interactions": 2,
+            "fold_cutoff": true,
+            "sort_receivers": true,
+            "density_first": true,
+            "reassociate_first": true,
+            "joint_radial_input": true,
+            "fused_folded_backward": true,
+            "segmented_first_sum": true,
+            "gpu_neighbour_list": true,
+            "block_linear": true,
+            "species_skip": false,
+            "generic_fused_radial_backward": false,
+            "streaming_conv": true,
+            "generic_reassociate": false,
+            "fused_radial_hidden": false,
+            "speculative_graph": false,
+            "polar_gpu": null,
+            "pipelined": true,
+            "pipelined_redos": 3,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 149,
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "peak_reserved_bytes": 2782920704
+          }
+        },
+        "fastmace": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T11:44:45.977905+00:00",
+          "median_ms": 31.314529860392213,
+          "mean_ms": 31.24681533003847,
+          "min_ms": 30.513992042591173,
+          "max_ms": 31.708607698480286,
+          "stdev_ms": 0.34238762489861196,
+          "spread": 0.03814892515439317,
+          "block_ms": [
+            30.513992042591173,
+            30.628983676433563,
+            31.708607698480286,
+            31.254148613661528,
+            31.28591393431028,
+            31.300533705701433,
+            31.316205418358244,
+            31.314334173997246,
+            31.31472554678718,
+            31.321965120732784,
+            31.545980491985876,
+            31.456393537422024
+          ],
+          "setup_s": 28.799353785812855,
+          "peak_memory_bytes": 2782920704,
+          "observables": {
+            "temperature_K": 295.49842304723626,
+            "potential_eV_atom": -10.586962287808642,
+            "kinetic_eV_atom": 0.038196112882871926
+          },
+          "info": {
+            "engine": "graph",
+            "mode": "pipelined",
+            "capture": true,
+            "pad_edges": true,
+            "variable_cell": false,
+            "initial_edges": 51084,
+            "edge_bucket": 2560,
+            "edge_sizes_used": [
+              51200,
+              53760,
+              56320
+            ],
+            "neighbour_rebuilds": 149,
+            "graphs": [
+              "ACP",
+              "('B', 51200)",
+              "('B', 53760)",
+              "('B', 56320)"
+            ],
+            "pool_resets": 0,
+            "capture_memory": [
+              {
+                "key": "ACP",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 2638.0,
+                "max_reserved_after_capture_MiB": 2638.0
+              },
+              {
+                "key": "('B', 51200)",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 2638.0,
+                "max_reserved_after_capture_MiB": 2638.0
+              },
+              {
+                "key": "('B', 53760)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 2638.0,
+                "max_reserved_after_capture_MiB": 2638.0
+              },
+              {
+                "key": "('B', 56320)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 2654.0,
+                "max_reserved_after_capture_MiB": 2654.0
+              }
+            ],
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "pipelined_redos": 3,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 149,
+            "process": {
+              "allocator": "expandable_segments:True",
+              "dynamo_cache_size_limit": 64,
+              "compile_family": "oeq"
+            },
+            "force_field": {
+              "backend": "hybrid",
+              "dtype": "float32",
+              "device": "cuda:0",
+              "compile_mode": "default",
+              "training": false,
+              "compute_stress": false,
+              "padding_exact": true,
+              "rewrites": [
+                "factor_species",
+                "fold_cutoff",
+                "density_first",
+                "joint_radial_input",
+                "fused_folded_backward",
+                "streaming_conv",
+                "reassociate_first",
+                "segmented_first_sum",
+                "block_linear",
+                "grouped_linear",
+                "merged_residual",
+                "single_graph_strain"
+              ],
+              "decisions": {
+                "factor_species": "on",
+                "fold_cutoff": "on",
+                "density_first": "on",
+                "joint_radial_input": "on",
+                "fused_folded_backward": "on",
+                "fused_radial_hidden": "off",
+                "streaming_conv": "on",
+                "reassociate_first": "on",
+                "segmented_first_sum": "on",
+                "generic_species_skip": "off",
+                "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+                "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+                "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+                "block_linear": "on",
+                "grouped_linear": "on",
+                "merged_residual": "on",
+                "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+                "single_graph_strain": "on"
+              },
+              "selfchecks": {
+                "factor_species": 7.498593076474026e-07,
+                "fold_cutoff": 8.293866377755755e-07,
+                "density_first": 1.0663542485685973e-06,
+                "joint_radial_input": 9.407705742016719e-07,
+                "fused_folded_backward": 1.6587734720889444e-06,
+                "streaming_conv": 2.014224930393718e-06,
+                "reassociate_first": 1.4081296959868103e-06,
+                "segmented_first_sum": 1.4081296959868103e-06,
+                "block_linear": 6.039514733043886e-07,
+                "grouped_linear": 6.039514733043886e-07,
+                "merged_residual": 2.7917198334199386e-07,
+                "single_graph_strain": 0.0
+              },
+              "streaming_interactions": 2,
+              "sort_receivers": true,
+              "gpu_neighbour_list": true,
+              "neighbour_rebuilds": 150,
+              "edge_capacity": 76032,
+              "candidates": 67842,
+              "species_columns": [
+                16,
+                40
+              ],
+              "charge": null,
+              "spin_multiplicity": null,
+              "dynamo_reset": false,
+              "polar": null
+            }
+          }
+        }
+      },
+      "plans": {
+        "fastmace": "Plan revision 0, tier graph: fixed plan of phase 1a (main.py)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (1944 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid': graph engine)\n  PrecisionConfig.dtype = float32  (auto (float32_for_hybrid_float64_for_cueq): hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=hybrid"
+      },
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ab": {
+        "names": [
+          "baseline",
+          "fastmace"
+        ],
+        "pattern": "abab",
+        "order": [
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace"
+        ],
+        "sides": {
+          "baseline": {
+            "median_ms": 31.30459755038222,
+            "mean_ms": 31.22583947247929,
+            "min_ms": 30.419689988096557,
+            "max_ms": 31.686325296759605,
+            "stdev_ms": 0.36742980997841496,
+            "spread": 0.04046163847417303,
+            "block_ms": [
+              30.419689988096557,
+              30.56286545470357,
+              31.686325296759605,
+              31.23942355935772,
+              31.276317592710253,
+              31.298081719626982,
+              31.304164597143732,
+              31.305030503620706,
+              31.309556451936558,
+              31.319105979055163,
+              31.5328047486643,
+              31.456707778076332
+            ]
+          },
+          "fastmace": {
+            "median_ms": 31.314529860392213,
+            "mean_ms": 31.24681533003847,
+            "min_ms": 30.513992042591173,
+            "max_ms": 31.708607698480286,
+            "stdev_ms": 0.34238762489861196,
+            "spread": 0.03814892515439317,
+            "block_ms": [
+              30.513992042591173,
+              30.628983676433563,
+              31.708607698480286,
+              31.254148613661528,
+              31.28591393431028,
+              31.300533705701433,
+              31.316205418358244,
+              31.314334173997246,
+              31.31472554678718,
+              31.321965120732784,
+              31.545980491985876,
+              31.456393537422024
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0003172795942834,
+        "pair_ratios_b_over_a": [
+          1.0031000333840192,
+          1.002163351529587,
+          1.0007032182341118,
+          1.0004713612681049,
+          1.0003068245349402,
+          1.0000783430146427,
+          1.0003846395957046,
+          1.0002971941003367,
+          1.0001650963934465,
+          1.0000912906543225,
+          1.0004178424160677,
+          0.9999900103769115
+        ]
+      },
+      "timing_wall_s": 224.90974659472704,
+      "warmup_s": {
+        "baseline": 9.46188560500741,
+        "fastmace": 9.40384279191494
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false,
+        "valid": true
+      },
+      "observables_difference": {
+        "temperature_K": 6.533761620630685e-05,
+        "potential_eV_atom": 2.0093878600135895e-05,
+        "kinetic_eV_atom": 8.445537338919173e-09
+      },
+      "dynamo_counters": {
+        "stats": {
+          "calls_captured": 5386,
+          "unique_graphs": 12
+        }
+      },
+      "other_gpu_processes": []
+    }
+  },
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_patches": [
+    "PatchRecord(name='oeq_runtime', value='/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:CXX', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+    "PatchRecord(name='capture_safe_mask_head', value=True, targets=('mace.modules.blocks:mask_head',), detail='multi-head readout mask without indexed assignment (CUDA graph capture)')",
+    "PatchRecord(name='unfuse_full_addmm', value=True, targets=('torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm', 'torch._inductor.config:post_grad_custom_pre_pass'), detail='mm + full-matrix add unfused on the GPU; cache key fastmace-unfused-full-addmm-v1')",
+    "PatchRecord(name='single_graph_strain', value=True, targets=('mace.modules.utils:get_symmetric_displacement', 'mace.modules.models:get_symmetric_displacement'), detail='MACE PR 1498: one-graph strain without per-edge cell gathers')"
+  ],
+  "finished_utc": "2026-10-18T11:44:46.053676+00:00"
+}

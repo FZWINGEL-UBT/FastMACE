@@ -11,8 +11,8 @@ runs. The owner then decides at checkpoint 3 whether `main.py` switches to
 
 | Acceptance item (plans/phase-1a.md) | Criterion | Result |
 | --- | --- | --- |
-| 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | workstation (murphy): … ; RTX 5060 Ti: **deferred: owner reserved the local GPU (18 October 2026)** |
-| 1. Setup time and peak memory | reported, not judged | … |
+| 1. Speed | steady-state MD step time within 3 % of the frozen baseline, or within the noise floor if that is larger (both reported); same-process A/B; RTX 5060 Ti and one workstation | murphy: **passes** for every valid case (MH-1 within 0.03 %, NPT 0.23 %, MP-0 medium 1.4–1.6 % slower, POLAR-1-S 0.03 %, OMOL-0 XL NbCl5 0.01 %); MH-1 NaCl hybrid and cuEq to be confirmed after the 1a-T13b fix: … ; RTX 5060 Ti: **deferred: owner reserved the local GPU (18 October 2026)** |
+| 1. Setup time and peak memory | reported, not judged | murphy: FastMACE's setup 4–33 s longer (self-checks), peak memory equal or lower |
 | 2. Accuracy | today's force/stress gate for all 19 labels | … |
 | 3. Compatibility | `main.py --engine fastmace`: smoke, `--profile anneal` on NaCl and `--quench` on its output, statistically equal to the baseline | … |
 | 4. Rules | layering test; no `gpu_langevin`-style globals; no `oeq_no_nvcc.sh` for FastMACE | … |
@@ -67,9 +67,57 @@ was not skipped for any other reason. The table below is filled then.
 | ab-polar1-s-nvt | polar1-s | NVT | NaCl / NbCl5 | | … | … | … | … | | … |
 | ab-omol0-xl-nvt | omol0-xl | NVT | NaCl / NbCl5 | | … | … | … | … | | … |
 
-### Workstation (murphy or leto)
+### Workstation: murphy
 
-Same table.
+Run `1a-T19-speed-murphy-20261018`, murphy, NVIDIA RTX 4000 Ada Generation 20 GB, driver 595.58.03,
+NAS `mace_cueq_oeq` (hybrid processes) and `mace_cueq_latest` (plain cuEq), 18 October 2026,
+11:33–15:10 UTC. FastMACE checkouts `5de02c5` (r1), `b084660` (r2, r3, NPT), `2f88d25`/`4791ec7`
+(the rest): the library code is the same in all of them, only the tools changed. Baseline
+`d2faa9fd`. Data: `results/1a-T19-speed-murphy-20261018/` (`summary.json` and every job's
+`metadata.json`). Murphy was otherwise idle for every timed job (idle check in `manifest.json`).
+
+| Job | Model | Ensemble | Structure | Atoms | Baseline (ms) | FastMACE (ms) | FastMACE/baseline | Pair ratios | Valid | Pass (±3 %) |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- | --- |
+| ab-mh1-nvt-r1 (ABAB, baseline first) | mh1-r2scan | NVT | NaCl | 216 | 3.560 | 3.562 | 1.0004 | 0.9995–10.36 | **no**: compiled while timed (`mask_head`) | – |
+| | | | NaNbO3 | 1080 | 26.031 | 26.021 | 0.9996 | 0.9992–1.0025 | yes | yes |
+| | | | NbCl5 | 1944 | 31.305 | 31.315 | 1.0003 | 1.0000–1.0031 | yes | yes |
+| ab-mh1-nvt-r2 (ABAB, FastMACE first) | mh1-r2scan | NVT | NaCl | 216 | 3.616 | 3.608 | 0.9978 | 0.9964–21.80 | **no**: compiled while timed (`mask_head`) | – |
+| | | | NaNbO3 | 1080 | 26.087 | 26.081 | 0.9998 | 0.9976–1.0003 | yes | yes |
+| | | | NbCl5 | 1944 | 31.312 | 31.312 | 1.0000 | 0.9962–1.0004 | yes | yes |
+| ab-mh1-nvt-r3 (ABBA, baseline first) | mh1-r2scan | NVT | NaCl | 216 | 3.640 | 3.641 | 1.0002 | 0.9956–1.0030 | yes | yes |
+| | | | NaNbO3 | 1080 | 26.105 | 26.097 | 0.9997 | 0.9979–1.0017 | yes | yes |
+| | | | NbCl5 | 1944 | 31.435 | 31.444 | 1.0003 | 0.9982–1.0025 | yes | yes |
+| ab-mh1-npt | mh1-r2scan | NPT, hydrostatic | NaCl | 216 | 3.877 | 3.886 | 1.0023 | 1.0016–1.0040 | yes | yes |
+| ab-mp0-medium-nvt | mp0-medium | NVT | NaCl | 216 | 1.488 | 1.508 | 1.0139 | 0.9938–1.0148 | yes | yes |
+| | | | NbCl5 | 1944 | 10.065 | 10.230 | 1.0164 | 1.0149–1.0237 | yes | yes |
+| ab-omol0-xl-nvt | omol0-xl | NVT | NaCl | 216 | 14.636 | 14.555 | 0.9944 | 0.9930–0.9985 | model-limited: both trajectories reach NaN | – |
+| | | | NbCl5 | 1944 | 161.759 | 161.744 | 0.9999 | 0.9996–1.0016 | yes | yes |
+| ab-mh1-cueq-nvt (plain cuEq float64) | mh1-r2scan | NVT | NaCl | 216 | 96.981 | 96.980 | 1.0000 | 0.8036–1.0000 | **no**: one compile per side while timed | – |
+
+POLAR-1-S, alternating single-engine processes (the engines cannot share a process, see below),
+12 blocks each, order baseline, FastMACE, FastMACE, baseline, baseline, FastMACE. The ratio is the
+median of FastMACE's process medians over the baseline's. Its noise floor is the larger relative
+spread of the per-process medians (0.29 %), so the criterion stays 3 %:
+
+| Model | Structure | Baseline medians (ms) | FastMACE medians (ms) | FastMACE/baseline | Noise floor | Valid | Pass |
+| --- | --- | --- | --- | ---: | ---: | --- | --- |
+| polar1-s | NaCl | 3.995, 4.007, 4.006 | 4.008, 4.006, 4.008 | 1.0003 | 0.29 % | yes | yes |
+| polar1-s | NbCl5 | 31.559, 31.633, 31.650 | 31.625, 31.643, 31.653 | 1.0003 | 0.29 % | yes | yes |
+
+Reading:
+- **MH-1, the primary set, is at parity.** Every valid ratio lies within 0.03 % of 1 (NaNbO3
+  0.9996–0.9998, NbCl5 1.0000–1.0003, NaCl 1.0002). That is inside the 0.16 % noise floor of
+  1a-T18, in both build orders and both patterns. NPT: 1.0023.
+- **MP-0 medium is 1.4–1.6 % slower** (pair ratios 0.994–1.024). That passes the 3 % criterion but
+  is ten times the noise floor, so it is a real difference for the screens after T19.
+- **OMOL-0 XL on NaCl is model-limited.** Both engines' trajectories fall apart (edge counts down
+  to 512, NaN temperature), in line with ResearchModule's screen (P = −20.7 GPa for unstrained
+  NaCl). The timing of a broken trajectory says nothing about the engines.
+- **Plain cuEq float64** gives 1.0000 but is invalid: each side compiled once while timed
+  (`stats.unique_graphs` 3 → 5), probably the same `mask_head` interaction. Its rerun belongs with
+  the post-fix NaCl rerun.
+- **Still open:** the MH-1 hybrid NaCl NVT A/B and the plain cuEq NaCl A/B, rerun on murphy with
+  1a-T13b's `mask_head` fix, after it merges: …
 
 ### The two engines clash on Inductor's custom-pass slot
 
@@ -101,9 +149,18 @@ keeps what the side left there:
 - Because the second engine's key differs from a production run's, the
   build order is swapped in one repeat per crystal (`ab-mh1-nvt-r2`).
 
-| Job | Structure | Keys (baseline / FastMACE) | Counters changed while timed | Valid |
+In every A/B process each side kept its own key: baseline "langevin-unfused-full-addmm-v2",
+FastMACE "fastmace-unfused-full-addmm-v1" (`custom_pass_uuids`). Counters changed while timed only in
+these runs:
+
+| Job | Structure | Counters changed while timed | Cause | Valid |
 | --- | --- | --- | --- | --- |
-| … | … | … | … | … |
+| ab-mh1-nvt-r1 | NaCl | `unique_graphs` 5 → 6, `frames.ok` 10 → 11 | FastMACE recompile at the first new bucket (`mask_head`, below) | no |
+| ab-mh1-nvt-r2 | NaCl | `unique_graphs` 5 → 6, `frames.ok` 10 → 11 | same | no |
+| ab-mh1-cueq-nvt | NaCl | `unique_graphs` 3 → 5, `frames.ok` 4 → 6 | one compile per side at the first new bucket | no |
+
+Everything else, including NbCl5's two bucket changes (51200 → 53760 → 56320) in every run, compiled
+nothing while timed.
 
 ### Other same-process interactions found during the runs
 
@@ -147,22 +204,45 @@ keeps what the side left there:
 
 ### Interference checks in the A/B processes
 
-- **Same trajectory.** Final temperature and potential energy of the two
-  sides, and their rebuild counts and edge sizes: …
+- **Same trajectory.** After 300 + 12 × 300 steps the two sides' temperatures differ by at most
+  2.4e-4 K (MH-1; MP-0 4.1e-5 K) and their potential energies by at most 2.0e-5 eV/atom. That is the
+  FP32 divergence of a chaotic trajectory, the same size as in 1a-T18's baseline-against-baseline
+  runs. Plain cuEq float64: 1.2e-10 K and 8e-15 eV/atom. Both sides used the same edge sizes. The
+  research engine counts one more neighbour rebuild in every run (155 against 154 on NaCl, 207
+  against 206 on NaNbO3), so its count apparently includes the initial build. OMOL-0 XL NbCl5
+  diverges more (1.5e-2 K, 1.0e-3 eV/atom); its forces scatter 100 times more between processes
+  (next item).
 - **FastMACE's forces in an A/B process against a FastMACE-only process**
   (decision after wave 1b; both engines patch MACE process-wide). These are
   the starting forces of the engine's initial evaluation, the same
   structure in both processes. Tolerance 1e-5 eV/Å (the gate's force
   floor):
 
-  | A/B job | Control | Structure | Max \|ΔF\| (eV/Å) | Bitwise | Pass |
-  | --- | --- | --- | ---: | --- | --- |
-  | … | … | … | … | … | … |
+  | A/B job | Structure | Max \|ΔF\| against the FastMACE-only control (eV/Å) | Pass |
+  | --- | --- | ---: | --- |
+  | ab-mh1-nvt-r1 / r2 / r3 | NaCl | 2.8e-7 / 3.1e-7 / 2.6e-7 | yes |
+  | | NaNbO3 | 2.4e-6 / 2.1e-6 / 2.5e-6 | yes |
+  | | NbCl5 | 1.8e-6 / 1.5e-6 / 1.8e-6 | yes |
+  | ab-mh1-npt | NaCl | 6.2e-7 | yes |
+  | ab-mp0-medium-nvt | NaCl / NbCl5 | 3.6e-7 / 1.7e-6 | yes |
+  | ab-mh1-cueq-nvt (float64) | NaCl | 7.0e-16 | yes |
+  | alt-polar1-s p1 / p2 / p3 (FastMACE-only processes) | NaCl | 1.6e-6 / 2.0e-6 / 1.6e-6 | yes |
+  | | NbCl5 | 5.1e-7 / 4.2e-7 / 3.7e-7 | yes |
+  | ab-omol0-xl-nvt | NaCl / NbCl5 | 9.1e-5 / 1.6e-4 | above 1e-5, but within OMOL-0 XL's process scatter |
+
+  For OMOL-0 XL a second FastMACE-only process (`scatter-omol0-xl-fastmace-2`) differs from the
+  first by 1.2e-4 (NaCl) and 1.8e-4 eV/Å (NbCl5). That is as much as the A/B process differs from
+  either (0.8–2.0e-4). So this is FP32 process-to-process scatter of the 1024-channel model (its
+  reassociation self-check is already 7e-5 relative), not interference. No process changed
+  FastMACE's starting forces beyond what a second FastMACE-only process does.
 
 - **FastMACE's plan in the A/B process** equals the plan of the
   FastMACE-only process (`plans` in `metadata.json`; the rewrite set must
-  not change because the research engine patched MACE first): …
-- **Dynamo counters and other GPU processes:** …
+  not change because the research engine patched MACE first): equal in every pair checked,
+  including OMOL-0 XL. The rewrite lists and FastMACE's process patches (`oeq_runtime`,
+  `capture_safe_mask_head`, `unfuse_full_addmm`, `single_graph_strain`) are identical too.
+- **Dynamo counters and other GPU processes:** the counters are in the table above. No other
+  compute process was on the GPU after any structure (`other_gpu_processes` empty in every job).
 
 ## Setup time and peak memory
 
@@ -174,10 +254,34 @@ the warm-up). Peak memory = `torch.cuda.max_memory_reserved()` per
 structure, after warm-up and timing. FastMACE-only processes run without
 the hybrid launcher.
 
-| Machine | Job | Engine | Model | Structure | Load (s) | Setup (s) | Peak memory (GiB) | Step (ms) |
-| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: |
-| … | control-mh1-nvt-baseline | baseline | mh1-r2scan | NaCl | … | … | … | … |
-| … | control-mh1-nvt-fastmace | fastmace | mh1-r2scan | NaCl | … | … | … | … |
+murphy, run `1a-T19-speed-murphy-20261018`. Step times from single processes are a cross-check
+only (cross-process scatter); the A/B tables above carry the speed verdict.
+
+| Model | Structure | Load (s) baseline / FastMACE | Setup (s) baseline / FastMACE | Peak memory (GiB) baseline / FastMACE | Step (ms) baseline / FastMACE |
+| --- | --- | --- | --- | --- | --- |
+| mh1-r2scan NVT | NaCl | 23.8 / 24.0 | 27.3 / 45.2 | 0.34 / 0.32 | 3.492 / 3.519 |
+| | NaNbO3 | | 28.8 / 42.5 | 1.54 / 1.52 | 25.717 / 25.832 |
+| | NbCl5 | | 28.5 / 36.9 | 1.31 / 1.31 | 30.934 / 30.989 |
+| mh1-r2scan NPT | NaCl | 4.5 / 23.4 | 27.6 / 31.5 | 0.34 / 0.32 | 3.807 / 3.823 |
+| mp0-medium | NaCl | 23.6 / 22.8 | 20.8 / 29.1 | 0.25 / 0.23 | 1.453 / 1.469 |
+| | NbCl5 | | 19.2 / 24.1 | 0.96 / 0.94 | 9.880 / 10.115 |
+| polar1-s | NaCl | 23.2 / 23.2 | 25.1 / 50.9 | 0.27 / 0.25 | 3.952 / 3.948 |
+| | NbCl5 | | 48.0 / 47.9 | 0.83 / 0.81 | 31.422 / 31.454 |
+| omol0-xl | NaCl | 22.2 / 22.0 | 36.0 / 68.6 | 1.35 / 1.27 | 14.450 / 14.323 |
+| | NbCl5 | | 36.8 / 59.0 | 4.68 / 4.66 | 162.643 / 161.710 |
+| mh1-r2scan cuEq float64 | NaCl | 6.3 / 6.2 | 20.8 / 41.3 | 0.83 / 0.83 | 95.505 / 95.255 |
+
+- Load: checkpoint and conversion. The baseline's MH-1 NPT load (4.5 s) hit the warm OEq extension
+  of the same process type; the research engine records its OEq JIT in load, FastMACE in its
+  in-process runtime.
+- Setup: FastMACE's force-field construction runs the per-rewrite self-checks of SPEC §6.4, the
+  research engine has none. It takes 4–33 s longer, most for the MH-1 package and the large models.
+- Peak memory: equal or lower for FastMACE in every case (up to −0.08 GiB).
+- No FastMACE-only process compiled while timed, NaCl's 7168 → 7680 transition included. That
+  confirms 1a-T13b's diagnosis.
+- `hybrid_launcher` in these processes' `metadata.json` reads true because the flag was read after
+  FastMACE's in-process OEq runtime had set the same variables (fixed in `d7773c6`). Their
+  commands in `manifest.json` show no launcher.
 
 ## 2. Accuracy: force/stress gate, 19 labels
 

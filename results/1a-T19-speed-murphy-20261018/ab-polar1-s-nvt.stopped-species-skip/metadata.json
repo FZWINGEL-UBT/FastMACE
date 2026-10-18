@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "status": "running",
+  "created_utc": "2026-10-18T12:14:28.067850+00:00",
+  "host": "murphy",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "b08466089e70ae1fadc3014bcc7fb1a59e1702bd",
+  "baseline": {
+    "root": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd"
+  },
+  "model": "polar1-s",
+  "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+  "checkpoint_sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "tf32": false,
+  "ensemble": "nvt",
+  "cell_mode": null,
+  "temperature_K": 300.0,
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "sides": [
+    "baseline",
+    "fastmace"
+  ],
+  "side_kinds": {
+    "baseline": "baseline",
+    "fastmace": "fastmace"
+  },
+  "build_order": [
+    "baseline",
+    "fastmace"
+  ],
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:CXX', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "hybrid_launcher": true,
+  "args": {
+    "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-20261018/ab-polar1-s-nvt",
+    "baseline": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "sides": [
+      "baseline",
+      "fastmace"
+    ],
+    "model": "polar1-s",
+    "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model",
+    "structures": [
+      "NaCl",
+      "NbCl5"
+    ],
+    "temperature_K": 300.0,
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12,
+    "pattern": "abab",
+    "seed": 1,
+    "backend": "hybrid",
+    "ensemble": "nvt",
+    "cell_mode": "hydrostatic",
+    "dump_forces": true,
+    "main_args": ""
+  },
+  "compile_cache": {
+    "directory": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq-launcher/mace",
+    "shared": true,
+    "cuda_allocator": "expandable_segments:True"
+  },
+  "calculators": {
+    "baseline": {
+      "load_s": 22.92585800588131,
+      "auto_options_off": {
+        "species_skip": "no MACE-MP-0 or density-family interaction"
+      },
+      "flags": {
+        "factor_species": true,
+        "fold_cutoff": true,
+        "sort_receivers": true,
+        "density_first": true,
+        "reassociate_first": true,
+        "joint_radial_input": true,
+        "fused_folded_backward": true,
+        "segmented_first_sum": true,
+        "gpu_neighbour_list": true,
+        "block_linear": true,
+        "grouped_linear": true,
+        "merged_residual": true,
+        "streaming_conv": true,
+        "fused_radial_hidden": false,
+        "pipelined": true
+      }
+    },
+    "fastmace": {
+      "load_s": 1.0471358485519886,
+      "backend": "hybrid",
+      "dtype": "float32",
+      "sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510"
+    }
+  },
+  "structures": {},
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130"
+}
