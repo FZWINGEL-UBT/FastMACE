@@ -1,0 +1,148 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-18T14:21:23.375098+00:00",
+      "host": "leto",
+      "machine": "leto",
+      "suites": [
+        "workflow"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-workflow-leto-20261018",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/FastMACE",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-workflow-leto-20261018/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-workflow-leto-20261018/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-workflow-leto-20261018/tmp"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "43ce026ef45c14977e33e84d88382c7ddbf2548a",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "main-smoke-NaNbO3-gpu",
+          "argv": [
+            "bash",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq",
+            "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/oeq-launcher",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/ResearchModule/Experiments/Langevin_Thermostat/main.py",
+            "--engine",
+            "gpu",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-workflow-leto-20261018/main-smoke-NaNbO3-gpu",
+            "--structures",
+            "NaNbO3",
+            "--heat-ps",
+            "0.5",
+            "--cool-ps",
+            "0.5",
+            "--peak-K",
+            "400"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-workflow-leto-20261018/main-smoke-NaNbO3-gpu",
+          "timing": false,
+          "note": "",
+          "idle_check": {
+            "utc": "2026-10-18T14:21:23.436439+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.1640625,
+              0.78271484375,
+              1.087890625
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:21:23.439901+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:23:54.351940+00:00",
+          "wall_s": 150.90971669740975,
+          "status": "complete"
+        },
+        {
+          "name": "main-smoke-NaNbO3-fastmace",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/ResearchModule/Experiments/Langevin_Thermostat/main.py",
+            "--engine",
+            "fastmace",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-workflow-leto-20261018/main-smoke-NaNbO3-fastmace",
+            "--structures",
+            "NaNbO3",
+            "--heat-ps",
+            "0.5",
+            "--cool-ps",
+            "0.5",
+            "--peak-K",
+            "400"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-workflow-leto-20261018/main-smoke-NaNbO3-fastmace",
+          "timing": false,
+          "note": "",
+          "idle_check": {
+            "utc": "2026-10-18T14:23:54.390831+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.42333984375,
+              1.15966796875,
+              1.18310546875
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-18T14:23:54.391587+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-18T14:26:28.112928+00:00",
+          "wall_s": 153.7195461485535,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-18T14:26:28.114291+00:00"
+    }
+  ]
+}

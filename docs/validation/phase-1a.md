@@ -425,8 +425,23 @@ which uses the measures of ResearchModule's `studies/annealing/README.md`.
 The full 270 ps anneal through FastMACE was not run. The conductor decision
 after T17 leaves it to checkpoint 3, if the owner asks for it.
 
-**Workstation half:** one `main.py --engine fastmace` smoke run on leto,
-after the gate, with the NAS FastMACE copy and its `.source_commit`: …
+**Workstation half: leto,** run `1a-T19-workflow-leto-20261018`, 18 October 2026, 14:21–14:27 UTC.
+`main.py` smoke on NaNbO3 3×3×3 (0.5 ps to 400 K and 0.5 ps back, 2000 steps, MH-1 hybrid FP32) from
+ResearchModule's NAS tree at `fb81217b`, once with `--engine gpu` through the hybrid launcher and once with
+`--engine fastmace` without it. FastMACE came from the NAS copy `/mnt/homes/zwingel/FastMACE` at
+`.source_commit` `43ce026`, which `run.json` records as `{"source": ".source_commit"}`. Data:
+`results/1a-T19-workflow-leto-20261018/`.
+
+| Measure | `--engine gpu` | `--engine fastmace` |
+| --- | --- | --- |
+| completed steps / output rows | 2000 / 21 | 2000 / 21 |
+| largest difference over the 21 rows: temperature, potential energy | – | 1.4e-4 K, 1.6e-5 eV/atom |
+| final temperature (K) | 161.48172 | 161.48167 |
+| job wall time incl. setup (s) | 151 | 154 |
+
+The trajectories agree to FP32 divergence. That is the same size as in the A/B runs and in T17's PC smoke
+run (7e-9 Å, 2.3e-6 eV/atom over 60 steps). The full 270 ps anneal through FastMACE is not run
+(conductor decision after T17).
 
 ## 4. Rules
 
@@ -438,7 +453,9 @@ after the gate, with the NAS FastMACE copy and its `.source_commit`: …
   the research engine needs it.
 - In-process OEq runtime on the workstations (decision after wave 0): a
   FastMACE-only hybrid process on coraline and on leto, before T17's
-  default switch: …
+  default switch. **leto:** every gate production process and the `main.py --engine fastmace` smoke
+  run used the in-process runtime, with no launcher. **murphy:** every FastMACE-only control and
+  alternating process. **coraline:** not run; the conductor allocated only murphy and leto.
 
 ## Reproducing
 
