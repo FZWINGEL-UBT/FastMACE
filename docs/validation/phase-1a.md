@@ -100,6 +100,46 @@ keeps what the side left there:
 | --- | --- | --- | --- | --- |
 | … | … | … | … | … |
 
+### Other same-process interactions found during the runs
+
+- **`mask_head` capture patch (r1 and r2 NaCl invalid).** Both engines
+  patch `mace.modules.blocks.mask_head` process-wide with a capture-safe
+  version. The research engine reinstalls its function before every
+  capture. FastMACE installed its own only once. After a research-engine
+  capture, FastMACE's compiled model therefore failed its dynamo guard at
+  the next eager call. That call was the warm-up of its first capture at a
+  new edge bucket: NaCl's 7168 → 7680 transition, in timed block 4.
+  - The result was one recompile while timed: 38.0 ms/step in r1 and
+    80.5 ms/step in r2 for that block, against about 3.6 ms/step otherwise.
+  - Under the no-compile rule, NaCl in r1 and r2 is invalid.
+  - r3's NaCl, where the research engine did not recapture before
+    FastMACE's transition, is valid.
+  - Each engine alone, with fresh caches, does not compile there: NaCl's
+    exact initial count (6912) and its padded size (7168) make the edge
+    dimension dynamic during warm-up.
+  - Root cause found by 1a-T13b. The fix, branch `fastmace/1a-T13b`
+    `ae3e758`, makes FastMACE reinstall its function before each capture.
+    One NaCl A/B rerun on murphy with that fix follows its merge: …
+- **PolarMACE patches (POLAR-1-S A/B impossible in one process).** The
+  research engine's `polar_gpu` replaces MACE's and graph_longrange's
+  PolarMACE functions process-wide. FastMACE's source qualification then
+  correctly refuses its GPU-only polar path ("unqualified
+  MACE/graph_longrange source").
+  - Swapping the build order would not help: the research engine would
+    replace the functions under FastMACE's engine.
+  - POLAR-1-S speed therefore comes from alternating single-engine
+    processes (baseline, FastMACE, FastMACE, baseline, baseline, FastMACE;
+    12 blocks each).
+  - Its noise floor is the spread of the per-process medians.
+- **A bug in the A/B tool, fixed (`2f88d25`).** The tool's list of
+  `GPUEngine` options, inherited from 1a-T18, lacked `species_skip`. The
+  baseline side therefore ran MP-0 medium without `main.py`'s
+  species-restricted skip, and FastMACE appeared 12–15 % faster. MH-1 does
+  not support the option, so the MH-1 results and the 1a-T18 noise floor
+  stand. The MP-0 run is kept as `ab-mp0-medium-nvt.invalid-species-skip`.
+  The tool now passes every option `main.py` passes, and a test pins the
+  list.
+
 ### Interference checks in the A/B processes
 
 - **Same trajectory.** Final temperature and potential energy of the two
