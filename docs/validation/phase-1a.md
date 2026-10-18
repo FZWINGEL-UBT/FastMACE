@@ -18,6 +18,63 @@ switches to `--engine fastmace`.
 | 3. Compatibility | `main.py --engine fastmace`: smoke, `--profile anneal` on NaCl and `--quench` on its output, statistically equal to the baseline | **passes**: PC (1a-T17), smoke, shortened anneal (two seeds) and quench equal within seed scatter; leto smoke equal to FP32 divergence |
 | 4. Rules | layering test; no `gpu_langevin`-style globals; no `oeq_no_nvcc.sh` for FastMACE | **passes**: layering and switch checks pass; no FastMACE process needed the launcher (PC, murphy, leto; coraline not run) |
 
+### How model-limited labels are read
+
+SPEC §4.3 treats model-level failures as warnings, not engine failures. The conductor applied that to
+the gate and to the speed table on 18 October 2026:
+
+- **What counts.** A label's gate verdict counts on the structures where the model itself is usable.
+  For POLAR-1 S/M/L and OMOL-0 XL, those are the crystals where ResearchModule's own screen
+  (`studies/other_models/README.md`) found plausible forces and pressures:
+  - POLAR-1-S: NaCl;
+  - POLAR-1-M: NaCl, NaNbO3, NbCl5;
+  - POLAR-1-L: NaCl, and NaNbO3 and NbCl5 reduced to 2×2×2;
+  - OMOL-0 XL: NaCl, and NbCl5 reduced to 2×2×2.
+- **Model-limited.** On the other crystals the run is recorded as "model-limited", with the failure
+  shown in the float64 reference itself:
+  - POLAR-1-S on NaNbO3: reference pressures 86 to 75,347 GPa;
+  - OMOL-0 XL on NaNbO3: 1.5e7 to 1.1e8 GPa;
+  - OMOL-0 XL on NaCl in MD: both engines' trajectories reach NaN.
+
+  These rows are neither engine passes nor engine failures.
+- **Float32-sensitive model.** POLAR-1-S on NbCl5 is float32-sensitive: force ratio 2.55 here, and
+  2.88 in the research engine's own screen. It is shown with 4 configurations, as supplementary.
+- **Reduced cells.** "2×2×2" is SPEC §12.3's `passed-reduced`, used where the float64 reference
+  does not fit 20 GB. That covers the cells the screen itself used, and paracetamol for MACE-OFF23
+  large.
+
+### Findings and open items (not acceptance failures)
+
+1. **MP-0 medium is 1.4–1.6 % slower** than the research engine (murphy, same process, with
+   `species_skip` on both sides). That is inside the 3 % criterion, but about ten times the noise
+   floor, so it is real. It is a candidate for the screens after T19, the `generic_*` path's
+   kernels or launch count.
+2. **Setup time.** FastMACE's engine construction takes 4–33 s longer than the research engine's.
+   Most of it is the per-rewrite self-checks of SPEC §6.4, which the research engine does not run.
+   This is an observation, not a 1a judgement (conductor decision). Peak GPU memory is equal or
+   slightly lower in every case.
+3. **Same-process clashes** between the two engines. Both patch process-wide state, so an A/B in one
+   process needs care:
+   - the Inductor custom-pass slot, handled in the A/B tool;
+   - `mask_head`, fixed in FastMACE by 1a-T13b, which reinstalls its function before each capture;
+   - the PolarMACE and graph_longrange functions: POLAR-1-S speed is measured in alternating
+     processes.
+
+   None of these affect a process that runs one engine.
+4. **PolarMACE stress on NbCl5 3×3×3.** Even with the issue-1642 correction active, the float64
+   POLAR-1-S reference's stress differs from finite differences of its own energy by 4.4e-4 eV/Å³,
+   about 3 % of the stress. On NaCl the difference is 7e-9, and on NbCl5 2×2×2 the research engine
+   measured 6.3e-9. Candidates are k-vectors crossing the cutoff under strain, or a non-variational
+   charge solve. The gate compares production against this same reference, so its verdicts stand.
+   The stress of POLAR models on large NbCl5 cells should still be investigated before NPT
+   production with them.
+5. **The old gate's polar references were correct only by accident**. They shared a process with
+   the production engine's patches; details in section 2. This is fixed, and a finite-difference
+   self-test now guards against it.
+6. **coraline soft-lock check, open.** It is not a 1a item; see section 4.
+7. **OMOL-0 XL float32 scatter between processes** is 1.2–1.8e-4 eV/Å in the starting forces. That
+   is 100 times MH-1's, and the in-process force check uses it as OMOL-0's tolerance.
+
 ## Runs
 
 | Run ID | Machine | GPU, driver | Suites | FastMACE commit | Baseline | Dates (UTC) |
