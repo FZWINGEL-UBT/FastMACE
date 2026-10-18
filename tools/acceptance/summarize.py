@@ -77,6 +77,37 @@ def ab_rows(name, meta):
     return rows
 
 
+def alternating_rows(processes):
+    """Speed from alternating single-engine processes: {slug: [(job name, metadata)]} -> one row per structure.
+
+    The ratio is the median over FastMACE's processes of their medians over the same for the baseline. Its
+    noise floor is the spread of the per-process medians (max - min over the median, the larger engine),
+    which replaces the same-process floor; a row is valid only if no process compiled while timed.
+    """
+    import statistics
+    rows = []
+    for slug, jobs in sorted(processes.items()):
+        medians, valid = {}, True
+        for name, meta in jobs:
+            (side,) = meta["sides"]
+            kind = meta.get("side_kinds", {}).get(side, side)
+            for structure, entry in meta["structures"].items():
+                medians.setdefault(structure, {}).setdefault(kind, []).append(entry["sides"][side]["median_ms"])
+                valid = valid and bool(entry.get("compile_during_timing", {}).get("valid", False))
+        for structure, sides in medians.items():
+            b, f = sides.get("baseline", []), sides.get("fastmace", [])
+            if not b or not f:
+                continue
+            spread = max((max(v) - min(v)) / statistics.median(v) for v in (b, f))
+            ratio = statistics.median(f) / statistics.median(b)
+            criterion = max(SPEED_LIMIT, spread)
+            rows.append(dict(job=f"alt-{slug}", structure=structure, processes=dict(baseline=b, fastmace=f),
+                             baseline_ms=statistics.median(b), fastmace_ms=statistics.median(f), ratio=ratio,
+                             deviation=ratio - 1, limit=SPEED_LIMIT, noise_floor=spread, criterion=criterion,
+                             valid=valid, passed=bool(valid and abs(ratio - 1) <= criterion)))
+    return rows
+
+
 def control_rows(name, meta):
     """Setup time, load time and peak memory of a single-engine process, per structure."""
     (side,) = meta["sides"]
@@ -142,8 +173,8 @@ def gate_row(name, meta):
 def summarize_run(run_root):
     """Every derived row of a run directory (the jobs' metadata.json files), by kind."""
     run_root = Path(run_root)
-    out = dict(run_root=str(run_root), speed=[], controls=[], forces=[], gate=[])
-    ab_jobs, control_jobs = {}, {}
+    out = dict(run_root=str(run_root), speed=[], alternating=[], controls=[], forces=[], gate=[])
+    ab_jobs, control_jobs, alternating = {}, {}, {}
     for meta_path in sorted(run_root.glob("*/metadata.json")):
         name = meta_path.parent.name
         if "." in name:
@@ -152,6 +183,11 @@ def summarize_run(run_root):
         if name.startswith("ab-"):
             out["speed"] += ab_rows(name, meta)
             ab_jobs.setdefault(_slug(name), []).append((name, meta_path.parent))
+        elif name.startswith("alt-"):
+            slug = name.removeprefix("alt-").rsplit("-p", 1)[0]
+            alternating.setdefault(slug, []).append((name, meta))
+            if name.endswith("-fastmace"):
+                ab_jobs.setdefault(slug, []).append((name, meta_path.parent))
         elif name.startswith("control-"):
             out["controls"] += control_rows(name, meta)
             if name.endswith("-fastmace"):
@@ -159,8 +195,10 @@ def summarize_run(run_root):
                     (name, meta_path.parent))
         elif name.startswith("gate-"):
             out["gate"].append(gate_row(name, meta))
+    out["alternating"] = alternating_rows(alternating)
     out["forces"] = forces_rows(ab_jobs, control_jobs)
-    out["passed"] = dict(speed=all(r["passed"] for r in out["speed"]) if out["speed"] else None,
+    timed = out["speed"] + out["alternating"]
+    out["passed"] = dict(speed=all(r["passed"] for r in timed) if timed else None,
                          forces=all(r["passed"] for r in out["forces"]) if out["forces"] else None,
                          gate=all(r["passed"] for r in out["gate"]) if out["gate"] else None,
                          gate_labels=len(out["gate"]))

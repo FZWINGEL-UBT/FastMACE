@@ -230,6 +230,30 @@ def speed_jobs(machine: Machine, run_root: Path) -> list:
     return jobs
 
 
+# Models whose two engines cannot share a process: the research engine's polar_gpu replaces MACE's and
+# graph_longrange's PolarMACE functions process-wide, and FastMACE's qualification then refuses its own
+# GPU-only polar path (murphy, 18 October 2026). Their speed comes from alternating single-engine
+# processes (the plan's fallback for interfering engines), baseline/FastMACE in the order b f f b b f.
+ALTERNATING_MODELS = ("polar1-s",)
+ALTERNATING_ROUNDS = 3
+
+
+def alternating_jobs(machine: Machine, run_root: Path, models=ALTERNATING_MODELS, rounds=ALTERNATING_ROUNDS) -> list:
+    """Alternating single-engine processes, ``rounds`` per engine, 12 blocks each, in the order b f f b b f ..."""
+    run_root = Path(run_root)
+    jobs = []
+    for model in models:
+        order = [side for index in range(rounds)
+                 for side in (("baseline", "fastmace") if index % 2 == 0 else ("fastmace", "baseline"))]
+        counts = {"baseline": 0, "fastmace": 0}
+        for side in order:
+            counts[side] += 1
+            jobs.append(_ab_job(machine, run_root, f"alt-{model}-nvt-p{counts[side]}-{side}", model, SECONDARY_CRYSTALS,
+                                (side,), blocks=AB_BLOCKS, dump=side == "fastmace",
+                                note="alternating single-engine processes: the engines cannot share a process"))
+    return jobs
+
+
 def gate_structures(machine: Machine, label: str) -> list:
     if label in MACE_OFF_LABELS:
         return [str(machine.path(machine.research_module) / spec) for spec in ORGANIC_STRUCTURES]
@@ -289,4 +313,4 @@ def workflow_jobs(machine: Machine, run_root: Path, research_module=None, engine
     return jobs
 
 
-SUITES = {"speed": speed_jobs, "gate": gate_jobs, "workflow": workflow_jobs}
+SUITES = {"speed": speed_jobs, "alternating": alternating_jobs, "gate": gate_jobs, "workflow": workflow_jobs}

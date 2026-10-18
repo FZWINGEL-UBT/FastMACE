@@ -666,6 +666,32 @@ def test_summarize_run_pairs_ab_processes_with_their_controls(tmp_path):
     assert "| ab-mh1-nvt-r1 |" in text and "| mh1-r2scan | fastmace |" in text
 
 
+def test_alternating_jobs_order_and_flags():
+    m = suites.MACHINES["murphy"]
+    jobs = suites.alternating_jobs(m, m.path(m.root) / "run", models=("polar1-s",), rounds=3)
+    assert [job.name for job in jobs] == [
+        "alt-polar1-s-nvt-p1-baseline", "alt-polar1-s-nvt-p1-fastmace", "alt-polar1-s-nvt-p2-fastmace",
+        "alt-polar1-s-nvt-p2-baseline", "alt-polar1-s-nvt-p3-baseline", "alt-polar1-s-nvt-p3-fastmace"]
+    for job in jobs:
+        assert len(_flag_values(job.argv, "--sides")) == 1 and _flag_values(job.argv, "--blocks") == ["12"]
+        assert _flag_values(job.argv, "--structures") == ["NaCl", "NbCl5"]
+
+
+def test_alternating_rows():
+    def meta(side, median, valid=True):
+        return dict(sides=[side], side_kinds={side: side},
+                    structures={"NaCl": dict(sides={side: dict(median_ms=median)},
+                                             compile_during_timing=dict(valid=valid))})
+    jobs = {"polar1-s-nvt": [("p1b", meta("baseline", 10.0)), ("p1f", meta("fastmace", 10.1)),
+                             ("p2f", meta("fastmace", 10.2)), ("p2b", meta("baseline", 10.0)),
+                             ("p3b", meta("baseline", 10.2)), ("p3f", meta("fastmace", 10.1))]}
+    (row,) = summarize.alternating_rows(jobs)
+    assert row["ratio"] == pytest.approx(10.1 / 10.0)
+    assert row["noise_floor"] == pytest.approx(0.02) and row["criterion"] == 0.03 and row["passed"]
+    jobs["polar1-s-nvt"][0] = ("p1b", meta("baseline", 10.0, valid=False))
+    assert not summarize.alternating_rows(jobs)[0]["passed"]
+
+
 def test_slug():
     assert summarize._slug("ab-mh1-nvt-r2") == "mh1-nvt"
     assert summarize._slug("ab-mh1-npt") == "mh1-npt"
