@@ -910,6 +910,26 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
   caches, compiles nothing there. The fix (`fastmace/1a-T13b`, ae3e758)
   reinstalls before each capture. Its GPU validation is paused while the
   owner uses the local GPU.
+- **Murphy speed suite done (T19, run `1a-T19-speed-murphy-20261018`).**
+  FastMACE/baseline step-time ratios, 12 blocks, same-process noise floor
+  0.16%:
+  - MH-1 NVT, NaNbO3 and NbCl5: 0.9996–1.0003;
+  - MH-1 NVT, NaCl: 1.0002 (r3; r1 and r2 invalid because of the
+    `mask_head` clash);
+  - MH-1 NPT: 1.0023;
+  - OMOL-0 XL, NbCl5: 0.9999;
+  - POLAR-1-S, alternating processes: 1.0003 (noise floor 0.29%);
+  - MP-0 medium: 1.014–1.016.
+  Two NaCl cases are rerun after T13b merges: the MH-1 hybrid A/B and the
+  plain-cuEq A/B (invalid: one compile per side, probably the same clash).
+  In the A/B process, every model's forces equal the FastMACE-only
+  control's within 3e-6 eV/Å, except OMOL-0 XL, where 0.9–2.0e-4 equals
+  OMOL's own process-to-process float32 scatter (1.2–1.8e-4). For OMOL the
+  tolerance is that scatter.
+- **Open: FastMACE setup 8–33 s longer** than the research engine (MH-1 37–45
+  s vs 27–29 s; OMOL-0 59–69 s vs 36–37 s), with equal or lower peak memory.
+  Setup is reported, not judged, in 1a. Diagnose it with MP-0's speed gap
+  after T19.
 - **Open: MP-0 medium 1.4–1.6% slower** than the research engine (murphy,
   `species_skip` on both sides). That is within 3% but about ten times the
   noise floor, so it is a real difference: diagnose it after T19 (generic
