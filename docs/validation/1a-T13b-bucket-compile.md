@@ -100,9 +100,17 @@ Tests:
   compiler caches. After warm-up it installs a foreign `mask_head`, as the
   research engine does, and crosses into the next bucket. It asserts that no
   graph is compiled after warm-up.
-  **This test has not run yet:** the local GPU run was stopped when the owner
-  needed the GPU. The earlier leto version of the test, without the foreign
-  `mask_head`, passed for both backends.
+  On the PC both pass with the fix and both fail without it (the same test
+  file on a copy of the tree with the old `_patches.py`):
+
+  | Backend | With the fix: graphs, step at 7680 | Without: graphs, step at 7680 |
+  | --- | --- | --- |
+  | plain cuEq float64 | 2 → 2, 528 ms (capture) | 2 → 3, 16.9 s |
+  | hybrid float32 | 4 → 4, 52 ms (capture) | 4 → 5, 15.0 s |
+
+Whole GPU suite on the PC in one process: 221 passed, 2 skipped (the
+OEq-only kernel tests), in 40 min. CPU suites: 984 passed and 28 skipped
+(`fastmace_cpu`), 1010 passed and 2 skipped (`mace_cueq_latest`).
 
 ## For T19
 
