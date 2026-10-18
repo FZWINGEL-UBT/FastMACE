@@ -90,3 +90,7 @@ Speculative graphs stay refused for NPT, as today.
    here `ForceField` is the protocol. Proposal: T11's class is
    `MACEForceField`, and the public `fm.ForceField` becomes a factory (phase 3).
 3. Where `p_eps` lives (integrator in 1a, state in 1b?).
+
+Questions 2 and 3 are answered in [contracts-1b.md](contracts-1b.md) (1b-T01): the public
+`fm.ForceField` is a plan-free class in `model/forcefield.py`, and every plan builds its own
+`MACEForceField`; `p_eps` and `force_eps` move into `SimulationState` (1b-T05).

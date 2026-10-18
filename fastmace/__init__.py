@@ -29,3 +29,36 @@ def runtime_info():
         file_lock_switch_late=_FILE_LOCK_SWITCH_LATE,
         cuda_driver_cache=_CUDA_DRIVER_CACHE,
     )
+
+
+# The public API of SPEC §7 (docs/design/contracts-1b.md), resolved at first use so that
+# `import fastmace` imports neither torch nor MACE: name -> (module, attribute or None for the module).
+_PUBLIC = {
+    "load": ("fastmace.model.loading", "load"),
+    "ForceField": ("fastmace.model.forcefield", "ForceField"),
+    "Simulation": ("fastmace.simulation", "Simulation"),
+    "Workload": ("fastmace.planner.workload", "Workload"),
+    "Output": ("fastmace.io.output", "Output"),
+    "integrators": ("fastmace.integrators", None),
+    "protocols": ("fastmace.protocols", None),
+    "md": ("fastmace.quick", "md"),
+    "calc": ("fastmace.ase.calculator", "calc"),
+    "D3": ("fastmace.longrange.d3", "D3"),
+}
+
+__all__ = ["RuntimeInfo", "__version__", "runtime_info", *_PUBLIC]
+
+
+def __getattr__(name):
+    try:
+        module_name, attribute = _PUBLIC[name]
+    except KeyError:
+        raise AttributeError(f"module 'fastmace' has no attribute {name!r}") from None
+    import importlib
+
+    module = importlib.import_module(module_name)
+    return module if attribute is None else getattr(module, attribute)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(_PUBLIC))
