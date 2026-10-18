@@ -1,7 +1,7 @@
 """The Engine contract: runs MD steps of one integrator on one force field and state (SPEC §8).
 
-Phase 1a stub (plan task 1a-T02); 1a-T13 writes the CUDA-graph engine (``graph.py``) from the
-capture, replay and pipelining half of the research engine's ``GPULangevin``. Only the planner
+Phase 1a contract (plan task 1a-T02); the CUDA-graph engine (``graph.py``, 1a-T13) implements it
+from the capture, replay and pipelining half of the research engine's ``GPULangevin``. Only the planner
 instantiates engines (SPEC §5); docs/design/interfaces.md has the step sequence.
 
 An engine owns the execution: the stage graphs (``AC``, ``ACP``, ``("B", edges)``, ``C`` and
@@ -46,7 +46,9 @@ class Snapshot:
 
     def wait(self) -> Mapping[str, torch.Tensor]:
         """Block until the copies are done and return ``values``."""
-        raise NotImplementedError("1a-T13")
+        from fastmace.io.trajectory import wait
+
+        return wait(self)
 
 
 class Engine(abc.ABC):
@@ -70,7 +72,9 @@ class Engine(abc.ABC):
 
     def run(self, steps: int) -> None:
         """``steps`` calls of ``step``, then ``flush``."""
-        raise NotImplementedError("1a-T13")
+        for _ in range(steps):
+            self.step()
+        self.flush()
 
     @abc.abstractmethod
     def flush(self) -> None:

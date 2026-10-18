@@ -1,0 +1,224 @@
+{
+ "replay_vs_eager_200": 5.8463424323917934e-08,
+ "fastmace_repeat_500": 9.830500768970296e-08,
+ "pipelined_vs_checked_500": 9.259257716109914e-08,
+ "speculative_vs_pipelined_200": 4.2855848647604944e-08,
+ "baseline_scatter_500": 1.0515153903156715e-07,
+ "baseline_checked_500": 8.659131722765778e-08,
+ "baseline_scatter_per_record": [
+  5.9677685015913084e-09,
+  2.1217262613504317e-08,
+  4.3890588941053466e-08,
+  4.8142954511831704e-08,
+  5.5873329074529465e-08,
+  7.612144159452328e-08,
+  7.990120565182224e-08,
+  9.099941955525992e-08,
+  9.753699181658249e-08,
+  1.0515153903156715e-07
+ ],
+ "fastmace_per_record": [
+  6.796113893869915e-09,
+  1.7915025907200288e-08,
+  2.6469952452146117e-08,
+  4.402158104710452e-08,
+  5.460601215645511e-08,
+  5.120942958569685e-08,
+  7.114480027325953e-08,
+  7.625244791142904e-08,
+  8.275623386566622e-08,
+  8.659131722765778e-08
+ ],
+ "kernels": {
+  "C": [
+   23,
+   23,
+   true
+  ],
+  "('B', 7168)": [
+   315,
+   317,
+   true
+  ],
+  "AC": [
+   64,
+   64,
+   true
+  ]
+ },
+ "ms_per_step": {
+  "fastmace": {
+   "eager": 10.981969659915194,
+   "checked": 3.7580394200631417,
+   "repeat": 3.71146282996051,
+   "pipelined": 3.5305471398169175,
+   "speculative": 3.854645640240051
+  },
+  "baseline": [
+   3.68983479012968,
+   3.7380352400941774
+  ]
+ },
+ "info": {
+  "eager": {
+   "engine": "graph",
+   "mode": "checked",
+   "capture": false,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  },
+  "checked": {
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "AC"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  },
+  "repeat": {
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "AC"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  },
+  "pipelined": {
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 18,
+   "graphs": [
+    "ACP",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 18,
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  },
+  "speculative": {
+   "engine": "graph",
+   "mode": "speculative",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "('ACB', 7168, 0)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 200,
+   "speculative_rollbacks": 5,
+   "speculative_rebuild_rollbacks": 5,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  }
+ },
+ "baseline_builds": [
+  15,
+  15
+ ],
+ "streaming": 2,
+ "warmups": {
+  "checked": [],
+  "pipelined": [],
+  "speculative": []
+ }
+}
