@@ -712,3 +712,69 @@ def test_process_constraints_refuse_a_mixed_process(tmp_path):
     assert out["family"] == constraints.OEQ_FAMILY
     assert out["eager_plain"] == "ok" and out["engines"] == 2
     assert out["compiled_plain"] and "process" in out["compiled_plain"]
+
+
+# --------------------------------------------------------------------------- no compile at a later edge bucket
+
+BUCKET_CHILD = """
+import json, time
+import numpy as np
+import fastmace
+from fastmace.config import EngineConfig, IntegratorConfig
+from fastmace.planner import fixed
+
+planner = fixed.FixedPlanner(engine=EngineConfig(backend={backend!r}))
+hardware = planner.hardware()
+loaded = planner.load("mh1-r2scan")
+import torch
+from ase.build import bulk
+from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+from torch._dynamo.utils import counters
+
+atoms = bulk("NaCl", "rocksalt", a=5.64, cubic=True).repeat((3, 3, 3))
+MaxwellBoltzmannDistribution(atoms, temperature_K=900.0, rng=np.random.default_rng(11))
+plan = planner.plan(loaded, atoms, IntegratorConfig(timestep_fs=0.5, friction=0.02, seed=20261018), hardware)
+engine = planner.build(plan, loaded, atoms, temperature_K=900.0)
+
+def compiled():
+    return {{"unique_graphs": counters["stats"]["unique_graphs"], "frames_ok": counters["frames"]["ok"]}}
+
+for _ in range({warmup}):
+    engine.step()
+engine.flush()
+after_warmup, sizes_after_warmup = compiled(), sorted(engine.edge_sizes_used)
+events, seen = [], set(engine.edge_sizes_used)
+for n in range({warmup} + 1, {steps} + 1):
+    start = time.perf_counter()
+    engine.step()
+    engine.flush()
+    torch.cuda.synchronize()
+    if set(engine.edge_sizes_used) != seen:
+        events.append({{"step": n, "new_sizes": sorted(set(engine.edge_sizes_used) - seen), "after": compiled(),
+                        "step_s": time.perf_counter() - start}})
+        seen = set(engine.edge_sizes_used)
+print(json.dumps({{"after_warmup": after_warmup, "end": compiled(), "sizes_after_warmup": sizes_after_warmup,
+                  "sizes": sorted(engine.edge_sizes_used), "events": events, "edge_bucket": engine.edge_bucket,
+                  "initial_edges": engine.initial_edges}}))
+"""
+
+
+def _bucket_crossing(backend, python):
+    out = run_fresh(BUCKET_CHILD.format(backend=backend, warmup=20, steps=200), python=python)
+    print(json.dumps(out, indent=1))
+    # At 900 K the edge count of NaCl 3x3x3 grows from 6912 (padded to 7168 in warm-up) into the
+    # next bucket (7680) within 200 steps; a new padded size needs a capture, but no compile:
+    # warm-up saw the exact initial count and a padded size, so the edge dimension is dynamic.
+    assert out["events"], "the run never reached a new edge bucket after warm-up"
+    assert out["end"] == out["after_warmup"], out
+
+
+@pytest.mark.skipif(not _mh1_path(), reason="needs FASTMACE_MODELS with MH-1")
+def test_no_compile_at_a_later_edge_bucket_plain_cueq():
+    _bucket_crossing("cueq", sys.executable)
+
+
+@needs_oeq
+@pytest.mark.skipif(not _mh1_path(), reason="needs FASTMACE_MODELS with MH-1")
+def test_no_compile_at_a_later_edge_bucket_hybrid():
+    _bucket_crossing("hybrid", HYBRID_PYTHON)
