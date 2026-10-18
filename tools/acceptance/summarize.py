@@ -146,6 +146,8 @@ def summarize_run(run_root):
     ab_jobs, control_jobs = {}, {}
     for meta_path in sorted(run_root.glob("*/metadata.json")):
         name = meta_path.parent.name
+        if "." in name:
+            continue  # a stopped or invalid run kept under a suffixed name (e.g. "ab-x.invalid-species-skip")
         meta = json.loads(meta_path.read_text())
         if name.startswith("ab-"):
             out["speed"] += ab_rows(name, meta)

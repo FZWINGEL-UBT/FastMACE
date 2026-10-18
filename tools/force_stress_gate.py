@@ -72,10 +72,12 @@ REFERENCE_SCOPES = ("calculator", "configuration")
 BENCHMARK_NAMES = ("NaCl", "NaNbCl6", "NaTaCl6", "NaNbO3", "NaTaO3",
                    "NbCl3O", "TaCl3O", "NbCl2O", "NbCl5", "TaCl5")
 BENCHMARK_DIRECTORY = Path("Structures", "Benchmark", "R2SCAN")
+# Every engine option main.py passes to GPUEngine (species_skip was missing before 1a-T19).
 FLAG_NAMES = (
     "factor_species", "fold_cutoff", "sort_receivers", "density_first", "reassociate_first",
     "joint_radial_input", "fused_folded_backward", "segmented_first_sum", "gpu_neighbour_list",
-    "block_linear", "grouped_linear", "merged_residual", "streaming_conv", "fused_radial_hidden", "pipelined")
+    "block_linear", "grouped_linear", "merged_residual", "species_skip", "streaming_conv", "fused_radial_hidden",
+    "speculative_graph", "pipelined")
 
 
 class GateJobError(RuntimeError):

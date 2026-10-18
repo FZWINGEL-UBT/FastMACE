@@ -47,9 +47,14 @@ import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
 # isort: split
 from fastmace.bench import ab, step_time
 
+# Every engine option main.py passes to GPUEngine (workflow.run_structure at the baseline tag), so the
+# baseline side runs main.py's plan. species_skip was missing until 1a-T19: it is on by default for the
+# gpu engine where the model supports it (MP-0, POLAR-1, OMOL-0, MACE-OFF; not MH-1).
 FLAGS = ("factor_species", "fold_cutoff", "sort_receivers", "density_first", "reassociate_first",
          "joint_radial_input", "fused_folded_backward", "segmented_first_sum", "gpu_neighbour_list",
-         "block_linear", "grouped_linear", "merged_residual", "streaming_conv", "fused_radial_hidden", "pipelined")
+         "block_linear", "grouped_linear", "merged_residual", "species_skip", "streaming_conv",
+         "fused_radial_hidden", "speculative_graph", "pipelined")
+NPT_KEYWORDS = ("pressure_GPa", "barostat_tau_fs", "barostat_mass_factor")
 
 
 class ResearchEngineSide:
@@ -348,7 +353,8 @@ def main(argv=None):
                     engine = experiment.GPUEngine(base.copy(), calcs[name], timestep_fs=md.timestep_fs,
                                                   friction=md.friction, seed=args.seed, skin=md.skin,
                                                   compile_mode=md.compile_mode, device="cuda:0",
-                                                  ensemble=args.ensemble, cell_mode=args.cell_mode, **flags[name])
+                                                  ensemble=args.ensemble, cell_mode=args.cell_mode,
+                                                  **{key: getattr(md, key) for key in NPT_KEYWORDS}, **flags[name])
                     sides[name] = ResearchEngineSide(engine, args.temperature_K, torch)
                 setup[name] = time.perf_counter() - started
                 if args.dump_forces and kinds[name] == "fastmace":

@@ -299,6 +299,19 @@ def test_old_invocation_without_subcommand_is_the_driver(tmp_path, export, check
 # --- the A/B tool's arguments --------------------------------------------------------------------------
 
 
+# The engine options workflow.run_structure passes to GPUEngine at the baseline tag (main.py's plan).
+MAIN_PY_ENGINE_OPTIONS = ("factor_species", "fold_cutoff", "sort_receivers", "density_first", "reassociate_first",
+                          "joint_radial_input", "fused_folded_backward", "segmented_first_sum", "gpu_neighbour_list",
+                          "block_linear", "grouped_linear", "merged_residual", "species_skip", "streaming_conv",
+                          "fused_radial_hidden", "speculative_graph", "pipelined")
+
+
+def test_baseline_sides_get_every_engine_option_main_py_passes():
+    assert set(ab_tool.FLAGS) == set(MAIN_PY_ENGINE_OPTIONS)
+    assert set(gate.FLAG_NAMES) == set(MAIN_PY_ENGINE_OPTIONS)
+    assert set(ab_tool.NPT_KEYWORDS) == {"pressure_GPa", "barostat_tau_fs", "barostat_mass_factor"}
+
+
 def test_ab_tool_accepts_a_fastmace_only_process_without_a_baseline(tmp_path):
     args = ab_tool.parse_args(["--output", str(tmp_path), "--checkpoint", "m", "--sides", "fastmace"])
     assert args.sides == ["fastmace"] and args.baseline is None
@@ -640,6 +653,7 @@ def test_summarize_run_pairs_ab_processes_with_their_controls(tmp_path):
     write("ab-mh1-nvt-r2", _ab_meta(["fastmace", "baseline"], [4.02, 4.0]), forces + 1e-3)
     write("control-mh1-nvt-fastmace", _ab_meta(["fastmace"], [4.01], blocks=4), forces)
     write("control-mh1-nvt-baseline", _ab_meta(["baseline"], [4.0], blocks=4))
+    write("ab-mh1-nvt-r9.invalid-species-skip", _ab_meta(["baseline", "fastmace"], [4.0, 9.0]))  # ignored
     write("gate-mh1-r2scan", dict(model="mh1-r2scan", engine="fastmace", status="complete", passed=True,
                                   summary={"NaCl": dict(passed=True, forces=dict(ratio=1.1), stress=dict(ratio=0.9))}))
     summary = summarize.summarize_run(tmp_path)
