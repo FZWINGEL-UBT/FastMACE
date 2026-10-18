@@ -493,7 +493,8 @@ def child_main(argv):
         raise SystemExit(f"{args.job} is a {job['kind']} job, not {args.kind}")
     result = dict(name=job["name"], kind=job["kind"], pid=os.getpid(), host=os.uname().nodename,
                   python=sys.executable, started_utc=datetime.now(timezone.utc).isoformat(),
-                  hybrid_launcher=bool(os.environ.get("OEQ_NVCC_ATTEMPTS")))
+                  # oeq_no_nvcc.sh's exports, read before FastMACE's in-process OEq runtime sets some of them
+                  hybrid_launcher=all(os.environ.get(name) for name in ("OEQ_NVCC_ATTEMPTS", "CUDA_HOME", "CUDACXX")))
     started = time.perf_counter()
     try:
         if job["kind"] == "reference":

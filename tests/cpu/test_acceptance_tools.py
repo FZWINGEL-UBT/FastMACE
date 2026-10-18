@@ -312,6 +312,11 @@ def test_baseline_sides_get_every_engine_option_main_py_passes():
     assert set(ab_tool.NPT_KEYWORDS) == {"pressure_GPa", "barostat_tau_fs", "barostat_mass_factor"}
 
 
+def test_launcher_detection_reads_the_wrappers_exports():
+    assert ab_tool.launched_by_hybrid_wrapper(dict(OEQ_NVCC_ATTEMPTS="a", CUDA_HOME="b", CUDACXX="c"))
+    assert not ab_tool.launched_by_hybrid_wrapper(dict(OEQ_NVCC_ATTEMPTS="a"))  # FastMACE's own runtime sets this
+
+
 def test_ab_tool_accepts_a_fastmace_only_process_without_a_baseline(tmp_path):
     args = ab_tool.parse_args(["--output", str(tmp_path), "--checkpoint", "m", "--sides", "fastmace"])
     assert args.sides == ["fastmace"] and args.baseline is None

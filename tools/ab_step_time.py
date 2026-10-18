@@ -240,7 +240,14 @@ def parse_args(argv=None):
     return args
 
 
+def launched_by_hybrid_wrapper(environ=os.environ):
+    """Whether this process was started through oeq_no_nvcc.sh: the variables it exports, read before FastMACE's
+    in-process OEq runtime sets some of the same names (call this first)."""
+    return all(environ.get(name) for name in ("OEQ_NVCC_ATTEMPTS", "CUDA_HOME", "CUDACXX"))
+
+
 def main(argv=None):
+    launched = launched_by_hybrid_wrapper()  # before prepare_fastmace_hybrid changes the environment
     args = parse_args(argv)
     protocol = step_time.TimingProtocol(warmup=args.warmup, block=args.block, blocks=args.blocks)
     has_baseline, has_fastmace = "baseline" in args.sides, "fastmace" in args.sides
@@ -292,7 +299,7 @@ def main(argv=None):
                 ensemble=args.ensemble, cell_mode=args.cell_mode if args.ensemble == "npt" else None,
                 temperature_K=args.temperature_K, protocol=protocol.as_dict(), pattern=args.pattern, sides=names,
                 side_kinds=kinds, build_order=names, oeq_runtime=oeq_runtime,
-                hybrid_launcher=bool(os.environ.get("OEQ_NVCC_ATTEMPTS")),
+                hybrid_launcher=launched,
                 args={k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
                 compile_cache=cache_info, calculators={}, structures={})
     path = args.output / "metadata.json"
