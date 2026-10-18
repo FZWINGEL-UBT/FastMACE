@@ -160,10 +160,11 @@ def test_rewritten_force_field_agrees_and_replays_in_a_graph(dtype, compile_mode
 # --------------------------------------------------------------------------- fresh hybrid interpreters
 
 
-def run_fresh(code, timeout=2400, python=HYBRID_PYTHON, prefix=()):
+def run_fresh(code, timeout=2400, python=HYBRID_PYTHON, prefix=(), extra_env=None):
     """Run code in a fresh interpreter; returns the JSON its last stdout line prints."""
     env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), str(REPOSITORY_ROOT / "tests")]),
                PYTHONDONTWRITEBYTECODE="1")
+    env.update(extra_env or {})
     if python != sys.executable:
         env.pop("LD_LIBRARY_PATH", None)  # set for this environment; the in-process OEq runtime needs none
     result = subprocess.run([*prefix, python, "-c", textwrap.dedent(code)], cwd=REPOSITORY_ROOT, env=env,
@@ -297,6 +298,12 @@ def test_two_force_fields_from_one_model_step_independently(tmp_path, dtype, com
 
 
 # --------------------------------------------------------------------------- MH-1 against the research engine
+
+
+def labels_mh1_file():
+    from fastmace.model import labels
+
+    return labels.LABELS["mh1-r2scan"].checkpoint.file_name
 
 
 def _has_mh1():
@@ -443,7 +450,10 @@ def test_mh1_agrees_with_maceforces(case):
         cache = Path(os.environ.get("FASTMACE_CACHE", REPOSITORY_ROOT / ".cache")) / "oeq-baseline-1a-T11"
         prefix = ("bash", str(root / "Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh"),
                   str(Path(python).parents[1]), str(cache))
-    theirs = run_fresh(theirs_code, python=python, prefix=prefix)
+    # The research engine's model store looks for the NAS path unless told where MH-1 is (1a-T13 Q2).
+    checkpoint = Path(MODELS) / labels_mh1_file()
+    theirs = run_fresh(theirs_code, python=python, prefix=prefix,
+                       extra_env={"MACE_BENCH_CHECKPOINT": os.environ.get("MACE_BENCH_CHECKPOINT", str(checkpoint))})
     ours = run_fresh(EVALUATIONS + FASTMACE_CHILD.format(backend=backend, dtype=dtype, compile_mode=compile_mode,
                                            rewrites=rewrites, sort="on" if sort else "off"), python=python)
     report = _compare(ours, theirs)

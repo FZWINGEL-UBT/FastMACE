@@ -2216,6 +2216,7 @@ deterministic.
 | MACE internals change every release; hash-pinned rewrites break | versioned registry, self-checks, upstreaming; reference fallback |
 | OEq/cuEq/torch version churn (lock files, `nvcc`, compile policy) | CI matrix, prebuilt extensions, process-constraint enforcement |
 | Hybrid OEq sums are not bitwise reproducible | statistical tests; `reproducible=True` plan |
+| Plain cuEq float64 is not bitwise reproducible either. cuEquivariance picks segmented-polynomial kernel variants at run time, which changes the summation order: the research engine differs from itself by up to 3.2e-13 Å over 500 MD steps (1a-T13, 18 October 2026) | equivalence tests compare at 1e-12 Å; `reproducible=True` (phase 2) must pin or refuse cuEq's run-time variant choice, or record the blocking kernel (§16 phase 2 acceptance) |
 | Species superset increases memory or cost (columns for absent species) | measure; superset defaults to initial species |
 | High-T workloads cause frequent re-captures | adaptive skin and headroom, re-capture budget, tier-2 fallback |
 | Model-level failures look like engine bugs (POLAR-1-S NaNbO3, OMOL NaCl) | planner warnings with diagnoses; gate against the reference (§12.1) separates the two |
@@ -2564,3 +2565,6 @@ repository `FZWINGEL-UBT/FastMACE` on an NVMe drive (§18). No content change.
 
 **Draft 0.12, third amendment (17 October 2026):** §14 (b) states which
 driver cache directory the NFS rule checks (task 0-T03). No other change.
+
+**Draft 0.12, fourth amendment (18 October 2026):** §18 risk table: plain cuEq float64
+is not bitwise reproducible (1a-T13). No other change.

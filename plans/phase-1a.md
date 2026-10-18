@@ -785,6 +785,38 @@ the host calls `rebuild` and `use_edges`. Verified:
   T15's plan for `--backend cueq` leaves `reassociate_first` and
   `segmented_first_sum` off, as today.
 
+## Conductor decisions after T13 (18 October 2026)
+
+T13 (`fastmace/engine/graph.py`, `GraphEngine`) is merged. Verified
+(`docs/validation/1a-T13-engine.md`): over 500 steps of MH-1 NaCl 3×3×3 at
+300 K, FastMACE's trajectory differs from the research engine's by
+2.5–2.9e-13 Å (plain cuEq float64 NVT), ≤ 8.9e-15 Å (NPT BAOAB) and
+8.4–8.7e-8 Å (hybrid FP32). That is within the research engine's own
+repeat scatter (3.2e-13 and 1.1e-7 Å), on the RTX 5060 Ti and on leto.
+Rebuild counts and padded sizes are identical, and the AC, C and ACP graphs
+have identical node counts. B's kernel sequence matches once cuEq's
+run-time variants are normalised. Rough step times equal the baseline's.
+The whole GPU suite passes in one process (216 passed).
+
+- **Plain cuEq float64 is not bitwise reproducible (T13 Q1).** cuEq picks
+  kernel variants at run time, so the research engine differs from itself
+  too. This is recorded in the SPEC §18 risks. Equivalence tests compare at
+  1e-12 Å. `reproducible=True` in phase 2 must pin cuEq's variant choice or
+  refuse it.
+- **T11's MH-1 agreement test (T13 Q2):** it now passes MH-1's checkpoint to
+  the research-engine child process through `MACE_BENCH_CHECKPOINT`, derived
+  from `FASTMACE_MODELS` unless already set. It passes locally with a local
+  `1a-T18`-style export at `~/fastmace-baseline/1a-T18`, now created.
+- **`constraints.PROCESS` (T13 Q3)** is accepted: a process-wide record of
+  facts (the compile family), not a switch. Tests pass their own
+  `ProcessRecord`.
+- **API for T15:** `GraphEngine(engine_config, force_field, integrator,
+  state, neighbours=...)`. `pipelined` must be resolved to "on" or "off".
+  `speculative_graph` is refused for NPT and together with pipelining.
+  `compile.configure_allocator()` must run before the first CUDA allocation
+  when `expandable_segments` is on. `async_output` is the run loop's
+  choice (T17), not the engine's.
+
 ## New optimisations: screens after T19 (owner, 17 October 2026)
 
 The owner welcomes trying new optimisations and adopting those that make
