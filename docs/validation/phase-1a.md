@@ -200,6 +200,37 @@ engine first moved the float64 POLAR-1-S reference on NbCl5 by up to
 FastMACE and stock MACE to 1e-13. Gate results from before this rewrite
 count as provisional ("Second outside review").
 
+**The old gate's polar references were correct only by accident.** The
+references' PolarMACE stress needs the k-space correction for MACE issue
+1642 (SPEC §12.1). The research engine's `polar_gpu` installs it on the
+class at the first `enable()`. `workflow.configure_md_calculator` stores
+each model's bound `forward`. The old gate called it before `enable()`,
+yet its references were corrected anyway: they shared a process with the
+production engine, whose setup had already installed the class patch.
+
+1a-T19's fresh reference processes had no such engine. Their first run
+called `configure_md_calculator` first, so both references, float64 and
+float32, silently computed MACE 0.3.16's uncorrected stress.
+- Every POLAR row then failed on stress: NaCl 3.0–4.6e-5 eV/Å³, the size
+  of the uncorrected error.
+- Two production engines that agree with each other both failed. FastMACE
+  gave 4.6e-5, and so did the research engine
+  (`gate-polar1-s-NaCl-baseline.uncorrected-reference`).
+
+Fixed in `5e5019d`: `enable()` first, and the reference raises unless the
+corrected `forward` is the active one. Since `e05dd55`, the first float64
+reference of each run also checks its stress against central finite
+differences of its energy, for PolarMACE: strain ±1e-4, six Voigt
+components, tolerance 1e-6 eV/Å³. That tolerance lies between the corrected
+path's 7.5e-9 and the uncorrected 2e-5 on NaCl. The driver also records the
+production stress against the same finite differences:
+
+| Run | Configuration | Reference − FD (eV/Å³) | Production − FD (eV/Å³) |
+| --- | --- | ---: | ---: |
+| … | … | … | … |
+
+The invalid runs are kept as `*.uncorrected-reference`.
+
 | Label | Structures | Worst force ratio | Worst stress ratio | Max energy error, production / float32 (meV/atom) | Pass |
 | --- | --- | ---: | ---: | --- | --- |
 | mp0-medium | NaCl, NaNbO3, NbCl5 (3×3×3) | … | … | … | … |
