@@ -481,7 +481,8 @@ def test_idle_verdict():
 
 
 def test_idle_check_waits_for_utilization_to_settle_but_not_for_a_process():
-    busy_then_idle = [dict(idle=False, compute_pids=[]), dict(idle=False, compute_pids=[]), dict(idle=True, compute_pids=[])]
+    busy, idle = dict(idle=False, compute_pids=[]), dict(idle=True, compute_pids=[])
+    busy_then_idle = [dict(busy), dict(busy), idle]
     records = iter(busy_then_idle)
     slept = []
     record = run.settled_idle_check(lambda: next(records), sleep=slept.append)
