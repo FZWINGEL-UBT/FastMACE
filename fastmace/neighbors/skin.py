@@ -302,7 +302,9 @@ class SkinNeighbourList:
     def buffers(self) -> Mapping[str, torch.Tensor]:
         """Persistent device buffers that build, compact and set_cell write, by name.
 
-        The addresses change only when ``build`` returns True.
+        The addresses change only when ``build`` returns True. The engine registers them as
+        ``force_field.neighbours.<name>`` (``fastmace.engine.registry.POLICIES``): ``cell`` is
+        derived from the state's cell, everything else is reset by a rebuild.
         """
         names = ["candidate_index", "candidate_unit_shifts", "candidate_shifts", "candidate_shifts64",
                  "edge_index", "unit_shifts", "shifts", "count", "reference_positions"]

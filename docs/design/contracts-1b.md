@@ -79,8 +79,9 @@ capture=True, sticky=False)`. `restart` is one of these:
 - `derived`: recomputed from saved state, or overwritten before it is read.
 
 `capture` means it is restored after warm-ups. `sticky` flags are cleared only by a
-host decision. Policies for what phase 1a has (`GraphEngine.runtime_state`); T04
-registers them and adds anything its version-counter test finds:
+host decision. Policies for what phase 1a has (`GraphEngine.runtime_state`, removed by T04);
+T04 registers them and adds anything its version-counter test finds. The table in code is
+`registry.POLICIES`, keyed by attribute path; a buffer without a policy raises `RegistryError`.
 
 | Buffers | Restart | Capture, sticky |
 | --- | --- | --- |
@@ -91,11 +92,18 @@ registers them and adds anything its version-counter test finds:
 | Langevin `x_old`, `rnd_pos`, `rnd_vel`, `xi`, `eta`; BAOAB `xi`, `zeta` | derived (written before read) | capture |
 | integrator `sqrt_kT` (target) | derived from the protocol position | capture |
 | `neighbours.*` (candidates, edges, shifts, `count`, `reference_positions`, build cell h₀) | reset (`rebuild`) | capture |
+| `neighbours.cell` (copy of the current cell, T04) | derived from `state.cell` (`set_cell`) | capture |
 | force-field `cell`, `volume`, `rcell` | derived from `state.cell` | capture |
+| force-field `positions` (the model's input leaf, T04) | derived (refilled before every force call) | capture |
 | `polar.*` k-vector set and bounds | reset (rebuild from the cell) | capture |
 | `polar.overflow` | reset | capture, **sticky** |
 | `engine.flags`, `pipe_flags`, `spec_flags`, `rebuild_needed` | reset (quiesce) | capture, **sticky** (overflow bits) |
 | `engine.mid.*`, pipeline floor and next bucket (`_pipe_floor`, `_pipe_edges`) | reset (quiesce) | capture |
+| `engine.flags_host`, `pipe_flags_host`, `spec_flags_host` (host mirrors, T04) | derived (overwritten before read) | no capture |
+
+`sqrt_kT` is read by the engine from the integrator (it is not in 1a's `Integrator.buffers`).
+`p_eps` and `force_eps` have policies under both `integrator.` and `state.`, so T05's move needs no
+registry change. The pipeline floor and next bucket are host integers, not tensors: T14 resets them.
 
 ## SimulationState fields 1b adds (T05)
 

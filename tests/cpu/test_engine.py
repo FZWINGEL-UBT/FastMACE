@@ -352,29 +352,29 @@ def test_run_flushes():
 # --------------------------------------------------------------------------- warm-up state and refusals
 
 
-def test_runtime_state_covers_every_writer():
-    """The tensors capture warm-ups save: integrator, force field, state results and engine buffers."""
+def test_registry_covers_every_writer():
+    """The tensors capture warm-ups save: state, integrator, force field and engine buffers (the registry, 1b-T04)."""
     engine = build(replay=True, npt=True, engine=EngineConfig(pipelined="on", device="cpu"))
-    names = set(engine.runtime_state())
-    assert {"state.forces", "state.energy", "state.stress", "integrator.positions", "integrator.velocities",
-            "integrator.p_eps", "integrator.force_eps", "integrator.cell", "force_field.neighbours.edge_index",
+    names = set(engine.registry.tensors())
+    assert {"state.forces", "state.energy", "state.stress", "state.positions", "state.velocities",
+            "integrator.p_eps", "integrator.force_eps", "state.cell", "force_field.neighbours.edge_index",
             "force_field.neighbours.count", "force_field.neighbours.cell", "engine.rebuild_needed",
             "engine.flags", "engine.pipe_flags", "engine.spec_flags", "engine.mid.0", "engine.mid.1"} <= names
     # one tensor appears once even when two owners name it (state.positions is the integrator's too)
-    pointers = [tensor.data_ptr() for tensor in engine.runtime_state().values()]
+    pointers = [tensor.data_ptr() for tensor in engine.registry.tensors().values()]
     assert len(pointers) == len(set(pointers))
 
 
-def test_warmups_restore_the_runtime_state():
-    """GraphEngine._warm_up runs a stage three times and puts every runtime tensor back (here on the CPU)."""
+def test_warmups_restore_the_registered_state():
+    """GraphEngine._warm_up runs a stage three times and puts every registered tensor back (here on the CPU)."""
     engine = build(npt=True, engine=EngineConfig(pipelined="on", device="cpu"))
     engine.integrator.set_temperature(100.0)
     engine.run(3)
     engine.integrator.prepare_step(engine.state)
-    before = {name: tensor.clone() for name, tensor in engine.runtime_state().items()}
+    before = {name: tensor.clone() for name, tensor in engine.registry.tensors().items()}
     for key in ("ACP", "AC", "C", ("B", engine.force_field.num_edges)):
         engine._warm_up(key)
-        for name, tensor in engine.runtime_state().items():
+        for name, tensor in engine.registry.tensors().items():
             assert torch.equal(tensor, before[name]), (key, name)
 
 

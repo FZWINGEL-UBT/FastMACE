@@ -215,7 +215,7 @@ def test_async_output_is_bit_identical(mode):
 
 
 @pytest.mark.parametrize("mode", ["checked", "pipelined", "speculative", "npt"])
-def test_capture_warmups_leave_the_runtime_state(mode):
+def test_capture_warmups_leave_the_registered_state(mode):
     engine = build(mode="pipelined" if mode == "npt" else mode, npt=mode == "npt")
     engine.integrator.set_temperature(100.0)
     engine.run(5)  # the stages of the first steps are captured
@@ -226,10 +226,10 @@ def test_capture_warmups_leave_the_runtime_state(mode):
             "speculative": [("ACB", edges + 64, 0), "C", ("B", edges + 64)], "npt": ["ACP", "C", ("B", edges)]}[mode]
     for key in keys:
         engine._graphs.pop(key, None)
-        before = {name: (tensor.data_ptr(), tensor.clone()) for name, tensor in engine.runtime_state().items()}
+        before = {name: (tensor.data_ptr(), tensor.clone()) for name, tensor in engine.registry.tensors().items()}
         engine._capture(key)
         torch.cuda.synchronize()
-        after = engine.runtime_state()
+        after = engine.registry.tensors()
         assert set(after) == set(before)
         for name, (pointer, value) in before.items():
             assert after[name].data_ptr() == pointer, (key, name)
@@ -403,10 +403,10 @@ def warmup_check(engine, keys):
     engine.integrator.prepare_step(engine.state)
     bad = []
     for key in keys:
-        before = {{name: (t.data_ptr(), t.clone()) for name, t in engine.runtime_state().items()}}
+        before = {{name: (t.data_ptr(), t.clone()) for name, t in engine.registry.tensors().items()}}
         engine._capture(key)
         torch.cuda.synchronize()
-        after = engine.runtime_state()
+        after = engine.registry.tensors()
         bad += [f"{{key}}:{{name}}" for name, (pointer, value) in before.items()
                 if after[name].data_ptr() != pointer or not torch.equal(after[name], value)]
     return bad
