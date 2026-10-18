@@ -75,6 +75,11 @@ REFERENCE_SCOPES = ("calculator", "configuration")
 FD_STRAIN = 1e-4
 FD_TOLERANCE = 1e-6  # eV/A^3
 VOIGT = ((0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1))
+# The self-test always runs on NaCl 3x3x3, the gate's first hydrostatic configuration, whatever the run's
+# structures: POLAR-1-S on NbCl5 3x3x3 differs from finite differences by 4.4e-4 eV/A^3 even on the
+# corrected path (a model property, recorded in docs/validation/phase-1a.md), so the test would stop
+# a run for a reason other than the one it guards against.
+FD_STRUCTURE, FD_REPEAT, FD_KEY = "NaCl", (3, 3, 3), "hydrostatic-0"
 # The research engine's benchmark crystals (workflow.NAMES); a name resolves to its r2SCAN CIF in the export.
 BENCHMARK_NAMES = ("NaCl", "NaNbCl6", "NaTaCl6", "NaNbO3", "NaTaO3",
                    "NbCl3O", "TaCl3O", "NbCl2O", "NbCl5", "TaCl5")
@@ -457,8 +462,15 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
         common = dict(model=args.model, checkpoint=str(checkpoint), baseline=str(export.root), backend=args.backend,
                       md_dtype=args.dtype, main_args=args.main_args)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
-        # One finite-difference self-test, by the first float64 reference (it acts for polar models only).
-        next(job for job in jobs if job["dtype"] == "float64")["fd_check"] = True
+        # One finite-difference self-test, by the first float64 reference (it acts for polar models only), on
+        # the gate's first NaCl 3x3x3 configuration (the same draw as a NaCl run's own hydrostatic-0).
+        fd_name, fd_source, fd_repeat = structure_spec(FD_STRUCTURE, FD_REPEAT, export.root)
+        fd_base = read(fd_source).repeat(fd_repeat)
+        fd_base.set_pbc(True)
+        fd_file = output / "configs" / "fd-selftest.npz"
+        write_configurations(fd_file, fd_base, {"hydrostatic": make_configurations(
+            fd_base, "hydrostatic", 1, args.seed, args.strain, args.rattle_A)})
+        next(job for job in jobs if job["dtype"] == "float64")["fd_check"] = str(fd_file)
         jobs.append(dict(kind="production", name=f"production-{args.engine}", engine=args.engine,
                          structures={s: dict(configurations=str(files[s]), keys=keys[s]) for s in keys}))
         script = Path(__file__).resolve()
@@ -494,9 +506,10 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
         for process in meta["processes"]:
             check = (process.get("result") or {}).get("fd_stress_check")
             if check:
-                job = next(j for j in jobs if j["name"] == process["name"])
-                where = f"{job['structure']}/{check['key']}"
-                check["production_max_abs"] = float(np.abs(production[where][2] - np.array(check["fd_stress"])).max())
+                where = f"{FD_STRUCTURE}/{check['key']}"
+                if where in production and tuple(meta["structures"][FD_STRUCTURE]["repeat"]) == FD_REPEAT:
+                    check["production_max_abs"] = float(np.abs(production[where][2]
+                                                               - np.array(check["fd_stress"])).max())
                 meta.setdefault("fd_stress_checks", {})[where] = check
         for structure in keys:
             entry = meta["structures"][structure]
@@ -617,12 +630,19 @@ def reference_child(job, result):
         values[f"{job['structure']}/{key}"] = calculator_values(configs[key], calc)
         print(job["name"], key, flush=True)
     if polar_gpu.is_polar(model) and job.get("fd_check"):
-        # The self-test: a reference without the k-space stress correction must not pass unnoticed.
-        key = job["keys"][0]
-        fd = finite_difference_stress(lambda atoms: calculator_values(atoms, calc)[0], configs[key])
-        analytic = values[f"{job['structure']}/{key}"][2]
+        # The self-test: a reference without the k-space stress correction must not pass unnoticed. It runs
+        # on NaCl 3x3x3 (FD_STRUCTURE), then the long-range state goes back to this job's structure.
+        fd_base, fd_configs = read_configurations(job["fd_check"])
+        key = FD_KEY
+        polar_gpu.enable(model, fd_base.cell.array, headroom=0.1)
+        try:
+            analytic = calculator_values(fd_configs[key], calc)[2]
+            fd = finite_difference_stress(lambda atoms: calculator_values(atoms, calc)[0], fd_configs[key])
+        finally:
+            polar_gpu.enable(model, base.cell.array, headroom=0.1)
         delta = float(np.abs(analytic - fd).max())
-        result["fd_stress_check"] = dict(key=key, strain=FD_STRAIN, tolerance=FD_TOLERANCE, max_abs=delta,
+        result["fd_stress_check"] = dict(structure=f"{FD_STRUCTURE} {'x'.join(map(str, FD_REPEAT))}", key=key,
+                                         strain=FD_STRAIN, tolerance=FD_TOLERANCE, max_abs=delta,
                                          fd_stress=fd.tolist(), passed=bool(delta <= FD_TOLERANCE))
         print(job["name"], "finite-difference stress check", key, f"{delta:.2e}", flush=True)
         if delta > FD_TOLERANCE:

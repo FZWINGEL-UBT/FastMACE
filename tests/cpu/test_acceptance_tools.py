@@ -231,7 +231,10 @@ def test_driver_runs_every_reference_before_the_production_process(tmp_path, exp
     assert kinds == ["reference", "reference", "production"]
     assert [job["dtype"] for job in jobs[:2]] == ["float64", "float32"]
     assert jobs[-1]["engine"] == "fastmace"
-    assert [job.get("fd_check", False) for job in jobs] == [True, False, False]  # the first float64 reference
+    # the first float64 reference does the self-test, on NaCl 3x3x3
+    assert [bool(job.get("fd_check")) for job in jobs] == [True, False, False]
+    fd_base, fd_configs = gate.read_configurations(jobs[0]["fd_check"])
+    assert len(fd_base) == 8 * 27 and list(fd_configs) == ["hydrostatic-0"]
     assert meta["status"] == "complete" and meta["passed"]
     assert len(meta["structures"]["NaCl"]["configs"]) == 4  # 2 configurations x 2 cell modes
     assert [p["kind"] for p in meta["processes"]] == kinds
