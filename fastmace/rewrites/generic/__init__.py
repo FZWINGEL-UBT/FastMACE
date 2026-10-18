@@ -331,8 +331,8 @@ RECORDS = {
         "generic_fused_radial_backward", "fused_folded_backward", _support_fused_radial_backward, "rounding", (),
         apply_fused_radial_backward, _selfcheck_fused_radial_backward),
     "generic_streaming": _record(
-        "generic_streaming", "streaming_conv", _support_streaming, "exact", ("sorted_receivers", "edge_counter"),
-        apply_streaming, _selfcheck_streaming),
+        "generic_streaming", "streaming_conv", _support_streaming, "exact",
+        ("sort_receivers", "per_engine_edge_counter"), apply_streaming, _selfcheck_streaming),
 }
 
 __all__ = ["NODE_ATTRS", "RECORDS", "apply_fused_radial_backward", "apply_reassociate", "apply_species_skip",

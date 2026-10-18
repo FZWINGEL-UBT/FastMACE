@@ -264,6 +264,12 @@ def check_trust(resolved, digest, sha256=None, trusted=False):
 # ------------------------------------------------------------------------ backend checks
 
 
+def _device_type(device):
+    import torch
+
+    return torch.device(device).type
+
+
 def _model_device_type(model):
     for tensor in model.parameters():
         return tensor.device.type
@@ -534,7 +540,13 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
         kwargs["enable_oeq"] = True
     # The fusion rule acts on this conversion only; the rule in force before is back afterwards.
     scope = _patches.cueq_conv_fusion(cueq_conv_fusion) if backend == "cueq" else contextlib.nullcontext()
-    with checkpoint_warning_filter(), scope:
+    # On the CPU, cuEq must build its naive kernels: with cuequivariance_ops_torch importable it would
+    # pick the CUDA-only uniform_1d kernel, and the first forward pass would fail (decision after T06).
+    naive = _device_type(device) == "cpu" and backend == "cueq"
+    if naive:
+        from fastmace.model import compile as compiling
+    naive_scope = compiling.naive_cueq() if naive else contextlib.nullcontext()
+    with checkpoint_warning_filter(), scope, naive_scope:
         from mace.calculators import MACECalculator
         try:
             if backend == "hybrid":

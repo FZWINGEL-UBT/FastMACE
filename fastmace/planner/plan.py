@@ -1,6 +1,6 @@
 """The Plan record and the Planner protocol (SPEC §9.1, §9.5).
 
-Phase 1a stub (plan task 1a-T02); 1a-T15 writes the fixed-plan planner (``fixed.py``), which
+The record and protocol are plan task 1a-T02's; the fixed-plan planner (``fixed.py``, 1a-T15)
 reproduces what the research engine's ``main.py`` runs today. The planner is the only code
 that builds force fields, integrators and engines from a plan (SPEC §5).
 
@@ -43,6 +43,10 @@ class Plan:
       ``neighbours``, ``polar`` (``None`` for non-polar models), ``integrator``;
     - ``decisions``: ``(item, choice, reason)`` for every decision, enabled and disabled
       rewrites included;
+    - ``requested``: ``(item, value)`` of every option the caller set to something other than
+      ``"auto"`` (an explicit ``"on"`` is refused, never downgraded, when it cannot be honoured);
+    - ``auto_options_off``: ``(option, reason)`` for every option that ``auto`` switched off because
+      the model does not support it (the research engine's ``model.auto_options_off``);
     - ``fallbacks``: the fallback candidates, in order (empty in 1a);
     - ``predicted_memory_bytes``: ``None`` until the memory model exists;
     - ``revision``, ``predecessor``, ``reason``: a plan never changes in place; a runtime switch
@@ -57,6 +61,8 @@ class Plan:
     polar: PolarConfig | None = None
     integrator: IntegratorConfig | None = None
     decisions: tuple[tuple[str, str, str], ...] = ()
+    requested: tuple[tuple[str, str], ...] = ()
+    auto_options_off: tuple[tuple[str, str], ...] = ()
     fallbacks: tuple[Plan, ...] = ()
     predicted_memory_bytes: int | None = None
     revision: int = 0
@@ -65,7 +71,16 @@ class Plan:
 
     def describe(self) -> str:
         """The human-readable plan (``str(plan)``), written into provenance (SPEC §13)."""
-        raise NotImplementedError("1a-T15")
+        lines = [f"Plan revision {self.revision}, tier {self.tier}: {self.reason}"]
+        lines += [f"  {item} = {choice}  ({reason})" for item, choice, reason in self.decisions]
+        if self.requested:
+            lines.append("  requested: " + ", ".join(f"{item}={value}" for item, value in self.requested))
+        if self.predecessor is not None:
+            lines.append(f"  predecessor: revision {self.predecessor.revision}")
+        return "\n".join(lines)
+
+    def __str__(self) -> str:
+        return self.describe()
 
 
 @runtime_checkable
