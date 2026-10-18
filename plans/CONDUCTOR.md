@@ -62,6 +62,25 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
   turn. It does its preparation, reports "prepared, waiting", and gets a go
   message after its dependency merges; messaging an existing session works
   from any turn. T17 and T19 run this way.
+- **Prestarted phase workers (owner, 19 October 2026).** So that the
+  conductor need not wait for "start all ready", the owner had every
+  remaining 1b task started at once in one owner turn. Each worker:
+  1. **Prepares read-only:** reads `AGENTS.md`, the phase plan's working
+     principles and resource rules, its own task, the decision sections, the
+     named SPEC sections and the research sources. Unmerged contracts are
+     read with `git show origin/fastmace/<branch>:<path>`. No edits, no
+     commits, no test runs, no WSL suites (15 GB RAM), no GPU, no
+     workstation commands.
+  2. **Reports "prepared, waiting"** with: its reading of the task, the
+     files it will own, open questions, and clashes it sees with other
+     tasks. Then it ends its turn and waits.
+  3. **Starts only on the conductor's go message.** The go names the GPU (or
+     none) and the reserved machines. The worker first brings its worktree
+     up to date with `main` (the app's `sync_with_base_branch`), re-reads
+     what its dependencies merged, and then works as in the plan.
+  The conductor sends go messages from any turn, at most four workers active
+  at once, one GPU per task. A waiting session costs nothing; its worktree
+  was cut from `main` at start, so syncing before work is mandatory.
 - **ResearchModule worktrees go on NVMe.** ResearchModule is on a USB hard
   disk: an app worktree there took more than 5 minutes and got stuck. For a
   task that must change ResearchModule (such as T17), the conductor creates

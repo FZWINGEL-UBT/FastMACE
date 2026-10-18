@@ -22,10 +22,12 @@ Tasks whose dependencies are merged and whose brief is ready. The owner
 starts all of them with one message, "start all ready" (see
 [CONDUCTOR.md](CONDUCTOR.md)).
 
-- **1b-T01** contracts: public names, config fields, stubs (wave 0; conductor task, delegated).
-- **1b-T11** MP-0 speed gap and setup-time diagnosis (murphy, idle check first).
-- 1b-T02 (exceptions) follows T01 and is started once T01 is merged.
-- Running: 1b-T01, 1b-T11 (murphy), 1b-T24 test-suite speed (local GPU).
+All remaining 1b tasks were prestarted on 19 October 2026 (owner request)
+and wait for the conductor's go message (`CONDUCTOR.md`, "Prestarted phase
+workers"). No "start all ready" is needed in phase 1b.
+
+- Working: 1b-T01 (review), 1b-T11 (murphy), 1b-T24 (local GPU).
+- Waiting for go: 1b-T02 to T10, T12 to T23.
 
 ## Open owner decisions
 
