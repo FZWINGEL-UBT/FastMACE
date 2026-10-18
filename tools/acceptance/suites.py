@@ -386,5 +386,11 @@ def primary_jobs(machine: Machine, run_root: Path) -> list:
     return [job for job in speed_jobs(machine, run_root) if job.name.startswith(("ab-mh1-nvt-r", "ab-mh1-npt"))]
 
 
+def alternating_cueq_jobs(machine: Machine, run_root: Path) -> list:
+    """MH-1 NaCl on plain cuEq float64 in alternating single-engine processes."""
+    return alternating_jobs(machine, run_root, models=("mh1-cueq",))
+
+
 SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun_jobs, "alternating": alternating_jobs,
+          "alternating-cueq": alternating_cueq_jobs,
           "gate": gate_jobs, "workflow": workflow_jobs}
