@@ -193,6 +193,22 @@ def test_values_round_trip(tmp_path):
         np.testing.assert_array_equal(got[key][2], stress)
 
 
+def test_finite_difference_stress_of_a_known_energy():
+    from ase.build import bulk
+
+    atoms = bulk("NaCl", "rocksalt", a=5.64, cubic=True)
+    sigma = np.array([[0.01, 0.002, -0.003], [0.002, -0.02, 0.004], [-0.003, 0.004, 0.005]])
+    reference = atoms.cell.array.copy()
+
+    def energy(probe):
+        # E = V0 * sum(sigma * strain), with the strain read back from the cell: exact linear stress sigma.
+        strain = np.linalg.solve(reference, probe.cell.array) - np.identity(3)
+        strain = 0.5 * (strain + strain.T)
+        return atoms.get_volume() * float((sigma * strain).sum())
+
+    np.testing.assert_allclose(gate.finite_difference_stress(energy, atoms), sigma, atol=1e-12)
+
+
 def test_assemble_row():
     f64 = (10.0, np.zeros((2, 3)), np.zeros((3, 3)))
     f32 = (10.001, np.full((2, 3), 1e-6), np.full((3, 3), 1e-8))
@@ -215,6 +231,7 @@ def test_driver_runs_every_reference_before_the_production_process(tmp_path, exp
     assert kinds == ["reference", "reference", "production"]
     assert [job["dtype"] for job in jobs[:2]] == ["float64", "float32"]
     assert jobs[-1]["engine"] == "fastmace"
+    assert [job.get("fd_check", False) for job in jobs] == [True, False, False]  # the first float64 reference
     assert meta["status"] == "complete" and meta["passed"]
     assert len(meta["structures"]["NaCl"]["configs"]) == 4  # 2 configurations x 2 cell modes
     assert [p["kind"] for p in meta["processes"]] == kinds

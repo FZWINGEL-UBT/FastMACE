@@ -68,6 +68,13 @@ CELL_MODES = ("hydrostatic", "full")
 # Reference calculators, in the order they run: (name in the rows, dtype).
 REFERENCES = (("f64", "float64"), ("ase_f32", "float32"))
 REFERENCE_SCOPES = ("calculator", "configuration")
+# Self-test of a float64 polar reference: its stress against central finite differences of its energy
+# (strain +-FD_STRAIN, six Voigt components) on the first configuration, before any polar row counts.
+# MACE 0.3.16's uncorrected PolarMACE stress is off by 2e-5 eV/A^3 on NaCl 3x3x3, the corrected one
+# agrees to 7.5e-9 (ResearchModule studies/other_models/README.md); the tolerance lies between.
+FD_STRAIN = 1e-4
+FD_TOLERANCE = 1e-6  # eV/A^3
+VOIGT = ((0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1))
 # The research engine's benchmark crystals (workflow.NAMES); a name resolves to its r2SCAN CIF in the export.
 BENCHMARK_NAMES = ("NaCl", "NaNbCl6", "NaTaCl6", "NaNbO3", "NaTaO3",
                    "NbCl3O", "TaCl3O", "NbCl2O", "NbCl5", "TaCl5")
@@ -292,6 +299,32 @@ def save_values(path, values):
     np.savez(path, **arrays)
 
 
+def strained(atoms, strain):
+    """A copy of ``atoms`` with the symmetric ``strain`` applied to cell and positions."""
+    copy = atoms.copy()
+    copy.set_cell(atoms.cell.array @ (np.identity(3) + strain), scale_atoms=True)
+    return copy
+
+
+def finite_difference_stress(energy, atoms, h=FD_STRAIN):
+    """3x3 stress (eV/A^3, ASE sign convention) of ``energy(atoms)`` by central differences in the strain.
+
+    Diagonal component ii: strain e_ii = +-h; shear ij: e_ij = e_ji = +-h/2, so in both cases
+    sigma = (E(+) - E(-)) / (2 h V).
+    """
+    volume = atoms.get_volume()
+    stress = np.zeros((3, 3))
+    for i, j in VOIGT:
+        e = np.zeros((3, 3))
+        if i == j:
+            e[i, i] = h
+        else:
+            e[i, j] = e[j, i] = h / 2
+        value = (energy(strained(atoms, e)) - energy(strained(atoms, -e))) / (2 * h * volume)
+        stress[i, j] = stress[j, i] = value
+    return stress
+
+
 def assemble_row(key, natoms, f64, f32, production, extra=None):
     """One configuration's row of metadata.json from the three (energy, forces, stress) evaluations."""
     from ase import units
@@ -424,6 +457,8 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
         common = dict(model=args.model, checkpoint=str(checkpoint), baseline=str(export.root), backend=args.backend,
                       md_dtype=args.dtype, main_args=args.main_args)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
+        # One finite-difference self-test, by the first float64 reference (it acts for polar models only).
+        next(job for job in jobs if job["dtype"] == "float64")["fd_check"] = True
         jobs.append(dict(kind="production", name=f"production-{args.engine}", engine=args.engine,
                          structures={s: dict(configurations=str(files[s]), keys=keys[s]) for s in keys}))
         script = Path(__file__).resolve()
@@ -455,6 +490,14 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
             else:
                 production = load_values(job["values"])
         production_info = meta["processes"][-1]["result"] or {}
+        # Finite-difference self-tests of the polar references, against the production stress too.
+        for process in meta["processes"]:
+            check = (process.get("result") or {}).get("fd_stress_check")
+            if check:
+                job = next(j for j in jobs if j["name"] == process["name"])
+                where = f"{job['structure']}/{check['key']}"
+                check["production_max_abs"] = float(np.abs(production[where][2] - np.array(check["fd_stress"])).max())
+                meta.setdefault("fd_stress_checks", {})[where] = check
         for structure in keys:
             entry = meta["structures"][structure]
             for key in keys[structure]:
@@ -573,6 +616,18 @@ def reference_child(job, result):
     for key in job["keys"]:
         values[f"{job['structure']}/{key}"] = calculator_values(configs[key], calc)
         print(job["name"], key, flush=True)
+    if polar_gpu.is_polar(model) and job.get("fd_check"):
+        # The self-test: a reference without the k-space stress correction must not pass unnoticed.
+        key = job["keys"][0]
+        fd = finite_difference_stress(lambda atoms: calculator_values(atoms, calc)[0], configs[key])
+        analytic = values[f"{job['structure']}/{key}"][2]
+        delta = float(np.abs(analytic - fd).max())
+        result["fd_stress_check"] = dict(key=key, strain=FD_STRAIN, tolerance=FD_TOLERANCE, max_abs=delta,
+                                         fd_stress=fd.tolist(), passed=bool(delta <= FD_TOLERANCE))
+        print(job["name"], "finite-difference stress check", key, f"{delta:.2e}", flush=True)
+        if delta > FD_TOLERANCE:
+            raise GateJobError(f"polar reference stress differs from finite differences by {delta:.2e} eV/A^3 "
+                               f"(tolerance {FD_TOLERANCE:g}): the k-space stress correction is not active")
     result.update(single_graph_strain=bool(md.single_graph_strain), dtype=job["dtype"])
     _torch_record(torch, result)
     return values
