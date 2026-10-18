@@ -7,7 +7,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | Phase | Plan | Status |
 | --- | --- | --- |
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
-| 1a. Extraction | [phase-1a.md](phase-1a.md) | 19 of 20 merged (T00–T18; T17 in ResearchModule; 18 October 2026); T19 running, T13b fix in progress |
+| 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phase-1a.md`); owner checkpoint 3 open |
 | 1b. Contracts | — | written during 1a |
 | 2. Safety | — | |
 | 3. Dynamic topology and MC | — | |
@@ -22,7 +22,7 @@ Tasks whose dependencies are merged and whose brief is ready. The owner
 starts all of them with one message, "start all ready" (see
 [CONDUCTOR.md](CONDUCTOR.md)).
 
-- none. T17 and T19 are running (go given after T15).
+- none. Phase 1a is complete except for the owner's checkpoint 3; the phase 1b plan is written next.
 
 ## Open owner decisions
 
