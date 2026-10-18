@@ -909,7 +909,7 @@ RTX 5060 Ti with hybrid FP32 MH-1 on NaCl 3×3×3 it matches `--engine gpu`:
   warm-up of its first capture at a new bucket. Each engine alone, with fresh
   caches, compiles nothing there. The fix (`fastmace/1a-T13b`, ae3e758)
   reinstalls before each capture. Its GPU validation is paused while the
-  owner uses the local GPU.
+  owner uses the local GPU. **Merged 18 October 2026: full GPU suite 221 passed, 2 skipped.**
 - **Murphy speed suite done (T19, run `1a-T19-speed-murphy-20261018`).**
   FastMACE/baseline step-time ratios, 12 blocks, same-process noise floor
   0.16%:
