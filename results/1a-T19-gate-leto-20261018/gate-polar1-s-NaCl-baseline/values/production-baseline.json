@@ -1,0 +1,84 @@
+{
+  "name": "production-baseline",
+  "kind": "production",
+  "pid": 1960715,
+  "host": "leto",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "started_utc": "2026-10-18T14:18:31.867032+00:00",
+  "hybrid_launcher": true,
+  "compile_cache": {
+    "directory": "/mnt/homes/zwingel/fastmace-cache/acceptance-leto/oeq-launcher/mace",
+    "shared": true,
+    "cuda_allocator": "expandable_segments:True",
+    "stats": {
+      "inductor.async_compile_cache_miss": 1944,
+      "inductor.async_compile_cache_hit": 1288,
+      "inductor.fxgraph_cache_hit": 76,
+      "aot_autograd.autograd_cache_bypass": 4,
+      "aot_autograd.autograd_cache_hit": 34,
+      "aot_autograd.autograd_cache_miss": 4
+    }
+  },
+  "auto_options_off": {
+    "species_skip": "no MACE-MP-0 or density-family interaction"
+  },
+  "flags": {
+    "factor_species": true,
+    "fold_cutoff": true,
+    "sort_receivers": true,
+    "density_first": true,
+    "reassociate_first": true,
+    "joint_radial_input": true,
+    "fused_folded_backward": true,
+    "segmented_first_sum": true,
+    "gpu_neighbour_list": true,
+    "block_linear": true,
+    "grouped_linear": true,
+    "merged_residual": true,
+    "species_skip": false,
+    "streaming_conv": true,
+    "fused_radial_hidden": false,
+    "speculative_graph": false,
+    "pipelined": true
+  },
+  "load_s": 3.979521980509162,
+  "backend": "hybrid",
+  "dtype": "float32",
+  "compile_mode": "default",
+  "skin": 0.3,
+  "edges": {
+    "NaCl/hydrostatic-0": {
+      "edges": 6920,
+      "padded_edges": 7168
+    },
+    "NaCl/hydrostatic-1": {
+      "edges": 6912,
+      "padded_edges": 7168
+    },
+    "NaCl/hydrostatic-2": {
+      "edges": 6918,
+      "padded_edges": 7168
+    },
+    "NaCl/full-0": {
+      "edges": 6958,
+      "padded_edges": 7168
+    },
+    "NaCl/full-1": {
+      "edges": 6960,
+      "padded_edges": 7168
+    },
+    "NaCl/full-2": {
+      "edges": 7000,
+      "padded_edges": 7168
+    }
+  },
+  "setup_s": {
+    "NaCl/hydrostatic": 14.480541579425335,
+    "NaCl/full": 8.00171273201704
+  },
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "peak_memory_bytes": 241172480,
+  "status": "complete",
+  "wall_s": 59.553975235670805
+}

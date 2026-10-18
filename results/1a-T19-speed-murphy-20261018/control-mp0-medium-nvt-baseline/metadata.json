@@ -1,0 +1,281 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "created_utc": "2026-10-18T13:15:48.927540+00:00",
+  "host": "murphy",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "2f88d25dc173bdf34918f4ec857100a1d5bbb318",
+  "baseline": {
+    "root": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd"
+  },
+  "model": "mp0-medium",
+  "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/2023-12-03-mace-128-L1_epoch-199.model",
+  "checkpoint_sha256": "01bfe22100139f424713cf921144e5509cbe353d67aa9fa1be9c6e1e0ed35845",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "tf32": false,
+  "ensemble": "nvt",
+  "cell_mode": null,
+  "temperature_K": 300.0,
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 4
+  },
+  "pattern": "abab",
+  "sides": [
+    "baseline"
+  ],
+  "side_kinds": {
+    "baseline": "baseline"
+  },
+  "build_order": [
+    "baseline"
+  ],
+  "oeq_runtime": null,
+  "hybrid_launcher": true,
+  "args": {
+    "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-20261018/control-mp0-medium-nvt-baseline",
+    "baseline": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "sides": [
+      "baseline"
+    ],
+    "model": "mp0-medium",
+    "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/2023-12-03-mace-128-L1_epoch-199.model",
+    "structures": [
+      "NaCl",
+      "NbCl5"
+    ],
+    "temperature_K": 300.0,
+    "warmup": 300,
+    "block": 300,
+    "blocks": 4,
+    "pattern": "abab",
+    "seed": 1,
+    "backend": "hybrid",
+    "ensemble": "nvt",
+    "cell_mode": "hydrostatic",
+    "dump_forces": false,
+    "main_args": ""
+  },
+  "compile_cache": {
+    "directory": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq-launcher/mace",
+    "shared": true,
+    "cuda_allocator": "expandable_segments:True",
+    "stats": {
+      "inductor.fxgraph_cache_miss": 6,
+      "inductor.async_compile_cache_miss": 450,
+      "inductor.async_compile_cache_hit": 227,
+      "inductor.fxgraph_cache_hit": 4,
+      "aot_autograd.autograd_cache_bypass": 3,
+      "aot_autograd.autograd_cache_hit": 4
+    }
+  },
+  "calculators": {
+    "baseline": {
+      "load_s": 23.645858880132437,
+      "auto_options_off": {
+        "density_first": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+        "joint_radial_input": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+        "fold_cutoff": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)",
+        "factor_species": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',)"
+      },
+      "flags": {
+        "factor_species": false,
+        "fold_cutoff": false,
+        "sort_receivers": true,
+        "density_first": false,
+        "reassociate_first": true,
+        "joint_radial_input": false,
+        "fused_folded_backward": true,
+        "segmented_first_sum": true,
+        "gpu_neighbour_list": true,
+        "block_linear": true,
+        "grouped_linear": true,
+        "merged_residual": true,
+        "species_skip": true,
+        "streaming_conv": true,
+        "fused_radial_hidden": false,
+        "speculative_graph": false,
+        "pipelined": true
+      }
+    }
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "structure": "NaCl",
+      "sides": {
+        "baseline": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T13:16:49.147601+00:00",
+          "median_ms": 1.452526869252324,
+          "mean_ms": 1.4894788137947519,
+          "min_ms": 1.4383103946844735,
+          "max_ms": 1.614551121989886,
+          "stdev_ms": 0.08399495059529177,
+          "spread": 0.12133388444382508,
+          "block_ms": [
+            1.4383103946844735,
+            1.443218986193339,
+            1.614551121989886,
+            1.461834752311309
+          ],
+          "setup_s": 20.78487885557115,
+          "peak_memory_bytes": 272629760,
+          "observables": {
+            "temperature_K": 231.52524890393113,
+            "potential_eV_atom": -3.344970703125,
+            "kinetic_eV_atom": 0.02992694326817418
+          },
+          "info": {
+            "edge_bucket": 512,
+            "edge_sizes_used": [
+              7168,
+              7680
+            ],
+            "neighbour_rebuilds": 47,
+            "pool_resets": 0,
+            "oeq": true,
+            "factored_interactions": 0,
+            "fold_cutoff": false,
+            "sort_receivers": true,
+            "density_first": false,
+            "reassociate_first": false,
+            "joint_radial_input": false,
+            "fused_folded_backward": false,
+            "segmented_first_sum": true,
+            "gpu_neighbour_list": true,
+            "block_linear": true,
+            "species_skip": true,
+            "generic_fused_radial_backward": true,
+            "streaming_conv": true,
+            "generic_reassociate": true,
+            "fused_radial_hidden": false,
+            "speculative_graph": false,
+            "polar_gpu": null,
+            "pipelined": true,
+            "pipelined_redos": 4,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 46,
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "peak_reserved_bytes": 272629760
+          }
+        }
+      },
+      "plans": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2"
+      },
+      "timing_wall_s": 1.7887211255729198,
+      "warmup_s": {
+        "baseline": 13.93502776324749
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false,
+        "valid": true
+      },
+      "dynamo_counters": {
+        "stats": {
+          "calls_captured": 834,
+          "unique_graphs": 4
+        }
+      },
+      "other_gpu_processes": []
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "structure": "NbCl5",
+      "sides": {
+        "baseline": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T13:17:23.205480+00:00",
+          "median_ms": 9.879987590635817,
+          "mean_ms": 9.82383397873491,
+          "min_ms": 9.493092416475218,
+          "max_ms": 10.042268317192793,
+          "stdev_ms": 0.2612905722682521,
+          "spread": 0.05558467515061256,
+          "block_ms": [
+            9.493092416475218,
+            9.736098237335682,
+            10.023876943935951,
+            10.042268317192793
+          ],
+          "setup_s": 19.236016273498535,
+          "peak_memory_bytes": 1033895936,
+          "observables": {
+            "temperature_K": 230.70350290718537,
+            "potential_eV_atom": -4.41076861095036,
+            "kinetic_eV_atom": 0.029820724417565513
+          },
+          "info": {
+            "edge_bucket": 2560,
+            "edge_sizes_used": [
+              51200,
+              53760,
+              56320
+            ],
+            "neighbour_rebuilds": 47,
+            "pool_resets": 0,
+            "oeq": true,
+            "factored_interactions": 0,
+            "fold_cutoff": false,
+            "sort_receivers": true,
+            "density_first": false,
+            "reassociate_first": false,
+            "joint_radial_input": false,
+            "fused_folded_backward": false,
+            "segmented_first_sum": true,
+            "gpu_neighbour_list": true,
+            "block_linear": true,
+            "species_skip": true,
+            "generic_fused_radial_backward": true,
+            "streaming_conv": true,
+            "generic_reassociate": true,
+            "fused_radial_hidden": false,
+            "speculative_graph": false,
+            "polar_gpu": null,
+            "pipelined": true,
+            "pipelined_redos": 2,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 46,
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "peak_reserved_bytes": 1033895936
+          }
+        }
+      },
+      "plans": {},
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2"
+      },
+      "timing_wall_s": 11.790186448022723,
+      "warmup_s": {
+        "baseline": 2.997955398634076
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false,
+        "valid": true
+      },
+      "dynamo_counters": {
+        "stats": {
+          "calls_captured": 1257,
+          "unique_graphs": 7
+        }
+      },
+      "other_gpu_processes": []
+    }
+  },
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "finished_utc": "2026-10-18T13:17:23.247031+00:00"
+}

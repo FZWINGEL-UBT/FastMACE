@@ -1,0 +1,498 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "created_utc": "2026-10-18T14:57:36.470256+00:00",
+  "host": "murphy",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+  "fastmace_commit": "6ec85b1ca21216f7191c5a831a0a26883e9017e3",
+  "baseline": {
+    "root": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd"
+  },
+  "model": "mh1-r2scan",
+  "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "backend": "cueq",
+  "dtype": "float64",
+  "tf32": false,
+  "ensemble": "nvt",
+  "cell_mode": null,
+  "temperature_K": 300.0,
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "sides": [
+    "baseline",
+    "fastmace"
+  ],
+  "side_kinds": {
+    "baseline": "baseline",
+    "fastmace": "fastmace"
+  },
+  "build_order": [
+    "baseline",
+    "fastmace"
+  ],
+  "oeq_runtime": null,
+  "hybrid_launcher": false,
+  "args": {
+    "output": "/mnt/homes/zwingel/fastmace-acceptance/1a-T19-speed-murphy-rerun-20261018/ab-mh1-cueq-nvt",
+    "baseline": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+    "sides": [
+      "baseline",
+      "fastmace"
+    ],
+    "model": "mh1-r2scan",
+    "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+    "structures": [
+      "NaCl"
+    ],
+    "temperature_K": 300.0,
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12,
+    "pattern": "abab",
+    "seed": 1,
+    "backend": "cueq",
+    "ensemble": "nvt",
+    "cell_mode": "hydrostatic",
+    "dump_forces": true,
+    "main_args": ""
+  },
+  "compile_cache": {
+    "directory": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+    "shared": true,
+    "cuda_allocator": "expandable_segments:True",
+    "stats": {
+      "inductor.async_compile_cache_miss": 1632,
+      "inductor.async_compile_cache_hit": 1074,
+      "inductor.fxgraph_cache_hit": 7,
+      "aot_autograd.autograd_cache_miss": 1,
+      "aot_autograd.autograd_cache_hit": 3
+    }
+  },
+  "calculators": {
+    "baseline": {
+      "load_s": 6.213796420022845,
+      "auto_options_off": {
+        "species_skip": "no MACE-MP-0 or density-family interaction"
+      },
+      "flags": {
+        "factor_species": false,
+        "fold_cutoff": false,
+        "sort_receivers": false,
+        "density_first": false,
+        "reassociate_first": false,
+        "joint_radial_input": false,
+        "fused_folded_backward": false,
+        "segmented_first_sum": false,
+        "gpu_neighbour_list": true,
+        "block_linear": false,
+        "grouped_linear": false,
+        "merged_residual": false,
+        "species_skip": false,
+        "streaming_conv": false,
+        "fused_radial_hidden": false,
+        "speculative_graph": false,
+        "pipelined": true
+      }
+    },
+    "fastmace": {
+      "load_s": 0.6124753598123789,
+      "backend": "cueq",
+      "dtype": "float64",
+      "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47"
+    }
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "structure": "NaCl",
+      "sides": {
+        "baseline": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T15:10:54.658614+00:00",
+          "median_ms": 96.95101109954217,
+          "mean_ms": 98.27369158052737,
+          "min_ms": 95.0947265016536,
+          "max_ms": 115.99795227870345,
+          "stdev_ms": 5.661403282003603,
+          "spread": 0.21560606269065064,
+          "block_ms": [
+            95.0947265016536,
+            95.292231682688,
+            95.29684928556283,
+            115.99795227870345,
+            96.59325343246262,
+            97.88767343387008,
+            97.64953604588906,
+            96.94183583681783,
+            97.1096941890816,
+            97.51852408051491,
+            96.95186922326684,
+            96.95015297581752
+          ],
+          "setup_s": 20.47493401914835,
+          "peak_memory_bytes": 1788870656,
+          "observables": {
+            "temperature_K": 311.62641854419405,
+            "potential_eV_atom": -6.853655612666926,
+            "kinetic_eV_atom": 0.04028081685598847
+          },
+          "info": {
+            "edge_bucket": 512,
+            "edge_sizes_used": [
+              7168,
+              7680
+            ],
+            "neighbour_rebuilds": 155,
+            "pool_resets": 0,
+            "oeq": false,
+            "factored_interactions": 0,
+            "fold_cutoff": false,
+            "sort_receivers": false,
+            "density_first": false,
+            "reassociate_first": false,
+            "joint_radial_input": false,
+            "fused_folded_backward": false,
+            "segmented_first_sum": false,
+            "gpu_neighbour_list": true,
+            "block_linear": false,
+            "species_skip": false,
+            "generic_fused_radial_backward": false,
+            "streaming_conv": false,
+            "generic_reassociate": false,
+            "fused_radial_hidden": false,
+            "speculative_graph": false,
+            "polar_gpu": null,
+            "pipelined": true,
+            "pipelined_redos": 15,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 154,
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "peak_reserved_bytes": 1788870656
+          }
+        },
+        "fastmace": {
+          "schema_version": 1,
+          "created_utc": "2026-10-18T15:10:54.658750+00:00",
+          "median_ms": 96.9430542550981,
+          "mean_ms": 96.73102995380759,
+          "min_ms": 95.20763759811719,
+          "max_ms": 97.87234962607423,
+          "stdev_ms": 0.968334900520148,
+          "spread": 0.027487395032397628,
+          "block_ms": [
+            95.20763759811719,
+            95.25747861713171,
+            95.26256833846371,
+            97.49760649477442,
+            96.5694711295267,
+            97.87234962607423,
+            97.64353832229972,
+            96.94273500392835,
+            97.10126203795275,
+            97.53514767934878,
+            96.9391910918057,
+            96.94337350626786
+          ],
+          "setup_s": 5.935322070494294,
+          "peak_memory_bytes": 1788870656,
+          "observables": {
+            "temperature_K": 311.62641854426477,
+            "potential_eV_atom": -6.853655612666951,
+            "kinetic_eV_atom": 0.04028081685599762
+          },
+          "info": {
+            "engine": "graph",
+            "mode": "pipelined",
+            "capture": true,
+            "pad_edges": true,
+            "variable_cell": false,
+            "initial_edges": 6912,
+            "edge_bucket": 512,
+            "edge_sizes_used": [
+              7168,
+              7680
+            ],
+            "neighbour_rebuilds": 154,
+            "graphs": [
+              "ACP",
+              "('B', 7168)",
+              "('B', 7680)"
+            ],
+            "pool_resets": 0,
+            "capture_memory": [
+              {
+                "key": "ACP",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 1564.0,
+                "max_reserved_after_capture_MiB": 1564.0
+              },
+              {
+                "key": "('B', 7168)",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 1608.0,
+                "max_reserved_after_capture_MiB": 1626.0
+              },
+              {
+                "key": "('B', 7680)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 1706.0,
+                "max_reserved_after_capture_MiB": 1706.0
+              }
+            ],
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "pipelined_redos": 15,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 154,
+            "process": {
+              "allocator": "expandable_segments:True",
+              "dynamo_cache_size_limit": 64,
+              "compile_family": "autograd-in-graph"
+            },
+            "force_field": {
+              "backend": "cueq",
+              "dtype": "float64",
+              "device": "cuda:0",
+              "compile_mode": "default",
+              "training": true,
+              "compute_stress": false,
+              "padding_exact": true,
+              "rewrites": [
+                "single_graph_strain"
+              ],
+              "decisions": {
+                "factor_species": "off",
+                "fold_cutoff": "off",
+                "density_first": "off",
+                "joint_radial_input": "off",
+                "fused_folded_backward": "off",
+                "fused_radial_hidden": "off",
+                "streaming_conv": "off",
+                "reassociate_first": "off",
+                "segmented_first_sum": "off",
+                "generic_species_skip": "off",
+                "generic_reassociate": "off",
+                "generic_fused_radial_backward": "off",
+                "generic_streaming": "off",
+                "block_linear": "off",
+                "grouped_linear": "off",
+                "merged_residual": "off",
+                "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+                "single_graph_strain": "on"
+              },
+              "selfchecks": {
+                "single_graph_strain": 0.0
+              },
+              "streaming_interactions": 0,
+              "sort_receivers": false,
+              "gpu_neighbour_list": true,
+              "neighbour_rebuilds": 155,
+              "edge_capacity": 14080,
+              "candidates": 10076,
+              "species_columns": [
+                10,
+                16
+              ],
+              "charge": null,
+              "spin_multiplicity": null,
+              "dynamo_reset": false,
+              "polar": null
+            }
+          }
+        }
+      },
+      "plans": {
+        "fastmace": "Plan revision 0, tier graph: fixed plan of phase 1a (main.py)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = cueq  (requested 'cueq': graph engine)\n  PrecisionConfig.dtype = float64  (auto (float32_for_hybrid_float64_for_cueq): cueq backend)\n  EngineConfig.cueq_conv_fusion = on  (auto (on_for_plain_cueq_unless_reproducible): plain cuEq: cuEquivariance's fused convolution (MACE PR 1641))\n  RewriteConfig.factor_species = off  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: plain cuEq backend)\n  RewriteConfig.fold_cutoff = off  (auto (on_with_factor_species_if_model_supports): stage 1: off (without factor_species))\n  RewriteConfig.density_first = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.reassociate_first = off  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.joint_radial_input = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.fused_folded_backward = off  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.segmented_first_sum = off  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: off (without reassociate_first and sort_receivers))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = off  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: off (without the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)))\n  RewriteConfig.block_linear = off  (auto (on_for_hybrid_graph_engine): stage 1: plain cuEq backend)\n  RewriteConfig.grouped_linear = off  (auto (on_with_block_linear): stage 1: off (without block_linear))\n  RewriteConfig.merged_residual = off  (auto (on_with_block_linear): stage 1: off (without block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = off  (auto (on_for_hybrid_graph_engine): plain cuEq backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=cueq"
+      },
+      "custom_pass_uuids": {
+        "baseline": "langevin-unfused-full-addmm-v2",
+        "fastmace": "fastmace-unfused-full-addmm-v1"
+      },
+      "ab": {
+        "names": [
+          "baseline",
+          "fastmace"
+        ],
+        "pattern": "abab",
+        "order": [
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace",
+          "baseline",
+          "fastmace"
+        ],
+        "sides": {
+          "baseline": {
+            "median_ms": 96.95101109954217,
+            "mean_ms": 98.27369158052737,
+            "min_ms": 95.0947265016536,
+            "max_ms": 115.99795227870345,
+            "stdev_ms": 5.661403282003603,
+            "spread": 0.21560606269065064,
+            "block_ms": [
+              95.0947265016536,
+              95.292231682688,
+              95.29684928556283,
+              115.99795227870345,
+              96.59325343246262,
+              97.88767343387008,
+              97.64953604588906,
+              96.94183583681783,
+              97.1096941890816,
+              97.51852408051491,
+              96.95186922326684,
+              96.95015297581752
+            ]
+          },
+          "fastmace": {
+            "median_ms": 96.9430542550981,
+            "mean_ms": 96.73102995380759,
+            "min_ms": 95.20763759811719,
+            "max_ms": 97.87234962607423,
+            "stdev_ms": 0.968334900520148,
+            "spread": 0.027487395032397628,
+            "block_ms": [
+              95.20763759811719,
+              95.25747861713171,
+              95.26256833846371,
+              97.49760649477442,
+              96.5694711295267,
+              97.87234962607423,
+              97.64353832229972,
+              96.94273500392835,
+              97.10126203795275,
+              97.53514767934878,
+              96.9391910918057,
+              96.94337350626786
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9999179292267938,
+        "pair_ratios_b_over_a": [
+          1.0011873539218983,
+          0.9996353001189855,
+          0.9996402719779707,
+          0.8405114450686249,
+          0.9997537891924042,
+          0.9998434551843118,
+          0.9999385790877027,
+          1.0000092753257948,
+          0.9999131688015367,
+          1.0001704660626338,
+          0.9998692327279225,
+          0.9999300726265863
+        ]
+      },
+      "timing_wall_s": 702.0176077689976,
+      "warmup_s": {
+        "baseline": 33.93126915022731,
+        "fastmace": 28.84406547434628
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_hit": [
+            2,
+            3
+          ],
+          "aot_autograd.ok": [
+            3,
+            4
+          ],
+          "aot_autograd.total": [
+            3,
+            4
+          ],
+          "frames.ok": [
+            4,
+            5
+          ],
+          "frames.total": [
+            4,
+            5
+          ],
+          "inductor.async_compile_cache_hit": [
+            784,
+            1074
+          ],
+          "inductor.async_compile_cache_miss": [
+            1191,
+            1632
+          ],
+          "inductor.extern_calls": [
+            472,
+            648
+          ],
+          "inductor.fxgraph_cache_hit": [
+            5,
+            7
+          ],
+          "inductor.triton_bundler_load_static_autotuner": [
+            387,
+            530
+          ],
+          "stats.calls_captured": [
+            2517,
+            3356
+          ],
+          "stats.unique_graphs": [
+            3,
+            4
+          ]
+        },
+        "recompiled": true,
+        "valid": false
+      },
+      "observables_difference": {
+        "temperature_K": 7.071321306284517e-11,
+        "potential_eV_atom": 2.4868995751603507e-14,
+        "kinetic_eV_atom": 9.145462165349727e-15
+      },
+      "dynamo_counters": {
+        "stats": {
+          "calls_captured": 3356,
+          "unique_graphs": 4
+        }
+      },
+      "other_gpu_processes": []
+    }
+  },
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_patches": [
+    "PatchRecord(name='capture_safe_mask_head', value=True, targets=('mace.modules.blocks:mask_head',), detail='multi-head readout mask without indexed assignment (CUDA graph capture)')",
+    "PatchRecord(name='first_derivative_only', value=True, targets=('mace.modules.utils:compute_forces', 'mace.modules.utils:compute_forces_virials'), detail='force and virial gradients with create_graph=False for training=True')",
+    "PatchRecord(name='unfuse_full_addmm', value=True, targets=('torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm', 'torch._inductor.config:post_grad_custom_pre_pass'), detail='mm + full-matrix add unfused on the GPU; cache key fastmace-unfused-full-addmm-v1')",
+    "PatchRecord(name='single_graph_strain', value=True, targets=('mace.modules.utils:get_symmetric_displacement', 'mace.modules.models:get_symmetric_displacement'), detail='MACE PR 1498: one-graph strain without per-edge cell gathers')"
+  ],
+  "finished_utc": "2026-10-18T15:10:54.713056+00:00"
+}

@@ -1,0 +1,20 @@
+| Run | Relax steps, E (eV/atom), fmax | MD wall (s) | Peak (meV/atom, target K) | Cooling T - target (K) | Quench heating | Quench cooling | Final | Not conv. | Rebuilds | Edge sizes | Peak GB |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| gpu 20261001 | 0, -6.887300, 0.0000 | 211 | +143.6 (961) | +8.5 ± 45.4 | +0.0140 ± 0.0039 (n=10) | +0.0119 ± 0.0013 (n=10) | +0.0158 | 0 | 3522 | 3 | 0.46 |
+| gpu 20261101 | 0, -6.887300, 0.0000 | 210 | +135.0 (923) | +17.9 ± 47.9 | +0.0124 ± 0.0018 (n=10) | +0.0122 ± 0.0019 (n=10) | +0.0136 | 0 | 3556 | 3 | 0.46 |
+| fastmace 20261001 | 0, -6.887300, 0.0000 | 212 | +143.6 (961) | +8.5 ± 45.4 | +0.0140 ± 0.0038 (n=10) | +0.0121 ± 0.0014 (n=10) | +0.0170 | 0 | 3522 | 3 | 0.49 |
+| fastmace 20261101 | 0, -6.887300, 0.0000 | 212 | +135.0 (923) | +17.9 ± 47.9 | +0.0125 ± 0.0016 (n=10) | +0.0123 ± 0.0024 (n=10) | +0.0124 | 0 | 3556 | 3 | 0.49 |
+
+Per-bin mean MD potential energy (meV/atom), max |difference| over the 100 K bins of both ramps:
+  gpu vs fastmace, seed 20261001: 0.01 (16 bins)
+  gpu vs fastmace, seed 20261101: 0.01 (16 bins)
+  seed 20261001 vs 20261101, gpu: 5.93 (16 bins)
+  seed 20261001 vs 20261101, fastmace: 5.93 (16 bins)
+
+Bins (phase, K): c200  c300  c400  c500  c600  c700  c800  c900  h200  h300  h400  h500  h600  h700  h800  h900
+  gpu      20261001:   37.8    46.6    59.4    74.1    84.2    97.9   110.4   118.6    13.7    19.1    29.9    40.4    51.2    62.6    76.9    87.5
+  gpu      20261101:   35.7    46.3    58.9    71.1    89.3   103.9   112.4   119.7    13.9    20.1    31.7    42.4    54.9    67.2    81.4    91.9
+  fastmace 20261001:   37.8    46.6    59.4    74.1    84.2    97.9   110.4   118.6    13.7    19.1    29.9    40.4    51.2    62.6    76.9    87.5
+  fastmace 20261101:   35.7    46.3    58.9    71.1    89.4   103.9   112.4   119.7    13.9    20.1    31.7    42.4    54.9    67.2    81.4    91.9
+run.json engine gpu: 54000 steps; checkout None
+run.json engine fastmace: 54000 steps; checkout {'path': '/mnt/d/Margraf/FastMACE', 'commit': '43ce026ef45c14977e33e84d88382c7ddbf2548a', 'dirty': False, 'source': 'git'}
