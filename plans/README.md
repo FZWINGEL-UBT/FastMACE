@@ -8,7 +8,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | --- | --- | --- |
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
 | 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phase-1a.md`); owner checkpoint 3 open |
-| 1b. Contracts | — | written during 1a |
+| 1b. Contracts | [phase-1b.md](phase-1b.md) | planned (draft) |
 | 2. Safety | — | |
 | 3. Dynamic topology and MC | — | |
 | 3b. NPT for the chlorides | — | |
