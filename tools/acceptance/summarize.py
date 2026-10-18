@@ -6,7 +6,9 @@ Reads the jobs' metadata.json files under RUN_ROOT (from run.py) and derives:
 
 - speed: FastMACE's median step time over the baseline's, per A/B process and structure, whatever
   the build order; the pass rule is |ratio - 1| <= max(3 %, noise floor), with the noise floor of
-  docs/validation/1a-noise-floor.md for the number of blocks (both are reported);
+  docs/validation/1a-noise-floor.md for the number of blocks (both are reported), and a row is valid
+  only if nothing compiled during its timed blocks (``compile_during_timing``; conductor's condition 1
+  for sharing Inductor's custom-pass slot);
 - controls: setup time and peak memory per engine from the single-engine processes (reported, not
   judged);
 - forces: FastMACE's starting forces in each A/B process against those of the FastMACE-only control
@@ -59,13 +61,19 @@ def ab_rows(name, meta):
     for structure, entry in meta["structures"].items():
         b, f = entry["sides"][baseline], entry["sides"][fastmace]
         pairs = [y / x for x, y in zip(b["block_ms"], f["block_ms"])]
+        # Option (a) of 1a-T19: a run counts only if nothing compiled during its timed blocks.
+        compiled = entry.get("compile_during_timing", {})
+        verdict = speed_verdict(f["median_ms"] / b["median_ms"], blocks)
+        valid = bool(compiled.get("valid", False))
+        verdict["passed"] = verdict["passed"] and valid
         rows.append(dict(job=name, structure=structure, natoms=entry["natoms"], ensemble=meta.get("ensemble", "nvt"),
                          model=meta["model"], pattern=meta["pattern"],
                          build_order=meta.get("build_order", meta["sides"]),
                          baseline_ms=b["median_ms"], fastmace_ms=f["median_ms"],
                          pair_ratio_min=min(pairs), pair_ratio_max=max(pairs),
                          observables_difference=entry.get("observables_difference"),
-                         **speed_verdict(f["median_ms"] / b["median_ms"], blocks)))
+                         valid=valid, compile_changes=compiled.get("changes"),
+                         custom_pass_uuids=entry.get("custom_pass_uuids"), **verdict))
     return rows
 
 
@@ -173,7 +181,8 @@ def markdown(summary):
         lines.append(f"| {r['job']} | {r['model']} | {r['ensemble']} | {r['structure']} | {r['natoms']} "
                      f"| {r['baseline_ms']:.3f} | {r['fastmace_ms']:.3f} | {r['ratio']:.4f} "
                      f"| {r['pair_ratio_min']:.4f}–{r['pair_ratio_max']:.4f} | ±{r['criterion']:.1%} "
-                     f"(noise floor {r['noise_floor']:.2%}) | {'yes' if r['passed'] else '**no**'} |")
+                     f"(noise floor {r['noise_floor']:.2%}) | {'yes' if r['passed'] else '**no**'}"
+                     f"{'' if r['valid'] else ' (compiled while timed: invalid)'} |")
     lines += ["", "| Job | Engine | Model | Structure | Load (s) | Setup (s) | Peak memory (GiB) | Step (ms) |",
               "| --- | --- | --- | --- | ---: | ---: | ---: | ---: |"]
     for r in summary["controls"]:

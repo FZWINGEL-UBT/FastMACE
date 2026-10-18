@@ -528,11 +528,59 @@ def _side(median, blocks, setup=10.0, memory=2**30):
     return dict(median_ms=median, block_ms=blocks, setup_s=setup, peak_memory_bytes=memory, spread=0.0)
 
 
-def _ab_meta(sides, medians, blocks=12, pattern="abab"):
+def _ab_meta(sides, medians, blocks=12, pattern="abab", valid=True):
     return dict(model="mh1-r2scan", ensemble="nvt", pattern=pattern, sides=sides, build_order=sides,
                 side_kinds={s: s for s in sides}, protocol=dict(blocks=blocks),
                 structures={"NaCl": dict(natoms=216, sides={s: _side(m, [m] * blocks) for s, m in zip(sides, medians)},
-                                         observables_difference={"temperature_K": 1e-4})})
+                                         observables_difference={"temperature_K": 1e-4},
+                                         compile_during_timing=dict(valid=valid, changes={}))})
+
+
+def test_a_run_that_compiled_while_timed_is_invalid():
+    row = summarize.ab_rows("ab-x-r1", _ab_meta(["baseline", "fastmace"], [4.0, 4.0], valid=False))[0]
+    assert not row["valid"] and not row["passed"]
+    assert "invalid" in summarize.markdown(dict(speed=[row], controls=[], forces=[], gate=[]))
+
+
+class FakeInductorConfig:
+    post_grad_custom_pre_pass = None
+
+
+class FakeKey:
+    def __init__(self, uuid):
+        self._uuid = uuid
+
+    def uuid(self):
+        return self._uuid
+
+
+def test_custom_pass_slot_gives_each_side_its_own_key():
+    config = FakeInductorConfig()
+    slot = ab_tool.CustomPassSlot(config)
+    langevin, fastmace = FakeKey("langevin-unfused-full-addmm-v2"), FakeKey("fastmace-unfused-full-addmm-v1")
+    slot.enter("baseline")
+    assert config.post_grad_custom_pre_pass is None
+    config.post_grad_custom_pre_pass = langevin  # the research engine installs its key
+    slot.leave("baseline")
+    slot.enter("fastmace")
+    assert config.post_grad_custom_pre_pass is None  # FastMACE would refuse the other key
+    config.post_grad_custom_pre_pass = fastmace
+    slot.leave("fastmace")
+    slot.enter("baseline")  # the next structure: the research engine finds its own key again
+    assert config.post_grad_custom_pre_pass is langevin
+    assert slot.uuids() == {"baseline": "langevin-unfused-full-addmm-v2", "fastmace": "fastmace-unfused-full-addmm-v1"}
+
+
+def test_compile_changes():
+    before = {"stats": {"unique_graphs": 4, "calls_captured": 10}, "frames": {"ok": 4, "total": 4}}
+    same = {"stats": {"unique_graphs": 4, "calls_captured": 10}, "frames": {"ok": 4, "total": 4}}
+    assert ab_tool.compile_changes(before, same) == ({}, False)
+    calls = {"stats": {"unique_graphs": 4, "calls_captured": 12}, "frames": {"ok": 4, "total": 4}}
+    changes, recompiled = ab_tool.compile_changes(before, calls)
+    assert changes == {"stats.calls_captured": [10, 12]} and not recompiled
+    graph = {"stats": {"unique_graphs": 5, "calls_captured": 10}, "frames": {"ok": 5, "total": 5}}
+    assert ab_tool.compile_changes(before, graph)[1]
+    assert ab_tool.compile_changes(before, {**same, "recompiles": {"cache_size_limit": 1}})[1]
 
 
 def test_speed_ratio_is_fastmace_over_baseline_whatever_the_build_order():

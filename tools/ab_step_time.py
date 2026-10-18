@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import dataclasses
 import json
 import os
 import subprocess
@@ -104,6 +105,58 @@ class FastMACESide:
         kinetic = 0.5 * float((state.masses.reshape(-1, 1) * state.velocities ** 2).sum())
         return dict(temperature_K=2 * kinetic / (3 * n * units.kB), potential_eV_atom=float(state.energy[0]) / n,
                     kinetic_eV_atom=kinetic / n)
+
+
+class CustomPassSlot:
+    """Gives each side its own key in Inductor's single ``post_grad_custom_pre_pass`` slot (1a-T19, option (a)).
+
+    Both engines keep Inductor's ``mm + full-matrix add`` unfused on the GPU and put a no-op custom
+    pass into that one config slot, whose uuid keys the compiler cache: the research engine
+    "langevin-unfused-full-addmm-v2", FastMACE "fastmace-unfused-full-addmm-v1". Each refuses a slot
+    that holds the other's key, so the two cannot share a process unchanged. The A/B tool therefore
+    puts a side's own key (none before its first build) into the slot before that side loads, builds
+    and warms up (where it compiles), and keeps what the side left there. The key matters only at
+    compile time, so the timed blocks must not compile: ``compile_changes`` checks it.
+    """
+
+    def __init__(self, inductor_config=None):
+        if inductor_config is None:
+            from torch._inductor import config as inductor_config
+        self.config = inductor_config
+        self.keys = {}
+
+    def enter(self, name):
+        self.config.post_grad_custom_pre_pass = self.keys.get(name)
+
+    def leave(self, name):
+        self.keys[name] = self.config.post_grad_custom_pre_pass
+
+    def uuids(self):
+        return {name: key.uuid() if hasattr(key, "uuid") else None for name, key in self.keys.items()}
+
+
+COMPILE_COUNTER_GROUPS = ("stats", "recompiles", "frames", "inductor", "aot_autograd", "graph_break")
+# Counters that move only when something is compiled; any change during the timed blocks invalidates a run.
+COMPILE_SIGNALS = (("stats", "unique_graphs"), ("frames", "ok"), ("frames", "total"))
+
+
+def compile_counters(counters):
+    """A copy of dynamo's compile counters (torch._dynamo.utils.counters)."""
+    return {group: dict(counters[group]) for group in COMPILE_COUNTER_GROUPS if group in counters}
+
+
+def compile_changes(before, after):
+    """(changes, recompiled): every counter that moved between two snapshots, and whether one of them means a
+    compilation (a new graph, a compiled frame, or any recompile counter)."""
+    changes = {}
+    for group in sorted(set(before) | set(after)):
+        old, new = before.get(group, {}), after.get(group, {})
+        for key in sorted(set(old) | set(new)):
+            if old.get(key, 0) != new.get(key, 0):
+                changes[f"{group}.{key}"] = [old.get(key, 0), new.get(key, 0)]
+    recompiled = any(f"{group}.{key}" in changes for group, key in COMPILE_SIGNALS) or any(
+        name.startswith("recompiles.") for name in changes)
+    return changes, recompiled
 
 
 def load_another_calculator(common, label):
@@ -245,7 +298,9 @@ def main(argv=None):
     save()
     try:
         calcs, flags, common, loaded, cache = {}, {}, None, {}, None
+        slot = CustomPassSlot()
         for name in names:
+            slot.enter(name)
             started = time.perf_counter()
             if kinds[name] == "fastmace":
                 from fastmace.model.compile import CompiledModelCache
@@ -253,6 +308,7 @@ def main(argv=None):
                 cache = CompiledModelCache()
                 meta["calculators"][name] = dict(load_s=time.perf_counter() - started, backend=loaded[name].backend,
                                                  dtype=loaded[name].dtype, sha256=loaded[name].sha256)
+                slot.leave(name)
                 continue
             if common is None:
                 common, calc = experiment.load_md_calculator(md.dtype, hybrid, "cuda:0", checkpoint, label=args.model,
@@ -269,6 +325,7 @@ def main(argv=None):
             calcs[name], flags[name] = calc, {flag: getattr(options, flag) for flag in FLAGS}
             meta["calculators"][name] = dict(load_s=time.perf_counter() - started, auto_options_off=off,
                                              flags=flags[name])
+            slot.leave(name)
         if has_baseline and hybrid:
             torch.set_default_dtype(torch.float32)  # as before: the research engine's float32 calculator
         meta.update(gpu=torch.cuda.get_device_name(0), torch=torch.__version__)
@@ -277,8 +334,9 @@ def main(argv=None):
             structure, base = read_structure(spec, experiment)
             entry = meta["structures"][structure] = dict(natoms=len(base), structure=str(spec), sides={}, plans={})
             torch.cuda.reset_peak_memory_stats()
-            sides, setup = {}, {}
+            sides, setup, warmup_s = {}, {}, {}
             for name in names:
+                slot.enter(name)
                 started = time.perf_counter()
                 if kinds[name] == "fastmace":
                     plan = planner.plan(loaded[name], base, fastmace_integrator(args), hardware)
@@ -297,14 +355,26 @@ def main(argv=None):
                     directory = args.output / "forces"
                     directory.mkdir(exist_ok=True)
                     np.save(directory / f"{structure}-{name}.npy", engine.state.forces.detach().cpu().numpy())
+                # Each side warms up (compiles and captures) right after its build, with its own key in
+                # the slot; the timed blocks then run with no warm-up of their own.
+                started = time.perf_counter()
+                step_time.warm_up(sides[name], protocol.warmup)
+                warmup_s[name] = time.perf_counter() - started
+                slot.leave(name)
+            entry["custom_pass_uuids"] = slot.uuids()
+            timed = dataclasses.replace(protocol, warmup=0)
+            before = compile_counters(counters)
             started = time.perf_counter()
             if len(names) == 2:
-                result = ab.run_ab(sides, protocol, pattern=args.pattern)
+                result = ab.run_ab(sides, timed, pattern=args.pattern)
                 entry["ab"] = result.as_dict()
                 statistics_by_side = result.statistics
             else:
-                statistics_by_side = {names[0]: step_time.time_engine(sides[names[0]], protocol)}
+                statistics_by_side = {names[0]: step_time.time_engine(sides[names[0]], timed)}
             entry["timing_wall_s"] = time.perf_counter() - started
+            entry["warmup_s"] = warmup_s
+            changes, recompiled = compile_changes(before, compile_counters(counters))
+            entry["compile_during_timing"] = dict(changes=changes, recompiled=recompiled, valid=not recompiled)
             # Warm-up includes compilation and capture; the timed blocks start after it.
             peak = torch.cuda.max_memory_reserved()
             for name in names:
