@@ -19,18 +19,25 @@ if TYPE_CHECKING:
     import numpy as np
     import torch
 
-# SPEC §10.6 state that phase 1a does not carry, with where it is in 1a instead.
+# SPEC §10.6 state that phase 1a does not carry, with where it is in 1a instead. The keys are the
+# SimulationState field names that plan task 1b-T05 adds (decided in 1b-T01,
+# docs/design/contracts-1b.md); 1b-T05 empties this table except "mc".
 FIELDS_ADDED_IN_1B = {
-    "charges": "per-atom charges for models that take them (1a: in the force field's input batch)",
-    "total_charge": "total charge (1a: in the force field's input batch, OMOL)",
-    "spin_multiplicity": "spin (1a: in the force field's input batch, OMOL)",
-    "pbc": "periodic directions (1a: always 3D-periodic; the planner refuses anything else)",
-    "constraints": "constraints with their parameters (1a: refused at plan time, SPEC §4.4)",
-    "barostat": "barostat state p_eps and cell force (1a: integrator state, Integrator.state_dict)",
-    "protocol": "schedule, position in it and thermostat target (1a: the caller's loop)",
+    "charges": "torch.Tensor (N,) float64 or None: per-atom charges for models that take them "
+               "(1a: in the force field's input batch)",
+    "total_charge": "float or None, host: total charge (1a: in the force field's input batch, OMOL)",
+    "spin_multiplicity": "int or None, host: spin (1a: in the force field's input batch, OMOL)",
+    "pbc": "tuple of 3 bools, host (1a: always 3D-periodic; the planner refuses anything else)",
+    "constraints": "tuple, host, always empty in 1b (1a: refused at plan time, SPEC §4.4; phase 4)",
+    "p_eps": "torch.Tensor () hydrostatic or (3, 3) full cell, float64, or None for fixed-cell "
+             "integrators: barostat momentum (1a: LangevinBAOAB.p_eps, Integrator.state_dict)",
+    "force_eps": "as p_eps: the cell force (1a: LangevinBAOAB.force_eps)",
+    "protocol": "host record or None: schedule, position in it and thermostat target, fastmace.protocols "
+                "(1b-T07) (1a: the caller's loop)",
     "mc": "MC move set, cycle position, counters and step sizes (phase 3)",
-    "force_field_identity": "checkpoint hash, head, species superset, precision, physics options",
-    "plan_revision": "the active plan revision (SPEC §9.5)",
+    "force_field_identity": "frozen record with a stable digest (1b-T05): checkpoint hash, head, species "
+                            "superset, precision, physics options, reference record id, versions",
+    "plan_revision": "int, host: the active plan revision (SPEC §9.5)",
 }
 
 

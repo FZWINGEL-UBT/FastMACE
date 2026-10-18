@@ -446,3 +446,67 @@ def test_import_sets_no_cache_variables_and_creates_nothing():
         """, FASTMACE_CACHE=root)
         assert not os.path.exists(root)
     assert set(result) <= {"CUDA_CACHE_DISABLE"}
+
+
+# --- Lazy public names (plan task 1b-T01) --------------------------------------------------------------
+
+PUBLIC_NAMES = ("load", "ForceField", "Simulation", "Workload", "Output", "integrators", "protocols", "md", "calc",
+                "D3")
+# The records a user builds before any model: resolving them must not import torch or MACE either.
+LIGHT_NAMES = ("Simulation", "Workload", "Output", "integrators", "protocols", "md", "D3")
+
+
+def test_import_fastmace_imports_neither_torch_nor_mace():
+    result = run_json("""
+        import json, sys
+        import fastmace
+        print(json.dumps(sorted(m for m in sys.modules if m.split(".")[0] in ("torch", "mace", "ase"))))
+    """)
+    assert result == []
+
+
+def test_public_names_are_listed_and_lazy():
+    result = run_json(f"""
+        import json, sys
+        import fastmace
+        listed = sorted(set({PUBLIC_NAMES!r}) - set(fastmace.__all__))
+        in_dir = sorted(set({PUBLIC_NAMES!r}) - set(dir(fastmace)))
+        loaded_before = sorted(n for n in {PUBLIC_NAMES!r} if n in vars(fastmace))
+        light = {{name: type(getattr(fastmace, name)).__name__ for name in {LIGHT_NAMES!r}}}
+        heavy_after_light = sorted(m for m in sys.modules if m.split(".")[0] in ("torch", "mace"))
+        print(json.dumps(dict(listed=listed, in_dir=in_dir, loaded_before=loaded_before, light=light,
+                              heavy_after_light=heavy_after_light)))
+    """)
+    assert result["listed"] == [] and result["in_dir"] == []
+    assert result["loaded_before"] == []
+    assert result["light"]["integrators"] == "module" and result["light"]["protocols"] == "module"
+    assert result["heavy_after_light"] == []
+
+
+def test_every_public_name_resolves_to_its_owner():
+    result = run_json(f"""
+        import json
+        import fastmace
+        out = {{}}
+        for name in {PUBLIC_NAMES!r}:
+            value = getattr(fastmace, name)
+            out[name] = getattr(value, "__module__", None) or value.__name__
+        print(json.dumps(out))
+    """)
+    assert result == {
+        "load": "fastmace.model.loading",
+        "ForceField": "fastmace.model.forcefield",
+        "Simulation": "fastmace.simulation",
+        "Workload": "fastmace.planner.workload",
+        "Output": "fastmace.io.output",
+        "integrators": "fastmace.integrators",
+        "protocols": "fastmace.protocols",
+        "md": "fastmace.quick",
+        "calc": "fastmace.ase.calculator",
+        "D3": "fastmace.longrange.d3",
+    }
+
+
+def test_unknown_attribute_is_an_attribute_error():
+    code, _, err = run("import fastmace; fastmace.no_such_name")
+    assert code != 0 and "AttributeError" in err and "no_such_name" in err

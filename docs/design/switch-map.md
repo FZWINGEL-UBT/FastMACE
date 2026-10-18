@@ -75,6 +75,7 @@ How to read the tables:
 | --- | --- | --- | --- | --- |
 | `--dtype` | `PrecisionConfig.dtype` | `"auto"` | `float32_for_hybrid_float64_for_cueq` | precision |
 | TF32 off (`Benchmark_MACE_GPU_OPTIMIZATIONS/scripts/common.py:575`, `allow_tf32 = False`; `main.py` banner "TF32 off") | `PrecisionConfig.tf32` | `False` | — | precision (§1.2: never default) |
+| none: the research engine sums the energy in float32 (new in the library, SPEC §6.2, §7.3; 1b-T01) | `PrecisionConfig.float64_energy` | `True` | — | precision (reference treatment, §12.1; `False` only for A/B against the research engine, 1b-T03) |
 
 ## 4. Neighbour list → `NeighbourConfig`
 
@@ -112,6 +113,9 @@ How to read the tables:
 | `--barostat-tau-fs` | `IntegratorConfig.barostat_tau_fs` | `None` | — | integrator |
 | `--barostat-mass-factor` | `IntegratorConfig.barostat_mass_factor` | `1.0` | — | integrator |
 | `gpu_npt.ASE_TRACE_DRAG_ALL_ELEMENTS` | `IntegratorConfig.ase_trace_drag_all_elements` | `False` | — | integrator (ASE comparison tests only; `studies/npt/README.md` "Deliberate difference from ASE 3.27") |
+| `GPULangevin.set_temperature` from `workflow.run_crystal`'s ramp (no flag; 1b-T01) | `IntegratorConfig.temperature_K` | `None` | — | integrator (`None`: the caller sets the target, as `main.py` does; the public integrator records always set it) |
+| `workflow.baoab_settings`: `externalstress = -pressure` (ASE units) (1b-T01) | `IntegratorConfig.external_stress_GPa` | `None` | — | integrator (ASE `externalstress` sign, scalar or six Voigt components; `None` = `-pressure_GPa`) |
+| ASE `LangevinBAOAB(disable_cell_langevin=False)`, not passed by `baoab_settings` (1b-T01) | `IntegratorConfig.disable_cell_langevin` | `False` | — | integrator |
 
 ## 7. Not carried over: rejected, screen-only and never-enable switches
 
@@ -226,11 +230,16 @@ model is an error with a reason, never a silent downgrade.
   (section 8).
 - `main.py` flags: 67. 36 map to fields, 2 (`--engine`, `--stress-mode`) are plan
   decisions, 29 are run options outside `config.py` (section 9).
-- Fields in `config.py`: 53 (`RewriteConfig` 16, `EngineConfig` 15,
+- Fields in `config.py` after phase 1a: 53 (`RewriteConfig` 16, `EngineConfig` 15,
   `PrecisionConfig` 2, `NeighbourConfig` 6, `PolarConfig` 3,
   `IntegratorConfig` 11), 23 of them admit `"auto"`. Four come from neither a
   global nor a flag: `fixcm` and the two headrooms (constructor arguments) and
   `tf32` (set in the benchmark scripts' `common.py`).
+- Phase 1b (plan task 1b-T01) added four fields, 57 in all (`PrecisionConfig` 3,
+  `IntegratorConfig` 14): `float64_energy` (new in the library),
+  `temperature_K` (the caller's ramp in 1a), `external_stress_GPa` (derived from
+  `--pressure-GPa` in the research engine) and `disable_cell_langevin` (ASE's
+  default there). None admits `"auto"`.
 
 ## Open questions for the conductor
 
@@ -259,4 +268,6 @@ model is an error with a reason, never a silent downgrade.
 6. **`fused_radial_hidden`** keeps `main.py`'s literal `"auto"` (= off). A
    plain `bool = False`, like `inplace_block_linear`, would say the same.
 7. **`float64_energy`** (§6.2, always on, new in the library) has no switch in
-   the research engine and gets no field.
+   the research engine and gets no field. **Revised in phase 1b** (1b-T01): it is
+   `PrecisionConfig.float64_energy = True`, so that `False` can reproduce 1a's
+   energy for A/B against the research engine (plan phase-1b, task 1b-T03).

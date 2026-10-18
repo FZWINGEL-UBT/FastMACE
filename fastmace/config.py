@@ -158,6 +158,9 @@ class PrecisionConfig:
     dtype: Literal["auto", "float32", "float64"] = "auto"
     # TF32 matrix products; off everywhere in the research engine (main.py: "TF32 off").
     tf32: bool = False
+    # Potential energy accumulated in float64 (SPEC §7.3; a reference treatment, not a rewrite).
+    # False reproduces phase 1a's float32 sum, for A/B against the research engine only (1b-T03).
+    float64_energy: bool = True
 
     def __post_init__(self):
         _check_choices(self)
@@ -246,6 +249,15 @@ class IntegratorConfig:
     # NPT, full cell: ASE 3.27's trace term on all nine drag elements; for comparisons with ASE only
     # (ASE_TRACE_DRAG_ALL_ELEMENTS).
     ase_trace_drag_all_elements: bool = False
+    # Thermostat target at the start, K. None: set by the caller through Integrator.set_temperature
+    # (main.py's ramp, phase 1a); the public integrator records always set it.
+    temperature_K: float | None = None
+    # NPT: external stress in GPa, ASE's externalstress sign (positive = tensile): a scalar or six
+    # Voigt components (xx, yy, zz, yz, xz, xy). None: -pressure_GPa on the diagonal. Setting both
+    # this and a nonzero pressure_GPa is refused.
+    external_stress_GPa: float | tuple[float, float, float, float, float, float] | None = None
+    # NPT: no Langevin noise and friction on the cell degrees of freedom (ASE LangevinBAOAB).
+    disable_cell_langevin: bool = False
 
     def __post_init__(self):
         _check_choices(self)
@@ -258,3 +270,35 @@ class IntegratorConfig:
             value = getattr(self, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise ValueError(f"IntegratorConfig.{name} must be a nonnegative int, got {value!r}")
+        if self.temperature_K is not None:
+            _nonnegative(self, "temperature_K")
+        stress = external_stress(self.external_stress_GPa, "IntegratorConfig.external_stress_GPa")
+        if stress is not None and self.pressure_GPa != 0:
+            raise ValueError("IntegratorConfig: give either pressure_GPa or external_stress_GPa, not both "
+                             f"(pressure_GPa={self.pressure_GPa!r}, external_stress_GPa={self.external_stress_GPa!r})")
+        object.__setattr__(self, "external_stress_GPa", stress)
+
+    def effective_external_stress_GPa(self) -> float | tuple[float, ...]:
+        """The external stress in GPa, ASE sign: ``external_stress_GPa``, else ``-pressure_GPa``."""
+        return -self.pressure_GPa if self.external_stress_GPa is None else self.external_stress_GPa
+
+
+def external_stress(value, name="external_stress_GPa"):
+    """``value`` as None, a float or a tuple of six floats (Voigt order), all finite; else ValueError."""
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a number or six Voigt components, got {value!r}")
+    if isinstance(value, (int, float)):
+        components = (float(value),)
+    else:
+        try:
+            components = tuple(float(component) for component in value)
+        except (TypeError, ValueError):
+            raise ValueError(f"{name} must be a number or six Voigt components, got {value!r}") from None
+        if len(components) != 6 or any(isinstance(component, bool) for component in value):
+            raise ValueError(f"{name} must be a number or six Voigt components (xx, yy, zz, yz, xz, xy), "
+                             f"got {value!r}")
+    if not all(math.isfinite(component) for component in components):
+        raise ValueError(f"{name} must be finite, got {value!r}")
+    return components[0] if len(components) == 1 else components
