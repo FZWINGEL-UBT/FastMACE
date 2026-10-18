@@ -35,6 +35,7 @@ from fastmace.rewrites import registry as reg
 from fastmace.rewrites.generic import modules as gm
 
 GENERIC_FIELDS = {"generic_species_skip": "species_skip", "generic_reassociate": "reassociate_first",
+                  "generic_segmented_first_sum": "segmented_first_sum",
                   "generic_fused_radial_backward": "fused_folded_backward", "generic_streaming": "streaming_conv"}
 FAMILIES = ("residual", "density", "off")
 
@@ -122,7 +123,8 @@ def test_records_have_the_spec_fields():
     for name, field in GENERIC_FIELDS.items():
         rewrite_ = registry[name]
         assert registry.config_field(name) == field  # docs/design/switch-map.md
-        assert rewrite_.default == "auto" and rewrite_.requires == () and rewrite_.conflicts == ()
+        requires = ("generic_reassociate",) if name == "generic_segmented_first_sum" else ()
+        assert rewrite_.default == "auto" and rewrite_.requires == requires and rewrite_.conflicts == ()
         assert rewrite_.source_hashes == gm.source_hashes() and len(rewrite_.source_hashes) == 3
         assert registry.qualification(name).supported  # the pins match the installed MACE 0.3.16
     assert registry["generic_species_skip"].exactness == "exact"
@@ -131,6 +133,8 @@ def test_records_have_the_spec_fields():
     assert registry["generic_fused_radial_backward"].exactness == "rounding"
     assert "fixed_species_superset" in registry["generic_species_skip"].workload_constraints
     assert "single_graph" in registry["generic_reassociate"].workload_constraints
+    assert registry["generic_segmented_first_sum"].exactness == "exact"  # summation order only, as MH-1's
+    assert "sort_receivers" in registry["generic_segmented_first_sum"].workload_constraints
 
 
 @pytest.mark.parametrize("family", ["residual", "density", "off", "mh1"])
@@ -230,6 +234,49 @@ def test_reassociated_models_match_the_original(family):
     assert first.forward.__func__ is gm.generic_interaction_forward
     assert not hasattr(model.interactions[0], "generic_kind")
     assert_same_physics(model, rewritten)
+
+
+@needs_mh1
+@pytest.mark.parametrize("family", ["residual", "density"])
+def test_segmented_first_sum_on_the_generic_reassociation(family):
+    """The research engine builds GENERIC_REASSOCIATE's reassociation with segmented=SEGMENTED_FIRST_SUM (1b-T11)."""
+    model, batch = model_and_batch(family)
+    rewritten, applied = rewrite(model, batch, ["generic_reassociate", "generic_segmented_first_sum"])
+    assert applied[1].detail == ["interactions.0"] and applied[1].result.modules == 1
+    assert rewritten.interactions[0].first_reassociation.segmented
+    assert_same_physics(model, rewritten)  # on the CPU the segmented sum is the same index_add
+
+
+def test_segmented_first_sum_needs_the_generic_reassociation():
+    model, _ = model_and_batch("residual")
+    requested = {"generic_reassociate": "off", "generic_segmented_first_sum": "on"}
+    resolution = generic_registry().resolve(copy.deepcopy(model), requested, strict=False)
+    decision = resolution.decision("generic_segmented_first_sum")
+    assert not decision.enabled and "generic_reassociate" in decision.reason
+
+
+@needs_mh1
+@pytest.mark.parametrize("family", FAMILIES)
+def test_hybrid_plan_builds_the_research_engines_segmented_sum(family):
+    """1b-T11 regression: for MP-0 the research engine runs the segmented first sum (SEGMENTED_FIRST_SUM acts on
+    the generic reassociation) and groups each receiver's edges by sender species. FastMACE left it off, and its
+    B graph ran zeros + index_add instead: 1.4-2.3 % slower on murphy."""
+    from fastmace.config import EngineConfig, IntegratorConfig
+    from fastmace.model import capabilities, forces
+    from fastmace.planner import fixed
+
+    model, _ = model_and_batch(family)
+    gpu = fixed.Hardware("NVIDIA RTX 4000 Ada Generation", (8, 9), 20 * 2**30)
+    planner = fixed.FixedPlanner(engine=EngineConfig(backend="hybrid"))
+    plan = planner.plan(capabilities.model_traits(model), structure(), IntegratorConfig(), gpu)
+    assert plan.rewrites.reassociate_first == "on" and plan.rewrites.segmented_first_sum == "on"
+    enabled = set(planner.rewrite_resolution(plan, model).enabled)
+    if family == "off":  # MACE-OFF's first block is not generic: no reassociation, nothing to segment
+        assert not enabled & {"generic_reassociate", "generic_segmented_first_sum"}
+        return
+    assert {"generic_reassociate", "generic_segmented_first_sum"} <= enabled
+    # The force field then orders each receiver's edges by sender species (sender_groups).
+    assert enabled & set(forces.SEGMENTED_RECORDS)
 
 
 @needs_mh1
