@@ -261,8 +261,10 @@ def gate_jobs(machine: Machine, run_root: Path, labels=GATE_LABELS, engine="fast
 def workflow_jobs(machine: Machine, run_root: Path, research_module=None, engines=("gpu", "fastmace")) -> list:
     """main.py smoke (NaNbO3, 0.5 ps to 400 K and back), --profile anneal on NaCl (1 ps ramps), --quench of it.
 
-    As ResearchModule's qualify_workstation.sh steps 4 and 5, once per engine, all through the hybrid
-    launcher (the research engine's default needs it). ``research_module`` is the tree with 1a-T17's main.py.
+    As ResearchModule's qualify_workstation.sh steps 4 and 5, once per engine: ``--engine gpu`` through
+    the hybrid launcher (the research engine needs it), ``--engine fastmace`` without it (FastMACE
+    prepares the OEq runtime in-process; ResearchModule fb81217b). ``research_module`` is the tree with
+    1a-T17's main.py.
     """
     run_root = Path(run_root)
     main = Path(research_module or machine.path(machine.research_module)) / "Experiments/Langevin_Thermostat/main.py"
@@ -272,7 +274,7 @@ def workflow_jobs(machine: Machine, run_root: Path, research_module=None, engine
         smoke = check_location(machine, run_root / f"main-smoke-NaNbO3-{engine}")
         anneal = check_location(machine, run_root / f"anneal-NaCl-{engine}")
         common = [str(main), "--engine", engine, "--checkpoint", checkpoint]
-        launcher = hybrid_launcher(machine, run_root)
+        launcher = hybrid_launcher(machine, run_root) if engine == "gpu" else [machine.python("mace_cueq_oeq")]
         jobs += [
             Job(name=f"main-smoke-NaNbO3-{engine}", output=str(smoke), argv=tuple(
                 launcher + common + ["--output", str(smoke), "--structures", "NaNbO3", "--heat-ps", "0.5",

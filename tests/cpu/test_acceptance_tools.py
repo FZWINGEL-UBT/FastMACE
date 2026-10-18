@@ -464,6 +464,9 @@ def test_workflow_jobs_cover_both_engines():
     for engine in ("gpu", "fastmace"):
         assert {f"main-smoke-NaNbO3-{engine}", f"anneal-NaCl-{engine}", f"quench-NaCl-{engine}"} <= set(names)
         assert names.index(f"anneal-NaCl-{engine}") < names.index(f"quench-NaCl-{engine}")
+    for job in suites.workflow_jobs(m, m.path(m.root) / "run"):
+        uses_launcher = any(word.endswith("oeq_no_nvcc.sh") for word in job.argv)
+        assert uses_launcher == job.name.endswith("-gpu")  # main.py --engine fastmace needs no launcher
 
 
 # --- run.py --------------------------------------------------------------------------------------------
