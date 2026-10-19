@@ -201,7 +201,7 @@ def test_fastmace_block_records_the_git_commit_of_a_source_checkout():
     head = result.stdout.strip()
     block = provenance.fastmace_block()
     assert block["git_commit"] == head
-    assert isinstance(block["git_dirty"], bool)
+    assert block["git_dirty"] in (True, False, "unknown")  # "unknown": git status ran out of time (1b-T28)
 
 
 def test_git_commit_is_none_outside_a_checkout(tmp_path):
