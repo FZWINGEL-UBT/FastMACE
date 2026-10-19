@@ -410,3 +410,25 @@ def test_native_float64_energy_is_mace_own(monkeypatch):
         native.per_atom_energies(atoms)
     with pytest.raises(energy.EnergyReductionError):
         force_field("float32")
+
+
+def test_force_field_identity_takes_the_effective_precision(monkeypatch, tmp_path):
+    pytest.importorskip("cuequivariance_torch")
+    import torch
+
+    from _support.structures import nacl
+    from _support.tiny_models import FAMILIES, tiny_mace_model
+    from fastmace.model import loading
+    from fastmace.model.forcefield import ForceField
+
+    path = tmp_path / "tiny-mh1-11-17.model"
+    torch.save(tiny_mace_model([11, 17], **FAMILIES["mh1"]), path)
+    loading._LICENCES_SHOWN.add(str(path))
+    atoms = nacl(repeat=1)
+    ff = ForceField(loading.load_pristine(str(path), trusted=True), atoms, precision="float32")
+    assert ff.effective_precision() == ("float32", None) and ff.identity.force_precision == "float32"
+    monkeypatch.setattr(energy, "SOURCE_HASHES", {key: WRONG for key in energy.SOURCE_HASHES})
+    precision, reason = ff.effective_precision()
+    assert precision == "float64" and reason.code == versions.PROMOTION_CODE
+    assert ff.identity.force_precision == "float64" and ff.precision == "float32"
+    assert ff.effective_precision(float64_energy=False) == ("float32", None)

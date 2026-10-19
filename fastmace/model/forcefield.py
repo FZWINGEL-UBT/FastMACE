@@ -89,9 +89,26 @@ class ForceField:
             self._fix_superset(tuple(sorted({int(z) for z in atoms.numbers})))
         return self.species
 
+    def effective_precision(self, float64_energy=True):
+        """``(precision, reason)``: the force precision plans run at, and why it differs from ``precision``.
+
+        On a MACE whose float64 energy forward does not hash, a float32 force field runs at float64
+        (``fastmace.rewrites.versions.effective_precision``; plan task 2-T04); ``reason`` is then a
+        ``Reason``, else None.
+        """
+        from fastmace.longrange import polar
+        from fastmace.rewrites import versions
+
+        return versions.effective_precision(self.precision, polar_model=polar.is_polar(self.model.model),
+                                            float64_energy=float64_energy)
+
     @property
     def identity(self):
-        """The ``state.ForceFieldIdentity`` (SPEC §10.6); ``None`` until the superset is known."""
+        """The ``state.ForceFieldIdentity`` (SPEC §10.6); ``None`` until the superset is known.
+
+        Its force precision is the effective one (``effective_precision``), so a resume on the same
+        MACE re-plans the same way and the identity matches.
+        """
         if self.species is None:
             return None
         import fastmace
@@ -101,7 +118,7 @@ class ForceField:
         model = self.model
         return ForceFieldIdentity(
             checkpoint_sha256=model.sha256, head=model.head or None, species=self.species,
-            force_precision=self.precision,
+            force_precision=self.effective_precision()[0],
             physics={"charge": model.charge, "spin_multiplicity": model.spin_multiplicity},
             mace_version=_mace_version() or "unknown", fastmace_version=fastmace.__version__)
 
