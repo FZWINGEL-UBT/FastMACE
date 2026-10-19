@@ -133,3 +133,36 @@ NAS environments `mace_cueq_latest` with `mace_cueq_oeq` as `FASTMACE_HYBRID_PYT
 
 The three research-engine comparisons in `test_engine_gpu.py` failed in 1b-T23's murphy rerun
 (phase-1b.md items 4 and 5) and pass here. Junit: `results/1b-T27-murphy-20261019/`.
+
+## CPU suite under xdist (after the conductor's review)
+
+murphy, NAS `mace_cueq_latest`, `CUDA_VISIBLE_DEVICES=''`, `OMP_NUM_THREADS=2`, `nice`,
+`pytest -n 8 tests/cpu tests/gpu`:
+
+| Run | Branch (517207a, main merged in) | main (a2f3159) |
+| --- | --- | --- |
+| 1 | 4 failed, 2004 passed | 1995 passed |
+| 2 | 2008 passed | 1995 passed |
+| 3 | 4 failed, 2004 passed | 1995 passed |
+| 4 | 2008 passed (`-v`) | |
+| 5 | 1 failed (`-v`, reproduction) | |
+
+At 88410c5, before main was merged in, the same command gave 1 failed and 1970 passed.
+
+No INTERNALERROR. The failures are an **order dependence that main has too**. The failing test is
+`tests/cpu/test_forces.py::test_polar_force_field_enables_its_own_copy`: one force element off by
+5.4e-12 against its 1e-12 tolerance. It fails whenever
+`tests/cpu/test_acceptance_1b.py::test_two_simulation_sides_on_the_cpu` ran earlier in the same
+process, also on main, without xdist:
+
+```bash
+pytest -p no:cacheprovider "tests/cpu/test_acceptance_1b.py::test_two_simulation_sides_on_the_cpu" tests/cpu/test_forces.py::test_polar_force_field_enables_its_own_copy
+```
+
+This gives 1 failed, 1 passed on both main and this branch. This branch only changes how xdist
+distributes the tests, so the two meet in one worker more often. When the polar test fails, it
+leaves its `polar_longrange` patch applied (conftest keeps it as permanent). The three
+`test_loading.py::test_conv_fusion_*` tests in the same worker then fail on the extra patch record.
+The process state that the CPU `Simulation` test leaves behind has not been found. conftest restores
+the default dtype and `fastmace._patches` records after each test, and nothing in `fastmace` sets
+torch's thread count, so it is probably something else (not checked by experiment).
