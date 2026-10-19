@@ -1500,6 +1500,23 @@ points here.
   `fused-cueq` when the fused kernels load. Confirmed by a hybrid
   `fastmace md` run on the RTX 5060 Ti.
 
+### Owner decisions on the review list (19 October 2026)
+
+The owner decided all seven items. They are SPEC §18 decisions 22–28:
+1. friction: ASE units (keep);
+2. a version change warns on resume;
+3. pristine `fm.load` (keep);
+4. the D2 shift is accepted;
+5. the stress floor stays, POLAR-1-S NPT stays refused by the gate, and
+   phase 3b investigates;
+6. NaCl timing accepted;
+7. `main.py` moves to `Simulation` in phase 2, under the stated
+   conditions.
+
+Item 2 needs code: `Simulation.resume` must warn instead of refusing on a
+version-only change. That goes in phase 2's first wave. The review list
+below is kept as the record.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's

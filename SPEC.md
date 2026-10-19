@@ -1693,7 +1693,9 @@ definition of continuation the library promises.
 - **Force-field identity:** checkpoint SHA-256, head, species superset, force
   precision, physics options (charge/spin inputs; D3 with all its parameters,
   §11.2; polar options such as the PR 1762 settings; the reference
-  corrections of §12.1), MACE and FastMACE versions.
+  corrections of §12.1), MACE and FastMACE versions. A different MACE or
+  FastMACE version alone does not refuse a resume: it warns and records
+  both versions in `metadata.json` (owner decision 23).
 - **Plan:** execution mode, backend, rewrites and MC energy precision; edge
   and capacity buckets.
 
@@ -1720,7 +1722,8 @@ reset at this point, and a CI test checks that nothing is left over.
 Restart files are written atomically (temporary file, then rename, as today),
 every 10,000 steps by default and only at committed steps: never inside an MC
 block or from an overflowed step. `Simulation.resume` refuses a different
-force-field identity. A different plan (another GPU or rewrite set) needs
+force-field identity, except that a version change alone warns and is
+recorded (decision 23). A different plan (another GPU or rewrite set) needs
 `allow_plan_change=True` and is recorded: same physics, but no bitwise
 continuation.
 
@@ -2280,6 +2283,27 @@ Open decisions for the owner:
      `max_temperature_K` (20);
    - the independent BAOAB reference is ASE 3.27's class with only the drag
      line patched, plus a float64 single-step check from the paper (21).
+22–28. Decided (user, 19 October 2026, the phase 1b review list):
+   - `fm.md`'s Langevin friction default is ASE's units as in `main.py`:
+     0.02 per ASE time unit, about 0.001965/fs (22);
+   - resuming with a different MACE or FastMACE version warns and records
+     both versions; any other identity change still refuses (23);
+   - public `fm.load` returns a pristine model, and each plan converts its
+     own copy (24);
+   - the float64 energy shift measured in 1b-T03 is accepted. Energies from
+     runs before 19 October 2026 carry the float32 summation error and are
+     labelled by `float64_energy` (25);
+   - the 1e-7 eV/Å³ stress floor stays. The in-library gate refusing
+     POLAR-1-S NPT is accepted, since PolarMACE NPT is experimental; the
+     precision of the hybrid polar stress path is investigated in phase 3b
+     (26);
+   - NaCl's 1b/1a timing (0.5 % faster on murphy, 0.3 % slower on the RTX
+     5060 Ti) is accepted as no regression (27);
+   - ResearchModule's `main.py` moves to the 1b API (`Simulation`) as the
+     first cross-repository task of phase 2. Conditions: an A/B against
+     the current adapter on the ultrafast and anneal profiles (bitwise on
+     plain cuEq float64, statistical on the hybrid), `run.json` keeps its
+     keys, and `--engine gpu` and the old adapter stay for one phase (28).
 4. Licence — **decided (user, 17 October 2026): MIT** (§14).
 5. Which GPUs to provide as CI runners (local RTX 5060 Ti, a workstation
    RTX 4000 Ada).
@@ -2604,3 +2628,7 @@ prestart reports):** §7.7 `fm.md` friction default stated in ASE units as in
 energy may be a separate reduction of the float32 terms while forces come
 from the float32 autograd (equivalent, 1b-T03); §7.7 ASE shim also refuses
 `comm` and `master`. Listed for the owner's review in `plans/phase-1b.md`.
+
+**Draft 0.12, seventh amendment (19 October 2026):** owner decisions 22–28
+(the phase 1b review list) recorded in §18; §10.6 and the restart text:
+a version change alone warns instead of refusing (decision 23).
