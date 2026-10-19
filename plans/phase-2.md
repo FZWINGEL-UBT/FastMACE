@@ -842,7 +842,7 @@ Wave 4   T23 acceptance
 
 **Decided (user, 19 October 2026): the recommendation of each, (a) in D1–D4.**
 They are recorded as SPEC §18 decisions 2 and 5 (D1, D2), 29 (D3) and 30 (D4).
-For D2 the owner registers the runners himself (2-T18 gives the commands).
+For D2 the owner registers the runners themselves (2-T18 gives the commands).
 
 
 **D1. Minimum MACE version (SPEC §18 open decision 2).** FastMACE is

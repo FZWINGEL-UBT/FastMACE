@@ -2326,7 +2326,7 @@ Open decisions for the owner:
    sm_89)** as user-level self-hosted GitHub Actions runners. murphy's
    runner waits while another user's process is on the GPU, and keeps its
    files under `/mnt/homes/zwingel`. The owner registers the runners
-   himself, so the token never passes through an agent (plan task 2-T18).
+   themselves, so the token never passes through an agent (plan task 2-T18).
 6. Constant-pressure melt–quench of the chlorides — **decided (user,
    16 October 2026): part of the first production deliverable**, so GPU D3
    is on the critical path (phase 3b, §16). If the chlorides fail
