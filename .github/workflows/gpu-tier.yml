@@ -1,0 +1,131 @@
+# One GPU tier on one self-hosted runner (plan task 2-T18), called by gpu.yml. Two jobs, so that a busy GPU
+# shows as a skipped tests job rather than as a failure:
+#   idle:  wait until no other process is on the GPU, up to idle_wait_minutes (tools/ci/gpu_idle.py);
+#   tests: the tier, with a junit file checked by tools/test_budget.py, while a watcher records any other
+#          user's process that appears during the run (recorded only, 2-T18 Q3).
+# Machine paths and limits come from the runner's .env (tools/ci/runner/env.*), never from this file.
+name: gpu-tier
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        type: string
+        required: true
+      arch:
+        type: string
+        required: true
+      tier:
+        type: string
+        required: true
+      idle_wait_minutes:
+        type: number
+        required: true
+      enforce_budget:
+        type: boolean
+        required: true
+
+permissions:
+  contents: read
+
+# Explicit bash: -eo pipefail, so a failing pytest is not hidden behind tee.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  idle:
+    name: idle (${{ inputs.runner }})
+    runs-on: [self-hosted, fastmace-gpu, "${{ inputs.arch }}"]
+    timeout-minutes: ${{ inputs.idle_wait_minutes > 30 && 170 || 45 }}  # the wait limit plus checkout
+    outputs:
+      idle: ${{ steps.check.outputs.idle }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for an idle GPU
+        id: check
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 tools/ci/gpu_idle.py check --wait-minutes ${{ inputs.idle_wait_minutes }}
+
+  tests:
+    name: ${{ inputs.tier }} tier (${{ inputs.runner }}, ${{ inputs.arch }})
+    needs: idle
+    if: needs.idle.outputs.idle == 'true'
+    runs-on: [self-hosted, fastmace-gpu, "${{ inputs.arch }}"]
+    # Tier times on the RTX 5060 Ti with warm caches (docs/development.md, "Test tiers"): fast 8 min, full
+    # 39 min; acceptance 103 min on murphy. Cold caches and NFS take longer.
+    timeout-minutes: ${{ inputs.tier == 'fast' && 45 || inputs.tier == 'full' && 120 || 300 }}
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: ${{ github.workspace }}
+      OUT: ${{ github.workspace }}/ci-out
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check again that the GPU is idle
+        id: recheck
+        run: python3 tools/ci/gpu_idle.py check --wait-minutes 0 --idle-samples 1
+
+      - name: Start the watcher
+        if: steps.recheck.outputs.idle == 'true'
+        run: |
+          mkdir -p "$OUT"
+          # The runner ends this job's leftover processes when the job finishes.
+          nohup python3 tools/ci/gpu_idle.py watch --out "$OUT/other-users.jsonl" > "$OUT/watch.log" 2>&1 &
+          echo $! > "$OUT/watch.pid"
+
+      - name: Environment
+        if: steps.recheck.outputs.idle == 'true'
+        run: |
+          : "${FASTMACE_CI_PYTHON:?not set: the runner's .env (docs/development.md, GPU CI)}"
+          : "${FASTMACE_CI_BASETEMP:?not set: the runner's .env (docs/development.md, GPU CI)}"
+          mkdir -p "$FASTMACE_CI_BASETEMP" "${TMPDIR:-$OUT}"
+          {
+            echo "### ${{ inputs.tier }} tier on ${{ inputs.runner }} (${{ inputs.arch }})"
+            echo
+            echo "- host: $(hostname), commit ${GITHUB_SHA}"
+            echo "- GPU: $(nvidia-smi --query-gpu=name,driver_version,compute_cap --format=csv,noheader)"
+            echo "- Python: $FASTMACE_CI_PYTHON ($("$FASTMACE_CI_PYTHON" -c 'import torch; print("torch", torch.__version__)'))"
+            echo "- hybrid Python: ${FASTMACE_HYBRID_PYTHON:-none}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Tests
+        id: tests
+        if: steps.recheck.outputs.idle == 'true'
+        run: |
+          marks=$(python3 tools/ci/gpu_idle.py marks "${{ inputs.tier }}")
+          "$FASTMACE_CI_PYTHON" -m pytest tests/gpu -m "$marks" -rs -p no:cacheprovider \
+            --basetemp="$FASTMACE_CI_BASETEMP/run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --junitxml="$OUT/junit.xml" 2>&1 | tee "$OUT/pytest.log"
+
+      - name: Time budgets
+        if: always() && steps.recheck.outputs.idle == 'true' && hashFiles('ci-out/junit.xml') != ''
+        continue-on-error: ${{ !inputs.enforce_budget }}
+        run: |
+          "$FASTMACE_CI_PYTHON" tools/test_budget.py "$OUT/junit.xml" | tee "$OUT/budget.txt"
+
+      - name: Summary
+        if: always() && steps.recheck.outputs.idle == 'true'
+        run: |
+          [ -f "$OUT/watch.pid" ] && kill "$(cat "$OUT/watch.pid")" 2>/dev/null || true
+          python3 tools/ci/gpu_idle.py summarize "$OUT/other-users.jsonl" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f "$OUT/budget.txt" ]; then
+            echo '#### Time budgets (tools/test_budget.py)${{ !inputs.enforce_budget && ', informational on this runner' || '' }}' >> "$GITHUB_STEP_SUMMARY"
+            { echo '```'; cat "$OUT/budget.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          rm -rf "$FASTMACE_CI_BASETEMP/run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+      - name: Upload results
+        if: always() && steps.recheck.outputs.idle == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-${{ inputs.tier }}-${{ inputs.runner }}-${{ github.run_attempt }}
+          path: |
+            ci-out/junit.xml
+            ci-out/pytest.log
+            ci-out/budget.txt
+            ci-out/other-users.jsonl
+          if-no-files-found: ignore
+          retention-days: 30

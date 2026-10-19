@@ -1,0 +1,60 @@
+# GPU CI (SPEC §12.4, plan task 2-T18, owner decision D2 = SPEC §18 decision 5): the GPU test tiers on two
+# self-hosted runners, murphy (RTX 4000 Ada, sm_89) and the local PC (RTX 5060 Ti in WSL, sm_120).
+# Each runner checks first that no other process is on its GPU (tools/ci/gpu_idle.py) and skips the tests
+# when the GPU stays busy. Runners, registration and machine settings: docs/development.md, "GPU CI".
+#
+# - push to main: the fast tier on both runners;
+# - nightly: the full tier on murphy only (the PC is not always on or idle; conductor answer to 2-T18 Q9);
+# - by hand: any tier on either or both runners.
+name: gpu
+
+on:
+  push:
+    # TEMPORARY (2-T18): fastmace/2-T18 runs the fast tier before the merge; remove it before merging.
+    branches: [main, fastmace/2-T18]
+  schedule:
+    - cron: "30 0 * * *"  # 01:30 CET / 02:30 CEST
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: GPU test tier (tests/_support/tiers.py)
+        type: choice
+        options: [fast, full, acceptance]
+        default: fast
+      runner:
+        description: Which runner
+        type: choice
+        options: [both, murphy, local]
+        default: both
+
+# One GPU run per ref and event at a time; a newer one waits instead of cancelling a run halfway.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  murphy:
+    if: github.event_name != 'workflow_dispatch' || inputs.runner != 'local'
+    uses: ./.github/workflows/gpu-tier.yml
+    with:
+      runner: murphy
+      arch: sm_89
+      tier: ${{ github.event_name == 'schedule' && 'full' || inputs.tier || 'fast' }}
+      idle_wait_minutes: ${{ github.event_name == 'schedule' && 150 || 30 }}
+      # Budgets are measured on the local RTX 5060 Ti; on murphy they are informational (2-T18 Q4).
+      enforce_budget: false
+
+  local:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.runner != 'murphy')
+    uses: ./.github/workflows/gpu-tier.yml
+    with:
+      runner: local-5060ti
+      arch: sm_120
+      tier: ${{ inputs.tier || 'fast' }}
+      idle_wait_minutes: 30
+      enforce_budget: true

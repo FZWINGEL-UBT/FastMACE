@@ -1,0 +1,5 @@
+# murphy's crontab lines for the GPU CI runner (plan task 2-T18). No root: murphy has no linger for
+# systemd user services, and cron is open to every user. The 10-minute line restarts the runner after a
+# crash or a reboot that came before the NAS mount; keepalive.sh exits at once while the runner runs.
+@reboot /mnt/homes/zwingel/actions-runner/murphy/keepalive.sh /mnt/homes/zwingel/actions-runner/murphy
+*/10 * * * * /mnt/homes/zwingel/actions-runner/murphy/keepalive.sh /mnt/homes/zwingel/actions-runner/murphy

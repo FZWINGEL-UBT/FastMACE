@@ -226,6 +226,130 @@ MACE 0.3.16, e3nn 0.4.4 and cuEquivariance 0.12.0 (pinned) or 0.13.0
 2.13.0, so no cell is dropped. The newest resolution then was ASE 3.29.0,
 NumPy 2.5.4 and filelock 4.2.0.
 
+## GPU CI
+
+Plan task 2-T18, owner decision D2 (SPEC §18 decision 5). `.github/workflows/gpu.yml` runs the GPU
+tiers (see "Test tiers") on two self-hosted GitHub Actions runners. They cost no Actions minutes:
+
+| Runner | Machine | GPU | Labels | Directory |
+| --- | --- | --- | --- | --- |
+| `murphy-sm89` | murphy (shared workstation) | RTX 4000 Ada, sm_89 | `self-hosted, linux, x64, fastmace-gpu, sm_89, murphy` | `/mnt/homes/zwingel/actions-runner/murphy` |
+| `local-5060ti-sm120` | the PC, WSL Ubuntu | RTX 5060 Ti, sm_120 | `self-hosted, linux, x64, fastmace-gpu, sm_120, local-5060ti` | `~/actions-runner/local` |
+
+What runs when:
+
+| Event | murphy | local |
+| --- | --- | --- |
+| push to `main` | fast tier | fast tier |
+| nightly, 00:30 UTC | full tier | — (the PC is not always on or idle) |
+| by hand (`gh workflow run gpu.yml -f tier=full -f runner=local`) | any tier | any tier |
+
+`gpu.yml` calls `gpu-tier.yml` once per runner. It has two jobs:
+
+- **idle** waits until the GPU is free (`tools/ci/gpu_idle.py check`), for at most 30 minutes, or 150
+  minutes at night. The GPU is busy while any compute process is on it: another user's, one of our own
+  from another task, or one whose owner `ps` cannot name. It is also busy if `nvidia-smi` fails. WSL's
+  `nvidia-smi` lists no processes, so the local runner counts the processes that hold `/dev/dxg`. It
+  also needs three consecutive samples under its memory, utilization and RAM limits. The desktop uses
+  about 4.3 GB, and WSL needs 10 GB available. A GPU that stays busy is not a failure: the tests job
+  shows as **skipped**, and the idle job's summary names the processes.
+- **tests** checks once more, then runs `pytest tests/gpu -m <tier>` with the runner's
+  `FASTMACE_CI_PYTHON` and `PYTHONPATH` set to the checkout. Nothing is installed. Then it runs
+  `tools/test_budget.py` on the junit file. Over budget fails the job on the local runner, where the
+  budgets were measured. On murphy it is informational. While the tests run, a watcher records any
+  other user's process that appears on the GPU. It does not stop the run, and the job summary lists
+  what it saw. The artefact `gpu-<tier>-<runner>-<attempt>` holds `junit.xml`, `pytest.log`,
+  `budget.txt` and the watcher's record for 30 days.
+
+Each runner's `.env` file holds its paths and limits (`tools/ci/runner/env.murphy`,
+`tools/ci/runner/env.local`), so the workflow names no machine path. On murphy everything stays under
+`/mnt/homes/zwingel`: the runner, its `_work` checkout, `HOME`, `TMPDIR` and a cache of its own
+(`fastmace-cache/ci-murphy`).
+
+### Keeping the runners up without root
+
+GitHub's `svc.sh install` needs `sudo`, and murphy has no linger for systemd user services. So
+`tools/ci/runner/keepalive.sh` keeps each runner up. It starts `run.sh` once per runner directory
+(`flock`), in a process group of its own, with `HOME` and `TMPDIR` inside the runner directory.
+
+- **murphy:** cron, open to every user there, runs it at `@reboot` and every 10 minutes
+  (`tools/ci/runner/crontab.murphy`). A run while the runner is up exits at once.
+- **The PC:** a shortcut in the Windows Startup folder runs it at log-on with `--loop`, through
+  `wsl.exe`, minimized. The open `wsl.exe` keeps the WSL VM running. Closing that window stops the
+  runner.
+
+The runner updates itself (owner, 20 October 2026). It was installed at v2.338.0.
+
+### Registering the runners (the owner)
+
+The owner runs these from Git Bash in `D:\Margraf\FastMACE`, on `main` after the merge. `gh` passes the
+registration token, valid for one hour, straight into a pipe, so it is never shown or written down. The
+`git show` copies keep LF line endings.
+
+murphy:
+
+```bash
+R=/mnt/homes/zwingel/actions-runner/murphy
+ssh murphy "mkdir -p $R"
+for f in keepalive.sh env.murphy crontab.murphy; do git -c core.autocrlf=false show main:tools/ci/runner/$f | ssh murphy "cat > $R/$f"; done
+ssh murphy "chmod +x $R/keepalive.sh && cd $R && curl -fsSLo runner.tar.gz https://github.com/actions/runner/releases/download/v2.338.0/actions-runner-linux-x64-2.338.0.tar.gz && echo 'af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32  runner.tar.gz' | sha256sum -c - && tar xzf runner.tar.gz && rm runner.tar.gz"
+gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/registration-token --jq .token | ssh murphy "read -r T && cd $R && ./config.sh --unattended --url https://github.com/FZWINGEL-UBT/FastMACE --token \"\$T\" --name murphy-sm89 --labels fastmace-gpu,sm_89,murphy --work _work --replace"
+ssh murphy "cd $R && cat env.murphy >> .env && (crontab -l 2>/dev/null; cat crontab.murphy) | crontab - && setsid -f $R/keepalive.sh $R < /dev/null > /dev/null 2>&1"
+```
+
+The local PC (WSL). `MSYS_NO_PATHCONV=1` stops Git Bash from rewriting `/home/...` arguments for
+`wsl.exe`:
+
+```bash
+export MSYS_NO_PATHCONV=1
+R=/home/fzwin/actions-runner/local
+wsl -e mkdir -p $R
+for f in keepalive.sh env.local; do git -c core.autocrlf=false show main:tools/ci/runner/$f | wsl -e sh -c "cat > $R/$f"; done
+wsl -e bash -c "chmod +x $R/keepalive.sh && cd $R && curl -fsSLo runner.tar.gz https://github.com/actions/runner/releases/download/v2.338.0/actions-runner-linux-x64-2.338.0.tar.gz && echo 'af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32  runner.tar.gz' | sha256sum -c - && tar xzf runner.tar.gz && rm runner.tar.gz"
+gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/registration-token --jq .token | wsl -e bash -c "read -r T && cd $R && ./config.sh --unattended --url https://github.com/FZWINGEL-UBT/FastMACE --token \"\$T\" --name local-5060ti-sm120 --labels fastmace-gpu,sm_120,local-5060ti --work _work --replace && cat env.local >> .env"
+```
+
+Then, in PowerShell, the Startup shortcut. The second line starts the runner now:
+
+```powershell
+$l = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\FastMACE GPU runner.lnk"; $s = (New-Object -ComObject WScript.Shell).CreateShortcut($l); $s.TargetPath = "$env:WINDIR\System32\wsl.exe"; $s.Arguments = "-d Ubuntu --exec /home/fzwin/actions-runner/local/keepalive.sh --loop /home/fzwin/actions-runner/local"; $s.WindowStyle = 7; $s.Save()
+Start-Process $l
+```
+
+Check that both are online and idle:
+
+```bash
+gh api repos/FZWINGEL-UBT/FastMACE/actions/runners --jq '.runners[] | [.name, .status, .busy, ([.labels[].name] | join(","))] | @tsv'
+```
+
+### Pausing, removing, cleaning up
+
+- **Pause all GPU CI:** `gh workflow disable gpu.yml` (and `enable` to resume). New jobs are not queued.
+- **Pause one runner:** create `PAUSED` in its directory, then stop its process group, for example
+  `ssh murphy 'R=/mnt/homes/zwingel/actions-runner/murphy; touch $R/PAUSED; kill -- -$(cat $R/.keepalive.pid)'`.
+  Never use a broad `pkill`. While `PAUSED` exists, cron and the shortcut start nothing. Remove it to
+  resume. The runner shows as offline. Jobs for it wait in the queue, and fail after 24 hours.
+- **Remove a runner:** pause it, then
+  `gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/remove-token --jq .token | ssh murphy 'read -r T && cd /mnt/homes/zwingel/actions-runner/murphy && ./config.sh remove --token "$T"'`
+  (through `wsl -e bash -c` for the local one). Then delete the cron lines (`crontab -e`) or the Startup
+  shortcut, and the runner directory. GitHub also drops a runner that has been offline for 14 days.
+- **Clean up:** each job deletes its own pytest temporary directory. `_work` holds one checkout, and
+  the CI cache (`fastmace-cache/ci-murphy`, `~/fastmace-cache/ci-local`) holds compiled kernels. Delete
+  either between runs if they grow, and `_diag/*.log` too.
+
+### Security
+
+Self-hosted runners run the workflow's code as the runner's user: on murphy as `zwingel`, with
+access to the NAS home. So:
+
+- the repository stays private, with no collaborators beyond the owner;
+- `gpu.yml` has no `pull_request` trigger, and only `contents: read`;
+- the workflows use no secrets;
+- jobs reach these runners only through the `fastmace-gpu` label.
+
+Anyone who can push a branch with a changed workflow can run code on murphy, so push access must stay
+with the owner. (GitHub's notes: "Secure use reference", self-hosted runner hardening.)
+
 ## NAS checkout
 
 The workstations (murphy, leto, coraline, ...) see FastMACE at
