@@ -6,39 +6,136 @@ graphs of the engine capture those addresses. Integrators read and write it duri
 steps; the engine writes the force results of each step into it; nothing else changes it
 during a run (from phase 3, changes between steps go through ``fastmace.events``).
 
-The complete §10.6 state comes in 1b. ``FIELDS_ADDED_IN_1B`` lists what it adds, so that no
-task adds those fields to the 1a state on the side.
+Plan task 1b-T05 completed the §10.6 state except MC (``FIELDS_ADDED_IN_1B``, phase 3) and added
+``ForceFieldIdentity``, the record a restart is resumed with.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import hashlib
+import json
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass, fields
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import numpy as np
     import torch
 
-# SPEC §10.6 state that phase 1a does not carry, with where it is in 1a instead. The keys are the
-# SimulationState field names that plan task 1b-T05 adds (decided in 1b-T01,
-# docs/design/contracts-1b.md); 1b-T05 empties this table except "mc".
+# SPEC §10.6 state that SimulationState does not carry yet, with where it is instead. Plan task
+# 1b-T05 added the rest (charges, total charge, spin, PBC, constraints, barostat, protocol, force-field
+# identity and plan revision); the MC state comes with MC in phase 3.
 FIELDS_ADDED_IN_1B = {
-    "charges": "torch.Tensor (N,) float64 or None: per-atom charges for models that take them "
-               "(1a: in the force field's input batch)",
-    "total_charge": "float or None, host: total charge (1a: in the force field's input batch, OMOL)",
-    "spin_multiplicity": "int or None, host: spin (1a: in the force field's input batch, OMOL)",
-    "pbc": "tuple of 3 bools, host (1a: always 3D-periodic; the planner refuses anything else)",
-    "constraints": "tuple, host, always empty in 1b (1a: refused at plan time, SPEC §4.4; phase 4)",
-    "p_eps": "torch.Tensor () hydrostatic or (3, 3) full cell, float64, or None for fixed-cell "
-             "integrators: barostat momentum (1a: LangevinBAOAB.p_eps, Integrator.state_dict)",
-    "force_eps": "as p_eps: the cell force (1a: LangevinBAOAB.force_eps)",
-    "protocol": "host record or None: schedule, position in it and thermostat target, fastmace.protocols "
-                "(1b-T07) (1a: the caller's loop)",
     "mc": "MC move set, cycle position, counters and step sizes (phase 3)",
-    "force_field_identity": "frozen record with a stable digest (1b-T05): checkpoint hash, head, species "
-                            "superset, precision, physics options, reference record id, versions",
-    "plan_revision": "int, host: the active plan revision (SPEC §9.5)",
 }
+
+IDENTITY_SCHEMA = "fastmace.identity/1"
+FORCE_PRECISIONS = ("float32", "float64")
+_SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
+def canonical_json(value: Any) -> str:
+    """JSON with sorted keys, no spaces and no NaN or infinity: equal values give equal text.
+
+    ``ValueError`` names what is not JSON-safe (only dicts with string keys, lists and tuples,
+    strings, numbers, booleans and ``None`` are).
+    """
+    try:
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"not JSON-safe: {error}") from None
+
+
+@dataclass(frozen=True)
+class ForceFieldIdentity:
+    """What a restart must be resumed with (SPEC §10.6 "Force-field identity"): same physics, same numbers.
+
+    - ``checkpoint_sha256``: SHA-256 of the checkpoint file, 64 lowercase hex digits;
+    - ``head``: the model head, ``None`` for single-head models;
+    - ``species``: the species superset, atomic numbers (stored sorted and unique);
+    - ``force_precision``: ``"float32"`` or ``"float64"``;
+    - ``physics``: the physics options as a JSON-safe mapping: charge and spin inputs, D3 with all
+      its parameters (§11.2), polar options (such as the PR 1762 settings), the reference
+      corrections of §12.1. Stored as canonical JSON text, so the record is hashable;
+    - ``reference_record_id``: the gate's reference record (§12.1), ``None`` when no gate ran;
+    - ``mace_version``, ``fastmace_version``.
+
+    ``digest`` is the SHA-256 of the canonical JSON of ``to_dict()``, schema name included: equal
+    records have equal digests in every process and on every machine. Every field is part of it,
+    the versions too, so in 1b a resume refuses another MACE or FastMACE version (SPEC §10.6).
+    Plan task 1b-T12 fills the record (``fm.ForceField``); 1b-T17 compares it on resume.
+    """
+
+    checkpoint_sha256: str
+    head: str | None
+    species: tuple[int, ...]
+    force_precision: str
+    physics: str = "{}"
+    reference_record_id: str | None = None
+    mace_version: str = ""
+    fastmace_version: str = ""
+
+    def __post_init__(self):
+        if not isinstance(self.checkpoint_sha256, str) or not _SHA256.fullmatch(self.checkpoint_sha256):
+            raise ValueError("ForceFieldIdentity.checkpoint_sha256 must be 64 lowercase hex digits, "
+                             f"got {self.checkpoint_sha256!r}")
+        for name in ("head", "reference_record_id"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or not value):
+                raise ValueError(f"ForceFieldIdentity.{name} must be a non-empty string or None, got {value!r}")
+        try:
+            species = tuple(sorted(int(z) for z in self.species))
+        except (TypeError, ValueError):
+            raise ValueError(f"ForceFieldIdentity.species must be atomic numbers, got {self.species!r}") from None
+        if (not species or len(set(species)) != len(species) or species[0] < 1
+                or any(isinstance(z, bool) for z in self.species)):
+            raise ValueError("ForceFieldIdentity.species must be distinct atomic numbers >= 1, "
+                             f"got {self.species!r}")
+        object.__setattr__(self, "species", species)
+        if self.force_precision not in FORCE_PRECISIONS:
+            raise ValueError(f"ForceFieldIdentity.force_precision must be one of {FORCE_PRECISIONS}, "
+                             f"got {self.force_precision!r}")
+        physics = json.loads(self.physics) if isinstance(self.physics, str) else self.physics
+        if not isinstance(physics, Mapping):
+            raise ValueError(f"ForceFieldIdentity.physics must be a mapping, got {self.physics!r}")
+        try:
+            object.__setattr__(self, "physics", canonical_json(dict(physics)))
+        except ValueError as error:
+            raise ValueError(f"ForceFieldIdentity.physics: {error}") from None
+        for name in ("mace_version", "fastmace_version"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value:
+                raise ValueError(f"ForceFieldIdentity.{name} must be a non-empty string, got {value!r}")
+
+    @property
+    def physics_options(self) -> dict[str, Any]:
+        """``physics`` as a new dict."""
+        return json.loads(self.physics)
+
+    def to_dict(self) -> dict[str, Any]:
+        """A JSON-safe dict with the schema name; ``from_dict`` reads it back."""
+        return {"schema": IDENTITY_SCHEMA, "checkpoint_sha256": self.checkpoint_sha256, "head": self.head,
+                "species": list(self.species), "force_precision": self.force_precision,
+                "physics": self.physics_options, "reference_record_id": self.reference_record_id,
+                "mace_version": self.mace_version, "fastmace_version": self.fastmace_version}
+
+    @classmethod
+    def from_dict(cls, record: Mapping[str, Any]) -> ForceFieldIdentity:
+        record = dict(record)
+        schema = record.pop("schema", None)
+        if schema != IDENTITY_SCHEMA:
+            raise ValueError(f"force-field identity schema {schema!r}, this FastMACE reads {IDENTITY_SCHEMA!r}")
+        return cls(**record)
+
+    @property
+    def digest(self) -> str:
+        """SHA-256 of the canonical JSON of ``to_dict()``."""
+        return hashlib.sha256(canonical_json(self.to_dict()).encode()).hexdigest()
+
+    def differences(self, other: ForceFieldIdentity) -> tuple[str, ...]:
+        """The names of the fields in which ``other`` differs, in field order."""
+        return tuple(field.name for field in fields(self) if getattr(self, field.name) != getattr(other, field.name))
 
 
 @dataclass
@@ -79,6 +176,20 @@ class SimulationState:
       at the current positions, written by the engine's force stage;
     - ``rng``: the noise stream;
     - ``step``: number of committed MD steps (host integer).
+
+    The rest of SPEC §10.6 (plan task 1b-T05; ``docs/design/contracts-1b.md``):
+
+    - ``charges`` ``(N,)`` float64 per-atom charges for models that take them, else ``None``;
+      ``total_charge`` (float) and ``spin_multiplicity`` (int), host, ``None`` when the model
+      takes none;
+    - ``pbc``: three bools, host; ``constraints``: a tuple, always empty until phase 4 (§4.4);
+    - ``p_eps``, ``force_eps``: the barostat momentum and cell force, float64, shape ``()``
+      (hydrostatic) or ``(3, 3)`` (full cell); ``None`` for fixed-cell integrators. The
+      variable-cell integrator allocates them, as it allocates ``rng.batch``;
+    - ``protocol``: the schedule with its position and target, an object with ``to_restart()``
+      (a JSON-safe dict) and a ``from_restart(dict)`` class method (plan task 1b-T07), or ``None``;
+    - ``plan_revision``: the active plan revision (§9.5);
+    - ``force_field_identity``: the ``ForceFieldIdentity`` of the force field, or ``None``.
     """
 
     positions: torch.Tensor
@@ -91,14 +202,25 @@ class SimulationState:
     stress: torch.Tensor | None
     rng: RandomStream
     step: int = 0
+    charges: torch.Tensor | None = None
+    total_charge: float | None = None
+    spin_multiplicity: int | None = None
+    pbc: tuple[bool, bool, bool] = (True, True, True)
+    constraints: tuple = ()
+    p_eps: torch.Tensor | None = None
+    force_eps: torch.Tensor | None = None
+    protocol: Any = None
+    plan_revision: int = 0
+    force_field_identity: ForceFieldIdentity | None = None
 
     @classmethod
     def from_atoms(cls, atoms: Any, device: Any, seed: int, compute_stress: bool = False) -> SimulationState:
-        """Build the state from an ASE ``Atoms`` (positions, velocities, masses, cell, numbers).
+        """Build the state from an ASE ``Atoms`` (positions, velocities, masses, cell, numbers, PBC).
 
         Forces and energy start as zeros; the engine fills them with the initial evaluation.
         ``compute_stress`` allocates ``stress``. Refuses constraints (SPEC §4.4). The noise batch is
-        left to the integrator, whose layout it is.
+        left to the integrator, whose layout it is; charges, total charge and spin to the planner,
+        because whether they are inputs depends on the model.
         """
         if atoms.constraints:
             raise ValueError("Constraints are not supported (SPEC §4.4)")
@@ -117,6 +239,7 @@ class SimulationState:
             energy=torch.zeros(1, **f64),
             stress=torch.zeros((3, 3), **f64) if compute_stress else None,
             rng=RandomStream(np.random.default_rng(seed)),
+            pbc=tuple(bool(periodic) for periodic in atoms.pbc),
         )
 
     @property
