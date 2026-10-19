@@ -196,7 +196,9 @@ def head_commit(directory):
 
 def _dirty(directory):
     """Whether tracked files differ from HEAD: ``git status`` once per process and checkout, with a
-    ``GIT_STATUS_TIMEOUT_S`` timeout ("unknown" when it runs out; None without a usable git)."""
+    ``GIT_STATUS_TIMEOUT_S`` timeout. "unknown" when it runs out or git refuses (for example git's
+    dubious-ownership check on NFS, which this never overrides: ``status`` on a foreign repository
+    can run its configured programs); None without a git executable."""
     key = str(directory)
     if key not in _DIRTY:
         try:
@@ -207,7 +209,7 @@ def _dirty(directory):
         except (OSError, subprocess.SubprocessError):  # no git executable
             _DIRTY[key] = None
         else:
-            _DIRTY[key] = bool(status.stdout.strip()) if status.returncode == 0 else None
+            _DIRTY[key] = bool(status.stdout.strip()) if status.returncode == 0 else "unknown"
     return _DIRTY[key]
 
 

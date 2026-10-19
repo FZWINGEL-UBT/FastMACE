@@ -30,16 +30,22 @@ def fresh_caches(monkeypatch):
 
 
 def _git(directory, *args):
-    env = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
-           "HOME": str(directory), "PATH": os.environ.get("PATH", "")}
+    env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+           "GIT_COMMITTER_EMAIL": "t@t"}
     result = subprocess.run(["git", "-C", str(directory), *args], capture_output=True, text=True, check=True, env=env)
     return result.stdout.strip()
 
 
 @pytest.fixture
-def repository(tmp_path):
+def repository(tmp_path, monkeypatch):
     if shutil.which("git") is None:
         pytest.skip("no git executable")
+    # The test repositories only: on NFS (a NAS --basetemp) git sees another owner uid than the login
+    # and refuses them as dubious. The library's own git status never overrides that check.
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "safe.directory")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", "*")
+    monkeypatch.setenv("HOME", str(tmp_path))  # no user git configuration
     root = tmp_path / "repo"
     root.mkdir()
     _git(root, "init", "-q", "-b", "main")
@@ -115,6 +121,20 @@ def test_the_dirtiness_timeout_is_honoured(repository, monkeypatch):
     commit, dirty = provenance.git_commit(repository)
     assert commit == provenance.head_commit(repository) and dirty == "unknown"
     assert seen["timeout"] == provenance.GIT_STATUS_TIMEOUT_S <= 2.0
+
+
+def test_a_git_refusal_is_unknown_and_never_overridden(repository, monkeypatch):
+    """git's dubious-ownership refusal (exit 128) records "unknown"; the library passes no
+    safe.directory override of its own."""
+    seen = {}
+
+    def run(argv, *args, **kwargs):
+        seen["argv"] = list(argv)
+        return subprocess.CompletedProcess(argv, 128, "", "fatal: detected dubious ownership in repository")
+
+    monkeypatch.setattr(provenance.subprocess, "run", run)
+    assert provenance.git_commit(repository) == (provenance.head_commit(repository), "unknown")
+    assert not any("safe.directory" in part for part in seen["argv"])
 
 
 def test_source_commit_without_git(tmp_path):
