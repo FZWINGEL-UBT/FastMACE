@@ -621,14 +621,9 @@ def test_polar_force_field_enables_its_own_copy():
     energy, forces = evaluate(field, positions, padded=True)
     expected_energy, expected_forces = reference(calc, atoms, positions)
     # cuEq's naive kernels against e3nn, and graph_longrange's k-vectors summed with zeros
-    # interleaved (fastmace.longrange.polar): equal to rounding. The forces' rounding depends on the
-    # process: after any float32 e3nn-to-cuEq conversion (a CPU Simulation of a tiny model does one),
-    # every later float64 cuEq model rounds differently, and the largest force deviation goes from
-    # 2.7e-12 to 5.4e-12 (7.3e-12 outside pytest) while the e3nn reference stays bitwise the same.
-    # Under xdist that depends on which tests ran earlier in the worker (2-T14, murphy, 20 October
-    # 2026), so the bound covers both states.
+    # interleaved (fastmace.longrange.polar): equal to rounding.
     np.testing.assert_allclose(float(energy[0]), expected_energy, rtol=1e-12, atol=0)
-    np.testing.assert_allclose(forces.numpy(), expected_forces, rtol=1e-12, atol=2e-11)
+    np.testing.assert_allclose(forces.numpy(), expected_forces, rtol=1e-12, atol=1e-12)
 
 
 @needs_polar

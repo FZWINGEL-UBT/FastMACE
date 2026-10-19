@@ -464,13 +464,18 @@ def test_charge_needs_a_joint_embedding():
 
 
 @pytest.fixture
-def clean_patches():
-    """MACE's own converter in place and an empty registry; the process's patches come back afterwards."""
+def clean_patches(monkeypatch):
+    """MACE's own converter in place and an empty registry; the process's patches come back afterwards.
+
+    Patches kept by their own module (``polar_longrange``) cannot be undone, so an earlier PolarMACE
+    test in the same process leaves one in ``applied()``; the registry here hides them (2-T14).
+    """
     import mace.calculators.mace  # noqa: F401
     from mace.cli import convert_e3nn_cueq
     calculator_module = sys.modules["mace.calculators.mace"]
     previous = _patches.record_of("cueq_conv_fusion")  # e.g. left by a GPU test that loaded a model
     _patches.restore("cueq_conv_fusion")
+    monkeypatch.setattr(_patches, "_RECORDED_ELSEWHERE", ())
     saved = dict(_patches._RECORDS)
     _patches._RECORDS.clear()
     originals = convert_e3nn_cueq.run, calculator_module.run_e3nn_to_cueq
