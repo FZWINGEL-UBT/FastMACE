@@ -27,8 +27,13 @@ without ``identity``. ``check_identity`` (``Simulation.resume``) refuses them, a
 
 The writer makes the same bytes from the same state: entries in name order, a fixed zip time stamp
 and canonical JSON (``np.savez`` stamps the time of writing), so save → load → save gives an
-identical file. Canonical restart points (pipeline quiesced, neighbour lists rebuilt) are the
-engine's, plan task 1b-T14.
+identical file.
+
+Every restart write of a run is a canonical restart point (plan task 1b-T14, SPEC §10.6):
+``write_engine_restart`` calls ``GraphEngine.canonicalise`` (pipeline quiesced, neighbour lists
+rebuilt, floors reset) and stores the engine's edge bucket and neighbour capacity in the plan
+record; ``resume_engine`` loads a file into a freshly built engine and gives it those buckets, so
+the resumed engine is in the state of the uninterrupted one.
 """
 
 from __future__ import annotations
@@ -196,6 +201,36 @@ def write_restart(path: str | Path, state: SimulationState, *, engine: str,
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
+
+
+def write_engine_restart(path: str | Path, engine: Any, *, name: str, plan: Any = None,
+                         outputs: Mapping[str, int] | None = None) -> None:
+    """A canonical restart point of ``engine``, then its restart file (SPEC §10.6).
+
+    ``engine.canonicalise()`` first, then ``write_restart`` with the engine's state and integrator.
+    ``name`` is the restart file's ``engine`` entry. ``plan`` is the active ``Plan``; its record is
+    ``plan.to_restart`` with the engine's edge bucket and neighbour capacity, or those two alone
+    without a plan. ``outputs`` is ``ChunkedOutput.restart_point()`` (the output queue drained first).
+    """
+    engine.canonicalise()
+    buckets = engine.restart_buckets()
+    record = buckets if plan is None else plan.to_restart(**buckets)
+    write_restart(path, engine.state, engine=name, variable_cell=engine.variable_cell, integrator=engine.integrator,
+                  plan=record, outputs=outputs)
+
+
+def resume_engine(restart: Mapping[str, Any], engine: Any) -> None:
+    """Load a restart file's state into a freshly built engine and give it the file's buckets.
+
+    Build the engine from the restart's positions and cell first. ``load_state`` replaces the build's
+    forces with the stored ones; then the force field takes the stored cell and the engine the plan
+    record's edge bucket and neighbour capacity, and canonicalises (``restore_restart_point``).
+    """
+    load_state(restart, engine.state, engine.integrator)
+    if engine.variable_cell:
+        engine.force_field.set_cell(engine.state.cell)
+    record = plan_record(restart) or {}
+    engine.restore_restart_point(**{key: record[key] for key in PLAN_BUCKET_KEYS if key in record})
 
 
 def read_restart(path: str | Path, engine: str | None = None) -> dict[str, np.ndarray]:
