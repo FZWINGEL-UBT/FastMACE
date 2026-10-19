@@ -236,8 +236,19 @@ QUALIFICATION = {
     # the two variants after the same 300 steps (N_dof = 192): the size of the correction
     "negative_control": {"test": f"{_TESTS}::test_the_variants_differ_by_the_correction",
                          "variant_difference": 4.3e-4},
-    # SPEC §12.2 on the GPU (tests/gpu/test_ase_equivalence_gpu.py); filled from the murphy runs
-    "gpu": {},
+    # SPEC §12.2 on the GPU (tests/gpu/test_ase_equivalence_gpu.py): murphy, RTX 4000 Ada, NAS
+    # mace_cueq_latest, MH-1 matpes_r2scan, NaCl 3x3x3, plain cuEq float64, FixedPlanner (pipelined),
+    # 19 October 2026; results/1b-T09-murphy-20261019/
+    "gpu": {
+        "langevin": {"protocol": "0 -> 400 -> 0 K in 1 + 8 ps, 18,000 steps, 50 K bins",
+                     "reference": "ase.md.langevin.Langevin, MACECalculator cuEq float64",
+                     "max_bin_dPE_meV_per_atom": 3.8e-11, "max_bin_dT_K": 3.5e-10,
+                     "final_positions_A": 1.0e-11, "limit_dPE_meV_per_atom": 0.01},
+        "baoab": {"protocol": "full cell, 300 K, 1 GPa, 2,000 steps",
+                  "ase_variant_vs_ase_positions_A": 4.8e-13,
+                  "production_vs_corrected_positions_A": 4.7e-13,
+                  "variant_difference_positions_A": 6.1e-6},
+    },
     "ase_source_sha256": ASE_SOURCE_SHA256,
     "report": "docs/validation/1b-T09-integrators.md",
 }
