@@ -144,8 +144,8 @@ def _report(name, out):
     print(json.dumps({"case": name, **out}))
 
 
-@pytest.mark.parametrize("name", [pytest.param(name, marks=() if name.startswith("mh1") else pytest.mark.slow)
-                                  for name in CASES])
+@pytest.mark.slow
+@pytest.mark.parametrize("name", list(CASES))
 def test_gate_passes_in_graph_mode(name):
     spec = CASES[name]
     if not _available(spec["label"]):
@@ -167,6 +167,7 @@ def test_gate_passes_in_graph_mode(name):
         assert fresh["yardstick"]["forces_eV_per_A"] <= SCATTER.get(spec["label"], 1e-5)
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(not _available("mh1-r2scan"), reason="needs MH-1 in FASTMACE_MODELS")
 def test_a_broken_captured_graph_fails_while_eager_passes():
     out = run_gate(dict(label="mh1-r2scan", **NACL, broken_capture=True))

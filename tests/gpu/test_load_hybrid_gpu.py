@@ -74,6 +74,7 @@ def test_fm_load_then_minimal_planner_gives_the_hybrid():
     assert run_plan(HYBRID_PYTHON) == {"oeq_runtime": "prepared", "backend": "hybrid", "code": "backend-hybrid"}
 
 
+@pytest.mark.slow
 @needs_oeq
 def test_mace_imported_first_gives_plain_cueq_with_the_reason():
     result = run_plan(HYBRID_PYTHON, before="import mace.calculators")

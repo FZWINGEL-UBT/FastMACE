@@ -68,6 +68,7 @@ CHILD = textwrap.dedent("""
 """)
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(_mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 @pytest.mark.parametrize("python", ["pytest", "hybrid"])
 def test_lbfgs_with_fm_calc_reaches_maces_minimum(python):

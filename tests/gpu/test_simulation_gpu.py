@@ -108,6 +108,7 @@ def energy_deviation_meV(rows, reference):
     return max(abs(a["energy"] - b["energy"]) * 1000 for a, b in zip(rows, reference, strict=True))
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 @pytest.mark.parametrize("backend", ["cueq", "hybrid"])
 def test_simulation_reaches_the_main_py_trajectory(tmp_path, backend):
