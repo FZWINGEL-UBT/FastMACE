@@ -252,6 +252,7 @@ def test_naive_cueq_line_only_when_the_kernels_are_naive():
     for allow in (False, True):
         plan = test_minimal_planner.plan_label("mh1-r2scan", allow_naive_cueq=allow)
         assert plan.engine.backend == "hybrid"
+        assert plan.decision("allow_naive_cueq")[2].code == "fused-cueq"
         lines = make_report(plan).setup_text().splitlines()
         assert not any(naive in line for line in lines), lines
         assert not any(line.startswith("why:") for line in lines), lines
@@ -259,6 +260,9 @@ def test_naive_cueq_line_only_when_the_kernels_are_naive():
         soft=test_minimal_planner.software(fused_cueq=(False, "cuequivariance_ops_torch cannot be imported")))
     plan = test_minimal_planner.plan_label("mh1-r2scan", planner=planner, allow_naive_cueq=True)
     assert plan.engine.backend == "hybrid"
+    assert plan.decision("allow_naive_cueq")[1] == "on"
+    assert plan.decision("allow_naive_cueq")[2].code == "allow-naive-cueq"
+    assert "allow_naive_cueq" in plan.allowances
     lines = make_report(plan).setup_text().splitlines()
     assert any(line.startswith("why:") and naive in line for line in lines), lines
 
