@@ -1,0 +1,141 @@
+{
+  "status": "failed",
+  "created_utc": "2026-10-19T08:22:31.574003+00:00",
+  "host": "Fabi-PC",
+  "engine": "fastmace",
+  "planner": "minimal",
+  "baseline": null,
+  "structures_root": "/home/fzwin/fastmace-baseline/1a-T18",
+  "fastmace_commit": null,
+  "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+  "checkpoint": "/home/fzwin/models/MACE-POLAR-1-S.model",
+  "checkpoint_sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+  "tf32": false,
+  "model": "polar1-s",
+  "backend": "auto",
+  "dtype": "auto",
+  "rule": {
+    "ratio": 2.0,
+    "floors": {
+      "energy": 0.01,
+      "forces": 1e-05,
+      "stress": 1e-07
+    },
+    "gated": [
+      "energy",
+      "forces",
+      "stress"
+    ],
+    "source": "fastmace.planner.selfcheck"
+  },
+  "energy_gated": true,
+  "references": "fastmace.reference (1b-T13): float64 reference, float32 yardstick with float64 energy",
+  "processes_rule": "every reference in a fresh process that builds no production engine, before the production process (scope 'calculator'); conductor decision after T10",
+  "protocol": "unrelaxed 3x3x3 supercells, symmetric strain +-0.02 (hydrostatic: isotropic; full: anisotropic and shear), Gaussian rattle 0.05 A; float64 reference; gate: max error <= max(2 x that of the float32 yardstick, floor), for energy, forces, stress",
+  "args": {
+    "output": "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-polar1-s-NbCl5x4",
+    "engine": "fastmace",
+    "planner": "minimal",
+    "baseline": null,
+    "structures_root": "/home/fzwin/fastmace-baseline/1a-T18",
+    "checkpoint": "/home/fzwin/models/MACE-POLAR-1-S.model",
+    "model": "polar1-s",
+    "structures": [
+      "NbCl5"
+    ],
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "configs": 4,
+    "rattle_A": 0.05,
+    "strain": 0.02,
+    "backend": "auto",
+    "dtype": "auto",
+    "main_args": "",
+    "seed": 20261015,
+    "reference_scope": "calculator",
+    "reference_command": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+    "production_command": "/home/fzwin/environments/mace_cueq_oeq/bin/python"
+  },
+  "structures": {
+    "NbCl5": {
+      "natoms": 1944,
+      "source": "/home/fzwin/fastmace-baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl5.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "1d662303cbc693ec1beb1b0af9adccbf0392d0919cddfe4628c5dc5dc1f8ae99",
+      "configurations": "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-polar1-s-NbCl5x4/configs/NbCl5.npz",
+      "configs": []
+    }
+  },
+  "processes": [
+    {
+      "name": "reference-NbCl5-f64",
+      "kind": "reference",
+      "argv": [
+        "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-polar1-s-NbCl5x4/jobs/reference-NbCl5-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 1,
+      "wall_s": 19.579022979,
+      "result": {
+        "name": "reference-NbCl5-f64",
+        "kind": "reference",
+        "pid": 6634,
+        "host": "Fabi-PC",
+        "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-19T08:22:32.491997+00:00",
+        "hybrid_launcher": false,
+        "load_s": 8.743717959001515,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/fzwin/models/MACE-POLAR-1-S.model",
+            "sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+            "label": "polar1-s",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain",
+            "polar_longrange"
+          ],
+          "corrections_active": [
+            "polar_kspace_stress"
+          ],
+          "optional_physics": [],
+          "polar": {
+            "bounds": [
+              19,
+              18,
+              6
+            ],
+            "k_vectors": 3959,
+            "k_superset": 7986,
+            "headroom": 0.1
+          }
+        },
+        "status": "failed",
+        "error": "RuntimeError: CUDA driver error: device not ready\nThe CUDA driver logged these messages, which may provide useful details:\nFailed to create GPU mapping\n",
+        "wall_s": 17.808741386001202
+      }
+    }
+  ],
+  "summary": {},
+  "error": "GateJobError: reference-NbCl5-f64 exited with 1; see logs/reference-NbCl5-f64.log",
+  "finished_utc": "2026-10-19T08:22:51.622565+00:00"
+}

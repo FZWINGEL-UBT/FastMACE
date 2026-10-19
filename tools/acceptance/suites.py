@@ -318,7 +318,9 @@ def gate_jobs(machine: Machine, run_root: Path, labels=GATE_LABELS, engine="fast
         if label not in GATE_LABELS:
             raise ValueError(f"{label!r} is not one of the 19 labels")
         cases = gate_cases(label) if structures is None else (
-            ("-" + "-".join(structures), tuple(structures), 3, "check"),)
+            # job names are file names: each structure by its stem and repeat, never a path
+            ("-" + "-".join(PurePosixPath(spec).name.replace(".", "_") for spec in structures), tuple(structures), 3,
+             "check"),)
         for suffix, specs, configs, role in cases:
             name = f"gate-{label}{suffix}" + ("" if engine == "fastmace" else f"-{engine}")
             output = check_location(machine, run_root / name)

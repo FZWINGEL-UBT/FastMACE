@@ -1,0 +1,38 @@
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+fastmace doctor: FastMACE 0.0.1.dev0, Python 3.10.12, Linux x86_64
+[ ok ] GPU and driver: NVIDIA GeForce RTX 5060 Ti; driver 610.88; torch CUDA 13.0
+[ ok ] torch: torch 2.14.1+cu130
+[ ok ] MACE: mace-torch 0.3.16; looked up, not imported
+[ ok ] cuEquivariance: cuequivariance 0.12.0, cuequivariance-torch 0.12.0; fused-kernel libraries present (cuequivariance-ops-torch-cu13 0.12.0, cuequivariance-ops-cu13 0.12.0); not imported, so a load failure shows at the first model load
+[ ok ] OpenEquivariance: openequivariance 0.7.0; looked up, not imported
+       build path: host toolchain (OEQ_JIT_EXTENSION=1, no nvcc; prebuilt wheels come in phase 6)
+       extension built before: /home/fzwin/fastmace-cache/acceptance/oeq/torch-extensions-4m0f_d9h/libtorch_tp_jit/libtorch_tp_jit.so
+[ ok ] Triton: triton 3.8.0 is importable
+[ ok ] NVRTC: NVRTC 13.0 loads through cuda.bindings
+[ ok ] graph-longrange: graph-longrange 0.4.0
+[warn] torch-dftd: torch-dftd is not installed; needed for the D3 reference
+       fix: pip install 'fastmace[d3]'
+[ ok ] cache root: /home/fzwin/fastmace-cache/acceptance (FASTMACE_CACHE; exists)
+[ ok ] file locks: PyTorch file locks: soft (start-up hook (nfs_soft_locks)); cache root on NFS: no; CUDA driver cache /home/fzwin/.nv/ComputeCache on NFS: no (enabled)
+[ ok ] model files: /home/fzwin/models/2023-12-03-mace-128-L1_epoch-199.model: mp0-medium, SHA-256 matches
+       /home/fzwin/models/MACE-OFF23_large.model: off23-large, SHA-256 matches
+       /home/fzwin/models/MACE-OFF23_medium.model: off23-medium, SHA-256 matches
+       /home/fzwin/models/MACE-OFF23_small.model: off23-small, SHA-256 matches
+       /home/fzwin/models/MACE-OFF23b_medium.model: off23b-medium, SHA-256 matches
+       /home/fzwin/models/MACE-OFF24_medium.model: off24-medium, SHA-256 matches
+       /home/fzwin/models/MACE-POLAR-1-L.model: polar1-l, SHA-256 matches
+       /home/fzwin/models/MACE-POLAR-1-M.model: polar1-m, SHA-256 matches
+       /home/fzwin/models/MACE-POLAR-1-S.model: polar1-s, SHA-256 matches
+       /home/fzwin/models/MACE-matpes-pbe-omat-ft.model: matpes-pbe, SHA-256 matches
+       /home/fzwin/models/MACE-matpes-r2scan-omat-ft.model: matpes-r2scan, SHA-256 matches
+       /home/fzwin/models/MACE-omol-0-extra-large-1024.model: omol0-xl, SHA-256 matches
+       /home/fzwin/models/MACE_MPtrj_2022.9.model: mp0-large, SHA-256 matches
+       /home/fzwin/models/mace-mh-1.matpes_r2scan.model: not in the label table (fm.load needs sha256= or trusted=True)
+       /home/fzwin/models/mace-mh-1.matpes_r2scan.model.json: not in the label table (fm.load needs sha256= or trusted=True)
+       /home/fzwin/models/mace-mh-1.model: mh1-omat, mh1-mp, mh1-r2scan, SHA-256 matches
+       /home/fzwin/models/mace-mp-0b3-medium.model: mp0b3-medium, SHA-256 matches
+       /home/fzwin/models/mace-mpa-0-medium.model: mpa0-medium, SHA-256 matches
+       /home/fzwin/models/mace-omat-0-medium.model: omat0-medium, SHA-256 matches
+all required checks passed (1 warning).
+exit 0
