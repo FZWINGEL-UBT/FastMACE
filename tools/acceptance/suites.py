@@ -490,8 +490,12 @@ def gpu_suite_jobs(machine: Machine, run_root: Path) -> list:
     tests = machine.path(machine.fastmace) / "tests" / "gpu"
     argv = [machine.python("mace_cueq_latest"), "-m", "pytest", str(tests), "-p", "no:cacheprovider",
             f"--basetemp={basetemp}", "--durations=40", "-rfEs", f"--junitxml={output / 'junit.xml'}"]
-    return [Job(name="gpu-suite", argv=tuple(argv), output=str(output),
-                env={"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq")}, note="full tier, one process")]
+    # The comparisons against the research engine need its export, and test_reference_gpu 1a-T19's stored POLAR-1-S
+    # references (on the NAS only); without them 77 tests skip (run 1b-T23-murphy-20261019).
+    env = {"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq"),
+           "FASTMACE_BASELINE": str(machine.path(machine.baseline)),
+           "FASTMACE_1A_T19_POLAR1S": str(machine.path(machine.root) / "1a-T19-gate-leto-20261018" / "gate-polar1-s")}
+    return [Job(name="gpu-suite", argv=tuple(argv), output=str(output), env=env, note="full tier, one process")]
 
 
 def adapter_jobs(machine: Machine, run_root: Path) -> list:
