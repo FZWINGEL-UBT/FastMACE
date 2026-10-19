@@ -47,7 +47,16 @@ CHILD = textwrap.dedent("""
                            fmax=float(np.abs(atoms.get_forces()).max()))
 
     calc = fm.calc("mh1", head="matpes_r2scan")
+    calls, calculate = [], calc.calculate
+
+    def timed(*args, **kwargs):
+        start = time.perf_counter()
+        calculate(*args, **kwargs)
+        calls.append(round(time.perf_counter() - start, 4))
+
+    calc.calculate = timed
     ours, ours_info = relax(calc)
+    ours_info["call_seconds"] = calls
     plan = calc.plan
     from mace.calculators import MACECalculator
     theirs, theirs_info = relax(MACECalculator(model_paths=sys.argv[1], device="cuda", default_dtype="float64",
@@ -60,15 +69,25 @@ CHILD = textwrap.dedent("""
 
 
 @pytest.mark.skipif(_mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
-def test_lbfgs_with_fm_calc_reaches_maces_minimum():
+@pytest.mark.parametrize("python", ["pytest", "hybrid"])
+def test_lbfgs_with_fm_calc_reaches_maces_minimum(python):
+    """``pytest``: this environment's Python; ``hybrid``: ``FASTMACE_HYBRID_PYTHON`` (OEq installed)."""
+    if python == "hybrid":
+        executable = os.environ.get("FASTMACE_HYBRID_PYTHON")
+        if not executable:
+            pytest.skip("FASTMACE_HYBRID_PYTHON is not set")
+    else:
+        executable = sys.executable
     environ = dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, [str(REPOSITORY_ROOT),
                                                                          os.environ.get("PYTHONPATH")])))
-    done = subprocess.run([sys.executable, "-c", CHILD, str(_mh1_path()), str(REPOSITORY_ROOT / "tests")],
+    done = subprocess.run([executable, "-c", CHILD, str(_mh1_path()), str(REPOSITORY_ROOT / "tests")],
                           capture_output=True, text=True, env=environ, timeout=1200, cwd=REPOSITORY_ROOT)
     assert done.returncode == 0, done.stderr[-4000:]
     result = json.loads(done.stdout.strip().splitlines()[-1])
     print(json.dumps(result, indent=1))
     assert result["tier"] == "compiled" and result["dtype"] == "float32"
+    if python == "hybrid":
+        assert result["backend"] == "hybrid", result["notes"]
     assert result["ours"]["converged"] and result["theirs"]["converged"]
     assert abs(result["ours"]["energy"] - result["theirs"]["energy"]) / result["atoms"] < 1e-4  # eV/atom
     assert result["max_displacement"] < 5e-3  # Å
