@@ -259,10 +259,12 @@ class MinimalPlanner:
             book.refuse("cuEquivariance's fused kernels do not load, so the run would be correct but slow: "
                         + "; ".join(problems) + ". Pass allow_naive_cueq=True to run anyway (recorded; SPEC §9.2, "
                         "§9.3 rule 6)", "naive-cueq", 6)
+        # Only naive kernels in use get the downgrade code: the report warns on it (1b-T22b).
         book.decide("allow_naive_cueq", "on" if allow_naive_cueq else "off", Reason(
             ("allowed: " + "; ".join(problems)) if problems and allow_naive_cueq else
             ("requested; the fused kernels load" if allow_naive_cueq else "not needed: no naive cuEq kernel")
-            if not problems else "refused: naive cuEq kernels", code="allow-naive-cueq"))
+            if not problems else "refused: naive cuEq kernels",
+            code="allow-naive-cueq" if problems else "fused-cueq"))
         return superset
 
     def _claim_family(self, plan, owner):

@@ -243,6 +243,26 @@ def test_hybrid_plan_has_no_downgrade_line():
     assert not any(line.startswith("why:") for line in make_report().setup_text().splitlines())
 
 
+def test_naive_cueq_line_only_when_the_kernels_are_naive():
+    """1b-T22b: the minimal planner's rule 6 record on a (mocked) hybrid GPU plan. With the fused
+    kernels loading, the report has no naive-cuEq line, also with allow_naive_cueq=True; with naive
+    kernels allowed, it has the line."""
+    test_minimal_planner = pytest.importorskip("test_minimal_planner")
+    naive = report.DOWNGRADES["allow-naive-cueq"]
+    for allow in (False, True):
+        plan = test_minimal_planner.plan_label("mh1-r2scan", allow_naive_cueq=allow)
+        assert plan.engine.backend == "hybrid"
+        lines = make_report(plan).setup_text().splitlines()
+        assert not any(naive in line for line in lines), lines
+        assert not any(line.startswith("why:") for line in lines), lines
+    planner = test_minimal_planner.minimal(
+        soft=test_minimal_planner.software(fused_cueq=(False, "cuequivariance_ops_torch cannot be imported")))
+    plan = test_minimal_planner.plan_label("mh1-r2scan", planner=planner, allow_naive_cueq=True)
+    assert plan.engine.backend == "hybrid"
+    lines = make_report(plan).setup_text().splitlines()
+    assert any(line.startswith("why:") and naive in line for line in lines), lines
+
+
 def test_unknown_code_is_named_not_dropped():
     error = PlanRefused.from_reasons([Reason("future rule", code="some-future-code")])
     text = make_report(plan=None, refusal=error, integrator=IntegratorConfig()).setup_text()
