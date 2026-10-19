@@ -1,0 +1,49 @@
+{
+  "command": "mace-first",
+  "created_utc": "2026-10-19T13:41:27.272932+00:00",
+  "host": "Fabi-PC",
+  "fastmace_commit": null,
+  "model": "mh1-r2scan",
+  "structure": "NaCl",
+  "runs": {
+    "fastmace-first": {
+      "exit_code": 0,
+      "process_wall_s": 45.58460773000115,
+      "load_s": 8.873008818998642,
+      "built_s": 33.76155538999592,
+      "first_20_steps_s": 9.81949528199766,
+      "setup_s": {
+        "plan": 0.25367415599612286,
+        "build": 23.512543901000754
+      },
+      "backend": "hybrid",
+      "backend_decisions": [
+        [
+          "EngineConfig.backend",
+          "hybrid",
+          "auto: OpenEquivariance builds and the process allows it (SPEC \u00a79.4)"
+        ]
+      ]
+    },
+    "mace-first": {
+      "exit_code": 0,
+      "process_wall_s": 55.91835937300493,
+      "load_s": 7.806947293996927,
+      "built_s": 48.44516844100144,
+      "first_20_steps_s": 5.181269982000231,
+      "setup_s": {
+        "plan": 0.2300806429993827,
+        "build": 39.04424192599981
+      },
+      "backend": "cueq",
+      "backend_decisions": [
+        [
+          "EngineConfig.backend",
+          "cueq",
+          "auto: mace, openequivariance, torch.utils.cpp_extension was imported before FastMACE could prepare the OpenEquivariance runtime (SPEC \u00a79.4, 1a-T00); import fastmace and plan before importing MACE"
+        ]
+      ]
+    }
+  },
+  "finished_utc": "2026-10-19T13:43:08.928817+00:00"
+}

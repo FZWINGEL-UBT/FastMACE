@@ -1,0 +1,97 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-19T10:40:10.654852+00:00",
+      "host": "Fabi-PC",
+      "machine": "local",
+      "suites": [
+        "gpu-suite"
+      ],
+      "run_root": "/home/fzwin/fastmace-acceptance/1b-T23-local-suite-20261019",
+      "environment": {
+        "PYTHONPATH": "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/home/fzwin/fastmace-cache/acceptance",
+        "FASTMACE_MODELS": "/home/fzwin/models",
+        "FASTMACE_STRUCTURES": "/home/fzwin/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/inductor",
+        "TRITON_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/triton",
+        "MACE_COMPILE_CACHE": "/home/fzwin/fastmace-cache/acceptance/compile",
+        "XDG_CACHE_HOME": "/home/fzwin/fastmace-cache/acceptance/xdg",
+        "TMPDIR": "/home/fzwin/fastmace-acceptance/1b-T23-local-suite-20261019/tmp",
+        "TMP": "/home/fzwin/fastmace-acceptance/1b-T23-local-suite-20261019/tmp",
+        "TEMP": "/home/fzwin/fastmace-acceptance/1b-T23-local-suite-20261019/tmp",
+        "TORCHINDUCTOR_COMPILE_THREADS": "4"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": null,
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/home/fzwin/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gpu-suite",
+          "argv": [
+            "/home/fzwin/environments/mace_cueq_latest/bin/python",
+            "-m",
+            "pytest",
+            "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52/tests/gpu",
+            "-p",
+            "no:cacheprovider",
+            "--basetemp=/home/fzwin/fastmace-acceptance/1b-T23-local-suite-20261019/gpu-suite-pytest",
+            "--durations=40",
+            "-rfEs",
+            "--junitxml=/home/fzwin/fastmace-acceptance/1b-T23-local-suite-20261019/gpu-suite/junit.xml"
+          ],
+          "output": "/home/fzwin/fastmace-acceptance/1b-T23-local-suite-20261019/gpu-suite",
+          "timing": false,
+          "note": "full tier, one process",
+          "idle_check": {
+            "utc": "2026-10-19T10:40:10.983854+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 1603.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "windows_gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 1603.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "load_average": [
+              138.72216796875,
+              139.14013671875,
+              139.36865234375
+            ],
+            "users": [
+              "fzwin    pts/2        2026-10-19 12:39"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-19T10:40:10.985057+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-19T13:02:51.220780+00:00",
+          "wall_s": 8560.240239556995,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-19T13:02:51.309612+00:00"
+    }
+  ]
+}

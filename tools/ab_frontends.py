@@ -159,7 +159,9 @@ def parse_args(argv=None):
 def _output(args, name):
     from fastmace.io.output import Output
 
-    return Output(str(args.output / name))
+    # The ASE shim writes thermo rows and restarts at the production cadences and its trajectory itself (none
+    # here): every side gets the same Output, without a FastMACE trajectory.
+    return Output(str(args.output / name), trajectory_every=None)
 
 
 def build_simulation(args, atoms, loaded):
@@ -189,11 +191,9 @@ def build_ase(args, atoms, loaded):
 
     from fastmace.ase import Langevin
     dyn = Langevin(atoms.copy(), TIMESTEP_FS * units.fs, temperature_K=args.temperature_K, friction=FRICTION_ASE,
-                   force_field=loaded, seed=args.seed, check=args.check, output=_output(args, "ase").directory)
-    sim = getattr(dyn, "simulation", None)
-    plan = getattr(dyn, "plan", None) or getattr(sim, "plan", None)
-    gate = getattr(dyn, "gate", None) or getattr(sim, "gate", None)
-    return dyn, dyn.run, plan, gate
+                   model=loaded, seed=args.seed, check=args.check, output=_output(args, "ase").directory)
+    dyn.run(1)  # the shim builds its Simulation at the first run, as fm.md runs its first step
+    return dyn, dyn.run, dyn.plan, dyn.gate
 
 
 BUILDERS = {"simulation": build_simulation, "md": build_md, "ase": build_ase}
@@ -220,7 +220,7 @@ def main(argv=None):
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, sha256=loaded.sha256,
                 structure=structure, natoms=len(atoms), temperature_K=args.temperature_K, check=args.check,
                 timestep_fs=TIMESTEP_FS, friction_ase=FRICTION_ASE, protocol=protocol.as_dict(), sides=args.sides,
-                gpu=torch.cuda.get_device_name(0), torch=torch.__version__, setup_s={}, plans={}, gates={})
+                torch=torch.__version__, setup_s={}, plans={}, gates={})
     path = args.output / "metadata.json"
 
     def save():
@@ -237,6 +237,8 @@ def main(argv=None):
             meta["plans"][name] = plans[name].describe() if plans[name] is not None else None
             meta["gates"][name] = gates[name].to_metadata() if gates[name] is not None else None
             save()
+        # Only after the first build: the planner sets the CUDA allocator before anything touches CUDA.
+        meta["gpu"] = torch.cuda.get_device_name(0)
         first = args.sides[0]
         meta["same_plan"] = {name: plans[name] is not None and plans_equal(plans[first], plans[name])
                              for name in args.sides[1:]}

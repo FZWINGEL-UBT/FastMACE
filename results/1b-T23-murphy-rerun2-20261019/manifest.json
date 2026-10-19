@@ -1,0 +1,249 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-19T13:03:08.301689+00:00",
+      "host": "murphy",
+      "machine": "murphy",
+      "suites": [
+        "frontends",
+        "compile-checks",
+        "library-gate",
+        "workflow"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-t23d",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/tmp",
+        "TORCHINDUCTOR_COMPILE_THREADS": "4"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "f6b7b86140bb8e408a91be5627a136aab0689ae0",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "compile-polar1s-npt-restart",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/fastmace-t23d/tools/compile_checks.py",
+            "polar-npt",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/compile-polar1s-npt-restart",
+            "--model",
+            "polar1-s"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/compile-polar1s-npt-restart",
+          "timing": true,
+          "note": "",
+          "idle_check": {
+            "utc": "2026-10-19T13:03:08.360132+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              17.95654296875,
+              8.7470703125,
+              4.1796875
+            ],
+            "users": [
+              "margraf  pts/0        2026-10-19 14:54 (132.180.232.211)"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-19T13:03:08.362781+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-19T13:06:11.310179+00:00",
+          "wall_s": 182.94551660865545,
+          "status": "complete"
+        },
+        {
+          "name": "library-gate-polar1-s",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/fastmace-t23d/tools/library_gate.py",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/library-gate-polar1-s",
+            "--model",
+            "polar1-s",
+            "--structure",
+            "NaCl",
+            "--check",
+            "gate"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/library-gate-polar1-s",
+          "timing": false,
+          "note": "in-library reduced gate (1b-T16), captured replay",
+          "idle_check": {
+            "utc": "2026-10-19T13:06:11.360067+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 20.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              20.24365234375,
+              13.8623046875,
+              6.9716796875
+            ],
+            "users": [
+              "margraf  pts/0        2026-10-19 14:54 (132.180.232.211)"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-19T13:06:11.361970+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-19T13:07:26.979994+00:00",
+          "wall_s": 75.61668014340103,
+          "status": "complete"
+        },
+        {
+          "name": "main-smoke-NaNbO3-gpu",
+          "argv": [
+            "bash",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq",
+            "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq-launcher",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/ResearchModule/Experiments/Langevin_Thermostat/main.py",
+            "--engine",
+            "gpu",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/main-smoke-NaNbO3-gpu",
+            "--structures",
+            "NaNbO3",
+            "--heat-ps",
+            "0.5",
+            "--cool-ps",
+            "0.5",
+            "--peak-K",
+            "400"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/main-smoke-NaNbO3-gpu",
+          "timing": false,
+          "note": "",
+          "idle_check": {
+            "utc": "2026-10-19T13:07:27.021934+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 10.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              7.63330078125,
+              11.64404296875,
+              6.78076171875
+            ],
+            "users": [
+              "margraf  pts/0        2026-10-19 14:54 (132.180.232.211)"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-19T13:07:27.025205+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-19T13:09:58.449885+00:00",
+          "wall_s": 151.42323275841773,
+          "status": "complete"
+        },
+        {
+          "name": "main-smoke-NaNbO3-fastmace",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/ResearchModule/Experiments/Langevin_Thermostat/main.py",
+            "--engine",
+            "fastmace",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/main-smoke-NaNbO3-fastmace",
+            "--structures",
+            "NaNbO3",
+            "--heat-ps",
+            "0.5",
+            "--cool-ps",
+            "0.5",
+            "--peak-K",
+            "400"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/main-smoke-NaNbO3-fastmace",
+          "timing": false,
+          "note": "",
+          "idle_check": {
+            "utc": "2026-10-19T13:09:58.490903+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              1.69482421875,
+              7.54443359375,
+              5.955078125
+            ],
+            "users": [
+              "margraf  pts/0        2026-10-19 14:54 (132.180.232.211)"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-19T13:09:58.493871+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-19T13:12:20.077949+00:00",
+          "wall_s": 141.58170246519148,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-19T13:12:20.080346+00:00"
+    }
+  ]
+}

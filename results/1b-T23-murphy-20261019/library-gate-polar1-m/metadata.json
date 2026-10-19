@@ -1,0 +1,271 @@
+{
+  "status": "complete",
+  "tool": "library_gate",
+  "created_utc": "2026-10-19T10:25:43.848739+00:00",
+  "host": "murphy",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "model": "polar1-m",
+  "structure": "NaCl",
+  "check": "gate",
+  "seed": 20261015,
+  "cases": {
+    "nvt": {
+      "ensemble": "nvt",
+      "status": "passed",
+      "gate": {
+        "status": "passed",
+        "check": "gate",
+        "reason": null,
+        "copies": "2 rattled (0.05 \u00c5)",
+        "energy_meV_per_atom": 0.0003383115485862449,
+        "force_eV_per_A": 3.503174084512617e-06,
+        "stress_eV_per_A3": null,
+        "quantities": {
+          "energy_meV_per_atom": {
+            "production": 0.0003383115485862449,
+            "yardstick": 0.00023759828225054121,
+            "ratio": 1.4238804480476175,
+            "floor": 0.01,
+            "limit": 0.01,
+            "passed": true
+          },
+          "force_eV_per_A": {
+            "production": 3.503174084512617e-06,
+            "yardstick": 3.053489115880867e-06,
+            "ratio": 1.1472692227042784,
+            "floor": 1e-05,
+            "limit": 1e-05,
+            "passed": true
+          },
+          "stress_eV_per_A3": {
+            "passed": true,
+            "note": "stress: not in plan"
+          }
+        },
+        "nonfinite": [],
+        "mode": "captured replay of stages C, B",
+        "references": {
+          "ran": "in-process",
+          "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+          "oeq_runtime": "prepared",
+          "reference": {
+            "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+            "role": "reference",
+            "dtype": "float64",
+            "float64_energy": false,
+            "e0_table": null,
+            "backend": "cueq",
+            "cueq_conv_fusion": false,
+            "model": {
+              "path": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+              "sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+              "label": "polar1-m",
+              "head": "Default"
+            },
+            "patches": [
+              "oeq_runtime",
+              "single_graph_strain",
+              "polar_longrange"
+            ],
+            "corrections_active": [
+              "polar_kspace_stress"
+            ],
+            "optional_physics": [],
+            "polar": {
+              "bounds": [
+                6,
+                6,
+                6
+              ],
+              "k_vectors": 346,
+              "k_superset": 786,
+              "headroom": 0.1
+            }
+          },
+          "yardstick": {
+            "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+            "role": "yardstick",
+            "dtype": "float32",
+            "float64_energy": true,
+            "e0_table": "checkpoint",
+            "backend": "cueq",
+            "cueq_conv_fusion": false,
+            "model": {
+              "path": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+              "sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+              "label": "polar1-m",
+              "head": "Default"
+            },
+            "patches": [
+              "oeq_runtime",
+              "single_graph_strain",
+              "polar_longrange"
+            ],
+            "corrections_active": [
+              "polar_kspace_stress"
+            ],
+            "optional_physics": [],
+            "polar": {
+              "bounds": [
+                6,
+                6,
+                6
+              ],
+              "k_vectors": 346,
+              "k_superset": 786,
+              "headroom": 0.1
+            }
+          }
+        },
+        "seconds": {
+          "references_s": 14.84582625888288,
+          "production_s": 3.8339700996875763
+        },
+        "notes": []
+      },
+      "plan": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  superset = Na Cl  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 300 K  (recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3)\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (auto: OpenEquivariance builds and the process allows it (SPEC \u00a79.4))\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (PolarMACE only (MACE PR 1711))\n  PolarConfig.kspace_headroom = 0.0  (auto (variable_cell_0_1_else_0): fixed cell)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: PrecisionConfig.dtype=float32",
+      "setup_s": {
+        "plan": 0.008754635229706764,
+        "build": 30.52828338742256,
+        "gate": 18.683748051524162
+      },
+      "structure": "NaCl",
+      "natoms": 216,
+      "wall_s": 49.40097517706454,
+      "exit_code": 0,
+      "log": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-20261019/library-gate-polar1-m/nvt.log"
+    },
+    "npt": {
+      "ensemble": "npt",
+      "status": "passed",
+      "gate": {
+        "status": "passed",
+        "check": "gate",
+        "reason": null,
+        "copies": "2 rattled (0.05 \u00c5), 2 strained (\u00b12 %, hydrostatic)",
+        "energy_meV_per_atom": 0.00037144356476211994,
+        "force_eV_per_A": 3.7785340539775447e-06,
+        "stress_eV_per_A3": 1.5171501066514256e-08,
+        "quantities": {
+          "energy_meV_per_atom": {
+            "production": 0.00037144356476211994,
+            "yardstick": 0.00027029697472850483,
+            "ratio": 1.3742054091993077,
+            "floor": 0.01,
+            "limit": 0.01,
+            "passed": true
+          },
+          "force_eV_per_A": {
+            "production": 3.7785340539775447e-06,
+            "yardstick": 3.239809352184597e-06,
+            "ratio": 1.166282840510256,
+            "floor": 1e-05,
+            "limit": 1e-05,
+            "passed": true
+          },
+          "stress_eV_per_A3": {
+            "production": 1.5171501066514256e-08,
+            "yardstick": 3.129477068588779e-08,
+            "ratio": 0.48479348894400953,
+            "floor": 1e-07,
+            "limit": 1e-07,
+            "passed": true
+          }
+        },
+        "nonfinite": [],
+        "mode": "captured replay of stages C, B",
+        "references": {
+          "ran": "in-process",
+          "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+          "oeq_runtime": "prepared",
+          "reference": {
+            "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+            "role": "reference",
+            "dtype": "float64",
+            "float64_energy": false,
+            "e0_table": null,
+            "backend": "cueq",
+            "cueq_conv_fusion": false,
+            "model": {
+              "path": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+              "sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+              "label": "polar1-m",
+              "head": "Default"
+            },
+            "patches": [
+              "oeq_runtime",
+              "single_graph_strain",
+              "polar_longrange"
+            ],
+            "corrections_active": [
+              "polar_kspace_stress"
+            ],
+            "optional_physics": [],
+            "polar": {
+              "bounds": [
+                6,
+                6,
+                6
+              ],
+              "k_vectors": 346,
+              "k_superset": 786,
+              "headroom": 0.1
+            }
+          },
+          "yardstick": {
+            "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+            "role": "yardstick",
+            "dtype": "float32",
+            "float64_energy": true,
+            "e0_table": "checkpoint",
+            "backend": "cueq",
+            "cueq_conv_fusion": false,
+            "model": {
+              "path": "/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-M.model",
+              "sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a",
+              "label": "polar1-m",
+              "head": "Default"
+            },
+            "patches": [
+              "oeq_runtime",
+              "single_graph_strain",
+              "polar_longrange"
+            ],
+            "corrections_active": [
+              "polar_kspace_stress"
+            ],
+            "optional_physics": [],
+            "polar": {
+              "bounds": [
+                6,
+                6,
+                6
+              ],
+              "k_vectors": 346,
+              "k_superset": 786,
+              "headroom": 0.1
+            }
+          }
+        },
+        "seconds": {
+          "references_s": 16.15590824559331,
+          "production_s": 4.130559949204326
+        },
+        "notes": []
+      },
+      "plan": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  superset = Na Cl  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 300 K  (recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3)\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (auto: OpenEquivariance builds and the process allows it (SPEC \u00a79.4))\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): acts where stress is computed (NPT))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (PolarMACE only (MACE PR 1711))\n  PolarConfig.kspace_headroom = 0.1  (auto (variable_cell_0_1_else_0): variable cell (NPT))\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = LangevinBAOAB  (NPT, hydrostatic cell, externalstress=-0 (-0 GPa), disable_cell_langevin=False (workflow.baoab_settings))\n  compute_stress = on  (variable cell (NPT))\n  requested: PrecisionConfig.dtype=float32",
+      "setup_s": {
+        "plan": 0.009463667869567871,
+        "build": 24.895366426557302,
+        "gate": 20.291120810434222
+      },
+      "structure": "NaCl",
+      "natoms": 216,
+      "wall_s": 45.37801741436124,
+      "exit_code": 0,
+      "log": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-20261019/library-gate-polar1-m/npt.log"
+    }
+  },
+  "passed": true,
+  "finished_utc": "2026-10-19T10:27:32.837447+00:00"
+}

@@ -1,0 +1,220 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-19T13:43:09.627080+00:00",
+      "host": "Fabi-PC",
+      "machine": "local",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019",
+      "environment": {
+        "PYTHONPATH": "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/home/fzwin/fastmace-cache/acceptance",
+        "FASTMACE_MODELS": "/home/fzwin/models",
+        "FASTMACE_STRUCTURES": "/home/fzwin/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/inductor",
+        "TRITON_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/triton",
+        "MACE_COMPILE_CACHE": "/home/fzwin/fastmace-cache/acceptance/compile",
+        "XDG_CACHE_HOME": "/home/fzwin/fastmace-cache/acceptance/xdg",
+        "TMPDIR": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/tmp",
+        "TMP": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/tmp",
+        "TEMP": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/tmp",
+        "TORCHINDUCTOR_COMPILE_THREADS": "4"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": null,
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/home/fzwin/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-off24-medium-urea_cod1008787_cif-naphthalene_cod2311090_cif-paracetamol_cod2104364_cif@2x2x2-water_216_extxyz@1x1x1",
+          "argv": [
+            "/home/fzwin/environments/mace_cueq_latest/bin/python",
+            "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/gate-off24-medium-urea_cod1008787_cif-naphthalene_cod2311090_cif-paracetamol_cod2104364_cif@2x2x2-water_216_extxyz@1x1x1",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/home/fzwin/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/home/fzwin/models/MACE-OFF24_medium.model",
+            "--model",
+            "off24-medium",
+            "--structures",
+            "/mnt/g/Margraf/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+            "/mnt/g/Margraf/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+            "/mnt/g/Margraf/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif@2x2x2",
+            "/mnt/g/Margraf/ResearchModule/Structures/Organic/water_216.extxyz@1x1x1",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/home/fzwin/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/home/fzwin/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/gate-off24-medium-urea_cod1008787_cif-naphthalene_cod2311090_cif-paracetamol_cod2104364_cif@2x2x2-water_216_extxyz@1x1x1",
+          "timing": false,
+          "note": "check",
+          "idle_check": {
+            "utc": "2026-10-19T13:43:10.424939+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 1616.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "windows_gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 1616.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "load_average": [
+              140.5439453125,
+              139.94384765625,
+              139.4951171875
+            ],
+            "users": [
+              "fzwin    pts/2        2026-10-19 12:39"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-19T13:43:10.426151+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-19T13:49:48.617604+00:00",
+          "wall_s": 398.19130003600003,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-19T13:49:48.617820+00:00"
+    },
+    {
+      "started_utc": "2026-10-19T13:56:20.232275+00:00",
+      "host": "Fabi-PC",
+      "machine": "local",
+      "suites": [
+        "gate"
+      ],
+      "run_root": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019",
+      "environment": {
+        "PYTHONPATH": "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/home/fzwin/fastmace-cache/acceptance",
+        "FASTMACE_MODELS": "/home/fzwin/models",
+        "FASTMACE_STRUCTURES": "/home/fzwin/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/inductor",
+        "TRITON_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/triton",
+        "MACE_COMPILE_CACHE": "/home/fzwin/fastmace-cache/acceptance/compile",
+        "XDG_CACHE_HOME": "/home/fzwin/fastmace-cache/acceptance/xdg",
+        "TMPDIR": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/tmp",
+        "TMP": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/tmp",
+        "TEMP": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/tmp",
+        "TORCHINDUCTOR_COMPILE_THREADS": "4"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": null,
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/home/fzwin/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-off24-medium-urea_cod1008787_cif-naphthalene_cod2311090_cif-paracetamol_cod2104364_cif@2x2x2-water_216_extxyz@1x1x1",
+          "argv": [
+            "/home/fzwin/environments/mace_cueq_latest/bin/python",
+            "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/gate-off24-medium-urea_cod1008787_cif-naphthalene_cod2311090_cif-paracetamol_cod2104364_cif@2x2x2-water_216_extxyz@1x1x1",
+            "--engine",
+            "fastmace",
+            "--baseline",
+            "/home/fzwin/fastmace-baseline/1a-T18",
+            "--checkpoint",
+            "/home/fzwin/models/MACE-OFF24_medium.model",
+            "--model",
+            "off24-medium",
+            "--structures",
+            "/mnt/g/Margraf/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+            "/mnt/g/Margraf/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+            "/mnt/g/Margraf/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif@2x2x2",
+            "/mnt/g/Margraf/ResearchModule/Structures/Organic/water_216.extxyz@1x1x1",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/home/fzwin/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/home/fzwin/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/home/fzwin/fastmace-acceptance/1b-T23-local-off24-reduced-20261019/gate-off24-medium-urea_cod1008787_cif-naphthalene_cod2311090_cif-paracetamol_cod2104364_cif@2x2x2-water_216_extxyz@1x1x1",
+          "timing": false,
+          "note": "check",
+          "idle_check": {
+            "utc": "2026-10-19T13:56:20.481768+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 1610.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "windows_gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 1610.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "load_average": [
+              140.78369140625,
+              140.7421875,
+              140.166015625
+            ],
+            "users": [
+              "fzwin    pts/1        2026-10-19 15:56"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-19T13:56:20.482810+00:00",
+          "exit_code": 1,
+          "finished_utc": "2026-10-19T13:56:21.029979+00:00",
+          "wall_s": 0.5469752270000754,
+          "status": "failed"
+        }
+      ],
+      "status": "failed",
+      "stopped": null,
+      "failed": [
+        "gate-off24-medium-urea_cod1008787_cif-naphthalene_cod2311090_cif-paracetamol_cod2104364_cif@2x2x2-water_216_extxyz@1x1x1"
+      ],
+      "finished_utc": "2026-10-19T13:56:21.030266+00:00"
+    }
+  ]
+}

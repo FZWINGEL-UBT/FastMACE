@@ -1,0 +1,538 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /mnt/homes/zwingel/fastmace-cache/acceptance-murphy/inductor, triton /mnt/homes/zwingel/fastmace-cache/acceptance-murphy/triton
+rootdir: /mnt/homes/zwingel/fastmace-t23d
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+collected 119 items
+
+tests/gpu/test_neighbors_gpu.py ........................................ [ 33%]
+.......................................................                  [ 79%]
+tests/gpu/test_kernels_triton_cuda.py .................                  [ 94%]
+tests/gpu/test_reference_gpu.py .                                        [ 94%]
+tests/gpu/test_engine_gpu.py FFF                                         [ 97%]
+tests/gpu/test_forces_gpu.py ...                                         [100%]
+
+=================================== FAILURES ===================================
+___________ test_mh1_plain_cueq_float64_against_the_research_engine ____________
+
+    @pytest.mark.slow
+    @needs_mh1_baseline
+    def test_mh1_plain_cueq_float64_against_the_research_engine():
+        ours = fastmace_run(spec("cueq", modes=[("eager", 200), ("checked", 500), ("repeat", 500), ("pipelined", 500),
+                                                ("speculative", 200)], warmups=True))
+        theirs = baseline_run(spec("cueq", modes=[("checked", 500), ("repeat", 500), ("pipelined", 500)]))
+        modes, base = ours["modes"], theirs["modes"]
+        checked, pipelined = modes["checked"], modes["pipelined"]
+        summary = {
+            "replay_vs_eager_200": deviation(checked["positions"], modes["eager"]["positions"], 4),
+            "fastmace_repeat_500": deviation(modes["repeat"]["positions"], checked["positions"]),
+            "baseline_repeat_500": deviation(base["repeat"]["positions"], base["checked"]["positions"]),
+            "pipelined_vs_checked_500": deviation(pipelined["positions"], checked["positions"]),
+            "speculative_vs_pipelined_200": deviation(modes["speculative"]["positions"], pipelined["positions"], 4),
+            "baseline_checked_500": deviation(checked["positions"], base["checked"]["positions"]),
+            "baseline_pipelined_500": deviation(pipelined["positions"], base["pipelined"]["positions"]),
+            "kernels": {mode: same_kernels(modes[mode]["kinds"], base[mode]["kinds"]) for mode in ("checked", "pipelined")},
+            "ms_per_step": {mode: {"fastmace": modes[mode]["ms_per_step"], "baseline": base[mode]["ms_per_step"]}
+                            for mode in ("checked", "pipelined")},
+            "info": {mode: out["info"] for mode, out in modes.items()},
+            "baseline_edge_sizes": {mode: out["edge_sizes_used"] for mode, out in base.items()},
+            "baseline_builds": {mode: out["rebuilds"] for mode, out in base.items()},
+            "warmups": ours["warmups"], "allocator": [ours["allocator"], theirs["allocator"]], "torch": ours["torch"],
+        }
+        report("1a-T13-mh1-cueq-float64-nvt", summary)
+        assert checked["info"]["neighbour_rebuilds"] >= 1
+        for name in ("replay_vs_eager_200", "fastmace_repeat_500", "pipelined_vs_checked_500",
+                     "speculative_vs_pipelined_200", "baseline_checked_500", "baseline_pipelined_500"):
+            assert summary[name] <= FLOAT64_LIMIT, (name, summary[name])
+        assert all(out["async_equal"] for out in modes.values())
+        assert not any(ours["warmups"].values()), ours["warmups"]
+        for mode in ("checked", "pipelined"):
+            assert modes[mode]["info"]["edge_sizes_used"] == base[mode]["edge_sizes_used"]
+            # The baseline counts the force field's first build too.
+            assert modes[mode]["info"]["neighbour_rebuilds"] + 1 == base[mode]["rebuilds"]
+>           assert all(equal for _, _, equal in summary["kernels"][mode].values()), summary["kernels"][mode]
+E           AssertionError: {'C': (23, 23, True), "('B', 7168)": (234, 234, False), 'AC': (64, 64, True)}
+E           assert False
+E            +  where False = all(<generator object test_mh1_plain_cueq_float64_against_the_research_engine.<locals>.<genexpr> at 0x778aa4170cf0>)
+
+tests/gpu/test_engine_gpu.py:597: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-cueq-float64-nvt: {
+ "replay_vs_eager_200": 7.105427357601002e-14,
+ "fastmace_repeat_500": 2.4868995751603507e-13,
+ "baseline_repeat_500": 2.877698079828406e-13,
+ "pipelined_vs_checked_500": 2.4868995751603507e-13,
+ "speculative_vs_pipelined_200": 7.105427357601002e-14,
+ "baseline_checked_500": 2.877698079828406e-13,
+ "baseline_pipelined_500": 2.877698079828406e-13,
+ "kernels": {
+  "checked": {
+   "C": [
+    23,
+    23,
+    true
+   ],
+   "('B', 7168)": [
+    234,
+    234,
+    false
+   ],
+   "AC": [
+    64,
+    64,
+    true
+   ]
+  },
+  "pipelined": {
+   "ACP": [
+    73,
+    73,
+    true
+   ],
+   "('B', 7168)": [
+    234,
+    234,
+    false
+   ]
+  }
+ },
+ "ms_per_step": {
+  "checked": {
+   "fastmace": 74.68134904280305,
+   "baseline": 74.87273195758462
+  },
+  "pipelined": {
+   "fastmace": 74.90142779424787,
+   "baseline": 74.86962338909507
+  }
+ },
+ "info": {
+  "eager": {
+   "engine": "graph",
+   "mode": "checked",
+   "capture": false,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   }
+  },
+  "checked": {
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "AC"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   }
+  },
+  "repeat": {
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "AC"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   }
+  },
+  "pipelined": {
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 18,
+   "graphs": [
+    "ACP",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 18,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   }
+  },
+  "speculative": {
+   "engine": "graph",
+   "mode": "speculative",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "('ACB', 7168, 0)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 200,
+   "speculative_rollbacks": 5,
+   "speculative_rebuild_rollbacks": 5,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   }
+  }
+ },
+ "baseline_edge_sizes": {
+  "checked": [
+   7168
+  ],
+  "repeat": [
+   7168
+  ],
+  "pipelined": [
+   7168
+  ]
+ },
+ "baseline_builds": {
+  "checked": 15,
+  "repeat": 15,
+  "pipelined": 19
+ },
+ "warmups": {
+  "checked": [],
+  "pipelined": [],
+  "speculative": []
+ },
+ "allocator": [
+  "expandable_segments:True",
+  "expandable_segments:True"
+ ],
+ "torch": "2.14.1+cu130"
+}
+_________ test_mh1_plain_cueq_float64_npt_against_the_research_engine __________
+
+    @pytest.mark.slow
+    @needs_mh1_baseline
+    def test_mh1_plain_cueq_float64_npt_against_the_research_engine():
+        options = spec("cueq", ensemble="npt", modes=[("checked", 500), ("pipelined", 500)])
+        ours = fastmace_run(options)
+        theirs = baseline_run(options)
+        modes, base = ours["modes"], theirs["modes"]
+        summary = {mode: {"baseline_500": deviation(modes[mode]["positions"], base[mode]["positions"]),
+                          "kernels": same_kernels(modes[mode]["kinds"], base[mode]["kinds"]),
+                          "ms_per_step": [modes[mode]["ms_per_step"], base[mode]["ms_per_step"]],
+                          "builds": [modes[mode]["info"]["neighbour_rebuilds"] + 1, base[mode]["rebuilds"]],
+                          "edge_sizes": [modes[mode]["info"]["edge_sizes_used"], base[mode]["edge_sizes_used"]]}
+                   for mode in ("checked", "pipelined")}
+        summary["pipelined_vs_checked_500"] = deviation(modes["pipelined"]["positions"], modes["checked"]["positions"])
+        report("1a-T13-mh1-cueq-float64-npt", summary)
+        assert all(out["async_equal"] for out in modes.values())
+        assert summary["pipelined_vs_checked_500"] <= FLOAT64_LIMIT
+        for mode in ("checked", "pipelined"):
+            assert summary[mode]["baseline_500"] <= FLOAT64_LIMIT, (mode, summary[mode])
+>           assert all(equal for _, _, equal in summary[mode]["kernels"].values()), summary[mode]["kernels"]
+E           AssertionError: {'C': (28, 28, True), "('B', 7168)": (292, 292, False), 'AC': (229, 229, True)}
+E           assert False
+E            +  where False = all(<generator object test_mh1_plain_cueq_float64_npt_against_the_research_engine.<locals>.<genexpr> at 0x778a9dfee5e0>)
+
+tests/gpu/test_engine_gpu.py:619: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-cueq-float64-npt: {
+ "checked": {
+  "baseline_500": 5.329070518200751e-15,
+  "kernels": {
+   "C": [
+    28,
+    28,
+    true
+   ],
+   "('B', 7168)": [
+    292,
+    292,
+    false
+   ],
+   "AC": [
+    229,
+    229,
+    true
+   ]
+  },
+  "ms_per_step": [
+   75.91750869527459,
+   75.11075275018811
+  ],
+  "builds": [
+   15,
+   15
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined": {
+  "baseline_500": 5.329070518200751e-15,
+  "kernels": {
+   "ACP": [
+    354,
+    354,
+    true
+   ],
+   "('B', 7168)": [
+    292,
+    292,
+    false
+   ]
+  },
+  "ms_per_step": [
+   75.82699989899993,
+   75.68588629364967
+  ],
+  "builds": [
+   18,
+   18
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined_vs_checked_500": 8.881784197001252e-15
+}
+_____________ test_mh1_hybrid_float32_against_the_research_engine ______________
+
+    @pytest.mark.slow
+    @needs_oeq
+    @needs_mh1_baseline
+    def test_mh1_hybrid_float32_against_the_research_engine():
+>       ours = fastmace_run(spec("hybrid", modes=[("eager", 200), ("checked", 500), ("repeat", 500), ("pipelined", 500),
+                                                  ("speculative", 200)], warmups=True), python=HYBRID_PYTHON)
+
+tests/gpu/test_engine_gpu.py:626: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/gpu/test_engine_gpu.py:494: in fastmace_run
+    return run_fresh(COMMON.format(spec=run_spec) + FASTMACE_CHILD.format(), python=python)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+code = '\nimport gc, json, sys, time\nimport numpy as np\nSPEC = {\'backend\': \'hybrid\', \'dtype\': \'float32\', \'ensemble...ine, out\n    gc.collect(); torch.cuda.empty_cache()\nresult["torch"] = torch.__version__\nprint(json.dumps(result))\n'
+timeout = 3600
+python = '/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python', prefix = ()
+extra_env = None
+
+    def run_fresh(code, timeout=3600, python=sys.executable, prefix=(), extra_env=None):
+        """Run code in a fresh interpreter; returns the JSON its last stdout line prints."""
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), str(REPOSITORY_ROOT / "tests")]),
+                   PYTHONDONTWRITEBYTECODE="1", **(extra_env or {}))
+        if python != sys.executable:
+            env.pop("LD_LIBRARY_PATH", None)  # set for this environment; the in-process OEq runtime needs none
+        result = subprocess.run([*prefix, python, "-c", textwrap.dedent(code)], cwd=REPOSITORY_ROOT, env=env,
+                                capture_output=True, text=True, timeout=timeout, check=False)
+>       assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-6000:]
+E       AssertionError: ationWarning: invalid escape sequence '\p'
+E           """
+E         /mnt/homes/zwingel/fastmace-t23d/fastmace/model/loading.py:499: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+E           warnings.warn(
+E         /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+E           warnings.warn(
+E         /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+E           warnings.warn(
+E         WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+E         /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+E           "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+E         <string>:79: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+E         /mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/graph.py:1072: UserWarning: The AccumulateGrad node's stream does not match the stream of the node that produced the incoming gradient. This may incur unnecessary synchronization and break CUDA graph capture if the AccumulateGrad node's stream is the default stream. This mismatch is caused by an AccumulateGrad node created prior to the current iteration being kept alive. This can happen if the autograd graph is still being kept alive by tensors such as the loss, or if you are using DDP, which will stash a reference to the node. To resolve the mismatch, delete all references to the autograd graph or ensure that DDP initialization is performed under the same stream as subsequent forwards. If the mismatch is intentional, you can use torch.autograd.graph.set_warn_on_accumulate_grad_stream_mismatch(False) to suppress this warning. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/input_buffer.cpp:310.)
+E           return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+E         Traceback (most recent call last):
+E           File "<string>", line 133, in <module>
+E           File "<string>", line 113, in warmup_check
+E           File "/mnt/homes/zwingel/fastmace-t23d/fastmace/engine/graph.py", line 619, in _capture
+E             stage()
+E           File "/mnt/homes/zwingel/fastmace-t23d/fastmace/engine/graph.py", line 514, in _stage_b
+E             self._force_stage()
+E           File "/mnt/homes/zwingel/fastmace-t23d/fastmace/engine/graph.py", line 483, in _force_stage
+E             out = self.force_field(self.state.positions)
+E           File "/mnt/homes/zwingel/fastmace-t23d/fastmace/model/forces.py", line 461, in __call__
+E             out = self._outputs(positions)
+E           File "/mnt/homes/zwingel/fastmace-t23d/fastmace/model/forces.py", line 473, in _outputs
+E             return self._model_call(self.data, training=self.training, compute_force=True, compute_stress=False)
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 563, in __call__
+E             return super().__call__(*args, **kwargs)
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+E             return self._call_impl(*args, **kwargs)
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+E             return forward_call(*args, **kwargs)
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_dynamo/eval_frame.py", line 1261, in compile_wrapper
+E             result = fn(*args, **kwargs)
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+E             return self._call_impl(*args, **kwargs)
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+E             return forward_call(*args, **kwargs)
+E           File "<fastmace float64-energy ScaleShiftMACE.forward>", line 128, in forward
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py", line 197, in get_outputs
+E             compute_forces(
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/utils.py", line 26, in compute_forces
+E             gradient = torch.autograd.grad(
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/__init__.py", line 594, in grad
+E             result = _engine_run_backward(
+E           File "/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/graph.py", line 1072, in _engine_run_backward
+E             return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+E         RuntimeError: During CUDA graph capture, autograd node 'torch::autograd::AccumulateGrad' has a stale reference to the default stream (stream 0) from warmup. This will invalidate the capture because cudaStreamWaitEvent on the default stream pulls a non-capturing stream into the graph.
+E         
+E         To fix, either:
+E           (a) Run warmup on the same stream that capture will use, or
+E           (b) Delete references to the loss / autograd graph (e.g. `del loss`) before capture, or
+E           (c) Call torch.autograd.graph.set_override_stale_capture_stream(True) to automatically redirect stale nodes to the capturing stream.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python', '-c', '\nimport gc, json, sys, time...tograd.graph.set_override_stale_capture_stream(True) to automatically redirect stale nodes to the capturing stream.\n').returncode
+
+tests/gpu/test_engine_gpu.py:288: AssertionError
+=============================== warnings summary ===============================
+../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_reference_gpu.py::test_polar1s_reference_equals_1a_t19
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/gpu/test_reference_gpu.py::test_polar1s_reference_equals_1a_t19
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/graph_longrange/kspace.py:224: DeprecationWarning: invalid escape sequence '\p'
+    """
+
+tests/gpu/test_reference_gpu.py::test_polar1s_reference_equals_1a_t19
+  /mnt/homes/zwingel/fastmace-t23d/fastmace/model/loading.py:499: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/gpu/test_reference_gpu.py::test_polar1s_reference_equals_1a_t19
+  /mnt/homes/zwingel/fastmace-t23d/fastmace/reference/calculators.py:302: ModelLicenceWarning: MACE-POLAR-1-S.model (SHA-256 e4495612037b…) is not a label of the FastMACE table; its licence is unknown, check it with the model's release
+    loaded = loading.load(source, head, backend=stock["backend"], dtype=dtype, device=device,
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/skipped-junit.xml -
+============================= slowest 20 durations =============================
+539.08s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+380.60s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+256.09s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[cueq-float64-compiled-production]
+168.75s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[hybrid-float32-compiled-production]
+43.63s call     tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+31.47s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[cueq-float64-eager-plain]
+16.96s call     tests/gpu/test_reference_gpu.py::test_polar1s_reference_equals_1a_t19
+12.72s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_backward_equals_baseline[dtype1]
+12.33s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_fused_radial_equals_baseline[128]
+2.35s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_backward_equals_baseline[dtype0]
+2.00s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_fused_radial_equals_baseline[64]
+1.52s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_fused_radial_equals_baseline[16]
+1.23s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_input_gradient_equals_baseline[777-96-33]
+1.10s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaCl-rattled-unsorted]
+0.83s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_input_gradient_equals_baseline[4000-1280-65]
+0.69s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x3-rattled-groups]
+0.58s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_input_gradient_equals_baseline[5-17-9]
+0.58s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x3-rattled-unsorted]
+0.40s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x3-rattled-sorted]
+0.38s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-rattled-unsorted-f64]
+=========================== short test summary info ============================
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+============ 3 failed, 116 passed, 5 warnings in 1485.43s (0:24:45) ============
+exit 1
