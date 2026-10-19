@@ -1329,6 +1329,23 @@ points here.
     `-p no:cacheprovider` and `--basetemp` outside the tree.
   - Machines as listed; the go message confirms the reserved list.
 
+### After T06 and T12 (19 October 2026)
+
+- **1b-T08b added.** 1b-T12 found that the public `fm.load` imports MACE
+  before OpenEquivariance is prepared, so the minimal planner never picks
+  the hybrid backend after it (`backend-cueq-mace-imported-first`). The fix
+  goes in `model/loading.py`: `load_pristine` prepares OEq first when it is
+  installed and CUDA is visible. The T08 session does it on branch
+  `fastmace/1b-T08b`. It blocks acceptance item 4, not the other tasks.
+- T12: each plan reloads and converts the checkpoint, because sharing one
+  converted model across plans would break §8.7 isolation; this costs load
+  time. A superset beyond the structure is `rule=8`,
+  `superset-beyond-structure`. Explicit option conflicts carry `rule=None`.
+  The GPU comparison against `FixedPlanner` (500 MH-1 steps) is left to
+  1b-T23.
+- T06: the chunks and the restart file are flushed but not fsynced. That
+  covers SIGKILL, not power loss (phase 2 safety).
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
