@@ -147,6 +147,7 @@ class ForceField(Protocol):
 # was off by a factor of 2.5 while every self-check passed (1a-T07), because the self-checks build
 # their own sorted graph.
 STREAMING_RECORDS = ("streaming_conv", "generic_streaming")
+SEGMENTED_RECORDS = ("segmented_first_sum", "generic_segmented_first_sum")  # edges grouped by sender species
 # Workload constraint of the records whose rewritten model depends on the structure's species.
 SPECIES_DEPENDENT = "fixed_species_superset"
 
@@ -337,7 +338,7 @@ class MACEForceField:
 
         self.data = {key: (value.to(self._device, self._dtype) if value.is_floating_point() else value.to(self._device))
                      if torch.is_tensor(value) else value for key, value in batch.items()}
-        segmented = "segmented_first_sum" in enabled
+        segmented = any(name in SEGMENTED_RECORDS for name in enabled)
         self.neighbours = SkinNeighbourList(
             cell, calc.r_max, self._device, self._dtype, neighbours,
             sender_groups=(node_attrs[:, list(self.species_columns)].argmax(dim=1).cpu().numpy()

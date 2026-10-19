@@ -1,6 +1,6 @@
 """The generic family: rewrites for MACE-MP-0, the density family and MACE-OFF's later blocks (SPEC §6.2).
 
-``RECORDS`` holds four registry records (``fastmace.rewrites.registry``), each a dict of the §6.1
+``RECORDS`` holds five registry records (``fastmace.rewrites.registry``), each a dict of the §6.1
 fields plus the ``RewriteConfig`` field that switches it (docs/design/switch-map.md):
 
 - ``generic_species_skip`` (``species_skip``): every generic skip connection restricted to the
@@ -8,6 +8,9 @@ fields plus the ``RewriteConfig`` field that switches it (docs/design/switch-map
 - ``generic_reassociate`` (``reassociate_first``): the first interaction summed per receiver and
   sender species before its last radial layer; only when the first interaction is a generic
   class and its inputs are species-only;
+- ``generic_segmented_first_sum`` (``segmented_first_sum``): that sum as MH-1's run-segmented
+  Triton kernel, with each receiver's edges grouped by sender species; the research engine's
+  GENERIC_REASSOCIATE builds its reassociation with ``segmented=SEGMENTED_FIRST_SUM``;
 - ``generic_fused_radial_backward`` (``fused_folded_backward``): the last radial layer through
   ``folded_linear`` (Triton input gradient on CUDA, PyTorch on the CPU), in every generic
   interaction that is not reassociated;
@@ -130,6 +133,18 @@ def apply_reassociate(model, context):
     interaction.first_reassociation = FirstInteractionReassociation(
         columns.to(_device(interaction)), channels, ls, gammas, ir_mul)
     return ["interactions.0"]
+
+
+def apply_segmented_first_sum(model, context):
+    """Sum the reassociated generic first interaction with the run-segmented Triton kernel; returns its name."""
+    from fastmace.rewrites.mh1 import segment_first_sum
+
+    generic = _generic_interactions(model)
+    reassociation = getattr(model.interactions[0], "first_reassociation", None) if generic else None
+    if reassociation is None:
+        raise ValueError("generic_segmented_first_sum requires the reassociated generic first interaction "
+                         "(generic_reassociate)")
+    return segment_first_sum(model)
 
 
 def apply_fused_radial_backward(model, context):
@@ -301,6 +316,11 @@ def _selfcheck_reassociate(original, rewritten, context):
                                lambda i: getattr(i, "first_reassociation", None) is not None)
 
 
+def _selfcheck_segmented_first_sum(original, rewritten, context):
+    return _check_interactions(original, rewritten, context,
+                               lambda i: getattr(getattr(i, "first_reassociation", None), "segmented", False))
+
+
 def _selfcheck_fused_radial_backward(original, rewritten, context):
     return _check_interactions(original, rewritten, context, lambda i: getattr(i, "fused_radial_backward", False))
 
@@ -313,8 +333,8 @@ def _selfcheck_streaming(original, rewritten, context):
 # --------------------------------------------------------------------------- records
 
 
-def _record(name, config_field, applies_to, exactness, constraints, apply, selfcheck):
-    return dict(name=name, config_field=config_field, applies_to=applies_to, requires=(), conflicts=(),
+def _record(name, config_field, applies_to, exactness, constraints, apply, selfcheck, requires=()):
+    return dict(name=name, config_field=config_field, applies_to=applies_to, requires=requires, conflicts=(),
                 mace_versions=MACE_VERSIONS, source_hashes=gm.source_hashes(), exactness=exactness,
                 default="auto", workload_constraints=constraints, apply=apply, selfcheck=selfcheck)
 
@@ -327,6 +347,11 @@ RECORDS = {
     "generic_reassociate": _record(
         "generic_reassociate", "reassociate_first", _support_reassociate, "rounding",
         ("single_graph", "fixed_species_superset"), apply_reassociate, _selfcheck_reassociate),
+    # GENERIC_REASSOCIATE builds its reassociation with segmented=SEGMENTED_FIRST_SUM.
+    "generic_segmented_first_sum": _record(
+        "generic_segmented_first_sum", "segmented_first_sum", _support_reassociate, "exact",
+        ("single_graph", "fixed_species_superset", "sort_receivers"), apply_segmented_first_sum,
+        _selfcheck_segmented_first_sum, requires=("generic_reassociate",)),
     "generic_fused_radial_backward": _record(
         "generic_fused_radial_backward", "fused_folded_backward", _support_fused_radial_backward, "rounding", (),
         apply_fused_radial_backward, _selfcheck_fused_radial_backward),
