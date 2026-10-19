@@ -47,8 +47,8 @@ Plan tasks 1b-T24 and 1b-T27 (19 October 2026). The GPU suite has three tiers
 
 | Tier | Command | Who runs it, when | Local RTX 5060 Ti, warm caches |
 | --- | --- | --- | ---: |
-| fast (worker) | `pytest tests/gpu -m "not slow and not acceptance"` | every worker, for every change, as often as needed | TBD-FAST |
-| full (merge) | `pytest tests/gpu -m "not acceptance"` | the conductor, at merges that touch `model/`, `rewrites/`, `kernels/` or `engine/` | TBD-FULL |
+| fast (worker) | `pytest tests/gpu -m "not slow and not acceptance"` | every worker, for every change, as often as needed | 7.9 min (190 tests, 1b-T27) |
+| full (merge) | `pytest tests/gpu -m "not acceptance"` | the conductor, at merges that touch `model/`, `rewrites/`, `kernels/` or `engine/` | 38.7 min (244 tests; 142 min before 1b-T27) |
 | acceptance | `pytest tests/gpu -m acceptance` | phase acceptance, and merges that touch `model/`, `rewrites/` or `kernels/` | TBD-ACCEPTANCE |
 
 **Merge rule:** the full tier on merges that touch `model/`, `rewrites/`, `kernels/` or `engine/`,
