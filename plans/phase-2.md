@@ -719,7 +719,7 @@ of 1b-T23 (`tools/`, `fastmace/bench/`).
 
 ### Wave 3: cross-repository
 
-#### 2-T21 `main.py` on `Simulation` (L, GPU: murphy, then local) — after T09, T10; owner decision D4; ResearchModule worktree by the conductor
+#### 2-T21 `main.py` on `Simulation` (L, GPU: murphy, then local) — after T01, T09, T10; owner decision D4; ResearchModule worktree by the conductor
 
 Spec: decision 28, §16 "During migration the experiment keeps working".
 Source: ResearchModule
@@ -916,6 +916,323 @@ validated, slower plan, recorded and reported. In 1b, a failing gate raises
   downstream changes. The assembled file costs one extra copy of the
   trajectory per run, up to about 770 MB for the longest anneal on the NAS.
   `md.traj` is ignored in git anyway.
+
+## Conductor answers to the prestart reports (20 October 2026)
+
+All 23 workers reported, and 22 had questions. These answers are binding, and
+each go message points here. The workers' longer notes are in the shared
+notes folder of the conductor's session (`2-T0x-…md`).
+
+### Changes to the plan
+
+- **2-T01 grows (all four reports needing it agree).** `Simulation` and
+  `fm.md` cannot take the planner's inputs today: no `mode=` (T02, T03),
+  and no engine or neighbour options (T21's blocker G1: `main.py
+  --backend cueq` cannot reach `Simulation`, so decision 28's bitwise A/B
+  cannot run). T01 adds the contract and the plumbing:
+  - `Simulation(...)` and `fm.md(...)` take `mode=`, `allow_reference=`,
+    `fallback=` (`FallbackConfig`), `gate=` (`GateConfig`), `runner=`
+    (`RunnerConfig`), `engine=` (`EngineConfig`) and `neighbours=`
+    (`NeighbourConfig`), and pass them to the planner;
+  - `simulation.json` records them, and `Simulation.resume` re-plans with
+    them;
+  - `test_simulation_signature` is updated.
+  So T01 is the first editor of `simulation.py` and `quick.py` in phase 2.
+- **New fields in T01:**
+  - `EngineConfig.dynamic_edges: bool = False` (for T13);
+  - `RewriteConfig.selfcheck_cache: Literal["use", "off", "refresh"] =
+    "use"` (for T19; inert until T19 lands);
+  - `RunnerConfig.stall_timeout_s = 1800` beside `timeout_s = None` (T07:
+    no total limit, but a child without progress for 30 minutes is killed);
+  - a `Plan.runner: Literal["in-process", "subprocess"] = "in-process"`
+    field in `planner/plan.py` (T07), as a contract before T06's edits;
+  - stubs `candidate` and `activate` in `planner/fallback.py` (T06 fills
+    them).
+  T01's own proposals are accepted:
+  - the `Mode` type;
+  - the default `cpu_float64_time_limit_s = 300`;
+  - `Rewrite.from_dict` not requiring the new field;
+  - the four error classes;
+  - the allow-list record in `planner/reproducible.py`, not `config.py`;
+  - `ReproducibilityError` for a failed qualification only, while rule 5
+    refusals stay `PlanRefused`.
+  `GateRecord`'s new fields are documented by T01 and added by T05.
+- **Merge orders for the shared files**, replacing the list in "Order and
+  parallelism":
+
+  | File | Editors, in merge order |
+  | --- | --- |
+  | `simulation.py` | T01 (options), T09 (resume), T10 (`_write_json` only), T07 (runner), T15 (fallback call) |
+  | `planner/minimal.py` | T02, T03, T07 (`_claim_family` only), T13, T16, then T15 (owner) |
+  | `planner/fixed.py` | T02 (a `capture=` keyword on `build`), T16 (reproducible overrides) |
+  | `model/forces.py` | T04 (call sites of `registry.apply` and the float64 energy), T13 (`dynamic_edges` and the cache key), T08 (`rebind`, only if a lease is needed) |
+  | `rewrites/registry.py` | T01 (field), T04 (owner), T19 (cache lookup), T20 (screen records) |
+  | `config.py` | T01 (owner), then T20 for its screens' fields only |
+  | `provenance.py` | T10 (the durable write in `write_metadata` only), T17 (owner) |
+  | `reference/calculators.py` | T03, T05 |
+  | `reference/records.py` | T04 (the unknown-version record) |
+  | `model/forcefield.py` | T04 (identity from the effective precision) |
+  | `_patches.py` | T04 (owner: hash gates) |
+  | `report.py` | T05 (gate line), T15 (revision lines) |
+
+- **T21 waits for T01, T09 and T10**, not T09 and T10 alone.
+
+### Shared decisions
+
+- **Fallback under the default `check="skip"`** (T06 Q2, T15 Q3). The
+  fallback acts on failures that raise: build, compile, capture and
+  self-check. On that failure path, a candidate is validated by its
+  self-checks **and a reduced gate** (one rattled copy). That runs even under
+  `check="skip"`, because §9.4 step 4 requires validation before activation.
+  The references are computed once, in a child process if a production
+  engine exists, reused for every candidate (the physics is fixed), and the
+  run is recorded. ddmin runs only when a gate fails: under `check="gate"`,
+  or when that validation fails. The default path, with no failure, never
+  computes references.
+- **Search dimensions in phase 2** (T06 Q3, T15 Q4): mode (graph → eager →
+  reference) and the rewrite set, which is the registry records only, not
+  engine options (T15 Q6). Backend changes only in §9.4 step 3's case
+  (eager in-process, or `Plan.runner="subprocess"`). Precision is not a
+  search dimension.
+- **Precision promotion on an unknown MACE** (T04 Q1, T06 Q3). When
+  `float64_energy`'s source does not hash, the plan promotes the force
+  precision to float64, with a revision and a report line, even if the user
+  asked for float32. The run stays correct and gets slower, as acceptance 1
+  says. The force-field identity takes the **effective** precision (T04
+  edits `model/forcefield.py`), so a resume re-plans the same way and the
+  identity matches.
+- **Always-on treatments on an unknown MACE** (T04): T04's proposal is
+  accepted in full.
+  - `float64_energy` runs a native float64 model on the normal tiers, with
+    the reference tier as the last resort.
+  - PolarMACE is refused without its hashed forward.
+  - An unhashed `capture_safe_mask_head` means no capture, so the eager
+    tier.
+  - Unhashed `first_derivative_only` and `single_graph_strain` are not
+    installed.
+  - Every patch in `_patches.py` gets a hash gate, including
+    `set_cueq_conv_fusion`. T04 owns `_patches.py`.
+  - The other environment holds mace-torch 0.3.15, because PyPI has nothing
+    newer.
+- **Unknown MACE in the reference policy** (T03 Q1): T04 adds an
+  "unqualified stock" record for versions outside 0.3.16: stock equivalence
+  only; PolarMACE refused. T04 also adds a `content_digest()` without the
+  version, for T09.
+- **Exceptions the fallback catches** (T15 Q7). Classified by the
+  **stage** where they were raised (build, compile, capture, self-check,
+  gate), never by type alone. The original exception is always recorded.
+  Out-of-memory and non-finite values are not fallback triggers in phase 2,
+  and propagate.
+- **Restart records** (T06 Q4, T15 Q8): `PLAN_RECORD_VERSION` 2 encodes
+  `fallbacks`, and version 1 records still read (T06). No fallback at resume:
+  resume rebuilds the stored revision, and a failure there raises (T15 Q9).
+- **The resume version rule** (T09 Q2). Decision 23 is read so that an
+  upgrade can warn instead of refusing. The reference record's id contains
+  the MACE version, so T09 compares the record's `content_digest()`: same
+  corrections and only the version differs → warning; different corrections
+  → `RestartMismatch`. The versions are recorded through a plan revision and
+  the report's warning, as T09 proposed; T17 may add a structured key.
+- **Provenance schema** (T17 Q2): T17 bumps it to `fastmace.metadata/2` with
+  a schema file and a validation test, and readers accept `/1`. Inputs for
+  new blocks come as `metadata_record(...)` arguments that T17 defines, the
+  child block among them (T07, T17 Q3). Reproducible data comes through
+  `Plan` (T16 → T17 Q4). Per-record self-check results move to
+  `plan.selfchecks` (T04 fills, T17 maps), not `gate.selfchecks` (T17 Q5).
+  `counters.tier_switches` stays `null` and its text says "phase 5" (T17 Q1).
+- **Durable writes** (T10 Q1, Q3): T10 adds `fastmace/io/durable.py`
+  (`atomic_write(path, data)`: temporary file, fsync, rename, directory
+  fsync). `simulation._write_json` and `provenance.write_metadata` call it
+  (T10 edits exactly those two functions). T21's assembled files use it.
+  The directory fsync is skipped on `EINVAL`, `ENOTSUP` and `EOPNOTSUPP`,
+  and any other error raises (T10 Q2). It is always on, with no switch (T10
+  Q4).
+- **Speed screens land "off"** (T20 Q2). A passing screen is merged with
+  default "off". Turning it on (`auto`) is the owner's decision after
+  murphy confirms the gain, so acceptance 8 (default plans unchanged) holds.
+  T20 may create `docs/rewrites.md` with the research engine's rejected
+  screens (SPEC §6.2).
+- **Hybrid on murphy** (T18 Q6). Allowed: ResearchModule's AGENTS.md gives
+  murphy the same setup as leto, and the hybrid default passed the
+  workstation check there on 15 October 2026.
+
+### Per task
+
+- **T02.**
+  - Use `tier="eager"`, built through a `capture=` keyword on
+    `FixedPlanner.build` (T02 edits `fixed.py` for that).
+  - Rule 4 is lifted for `mode="eager"`, which uses exact edge counts (§9.3
+    rule 4's "exact edge counts"), and only there.
+  - `pipelined` keeps its resolved value, so CPU eager equals graph.
+  - PolarMACE on plain cuEq in eager mode: a short POLAR-1-S check on murphy
+    belongs to T02.
+- **T03.**
+  - The design is accepted: `ReferenceForceField` on `GraphEngine` with
+    `capture=False` and `pad_edges=False`; no rewrites; and "fits" decided
+    by the gate's reference result, or by one trial evaluation that fails on
+    out-of-memory.
+  - The gate runs as usual in reference mode.
+  - On an unknown MACE whose `float64_energy` does not hash, the tier is
+    float64 only.
+  - `records.py` belongs to T04 (above).
+- **T04.**
+  - The split with T15 is accepted: T04 provides
+    `Registry.disable_with_dependants(...)` and the reaction, T15 calls them,
+    and T04 does not touch `minimal.py`.
+  - Test against T03's stub if T03 is not merged.
+  - Keep the self-check call in one place for T19's seam.
+- **T05.**
+  - The ladder, the CPU estimate (with an atoms term for PolarMACE, Q5) and
+    the reduced-cell rule are accepted.
+  - The order is GPU on the production cell; then CPU on the production cell
+    if within the time limit; then GPU on the reduced cell; then CPU on the
+    reduced cell (Q6). Memory never grows.
+  - On the reduced cell, production is evaluated eagerly by a separate force
+    field from the pristine model, not by a second engine (Q1).
+  - Under `passed-reduced`, the replay check on the production cell compares
+    the captured replay with a direct evaluation of the same force field at
+    the same state (Q2).
+  - The CPU step checks `MemAvailable` against a calibrated bytes-per-edge
+    figure and runs in a child process, so a kill becomes a recorded failure
+    (Q3).
+  - Both roles use the same device at each step (Q4).
+  - T05 parameterises the copy count and the quantities, so T15's reduced
+    gate (one copy, the failing quantity) is a call (T15 Q1).
+- **T06.**
+  - Your shapes for `candidate` and `activate` stand.
+  - A `ProcessConstraintError` propagates to T15, which routes it to the
+    runner (Q5).
+- **T07.**
+  - The hand-off design is accepted.
+  - The directory is `<output>/.fastmace-handoff/`, or under
+    `FASTMACE_CACHE` without output. It is deleted on a clean `close()` and
+    kept, with its path recorded, after an error (Q3).
+  - The parent's report is rebuilt from the child's plan, with no
+    `report.py` edit (Q4).
+  - Stub-test the reproducible trigger; T16 adds the GPU case (Q5).
+  - The killed-child test uses a wrapper interpreter through
+    `RunnerConfig.python` (Q6).
+- **T08.**
+  - `rebind()` exists on `MACEForceField` (state) and `GraphEngine` (the
+    force field's `rebind` plus clearing the graphs), but only where a lease
+    turns out to be needed (Q1).
+  - The polar `dynamo.reset()` recompile is acceptable as "correct, slower".
+    The test counts the recompiles, and a wrong result after it means a
+    lease (Q3).
+  - Polar A → B → A on the GPU only (Q4). T01 is merged before your go (Q2).
+- **T11.**
+  - The wait is a keyword argument with a module-constant default, with no
+    config field (Q1).
+  - `import fastmace` stays quiet: `doctor` reports default-root locks (Q2).
+  - The growing per-process extension directories are a finding for later,
+    not this task.
+- **T12.**
+  - Both: identical FastMACE sides, plus one baseline-against-baseline
+    process (Q1).
+  - NaCl and NbCl5 only (Q2).
+  - The conductor gives the go only when nothing else runs locally (Q3).
+  - The floor applies to every same-process A/B tool, and the report says so
+    (Q4).
+- **T13.**
+  - Design A, through `EngineConfig.dynamic_edges` (T01), plus a narrow edit
+    in `forces.py` (Q1). T13 merges before T08 there (Q2).
+  - Judge per-call time against T12's floor. T12 runs first (Q3).
+- **T14.**
+  - Your own cache root under `/mnt/homes/zwingel/fastmace-2-T14/`. Runs
+    1–4 start cold, from a fresh cache each, to provoke your top suspect
+    (the OEq first-build race); the rest are warm.
+  - Current `main` at go.
+  - The order plugin outside the repository is fine.
+  - Ask before each batch.
+- **T15.**
+  - The eager diagnosis and the empty-set test count toward the 64 (Q2).
+  - The fallback may switch off a rewrite the user set to "on", recorded
+    (Q5). The rest of your sketch stands.
+- **T16.**
+  - `CUBLAS_WORKSPACE_CONFIG`, `CUEQUIVARIANCE_OPS_U1D_ALGOS` and
+    `TORCHINDUCTOR_DETERMINISTIC` are set together before CUDA starts, and
+    the child gets them through the runner (Q1).
+  - The undocumented cuEq variable is acceptable for qualification only:
+    - pinned to the `cuequivariance_ops` version in the allow-list;
+    - with a plan-time check that two evaluations are bitwise equal;
+    - recorded in the provenance;
+    - named in the report as relying on an undocumented internal.
+    On any other version the family is not qualified (Q2).
+  - `segmented_first_sum` gets `deterministic=False` (Q3).
+  - Three fresh processes × 500 steps, plus an interrupted run resumed in a
+    fresh process (Q4).
+  - Use the unsegmented `edge_outer_sum`, and no deterministic segmented
+    variant.
+  - T16 may edit `fixed.py`'s reproducible overrides, after T02, if
+    `minimal.py` cannot do it cleanly.
+  - A reproducible plan has its own compile-cache key.
+- **T18.**
+  - The design is accepted. Wait for 1b-T27 (Q1).
+  - Wait for zwingel's own GPU processes too (Q2).
+  - Another user mid-run: record only (Q3).
+  - Budget failures fail on the local runner and are informational on
+    murphy (Q4).
+  - A temporary push trigger on `fastmace/2-T18`, removed before the merge
+    (Q5).
+  - Read-only `loginctl`/`crontab -l` on murphy is OK (Q7).
+  - Automatic runner updates (Q8).
+  - The full tier runs nightly on murphy, and on the local runner by
+    dispatch only, because the PC is not always on or idle (Q9). This
+    adjusts acceptance 7.
+  - The owner runs the registration commands.
+- **T19.**
+  - Measure first. The cache is built only if the measurement shows that
+    the self-checks are a material part of the gap. The owner's checkpoint 2
+    is taken with that number.
+  - Structure-dependent checks stay uncached unless shown species-set
+    invariant (Q2).
+  - Cache only passes with a margin of threshold/10 or better (Q3).
+  - A gap found elsewhere (for example the per-plan reload of decision 24)
+    is reported with numbers, not fixed in T19 (Q4).
+- **T20.**
+  - Write `tools/ab_rewrites.py` (option off against on in one process) or
+    extend T12's tool, whichever is smaller (Q1).
+  - The 19-label gate on murphy, untimed (Q5).
+  - Models (Q6):
+    - T20a: MP-0 medium and MPA-0 medium;
+    - T20b and T20c: MH-1 and MP-0 medium.
+  - The order is 20a, then 20b; 20c is a timing-only check; 20d starts with
+    the op map.
+- **T21.**
+  - G1 goes to T01.
+  - G2: `resume` reloads from the recorded source (path and SHA-256), not
+    the label alone. That belongs to T09.
+  - G3: segments of 1,000 steps with a stop check between them; no library
+    change.
+  - G4: refuse custom phase ends that are not multiples of the intervals.
+  - G5: check the friction round trip first. If it is not bitwise, report it;
+    `IntegratorConfig` takes ASE-unit friction.
+  - G6: the plan-equality test, yes.
+  - Q1: `--fastmace-api simulation|adapter`, default `simulation`. Runs
+    started before this task resume on `adapter`. `run.json` gains a key
+    and loses none.
+  - Q3: delete `simulation/restart.npz` on completion, as the old path does.
+  - Q4: the A/B is `ultrafast` for NaCl and NbCl5 plus a full `anneal` of
+    NaCl in plain cuEq float64 on murphy (hours are fine), and hybrid
+    statistics on NaCl and NbCl5 `ultrafast`, two seeds each.
+- **T22.**
+  - The read-only lock-mode wrapper and `nfsstat` on coraline are OK at any
+    time. The run itself only with the GPU idle (Q1).
+  - The conductor syncs the NAS checkout before your run (Q2) and makes the
+    ResearchModule change.
+- **T23.**
+  - The tag `fastmace-1b` goes on main once 1b-T27 is merged (Q1).
+  - Item 1 runs locally only (Q2).
+  - The hybrid statistics use 1b-T14's measure (Q3).
+  - If T16 is "not qualifiable", record the refusal and show the runner on
+    the backend case (Q4).
+  - Item 8's criteria are as you proposed (Q5).
+  - Dispatch runs with `gh`, using the `FZWINGEL-UBT` token for that one
+    command and never printing it (Q6).
+  - leto for untimed work when no other user's process is there (Q7).
+  - `fastmace/bench/versions.py` is yours to edit (Q8).
+  - Sanity reruns: the in-library gate for MH-1 and POLAR-1-S, or the
+    19-label gate after a merge that changed numerics (Q9).
+  - Judge each machine against its own noise floor, as decision 27 did (Q10).
 
 ## Phase 1b items carried into phase 2
 
