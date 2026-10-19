@@ -36,11 +36,9 @@ GROWTH = 1.5  # an allowlisted test may take this many times its recorded second
 # (seconds measured on the local RTX 5060 Ti with warm caches, the reason they run at every merge).
 FULL_TIER_ALLOWED = {
     "tests/gpu/test_canonical_restart_gpu.py::test_mh1_plain_cueq_float64_resumes_within_1e_12": (
-        203.0, "the only check that a resumed MH-1 engine follows the uninterrupted one within 1e-12 Å"),
+        205.0, "the only check that a resumed MH-1 engine follows the uninterrupted one within 1e-12 Å"),
     "tests/gpu/test_planner_gpu.py::test_mh1_plain_cueq_float64_planned_equals_hand_built_and_minimal": (
-        300.0, "planned, hand-built and minimal engines on MH-1 in one process (four tests merged in 1b-T27)"),
-    "tests/gpu/test_planner_gpu.py::test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal": (
-        300.0, "planned, hand-built and minimal engines on MH-1 in one process (four tests merged in 1b-T27)"),
+        217.0, "planned, hand-built and minimal engines on MH-1 in one process (four tests merged in 1b-T27)"),
 }
 
 # Tier totals (seconds of measured tests), a warning when over.

@@ -144,8 +144,10 @@ def _report(name, out):
     print(json.dumps({"case": name, **out}))
 
 
+# OMOL-0 XL (147 s) checks a further model at acceptance (1b-T27); the gate itself stays in the full tier.
 @pytest.mark.slow
-@pytest.mark.parametrize("name", list(CASES))
+@pytest.mark.parametrize("name", [pytest.param(name, marks=pytest.mark.acceptance if name == "omol0-xl" else ())
+                                  for name in CASES])
 def test_gate_passes_in_graph_mode(name):
     spec = CASES[name]
     if not _available(spec["label"]):

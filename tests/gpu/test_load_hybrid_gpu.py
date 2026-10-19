@@ -74,7 +74,8 @@ pytestmark = [needs_cuda, needs_planner, needs_mh1]
 
 @needs_oeq
 def test_fm_load_then_minimal_planner_gives_the_hybrid(tmp_path):
-    assert run_plan(HYBRID_PYTHON, tmp_path) == {"oeq_runtime": "prepared", "backend": "hybrid", "code": "backend-hybrid"}
+    assert run_plan(HYBRID_PYTHON, tmp_path) == {"oeq_runtime": "prepared", "backend": "hybrid",
+                                                 "code": "backend-hybrid"}
 
 
 @needs_oeq
