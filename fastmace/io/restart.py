@@ -1,8 +1,9 @@
 """The restart file: the complete simulation state, format version 2 (SPEC §10.6, §9.5).
 
-One ``.npz`` per run directory (plain arrays and JSON text, no pickles), written atomically
-(temporary file, then rename) at committed steps after the output queue has been drained and the
-engine flushed. Version 2 (plan task 1b-T05) holds every §10.6 item except the MC state (phase 3):
+One ``.npz`` per run directory (plain arrays and JSON text, no pickles), written durably and
+atomically (``io.durable``: fsynced temporary file, rename, directory fsync) at committed steps
+after the output queue has been drained, its chunks fsynced, and the engine flushed.
+Version 2 (plan task 1b-T05) holds every §10.6 item except the MC state (phase 3):
 
 - the research engine's keys (``workflow.write_restart`` with ``GPUEngine.state``), so either side
   reads the other's files: ``step``, ``engine`` (checked on resume), ``positions``, ``momenta``,
@@ -40,16 +41,16 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 import zipfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import IO, TYPE_CHECKING, Any
 
 import numpy as np
 import torch
 
 from fastmace.errors import RestartMismatch
+from fastmace.io import durable
 from fastmace.state import ForceFieldIdentity, canonical_json
 
 if TYPE_CHECKING:
@@ -171,9 +172,9 @@ def state_arrays(state: SimulationState, engine: str, integrator_state: Mapping[
     return arrays
 
 
-def _write_npz(path: Path, arrays: Mapping[str, Any]) -> None:
+def _write_npz(handle: IO[bytes], arrays: Mapping[str, Any]) -> None:
     """``np.savez`` with entries in name order and a fixed time stamp: the same arrays give the same bytes."""
-    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as archive:
+    with zipfile.ZipFile(handle, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as archive:
         for key in sorted(arrays):
             info = zipfile.ZipInfo(key + ".npy", date_time=_ZIP_TIME)
             info.external_attr = 0o600 << 16  # as np.savez
@@ -185,7 +186,8 @@ def write_restart(path: str | Path, state: SimulationState, *, engine: str,
                   integrator_state: Mapping[str, Any] | None = None, variable_cell: bool = False,
                   integrator: Any = None, plan: Mapping[str, Any] | None = None,
                   outputs: Mapping[str, int] | None = None) -> None:
-    """Atomic restart file: write a temporary file, then rename it over the old one.
+    """Durable atomic restart file: write and fsync a temporary file, rename it over the old one, then
+    fsync the directory (``io.durable``).
 
     Call at a committed step, after draining the output queue and flushing the engine. The other
     arguments are ``state_arrays``'s; ``variable_cell`` stores the cell again as ``cell_state``, the
@@ -194,13 +196,8 @@ def write_restart(path: str | Path, state: SimulationState, *, engine: str,
     path = Path(path)
     arrays = state_arrays(state, engine, integrator_state, variable_cell, integrator=integrator, plan=plan,
                           outputs=outputs)
-    temporary = path.with_name(path.name + ".tmp.npz")
-    try:
-        _write_npz(temporary, arrays)
-        os.replace(temporary, path)
-    except BaseException:
-        temporary.unlink(missing_ok=True)
-        raise
+    durable.write_atomically(path, lambda handle: _write_npz(handle, arrays),
+                             temporary=path.with_name(path.name + ".tmp.npz"))
 
 
 def write_engine_restart(path: str | Path, engine: Any, *, name: str, plan: Any = None,
