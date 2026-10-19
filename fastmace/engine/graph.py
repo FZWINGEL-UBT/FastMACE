@@ -36,15 +36,15 @@ restore and redo of B.
 ``integrator.output_values`` behind it and records an event (``fastmace.io.trajectory``).
 
 Capture: three eager warm-ups on a side stream (inside the graph pool after the first capture of a
-stage kind, ``warmup_in_graph_pool``), then the capture. Warm-ups save and restore the whole
-runtime state (``runtime_state``: the state's results, ``integrator.buffers``,
-``force_field.buffers`` and the engine's own flags and mid-step copies), which is more than the
-baseline's ``_graph_state``: SPEC §8.1 lists what that missed.
+stage kind, ``warmup_in_graph_pool``), then the capture. Warm-ups snapshot and restore every
+captured buffer of the runtime-state registry (``registry``: the state, ``integrator.buffers``,
+``force_field.buffers`` and the engine's own flags, host mirrors and mid-step copies, sticky flags
+included), which is more than the baseline's ``_graph_state``: SPEC §8.1 lists what that missed.
 
 Seams for 1b and phase 2 (SPEC §8.1, kept at today's behaviour here): every re-capture goes through
 ``_clear_graphs`` and ``_capture`` (the re-capture policy and its log); every host decision on a
 step's flags is in ``_step_checked``, ``_validate_pipelined`` and ``_validate_oldest_speculative``
-(overflow before commit); ``runtime_state`` is the seed of the runtime-state registry.
+(overflow before commit); the registry (``fastmace.engine.registry``) holds the policies.
 """
 
 from __future__ import annotations
@@ -58,7 +58,8 @@ import torch
 from fastmace.neighbors.buckets import edge_bucket, round_up_edges
 
 from . import constraints as process
-from .base import Engine, Snapshot
+from .base import Engine, Snapshot, _record_production_engine
+from .registry import Registry
 
 # Speculative combined-graph steps kept in flight: one, validated when the next step is launched
 # (its noise load already queued behind it). The speculative path is designed around one slot.
@@ -126,6 +127,7 @@ class GraphEngine(Engine):
         self.neighbour_config = neighbours
         self.process = process.check_engine(config, force_field, record=constraints, owner=type(self).__name__,
                                             segments=torch.cuda.memory_snapshot() if self.cuda else None)
+        _record_production_engine(type(self).__name__)
 
         # Initial compaction and forces (GPULangevin._init_runtime; BAOAB sets the cell first).
         if self.variable_cell:
@@ -173,6 +175,8 @@ class GraphEngine(Engine):
         # What stage A produces and stage B changes (Langevin v; BAOAB v, p_eps), saved inside the
         # pipelined and speculative graphs so that a failed step can redo stage B alone.
         self._mids = tuple(torch.zeros_like(tensor) for tensor in integrator.mid_step_tensors(state))
+        self.registry = Registry(self._registered_buffers)
+        self.registry.entries()  # every buffer has a policy (RegistryError otherwise)
         integrator.start(state)  # LangevinBAOAB.__init__: the cell force of the starting forces
 
     # ------------------------------------------------------------------ public API
@@ -230,29 +234,31 @@ class GraphEngine(Engine):
             "pipelined_early_rebuilds": self.pipelined_early_rebuilds, "process": dict(self.process),
         }
 
-    def runtime_state(self) -> dict[str, torch.Tensor]:
-        """Every tensor a stage writes and that lives across steps, by name (each tensor once).
+    def _registered_buffers(self) -> dict[str, torch.Tensor]:
+        """The registry's sources: every tensor a stage writes and that lives across steps, by name.
 
-        The state's force results, ``integrator.buffers``, ``force_field.buffers`` and the engine's
-        flags and mid-step copies: what capture warm-ups save and restore. The seed of SPEC §8.1's
-        runtime-state registry (1b).
+        The state first (its positions and barostat state are the integrator's too), then ``integrator.buffers`` and
+        its temperature target, ``force_field.buffers``, the engine's flags, their host mirrors and
+        the mid-step copies. ``fastmace.engine.registry.POLICIES`` has the policy of each.
         """
         state = self.state
-        named = {"state.forces": state.forces, "state.energy": state.energy}
-        if state.stress is not None:
-            named["state.stress"] = state.stress
+        named = {f"state.{name}": getattr(state, name) for name in (
+            "positions", "velocities", "cell", "species", "masses", "charges", "forces", "energy", "stress",
+            "p_eps", "force_eps") if getattr(state, name, None) is not None}
+        if state.rng.batch is not None:
+            named["state.rng.batch"] = state.rng.batch
         named.update({f"integrator.{name}": tensor for name, tensor in self.integrator.buffers(state).items()})
+        # Set by set_temperature between steps and read by every step; not in buffers() (1a).
+        sqrt_kT = getattr(self.integrator, "sqrt_kT", None)
+        if isinstance(sqrt_kT, torch.Tensor):
+            named.setdefault("integrator.sqrt_kT", sqrt_kT)
         named.update({f"force_field.{name}": tensor for name, tensor in self.force_field.buffers().items()})
         named.update({"engine.rebuild_needed": self.rebuild_needed, "engine.flags": self._flags,
-                      "engine.pipe_flags": self._pipe_flags, "engine.spec_flags": self._spec_flags})
+                      "engine.pipe_flags": self._pipe_flags, "engine.spec_flags": self._spec_flags,
+                      "engine.flags_host": self._flags_host, "engine.pipe_flags_host": self._pipe_flags_host,
+                      "engine.spec_flags_host": self._spec_flags_host})
         named.update({f"engine.mid.{index}": tensor for index, tensor in enumerate(self._mids)})
-        out, seen = {}, set()
-        for name, tensor in named.items():
-            key = (tensor.data_ptr(), tensor.dtype, tuple(tensor.shape), tuple(tensor.stride()))
-            if key not in seen:
-                seen.add(key)
-                out[name] = tensor
-        return out
+        return named
 
     # ------------------------------------------------------------------ steps
 
@@ -470,21 +476,13 @@ class GraphEngine(Engine):
             self._capture(key)
         self._graphs[key].replay()
 
-    def _save_runtime_state(self) -> list[tuple[torch.Tensor, torch.Tensor]]:
-        return [(tensor, tensor.clone()) for tensor in self.runtime_state().values()]
-
-    @staticmethod
-    def _restore_runtime_state(saved) -> None:
-        for target, value in saved:
-            target.copy_(value)
-
     def _warm_up(self, key) -> None:
         """The warm-up runs of a capture without the capture: run ``key`` eagerly, then restore the state."""
         stage = self._stage(key)
-        saved = self._save_runtime_state()
+        saved = self.registry.snapshot()
         for _ in range(WARMUP_RUNS):
             stage()
-        self._restore_runtime_state(saved)
+        self.registry.restore(saved)
 
     def _capture(self, key) -> None:
         """Capture one stage as a CUDA graph without changing the MD state."""
@@ -494,7 +492,7 @@ class GraphEngine(Engine):
             raise RuntimeError("CUDA graphs need a CUDA device")
         _patches.set_capture_safe_mask_head(True)
         stage = self._stage(key)
-        saved = self._save_runtime_state()
+        saved = self.registry.snapshot()
         if self._side_stream is None:  # one stream: library workspaces are made once
             self._side_stream = torch.cuda.Stream()
         side = self._side_stream
@@ -535,7 +533,7 @@ class GraphEngine(Engine):
             # new pool); the allocation stays valid.
             self._clear_graphs()
             self.pool_resets += 1
-        self._restore_runtime_state(saved)
+        self.registry.restore(saved)
         del saved
         if self.config.empty_cache_before_capture:
             # The capture allocates in the graph pool and cannot reuse blocks cached by the warm-up,

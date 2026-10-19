@@ -13,6 +13,13 @@ composes the integrator's half steps with the force field's calls; it holds no M
 
 Reading the state (``snapshot``, ``sync``, ``potential_energy``, ``flush``) first validates the
 step in flight, exactly what the next step would do.
+
+Every buffer a stage writes and that lives across steps is in the engine's ``registry``
+(``fastmace.engine.registry``, SPEC §8.1): capture warm-ups, the gate and restart work from it.
+
+``production_engine_built()`` records, for the whole process, whether a production engine has been
+built: the gate (1b-T16) computes its references in-process only before that (the 1a rule "after
+T10": production patches must not reach the references).
 """
 
 from __future__ import annotations
@@ -29,6 +36,36 @@ if TYPE_CHECKING:
     from fastmace.integrators.base import Integrator
     from fastmace.model.forces import ForceField
     from fastmace.state import SimulationState
+
+    from .registry import Registry
+
+
+@dataclass
+class _ProductionEngines:
+    """Production engines built in this process: how many, and the first one's class."""
+
+    count: int = 0
+    first: str | None = None
+
+
+_PRODUCTION_ENGINES = _ProductionEngines()
+
+
+def production_engine_built() -> bool:
+    """True once a production engine (``GraphEngine``) has been built in this process."""
+    return _PRODUCTION_ENGINES.count > 0
+
+
+def _record_production_engine(owner: str) -> None:
+    _PRODUCTION_ENGINES.count += 1
+    if _PRODUCTION_ENGINES.first is None:
+        _PRODUCTION_ENGINES.first = owner
+
+
+def _forget_production_engines() -> None:
+    """Tests only: forget the engines built so far."""
+    _PRODUCTION_ENGINES.count = 0
+    _PRODUCTION_ENGINES.first = None
 
 
 @dataclass
@@ -64,6 +101,7 @@ class Engine(abc.ABC):
     force_field: ForceField
     integrator: Integrator
     state: SimulationState
+    registry: Registry
 
     @abc.abstractmethod
     def step(self) -> None:

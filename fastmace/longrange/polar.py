@@ -258,7 +258,12 @@ class PolarState:
         self.headroom = headroom
 
     def buffers(self):
-        """The device tensors a CUDA graph reads (for the force field's buffer list)."""
+        """The device tensors a CUDA graph reads (for the force field's buffer list).
+
+        Registered as ``force_field.polar.<name>``: the k-vector set and bounds are reset from the
+        cell (``enable``); ``overflow`` is sticky, set with ``|=`` by every call whose cell leaves
+        the headroom and cleared only by ``reset_overflow`` (a host decision).
+        """
         return {"coefficients": self.coefficients, "integer": self.integer, "part": self.part,
                 "k0_mask": self.k0_mask, "inverse_cell0": self.inverse_cell0, "bounds": self.bounds_t,
                 "overflow": self.overflow}
