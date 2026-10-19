@@ -8,7 +8,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | --- | --- | --- |
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
 | 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phase-1a.md`); owner checkpoint 3 decided (19 October: `main.py` defaults to FastMACE) |
-| 1b. Contracts | [phase-1b.md](phase-1b.md) | **all tasks merged; acceptance report** `docs/validation/phase-1b.md` (19 October 2026); follow-ups T21b, T22b running; owner checkpoint open |
+| 1b. Contracts | [phase-1b.md](phase-1b.md) | **all tasks merged; acceptance report** `docs/validation/phase-1b.md` (19 October 2026); follow-ups T03b, T21b, T22b merged; owner checkpoint open |
 | 2. Safety | — | |
 | 3. Dynamic topology and MC | — | |
 | 3b. NPT for the chlorides | — | |
@@ -27,7 +27,7 @@ and wait for the conductor's go message (`CONDUCTOR.md`, "Prestarted phase
 workers"). No "start all ready" is needed in phase 1b.
 
 - Merged: 1b-T01, T02, T03, T05, T04, T06, T06b, T07, T08, T08b, T08c, T09, T10, T11, T12, T13, T14, T15, T16 to T22, T23 tools, T24 to T26 (19 October 2026).
-- Working: 1b-T21b (ASE shim per-run() overhead), T22b (wrong naive-cuEq warning).
+- Working: 1b-T23 addendum.
 - Waiting for go: none. Answers to their prestart
   reports, and three items for the owner's review, are in `phase-1b.md`,
   "Conductor answers to the prestart reports".

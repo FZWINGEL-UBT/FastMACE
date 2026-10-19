@@ -1489,6 +1489,17 @@ points here.
 - Failures 1 (POLAR-1-S NPT stress at the floor) and 3 (NaCl timing in
   both directions) are owner items 5 and 6.
 
+### After T21b, T22b (19 October 2026)
+
+- T21b: the shim no longer builds a second metadata record per `run()`
+  call. Ratio to `Simulation` with 300-step calls on the RTX 5060 Ti: 1.015
+  → 1.000 (ext4), 1.90 → 0.986 (output on `/mnt/d`). Still open for
+  phase 2: `Simulation.run` itself rebuilds provenance at every call.
+- T22b: the planner's rule 6 record used the code `allow-naive-cueq` on
+  every run, and the report read it as a downgrade. Now it reads
+  `fused-cueq` when the fused kernels load. Confirmed by a hybrid
+  `fastmace md` run on the RTX 5060 Ti.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
