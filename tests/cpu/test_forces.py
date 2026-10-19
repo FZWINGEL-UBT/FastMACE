@@ -318,7 +318,9 @@ def test_equals_maceforces_bitwise(family, names, stress):
     with mock.patch.multiple(gl, **switches) if switches else contextlib.nullcontext():
         theirs = gl.MACEForces(calc, atoms, skin=SKIN, factor_species="factor_species" in names,
                                compute_stress=stress)
-    ours = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, compute_stress=stress, rewrites=only(*names))
+    # 1a's energy sum: the research engine has no float64 accumulation (1b-T03).
+    ours = MACEForceField(calc, atoms, neighbours=NEIGHBOURS, compute_stress=stress, rewrites=only(*names),
+                          float64_energy=False)
     assert (ours.model is calc.models[0]) is (theirs.model is calc.models[0])
     if names:
         theirs_params = dict(theirs.model.named_parameters())
@@ -501,9 +503,11 @@ def test_each_force_field_reads_its_own_streaming_count():
         return original_forward(self, *args, **kwargs)
 
     sorted_neighbours = NeighbourConfig(skin=SKIN, sort_receivers="on", gpu_neighbour_list="off")
+    # 1a's energy sum: the float64 forward is built from MACE's own source, not this patched one.
     with mock.patch.object(type(calc.models[0]), "forward", forward):
-        first = MACEForceField(calc, atoms, neighbours=sorted_neighbours)
-        second = MACEForceField(calc, structure(rattle=0.2, seed=3), neighbours=sorted_neighbours)
+        first = MACEForceField(calc, atoms, neighbours=sorted_neighbours, float64_energy=False)
+        second = MACEForceField(calc, structure(rattle=0.2, seed=3), neighbours=sorted_neighbours,
+                                float64_energy=False)
         assert first.model is second.model  # one shared model
         assert first.info()["streaming_interactions"] == 1
         for field in (first, second, first, second):
