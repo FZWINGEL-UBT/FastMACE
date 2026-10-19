@@ -18,10 +18,13 @@ import traceback
 import fastmace
 from fastmace.errors import FastMACEError
 
-# Subcommand -> module. 1b-T22 adds md, init and run here.
+# Subcommand -> module.
 COMMANDS = {
     "doctor": "fastmace.cli.doctor",
     "models": "fastmace.cli.models",
+    "md": "fastmace.cli.md",
+    "init": "fastmace.cli.init",
+    "run": "fastmace.cli.run",
 }
 
 
