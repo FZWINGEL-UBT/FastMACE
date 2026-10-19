@@ -7,7 +7,13 @@ server; nothing leaves the machine and no GPU is used.
 import functools
 import hashlib
 import http.server
+import json
+import os
+import subprocess
+import sys
+import textwrap
 import threading
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -15,10 +21,11 @@ import torch
 
 from _support.tiny_models import FAMILIES, tiny_mace_model
 from fastmace import _cache
-from fastmace.errors import CheckpointTrustError, FastMACEError
+from fastmace.errors import CheckpointTrustError, FastMACEError, HybridUnavailableError
 from fastmace.model import labels as table
 from fastmace.model import loading
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 KNOWN_FUNCTIONALS = ("pbe", "r2scan", "wb97m-v", "wb97m-d3bj")
 
 
@@ -272,3 +279,104 @@ def test_unknown_functional_is_not_a_string():
     # T20 tells "unknown" from a functional by None; a path or URL has no label and no functional.
     assert table.find("polar1-s").functional is None
     assert table.find("polar1-s").functional_source.startswith("unknown:")
+
+
+# ------------------------------------------------------------------------ OEq runtime before MACE (1b-T08b)
+
+
+@pytest.fixture
+def no_runtime_record(monkeypatch):
+    """Neither an OEq runtime record nor a blocking import: preparation is still possible."""
+    monkeypatch.setattr(loading._patches, "record_of", lambda name: None)
+    monkeypatch.setattr(loading, "hybrid_blockers", lambda modules=None: [])
+
+
+def test_oeq_runtime_is_prepared_when_possible(no_runtime_record, monkeypatch):
+    calls = []
+    monkeypatch.setattr(loading, "_oeq_installed", lambda: True)
+    monkeypatch.setattr(loading, "_cuda_visible", lambda: True)
+    monkeypatch.setattr(loading, "prepare_hybrid", lambda cache=None: calls.append(cache) or "record")
+    assert loading.prepare_hybrid_if_possible() == "prepared"
+    assert calls == [None]
+
+
+@pytest.mark.parametrize("oeq, cuda, expected", [
+    (False, True, "skipped: OpenEquivariance is not installed"),
+    (True, False, "skipped: no CUDA device is visible"),
+])
+def test_oeq_runtime_is_skipped_without_oeq_or_cuda(no_runtime_record, monkeypatch, oeq, cuda, expected):
+    monkeypatch.setattr(loading, "_oeq_installed", lambda: oeq)
+    monkeypatch.setattr(loading, "_cuda_visible", lambda: cuda)
+    monkeypatch.setattr(loading, "prepare_hybrid", lambda cache=None: pytest.fail("prepared"))
+    assert loading.prepare_hybrid_if_possible() == expected
+
+
+def test_oeq_runtime_is_not_prepared_too_late(monkeypatch):
+    monkeypatch.setattr(loading._patches, "record_of", lambda name: None)
+    monkeypatch.setattr(loading, "hybrid_blockers", lambda modules=None: ["mace"])
+    monkeypatch.setattr(loading, "_oeq_installed", lambda: True)
+    monkeypatch.setattr(loading, "_cuda_visible", lambda: True)
+    monkeypatch.setattr(loading, "prepare_hybrid", lambda cache=None: pytest.fail("prepared"))
+    assert loading.prepare_hybrid_if_possible() == "too late: mace was imported first"
+
+
+def test_an_earlier_oeq_runtime_is_reused(monkeypatch):
+    monkeypatch.setattr(loading._patches, "record_of", lambda name: "record" if name == "oeq_runtime" else None)
+    monkeypatch.setattr(loading, "prepare_hybrid", lambda cache=None: pytest.fail("prepared again"))
+    assert loading.prepare_hybrid_if_possible() == "prepared"
+
+
+def test_a_failed_oeq_runtime_is_tolerated_and_recorded(no_runtime_record, monkeypatch, single_head,
+                                                         fresh_licences):
+    path, digest = single_head
+
+    def fail(cache=None):
+        raise HybridUnavailableError("the OEq runtime is missing")
+
+    monkeypatch.setattr(loading, "_oeq_installed", lambda: True)
+    monkeypatch.setattr(loading, "_cuda_visible", lambda: True)
+    monkeypatch.setattr(loading, "prepare_hybrid", fail)
+    with pytest.warns(loading.ModelLicenceWarning):
+        loaded = loading.load_pristine(str(path), sha256=digest)
+    assert loaded.oeq_runtime == ("failed: the cuEquivariance/OpenEquivariance hybrid is unavailable: "
+                                  "the OEq runtime is missing")
+    assert loaded.provenance()["oeq_runtime"] == loaded.oeq_runtime
+    assert loaded.backend == "e3nn"
+
+
+def test_the_cpu_only_path_records_why_and_stays_quiet(single_head, monkeypatch, fresh_licences):
+    import warnings
+
+    path, digest = single_head
+    monkeypatch.setattr(loading, "_cuda_visible", lambda: False)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        status = loading.prepare_hybrid_if_possible()
+    assert caught == [] and status.startswith("skipped:")
+    with pytest.warns(loading.ModelLicenceWarning):
+        loaded = loading.load_pristine(str(path), sha256=digest)
+    assert loaded.oeq_runtime == status
+
+
+def test_fm_load_prepares_the_oeq_runtime_before_mace_is_imported(single_head):
+    # A fresh interpreter: MACE is not imported yet. OEq and CUDA are mocked present; the
+    # preparation records whether MACE was imported when it ran.
+    path, digest = single_head
+    code = textwrap.dedent(f"""
+        import json, sys
+        import fastmace as fm
+        from fastmace.model import loading
+        seen = []
+        loading._oeq_installed = lambda: True
+        loading._cuda_visible = lambda: True
+        loading.prepare_hybrid = lambda cache=None: seen.append(sorted(m for m in sys.modules
+                                                                       if m.split(".")[0] == "mace")) or "record"
+        loaded = fm.load({str(path)!r}, sha256={digest!r})
+        print(json.dumps({{"seen": seen, "status": loaded.oeq_runtime, "mace_after": "mace" in sys.modules}}))
+    """)
+    env = dict(os.environ, CUDA_VISIBLE_DEVICES="", PYTHONDONTWRITEBYTECODE="1",
+               PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), str(REPOSITORY_ROOT / "tests")]))
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=600)
+    assert done.returncode == 0, done.stderr
+    result = json.loads(done.stdout.strip().splitlines()[-1])
+    assert result == {"seen": [[]], "status": "prepared", "mace_after": True}

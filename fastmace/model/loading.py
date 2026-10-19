@@ -39,8 +39,10 @@ What ``load`` does, in order:
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import hashlib
 import importlib
+import importlib.util
 import inspect
 import os
 import sys
@@ -114,6 +116,8 @@ class LoadedModel:
     patches: tuple = field(default=())  # _patches.applied() while the model was built
     # The checkpoint's E0 table as float64, copied before MACE's dtype conversion (SPEC §7.3).
     atomic_energies: object = None
+    # fm.load only: what became of the OEq runtime before MACE was imported (prepare_hybrid_if_possible).
+    oeq_runtime: str | None = None
 
     @property
     def model(self):
@@ -129,7 +133,7 @@ class LoadedModel:
             "functional": self.functional, "licence": self.licence, "backend": self.backend, "dtype": self.dtype,
             "device": self.device, "cueq_conv_fusion": self.cueq_conv_fusion, "fused_cueq": dict(self.fused_cueq),
             "embedding_specs": self.embedding_specs, "charge": self.charge,
-            "spin_multiplicity": self.spin_multiplicity,
+            "spin_multiplicity": self.spin_multiplicity, "oeq_runtime": self.oeq_runtime,
             "patches": [{"name": r.name, "value": r.value, "targets": list(r.targets), "detail": r.detail}
                         for r in self.patches],
         }
@@ -399,6 +403,42 @@ def prepare_hybrid(cache=None):
         raise HybridUnavailableError(str(error)) from error
 
 
+def _oeq_installed():
+    """Whether OpenEquivariance is installed, found without importing it (an import would be too early)."""
+    return importlib.util.find_spec("openequivariance") is not None
+
+
+def _cuda_visible():
+    import torch
+
+    return torch.cuda.is_available()
+
+
+def prepare_hybrid_if_possible(cache=None):
+    """Prepare the OEq runtime when the hybrid could be planned later; never raises. Returns what happened.
+
+    ``fm.load`` imports MACE, after which the runtime can no longer be prepared and
+    every plan in the process gets plain cuEq (SPEC §9.4). So it prepares the
+    runtime first, but only when OpenEquivariance is installed, a CUDA device is
+    visible and nothing blocks it yet: a CPU-only process does no extra work. A
+    failure is recorded, not raised; the planner then gives plain cuEq with its reason.
+    """
+    if _patches.record_of("oeq_runtime") is not None:
+        return "prepared"
+    if not _oeq_installed():
+        return "skipped: OpenEquivariance is not installed"
+    if not _cuda_visible():
+        return "skipped: no CUDA device is visible"
+    blockers = hybrid_blockers()
+    if blockers:
+        return f"too late: {blockers[0]} was imported first"
+    try:
+        prepare_hybrid(cache)
+    except HybridUnavailableError as error:
+        return f"failed: {error.what}"
+    return "prepared"
+
+
 @contextmanager
 def hybrid_keeps_last_layer_irreps():
     """While a hybrid calculator is built, pass the model's keep_last_layer_irreps to the transfer.
@@ -629,16 +669,20 @@ def load_pristine(source, head=None, *, sha256=None, trusted=False, download=Fal
     (SPEC §7.6). ``download=True`` fetches a missing file into the models cache and
     checks it before it is kept. The trust decision and the hash are in
     ``provenance()``. The plan converts the model to its backend and precision; the
-    pristine model itself is never changed (``fm.ForceField``).
+    pristine model itself is never changed (``fm.ForceField``). Before MACE is
+    imported, the OEq runtime is prepared where the hybrid is possible
+    (``prepare_hybrid_if_possible``; the outcome is ``oeq_runtime``).
     """
-    return load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
-                sha256=sha256, trusted=trusted, download=download, charge=charge,
-                spin_multiplicity=spin_multiplicity, environ=environ)
+    oeq_runtime = prepare_hybrid_if_possible()
+    loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+                  sha256=sha256, trusted=trusted, download=download, charge=charge,
+                  spin_multiplicity=spin_multiplicity, environ=environ)
+    return dataclasses.replace(loaded, oeq_runtime=oeq_runtime)
 
 
 __all__ = [
     "BACKENDS", "BackendError", "CheckpointTrustError", "HybridUnavailableError", "LoadedModel",
     "ModelLicenceWarning", "NaiveCueqError", "ResolvedCheckpoint", "capture_atomic_energies", "check_trust",
     "download_checkpoint", "fused_cueq_problems", "hybrid_keeps_last_layer_irreps", "load", "load_pristine",
-    "require_fused_cueq", "resolve_checkpoint", "sha256_of",
+    "prepare_hybrid_if_possible", "require_fused_cueq", "resolve_checkpoint", "sha256_of",
 ]
