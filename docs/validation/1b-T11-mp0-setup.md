@@ -9,7 +9,7 @@ report ([phase-1a.md](phase-1a.md)):
 
 | Finding | Cause | Disposition |
 | --- | --- | --- |
-| MP-0 medium 1.4–1.6 % slower (2.3 % in the B graph) | **A deviation from the research engine.** The research engine's `SEGMENTED_FIRST_SUM` also acts on the generic (MP-0) reassociated first interaction: the run-segmented Triton sum, and each receiver's edges grouped by sender species. FastMACE only had `segmented_first_sum` as an MH-1 record, so on MP-0 it stayed off. Its B graph runs Inductor's `zeros` + `index_add` instead of the segmented kernel. | Fix proposed: a `generic_segmented_first_sum` record, and sender grouping in the force field. With the fix, the same-process A/B gives 0.9988 (NaCl) and 1.0002 (NbCl5), and the B graphs have identical kernel lists. Pending the conductor's agreement, because it touches two modules. |
+| MP-0 medium 1.4–1.6 % slower (2.3 % in the B graph) | **A deviation from the research engine: a 1a extraction gap, found in 1b.** The research engine's `SEGMENTED_FIRST_SUM` also acts on the generic (MP-0) reassociated first interaction: the run-segmented Triton sum, and each receiver's edges grouped by sender species. FastMACE only had `segmented_first_sum` as an MH-1 record, so on MP-0 it stayed off. Its B graph runs Inductor's `zeros` + `index_add` instead of the segmented kernel. | **Fixed** (conductor's approval, commit `efd617f`): a `generic_segmented_first_sum` record, and sender grouping in the force field. The B graphs now have identical kernel lists; the same-process A/B is in section 1. |
 | Setup 4–33 s longer | **A measurement artefact of the 1a runs.** The FastMACE-only control processes compiled into an Inductor cache directory that no earlier process had used. The research-engine controls reused the cache that the A/B processes had warmed. The self-checks themselves cost 0.1–1.1 s per structure with a warm cache, and about 3.5 s in a cold first process. | No change. With equal cache state, FastMACE's setup is equal to the research engine's or shorter (table below). |
 
 ## Setup
@@ -107,7 +107,10 @@ They are not bitwise equal. The segmented kernel and OEq's backward accumulate w
 FP32-nondeterministic in summation order. The patch halves the difference on NbCl5, as expected when both sides
 now sum in the same order and in the same kernels.
 
-### The fix (proposed; two modules)
+### The fix (commit `efd617f`, approved by the conductor)
+
+This is a 1a extraction gap: 1a-T07/T08 ported `segmented_first_sum` as an MH-1 record only. 1a-T15's planner then
+resolved the field for MP-0 as the research engine does, but no record carried it out.
 
 1. `fastmace/rewrites/generic/__init__.py`: a record `generic_segmented_first_sum`:
    - config field `segmented_first_sum`, the same pattern as `generic_streaming` sharing `streaming_conv`;
@@ -118,22 +121,52 @@ now sum in the same order and in the same kernels.
    - self-check: the generic interaction check.
 2. `fastmace/model/forces.py`: `SEGMENTED_RECORDS = ("segmented_first_sum", "generic_segmented_first_sum")`. The
    neighbour list's `sender_groups` are set when either is enabled.
-3. Tests (`tests/cpu/test_rewrites_generic.py`):
+3. `fastmace/planner/fixed.py`: the `rewrite_resolution` docstring no longer calls MH-1's record beside
+   `generic_reassociate` a no-op of the research engine.
+4. Tests (`tests/cpu/test_rewrites_generic.py`):
    - the record list;
    - the generic segmented sum is bitwise unchanged physics on the CPU, where the segmented forward is the same
      `index_add`;
    - it needs `generic_reassociate`;
-   - regression: a hybrid MP-0 plan's rewrite resolution enables `generic_reassociate` and
-     `generic_segmented_first_sum`, which turns on the force field's sender grouping.
+   - regression, for the residual (MP-0), density and MACE-OFF tiny models: a hybrid plan's rewrite resolution
+     enables `generic_reassociate` and `generic_segmented_first_sum`, which turns on the force field's sender
+     grouping. MACE-OFF gets neither, because its first block is not generic.
+
+   `tests/cpu/test_planner.py`'s comparison with the research engine is unchanged and passes. It compares plan
+   fields, and `segmented_first_sum` already resolved "on" there for MP-0 and the density family; the gap was
+   between that field and the records it enables.
 
 CPU float64 is unchanged: the reassociation is enabled only for the hybrid graph engine, and on the CPU the
 segmented forward is the same `index_add`. Hybrid MP-0 forces change at the FP32 rounding level, towards the
 research engine's.
 
-Still open after the fix is approved:
-- the `FixedPlanner.rewrite_resolution` docstring;
-- `docs/design/switch-map.md`, the §6.2 row of `segmented_first_sum`, which should name the generic record. That
-  file belongs to 1b-T01.
+Left over:
+- `docs/design/switch-map.md`, the §6.2 row of `segmented_first_sum`, should name the generic record. That file
+  belongs to 1b-T01.
+- **MACE-OFF, edge order only.** In the research engine, `MACEForces.generic_reassociate` is true for MACE-OFF,
+  because its later blocks are generic, even though `generic_rewrites` reassociates nothing there (1a-T08's note).
+  `segmented_first_sum` is therefore true too, and the neighbour list groups each receiver's edges by sender
+  species. FastMACE does not do that for MACE-OFF. No kernel differs: only the order of edges within a receiver,
+  so sums differ at FP32 rounding level. It is not changed here, because it would need a record that rewrites
+  nothing; this is a conductor decision.
+
+### Same-process A/B after the fix
+
+`tools/ab_step_time.py`, the 1a acceptance protocol: 300 warm-up steps per side right after its build, then 12
+alternating blocks of 300 steps (ABAB). FastMACE `efd617f`, murphy, 18 October 2026, 23:20–23:27 UTC. Before each
+process murphy had no compute process from anyone. Data: `results/1b-T11-murphy-20261019/ab-mp0-medium-*/metadata.json`.
+
+| Process | Structure | Baseline (ms) | FastMACE (ms) | FastMACE/baseline | Pair ratios | Valid | 1a-T19 (before) |
+| --- | --- | ---: | ---: | ---: | --- | --- | ---: |
+| baseline built first | NaCl | 1.4848 | 1.4864 | **1.0011** | 0.9961–1.0016 | yes | 1.0139 |
+| | NbCl5 | 10.0440 | 10.0349 | **0.9991** | 0.9988–1.0001 | yes | 1.0164 |
+| FastMACE built first | NaCl | 1.4908 | 1.4896 | **0.9992** | 0.9892–0.9998 | yes | – |
+| | NbCl5 | 10.0581 | 10.0546 | **0.9996** | 0.9981–0.9999 | yes | – |
+
+Every ratio is within 0.11 % of 1, inside the 0.16 % noise floor of [1a-noise-floor.md](1a-noise-floor.md), in both
+build orders. Nothing compiled while timed. FastMACE's applied rewrites now include `generic_segmented_first_sum`.
+At the end, the two sides' temperatures differ by at most 9.4e-5 K and their potential energies by at most
+6.0e-6 eV/atom: the FP32 divergence of one trajectory, as in 1a.
 
 ## 2. Setup time
 
@@ -198,13 +231,31 @@ per further structure. It is not 4–33 s. Speeding it up stays after 1b, as pla
 1b-T15's run report should show these stages: load, plan, rewrites, self-checks, model copy, first compiled call and
 captures.
 
+## Checks of the code change
+
+- CPU suite, `fastmace_cpu` (WSL, `-n 4`): 873 passed, 200 skipped.
+- CPU suite, `mace_cueq_latest`: the local WSL run failed when WSL itself crashed (`Wsl/Service/E_UNEXPECTED`), so it
+  ran on murphy in the NAS `mace_cueq_latest` at `cad3a1e`: 1071 passed, 2 skipped (`-n 8`, CUDA hidden).
+- ruff: clean (`fastmace tests tools results/1b-T11-probes`).
+- GPU suite on murphy (NAS `mace_cueq_latest`, hybrid children in `mace_cueq_oeq`, idle check first):
+  - at `efd617f`: 218 passed, 2 skipped, 3 failed. All three failures were
+    `tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_*[mp0-medium]`, whose list of expected
+    records lacked the new record. The records applied and passed their self-checks. The real-model agreement printed
+    before the assertion was within threshold, for example hybrid float32 forces at 8.8e-7 relative. Fixed in
+    `cad3a1e`;
+  - at `cad3a1e`, the whole suite again: **221 passed, 2 skipped** (OEq streaming-kernel tests, which need
+    OpenEquivariance in the pytest environment). That includes the MP-0 checks on the real checkpoint (plain cuEq
+    float64; hybrid float64 and float32 in fresh processes) with `generic_segmented_first_sum` applied.
+
+  Summaries are in `results/1b-T11-murphy-20261019/suites/`.
+
 ## Recommendations
 
-1. Adopt the `generic_segmented_first_sum` fix. It restores the research engine's numerics and kernel path, and
-   closes the gap.
+1. The `generic_segmented_first_sum` fix is in. It restores the research engine's kernel path and summation order,
+   and closes the gap.
 2. For future setup comparisons, give both sides the same Inductor cache state: the same directory, or both fresh.
    An A/B tool change could make `ab_step_time.py`'s FastMACE-only processes use `MACE_COMPILE_CACHE` as the others
    do. That tool is not this task's file.
-3. Correct the `rewrite_resolution` docstring and the switch map's `segmented_first_sum` row (T01's file) when the
-   fix merges.
+3. Correct the switch map's `segmented_first_sum` row (T01's file) when the fix merges. Decide whether MACE-OFF
+   should also get the research engine's sender grouping (rounding level only).
 4. No other generic-path deviation was found: plans, rewrites, node counts and per-kernel times agree.
