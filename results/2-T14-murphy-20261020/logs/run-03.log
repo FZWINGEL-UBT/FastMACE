@@ -1,0 +1,156 @@
+run 03 seed default mode cold cache /mnt/homes/zwingel/fastmace-2-T14/cache-cold-03 start 2026-10-20T00:17:12+02:00 commit ed39645204eb42ea80ed4a3e3d1139d4ab4015c3
+ 00:17:12 up 153 days, 10:59,  0 users,  load average: 3.87, 6.89, 4.43
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+t14 order: default
+compile caches (shared): inductor /mnt/homes/zwingel/fastmace-2-T14/cache-cold-03/inductor, triton /mnt/homes/zwingel/fastmace-2-T14/cache-cold-03/triton
+rootdir: /mnt/homes/zwingel/fastmace-2-T14/src
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+created: 8/8 workers
+8 workers [2150 items]
+
+........................................................................ [  3%]
+........................................................................ [  6%]
+........................................................................ [ 10%]
+........................................................................ [ 13%]
+........................................................................ [ 16%]
+........................................................................ [ 20%]
+........................................................................ [ 23%]
+........................................................................ [ 26%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 40%]
+........................................................................ [ 43%]
+........................................................................ [ 46%]
+........................................................................ [ 50%]
+........................................................................ [ 53%]
+.....................................................................s.s [ 56%]
+......s................................................................. [ 60%]
+....................F......s............................................ [ 63%]
+........................................................................ [ 66%]
+........................................................................ [ 70%]
+........................................................................ [ 73%]
+........................................................................ [ 77%]
+........................................................................ [ 80%]
+....................................s................................... [ 83%]
+........................................................................ [ 87%]
+........................................................................ [ 90%]
+........................................................................ [ 93%]
+........................................................................ [ 97%]
+..............................................................           [100%]
+=================================== FAILURES ===================================
+_________________ test_polar_force_field_enables_its_own_copy __________________
+[gw0] linux -- Python 3.10.12 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python
+
+    @needs_polar
+    def test_polar_force_field_enables_its_own_copy():
+        from fastmace.longrange import polar
+    
+        calc, cueq = polar_calculators()
+        atoms = structure(oxygen=False)
+        field = MACEForceField(cueq, atoms, neighbours=NEIGHBOURS, rewrites=only())
+        assert field.model is not cueq.models[0] and polar.get_state(cueq.models[0]) is None
+        assert polar.get_state(field.model) is not None and field.info()["polar"]["k_vectors"] > 0
+        assert "polar.overflow" in field.buffers()
+        positions = moved(atoms, 0.05)
+        reference(calc, atoms, positions)  # throwaway: the first model of a process rounds differently
+        energy, forces = evaluate(field, positions, padded=True)
+        expected_energy, expected_forces = reference(calc, atoms, positions)
+        # cuEq's naive kernels against e3nn, and graph_longrange's k-vectors summed with zeros
+        # interleaved (fastmace.longrange.polar): equal to rounding.
+        np.testing.assert_allclose(float(energy[0]), expected_energy, rtol=1e-12, atol=0)
+>       np.testing.assert_allclose(forces.numpy(), expected_forces, rtol=1e-12, atol=1e-12)
+E       AssertionError: 
+E       Not equal to tolerance rtol=1e-12, atol=1e-12
+E       
+E       Mismatched elements: 1 / 192 (0.521%)
+E       Max absolute difference among violations: 5.40856249e-12
+E       Max relative difference among violations: 2.02464222e-12
+E        ACTUAL: array([[-4.722116e+00,  6.002286e+00, -2.671367e+00],
+E              [ 8.131732e-01,  1.859680e+00,  7.300108e+00],
+E              [ 1.734902e+00,  2.658248e+00, -3.717024e+00],...
+E        DESIRED: array([[-4.722116e+00,  6.002286e+00, -2.671367e+00],
+E              [ 8.131732e-01,  1.859680e+00,  7.300108e+00],
+E              [ 1.734902e+00,  2.658248e+00, -3.717024e+00],...
+
+tests/cpu/test_forces.py:626: AssertionError
+=============================== warnings summary ===============================
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_capabilities.py::test_family_traits[residual]
+tests/cpu/test_checkpoint_trust.py::test_a_failed_oeq_runtime_is_tolerated_and_recorded
+tests/cpu/test_engine.py::test_capture_safe_mask_head_is_put_back_after_another_install
+tests/cpu/test_energy.py::test_energy_never_comes_from_node_energy[polar]
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/cpu/test_capabilities.py::test_family_traits[residual]
+tests/cpu/test_checkpoint_trust.py::test_a_failed_oeq_runtime_is_tolerated_and_recorded
+tests/cpu/test_ase_md.py::test_fix_atoms_is_refused_with_the_phase_4_reason
+tests/cpu/test_engine.py::test_capture_safe_mask_head_is_put_back_after_another_install
+tests/cpu/test_ase_calculator.py::test_results_equal_stock_mace_in_float64[mh1]
+tests/cpu/test_acceptance_1b.py::test_two_simulation_sides_on_the_cpu
+tests/cpu/test_energy.py::test_energy_never_comes_from_node_energy[polar]
+tests/cpu/test_canonical_restart.py::test_mace_interrupted_equals_uninterrupted[mh1-options0]
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/graph_longrange/kspace.py:224: DeprecationWarning: invalid escape sequence '\p'
+    """
+
+tests/cpu/test_checkpoint_trust.py: 13 warnings
+tests/cpu/test_loading.py: 3 warnings
+tests/cpu/test_reference_policy.py: 2 warnings
+  /mnt/homes/zwingel/fastmace-2-T14/src/fastmace/model/loading.py:499: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/cpu/test_energy.py: 40 warnings
+tests/cpu/test_forces.py: 12 warnings
+tests/cpu/test_reference_policy.py: 136 warnings
+tests/cpu/test_rewrites_generic.py: 12 warnings
+tests/cpu/test_rewrites_linear.py: 40 warnings
+tests/cpu/test_rewrites_mh1.py: 96 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py:183: UserWarning: cuequivariance_ops_torch is not available. Falling back to naive implementation.
+    warnings.warn(
+
+tests/cpu/test_energy.py::test_energy_never_comes_from_node_energy[polar]
+tests/cpu/test_energy.py::test_energy_never_comes_from_node_energy[omol]
+  /mnt/homes/zwingel/fastmace-2-T14/src/tests/cpu/test_energy.py:132: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+  Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:820.)
+    missing = float(out["energy"].sum()) - float(out["node_energy"].sum())
+
+tests/cpu/test_loading.py::test_load_records_the_hash_and_matches_mace
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/mace/calculators/mace.py:226: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    torch.load(f=model_path, map_location=device)
+
+tests/cpu/test_loading.py::test_load_refuses_a_model_that_fell_back
+  /mnt/homes/zwingel/fastmace-2-T14/src/tests/cpu/test_loading.py:364: ModelLicenceWarning: tiny-mh1.model (SHA-256 7cd7d3398689…) is not a label of the FastMACE table; its licence is unknown, check it with the model's release
+    loaded = loading.load(str(path), backend="e3nn", device="cpu", trusted=True, allow_naive_cueq=True)
+
+tests/cpu/test_reference_policy.py::test_load_builds_the_reference_from_a_checkpoint
+  /mnt/homes/zwingel/fastmace-2-T14/src/fastmace/reference/calculators.py:302: ModelLicenceWarning: tiny-mh1.model (SHA-256 8e32367a3812…) is not a label of the FastMACE table; its licence is unknown, check it with the model's release
+    loaded = loading.load(source, head, backend=stock["backend"], dtype=dtype, device=device,
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+---- generated xml file: /mnt/homes/zwingel/fastmace-2-T14/junit/run-03.xml ----
+=========================== short test summary info ============================
+FAILED tests/cpu/test_forces.py::test_polar_force_field_enables_its_own_copy
+===== 1 failed, 2144 passed, 5 skipped, 379 warnings in 313.37s (0:05:13) ======
+exit 1 end 2026-10-20T00:22:27+02:00 seconds 315
+ 00:22:27 up 153 days, 11:04,  0 users,  load average: 7.17, 9.02, 6.17
+zwingel   100 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
+zwingel  88.1 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
+zwingel  72.0 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
+zwingel  70.5 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
+zwingel  69.1 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
+zwingel  67.2 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
+zwingel  65.7 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
+zwingel  53.8 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
