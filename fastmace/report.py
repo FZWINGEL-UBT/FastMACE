@@ -176,6 +176,38 @@ def _label_of(model, head, sha256):
     return None
 
 
+def gate_line(gate) -> str:
+    """The report's gate line from a gate record (mapping); the not-run text for none or ``skipped``.
+
+    After the first step of the gate's resource ladder (§12.3 "Resources", 2-T05) it names where the
+    references ran: the CPU after an out-of-memory, or the reduced cell (``passed-reduced``).
+    """
+    gate = _mapping(gate)
+    status = None if gate is None else gate.get("status")
+    if status in (None, "skipped"):
+        return GATE_OPT_IN
+    if status == "unavailable":
+        reason = gate.get("reason") or "no reference ran"
+        return f'unavailable ({reason}); run allowed by check="allow_unavailable"'
+    numbers = []
+    for key, unit in (("energy_meV_per_atom", "meV/atom"), ("force_eV_per_A", "eV/Å"),
+                      ("stress_eV_per_A3", "eV/Å³")):
+        if gate.get(key) is not None:
+            numbers.append(f"{gate[key]:.2g} {unit}")
+    where = None
+    steps = gate.get("steps") or ()
+    if gate.get("reduced_cell"):
+        where = (f"reduced cell {'×'.join(str(m) for m in gate['reduced_cell'])} of the primitive cell on "
+                 f"{gate.get('device')}, replay checked on the production cell")
+    elif len(steps) > 1 and gate.get("device"):
+        where = f"reference on {gate['device']} after {steps[0].get('outcome')}"
+    parts = [part for part in (where, gate.get("copies"), ", ".join(numbers)) if part]
+    detail = "; ".join(parts + ["floors §12.3"])
+    if gate.get("reason") and status not in ("passed", "passed-reduced"):
+        detail = f"{gate['reason']}; {detail}"
+    return f"{status} ({detail})"
+
+
 class Report:
     """The run report of one run (SPEC §7.7). Build it at setup; feed it the speed; read ``text()``.
 
@@ -275,23 +307,7 @@ class Report:
         return f"{plan.tier}, {backend}, {precision}, {on} rewrites on, {off} off (reasons in run.plan)"
 
     def _gate(self):
-        gate = self.gate
-        status = None if gate is None else gate.get("status")
-        if status in (None, "skipped"):
-            return GATE_OPT_IN
-        if status == "unavailable":
-            reason = gate.get("reason") or "no reference ran"
-            return f'unavailable ({reason}); run allowed by check="allow_unavailable"'
-        numbers = []
-        for key, unit in (("energy_meV_per_atom", "meV/atom"), ("force_eV_per_A", "eV/Å"),
-                          ("stress_eV_per_A3", "eV/Å³")):
-            if gate.get(key) is not None:
-                numbers.append(f"{gate[key]:.2g} {unit}")
-        parts = [part for part in (gate.get("copies"), ", ".join(numbers)) if part]
-        detail = "; ".join(parts + ["floors §12.3"])
-        if gate.get("reason") and status != "passed":
-            detail = f"{gate['reason']}; {detail}"
-        return f"{status} ({detail})"
+        return gate_line(self.gate)
 
     def _setup(self):
         if not self.setup_s:
