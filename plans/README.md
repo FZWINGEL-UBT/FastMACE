@@ -26,9 +26,9 @@ All remaining 1b tasks were prestarted on 19 October 2026 (owner request)
 and wait for the conductor's go message (`CONDUCTOR.md`, "Prestarted phase
 workers"). No "start all ready" is needed in phase 1b.
 
-- Merged: 1b-T01, T02, T03, T05, T04, T06, T06b, T07, T08, T08b, T08c, T09, T10, T11, T12, T13, T14, T15, T16, T18, T19, T24 (19 October 2026).
-- Working: 1b-T17 (gate wiring after T16).
-- Waiting for go: 1b-T20 to T23. Answers to their prestart
+- Merged: 1b-T01, T02, T03, T05, T04, T06, T06b, T07, T08, T08b, T08c, T09, T10, T11, T12, T13, T14, T15, T16, T17, T18, T19, T24 (19 October 2026).
+- Working: 1b-T20, T21 (`fm.md` test after T20), T25 (fast-tier GPU tests, local GPU).
+- Waiting for go: 1b-T22, T23. Answers to their prestart
   reports, and three items for the owner's review, are in `phase-1b.md`,
   "Conductor answers to the prestart reports".
 

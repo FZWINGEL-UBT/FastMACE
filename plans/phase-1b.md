@@ -1400,6 +1400,22 @@ points here.
   cuEq float64 run therefore need not stay within 1e-12 Å of an ungated
   one on the GPU.
 
+### After T17 (19 October 2026)
+
+- `Simulation` is complete: plan, opt-in gate, chunked output, the report,
+  `metadata.json`, canonical restart and resume, and host writes. Its GPU
+  smoke test (60 steps of MH-1) passes on plain cuEq and hybrid, within
+  float32 noise of `FixedPlanner`.
+- Deviations accepted: a resumed run records its trust decision as
+  `sha256` even when the original used `trusted=True`, because resume
+  verifies the hash. Restart files are written at every multiple of
+  `restart_every`, the last step of a run included (`main.py` skips the
+  last step).
+- **1b-T25 added** (19 October 2026): two fast-tier GPU tests from a
+  session started by 1b-T24, on tiny models: no compile at a later edge
+  bucket, and a planned engine equal to a hand-built one. New test files
+  only.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
