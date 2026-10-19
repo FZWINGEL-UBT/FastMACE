@@ -1468,6 +1468,27 @@ points here.
   murphy only), and its per-block-pair ratios scatter widely (NaCl
   0.987–1.014).
 
+### After 1b-T23 (19 October 2026)
+
+- The acceptance report is `docs/validation/phase-1b.md` (merged). It
+  passes the gate with energy on all 19 labels, the in-library gate (19
+  NVT, 18 NPT), the full GPU tier on murphy and the RTX 5060 Ti (176 each),
+  restart, `doctor`/`md`, and compatibility with `main.py`.
+- Its failure 4 (the research-engine comparisons) is resolved by 1b-T03b,
+  merged:
+  - the kernel lists differ because the float64 reduction changes
+    Inductor's fusion, so those comparisons run with
+    `float64_energy=False`;
+  - the hybrid crash was the test's warm-up clones of a leaf that requires
+    grad, fixed with `detach()`; no library change.
+  Results: NVT 2.5e-13 Å, NPT 7.1e-15 Å, hybrid 1.0e-7 Å against a run
+  scatter of 8.7e-8.
+- Failure 2 (the ASE shim costs about 0.26 s per `run()` call; per step it
+  is equal) goes to **1b-T21b**. A wrong "naive cuEq" warning from
+  `fastmace md` on hybrid runs goes to **1b-T22b**.
+- Failures 1 (POLAR-1-S NPT stress at the floor) and 3 (NaCl timing in
+  both directions) are owner items 5 and 6.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
