@@ -113,9 +113,9 @@ def test_hybrid_conversion_keeps_the_last_layer_irreps_of_a_tiny_polar_model(tmp
         import json
         import fastmace
         from fastmace.model import loading
-        from fastmace import _patches
+        from fastmace import _cache, _patches
         import os
-        _patches.prepare_oeq_runtime(os.path.join({str(tmp_path)!r}, "oeq"))
+        _patches.prepare_oeq_runtime(_cache.cache_dir("oeq"))  # the shared build (1b-T24), not a cold one
         import torch
         from _support.tiny_models import FAMILIES, tiny_mace_model
         model = tiny_mace_model([11, 17], **FAMILIES["polar"])
