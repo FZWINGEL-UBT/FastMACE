@@ -3,8 +3,11 @@
 Tests import helpers as ``from _support import ...``: pytest puts this directory on
 ``sys.path`` because it holds the root conftest and is not a package.
 
-Test tiers (plan task 1b-T24, ``docs/development.md``): ``pytest tests/gpu -m "not slow"``
-is the worker tier, the full ``pytest tests/gpu`` the merge and acceptance tier.
+Test tiers (plan tasks 1b-T24, 1b-T27, ``_support.tiers``, ``docs/development.md``): fast
+``-m "not slow and not acceptance"`` (workers), full ``-m "not acceptance"`` (merges) and
+``-m acceptance`` (phase acceptance). An acceptance test must also be ``slow``
+(``tests/cpu/test_tiers.py`` checks it), and a ``-m`` that selects acceptance tests stops the run
+without the research engine, the hybrid Python or the models.
 """
 
 import fastmace  # noqa: F401  (before torch: it switches PyTorch's file locks, SPEC §14)
@@ -33,6 +36,21 @@ def pytest_addoption(parser):
                           "(default: the FastMACE cache root's, shared by all runs)")
 
 
+def _check_acceptance_environment(config):
+    """A -m expression that selects acceptance tests needs their environment, or the run stops (1b-T27).
+
+    In the controller, before collection: an error raised in xdist workers' collection crashes them.
+    A run without -m keeps the acceptance tests' own skips.
+    """
+    from _support import tiers
+
+    if tiers.selects_acceptance(config.getoption("markexpr", "")):
+        problems = tiers.acceptance_environment_problems()
+        if problems:
+            raise pytest.UsageError("\n".join(["-m selects the acceptance tier (docs/development.md, "
+                                               "'Test tiers'), which needs:", *problems]))
+
+
 def pytest_configure(config):
     """One Inductor/Triton cache root for the whole run, inherited by every child process (1b-T24).
 
@@ -44,6 +62,7 @@ def pytest_configure(config):
     """
     if hasattr(config, "workerinput"):  # an xdist worker inherits the controller's variables
         return
+    _check_acceptance_environment(config)
     from fastmace import _cache
     from fastmace.kernels.triton import cache
 

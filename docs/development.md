@@ -42,30 +42,62 @@ Never install FastMACE into the GPU environments; GPU runs use
 
 ## Test tiers
 
-Plan task 1b-T24 (19 October 2026). The GPU suite has two tiers:
+Plan tasks 1b-T24 and 1b-T27 (19 October 2026). The GPU suite has three tiers
+(`tests/_support/tiers.py`):
 
 | Tier | Command | Who runs it, when | Local RTX 5060 Ti, warm caches |
 | --- | --- | --- | ---: |
-| fast (worker) | `pytest tests/gpu -m "not slow"` | every worker, for every change, as often as needed | 8.0 min (189 tests, 1b-T26) |
-| full (merge, acceptance) | `pytest tests/gpu` | the conductor, at merges that touch `model/`, `rewrites/`, `kernels/` or `engine/`, and acceptance runs | 28.7 min (223 tests, 1b-T24; not measured since) |
+| fast (worker) | `pytest tests/gpu -m "not slow and not acceptance"` | every worker, for every change, as often as needed | 7.9 min (190 tests, 1b-T27) |
+| full (merge) | `pytest tests/gpu -m "not acceptance"` | the conductor, at merges that touch `model/`, `rewrites/`, `kernels/` or `engine/` | 38.7 min (244 tests; 142 min before 1b-T27) |
+| acceptance | `pytest tests/gpu -m acceptance` | phase acceptance, and merges that touch `model/`, `rewrites/` or `kernels/` | murphy: 103 min (10 tests) |
 
-The first run after a change of environment, or with emptied caches, is slower
-(5.7 and 34.8 min), because it compiles everything and builds the OEq extension
-once. Measurements: [validation/1b-T24-test-suite-speed.md](validation/1b-T24-test-suite-speed.md).
+**Merge rule:** the full tier on merges that touch `model/`, `rewrites/`, `kernels/` or `engine/`,
+and in addition the acceptance tier on merges that touch `model/`, `rewrites/` or `kernels/`
+(they change numerics).
+
+The first run after a change of environment, or with emptied caches, is slower,
+because it compiles everything and builds the OEq extension once. Measurements:
+[validation/1b-T24-test-suite-speed.md](validation/1b-T24-test-suite-speed.md),
+[validation/1b-T27-gpu-tiers.md](validation/1b-T27-gpu-tiers.md).
 
 The CPU suite (`tests/cpu`) has no tiers: everyone runs all of it.
 
 A test is marked `@pytest.mark.slow` when it needs one of these:
 
 - a real checkpoint (MH-1, MP-0, OFF, POLAR-1-S), whose load and compile take tens of seconds;
-- the research engine (`FASTMACE_BASELINE`) in its own process;
 - a long trajectory (hundreds of steps);
 - a cold compiler cache (the edge-bucket regression tests).
+
+A test is also marked `@pytest.mark.acceptance` (and keeps `slow`, so that the older
+`-m "not slow"` leaves it out too) when it is:
+
+- a comparison with the research engine (`FASTMACE_BASELINE`) in its own process;
+- a statistical check over tens of thousands of steps (ASE equivalence, the hybrid restart);
+- a timing record (the gate's time on NbCl5).
+
+`tests/cpu/test_tiers.py` fails for an `acceptance` mark without `slow`. When a `-m` expression
+selects acceptance tests (`-m acceptance`, or `-m slow`), `tests/conftest.py` stops the run with a
+usage error if `FASTMACE_BASELINE`, `FASTMACE_HYBRID_PYTHON` or `FASTMACE_MODELS` is unset or names
+nothing, so the acceptance tier never skips silently. The check runs in the controller before
+collection, so xdist workers never see it. A run without `-m` keeps the tests' own skips.
+Run CPU suites under xdist (`-n 2` or more) whenever you change `conftest.py` or a pytest plugin.
 
 Every behaviour tested on the GPU keeps at least one test in the fast tier, usually on a
 tiny model or the Lennard-Jones force field in the pytest process, except those listed
 below. When you add a GPU test that is slow for one of these reasons, mark it `slow` and
 check that a fast test still covers the behaviour. If none can, add the behaviour to that list.
+
+**Budgets.** `tools/test_budget.py` reads junit files (`pytest --junitxml`) and the tiers (by
+collecting `tests/gpu`). It prints each tier's total against its budget first (fast 10 min, full
+40 min, local RTX 5060 Ti with warm caches; over budget is a warning). It exits 1 if a fast-tier
+test takes over 60 s, or a full-tier test over 120 s. The exception is a test that
+`FULL_TIER_ALLOWED` in the tool lists with its measured time and a reason; such a test fails only
+when it takes more than 1.5 times its recorded time. Run the tool on the junit of a tier run before
+you merge new GPU tests:
+
+```bash
+python tools/test_budget.py results/<run>/junit.xml
+```
 
 GPU command for workers on the local PC (one process; `FASTMACE_HYBRID_PYTHON` runs the
 hybrid tests in the OEq environment). `TORCHINDUCTOR_COMPILE_THREADS=4` keeps Inductor from
@@ -73,7 +105,7 @@ starting 24 compile workers per process. Without it, WSL's 15 GB ran out on
 19 October 2026 while other sessions ran CPU suites, and the WSL VM restarted:
 
 ```bash
-TORCHINDUCTOR_COMPILE_THREADS=4 FASTMACE_HYBRID_PYTHON=~/environments/mace_cueq_oeq/bin/python FASTMACE_MODELS=~/models FASTMACE_BASELINE=~/fastmace-baseline/1a-T18 PYTHONPATH=$PWD PYTHONDONTWRITEBYTECODE=1 ~/environments/mace_cueq_latest/bin/python -m pytest -m "not slow" tests/gpu
+TORCHINDUCTOR_COMPILE_THREADS=4 FASTMACE_HYBRID_PYTHON=~/environments/mace_cueq_oeq/bin/python FASTMACE_MODELS=~/models FASTMACE_BASELINE=~/fastmace-baseline/1a-T18 PYTHONPATH=$PWD PYTHONDONTWRITEBYTECODE=1 ~/environments/mace_cueq_latest/bin/python -m pytest -m "not slow and not acceptance" tests/gpu
 ```
 
 Two MH-1 behaviours have tiny-model versions in the fast tier
@@ -93,8 +125,6 @@ tests' own child processes dominate, so they were left out
 ([validation/1b-T26-gpu-retiering.md](validation/1b-T26-gpu-retiering.md)). These behaviours
 are tested **only in the full tier**:
 
-- fm.load after MACE was imported gives plain cuEq with its reason
-  (`test_load_hybrid_gpu.py::test_mace_imported_first_gives_plain_cueq_with_the_reason`, 310 s);
 - an engine resumed from canonical restart points follows the uninterrupted run within 1e-12 Å
   (`test_canonical_restart_gpu.py`; the CPU suite has tiny-model restart tests);
 - the gate passes in graph mode, NVT with fresh references and full-cell NPT
@@ -104,6 +134,19 @@ are tested **only in the full tier**:
   does not converge);
 - the registry checks in hybrid pipelined NVT, hybrid full-cell NPT and POLAR-1-S
   (`test_registry_gpu.py`).
+
+Behaviours tested **only in the acceptance tier** (1b-T27):
+
+- Langevin and BAOAB reproduce ASE's integrators statistically (`test_ase_equivalence_gpu.py`,
+  88 min; the CPU suite checks both integrators step by step against ASE);
+- a hybrid engine resumed from a restart file is statistically the same as the uninterrupted run
+  (`test_canonical_restart_gpu.py::test_mh1_hybrid_resumes_statistically`; plain cuEq within
+  1e-12 Å stays in the full tier);
+- the gate's time on NbCl5 (`test_selfcheck_gpu.py::test_gate_time_on_nbcl5`);
+- FastMACE against the research engine: the MH-1 engine in plain cuEq NVT and NPT and the hybrid
+  (`test_engine_gpu.py::*against_the_research_engine`), and the compiled production force fields
+  (`test_forces_gpu.py::test_mh1_agrees_with_maceforces[*compiled-production]`; the eager case stays
+  in the full tier).
 
 ### Caches the suite shares
 

@@ -25,11 +25,11 @@ workers"). 2-T21 works in the ResearchModule worktree
 
 - Phase 1b: done, apart from 1b-T27 (the GPU acceptance tier), which is
   finishing its acceptance-tier run on murphy. 2-T01's go waits for it.
-- Merged in phase 2: 2-T11.
-- Working in phase 2: 2-T01 (contracts), 2-T14 (flaky test, murphy CPUs).
-- 1b-T27 is back with its worker: its branch breaks the `-n 8` CPU suite
-  (an xdist worker crash).
-- Next: 2-T12 when the local machine is quiet.
+- Merged in phase 2: 2-T11, 2-T01 (20 October 2026).
+- Working in phase 2: 2-T12 (local noise floor; local machine exclusive),
+  2-T09, 2-T04, 2-T05 (tests on murphy's CPUs meanwhile), 2-T14 (the
+  cuEq basis-cache fix, approved).
+- 1b-T27 merges after 2-T14's fix.
 - Waiting for go: the rest. Answers to all prestart reports are in
   `phase-2.md`, "Conductor answers to the prestart reports".
 

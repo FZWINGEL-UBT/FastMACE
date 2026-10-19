@@ -436,7 +436,9 @@ def _compare(ours, theirs):
 
 @pytest.mark.slow
 @needs_mh1_baseline
-@pytest.mark.parametrize("case", list(MH1_CASES))
+# The compiled production cases compare with the research engine (acceptance); the eager one stays in full.
+@pytest.mark.parametrize("case", [pytest.param(name, marks=pytest.mark.acceptance if "compiled" in name else ())
+                                  for name in MH1_CASES])
 def test_mh1_agrees_with_maceforces(case):
     backend, dtype, compile_mode, rewrites, switches, sort = MH1_CASES[case]
     root = _baseline_root()
