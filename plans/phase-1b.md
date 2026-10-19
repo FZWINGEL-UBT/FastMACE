@@ -1346,6 +1346,21 @@ points here.
 - T06: the chunks and the restart file are flushed but not fsynced. That
   covers SIGKILL, not power loss (phase 2 safety).
 
+### After T09, T15, T19 (19 October 2026)
+
+- T09: the engines match their corrected references to about 1e-13 Å on CPU
+  and GPU (murphy); the two BAOAB variants differ by 6e-6 Å on the GPU run.
+  The per-bin temperature limit (0.1 K) and the BAOAB position-ratio limit
+  are T09's own thresholds.
+- T15: no atom-count warning, because a fixed atom threshold would be a
+  per-GPU rule (§9.1); only the small-cell warning (cell height below twice
+  the cutoff). The report reads the gate keys `status`, `reason`, `copies`,
+  `energy_meV_per_atom`, `force_eV_per_A` and `stress_eV_per_A3`; T16
+  provides them.
+- T19 went back to its worker: on the NAS environment, `doctor`'s import of
+  `cuequivariance_ops_torch` created `~/.cache/cuequivariance-triton`, and
+  `doctor` must change nothing.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
