@@ -393,7 +393,8 @@ atoms = structure()
 field = MACEForceField(loaded, atoms, rewrites={{name: "on" if name in {rewrites!r} else "off" for name in names}},
                        engine=EngineConfig(compile_mode={compile_mode!r}),
                        neighbours=NeighbourConfig(skin=0.3, sort_receivers={sort!r}, gpu_neighbour_list="on"),
-                       compute_stress=True, compile_cache=fc.CompiledModelCache())
+                       compute_stress=True, compile_cache=fc.CompiledModelCache(),
+                       float64_energy=False)  # 1a's energy sum, as the research engine (1b-T03)
 rows = evaluations(field.compact, lambda: field.edge_count, lambda: field.edge_capacity, field.use_edges, field,
                    atoms.positions, torch)
 print(json.dumps({{"rows": rows, "info": {{k: v for k, v in field.info().items() if k != "decisions"}},

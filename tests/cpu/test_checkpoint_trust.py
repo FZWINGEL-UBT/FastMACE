@@ -110,6 +110,16 @@ def test_public_load_is_pristine(single_head, fresh_licences):
     assert (loaded.sha256, loaded.trust, loaded.cueq_conv_fusion) == (digest, "sha256", None)
 
 
+def test_public_load_keeps_the_float64_e0_table(tmp_path, fresh_licences):
+    # 1b-T03: the float64 energy needs the checkpoint's E0 table; plans build from the pristine model.
+    e0 = np.array([-1.2345678901234567, -12522.123456789012])
+    path, digest = save(tmp_path, "e0.model", tiny_mace_model([11, 17], atomic_energies=e0, **FAMILIES["mh1"]))
+    with pytest.warns(loading.ModelLicenceWarning):
+        loaded = loading.load_pristine(str(path), sha256=digest)
+    assert loaded.atomic_energies.dtype == torch.float64
+    assert loaded.atomic_energies.flatten().tolist() == e0.tolist()
+
+
 def test_internal_load_keeps_its_defaults():
     import inspect
 

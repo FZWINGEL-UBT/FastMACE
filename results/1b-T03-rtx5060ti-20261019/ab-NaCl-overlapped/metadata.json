@@ -1,0 +1,134 @@
+{
+  "command": "ab",
+  "created_utc": "2026-10-19T00:55:09.061660+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": null,
+  "model": "mh1-r2scan",
+  "structure": "NaCl",
+  "natoms": 216,
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "plans": {
+    "float64_sum": {
+      "backend": "hybrid",
+      "dtype": "float32",
+      "float64_energy": true
+    },
+    "float32_sum_1a": {
+      "backend": "hybrid",
+      "dtype": "float32",
+      "float64_energy": false
+    }
+  },
+  "result": {
+    "names": [
+      "float64_sum",
+      "float32_sum_1a"
+    ],
+    "pattern": "abba",
+    "order": [
+      "float64_sum",
+      "float32_sum_1a",
+      "float32_sum_1a",
+      "float64_sum",
+      "float64_sum",
+      "float32_sum_1a",
+      "float32_sum_1a",
+      "float64_sum",
+      "float64_sum",
+      "float32_sum_1a",
+      "float32_sum_1a",
+      "float64_sum",
+      "float64_sum",
+      "float32_sum_1a",
+      "float32_sum_1a",
+      "float64_sum",
+      "float64_sum",
+      "float32_sum_1a",
+      "float32_sum_1a",
+      "float64_sum",
+      "float64_sum",
+      "float32_sum_1a",
+      "float32_sum_1a",
+      "float64_sum"
+    ],
+    "sides": {
+      "float64_sum": {
+        "median_ms": 3.5078300116674654,
+        "mean_ms": 3.5095476611114567,
+        "min_ms": 3.4283325300020806,
+        "max_ms": 3.6843453833322806,
+        "stdev_ms": 0.0685628092187893,
+        "spread": 0.07298325531130938,
+        "block_ms": [
+          3.4310857733332036,
+          3.436668866667484,
+          3.4283325300020806,
+          3.6843453833322806,
+          3.5273156033326813,
+          3.5599644066678593,
+          3.5169095733332747,
+          3.49732660666632,
+          3.509462633334503,
+          3.5114068733340296,
+          3.506197390000428,
+          3.505556293333332
+        ]
+      },
+      "float32_sum_1a": {
+        "median_ms": 3.525522160001249,
+        "mean_ms": 3.523698697222244,
+        "min_ms": 3.440029966665558,
+        "max_ms": 3.6902754499988077,
+        "stdev_ms": 0.06659746845640253,
+        "spread": 0.07098111201013164,
+        "block_ms": [
+          3.4503250233350022,
+          3.4589198699995904,
+          3.440029966665558,
+          3.6902754499988077,
+          3.5070381566644455,
+          3.5861156433323536,
+          3.530341033335086,
+          3.526841616667298,
+          3.5267082300015318,
+          3.5320827633343774,
+          3.524336090000967,
+          3.51137052333191
+        ]
+      }
+    },
+    "ratio_b_over_a": 1.0050436162171308,
+    "pair_ratios_b_over_a": [
+      1.0056073357743862,
+      1.00647458460369,
+      1.0034119901033842,
+      1.0016095306084372,
+      0.9942513092253278,
+      1.00734592644115,
+      1.0038191087151216,
+      1.008439306167379,
+      1.0049140277212876,
+      1.0058882068487598,
+      1.0051733253958461,
+      1.0016585755617833
+    ]
+  },
+  "observables": {
+    "float64_sum": {
+      "temperature_K": 311.64131260926763,
+      "potential_eV_atom": -6.8535410585226835,
+      "kinetic_eV_atom": 0.04028274206217052
+    },
+    "float32_sum_1a": {
+      "temperature_K": 311.64134811145607,
+      "potential_eV_atom": -6.85354557743779,
+      "kinetic_eV_atom": 0.040282746651181804
+    }
+  }
+}
