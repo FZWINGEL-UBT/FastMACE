@@ -86,10 +86,11 @@ def simulation():
             "report": sim.report.text(), "speed": sim.report.speed, "mode": sim._engine.info()["mode"]}
 
 
-out = {"gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "fastmace": fastmace.__version__}
-# Simulation first: fm.load prepares the OEq runtime before MACE is imported (1b-T08b), which the
-# hybrid needs; FixedPlanner's engines then run in the same backend family.
-out["simulation"] = simulation()
+# Simulation first, before anything touches CUDA: the planner sets the allocator before the first CUDA
+# use, and fm.load prepares the OEq runtime before MACE is imported (1b-T08b), which the hybrid needs.
+# FixedPlanner's engines then run in the same backend family.
+out = {"simulation": simulation()}
+out.update(gpu=torch.cuda.get_device_name(), torch=torch.__version__, fastmace=fastmace.__version__)
 out["reference"] = reference()
 out["repeat"] = reference()
 print(json.dumps(out))

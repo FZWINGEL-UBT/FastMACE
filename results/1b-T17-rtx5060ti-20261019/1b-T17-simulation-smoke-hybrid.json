@@ -1,0 +1,22 @@
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "mode": "pipelined",
+ "gate": "skipped",
+ "simulation_vs_fixed_A": 1.304577885719027e-07,
+ "repeat_vs_fixed_A": 1.584014661659694e-07,
+ "simulation_vs_fixed_energy_meV_per_atom": 4.194400915480401e-05,
+ "repeat_vs_fixed_energy_meV_per_atom": 4.194400915480401e-05,
+ "same_options": true,
+ "setup_s": 26.87590659199941,
+ "speed": {
+  "status": "whole-run mean",
+  "seconds_per_step": 0.17019812063334333,
+  "first_step": 1,
+  "last_step": 60
+ },
+ "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 12 rewrites on, 2 off (reasons in run.plan)\nwhy:     naive cuEq allowed (allow_naive_cueq=True): cuEquivariance's fused kernels do not load, so this run is slow; install cuequivariance-ops-torch (`fastmace doctor`)\ngate:    not run (opt-in: check=\"gate\")\nsetup:   26 s (plan 0.23 s, build 25 s)\nspeed:   170 ms/step, whole-run mean over steps 1\u201360\noutput:  /tmp/pytest-of-fzwin/pytest-0/test_simulation_reaches_the_ma1/run\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+}
