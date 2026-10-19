@@ -580,6 +580,47 @@ def test_the_files_never_stop_the_run(loaded, monkeypatch):
     assert calls == [6]
 
 
+def test_a_run_call_costs_what_simulation_run_costs(loaded, monkeypatch, tmp_path):
+    """1b-T21b: per run() the shim builds no metadata record of its own (provenance.fastmace_block
+    queries the software versions, about 0.25 s), takes no extra committed() sync without observers,
+    and writes metadata.json and report.txt once each beside the Simulation's own write."""
+    from fastmace import provenance, simulation
+    from fastmace.io.output import Output
+
+    counts = {"block": 0, "committed": 0, "write_metadata": 0}
+    original_block, original_write = provenance.fastmace_block, provenance.write_metadata
+    original_committed = simulation.Simulation.committed
+
+    def block(*args, **kwargs):
+        counts["block"] += 1
+        return original_block(*args, **kwargs)
+
+    def write(*args, **kwargs):
+        counts["write_metadata"] += 1
+        return original_write(*args, **kwargs)
+
+    def committed(self):
+        counts["committed"] += 1
+        return original_committed(self)
+
+    monkeypatch.setattr(provenance, "fastmace_block", block)
+    monkeypatch.setattr(provenance, "write_metadata", write)
+    monkeypatch.setattr(simulation.Simulation, "committed", committed)
+
+    def per_call(run):
+        run(2)  # setup and the step-0 work
+        before = dict(counts)
+        run(3)
+        return {key: counts[key] - before[key] for key in counts}
+
+    sim = _simulation(loaded, output=Output(str(tmp_path / "sim")))
+    reference = per_call(lambda steps: sim.run(steps=steps))
+    shim = per_call(_langevin(loaded).run)
+    assert shim["block"] == reference["block"] == 1
+    assert shim["write_metadata"] == reference["write_metadata"] + 1  # the merged "ase" block
+    assert shim["committed"] == reference["committed"] + 1 == 1  # atoms hold the final state
+
+
 def test_append_trajectory_keeps_frames_as_ase(loaded):
     from ase.io import read
 
