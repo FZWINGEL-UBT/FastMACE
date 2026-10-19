@@ -112,6 +112,14 @@ def test_a_new_run_refuses_a_directory_with_chunks(tmp_path):
         output_io.ChunkedOutput(tmp_path, atoms, chunk_run.HEADER)
 
 
+def test_output_steps_is_reexported_from_protocols():
+    """main.py's adapter imports io.trajectory.output_steps; the canonical copy is fastmace.protocols' (1b-T07)."""
+    from fastmace import protocols
+    from fastmace.io import trajectory
+
+    assert trajectory.output_steps is protocols.output_steps
+
+
 # --------------------------------------------------------------------------- resume
 
 

@@ -31,6 +31,9 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import torch
 
+# The canonical copy is in fastmace.protocols (plan task 1b-T07); kept here for main.py's adapter.
+from fastmace.protocols import output_steps  # noqa: F401
+
 if TYPE_CHECKING:
     from ase import Atoms
 
@@ -198,13 +201,6 @@ class AsyncOutput:
 
     def __len__(self) -> int:
         return len(self._pending)
-
-
-def output_steps(total_steps: int, interval: int, heat_steps: int, hold_steps: int = 0) -> list[int]:
-    """Steps at which a sample (or trajectory frame) is written: 0, every interval, the phase ends."""
-    steps = {0, heat_steps, heat_steps + hold_steps, total_steps}
-    steps.update(range(interval, total_steps + 1, interval))
-    return sorted(steps)
 
 
 def truncate_outputs(directory: str | Path, step: int, frame_steps: Iterable[int]) -> list[tuple[Any, ...]]:
