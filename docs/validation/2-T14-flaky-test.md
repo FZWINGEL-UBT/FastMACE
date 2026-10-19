@@ -12,7 +12,7 @@ found its cause in two dependencies, and fixed it in `fastmace.model.loading`.
 | Environment | NAS `mace_cueq_latest` (torch 2.14.1+cu130, MACE 0.3.16, cuequivariance 0.12.0, e3nn), `PYTHONPATH` checkout |
 | Command | `CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=2 nice -n 10 python -m pytest -n 8 -rf -p no:cacheprovider --junitxml=… --basetemp=… tests/cpu`, `set -o pipefail` |
 | Caches | own cache root under `/mnt/homes/zwingel/fastmace-2-T14/`; batch 1 cold (a new, empty cache per run), the confirmation runs warm |
-| Files | logs, junit files and probe scripts in `/mnt/homes/zwingel/fastmace-2-T14/` (`logs/`, `junit/`, `probe/`, `plugins/`) |
+| Files | logs, junit files, runner and probe scripts in [results/2-T14-murphy-20261020/](../../results/2-T14-murphy-20261020/README.md) (`logs/`, `junit/`, `probe/`, `plugins/`) |
 
 No order plugin is installed in any environment; a small seeded order plugin outside the
 repository was prepared but not needed, because the default order reproduced the failure.
@@ -136,7 +136,8 @@ murphy CPUs, default order, warm caches, same command as batch 1. The branch syn
 | c6 | 4cdcfd1 | 2239 passed, 5 skipped | 145 s |
 
 Without the fix, the same T27 combination failed in 3 of 5 runs (1b-T27's worker). No other
-user's process ran on murphy during the runs. The local `fastmace_cpu` suite was not run,
+user's process ran on murphy during the runs; trial suites of our own account overlapped
+runs 01, 02 and c2–c6 (untimed runs, so allowed). The local `fastmace_cpu` suite was not run,
 because the local machine was reserved for 2-T12's timing.
 
 ## Upstream

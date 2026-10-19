@@ -1,0 +1,42 @@
+run 02 seed default mode cold cache /mnt/homes/zwingel/fastmace-2-T14/cache-cold-02 start 2026-10-20T00:06:26+02:00 commit ed39645204eb42ea80ed4a3e3d1139d4ab4015c3
+ 00:06:26 up 153 days, 10:48,  0 users,  load average: 0.72, 0.93, 1.14
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+t14 order: default
+compile caches (shared): inductor /mnt/homes/zwingel/fastmace-2-T14/cache-cold-02/inductor, triton /mnt/homes/zwingel/fastmace-2-T14/cache-cold-02/triton
+rootdir: /mnt/homes/zwingel/fastmace-2-T14/src
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+created: 8/8 workers
+INTERNALERROR> Traceback (most recent call last):
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/_pytest/main.py", line 328, in wrap_session
+INTERNALERROR>     config.hook.pytest_sessionstart(session=session)
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/pluggy/_caller.py", line 197, in __call__
+INTERNALERROR>     return self._hookexec(
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/pluggy/_manager.py", line 183, in _hookexec
+INTERNALERROR>     return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/pluggy/_execution.py", line 195, in _multicall
+INTERNALERROR>     raise exception
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/pluggy/_execution.py", line 167, in _multicall
+INTERNALERROR>     teardown.throw(exception)
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/_pytest/logging.py", line 795, in pytest_sessionstart
+INTERNALERROR>     return (yield)
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/pluggy/_execution.py", line 147, in _multicall
+INTERNALERROR>     res = hook_impl.function(*args)
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/xdist/dsession.py", line 90, in pytest_sessionstart
+INTERNALERROR>     nodes = self.nodemanager.setup_nodes(putevent=self.queue.put)
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/xdist/workermanage.py", line 97, in setup_nodes
+INTERNALERROR>     return [self.setup_node(spec, putevent) for spec in self.specs]
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/xdist/workermanage.py", line 97, in <listcomp>
+INTERNALERROR>     return [self.setup_node(spec, putevent) for spec in self.specs]
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/xdist/workermanage.py", line 112, in setup_node
+INTERNALERROR>     node.setup()
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/xdist/workermanage.py", line 340, in setup
+INTERNALERROR>     basetemp = self.config._tmp_path_factory.getbasetemp()
+INTERNALERROR>   File "/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/_pytest/tmpdir.py", line 158, in getbasetemp
+INTERNALERROR>     basetemp.mkdir(mode=0o700)
+INTERNALERROR>   File "/usr/lib/python3.10/pathlib.py", line 1175, in mkdir
+INTERNALERROR>     self._accessor.mkdir(self, mode)
+INTERNALERROR> FileNotFoundError: [Errno 2] No such file or directory: '/mnt/homes/zwingel/fastmace-2-T14/basetemp/run-02'
+exit 3 end 2026-10-20T00:06:27+02:00 seconds 1
+ 00:06:27 up 153 days, 10:48,  0 users,  load average: 0.72, 0.93, 1.14
