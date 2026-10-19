@@ -11,6 +11,9 @@ of the switch map (from the backend, the execution tier and the model's ``rewrit
 and records a reason. ``"on"`` asks for the option and is refused, with a reason, when the
 model or the plan cannot take it; ``"off"`` disables it.
 
+Phase 2 (plan task 2-T01) adds the records of the safety layer: ``FallbackConfig`` (§9.4),
+``GateConfig`` (§12.3 "Resources") and ``RunnerConfig`` (§8.7), and the ``Mode`` of the planner.
+
 This module holds no state: no caches, no registries, no switches.
 """
 
@@ -18,11 +21,15 @@ from __future__ import annotations
 
 import dataclasses
 import math
+import sys
 import typing
 from dataclasses import dataclass
 from typing import Literal
 
 Toggle = Literal["on", "off", "auto"]
+# Execution modes, the tiers of SPEC §8 (§9.3 "execution mode"): the planner's ``mode=``.
+Mode = Literal["graph", "compiled", "eager", "reference"]
+MODES = typing.get_args(Mode)
 
 
 def _check_choices(instance):
@@ -97,6 +104,10 @@ class RewriteConfig:
     single_graph_strain: Toggle = "auto"
     # PolarMACE: reassociated SparseUvuTensorProduct, MACE PR 1711 (polar_gpu.REASSOCIATE_UVU).
     polar_uvu: bool = True
+    # Self-check results cached by checkpoint, sources, rewrite set, versions and device kind (2-T19):
+    # "use" reads and writes the cache, "off" neither, "refresh" runs every check and rewrites it.
+    # No effect until 2-T19.
+    selfcheck_cache: Literal["use", "off", "refresh"] = "use"
 
     def __post_init__(self):
         _check_choices(self)
@@ -135,6 +146,9 @@ class EngineConfig:
     empty_cache_before_capture: bool = True
     # Eager warm-ups after the first capture run inside the graph pool.
     warmup_in_graph_pool: bool = True
+    # Evaluation plans compile with the edge dimension dynamic from the first call, so a changed edge
+    # count does not recompile (2-T13). No effect until 2-T13.
+    dynamic_edges: bool = False
 
     def __post_init__(self):
         _check_choices(self)
@@ -281,6 +295,94 @@ class IntegratorConfig:
     def effective_external_stress_GPa(self) -> float | tuple[float, ...]:
         """The external stress in GPa, ASE sign: ``external_stress_GPa``, else ``-pressure_GPa``."""
         return -self.pressure_GPa if self.external_stress_GPa is None else self.external_stress_GPa
+
+
+@dataclass(frozen=True)
+class FallbackConfig:
+    """The fallback of SPEC §9.4 on a failing self-check, gate, compile or capture (decision 29).
+
+    No effect on a run where nothing fails.
+    """
+
+    # "auto": diagnose and fall back to a validated slower plan, recorded; "refuse": raise as in 1b,
+    # with the record.
+    fallback: Literal["auto", "refuse"] = "auto"
+    # Reduced-gate runs (one rattled copy, the failing quantity) per fallback; full gate runs are
+    # counted apart, one per candidate to activate (§9.4 step 2).
+    diagnosis_budget: int = 64
+    # The reference tier may end the terminal sequence, if it fits (§9.4 step 5).
+    reference_last: bool = True
+
+    def __post_init__(self):
+        _check_choices(self)
+        _positive(self, "diagnosis_budget")
+        if not isinstance(self.diagnosis_budget, int):
+            raise ValueError(f"FallbackConfig.diagnosis_budget must be an int, got {self.diagnosis_budget!r}")
+
+
+@dataclass(frozen=True)
+class GateConfig:
+    """Where the gate's references may run (SPEC §12.3 "Resources"): GPU float64 on the production
+    cell, then CPU float64 within a time limit, then a reduced cell. Whether the gate runs is
+    ``check=`` (decision 3), not this record."""
+
+    # CPU float64 is tried after GPU memory runs out only if its estimated time is within this limit, s.
+    # 0 never tries the CPU.
+    cpu_float64_time_limit_s: float = 300.0
+    # "auto": the largest supercell of the same primitive cell smaller than the production cell whose
+    # every height is at least reduced_cell_min_height_cutoffs x the cutoff (2-T05); "off": never.
+    reduced_cell: Literal["auto", "off"] = "auto"
+    # The reduced cell's minimum height in cutoffs; below 1 a periodic image would sit inside the cutoff.
+    reduced_cell_min_height_cutoffs: float = 2.0
+
+    def __post_init__(self):
+        _check_choices(self)
+        _nonnegative(self, "cpu_float64_time_limit_s")
+        _positive(self, "reduced_cell_min_height_cutoffs")
+        if self.reduced_cell_min_height_cutoffs < 1:
+            raise ValueError(f"GateConfig.reduced_cell_min_height_cutoffs must be at least 1, "
+                             f"got {self.reduced_cell_min_height_cutoffs!r}")
+
+
+@dataclass(frozen=True)
+class RunnerConfig:
+    """The subprocess runner of SPEC §8.7: a plan that a process constraint forbids in this process
+    runs in a child, handed over through a restart write (2-T07)."""
+
+    # The child's Python; None: sys.executable when the runner starts (resolved_python()).
+    python: str | None = None
+    # Variables set in the child, over the parent's (a mapping is normalised to sorted pairs).
+    environment: tuple[tuple[str, str], ...] = ()
+    # The child starts from the parent's environment; False: from `environment` alone.
+    inherit_environment: bool = True
+    # Total limit of one child run, s; None: none.
+    timeout_s: float | None = None
+    # A child without progress (no committed step) for this long is killed, s.
+    stall_timeout_s: float = 1800.0
+
+    def __post_init__(self):
+        _check_choices(self)
+        if self.python is not None and (not isinstance(self.python, str) or not self.python):
+            raise ValueError(f"RunnerConfig.python must be a path or None, got {self.python!r}")
+        environment = self.environment
+        if isinstance(environment, (str, bytes)):
+            raise ValueError(f"RunnerConfig.environment must be a mapping or (name, value) pairs, got {environment!r}")
+        try:
+            pairs = tuple(sorted((environment.items() if hasattr(environment, "items") else environment)))
+        except (TypeError, ValueError):
+            raise ValueError(f"RunnerConfig.environment must be a mapping or (name, value) pairs, "
+                             f"got {environment!r}") from None
+        for pair in pairs:
+            if len(pair) != 2 or not isinstance(pair[0], str) or not pair[0] or not isinstance(pair[1], str):
+                raise ValueError(f"RunnerConfig.environment: names and values must be strings, got {pair!r}")
+        object.__setattr__(self, "environment", tuple((name, value) for name, value in pairs))
+        if self.timeout_s is not None:
+            _positive(self, "timeout_s")
+        _positive(self, "stall_timeout_s")
+
+    def resolved_python(self) -> str:
+        """The child's interpreter: ``python``, else this process's ``sys.executable``."""
+        return self.python if self.python is not None else sys.executable
 
 
 def external_stress(value, name="external_stress_GPa"):

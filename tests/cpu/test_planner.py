@@ -287,7 +287,9 @@ def _auto_rules():
     spec = importlib.util.spec_from_file_location("_planner_test_config", Path(__file__).parent / "test_config.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.AUTO_RULES
+    # The plan's config parts; FallbackConfig and GateConfig (2-T01) are not resolved into a plan.
+    parts = ("RewriteConfig", "EngineConfig", "PrecisionConfig", "NeighbourConfig", "PolarConfig", "IntegratorConfig")
+    return {field: rule for field, rule in module.AUTO_RULES.items() if field.split(".")[0] in parts}
 
 
 def test_every_auto_rule_is_implemented():

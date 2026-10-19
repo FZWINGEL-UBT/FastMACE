@@ -28,6 +28,9 @@ CLASSES = (
     config.NeighbourConfig,
     config.PolarConfig,
     config.IntegratorConfig,
+    config.FallbackConfig,
+    config.GateConfig,
+    config.RunnerConfig,
 )
 
 # Every field that can be "auto", with the named rule that resolves it. 1a-T15 implements
@@ -58,6 +61,8 @@ AUTO_RULES = {
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
+    "GateConfig.reduced_cell": "largest_smaller_supercell_at_least_min_height",
+    "FallbackConfig.fallback": "fallback_search_on_failure",
 }
 
 # Research-engine switches that SPEC §6.2 or the research engine's own records reject;
