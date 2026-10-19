@@ -8,7 +8,7 @@ A tiny MH-1-like model (``_support.tiny_models``, r_max 4 Angstrom) on NaCl 2x2x
   fresh Inductor cache, with a foreign capture-safe ``mask_head`` installed as the research engine does.
   Plain cuEq only: a tiny hybrid version costs another 50 s, and the MH-1 hybrid test stays in the full tier;
 - a planned engine equals a hand-built one
-  (``test_planner_gpu.py::test_mh1_plain_cueq_float64_planned_equals_hand_built``): ``FixedPlanner``
+  (``test_planner_gpu.py::test_mh1_plain_cueq_float64_planned_equals_hand_built_and_minimal``): ``FixedPlanner``
   with main.py's ``--backend cueq`` defaults against an engine assembled by hand with 1a-T13's
   settings, float64, within 1e-12 Angstrom, with the same edge sizes and rebuilds.
 

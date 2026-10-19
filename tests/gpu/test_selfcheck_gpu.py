@@ -144,8 +144,10 @@ def _report(name, out):
     print(json.dumps({"case": name, **out}))
 
 
+# OMOL-0 XL (147 s) checks a further model at acceptance (1b-T27); the gate itself stays in the full tier.
 @pytest.mark.slow
-@pytest.mark.parametrize("name", list(CASES))
+@pytest.mark.parametrize("name", [pytest.param(name, marks=pytest.mark.acceptance if name == "omol0-xl" else ())
+                                  for name in CASES])
 def test_gate_passes_in_graph_mode(name):
     spec = CASES[name]
     if not _available(spec["label"]):
@@ -180,6 +182,7 @@ def test_a_broken_captured_graph_fails_while_eager_passes():
 
 
 @pytest.mark.slow
+@pytest.mark.acceptance
 @pytest.mark.skipif(not _available("mh1-r2scan"), reason="needs MH-1 in FASTMACE_MODELS")
 def test_gate_time_on_nbcl5():
     out = run_gate(dict(label="mh1-r2scan", structure="nbcl5", repeat=2))
