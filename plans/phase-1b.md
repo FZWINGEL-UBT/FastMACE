@@ -1467,6 +1467,20 @@ points here.
    checked at 2×2×2, where the float64 sum is within 0.0014 meV/atom. Step
    time is unchanged (NaCl MH-1 hybrid, 1.003). ResearchModule's
    `main.py --engine fastmace` energies move by these amounts.
+5. **POLAR-1-S NPT fails the in-library gate on stress, at the floor
+   (1b-T23).** NaCl: the production stress error is 1.18e-7 eV/Å³, the
+   float32 yardstick's 3.89e-8, so the limit is the 1e-7 floor (owner
+   decision 7). The NVT half passes. The external 19-label driver passes the
+   same model at ratio 1.57 with 3 configurations per cell mode. The
+   production error matches 1a's production-versus-finite-difference value.
+   Options: keep the floor (the gate refuses PolarMACE NPT, which is
+   experimental anyway); raise the stress floor for polar models; or use
+   more copies in the gate. Not changed by the conductor.
+6. **NaCl timing, 1b against 1a (1b-T23):** 0.5 % faster on murphy and
+   0.3 % slower on the RTX 5060 Ti, consistently within each machine, so
+   outside the 0.16 % noise floor in both directions. NbCl5 is within
+   noise on both. Most likely not a 1b regression; the verdict is the
+   owner's.
 
 ## 1a items deferred to 1b
 
