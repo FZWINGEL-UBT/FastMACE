@@ -1538,6 +1538,14 @@ below is kept as the record.
   second editor of `provenance.py` and `simulation.py` for this only. Short
   local GPU A/B.
 
+- **1b-T28 merged:** `Simulation` from the `/mnt/d` checkout went from
+  20.76 to 3.649 ms/step (RTX 5060 Ti, 300-step blocks). The software block
+  is built once per process; the git commit is read from `.git` files or
+  `.source_commit`; the dirtiness check runs once, with a timeout, and
+  records `"unknown"` when git refuses (no `safe.directory` override in the
+  library). The trial passed on murphy (2145). The local `fastmace_cpu`
+  suite was not run at this merge because 1b-T27 was timing locally; it
+  runs at the next merge.
 - **Finding from 1b-T27:** a stale torch-extension build lock
   (`~/.cache/torch_extensions/py310_cu130/libtorch_tp_jit/lock`, left by a
   killed OEq JIT build on 8 October) made every local process that imports

@@ -27,7 +27,8 @@ and wait for the conductor's go message (`CONDUCTOR.md`, "Prestarted phase
 workers"). No "start all ready" is needed in phase 1b.
 
 - Merged: 1b-T01, T02, T03, T05, T04, T06, T06b, T07, T08, T08b, T08c, T09, T10, T11, T12, T13, T14, T15, T16 to T22, T23 tools, T24 to T26 (19 October 2026).
-- Working: 1b-T27 (GPU acceptance tier), 1b-T28 (software block once per process). Owner checkpoint decided (SPEC §18 decisions 22–28).
+- Merged since: 1b-T28 (software block once per process).
+- Working: 1b-T27 (GPU acceptance tier). Owner checkpoint decided (SPEC §18 decisions 22–28).
 - Waiting for go: none. Answers to their prestart
   reports, and three items for the owner's review, are in `phase-1b.md`,
   "Conductor answers to the prestart reports".
