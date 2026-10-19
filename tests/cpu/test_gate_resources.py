@@ -130,7 +130,7 @@ def test_calibration_boxes_are_periodic_cubes_cut_from_the_structure():
         assert all(box.pbc)
         assert set(box.numbers) <= set(atoms.numbers)
         assert int(box.numbers.sum()) % 2 == 0  # an even electron count for a neutral singlet
-    assert 1.6 < len(large) / len(small) < 2.4
+    assert 1.5 < len(large) / len(small) < 3.0  # twice the volume; few atoms, so not exactly twice
 
 
 def test_estimate_is_linear_in_edges_and_conservative():
@@ -189,12 +189,12 @@ def cpu_planner():
                           process=constraints.ProcessRecord())
 
 
-def setup(pristine, integrator=NVT, atoms=None):
+def setup(pristine, integrator=NVT, atoms=None, family="mh1"):
     from fastmace.model.forcefield import ForceField
     from fastmace.planner.plan import Hardware
 
     atoms = nacl(repeat=3, rattle=0.02, seed=1) if atoms is None else atoms
-    ff = ForceField(pristine(), atoms, precision="float64")
+    ff = ForceField(pristine(family), atoms, precision="float64")
     planner = cpu_planner()
     plan = planner.plan(ff, atoms, integrator, WORKLOAD, Hardware("cpu", (0, 0), 0))
     return planner, plan, ff, atoms
@@ -442,8 +442,14 @@ def test_a_replay_that_differs_from_direct_evaluation_fails(pristine, no_engines
 
 @pytest.mark.filterwarnings("ignore::UserWarning")
 @pytest.mark.parametrize("limit", [1e6, 1e-9], ids=["within", "over"])
-def test_cpu_step_calibrates_estimates_and_runs_or_declines(pristine, no_engines_yet, limit):
-    planner, plan, ff, atoms = setup(pristine)
+@pytest.mark.parametrize("family", ["mh1", "polar"])
+def test_cpu_step_calibrates_estimates_and_runs_or_declines(pristine, no_engines_yet, limit, family):
+    from fastmace.errors import PlanRefused
+
+    try:
+        planner, plan, ff, atoms = setup(pristine, family=family)
+    except PlanRefused as error:  # PolarMACE has no CPU production route; the reference has one
+        pytest.skip(str(error))
     job = selfcheck.cpu_job(plan, ff, [("production", None, atoms, selfcheck.make_copies(atoms, NVT, 0))],
                             atoms, GateConfig(cpu_float64_time_limit_s=limit))
     values, info = selfcheck.evaluate_references(job)

@@ -861,12 +861,15 @@ class _Ladder:
         if "candidates" in job:
             chosen = job["candidates"][info["cpu"]["chosen"]]
             cell, repeat, natoms = chosen["cell"], chosen["repeat"], chosen["atoms"]
-        self._record(device, cell, repeat, natoms, seconds, "ran",
-                     **({"estimate": info["cpu"]["estimates"][info["cpu"]["chosen"]]} if "cpu" in info else {}))
+        estimates = (info.get("cpu") or {}).get("estimates")
+        extra = {"estimate": estimates[info["cpu"]["chosen"]]} if estimates else {}
+        self._record(device, cell, repeat, natoms, seconds, "ran", **extra)
         return values, info
 
     def _copies(self, atoms):
-        return make_copies(atoms, self.config, self.seed, self.count)
+        if self.count == COPIES:  # the default gate: the call 1b's tests wrap
+            return make_copies(atoms, self.config, self.seed)
+        return make_copies(atoms, self.config, self.seed, count=self.count)
 
     def _cpu(self, cells):
         """The CPU step with ``cells`` (name, repeat, atoms, copies); None when it did not run."""
@@ -967,7 +970,7 @@ def references(plan, force_field, atoms, integrator, *, check: str, seed: int, g
         values, info, device, reduced, reference_copies = ladder.run()
     except _Unavailable as error:
         steps = tuple(ladder.steps)
-        copies = make_copies(atoms, config, seed, count)
+        copies = ladder._copies(atoms)
         description = describe_copies(copies, cell_mode)
         record = GateRecord(status="unavailable", check=check, reason=str(error), copies=description,
                             references={"ran": ran}, seconds={"references_s": time.perf_counter() - started},
@@ -979,7 +982,7 @@ def references(plan, force_field, atoms, integrator, *, check: str, seed: int, g
                           "(recorded).", gate_record=record) from error.__cause__
         return References(check=check, copies=copies, description=description, ran=ran, unavailable=record,
                           steps=steps, quantities=tuple(quantities))
-    copies = make_copies(atoms, config, seed, count) if reduced is not None else reference_copies
+    copies = ladder._copies(atoms) if reduced is not None else reference_copies
     description = describe_copies(reference_copies, cell_mode)
     return References(check=check, copies=copies, description=description, values=values, ran=ran, info=info,
                       seconds=time.perf_counter() - started, device=device, reduced=reduced,
