@@ -1,12 +1,17 @@
-"""Shared fixtures and GPU skipping for the whole suite.
+"""Shared fixtures, GPU skipping and the run's compiler caches for the whole suite.
 
 Tests import helpers as ``from _support import ...``: pytest puts this directory on
 ``sys.path`` because it holds the root conftest and is not a package.
+
+Test tiers (plan task 1b-T24, ``docs/development.md``): ``pytest tests/gpu -m "not slow"``
+is the worker tier, the full ``pytest tests/gpu`` the merge and acceptance tier.
 """
 
 import fastmace  # noqa: F401  (before torch: it switches PyTorch's file locks, SPEC §14)
 
 # isort: split
+import os
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -18,6 +23,46 @@ SEED = 0
 _GPU_DIR = Path(__file__).resolve().parent / "gpu"
 
 _NO_CUDA = "CUDA is not available (torch.cuda.is_available() is False); GPU test skipped"
+
+_COMPILE_CACHE_KEY = pytest.StashKey[str]()
+
+
+def pytest_addoption(parser):
+    parser.addoption("--fresh-compile-cache", action="store_true", default=False,
+                     help="compile from scratch: a new Inductor/Triton cache for this run "
+                          "(default: the FastMACE cache root's, shared by all runs)")
+
+
+def pytest_configure(config):
+    """One Inductor/Triton cache root for the whole run, inherited by every child process (1b-T24).
+
+    The default is the FastMACE cache root's (``fastmace.kernels.triton.cache``, under
+    ``FASTMACE_CACHE``), which production runs use too; a ``TORCHINDUCTOR_CACHE_DIR`` set by the
+    caller is kept. ``--fresh-compile-cache`` gives the run a new empty root. Tests that need a cold
+    cache of their own (the edge-bucket regression tests) still set one explicitly. Without this,
+    torch puts its caches in /tmp, which the workstations forbid.
+    """
+    if hasattr(config, "workerinput"):  # an xdist worker inherits the controller's variables
+        return
+    from fastmace import _cache
+    from fastmace.kernels.triton import cache
+
+    if config.getoption("fresh_compile_cache"):
+        runs = _cache.cache_root() / "test-runs"
+        runs.mkdir(parents=True, exist_ok=True)
+        info = cache.configure(tempfile.mkdtemp(prefix="compile-", dir=runs))
+        kind = "fresh"
+    elif os.environ.get("TORCHINDUCTOR_CACHE_DIR"):
+        info, kind = {"inductor": os.environ["TORCHINDUCTOR_CACHE_DIR"],
+                      "triton": os.environ.get("TRITON_CACHE_DIR", "(torch default)")}, "caller's"
+    else:
+        info, kind = cache.configure(), "shared"
+    config.stash[_COMPILE_CACHE_KEY] = f"compile caches ({kind}): inductor {info['inductor']}, triton {info['triton']}"
+
+
+def pytest_report_header(config):
+    line = config.stash.get(_COMPILE_CACHE_KEY, None)
+    return [line] if line else []
 
 
 def pytest_collection_modifyitems(config, items):

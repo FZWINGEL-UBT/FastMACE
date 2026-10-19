@@ -40,6 +40,62 @@ CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environmen
 Never install FastMACE into the GPU environments; GPU runs use
 `PYTHONPATH=<checkout>` with the environment's Python (AGENTS.md).
 
+## Test tiers
+
+Plan task 1b-T24 (19 October 2026). The GPU suite has two tiers:
+
+| Tier | Command | Who runs it, when | Local RTX 5060 Ti, warm caches |
+| --- | --- | --- | ---: |
+| fast (worker) | `pytest tests/gpu -m "not slow"` | every worker, for every change, as often as needed | 3.4 min (178 tests) |
+| full (merge, acceptance) | `pytest tests/gpu` | the conductor, at merges that touch `model/`, `rewrites/`, `kernels/` or `engine/`, and acceptance runs | 28.7 min (223 tests) |
+
+The first run after a change of environment, or with emptied caches, is slower
+(5.7 and 34.8 min), because it compiles everything and builds the OEq extension
+once. Measurements: [validation/1b-T24-test-suite-speed.md](validation/1b-T24-test-suite-speed.md).
+
+The CPU suite (`tests/cpu`) has no tiers: everyone runs all of it.
+
+A test is marked `@pytest.mark.slow` when it needs one of these:
+
+- a real checkpoint (MH-1, MP-0, OFF, POLAR-1-S), whose load and compile take tens of seconds;
+- the research engine (`FASTMACE_BASELINE`) in its own process;
+- a long trajectory (hundreds of steps);
+- a cold compiler cache (the edge-bucket regression tests).
+
+Every behaviour tested on the GPU keeps at least one test in the fast tier, usually on a
+tiny model or the Lennard-Jones force field in the pytest process. When you add a GPU test
+that is slow for one of these reasons, mark it `slow` and check that a fast test still
+covers the behaviour.
+
+GPU command for workers on the local PC (one process; `FASTMACE_HYBRID_PYTHON` runs the
+hybrid tests in the OEq environment). `TORCHINDUCTOR_COMPILE_THREADS=4` keeps Inductor from
+starting 24 compile workers per process. Without it, WSL's 15 GB ran out on
+19 October 2026 while other sessions ran CPU suites, and the WSL VM restarted:
+
+```bash
+TORCHINDUCTOR_COMPILE_THREADS=4 FASTMACE_HYBRID_PYTHON=~/environments/mace_cueq_oeq/bin/python FASTMACE_MODELS=~/models FASTMACE_BASELINE=~/fastmace-baseline/1a-T18 PYTHONPATH=$PWD PYTHONDONTWRITEBYTECODE=1 ~/environments/mace_cueq_latest/bin/python -m pytest -m "not slow" tests/gpu
+```
+
+Two behaviours are tested only in the full tier, because no tiny-model test of
+them exists yet: no compile at a later edge bucket
+(`test_no_compile_at_a_later_edge_bucket_*`) and a planned engine equal to a
+hand-built one on the GPU (`test_mh1_*_planned_equals_hand_built`; the CPU suite
+has the tiny-model version).
+
+### Caches the suite shares
+
+- **Compiler caches.** `tests/conftest.py` gives the whole run one Inductor/Triton cache,
+  inherited by every child process: the FastMACE cache root's (`FASTMACE_CACHE`, else
+  `~/.cache/fastmace`, as production runs), unless `TORCHINDUCTOR_CACHE_DIR` is already
+  set. `pytest --fresh-compile-cache` compiles everything from scratch in a new directory
+  under `<cache root>/test-runs/`. The pytest header names the caches. Tests that need a
+  cold cache set their own, explicitly.
+- **OEq host extension.** `fastmace.kernels._oeq_runtime` builds OpenEquivariance's host
+  extension once per build identity (Python and environment, torch, OpenEquivariance, the
+  CUDA runtime wheel, the compiler) in `<cache root>/oeq/extensions/<key>/` and copies it
+  into each process's own extension directory. Only the first process after a change of
+  environment builds it. Delete that directory to force a rebuild.
+
 ## Bitwise equality in CPU float64 tests
 
 Found in task 0-T04 (17 October 2026, `fastmace_cpu`, torch 2.14.1+cpu,

@@ -137,6 +137,7 @@ def expected_records(label, backend):
     return names
 
 
+@pytest.mark.slow
 @needs_mh1
 @needs_models
 @pytest.mark.parametrize("label", [MP0, OFF])
@@ -163,6 +164,7 @@ def test_stacked_generic_rewrites_plain_cueq_float64(label):
         assert "RealAgnosticInteractionBlock" in result["reasons"]["generic_reassociate"]
 
 
+@pytest.mark.slow
 @needs_mh1
 @needs_models
 @needs_oeq

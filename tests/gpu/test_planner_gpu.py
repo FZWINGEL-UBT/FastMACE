@@ -108,6 +108,7 @@ def direct_run(planned, python):
     return ENGINE.fastmace_run(spec, python=python)["modes"]["pipelined"]
 
 
+@pytest.mark.slow
 @needs_mh1
 def test_mh1_plain_cueq_float64_planned_equals_hand_built():
     planned = planner_run("cueq", sys.executable)
@@ -130,6 +131,7 @@ def test_mh1_plain_cueq_float64_planned_equals_hand_built():
     assert planned["ms_per_step"] < 1.25 * direct["ms_per_step"], summary["ms_per_step"]
 
 
+@pytest.mark.slow
 @ENGINE.needs_oeq
 @needs_mh1
 def test_mh1_hybrid_float32_planned_equals_hand_built():
