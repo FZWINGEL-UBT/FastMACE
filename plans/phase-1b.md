@@ -1375,6 +1375,18 @@ points here.
   or `model/compile.py`; it is phase 2 planner work unless 1b-T23 shows it
   matters for acceptance.
 
+### After T14 (19 October 2026)
+
+- Canonical restart: plain cuEq float64 resumes to 3.7e-13 Å (MH-1 NaCl
+  3×3×3, 500 steps, resumed every 100). The hybrid is statistical: resumed
+  minus uninterrupted is about 1e-5 K and 1e-5 meV/atom, against 2.7 K and
+  0.48 meV/atom between seeds (RTX 5060 Ti).
+- Conductor decisions: T14's narrow `reset_polar` edit in `model/forces.py`
+  is accepted. `canonicalise()` clears the sticky polar overflow flag at a
+  canonical point and records the step; it does not refuse the restart.
+- Not covered: compiled PolarMACE NPT on the GPU, which may recompile if
+  its k-vector set changes shape at a restart. That is for 1b-T23.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
