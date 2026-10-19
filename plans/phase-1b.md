@@ -1338,6 +1338,17 @@ points here.
    recorded warning.
 3. Public `fm.load` returns a pristine model, and the planner chooses the
    backend.
+4. **D2 measured (1b-T03, merged 19 October 2026).** MH-1 r²SCAN's
+   production energy changes by 0.12 meV/atom on NbCl5 3×3×3 (0.236 eV in
+   total), and by 0.005 meV/atom on NaCl. D2 expected about 0.01 meV/atom.
+   The change is the removed float32 summation error: against the float64
+   reference, the float64 sum is off by 0.00014 meV/atom, the 1a sum by
+   0.122. On NbCl5 3×3×3 the POLAR-1-S and OMOL-0 XL sums differ by 83 and
+   154 meV/atom; OMOL's is above the 45–102 quoted in SPEC draft 0.3. The
+   float64 references of both run out of memory at 3×3×3, so they were
+   checked at 2×2×2, where the float64 sum is within 0.0014 meV/atom. Step
+   time is unchanged (NaCl MH-1 hybrid, 1.003). ResearchModule's
+   `main.py --engine fastmace` energies move by these amounts.
 
 ## 1a items deferred to 1b
 
