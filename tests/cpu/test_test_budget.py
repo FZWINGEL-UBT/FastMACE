@@ -59,24 +59,37 @@ def test_violations_per_tier():
     times = {"tests/gpu/test_a.py::test_fast_ok": 12.0, "tests/gpu/test_a.py::test_fast_slow[x]": 75.5,
              "tests/gpu/test_b.py::test_full_ok": 110.0, "tests/gpu/test_b.py::test_full_long": 300.0,
              "tests/gpu/test_b.py::test_allowed[p]": 400.0, "tests/gpu/test_c.py::test_acceptance": 4000.0}
-    allowed = {"tests/gpu/test_b.py::test_allowed": "a reason"}
+    allowed = {"tests/gpu/test_b.py::test_allowed": (350.0, "a reason")}
     found = budget.violations(times, set(FAST), set(FULL), allowed=allowed)
     assert len(found) == 2
     assert "full tier, over 120 s: tests/gpu/test_b.py::test_full_long" in found[0]
     assert "fast tier, over 60 s: tests/gpu/test_a.py::test_fast_slow[x]" in found[1]
+    # An allowlisted test may grow to 1.5 times its recorded time, no further.
+    times["tests/gpu/test_b.py::test_allowed[p]"] = 530.0
+    found = budget.violations(times, set(FAST), set(FULL), allowed=allowed)
+    assert len(found) == 3 and "allowlisted at 350 s, grew over 1.5x: tests/gpu/test_b.py::test_allowed[p]" in found[0]
 
 
-def test_the_allowlist_names_existing_tests_with_reasons():
-    for key, reason in budget.FULL_TIER_ALLOWED.items():
+def test_tier_totals_warn_over_budget():
+    times = {"tests/gpu/test_a.py::test_fast_ok": 400.0, "tests/gpu/test_a.py::test_fast_slow[x]": 300.0,
+             "tests/gpu/test_b.py::test_full_ok": 600.0, "tests/gpu/test_c.py::test_acceptance": 9000.0}
+    fast, full = budget.totals(times, set(FAST), set(FULL))
+    assert fast.startswith("fast tier: 11.7 min over 2 measured tests, budget 10 min: WARNING: over budget")
+    assert full.startswith("full tier: 21.7 min over 3 measured tests, budget 40 min: within budget")
+
+
+def test_the_allowlist_names_existing_tests_with_times_and_reasons():
+    for key, (seconds, reason) in budget.FULL_TIER_ALLOWED.items():
         path, function = key.split("::")
         assert function in (REPOSITORY_ROOT / path).read_text(encoding="utf-8"), key
-        assert reason
+        assert seconds > 0 and reason
 
 
 def test_command_line_exit_status(tmp_path):
     tool = [sys.executable, str(REPOSITORY_ROOT / "tools" / "test_budget.py")]
     over = subprocess.run([*tool, *files(tmp_path)], capture_output=True, text=True, check=False)
     assert over.returncode == 1, over.stdout + over.stderr
+    assert over.stdout.startswith("fast tier: ")  # the totals come first
     assert "test_full_long" in over.stdout and "test_fast_slow[x]" in over.stdout
     assert "test_acceptance" not in over.stdout and "test_allowed" in over.stdout  # not in FULL_TIER_ALLOWED
     within = subprocess.run([*tool, *files(tmp_path), "--fast-limit", "100", "--full-limit", "500"],

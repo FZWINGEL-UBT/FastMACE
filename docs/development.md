@@ -84,10 +84,13 @@ tiny model or the Lennard-Jones force field in the pytest process, except those 
 below. When you add a GPU test that is slow for one of these reasons, mark it `slow` and
 check that a fast test still covers the behaviour. If none can, add the behaviour to that list.
 
-**Per-test budgets.** `tools/test_budget.py` reads junit files (`pytest --junitxml`) and the
-tiers (by collecting `tests/gpu`), and exits 1 if a fast-tier test takes over 60 s or a full-tier
-test over 120 s, unless `FULL_TIER_ALLOWED` in the tool names it with a reason. Run it on the
-junit of a tier run before you merge new GPU tests:
+**Budgets.** `tools/test_budget.py` reads junit files (`pytest --junitxml`) and the tiers (by
+collecting `tests/gpu`). It prints each tier's total against its budget first (fast 10 min, full
+40 min, local RTX 5060 Ti with warm caches; over budget is a warning). It exits 1 if a fast-tier
+test takes over 60 s, or a full-tier test over 120 s. The exception is a test that
+`FULL_TIER_ALLOWED` in the tool lists with its measured time and a reason; such a test fails only
+when it takes more than 1.5 times its recorded time. Run the tool on the junit of a tier run before
+you merge new GPU tests:
 
 ```bash
 python tools/test_budget.py results/<run>/junit.xml
