@@ -532,5 +532,6 @@ def test_compile_checks_args_and_suite():
     jobs = suites.compile_checks_jobs(suites.MACHINES["murphy"], Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
     environments = {job.name: Path(job.argv[0]).parts[-3] for job in jobs}
     assert environments == {"compile-polar1s-npt-restart": "mace_cueq_oeq", "compile-fm-calc-hybrid": "mace_cueq_oeq",
+                            "setup-mace-imported-first": "mace_cueq_oeq",
                             "compile-fm-calc-cueq": "mace_cueq_latest"}
-    assert all(job.argv[2] in ("polar-npt", "calc") for job in jobs)
+    assert all(job.argv[2] in ("polar-npt", "calc", "mace-first") for job in jobs)

@@ -519,7 +519,8 @@ def compile_checks_jobs(machine: Machine, run_root: Path) -> list:
     for name, environment, argv in (
             ("compile-polar1s-npt-restart", "mace_cueq_oeq", ["polar-npt", "--model", "polar1-s"]),
             ("compile-fm-calc-hybrid", "mace_cueq_oeq", ["calc", "--model", PRIMARY_MODEL]),
-            ("compile-fm-calc-cueq", "mace_cueq_latest", ["calc", "--model", PRIMARY_MODEL])):
+            ("compile-fm-calc-cueq", "mace_cueq_latest", ["calc", "--model", PRIMARY_MODEL]),
+            ("setup-mace-imported-first", "mace_cueq_oeq", ["mace-first", "--model", PRIMARY_MODEL])):
         output = check_location(machine, run_root / name)
         jobs.append(Job(name=name, argv=(machine.python(environment), _tool(machine, "compile_checks.py"), *argv[:1],
                                          "--output", str(output), *argv[1:]), output=str(output), timing=True))
