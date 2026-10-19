@@ -304,8 +304,10 @@ def test_an_unqualified_forward_is_refused(monkeypatch):
     monkeypatch.setitem(energy.SOURCE_HASHES, "mace.modules.models:ScaleShiftMACE.forward", "0" * 64)
     monkeypatch.setattr(energy, "_FORWARDS", {})
     with pytest.raises(energy.EnergyReductionError, match="ScaleShiftMACE.forward"):
-        field(calculator(model), atoms)
-    field(calculator(model), atoms, float64_energy=False)  # 1a's energy needs no rewritten source
+        field(calculator(model, "float32"), atoms)
+    field(calculator(model, "float32"), atoms, float64_energy=False)  # 1a's energy needs no rewritten source
+    # A float64 model sums in float64 itself (2-T04: the planner promotes to it).
+    assert field(calculator(model), atoms).energy_treatment == "native"
 
 
 def test_edits_must_match_exactly_once():

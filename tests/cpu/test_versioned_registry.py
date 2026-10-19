@@ -372,3 +372,41 @@ def test_content_digest_ignores_only_the_version():
     assert moved.content_digest() == record.content_digest() and moved.id != record.id
     changed = dataclasses.replace(record, numerical=())
     assert changed.content_digest() != record.content_digest()
+
+
+# --------------------------------------------------------------------------- the force field's energy treatment
+
+
+def test_native_float64_energy_is_mace_own(monkeypatch):
+    import copy
+
+    import numpy as np
+    from mace.calculators import MACECalculator
+
+    from _support.structures import nacl
+    from _support.tiny_models import FAMILIES, tiny_mace_model
+    from fastmace.config import EngineConfig, NeighbourConfig
+    from fastmace.model.forces import MACEForceField
+
+    model = tiny_mace_model([11, 17], **FAMILIES["mh1"])
+    atoms = nacl(repeat=2, rattle=0.1, seed=8)
+
+    def force_field(dtype):
+        calc = MACECalculator(models=[copy.deepcopy(model)], device="cpu", default_dtype=dtype)
+        return MACEForceField(calc, atoms, engine=EngineConfig(compile_mode="none"),
+                              neighbours=NeighbourConfig(skin=0.5, sort_receivers="off", gpu_neighbour_list="off"))
+
+    assert force_field("float64").energy_treatment == "patched"
+    monkeypatch.setattr(energy, "SOURCE_HASHES", {key: WRONG for key in energy.SOURCE_HASHES})
+    monkeypatch.setattr(energy, "_FORWARDS", {})
+    native = force_field("float64")
+    assert native.energy_treatment == "native" and native.info()["energy_treatment"] == "native"
+    stock = atoms.copy()
+    stock.calc = MACECalculator(models=[copy.deepcopy(model)], device="cpu", default_dtype="float64")
+    e, f, _ = native.evaluate(atoms)
+    assert e == pytest.approx(stock.get_potential_energy(), rel=1e-12)  # other edge order: summation order
+    np.testing.assert_allclose(f, stock.get_forces(), rtol=0, atol=1e-10)
+    with pytest.raises(ValueError, match="qualified float64 energy forward"):
+        native.per_atom_energies(atoms)
+    with pytest.raises(energy.EnergyReductionError):
+        force_field("float32")
