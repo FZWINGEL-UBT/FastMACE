@@ -1416,6 +1416,18 @@ points here.
   bucket, and a planned engine equal to a hand-built one. New test files
   only.
 
+### After T20, T25 (19 October 2026)
+
+- T25: two tiny-model fast-tier GPU tests: no compile at a later edge
+  bucket, and planned equals hand-built to 2.2e-15 Å. A fresh process costs
+  about 25 s even with warm caches, so the 20 s target per test is not met.
+- The fast GPU tier had grown to 27 min warm, against T24's 3.4 min,
+  because GPU tests merged after T24 lack the slow mark.
+  **1b-T26 added:** re-tier them (markers and tiny tests only).
+- T21 is the second editor of `simulation.py`, for `Simulation.add_sink`
+  only (approved). It lets the ASE shim write trajectory and log at
+  `loginterval` without ending a `run()` chunk.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
