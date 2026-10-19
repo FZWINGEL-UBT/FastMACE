@@ -1424,6 +1424,11 @@ points here.
 - The fast GPU tier had grown to 27 min warm, against T24's 3.4 min,
   because GPU tests merged after T24 lack the slow mark.
   **1b-T26 added:** re-tier them (markers and tiny tests only).
+- **Flaky test, unidentified:** the T20+T25 trial on murphy had 1 failure in
+  1964 that two reruns did not repeat (both 1964 passed). The conductor's
+  command chain merged anyway, because `| tail` hid pytest's exit status.
+  Since then trial runs use `set -o pipefail` and `-rf`. 1b-T23 watches for
+  a repeat.
 - T21 is the second editor of `simulation.py`, for `Simulation.add_sink`
   only (approved). It lets the ASE shim write trajectory and log at
   `loginterval` without ending a `run()` chunk.
