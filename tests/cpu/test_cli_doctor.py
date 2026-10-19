@@ -6,6 +6,7 @@ import importlib
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -235,6 +236,69 @@ def test_oeq_without_cached_extension(healthy):
     assert "not built yet" in item.detail
 
 
+# 2-T11: stale torch-extension build locks (1b-T27: a killed OEq build cost every MACE-first import 300 s)
+
+def _lock(directory, age):
+    lock = Path(directory) / "lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    lock.write_bytes(b"")
+    then = time.time() - age
+    os.utime(lock, (then, then))
+    return lock
+
+
+@pytest.fixture
+def no_holders(monkeypatch):
+    from fastmace.kernels import _oeq_runtime
+    monkeypatch.setattr(_oeq_runtime, "lock_holders", lambda path: [])
+
+
+def test_oeq_reports_a_stale_lock_in_the_default_torch_root(healthy, no_holders):
+    lock = _lock(Path(healthy["HOME"]) / ".cache" / "torch_extensions" / "py310_cu130" / "libtorch_tp_jit",
+                 8 * 24 * 3600)
+    item = _item("oeq", healthy)
+    assert not item.ok and not item.required
+    assert str(lock) in item.detail and "stale build lock" in item.detail
+    assert f"rm {lock}" in item.fix
+    assert lock.exists()  # doctor changes nothing
+
+
+def test_oeq_reports_stale_locks_under_the_fastmace_cache(healthy, no_holders):
+    oeq = Path(healthy["FASTMACE_CACHE"]) / "oeq"
+    process = _lock(oeq / "torch-extensions-abc" / "libtorch_tp_jit", 2 * 3600)
+    staging = _lock(oeq / "extensions" / ".key-xyz" / "libtorch_tp_jit", 2 * 3600)
+    item = _item("oeq", healthy)
+    assert not item.ok
+    assert str(process) in item.detail and str(staging) in item.detail
+
+
+def test_oeq_honours_torch_extensions_dir(healthy, no_holders, tmp_path):
+    lock = _lock(tmp_path / "ext" / "libtorch_tp_jit", 2 * 3600)
+    item = _item("oeq", {**healthy, "TORCH_EXTENSIONS_DIR": str(tmp_path / "ext")})
+    assert not item.ok and str(lock) in item.detail
+
+
+def test_oeq_ignores_a_young_or_held_lock(healthy, monkeypatch):
+    from fastmace.kernels import _oeq_runtime
+    root = Path(healthy["HOME"]) / ".cache" / "torch_extensions" / "py310_cu130"
+    _lock(root / "young", 60)
+    held = _lock(root / "held", 2 * 3600)
+    monkeypatch.setattr(_oeq_runtime, "lock_holders", lambda path: [77] if path == held else [])
+    item = _item("oeq", healthy)
+    assert item.ok, item
+    assert "stale" not in item.detail
+
+
+def test_oeq_lists_an_old_lock_of_unknown_holder_without_failing(healthy, monkeypatch):
+    from fastmace.kernels import _oeq_runtime
+    lock = _lock(Path(healthy["HOME"]) / ".cache" / "torch_extensions" / "py310_cu130" / "libtorch_tp_jit",
+                 2 * 3600)
+    monkeypatch.setattr(_oeq_runtime, "lock_holders", lambda path: None)
+    item = _item("oeq", healthy)
+    assert item.ok
+    assert str(lock) in item.detail and "holder unknown" in item.detail
+
+
 def test_cache_root_inside_environment(healthy, monkeypatch):
     def refuse(environ=None):
         raise CacheLocationError("cache root /env/cache lies inside the Python environment")
@@ -373,7 +437,8 @@ def test_doctor_writes_no_file(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
     (home / "keep.txt").write_text("x")
-    environ = {**os.environ, "HOME": str(home), "USERPROFILE": str(home), "XDG_CACHE_HOME": str(home / ".cache"),
+    _lock(home / ".cache" / "torch_extensions" / "py310_cu130" / "libtorch_tp_jit", 8 * 24 * 3600)  # 2-T11
+    environ ={**os.environ, "HOME": str(home), "USERPROFILE": str(home), "XDG_CACHE_HOME": str(home / ".cache"),
                "FASTMACE_CACHE": str(tmp_path / "cache"), "PYTHONDONTWRITEBYTECODE": "1",
                "PYTHONPATH": os.pathsep.join([str(REPOSITORY), os.environ.get("PYTHONPATH", "")]),
                "TRITON_CACHE_DIR": str(home / ".triton")}

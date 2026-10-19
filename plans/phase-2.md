@@ -1234,6 +1234,51 @@ notes folder of the conductor's session (`2-T0x-…md`).
     19-label gate after a merge that changed numerics (Q9).
   - Judge each machine against its own noise floor, as decision 27 did (Q10).
 
+### During wave 1 (20 October 2026)
+
+- **2-T11 merged** (trial on murphy: 2167 passed).
+- **1b-T27 held.** Its tier hook raised `UsageError` during collection when
+  acceptance tests were collected without their environment variables. That
+  crashed every xdist worker, and xdist blamed each worker's first test.
+  The fix (c2ac3b8: the check runs in the controller only, and only when
+  `-m` selects acceptance tests) is accepted.
+- **The flaky test, found.** 1b-T27 found an order-dependent failure that
+  `main` has too:
+  - running `test_acceptance_1b.py::test_two_simulation_sides_on_the_cpu`
+    and then `test_forces.py::test_polar_force_field_enables_its_own_copy`
+    in one process makes the polar test fail (5.4e-12 against 1e-12);
+  - the polar patch that stays applied after it then fails three
+    `test_loading` tests in the same worker.
+  2-T14 takes the reproducer and finds the leaked process state: a library
+  fix if a `Simulation` or force field leaks state (an isolation defect), a
+  test fix if the bound wrongly assumes first-in-process rounding. 1b-T27
+  merges after that fix, because with it the `-n 8` suite fails in about 3 of
+  5 runs.
+
+- **Cause of the flaky test (2-T14): a process-state precision defect.**
+  - MACE 0.3.16's `O3_e3nn.clebsch_gordan` builds e3nn's `wigner_3j` in
+    torch's default dtype.
+  - cuEquivariance 0.12 caches the reduced products in
+    `reduced_tensor_product._cache_reduce_basis_product` under a key without
+    that dtype.
+  - So after any float32 conversion in a process, every later float64
+    conversion gets float32-precision symmetric-contraction coefficients:
+    the reduced basis is off by up to 1.3e-8 and the descriptor by 5.8e-9,
+    and the polar force deviation grows from 2.66e-12 to 5.41e-12.
+  - Trigger modules: `test_quick`, `test_cli`, `test_ase_md`,
+    `test_acceptance_1b` and `test_provenance_git`. Production runs and the
+    acceptance gates were protected, because their references run in fresh
+    processes or before production.
+  - Conductor decision: fix A. FastMACE clears that cache before and after
+    every conversion it runs (`model/loading.py`, edited by 2-T14), so each
+    conversion behaves as first-in-process and default trajectories stay
+    bitwise. Fix B (float64 coefficients always) is rejected for phase 2,
+    because it changes float32 plans.
+  - Upstream issues for MACE and cuEquivariance go to phase 6.
+  - A finding for ResearchModule (no action now): any of its validation
+    tools that built float64 references in a process after a float32
+    conversion had float32-precision coefficients.
+
 ## Phase 1b items carried into phase 2
 
 | Item (where found or decided) | Phase 2 task |

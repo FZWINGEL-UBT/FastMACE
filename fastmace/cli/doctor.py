@@ -16,6 +16,8 @@ unavailable, and the run report says which.
   Triton cache directory. A library that is present but does not load (CUDA or
   torch ABI mismatch) therefore shows only at the first model load.
 - The cache root and the models directory are not created.
+- Stale torch-extension build locks are listed with the command that removes
+  them, never removed (2-T11).
 - The process sets ``CUDA_CACHE_DISABLE=1`` before CUDA starts, so the CUDA
   driver writes no JIT cache. The file-lock check reports the driver-cache
   status of a normal run, recorded at ``import fastmace``.
@@ -273,6 +275,29 @@ def _built_extensions(environ):
     return sorted(oeq.glob("torch-extensions-*/**/*.so"), key=lambda path: path.stat().st_mtime, reverse=True)
 
 
+def _lock_roots(environ):
+    """Where torch-extension build locks can lie: torch's default root and FastMACE's OEq cache."""
+    from fastmace.kernels import _oeq_runtime
+    roots = [_oeq_runtime.torch_extensions_root(environ)]
+    try:
+        oeq = _cache.cache_root(environ=environ) / "oeq"
+        roots += [oeq, oeq / _oeq_runtime.EXTENSIONS]
+    except CacheLocationError:
+        pass
+    return roots
+
+
+def _old_build_locks(environ):
+    """Build locks older than the threshold (2-T11): (stale ones, ones whose holder is unknown). Reads only."""
+    from fastmace.kernels import _oeq_runtime
+    old = [lock for lock in _oeq_runtime.build_locks(_lock_roots(environ)) if lock.age > lock.threshold]
+    return [lock for lock in old if lock.stale], [lock for lock in old if lock.holders is None]
+
+
+def _age(seconds):
+    return f"{seconds / 86400:.1f} days" if seconds >= 86400 else f"{seconds / 3600:.1f} h"
+
+
 @_check("OpenEquivariance", required=False)
 def check_oeq(context):
     if not _find_spec("openequivariance"):
@@ -292,6 +317,14 @@ def check_oeq(context):
         lines.append(f"extension built before: {built[0]}")
     else:
         lines.append("extension not built yet: the first hybrid load builds it")
+    stale, unknown = _old_build_locks(context.environ)
+    lines += [f"holder unknown (no readable /proc): build lock {lock.path}, {_age(lock.age)} old" for lock in unknown]
+    if stale:
+        lines += [f"stale build lock: {lock.path}, {_age(lock.age)} old, no process holds it; OpenEquivariance "
+                  "waits 300 s for it in a process that imports MACE first" for lock in stale]
+        return _fail("\n".join(lines), "A killed torch-extension build left it. If no build is running, delete it: "
+                                       + "; ".join(f"rm {lock.path}" for lock in stale)
+                                       + " (doctor changes nothing, so it does not delete it).")
     return _ok("\n".join(lines))
 
 
