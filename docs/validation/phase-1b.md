@@ -13,6 +13,11 @@ Each failure and finding is listed with its numbers. None of them changed librar
 in every run is main `591be54`, and every 1b-T23 commit after it touches `tools/`, `tests/` and
 `docs/` only. The owner decides at checkpoint 3.
 
+**Update, 20 October 2026:** follow-up tasks 1b-T03b, 1b-T21b and 1b-T22b resolved findings 2, 4, 5
+and 6. Two failures remain for the owner: 1c (POLAR-1-S NPT stress at the floor) and 5 (NaCl timing).
+See [Addendum](#addendum-20-october-2026) for the final table. The sections below record the runs of
+19 October as they were.
+
 ## Verdict
 
 | # | Item (plans/phase-1b.md) | Result |
@@ -34,6 +39,59 @@ in every run is main `591be54`, and every 1b-T23 commit after it touches `tools/
 | – | GPU suite, full tier | murphy and RTX 5060 Ti: 176 passed, 0 failed. The 77 tests that first skipped for missing environment variables then ran on murphy: 116 passed, **3 failed** (findings 4, 5) |
 | – | MACE imported first (setup, measured) | 48 s against 34 s for MH-1 NaCl; the ~310 s of 1b-T26 did not appear |
 | – | Flaky test (watch) | no unexplained failure in 4 GPU-suite runs |
+
+## Addendum (20 October 2026)
+
+Three follow-up tasks, merged into main before this addendum (`11596b3`), resolved four of the
+findings below. This addendum ran nothing new; its numbers come from those tasks' records.
+
+- **Findings 4 and 5, the research-engine comparisons in `test_engine_gpu.py`: resolved by 1b-T03b**
+  ([1b-T03-energy.md](1b-T03-energy.md), section "1b-T03b"; murphy).
+  - Kernel lists: the float64 energy reduction is part of the compiled stage B, so Inductor fuses and
+    numbers its kernels differently (same node count). These comparisons now run FastMACE with
+    `float64_energy=False`, as the other research-engine comparisons do. The trajectory limits are
+    unchanged.
+  - Hybrid capture crash: the test's own warm-up check cloned every registered tensor without
+    detaching. One of them is a leaf that requires grad, and its `AccumulateGrad` node stayed on the
+    default stream. The test now detaches; the library's `registry.snapshot()` already did. No
+    library change.
+  - Results: the three tests pass. NVT 2.5e-13 Å after 500 steps, NPT 7.1e-15 Å, hybrid 1.0e-7 Å
+    against a research-engine run-to-run scatter of 8.7e-8 Å.
+- **Finding 2, the ASE shim's cost per `run()` call: resolved by 1b-T21b**
+  ([1b-T21b-ase-shim-overhead.md](1b-T21b-ase-shim-overhead.md)).
+  - Cause: the shim built a second `metadata.json` record at every call, about 0.25 s, almost all of it
+    `provenance.fastmace_block`.
+  - Fix: it now adds its `"ase"` block to the record the `Simulation` has just written.
+  - Ratio to `Simulation` in 300-step calls on the RTX 5060 Ti:
+    - FastMACE source on ext4: 1.015 before, 1.000 after;
+    - checkout on `/mnt/d`: 1.90 before, 0.986 after.
+  - **Open for phase 2:** `Simulation.run` itself rebuilds that provenance record at the end of every
+    call. That costs about 0.13 s per call from a worktree, and about 13 s from the main checkout on
+    `/mnt/d`, where `git_commit` is slow over WSL's file system. `fm.md`, the CLI and the shim pay it
+    too.
+- **Finding 6, the wrong "naive cuEq" warning from `fastmace md`: fixed by 1b-T22b.**
+  - Cause: the planner's rule 6 record used the code `allow-naive-cueq` on every run, and the report
+    read it as a downgrade.
+  - Fix: it now reads `fused-cueq` when the fused kernels load.
+  - Confirmed by a hybrid `fastmace md` run on the RTX 5060 Ti.
+
+**Final table.** The items that passed on 19 October are unchanged.
+
+| # | Item | Final result |
+| --- | --- | --- |
+| 1a, 1b | Gate with energy, 19 labels; energy headline | **pass** |
+| 1c | In-library reduced gate | **fail, open for the owner**: POLAR-1-S NPT, stress 1.18e-7 and 1.20e-7 eV/Å³ against the 1e-7 floor (owner decision 7); the other 37 cases pass |
+| 1d | Gate subset on the RTX 5060 Ti | **pass** (OFF24-M `passed-reduced`) |
+| 2 | Registry and capture state | **pass** |
+| 3 | Restart | **pass** |
+| 4a | `fastmace doctor`, `fastmace md` | **pass** (warning fixed by 1b-T22b) |
+| 4b | Three front ends: plan, gate, step time | **pass** after 1b-T21b (shim / `Simulation` 1.000 on ext4); `Simulation.run`'s per-call provenance is open for phase 2 |
+| 4c | Other §7.7 items | **pass** |
+| 5 | 1b against 1a | NbCl5 **pass**; NaCl **open for the owner**: 1b 0.4–0.6 % faster on murphy, 0.06–0.44 % slower on the RTX 5060 Ti, outside the 0.16 % floor in both directions |
+| 5b, 5c | `MinimalPlanner` against `FixedPlanner`; `fm.calc` recompile | **pass**; measured |
+| 6 | `main.py` compatibility | **pass** |
+| 7 | Rules | **pass** |
+| – | GPU suite, full tier | **pass**: 176/176 on both machines; the 3 research-engine comparisons pass after 1b-T03b |
 
 ## Failures and findings for the conductor
 
