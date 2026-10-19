@@ -24,15 +24,25 @@ The installed package files are never modified. Entries so far:
   ``single_graph_strain`` (1a-T08): the engine-level rewrites of ``fastmace.rewrites.engine``
   (MACE's readout mask, its force functions, Inductor's addmm rule with its cache key, and MACE
   PR 1498's one-graph strain). Each can be undone with ``restore``.
+
+**Hash gates** (SPEC §6.3, plan task 2-T04). Every patch that replaces a function first checks
+that the function it replaces is the one it was written for: the sha256 of its
+``inspect.getsource`` must equal the pin in ``SOURCE_PINS`` (MACE 0.3.16 and torch 2.14.1, the
+qualified versions). Otherwise nothing is replaced and ``UnqualifiedPatchError`` names the
+source; the library never patches source it has not hashed. ``patch_problems(name)`` asks the
+same question without patching.
 """
 
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import importlib
 import inspect
 import sys
 from dataclasses import dataclass
+
+from fastmace.errors import FastMACEError
 
 # What is in force: name -> PatchRecord. The registry is the process-wide state this
 # module exists to own; nothing else in fastmace keeps a copy.
@@ -114,6 +124,112 @@ def original_if_patched(target, current):
     if active and target in _INSTALLED and current is _INSTALLED[target]:
         return _ORIGINALS[target]
     return None
+
+
+# --------------------------------------------------------------------------- hash gates
+
+# sha256 of inspect.getsource of every object a patch replaces, keyed "module:attribute" as
+# replaced (MACE 0.3.16, torch 2.14.1). mace.modules.blocks imports mask_head from irreps_tools,
+# mace.modules.models get_symmetric_displacement from utils, and mace.calculators.mace imports
+# convert_e3nn_cueq.run as run_e3nn_to_cueq: the same source, so the same pin.
+_MASK_HEAD = "bcb74869e70f9cd7ddfdfb7e133f4aacec058e8dd996b3c6eeb916e6e1b49e8e"
+_STRAIN = "d75106300f967df0872e253c6d9c4607c0783a6dd8fe35045204e958a0b36437"
+_CUEQ_RUN = "5dde1426a0701a9bd9a4ced74fb810e3f82a849cff42b3778d96f8d7c4a4487c"
+SOURCE_PINS = {
+    "capture_safe_mask_head": {"mace.modules.blocks:mask_head": _MASK_HEAD},
+    "first_derivative_only": {
+        "mace.modules.utils:compute_forces": "b19d3e4acaf2c13eeff68562e22d6bb54cc03d73901336aba63e0b9a02c13565",
+        "mace.modules.utils:compute_forces_virials":
+            "8c1d2ab9d98ce99f3b8791c9c78f5f10d0d32ff5508ff48e0a641c174fed5ba0",
+    },
+    "single_graph_strain": {"mace.modules.utils:get_symmetric_displacement": _STRAIN,
+                            "mace.modules.models:get_symmetric_displacement": _STRAIN},
+    "cueq_conv_fusion": {"mace.cli.convert_e3nn_cueq:run": _CUEQ_RUN,
+                         "mace.calculators.mace:run_e3nn_to_cueq": _CUEQ_RUN},
+    # The addmm rule wraps torch's decision and reads its bias-like test: both are pinned.
+    "unfuse_full_addmm": {
+        "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm":
+            "5acf9ce3368b75519915c528ac2669fa6fac47741970b4324d8544c9236c10a1",
+        "torch._inductor.fx_passes.post_grad:_is_bias_like_addmm_input":
+            "a64f98f7d29f7398468b2bc2276dbff8ceacbe3ec120f07ee89179eff47ba321",
+    },
+}
+
+
+class UnqualifiedPatchError(FastMACEError, RuntimeError):
+    """A process-wide patch was refused: a source it replaces does not hash to its pin (SPEC §6.3).
+
+    ``patch`` names the patch, ``problems`` lists each source and why.
+    """
+
+    default_next_step = ("Use the qualified MACE version (0.3.16); on another version the planner runs without "
+                         "this patch (SPEC §18 decision 2).")
+
+    def __init__(self, patch, problems):
+        self.patch = patch
+        self.problems = tuple(problems)
+        super().__init__(f"process-wide patch {patch} refused: unqualified source: " + "; ".join(self.problems),
+                         why="FastMACE never patches source it has not hashed (SPEC §6.3).")
+
+
+def _present(target):
+    """The object at ``"module:attribute"`` before any of our replacements (MACE's), or raises."""
+    module_name, attribute = target.split(":", 1)
+    module = importlib.import_module(module_name)
+    key = f"{module.__name__}:{attribute}"
+    if key in _ORIGINALS:
+        return _ORIGINALS[key]
+    return getattr(module, attribute)
+
+
+def patch_problems(name):
+    """Every source patch ``name`` would replace that does not hash to its pin (empty: qualified).
+
+    A target module that does not exist is a problem; an attribute missing from a module that
+    only re-imports it by name (``mace.modules.models``, ``mace.calculators.mace``) is not, since
+    the patch skips it.
+    """
+    problems = []
+    for target, expected in SOURCE_PINS[name].items():
+        try:
+            obj = _present(target)
+            digest = hashlib.sha256(inspect.getsource(obj).encode()).hexdigest()
+        except AttributeError as error:
+            if target.split(":", 1)[0] in ("mace.modules.models", "mace.calculators.mace"):
+                continue
+            problems.append(f"{target}: {type(error).__name__}: {error}")
+            continue
+        except (ImportError, OSError, TypeError) as error:
+            problems.append(f"{target}: {type(error).__name__}: {error}")
+            continue
+        if digest != expected:
+            problems.append(f"{target}: source sha256 {digest[:12]} is not the qualified {expected[:12]}")
+    return problems
+
+
+def _require_pinned(name):
+    problems = patch_problems(name)
+    if problems:
+        raise UnqualifiedPatchError(name, problems)
+
+
+def install_if_qualified(name):
+    """Install engine-level patch ``name`` (``set_<name>(True)``) only if its sources hash; else log why.
+
+    Returns the record in force, or None when the patch is not needed or not qualified. For the
+    callers that can run with MACE's own function (SPEC §6.3: off with the reason logged); a
+    caller that cannot (CUDA graph capture needs the capture-safe mask) calls the setter, which
+    raises ``UnqualifiedPatchError``.
+    """
+    if name not in _RECORDS:
+        problems = patch_problems(name)
+        if problems:
+            import logging
+
+            logging.getLogger("fastmace.rewrites").warning("%s not installed: unqualified source: %s", name,
+                                                           "; ".join(problems))
+            return None
+    return globals()[f"set_{name}"](True)
 
 
 def restore(name):
@@ -210,6 +326,7 @@ def set_cueq_conv_fusion(enabled):
         return current
     from mace.cli import convert_e3nn_cueq
     calculator_module = importlib.import_module("mace.calculators.mace")
+    _require_pinned("cueq_conv_fusion")
     original = _original(convert_e3nn_cueq, "run")
     parameters = tuple(inspect.signature(original).parameters)
     if parameters != CUEQ_RUN_PARAMETERS:
@@ -311,6 +428,7 @@ def set_capture_safe_mask_head(enabled=True):
         if blocks.mask_head is not engine.capture_safe_mask_head:
             _put(blocks, "mask_head", engine.capture_safe_mask_head)
         return _RECORDS[name]
+    _require_pinned(name)
     _check_parameters(_original(blocks, "mask_head"), MASK_HEAD_PARAMETERS, "mace.modules.blocks.mask_head")
     return _install(name, [_put(blocks, "mask_head", engine.capture_safe_mask_head)],
                     "multi-head readout mask without indexed assignment (CUDA graph capture)")
@@ -331,6 +449,7 @@ def set_first_derivative_only(enabled=True):
     from mace.modules import utils
 
     from fastmace.rewrites import engine
+    _require_pinned(name)
     _check_parameters(_original(utils, "compute_forces"), COMPUTE_FORCES_PARAMETERS,
                       "mace.modules.utils.compute_forces")
     _check_parameters(_original(utils, "compute_forces_virials"), COMPUTE_FORCES_VIRIALS_PARAMETERS,
@@ -362,6 +481,7 @@ def set_unfuse_full_addmm(enabled=True):
     if not hasattr(post_grad, "_is_bias_like_addmm_input"):
         return None  # torch 2.5 behaviour already
     from fastmace.rewrites import engine
+    _require_pinned(name)
     current = inductor_config.post_grad_custom_pre_pass
     if current is not None and not (hasattr(current, "uuid") and current.uuid() == engine.UNFUSED_ADDMM_UUID):
         raise RuntimeError("Inductor's post_grad_custom_pre_pass is already in use; cannot key the addmm choice")
@@ -390,6 +510,7 @@ def set_single_graph_strain(enabled=True):
     from mace.modules import models, utils
 
     from fastmace.rewrites import engine
+    _require_pinned(name)
     _check_parameters(_original(utils, "get_symmetric_displacement"), SYMMETRIC_DISPLACEMENT_PARAMETERS,
                       "mace.modules.utils.get_symmetric_displacement")
     targets = [_put(module, "get_symmetric_displacement", engine.single_graph_symmetric_displacement)

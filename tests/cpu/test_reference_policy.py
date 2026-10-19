@@ -183,9 +183,11 @@ def test_d3_is_declared_and_refused_until_phase_3b():
     assert "d3" in records.OPTIONAL_PHYSICS and records.OPTIONAL_PHYSICS["d3"]["status"] == "refused until phase 3b"
 
 
-def test_unqualified_mace_version_and_unknown_family_are_refused():
+def test_unqualified_mace_version_polar_and_unknown_family_are_refused():
+    # Another MACE gets the unqualified stock record (2-T04, test_versioned_registry.py); PolarMACE not.
+    assert not records.record_for("0.3.17", "mh1").qualified
     with pytest.raises(records.ReferencePolicyError, match="0.3.17"):
-        records.record_for("0.3.17", "mh1")
+        records.record_for("0.3.17", "polar")
     with pytest.raises(records.ReferencePolicyError, match="family"):
         records.record_for("0.3.16", "nonsense")
 

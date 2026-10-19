@@ -199,17 +199,17 @@ def install_engine_patches(engine=None, *, oeq=False):
     ``capture_safe_mask_head`` always (it must be in place before tracing),
     ``first_derivative_only`` when asked for and not on OEq models (which run with
     training=False), ``unfuse_full_addmm`` when asked for (read by Inductor when the graph is
-    compiled).
+    compiled). A patch whose source does not hash is left out with its reason logged (2-T04).
     """
     from fastmace import _patches
     from fastmace.config import EngineConfig
 
     engine = engine or EngineConfig()
-    records = [_patches.set_capture_safe_mask_head(True)]
+    records = [_patches.install_if_qualified("capture_safe_mask_head")]
     if engine.first_derivative_only and not oeq:
-        records.append(_patches.set_first_derivative_only(True))
+        records.append(_patches.install_if_qualified("first_derivative_only"))
     if engine.unfuse_full_addmm:
-        records.append(_patches.set_unfuse_full_addmm(True))
+        records.append(_patches.install_if_qualified("unfuse_full_addmm"))
     return tuple(record for record in records if record is not None)
 
 
