@@ -347,14 +347,24 @@ def set_cueq_conv_fusion(enabled):
 # ------------------------------------------------------------------------ oeq_runtime
 
 @contextlib.contextmanager
-def cueq_conv_fusion(enabled):
+def cueq_conv_fusion(enabled, device=None):
     """``set_cueq_conv_fusion(enabled)`` for the duration of the block, then the rule that was in force before.
 
     ``fastmace.model.loading.load`` converts each plain cuEq model inside this block, so its fusion
     setting acts on that conversion only and does not leak into later conversions in the process
     (a deep copy of a fused model loses MACE's convolution adapter). Yields the record in force
     inside the block (None for MACE's own rule).
+
+    On a MACE whose converter does not hash (2-T04) nothing is patched when MACE's own rule gives
+    the asked-for fusion on ``device`` (the block yields None); otherwise ``UnqualifiedPatchError``.
     """
+    if enabled is not None and "cueq_conv_fusion" not in _RECORDS:
+        problems = patch_problems("cueq_conv_fusion")
+        if problems:
+            if device is None or conv_fusion_for(enabled, device) != conv_fusion_for(None, device):
+                raise UnqualifiedPatchError("cueq_conv_fusion", problems)
+            yield None
+            return
     before = _RECORDS.get("cueq_conv_fusion")
     record = set_cueq_conv_fusion(enabled)
     try:

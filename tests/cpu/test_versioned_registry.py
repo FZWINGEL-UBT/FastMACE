@@ -26,7 +26,12 @@ from fastmace.rewrites import engine, versions
 from fastmace.rewrites import registry as reg
 from fastmace.rewrites.registry import CheckResult, Registry, Rewrite
 
-pytestmark = [pytest.mark.filterwarnings("ignore::UserWarning")]
+pytestmark = [
+    pytest.mark.filterwarnings("ignore::UserWarning"),
+    # Fake hashes against the qualified sources; the real other MACE is test_unknown_mace.py.
+    pytest.mark.skipif(reg.installed_mace_version() not in versions.QUALIFIED_MACE_VERSIONS,
+                       reason="needs the qualified MACE 0.3.16"),
+]
 
 PATCHES = ("capture_safe_mask_head", "first_derivative_only", "single_graph_strain", "unfuse_full_addmm")
 SETTERS = {"capture_safe_mask_head": _patches.set_capture_safe_mask_head,
@@ -592,3 +597,18 @@ def test_the_report_names_the_looser_energy_bound():
     gate["references"]["yardstick"]["energy_bound"] = "float64 accumulation"
     assert "energy bound" not in report.Report(model="tiny", structure="NaCl", n_atoms=8, plan=Plan(tier="graph"),
                                                gate=gate)._gate()
+
+
+def test_conv_fusion_scope_on_an_unhashed_converter(monkeypatch):
+    _unpin(monkeypatch, "cueq_conv_fusion")
+    # MACE's own rule fuses only for the device string "cuda": asking for that needs no patch.
+    with _patches.cueq_conv_fusion(False, "cpu") as record:
+        assert record is None and _patches.record_of("cueq_conv_fusion") is None
+    with _patches.cueq_conv_fusion(True, "cuda") as record:
+        assert record is None
+    with pytest.raises(_patches.UnqualifiedPatchError):
+        with _patches.cueq_conv_fusion(True, "cuda:0"):
+            pass
+    with pytest.raises(_patches.UnqualifiedPatchError):
+        with _patches.cueq_conv_fusion(False):
+            pass

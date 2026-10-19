@@ -82,16 +82,17 @@ def test_md_runs_on_the_reported_path_and_passes_the_gate(model_path, tmp_path, 
     run = md(nacl(repeat=1, rattle=0.05, seed=3), model=model_path, trusted=True, temperature_K=300.0,
              steps=3, seed=5, output=tmp_path / "run", check="gate")
     assert run.gate.status == "passed"
+    # The records the built force field resolved: every unhashed one is off with its reason.
+    resolution = run.simulation._engine.force_field.resolution
     registry = reg.default_registry()
-    for name in registry.names():
-        qualified = registry.qualification(name)
-        if not qualified.supported:
-            field = registry.config_field(name)
-            key = f"RewriteConfig.{field}"
-            enabled = [other for other in registry.names()
-                       if registry.config_field(other) == field and registry.qualification(other).supported]
-            if not enabled:
-                assert run.plan.decision(key)[1] == "off", key
+    version = reg.installed_mace_version()
+    unhashed = [name for name in registry.names() if not registry.qualification(name).supported]
+    assert unhashed
+    for name in unhashed:
+        decision = resolution.decision(name)
+        assert not decision.enabled, name
+        if decision.requested != "off":  # the plan asked for it: the hash is the reason it is off
+            assert f"on MACE {version}" in decision.reason, (name, decision.reason)
     precision, promoted = versions.effective_precision("float32", polar_model=False)
     decision = run.plan.decision("force_precision")
     assert decision[1] == precision
