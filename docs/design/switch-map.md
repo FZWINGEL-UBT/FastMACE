@@ -48,6 +48,7 @@ How to read the tables:
 | `INPLACE_BLOCK_LINEAR` (no flag) | `RewriteConfig.inplace_block_linear` | `False` | — | §6.2 opt-in "in-place block linear (slower)" |
 | `--single-graph-strain`; `upstream_mace.use_single_graph_strain` (process-wide patch of MACE) | `RewriteConfig.single_graph_strain` | `"auto"` | `on` | §6.2 `single_graph_strain` |
 | `--polar-uvu`; `polar_gpu.REASSOCIATE_UVU` | `RewriteConfig.polar_uvu` | `True` (flag `on`) | — | §6.2 `polar_uvu` |
+| none: the research engine runs every self-check (new in the library, 2-T01; filled by 2-T19) | `RewriteConfig.selfcheck_cache` | `"use"` | — | qualification cache (§6.4; no effect until 2-T19) |
 
 ## 2. Engine options → `EngineConfig`
 
@@ -68,6 +69,7 @@ How to read the tables:
 | `ALLOCATOR_SETTINGS`, `ALLOCATOR_MIN_TORCH` (`configure_allocator()`) | `EngineConfig.expandable_segments` | `"auto"` (`"expandable_segments:True"` from torch 2.14) | `on_for_torch_2_14_unless_alloc_conf_set` | §6.2 "expandable segments allocator" (engine) |
 | `EMPTY_CACHE_BEFORE_CAPTURE` | `EngineConfig.empty_cache_before_capture` | `True` | — | engine |
 | `WARMUP_IN_GRAPH_POOL` | `EngineConfig.warmup_in_graph_pool` | `True` | — | engine |
+| none: the research engine's `fm.calc` path recompiles on a new edge count (new in the library, 2-T01; filled by 2-T13) | `EngineConfig.dynamic_edges` | `False` | — | engine (evaluation plans; no effect until 2-T13) |
 
 ## 3. Precision → `PrecisionConfig`
 
@@ -179,6 +181,26 @@ on FastMACE (1a-T17), and are not fields of the six config classes.
 | `--quench`, `--quench-min-K`, `--quench-bin-K`, `--quench-per-bin`, `--quench-plot-only`, `--quench-optimizer`, `--quench-threads`, `--quench-fmax` | not carried over | `None`, `500.0`, `100.0`, `2`, `False`, `"LBFGS"`, `16`, `None` | quench post-processing (later phase) | run |
 | `LEGACY_PROTOCOL` (resume of runs older than a flag) | not carried over | dict | research `run.json` compatibility only | never |
 
+## 10. Safety options of phase 2 → `FallbackConfig`, `GateConfig`, `RunnerConfig`
+
+New in the library (plan task 2-T01); the research engine has none of them. They
+reach the planner through `Simulation(fallback=, gate=, runner=)` and `fm.md`
+(`docs/design/contracts-2.md`).
+
+| Research engine | FastMACE field | Default | `auto` rule | Kind |
+| --- | --- | --- | --- | --- |
+| none (new, SPEC §9.4, decision 29) | `FallbackConfig.fallback` | `"auto"` | `fallback_search_on_failure` | fallback (`"refuse"`: raise as in 1b) |
+| none (new, SPEC §9.4 step 2) | `FallbackConfig.diagnosis_budget` | `64` | — | fallback (reduced-gate runs) |
+| none (new, SPEC §9.4 step 5) | `FallbackConfig.reference_last` | `True` | — | fallback |
+| none (new, SPEC §12.3 "Resources") | `GateConfig.cpu_float64_time_limit_s` | `300.0` | — | gate resources |
+| none (new, SPEC §12.3 "Resources") | `GateConfig.reduced_cell` | `"auto"` | `largest_smaller_supercell_at_least_min_height` | gate resources (2-T05) |
+| none (new, SPEC §12.3 "Resources") | `GateConfig.reduced_cell_min_height_cutoffs` | `2.0` | — | gate resources |
+| none (new, SPEC §8.7) | `RunnerConfig.python` | `None` | — | subprocess runner (`None`: `sys.executable`) |
+| none (new, SPEC §8.7) | `RunnerConfig.environment` | `()` | — | subprocess runner |
+| none (new, SPEC §8.7) | `RunnerConfig.inherit_environment` | `True` | — | subprocess runner |
+| none (new, SPEC §8.7) | `RunnerConfig.timeout_s` | `None` | — | subprocess runner |
+| none (new, SPEC §8.7) | `RunnerConfig.stall_timeout_s` | `1800.0` | — | subprocess runner |
+
 ## Auto resolution rules
 
 The research engine resolves `auto` in two stages, and the result depends on the
@@ -216,6 +238,8 @@ tier 1, §8.1); "hybrid" the resolved backend. Support keys are those of
 | `on_for_plain_cueq_unless_reproducible` | Plain cuEq backend: on, except in a `reproducible=True` plan, which needs the unfused convolution (§9.3, owner decision 13). Hybrid: not applicable (the research engine records `None`). | `EngineConfig.cueq_conv_fusion` |
 | `on_for_torch_2_14_unless_alloc_conf_set` | Set `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` before the first CUDA allocation when torch ≥ 2.14 and the variable is unset; otherwise leave the allocator alone. | `EngineConfig.expandable_segments` |
 | `variable_cell_0_1_else_0` | `0.1` for a variable-cell integrator (NPT), `0.0` otherwise. | `PolarConfig.kspace_headroom` |
+| `fallback_search_on_failure` | On a failing build, compile, capture, self-check or gate before the first step, the §9.4 search (diagnosis, ddmin within the budget, the terminal sequence), each candidate validated before activation (2-T15); nothing happens on a run that does not fail. `"refuse"` raises as in 1b. | `FallbackConfig.fallback` |
+| `largest_smaller_supercell_at_least_min_height` | The gate's reduced cell (2-T05): the largest supercell of the same primitive cell that is smaller than the production cell and whose every height is at least `reduced_cell_min_height_cutoffs` × the cutoff; none if no such cell exists. | `GateConfig.reduced_cell` |
 
 An explicit `"on"` keeps the research engine's refusals: a dependency that is off
 (for example `fold_cutoff="on"` without `factor_species`) or an unsupported
@@ -240,6 +264,12 @@ model is an error with a reason, never a silent downgrade.
   `temperature_K` (the caller's ramp in 1a), `external_stress_GPa` (derived from
   `--pressure-GPa` in the research engine) and `disable_cell_langevin` (ASE's
   default there). None admits `"auto"`.
+- Phase 2 (plan task 2-T01) added two fields to existing records,
+  `EngineConfig.dynamic_edges` and `RewriteConfig.selfcheck_cache`, and three
+  records with 11 fields (section 10: `FallbackConfig` 3, `GateConfig` 3,
+  `RunnerConfig` 5), 70 in all. Two admit `"auto"` (`FallbackConfig.fallback`,
+  `GateConfig.reduced_cell`).
+  None comes from the research engine.
 
 ## Open questions for the conductor
 

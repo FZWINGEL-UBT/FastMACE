@@ -135,6 +135,9 @@ class Rewrite:
     workload_constraints: tuple[str, ...]
     apply: Callable[[Any, Context], Any]
     selfcheck: Callable[[Any, Any, Context], Any]  # (original, rewritten, context) -> CheckResult
+    # Bitwise-deterministic on CUDA under torch.use_deterministic_algorithms(True) (SPEC §9.3
+    # "reproducible=True"): True, False, or None = undeclared, which a reproducible plan refuses.
+    deterministic: bool | None = None
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name:
@@ -158,21 +161,28 @@ class Rewrite:
         for name in ("applies_to", "apply", "selfcheck"):
             if not callable(getattr(self, name)):
                 raise ValueError(f"Rewrite {self.name}: {name} is not callable")
+        if self.deterministic is not None and not isinstance(self.deterministic, bool):
+            raise ValueError(f"Rewrite {self.name}: deterministic must be True, False or None, "
+                             f"got {self.deterministic!r}")
 
     @classmethod
     def from_dict(cls, mapping):
-        """(Rewrite, config field or None) from a dict of the §6.1 fields plus an optional ``config_field``."""
+        """(Rewrite, config field or None) from a dict of the §6.1 fields plus an optional ``config_field``.
+
+        Fields with a default (``deterministic``) may be left out.
+        """
         names = [f.name for f in dataclasses.fields(cls)]
         unknown = set(mapping) - set(names) - {"config_field"}
         if unknown:
             raise ValueError(f"unknown Rewrite fields {sorted(unknown)}")
-        missing = set(names) - set(mapping)
+        required = [f.name for f in dataclasses.fields(cls) if f.default is dataclasses.MISSING]
+        missing = set(required) - set(mapping)
         if missing:
             raise ValueError(f"Rewrite {mapping.get('name')!r} lacks the fields {sorted(missing)}")
         config_field = mapping.get("config_field")
         if config_field is not None:
             config_field = str(config_field).removeprefix("RewriteConfig.")
-        return cls(**{name: mapping[name] for name in names}), config_field
+        return cls(**{name: mapping[name] for name in names if name in mapping}), config_field
 
 
 # --------------------------------------------------------------------------- qualification

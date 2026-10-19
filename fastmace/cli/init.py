@@ -53,6 +53,9 @@ SCALARS = (
     ("seed", "Noise seed; without it one is drawn and recorded in metadata.json.", "1"),
     ("check", '"skip" (default), "gate" (the gate on this structure, opt-in) or "allow_unavailable".', '"skip"'),
     ("output", "Output directory, default ./<structure stem>.fastmace/; or the [output] table below.", '"run/"'),
+    ("mode", 'Execution mode: "graph" (default); "eager" and "reference" come in phase 2, "compiled" in phase 3.',
+     '"graph"'),
+    ("allow_reference", "Allow the reference tier where rule 1 needs it (SPEC §9.3).", "false"),
 )
 
 # (comment, commented table lines): the records, after every top-level key; "" is an empty comment line.
@@ -71,6 +74,12 @@ TABLES = (
      ("[[mc]]", 'move = "swap"')),
     ("Output with its intervals (the fields of fm.Output).",
      ("[output]", 'directory = "run/"', "trajectory_every = 20", "thermo_every = 20", "restart_every = 10000")),
+    ("Planner options (the fields of fastmace.config.EngineConfig and NeighbourConfig); without them the\n"
+     "# default planner's.",
+     ("[engine]", 'backend = "cueq"', "", "[neighbours]", "skin = 0.3")),
+    ("Safety options (fastmace.config.FallbackConfig, GateConfig, RunnerConfig; SPEC §9.4, §12.3, §8.7).",
+     ("[fallback]", 'fallback = "auto"', "", "[gate]", "cpu_float64_time_limit_s = 300.0", "",
+      "[runner]", "stall_timeout_s = 1800.0")),
 )
 
 

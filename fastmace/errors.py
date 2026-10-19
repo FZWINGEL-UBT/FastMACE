@@ -129,6 +129,74 @@ class ProcessConstraintError(FastMACEError, RuntimeError):
     default_environment = True
 
 
+class FallbackExhausted(PlanRefused):
+    """No fallback candidate passed validation (SPEC §9.4 step 5); ``revisions`` holds every tried plan.
+
+    ``revisions`` is the revision chain of the fallback, oldest first: the failed plan, then each
+    candidate tried, each with its reason. ``reasons`` are the refusal's, as for ``PlanRefused``.
+    """
+
+    default_next_step = ("Read the tried candidates and their reasons in the record; pass fallback=FallbackConfig("
+                         "fallback='refuse') to see the first failure alone, and report the model and structure.")
+    default_record = "run.plan (its fallbacks and revision chain) and metadata.json"
+
+    def __init__(self, reasons, why=None, next_step=None, record=None, environment=None, *, revisions=()):
+        super().__init__(reasons, why, next_step, record, environment)
+        self.revisions = tuple(revisions)
+
+
+class SubprocessRunnerError(FastMACEError, RuntimeError):
+    """The subprocess runner's child failed, was killed or stalled (SPEC §8.7); never a hang.
+
+    ``exit_code`` is the child's (negative: killed by that signal; ``None``: still running when it
+    was stopped), ``child_message`` its error message, and ``directory`` the hand-off directory,
+    kept after an error.
+    """
+
+    default_next_step = ("Read the child's message; the hand-off directory holds its restart and log. Resume from "
+                         "the last restart point, in a fresh process if the constraint allows.")
+    default_record = "the hand-off directory and metadata.json"
+
+    def __init__(self, what, why=None, next_step=None, record=None, environment=None, *, exit_code=None,
+                 child_message=None, directory=None):
+        super().__init__(what, why, next_step, record, environment)
+        self.exit_code = exit_code
+        self.child_message = child_message
+        self.directory = None if directory is None else str(directory)
+
+
+class IsolationError(FastMACEError, RuntimeError):
+    """An instance whose lease on a shared component was taken by another instance (SPEC §8.7).
+
+    ``component`` names the shared component, ``holder`` the instance that holds its lease now.
+    """
+
+    default_next_step = "Call rebind() on this force field or engine before using it again (SPEC §8.7)."
+
+    def __init__(self, what, why=None, next_step=None, record=None, environment=None, *, component=None,
+                 holder=None):
+        super().__init__(what, why, next_step, record, environment)
+        self.component = component
+        self.holder = holder
+
+
+class ReproducibilityError(FastMACEError):
+    """A (backend, model family) failed qualification for ``reproducible=True`` (SPEC §9.3 rule 5).
+
+    ``blocking`` names the kernels or operators without a deterministic implementation. A plan that
+    asks for ``reproducible=True`` without a qualified family is refused by ``PlanRefused`` (rule 5),
+    not by this error.
+    """
+
+    default_next_step = ("Run with reproducible=False (results compared statistically), or report the blocking "
+                         "kernels.")
+    default_record = "the qualification record (planner.reproducible) and metadata.json"
+
+    def __init__(self, what, why=None, next_step=None, record=None, environment=None, *, blocking=()):
+        super().__init__(what, why, next_step, record, environment)
+        self.blocking = tuple(str(name) for name in blocking)
+
+
 # --------------------------------------------------------------------------- the gate
 
 class _GateError(FastMACEError):
@@ -270,6 +338,7 @@ class ModelLicenceWarning(UserWarning):
 
 
 __all__ = ["FastMACEError", "Reason", "PlanRefused", "SpeciesNotInSuperset", "ProcessConstraintError",
+           "FallbackExhausted", "SubprocessRunnerError", "IsolationError", "ReproducibilityError",
            "GateFailed", "GateUnavailable", "ModelElementError", "RestartMismatch", "CheckpointTrustError",
            "NonFiniteError", "HybridUnavailableError", "BackendError", "NaiveCueqError", "PolarUnavailableError",
            "OEqRuntimeError", "CacheLocationError", "RewriteError", "RewriteRefusedError", "SelfCheckError",
