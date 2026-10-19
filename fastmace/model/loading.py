@@ -5,6 +5,10 @@ scripts), ``model_store.checkpoint``, ``workflow.load_md_calculator`` and
 ``langevin/upstream_mace.py`` and refactored: no NAS paths, no environment
 variables as switches, no module globals.
 
+``fm.load`` is ``load_pristine``: ``load`` as e3nn in float64 on the CPU, the
+pristine model that each plan converts (1b-T12). ``load`` itself keeps its explicit
+backend, dtype and device for ``FixedPlanner`` and ``main.py``.
+
 What ``load`` does, in order:
 
 1. **Resolve** the checkpoint (``resolve_checkpoint``): an explicit path, else
@@ -35,8 +39,10 @@ What ``load`` does, in order:
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import hashlib
 import importlib
+import importlib.util
 import inspect
 import os
 import sys
@@ -110,6 +116,8 @@ class LoadedModel:
     patches: tuple = field(default=())  # _patches.applied() while the model was built
     # The checkpoint's E0 table as float64, copied before MACE's dtype conversion (SPEC §7.3).
     atomic_energies: object = None
+    # fm.load only: what became of the OEq runtime before MACE was imported (prepare_hybrid_if_possible).
+    oeq_runtime: str | None = None
 
     @property
     def model(self):
@@ -125,7 +133,7 @@ class LoadedModel:
             "functional": self.functional, "licence": self.licence, "backend": self.backend, "dtype": self.dtype,
             "device": self.device, "cueq_conv_fusion": self.cueq_conv_fusion, "fused_cueq": dict(self.fused_cueq),
             "embedding_specs": self.embedding_specs, "charge": self.charge,
-            "spin_multiplicity": self.spin_multiplicity,
+            "spin_multiplicity": self.spin_multiplicity, "oeq_runtime": self.oeq_runtime,
             "patches": [{"name": r.name, "value": r.value, "targets": list(r.targets), "detail": r.detail}
                         for r in self.patches],
         }
@@ -140,16 +148,17 @@ def _is_url(source):
 
 def models_cache_directory(environ=None):
     """``<cache root>/models``: where downloads go and the last place a label's file is looked for."""
-    return _cache.cache_root(environ) / "models"
+    return _cache.cache_dir("models", create=False, environ=environ)
 
 
-def resolve_checkpoint(source, head=None, checkpoint=None, environ=None, download=False):
+def resolve_checkpoint(source, head=None, checkpoint=None, environ=None, download=False, sha256=None):
     """Find the checkpoint of ``source`` (a label, alias, checkpoint name, path or URL).
 
     Order for a label: ``checkpoint`` (explicit path), else ``$FASTMACE_MODELS/<file>``,
     else ``<cache root>/models/<file>``, else (``download=True``) the official URL into
     the cache directory. A path is used as it is; a URL is downloaded into the cache
-    directory unless the file is there already.
+    directory unless the file is there already. A download is checked against the
+    table's SHA-256, or for a URL against ``sha256``, and not kept if it differs.
     """
     environ = os.environ if environ is None else environ
     entry = None if isinstance(source, os.PathLike) or _is_url(source) else label_table.find(str(source), head)
@@ -180,7 +189,7 @@ def resolve_checkpoint(source, head=None, checkpoint=None, environ=None, downloa
         raise FileNotFoundError(f"checkpoint {file_name} not found (looked in {', '.join(searched)}); pass "
                                 f"checkpoint=, set {MODELS_VARIABLE}, or load with download=True")
     url = entry.checkpoint.url if entry is not None else source
-    expected = entry.checkpoint.sha256 if entry is not None else None
+    expected = entry.checkpoint.sha256 if entry is not None else (sha256.lower() if sha256 else None)
     return ResolvedCheckpoint(download_checkpoint(url, path, expected), "download", entry, tuple(searched))
 
 
@@ -204,7 +213,10 @@ def download_checkpoint(url, target, sha256=None):
             if not output.tell():
                 raise OSError(f"empty checkpoint: {url}")
         if sha256 is not None and digest.hexdigest() != sha256:
-            raise CheckpointTrustError(f"{url} has SHA-256 {digest.hexdigest()}, the label table expects {sha256}")
+            raise CheckpointTrustError(
+                f"the download {url} has SHA-256 {digest.hexdigest()}, not the expected {sha256}",
+                why="the file differs from the one whose hash was given, so it was deleted without being unpickled",
+                next_step="Check the URL and the hash; a checkpoint is a pickle and runs code when loaded.")
         os.replace(temporary, target)
     finally:
         temporary.unlink(missing_ok=True)
@@ -228,7 +240,9 @@ def check_trust(resolved, digest, sha256=None, trusted=False):
     """
     if sha256 is not None:
         if digest != sha256.lower():
-            raise CheckpointTrustError(f"{resolved.path} has SHA-256 {digest}, not the expected {sha256}")
+            raise CheckpointTrustError(
+                f"{resolved.path} has SHA-256 {digest}, not the expected {sha256}",
+                why="the file is not the one whose hash was given, so it was not unpickled")
         return "sha256"
     if resolved.label is not None:
         if digest == resolved.label.checkpoint.sha256:
@@ -237,12 +251,15 @@ def check_trust(resolved, digest, sha256=None, trusted=False):
             return "trusted"
         raise CheckpointTrustError(
             f"{resolved.path} has SHA-256 {digest}, but label {resolved.label.label!r} is the release with "
-            f"SHA-256 {resolved.label.checkpoint.sha256}; pass trusted=True to load this file anyway")
+            f"SHA-256 {resolved.label.checkpoint.sha256}",
+            why="the file is not the released checkpoint of the label, so it was not unpickled",
+            next_step="Download the release again (download=True), or pass trusted=True to load this file anyway.")
     if trusted:
         return "trusted"
     raise CheckpointTrustError(
-        f"{resolved.path} is not a label of the table; MACE checkpoints are pickles that run code when loaded, so "
-        f"pass sha256='{digest}' after checking the file, or trusted=True")
+        f"{resolved.path} (SHA-256 {digest}) is not a label of the table and was not unpickled",
+        why="MACE checkpoints are pickles that run code when loaded; a file from a path or URL needs a stated hash",
+        next_step=f"Pass sha256='{digest}' after checking the file against its publisher, or trusted=True.")
 
 
 # ------------------------------------------------------------------------ backend checks
@@ -386,6 +403,42 @@ def prepare_hybrid(cache=None):
         raise HybridUnavailableError(str(error)) from error
 
 
+def _oeq_installed():
+    """Whether OpenEquivariance is installed, found without importing it (an import would be too early)."""
+    return importlib.util.find_spec("openequivariance") is not None
+
+
+def _cuda_visible():
+    import torch
+
+    return torch.cuda.is_available()
+
+
+def prepare_hybrid_if_possible(cache=None):
+    """Prepare the OEq runtime when the hybrid could be planned later; never raises. Returns what happened.
+
+    ``fm.load`` imports MACE, after which the runtime can no longer be prepared and
+    every plan in the process gets plain cuEq (SPEC §9.4). So it prepares the
+    runtime first, but only when OpenEquivariance is installed, a CUDA device is
+    visible and nothing blocks it yet: a CPU-only process does no extra work. A
+    failure is recorded, not raised; the planner then gives plain cuEq with its reason.
+    """
+    if _patches.record_of("oeq_runtime") is not None:
+        return "prepared"
+    if not _oeq_installed():
+        return "skipped: OpenEquivariance is not installed"
+    if not _cuda_visible():
+        return "skipped: no CUDA device is visible"
+    blockers = hybrid_blockers()
+    if blockers:
+        return f"too late: {blockers[0]} was imported first"
+    try:
+        prepare_hybrid(cache)
+    except HybridUnavailableError as error:
+        return f"failed: {error.what}"
+    return "prepared"
+
+
 @contextmanager
 def hybrid_keeps_last_layer_irreps():
     """While a hybrid calculator is built, pass the model's keep_last_layer_irreps to the transfer.
@@ -524,7 +577,13 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
     if dtype not in DTYPES:
         raise ValueError(f"dtype {dtype!r} is not one of {DTYPES}")
     environ = os.environ if environ is None else environ
-    resolved = resolve_checkpoint(source, head, checkpoint, environ, download)
+    if _is_url(source) and checkpoint is None and sha256 is None and not trusted:
+        # Refused before anything is fetched: the file could only be refused after the download.
+        raise CheckpointTrustError(
+            f"{source} is not a label of the table and was not downloaded",
+            why="MACE checkpoints are pickles that run code when loaded; a file from a URL needs a stated hash",
+            next_step="Pass sha256= with the hash its publisher gives, or trusted=True.")
+    resolved = resolve_checkpoint(source, head, checkpoint, environ, download, sha256)
     entry = resolved.label
     digest = sha256_of(resolved.path)
     trust = check_trust(resolved, digest, sha256, trusted)
@@ -574,6 +633,8 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
 
     heads = tuple(getattr(calculator, "available_heads", ()) or ())
     wanted = kwargs.get("head")
+    if wanted is None and len(heads) > 1:  # MACE would take a head named "default"; SPEC §7.7 has none
+        raise ValueError(f"{resolved.path.name} has several heads; pass head= one of {', '.join(heads)}")
     if wanted is not None and calculator.head != wanted:  # MACE falls back to the last head with a warning only
         raise ValueError(f"{resolved.path.name} has no head {wanted!r}; its heads are {', '.join(heads)}")
     if backend in ("hybrid", "cueq") and not getattr(calculator, "_enable_cueq", False):
@@ -597,9 +658,31 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
         spin_multiplicity=spin_multiplicity, patches=patches, atomic_energies=tables[0] if tables else None)
 
 
+def load_pristine(source, head=None, *, sha256=None, trusted=False, download=False, charge=None,
+                  spin_multiplicity=None, checkpoint=None, environ=None):
+    """``fm.load`` (SPEC §7.1): the checkpoint as a pristine model, e3nn in float64 on the CPU.
+
+    ``source`` is a label (``"mh1-r2scan"``), an alias with ``head=`` (``"mh1"``), a
+    path or a URL. A multi-head checkpoint needs ``head=`` or a label that names one;
+    otherwise ``ValueError`` lists its heads. A path or URL is unpickled only with a
+    matching ``sha256=`` or ``trusted=True``; a label's file must match the table
+    (SPEC §7.6). ``download=True`` fetches a missing file into the models cache and
+    checks it before it is kept. The trust decision and the hash are in
+    ``provenance()``. The plan converts the model to its backend and precision; the
+    pristine model itself is never changed (``fm.ForceField``). Before MACE is
+    imported, the OEq runtime is prepared where the hybrid is possible
+    (``prepare_hybrid_if_possible``; the outcome is ``oeq_runtime``).
+    """
+    oeq_runtime = prepare_hybrid_if_possible()
+    loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+                  sha256=sha256, trusted=trusted, download=download, charge=charge,
+                  spin_multiplicity=spin_multiplicity, environ=environ)
+    return dataclasses.replace(loaded, oeq_runtime=oeq_runtime)
+
+
 __all__ = [
     "BACKENDS", "BackendError", "CheckpointTrustError", "HybridUnavailableError", "LoadedModel",
     "ModelLicenceWarning", "NaiveCueqError", "ResolvedCheckpoint", "capture_atomic_energies", "check_trust",
-    "download_checkpoint", "fused_cueq_problems", "hybrid_keeps_last_layer_irreps", "load", "require_fused_cueq",
-    "resolve_checkpoint", "sha256_of",
+    "download_checkpoint", "fused_cueq_problems", "hybrid_keeps_last_layer_irreps", "load", "load_pristine",
+    "prepare_hybrid_if_possible", "require_fused_cueq", "resolve_checkpoint", "sha256_of",
 ]

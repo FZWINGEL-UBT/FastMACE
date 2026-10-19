@@ -1329,6 +1329,38 @@ points here.
     `-p no:cacheprovider` and `--basetemp` outside the tree.
   - Machines as listed; the go message confirms the reserved list.
 
+### After T06 and T12 (19 October 2026)
+
+- **1b-T08b added.** 1b-T12 found that the public `fm.load` imports MACE
+  before OpenEquivariance is prepared, so the minimal planner never picks
+  the hybrid backend after it (`backend-cueq-mace-imported-first`). The fix
+  goes in `model/loading.py`: `load_pristine` prepares OEq first when it is
+  installed and CUDA is visible. The T08 session does it on branch
+  `fastmace/1b-T08b`. It blocks acceptance item 4, not the other tasks.
+- T12: each plan reloads and converts the checkpoint, because sharing one
+  converted model across plans would break §8.7 isolation; this costs load
+  time. A superset beyond the structure is `rule=8`,
+  `superset-beyond-structure`. Explicit option conflicts carry `rule=None`.
+  The GPU comparison against `FixedPlanner` (500 MH-1 steps) is left to
+  1b-T23.
+- T06: the chunks and the restart file are flushed but not fsynced. That
+  covers SIGKILL, not power loss (phase 2 safety).
+
+### After T09, T15, T19 (19 October 2026)
+
+- T09: the engines match their corrected references to about 1e-13 Å on CPU
+  and GPU (murphy); the two BAOAB variants differ by 6e-6 Å on the GPU run.
+  The per-bin temperature limit (0.1 K) and the BAOAB position-ratio limit
+  are T09's own thresholds.
+- T15: no atom-count warning, because a fixed atom threshold would be a
+  per-GPU rule (§9.1); only the small-cell warning (cell height below twice
+  the cutoff). The report reads the gate keys `status`, `reason`, `copies`,
+  `energy_meV_per_atom`, `force_eV_per_A` and `stress_eV_per_A3`; T16
+  provides them.
+- T19 went back to its worker: on the NAS environment, `doctor`'s import of
+  `cuequivariance_ops_torch` created `~/.cache/cuequivariance-triton`, and
+  `doctor` must change nothing.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's

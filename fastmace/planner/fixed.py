@@ -51,7 +51,7 @@ from fastmace.config import (
     PrecisionConfig,
     RewriteConfig,
 )
-from fastmace.errors import PlanRefused  # noqa: F401 (re-exported: the 1a names)
+from fastmace.errors import PlanRefused, Reason
 
 from .plan import Hardware, Plan
 
@@ -135,15 +135,20 @@ def detect_hardware(device: str = "cuda:0") -> Hardware:
 def integrator_keywords(config: IntegratorConfig) -> dict[str, Any]:
     """Constructor keywords of the integrator beyond its config, as ``workflow.baoab_settings`` passes them.
 
-    NPT: ``externalstress = -pressure`` (ASE units) and ``disable_cell_langevin`` False (ASE's
-    default; ``baoab_settings`` does not pass it). The cell mode, barostat time constant and mass
-    factor travel in the config. NVT: none.
+    NPT: ``externalstress`` in ASE units from ``effective_external_stress_GPa()`` (``-pressure`` unless
+    ``external_stress_GPa`` is set: bitwise 1a's ``-pressure_GPa * units.GPa``; six Voigt components
+    as an array) and ``disable_cell_langevin`` from the config (False by default, ASE's default;
+    ``baoab_settings`` does not pass it). The cell mode, barostat time constant and mass factor
+    travel in the config. NVT: none.
     """
     if config.ensemble != "npt":
         return {}
+    import numpy as np
     from ase import units
 
-    return {"externalstress": -config.pressure_GPa * units.GPa, "disable_cell_langevin": False}
+    stress = config.effective_external_stress_GPa()
+    externalstress = stress * units.GPa if isinstance(stress, float) else np.asarray(stress) * units.GPa
+    return {"externalstress": externalstress, "disable_cell_langevin": bool(config.disable_cell_langevin)}
 
 
 def workload_problems(names, plan: Plan, registry) -> list[str]:
@@ -152,13 +157,16 @@ def workload_problems(names, plan: Plan, registry) -> list[str]:
     for name in names:
         for constraint in registry[name].workload_constraints:
             if constraint not in WORKLOAD_CONSTRAINTS:
-                problems.append(f"{name}: unknown workload constraint {constraint!r}")
+                problems.append(Reason(f"{name}: unknown workload constraint {constraint!r}",
+                                       code="unknown-workload-constraint"))
             elif constraint == SORT_RECEIVERS and plan.neighbours.sort_receivers != "on":
-                problems.append(f"{name} needs receiver-sorted edges (NeighbourConfig.sort_receivers='on'); in "
-                                "any other order the streaming kernels give wrong results while every "
-                                "self-check passes (1a-T07)")
+                problems.append(Reason(
+                    f"{name} needs receiver-sorted edges (NeighbourConfig.sort_receivers='on'); in any other "
+                    "order the streaming kernels give wrong results while every self-check passes (1a-T07)",
+                    code="streaming-needs-sorted-receivers"))
             elif constraint == OEQ and plan.engine.backend != "hybrid":
-                problems.append(f"{name} needs the hybrid backend (OpenEquivariance kernels)")
+                problems.append(Reason(f"{name} needs the hybrid backend (OpenEquivariance kernels)",
+                                       code="rewrite-needs-hybrid"))
     return problems
 
 
@@ -172,12 +180,28 @@ class _Book:
     def decide(self, item, choice, reason):
         self.decisions.append((item, str(choice), reason))
 
-    def refuse(self, reason):
-        self.refusals.append(reason)
+    def refuse(self, reason, code, rule=None):
+        """Record a refusal: a ``Reason`` with its stable ``code`` and §9.3 ``rule`` (None: an option request)."""
+        self.refusals.append(reason if isinstance(reason, Reason) else Reason(reason, rule=rule, code=code))
+
+    def raise_refusals(self):
+        if self.refusals:
+            raise PlanRefused.from_reasons(self.refusals)
 
 
 def _toggle(value):
     return "on" if value else "off"
+
+
+def _stress_text(config):
+    """The integrator decision's externalstress, in ASE units, with where it came from."""
+    keywords = integrator_keywords(config)
+    stress = keywords["externalstress"]
+    if config.external_stress_GPa is None:
+        return f"{stress:.6g} (-{config.pressure_GPa:g} GPa)"
+    if isinstance(stress, float):
+        return f"{stress:.6g} ({config.external_stress_GPa:g} GPa)"
+    return "(" + ", ".join(f"{value:.6g}" for value in stress) + ") (external_stress_GPa, Voigt)"
 
 
 def _why(request, rule, explanation):
@@ -211,17 +235,26 @@ class FixedPlanner:
 
     # ------------------------------------------------------------------ stage 1: what loading needs
 
-    def _backend(self, book):
-        """(backend, dtype, cueq_conv_fusion) of stage 1, with their decisions and refusals."""
+    def _backend(self, book, choice=None):
+        """(backend, dtype, cueq_conv_fusion) of stage 1, with their decisions and refusals.
+
+        ``choice``: ``(backend, reason)`` decided by another planner (the minimal planner's backend
+        rule, SPEC §9.3); default the research engine's rule.
+        """
         engine, precision = self.engine, self.precision
-        backend = "hybrid" if engine.backend == "auto" else engine.backend
-        book.decide("EngineConfig.backend", backend, _why(engine.backend, AUTO_RULES["EngineConfig.backend"],
-                                                          "graph engine"))
+        if choice is None:
+            backend = "hybrid" if engine.backend == "auto" else engine.backend
+            book.decide("EngineConfig.backend", backend, _why(engine.backend, AUTO_RULES["EngineConfig.backend"],
+                                                              "graph engine"))
+        else:
+            backend, reason = choice
+            book.decide("EngineConfig.backend", backend, reason)
         dtype = ("float32" if backend == "hybrid" else "float64") if precision.dtype == "auto" else precision.dtype
         book.decide("PrecisionConfig.dtype", dtype, _why(precision.dtype, AUTO_RULES["PrecisionConfig.dtype"],
                                                          f"{backend} backend"))
         if backend == "hybrid" and self._device_type() != "cuda":
-            book.refuse(f"the hybrid backend needs a CUDA device (EngineConfig.device={engine.device!r})")
+            book.refuse(f"the hybrid backend needs a CUDA device (EngineConfig.device={engine.device!r})",
+                        "hybrid-needs-cuda")
         rule = AUTO_RULES["EngineConfig.cueq_conv_fusion"]
         if backend == "cueq":
             fusion = engine.cueq_conv_fusion != "off"
@@ -231,7 +264,7 @@ class FixedPlanner:
         else:
             if engine.cueq_conv_fusion == "on":
                 book.refuse("EngineConfig.cueq_conv_fusion='on' requires backend 'cueq' (the hybrid fuses its OEq "
-                            "convolution anyway)")
+                            "convolution anyway)", "conv-fusion-needs-cueq")
             fusion = None
             book.decide("EngineConfig.cueq_conv_fusion", "off", _why(
                 engine.cueq_conv_fusion, rule, "not applicable: the hybrid fuses its OEq convolution anyway "
@@ -247,8 +280,7 @@ class FixedPlanner:
         """Backend, dtype, device and cuEq fusion for ``loading.load`` (stage 1; raises PlanRefused)."""
         book = _Book()
         backend, dtype, fusion = self._backend(book)
-        if book.refusals:
-            raise PlanRefused(book.refusals)
+        book.raise_refusals()
         return ModelSettings(backend, dtype, self.engine.device, fusion)
 
     def _expandable_segments(self, book):
@@ -304,35 +336,57 @@ class FixedPlanner:
     def plan(self, traits, atoms, integrator: IntegratorConfig, hardware: Hardware) -> Plan:
         """The fixed plan for model ``traits`` (a ``ModelTraits``, a model or a ``LoadedModel``), ``atoms``,
         ``integrator`` and ``hardware``; raises ``PlanRefused`` with every reason."""
+        book = _Book()
+        parts = self._resolve(book, traits, atoms, integrator, hardware)
+        book.raise_refusals()
+        return Plan(**parts, reason="fixed plan of phase 1a (main.py)")
+
+    def _resolve(self, book, traits, atoms, integrator, hardware, *, backend_choice=None, evaluation=False,
+                 texts=None):
+        """The plan's parts (``Plan`` keywords except the reason), decisions and refusals in ``book``.
+
+        Shared with the minimal planner (1b-T12): ``backend_choice`` is its backend rule;
+        ``evaluation`` plans a one-off compiled evaluation with stress (no integrator, no graph
+        tier, so exact padding is not required); ``texts`` maps a refusal code to a function that
+        rewrites its text.
+        """
         from fastmace.longrange import polar as longrange
         from fastmace.model.capabilities import ModelTraits, model_traits
 
+        texts = texts or {}
+
+        def refuse(text, code, rule=None):
+            book.refuse(texts[code](text) if code in texts else text, code, rule)
+
         if not isinstance(traits, ModelTraits):
             traits = model_traits(traits.model if hasattr(traits, "calculator") else traits)
-        book = _Book()
         requested = self._requested()
         explicit = {item.split(".", 1)[1] for item, value in requested if item.startswith("RewriteConfig.")
                     and value == "on"}
-        npt = integrator.ensemble == "npt"
+        npt = evaluation or integrator.ensemble == "npt"
 
         # Workload (SPEC §4.4, rule 1) and the graph tier's exact padding (rule 4).
-        book.decide("tier", TIER, "the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC §8.1)")
+        if evaluation:
+            book.decide("tier", "compiled", "one-off evaluation: compiled model, exact edge counts, no CUDA graphs")
+        else:
+            book.decide("tier", TIER, "the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC §8.1)")
         pbc = tuple(bool(flag) for flag in atoms.pbc)
         if not all(pbc):
-            book.refuse(f"periodic boundaries in all three directions (3D PBC) are required, got pbc={pbc} (SPEC §4.4)")
+            refuse(f"periodic boundaries in all three directions (3D PBC) are required, got pbc={pbc} (SPEC §4.4)",
+                   "non-3d-pbc", 1)
         if atoms.constraints:
             names = ", ".join(sorted({type(c).__name__ for c in atoms.constraints}))
-            book.refuse(f"constraints are refused in 1a ({names}; SPEC §4.4)")
-        if not traits.padding_is_exact:
-            book.refuse("edge padding is not exact for this model (edges beyond the cutoff get nonzero weights: "
-                        "apply_cutoff=True with biased or species-dependent radial networks), so the graph tier "
-                        "is refused (SPEC §9.3 rule 4)")
+            refuse(f"constraints are refused in 1a ({names}; SPEC §4.4)", "constraints", 1)
+        if not traits.padding_is_exact and not evaluation:
+            refuse("edge padding is not exact for this model (edges beyond the cutoff get nonzero weights: "
+                   "apply_cutoff=True with biased or species-dependent radial networks), so the graph tier "
+                   "is refused (SPEC §9.3 rule 4)", "inexact-padding", 4)
         book.decide("workload", "ok", f"{len(atoms)} atoms, 3D PBC, no constraints" if all(pbc) and not
                     atoms.constraints else "refused")
         book.decide("hardware", hardware.name, f"compute capability {hardware.compute_capability[0]}."
                     f"{hardware.compute_capability[1]}, {hardware.memory_bytes / 2**30:.1f} GiB (recorded only)")
 
-        backend, dtype, fusion = self._backend(book)
+        backend, dtype, fusion = self._backend(book, backend_choice)
         hybrid = backend == "hybrid"
         values = self._stage1(book, hybrid, npt)
         self._stage2(book, values, traits, explicit)
@@ -341,7 +395,8 @@ class FixedPlanner:
 
         rewrites = self.rewrites
         if rewrites.inplace_block_linear:
-            book.refuse(f"RewriteConfig.inplace_block_linear=True: {NOT_CARRIED_OVER_1A}")
+            book.refuse(f"RewriteConfig.inplace_block_linear=True: {NOT_CARRIED_OVER_1A}",
+                        "inplace-block-linear-not-carried-over")
         book.decide("RewriteConfig.inplace_block_linear", _toggle(rewrites.inplace_block_linear), NOT_CARRIED_OVER_1A)
         book.decide("RewriteConfig.polar_uvu", _toggle(rewrites.polar_uvu),
                     "PolarMACE only (MACE PR 1711)" if traits.polar else "no effect: not a PolarMACE model")
@@ -351,7 +406,7 @@ class FixedPlanner:
         if traits.polar:
             supported, reason = longrange.route_support(backend, self.engine.compile_mode)
             if not supported:
-                book.refuse(reason)
+                book.refuse(reason, "polar-plain-compiled-cueq", 3)
             headroom = self.polar.kspace_headroom
             resolved = longrange.resolve_kspace_headroom(self.polar, npt)
             book.decide("PolarConfig.kspace_headroom", resolved, _why(
@@ -365,39 +420,46 @@ class FixedPlanner:
 
         # Engine options (stage 1 of parse_args) and the process constraints.
         engine = self.engine
-        if npt and engine.speculative_graph:
-            book.refuse("EngineConfig.speculative_graph is not available with NPT (variable cell)")
-        book.decide("EngineConfig.speculative_graph", _toggle(engine.speculative_graph),
-                    "requested" if engine.speculative_graph else "off unless requested (main.py default)")
-        if engine.pipelined == "on" and engine.speculative_graph:
-            book.refuse("EngineConfig.pipelined='on' excludes speculative_graph")
-        pipelined = not engine.speculative_graph and engine.pipelined != "off"
-        book.decide("EngineConfig.pipelined", _toggle(pipelined), _why(
-            engine.pipelined, AUTO_RULES["EngineConfig.pipelined"],
-            "off: speculative_graph" if engine.speculative_graph else "graph engine"))
-        async_output = engine.async_output != "off"
-        book.decide("EngineConfig.async_output", _toggle(async_output), _why(
-            engine.async_output, AUTO_RULES["EngineConfig.async_output"], "graph engine; the run loop's choice"))
         expandable = self._expandable_segments(book)
         book.decide("EngineConfig.compile_mode", engine.compile_mode, "main.py's --compile-mode")
-        book.decide("capture", "on" if self._device_type() == "cuda" else "off",
-                    "CUDA graphs" if self._device_type() == "cuda" else "CPU device: eager stages")
-
-        # Integrator (workflow.GPUEngine.__init__, baoab_settings).
-        if npt:
-            keywords = integrator_keywords(integrator)
-            book.decide("integrator", "LangevinBAOAB", f"NPT, {integrator.cell_mode} cell, externalstress="
-                        f"{keywords['externalstress']:.6g} (-{integrator.pressure_GPa:g} GPa), "
-                        "disable_cell_langevin=False (workflow.baoab_settings)")
+        if evaluation:
+            pipelined = async_output = False
+            for name in ("speculative_graph", "pipelined", "async_output"):
+                book.decide(f"EngineConfig.{name}", "off", "one-off evaluation: no graph engine")
+            book.decide("capture", "off", "one-off evaluation: no CUDA graphs")
+            book.decide("integrator", "none", "one-off evaluation")
+            book.decide("compute_stress", "on", "one-off evaluation: stress for any cell (fm.calc, cell filters)")
+            engine = dataclasses.replace(engine, speculative_graph=False)
         else:
-            book.decide("integrator", "Langevin", f"NVT, fixcm={integrator.fixcm} (workflow.GPUEngine)")
-        book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
-                    "fixed cell: the graph engine computes no stress")
+            if npt and engine.speculative_graph:
+                book.refuse("EngineConfig.speculative_graph is not available with NPT (variable cell)",
+                            "speculative-graph-npt")
+            book.decide("EngineConfig.speculative_graph", _toggle(engine.speculative_graph),
+                        "requested" if engine.speculative_graph else "off unless requested (main.py default)")
+            if engine.pipelined == "on" and engine.speculative_graph:
+                book.refuse("EngineConfig.pipelined='on' excludes speculative_graph", "pipelined-excludes-speculative")
+            pipelined = not engine.speculative_graph and engine.pipelined != "off"
+            book.decide("EngineConfig.pipelined", _toggle(pipelined), _why(
+                engine.pipelined, AUTO_RULES["EngineConfig.pipelined"],
+                "off: speculative_graph" if engine.speculative_graph else "graph engine"))
+            async_output = engine.async_output != "off"
+            book.decide("EngineConfig.async_output", _toggle(async_output), _why(
+                engine.async_output, AUTO_RULES["EngineConfig.async_output"], "graph engine; the run loop's choice"))
+            book.decide("capture", "on" if self._device_type() == "cuda" else "off",
+                        "CUDA graphs" if self._device_type() == "cuda" else "CPU device: eager stages")
 
-        if book.refusals:
-            raise PlanRefused(book.refusals)
-        return Plan(
-            tier=TIER,
+            # Integrator (workflow.GPUEngine.__init__, baoab_settings).
+            if npt:
+                book.decide("integrator", "LangevinBAOAB", f"NPT, {integrator.cell_mode} cell, externalstress="
+                            f"{_stress_text(integrator)}, disable_cell_langevin="
+                            f"{bool(integrator.disable_cell_langevin)} (workflow.baoab_settings)")
+            else:
+                book.decide("integrator", "Langevin", f"NVT, fixcm={integrator.fixcm} (workflow.GPUEngine)")
+            book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
+                        "fixed cell: the graph engine computes no stress")
+
+        return dict(
+            tier="compiled" if evaluation else TIER,
             rewrites=dataclasses.replace(rewrites, **rewrite_values),
             engine=dataclasses.replace(engine, backend=backend, pipelined=_toggle(pipelined),
                                        async_output=_toggle(async_output), cueq_conv_fusion=_toggle(bool(fusion)),
@@ -406,11 +468,10 @@ class FixedPlanner:
             neighbours=dataclasses.replace(self.neighbours, sort_receivers=_toggle(values["sort_receivers"]),
                                            gpu_neighbour_list=_toggle(values["gpu_neighbour_list"])),
             polar=polar,
-            integrator=integrator,
+            integrator=None if evaluation else integrator,
             decisions=tuple(book.decisions),
             requested=requested,
             auto_options_off=tuple(values["_auto_off"].items()),
-            reason="fixed plan of phase 1a (main.py)",
         )
 
     def _requested(self):
@@ -439,7 +500,7 @@ class FixedPlanner:
             """An option that needs ``condition``: "on" without it is refused, "auto" follows it."""
             request = getattr(r, name)
             if request == "on" and not condition:
-                book.refuse(f"RewriteConfig.{name}='on' requires {requirement}")
+                book.refuse(f"RewriteConfig.{name}='on' requires {requirement}", "rewrite-requirement-missing")
             note(name, condition and value, f"stage 1: {'on' if condition and value else 'off'}"
                  + ("" if request == "off" else f" ({'with' if condition else 'without'} {requirement})"))
 
@@ -476,7 +537,8 @@ class FixedPlanner:
             supported, reason = support[key]
             if v[name] and not supported:
                 if name in explicit:
-                    book.refuse(f"RewriteConfig.{name}='on': not supported by the model ({reason})")
+                    book.refuse(f"RewriteConfig.{name}='on': not supported by the model ({reason})",
+                                "rewrite-unsupported-by-model")
                     continue
                 v[name] = False
                 v["_auto_off"][name] = reason
@@ -488,16 +550,19 @@ class FixedPlanner:
         """FastMACE's hard rules on the rewrites, then one decision per rewrite field and neighbour option."""
         if not hybrid and v["reassociate_first"]:
             if "reassociate_first" in explicit:
-                book.refuse(f"RewriteConfig.reassociate_first='on' on plain cuEq: {PLAIN_CUEQ_REASSOCIATION}")
+                book.refuse(f"RewriteConfig.reassociate_first='on' on plain cuEq: {PLAIN_CUEQ_REASSOCIATION}",
+                            "reassociation-plain-cueq")
             v["reassociate_first"] = False
             v["_why"]["reassociate_first"] += f"; off on plain cuEq: {PLAIN_CUEQ_REASSOCIATION}"
         if v["segmented_first_sum"] and not v["reassociate_first"]:
             if "segmented_first_sum" in explicit:
-                book.refuse("RewriteConfig.segmented_first_sum='on' requires reassociate_first, which is off")
+                book.refuse("RewriteConfig.segmented_first_sum='on' requires reassociate_first, which is off",
+                            "rewrite-requirement-missing")
             v["segmented_first_sum"] = False
             v["_why"]["segmented_first_sum"] += "; off: requires reassociate_first, which is off"
         if v["streaming_conv"] and not v["sort_receivers"]:  # cannot happen after stage 1; kept as the hard rule
-            book.refuse("RewriteConfig.streaming_conv needs sort_receivers (NeighbourConfig.sort_receivers='on')")
+            book.refuse("RewriteConfig.streaming_conv needs sort_receivers (NeighbourConfig.sort_receivers='on')",
+                        "streaming-needs-sorted-receivers")
         for name in REWRITE_FIELDS:
             item = f"RewriteConfig.{name}"
             book.decide(item, _toggle(v[name]), _why(getattr(self.rewrites, name), AUTO_RULES[item], v["_why"][name]))
@@ -538,7 +603,7 @@ class FixedPlanner:
         resolution = reg.Resolution(tuple(decisions))
         problems = workload_problems(resolution.enabled, plan, registry)
         if problems:
-            raise PlanRefused(problems)
+            raise PlanRefused.from_reasons(problems)
         return resolution
 
     def build(self, plan: Plan, model, atoms, *, temperature_K: float = 0.0, compile_cache=None, constraints=None,
@@ -567,13 +632,13 @@ class FixedPlanner:
         if backend is not None and (backend, dtype) != (plan.engine.backend, plan.precision.dtype):
             raise ValueError(f"the model was loaded as {backend} {dtype}, the plan needs {plan.engine.backend} "
                              f"{plan.precision.dtype}; load it with FixedPlanner.load")
-        reasons = []
+        book = _Book()
         if not all(atoms.pbc):
-            reasons.append("periodic boundaries in all three directions (3D PBC) are required (SPEC §4.4)")
+            book.refuse("periodic boundaries in all three directions (3D PBC) are required (SPEC §4.4)",
+                        "non-3d-pbc", 1)
         if atoms.constraints:
-            reasons.append("constraints are refused in 1a (SPEC §4.4)")
-        if reasons:
-            raise PlanRefused(reasons)
+            book.refuse("constraints are refused in 1a (SPEC §4.4)", "constraints", 1)
+        book.raise_refusals()
         self.configure_process(plan.engine)
 
         from fastmace.rewrites import registry as reg

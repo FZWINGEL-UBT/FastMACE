@@ -70,7 +70,8 @@ class ProcessRecord:
             raise ProcessConstraintError(
                 f"this process already compiled a {self.family} model ({self.family_owner}); MACE's "
                 f"autograd-compile policy is process-wide, so a compiled {family} model ({owner}) cannot "
-                "run in the same process. Run it in a separate process (SPEC §8.7)")
+                "run in the same process. Run it in a separate process; the subprocess runner, which hands "
+                "the state over through a restart write, comes in phase 2 (SPEC §8.7)")
 
 
 PROCESS = ProcessRecord()

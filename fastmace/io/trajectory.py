@@ -13,10 +13,11 @@ step and records an event; the engine wraps them in a ``Snapshot``. ``AsyncOutpu
 snapshots and writes them, oldest first, when the caller drains it, which the run loop does right
 after launching the next step (so the copies overlap the GPU work) and before every restart file.
 
-Seams for 1b (SPEC §10.6): every restart point becomes a chunk boundary of both files and resume
-deletes the chunks after it instead of rewriting the files (``truncate_outputs``, which rereads and
-rewrites the whole trajectory as today). ``OutputWriter`` is the one place that opens the files,
-so chunking replaces its file handling and ``truncate_outputs`` only.
+Chunks (plan task 1b-T06, SPEC §10.6): ``fastmace.io.output.ChunkedOutput`` makes every restart
+point a chunk boundary of both files (``thermo.<n>.csv``, ``trajectory.<n>.traj``), each chunk
+written by an ``OutputWriter``, and resume deletes the later chunks instead of rewriting files.
+``OutputWriter`` with the 1a names and ``truncate_outputs`` (which rereads and rewrites the whole
+trajectory, as the research engine does) stay for ResearchModule's ``main.py``.
 """
 
 from __future__ import annotations
@@ -29,6 +30,9 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
+
+# The canonical copy is in fastmace.protocols (plan task 1b-T07); kept here for main.py's adapter.
+from fastmace.protocols import output_steps  # noqa: F401
 
 if TYPE_CHECKING:
     from ase import Atoms
@@ -97,19 +101,22 @@ class OutputWriter:
     ``atoms`` is the run's ``Atoms`` (numbers, masses, pbc): each frame puts the step's cell,
     positions, momenta and a single-point calculator with energy, forces and stress into it and
     writes it, as the research engine does. ``header`` is written first unless ``append`` (a
-    resumed run, after ``truncate_outputs``).
+    resumed run, after ``truncate_outputs``). ``thermo_name`` and ``trajectory_name`` are the 1a
+    files by default; ``io.output.ChunkedOutput`` opens one writer per chunk with the chunk's names.
     """
 
-    def __init__(self, directory: str | Path, atoms: Atoms, header: Sequence[str], append: bool = False):
+    def __init__(self, directory: str | Path, atoms: Atoms, header: Sequence[str], append: bool = False, *,
+                 thermo_name: str = THERMO_NAME, trajectory_name: str = TRAJECTORY_NAME):
         from ase.io.trajectory import Trajectory
         directory = Path(directory)
         mode = "a" if append else "w"
         self.atoms = atoms
-        self._trajectory = Trajectory(str(directory / TRAJECTORY_NAME), mode, atoms)
-        self._handle = (directory / THERMO_NAME).open(mode, newline="")
+        self._trajectory = Trajectory(str(directory / trajectory_name), mode, atoms)
+        self._handle = (directory / thermo_name).open(mode, newline="")
         self._csv = csv.writer(self._handle)
         if not append:
             self._csv.writerow(list(header))
+            self._handle.flush()  # a chunk opened at a restart point is complete on disk
 
     def write(self, values: Mapping[str, Any], sample: Sequence[Any] | None = None,
               frame: bool = False) -> tuple[Any, ...] | None:
@@ -187,15 +194,13 @@ class AsyncOutput:
             written.append((snapshot.step, self.writer.write(wait(snapshot), sample, frame)))
         return written
 
+    def restart_point(self) -> dict[str, int]:
+        """Drain, then close the writer's chunk (``ChunkedOutput.restart_point``); returns its indices."""
+        self.drain()
+        return self.writer.restart_point()
+
     def __len__(self) -> int:
         return len(self._pending)
-
-
-def output_steps(total_steps: int, interval: int, heat_steps: int, hold_steps: int = 0) -> list[int]:
-    """Steps at which a sample (or trajectory frame) is written: 0, every interval, the phase ends."""
-    steps = {0, heat_steps, heat_steps + hold_steps, total_steps}
-    steps.update(range(interval, total_steps + 1, interval))
-    return sorted(steps)
 
 
 def truncate_outputs(directory: str | Path, step: int, frame_steps: Iterable[int]) -> list[tuple[Any, ...]]:

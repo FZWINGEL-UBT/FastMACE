@@ -1,4 +1,4 @@
-"""The cache root (SPEC §14 "Caches"): Triton, Inductor, OEq and compile caches, never inside an environment.
+"""The cache root (SPEC §14 "Caches"): Triton, Inductor, OEq, compile and model caches, never inside an environment.
 
 The root is ``FASTMACE_CACHE``, else the user cache directory
 (``$XDG_CACHE_HOME/fastmace`` or ``~/.cache/fastmace`` on Linux). It must not
@@ -16,7 +16,8 @@ from pathlib import Path
 from fastmace.errors import CacheLocationError  # noqa: F401 (re-exported: the 1a names)
 
 ENVIRONMENT_VARIABLE = "FASTMACE_CACHE"
-CACHE_KINDS = ("triton", "inductor", "oeq", "compile")
+# "models": downloaded checkpoints, each verified against its SHA-256 before it is kept (SPEC §7.6).
+CACHE_KINDS = ("triton", "inductor", "oeq", "compile", "models")
 
 
 def _user_cache_directory(environ):
