@@ -164,7 +164,7 @@ def test_warmups_restore_the_full_registered_state(npt):
     engine.flush()
     engine.integrator.prepare_step(engine.state)
     set_sticky_flags(engine)
-    before = {name: tensor.clone() for name, (_, tensor) in engine.registry.entries().items()}
+    before = {name: tensor.detach().clone() for name, (_, tensor) in engine.registry.entries().items()}
     for key in stage_keys(engine):
         engine._warm_up(key)
         assert_registered_state_unchanged(engine, before, key)
@@ -176,7 +176,7 @@ def test_snapshot_and_restore_put_every_captured_buffer_back():
     engine.run(2)
     engine.flush()
     saved = engine.registry.snapshot()
-    before = {name: tensor.clone() for name, (_, tensor) in engine.registry.entries().items()}
+    before = {name: tensor.detach().clone() for name, (_, tensor) in engine.registry.entries().items()}
     engine.run(3)
     engine.flush()
     engine.registry.restore(saved)
@@ -263,7 +263,7 @@ def test_mace_warmups_restore_the_full_registered_state(mace_engine, family, npt
     set_sticky_flags(engine)
     if family == "polar":
         assert "force_field.polar.overflow" in engine.registry.entries()
-    before = {name: tensor.clone() for name, (_, tensor) in engine.registry.entries().items()}
+    before = {name: tensor.detach().clone() for name, (_, tensor) in engine.registry.entries().items()}
     for key in stage_keys(engine):
         engine._warm_up(key)
         assert_registered_state_unchanged(engine, before, key)

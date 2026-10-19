@@ -50,22 +50,33 @@ engine.run(20)
 engine.flush()
 torch.cuda.synchronize()
 
+graphs_after_run = [str(key) for key in engine._graphs]
+
+# The graphs the run captured, plus AC, C, ACP and the current B bucket (a rebuild or a pool reset
+# in the last step may have cleared the dict).
 def keys():
     out = [key for key in engine._graphs]
-    for key in ("AC", "C"):
+    extra = ["AC", "C"]
+    if engine.pipelined:
+        extra += ["ACP", ("B", engine._pipe_edges)]
+    else:
+        extra.append(("B", engine._padded(int(engine.force_field.edge_count))))
+    for key in extra:
         if key not in out:
             out.append(key)
     return out
 
-# Capture warm-ups leave no trace, sticky flags included.
+# Capture warm-ups leave no trace, sticky flags included. The copies are detached: a clone of the
+# force field's positions leaf (requires grad) would leave an autograd node on the default stream,
+# which a later capture refuses (stale AccumulateGrad stream).
 engine.integrator.prepare_step(engine.state)
 for name, (policy, tensor) in engine.registry.entries().items():
     if policy.sticky:
         tensor.fill_(1)
 bad, captured = [], []
 for key in keys():
-    before = {name: (tensor.data_ptr(), tensor.clone()) for name, (policy, tensor) in engine.registry.entries().items()
-              if policy.capture}
+    before = {name: (tensor.data_ptr(), tensor.detach().clone())
+              for name, (policy, tensor) in engine.registry.entries().items() if policy.capture}
     engine._graphs.pop(key, None)
     engine._capture(key)
     torch.cuda.synchronize()
@@ -94,7 +105,9 @@ def exercise():
 
 unregistered = unregistered_mutations(engine, exercise)
 print(json.dumps({"warmup_mismatches": bad, "captured": captured, "sticky": sticky, "unregistered": unregistered,
-                  "mode": engine.mode, "backend": plan.engine.backend, "dtype": plan.precision.dtype,
+                  "mode": engine.mode, "graphs_after_run": graphs_after_run,
+                  "pool_resets": engine.pool_resets, "neighbour_rebuilds": engine.rebuilds,
+                  "backend": plan.engine.backend, "dtype": plan.precision.dtype,
                   "registered": sorted(engine.registry.tensors()), "torch": torch.__version__,
                   "gpu": torch.cuda.get_device_name()}))
 """
@@ -111,6 +124,7 @@ def check(result, name):
     assert result["warmup_mismatches"] == [], result["warmup_mismatches"]
     assert result["unregistered"] == [], result["unregistered"]
     assert {"engine.flags", "engine.pipe_flags"} <= set(result["sticky"])
+    assert any(key.startswith("('B'") for key in result["captured"]), result["captured"]
 
 
 @ENGINE.needs_oeq
