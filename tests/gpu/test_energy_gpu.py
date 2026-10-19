@@ -95,14 +95,18 @@ def test_float64_energy_replays_and_keeps_forces(dtype, compile_mode):
     eager = {flag: evaluate(field, positions) for flag, field in fields.items()}
     replayed = {flag: captured(field, positions) for flag, field in fields.items()}
     assert eager[True][0].dtype == torch.float64
-    # The float64 sums use atomic adds on the GPU: the same value up to their summation order.
-    np.testing.assert_allclose(float(replayed[True][0][0]), float(eager[True][0][0]), rtol=1e-13, atol=0)
+    # The float64 sums use atomic adds on the GPU: the same value up to their summation order. In
+    # float32 the per-atom terms themselves come from atomic float32 scatters (4e-7 eV on 64 atoms).
+    np.testing.assert_allclose(float(replayed[True][0][0]), float(eager[True][0][0]),
+                               rtol=1e-13 if dtype == torch.float64 else 0,
+                               atol=0 if dtype == torch.float64 else 1e-5)
     # Forces and stress: MACE's autograd of its own scalar either way (design A). Bitwise on the CPU
     # (tests/cpu/test_energy.py); here two graphs with atomic scatters, so to rounding.
-    tolerance = 1e-12 if dtype == torch.float64 else 1e-5
+    # The noise of one force field (its replay against its eager call) bounds the difference.
     for index in (1, 2):
         a, b = replayed[True][index], replayed[False][index]
-        assert float((a - b).abs().max()) <= tolerance * float(b.abs().max())
+        noise = float((replayed[False][index] - eager[False][index]).abs().max())
+        assert float((a - b).abs().max()) <= 4 * noise + 1e-12 * float(b.abs().max())
     reference = MACEForceField(cueq_calculator(model, torch.float64), atoms, neighbours=NEIGHBOURS)
     expected = float(evaluate(reference, positions)[0][0])
     error, stock_error = abs(float(eager[True][0][0]) - expected), abs(float(eager[False][0][0]) - expected)

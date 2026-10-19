@@ -86,15 +86,87 @@ float32 and float64.
 
 ## GPU
 
-Pending the conductor's GPU slot (local RTX 5060 Ti). Commands, from the
-repository root in WSL with `PYTHONPATH=$PWD`, `FASTMACE_MODELS` and
-`FASTMACE_STRUCTURES` set:
+Local PC, NVIDIA GeForce RTX 5060 Ti (16 GB, WSL2), 20 October 2026,
+02:39–03:12, in the conductor's slot. References: `mace_cueq_latest`, plain
+cuEquivariance float64, eager, no rewrites. Production: `mace_cueq_oeq`,
+main.py's fixed plan for the hybrid backend (float32, compiled, CUDA graphs),
+the energy of the engine's initial evaluation. FastMACE: branch
+`fastmace/1b-T03`, engine code of `7fe4345` (the later commits change only
+tests, `tools/energy64_gpu.py`'s `--first` option and this document).
+Baseline for "1a sum": the same build with `float64_energy=False`, which
+reproduces 1a's energy exactly (CPU test). Structures from the baseline
+export (`research-engine-baseline-20261017`, `Structures/Benchmark/R2SCAN`),
+rattled by 0.03 Å (seed 1). Checkpoints by label: `polar1-s` (sha256
+e4495612…), `omol0-xl` (9b64b4fd…), `mh1-r2scan` (a522eb7f…). Raw JSON, logs,
+scripts and the `free -m`/load log in `results/1b-T03-rtx5060ti-20261019/`
+(the JSON's `fastmace_commit` is empty: git in WSL does not read this Windows
+worktree; the commit is the one above). Runs launched with
+`setsid nohup`, `TORCHINDUCTOR_COMPILE_THREADS=4`, at least 10.9 GB RAM
+available throughout the second part.
+
+### Energies: float32 production against float64
+
+Error = production − float64 reference, per atom.
+
+| Model | Structure | Atoms | 1a float32 sum (meV/atom) | float64 sum (meV/atom) |
+| --- | --- | ---: | ---: | ---: |
+| POLAR-1-S | NbCl5 2×2×2 | 576 | −63.9 | +0.0004 |
+| OMOL-0 XL | NbCl5 2×2×2 | 576 | −45.5 | +0.0014 |
+| MH-1 `matpes_r2scan` | NbCl5 3×3×3 | 1944 | +0.122 | +0.00014 |
+| MH-1 `matpes_r2scan` | NaCl 3×3×3 | 216 | −0.0051 | +0.00002 |
+
+On NbCl5 3×3×3 the float64 references of POLAR-1-S and OMOL-0 XL do not fit
+in 16 GB (CUDA out of memory), so those two models are compared on 2×2×2,
+where the reference fits; the plan asked for 3×3×3. On 3×3×3 only the two
+production sums exist: POLAR-1-S 1a −20,790,678.0 eV against float64
+−20,790,840.03 eV (83 meV/atom apart), OMOL-0 XL −20,790,748.0 against
+−20,791,047.98 eV (154 meV/atom apart). Since the float64 sum agrees with
+the reference to 0.001 meV/atom on 2×2×2, these differences are the error of
+1a's float32 sum at 3×3×3; OMOL-0 XL's exceeds the 45–102 meV/atom of 1a's
+gates (§4.3), because the float32 summation error grows with the total. The
+reference's two sums (float64 and MACE's own, both in a float64 model) agree
+to 1e-15 relative in every case.
+
+**Owner decision D2 (MH-1 on `main.py`).** The production energy of MH-1
+`matpes_r2scan` changes by **0.12 meV/atom on NbCl5 3×3×3** (0.236 eV in
+total) and 0.005 meV/atom on NaCl 3×3×3, against the expectation of D2
+(below 0.01 meV/atom). The change is the removal of 1a's float32 summation
+error: the float64-summed energy is within 0.00014 meV/atom of the float64
+reference. Forces, stress and trajectories do not change.
+
+### GPU tests
+
+`tests/gpu/test_energy_gpu.py`, `mace_cueq_latest`: 4 passed (float32 and
+float64, eager and compiled). The float64 energy replays in a CUDA graph as
+eager, to the order of the GPU's atomic float64 adds (1e-13 relative) in a
+float64 model and to the float32 per-atom noise (4e-7 eV on 64 atoms) in a
+float32 one; forces and stress with and without the float64 sum differ by no
+more than one force field's own replay noise (not bitwise on the GPU, where
+both sides use atomic scatters). Tiny float32 model with all-electron E0:
+float64 sum 2.6–5.9 µeV from the float64 model, stock float32 sum 0.28 eV.
+
+### Step time
+
+MH-1 `matpes_r2scan` NaCl 3×3×3, hybrid NVT, two engines in one process
+(float64 sum, 1a sum), 300 warm-up steps, 12 alternating blocks of 300 steps
+per side (`abba`), one process per build order:
+
+| Built first | float64 sum (ms) | 1a sum (ms) | 1a / float64 |
+| --- | ---: | ---: | ---: |
+| float64 sum | 3.5656 | 3.5766 | 1.0031 |
+| 1a sum | 3.5662 | 3.5760 | 1.0027 |
+
+The float64 sum is not slower; in both orders it is 0.3 % faster, inside the
+block-pair spread on this GPU (0.990–1.015) and the 1.8 % cross-process
+spread of NaCl in `1a-noise-floor.md`. A first A/B process (02:52–02:55)
+overlapped a CPU suite of another task and is discarded
+(`ab-NaCl-overlapped/`).
+
+Commands (from the repository root in WSL, `PYTHONPATH=$PWD`,
+`FASTMACE_MODELS=~/models`, `FASTMACE_STRUCTURES=~/fastmace-baseline/1a-T18`):
+`results/1b-T03-rtx5060ti-20261019/run.sh` and `run2.sh`, for example
 
 ```bash
-# References (plain cuEq float64) and production (main.py's hybrid plan), one process each.
-python tools/energy64_gpu.py energy --side reference --model polar1-s --structure NbCl5 --output results/1b-T03/polar1-s-NbCl5-ref.json
-python tools/energy64_gpu.py energy --side production --model polar1-s --structure NbCl5 --output results/1b-T03/polar1-s-NbCl5-f64.json
-python tools/energy64_gpu.py energy --side production --float64-energy off --model polar1-s --structure NbCl5 --output results/1b-T03/polar1-s-NbCl5-1a.json
-# Step time, float64 sum against 1a's sum, 12 alternating blocks in one process.
-python tools/energy64_gpu.py ab --model mh1-r2scan --structure NaCl --output results/1b-T03/ab-NaCl
+python tools/energy64_gpu.py energy --side reference --model polar1-s --structure ~/fastmace-baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl5.cif@2x2x2 --output out.json
+python tools/energy64_gpu.py ab --model mh1-r2scan --structure NaCl --first float32_sum_1a --output ab-dir
 ```
