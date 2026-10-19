@@ -1234,6 +1234,27 @@ notes folder of the conductor's session (`2-T0x-…md`).
     19-label gate after a merge that changed numerics (Q9).
   - Judge each machine against its own noise floor, as decision 27 did (Q10).
 
+### During wave 1 (20 October 2026)
+
+- **2-T11 merged** (trial on murphy: 2167 passed).
+- **1b-T27 held.** Its tier hook raised `UsageError` during collection when
+  acceptance tests were collected without their environment variables. That
+  crashed every xdist worker, and xdist blamed each worker's first test.
+  The fix (c2ac3b8: the check runs in the controller only, and only when
+  `-m` selects acceptance tests) is accepted.
+- **The flaky test, found.** 1b-T27 found an order-dependent failure that
+  `main` has too:
+  - running `test_acceptance_1b.py::test_two_simulation_sides_on_the_cpu`
+    and then `test_forces.py::test_polar_force_field_enables_its_own_copy`
+    in one process makes the polar test fail (5.4e-12 against 1e-12);
+  - the polar patch that stays applied after it then fails three
+    `test_loading` tests in the same worker.
+  2-T14 takes the reproducer and finds the leaked process state: a library
+  fix if a `Simulation` or force field leaks state (an isolation defect), a
+  test fix if the bound wrongly assumes first-in-process rounding. 1b-T27
+  merges after that fix, because with it the `-n 8` suite fails in about 3 of
+  5 runs.
+
 ## Phase 1b items carried into phase 2
 
 | Item (where found or decided) | Phase 2 task |
