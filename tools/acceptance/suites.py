@@ -161,6 +161,8 @@ def environment(machine: Machine, run_root: Path) -> dict:
         "TORCHINDUCTOR_CACHE_DIR": str(cache / "inductor"), "TRITON_CACHE_DIR": str(cache / "triton"),
         "MACE_COMPILE_CACHE": str(cache / "compile"), "XDG_CACHE_HOME": str(cache / "xdg"),
         "TMPDIR": str(tmp), "TMP": str(tmp), "TEMP": str(tmp),
+        # Inductor's compile workers (conductor rule for 1b-T23: 4, so a compile cannot crowd out the machine).
+        "TORCHINDUCTOR_COMPILE_THREADS": "4",
     }
 
 

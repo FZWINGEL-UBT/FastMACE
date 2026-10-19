@@ -427,20 +427,25 @@ def test_two_simulation_sides_on_the_cpu(tmp_path, monkeypatch):
                                      process=constraints.ProcessRecord())
     monkeypatch.setattr(minimal, "default_planner", lambda force_field: planner)
     atoms = nacl(repeat=1, rattle=0.05, seed=3)
-    built = {}
-    for name in ("first", "second"):
-        args = ab_frontends.parse_args(["--output", str(tmp_path / name), "--sides", "simulation", "md"])
-        built[name] = ab_frontends.build_simulation(args, atoms, loaded)
+    args = ab_frontends.parse_args(["--output", str(tmp_path / "runs"), "--sides", "simulation", "md", "ase"])
+    built = {name: ab_frontends.BUILDERS[name](args, atoms, loaded) for name in args.sides}
     sides = {name: ab_frontends.ChunkSide(runner, synchronize=lambda: None)
              for name, (_, runner, _, _) in built.items()}
     result = ab_frontends.run_round_robin(sides, step_time.TimingProtocol(warmup=2, block=3, blocks=2))
-    assert set(result["ratios_over_first"]) == {"second"} and result["order"] == ["first", "second"] * 2
-    (sim_a, _, plan_a, gate_a), (sim_b, _, plan_b, gate_b) = built["first"], built["second"]
-    assert ab_frontends.plans_equal(plan_a, plan_b) and ab_frontends.gate_records_equal(gate_a, gate_b)
-    assert sim_a.committed().step == sim_b.committed().step == 2 + 2 * 3
-    np.testing.assert_array_equal(sim_a.committed().positions, sim_b.committed().positions)  # same seed, same work
-    for sim, _, _, _ in built.values():
-        sim.close()
+    assert set(result["ratios_over_first"]) == {"md", "ase"} and result["order"] == ["simulation", "md", "ase"] * 2
+    plans = {name: entry[2] for name, entry in built.items()}
+    gates = {name: entry[3] for name, entry in built.items()}
+    for name in ("md", "ase"):
+        assert ab_frontends.plans_equal(plans["simulation"], plans[name]), name
+        assert ab_frontends.gate_records_equal(gates["simulation"], gates[name]), name
+    sims = {"simulation": built["simulation"][0], "md": built["md"][0].simulation, "ase": built["ase"][0].simulation}
+    steps = {name: sim.committed().step for name, sim in sims.items()}
+    # fm.md and the ASE shim ran one step to build; then the same warm-up and blocks
+    assert steps == {"simulation": 2 + 2 * 3, "md": 1 + 2 + 2 * 3, "ase": 1 + 2 + 2 * 3}
+    np.testing.assert_array_equal(sims["md"].committed().positions, sims["ase"].committed().positions)
+    built["ase"][0].close()
+    for name in ("simulation", "md"):
+        sims[name].close()
 
 
 # --- tools/library_gate.py: the in-library reduced gate per label -------------------------------------------
