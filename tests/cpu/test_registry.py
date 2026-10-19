@@ -72,6 +72,8 @@ def test_policy_table_records_are_valid_and_unique():
     ("integrator.x_old", "derived", True, False),
     ("force_field.neighbours.edge_index", "reset", True, False),
     ("force_field.volume", "derived", True, False),
+    ("force_field.positions", "derived", True, False),
+    ("force_field.node_e0", "derived", True, False),
     ("force_field.polar.overflow", "reset", True, True),
     ("force_field.polar.coefficients", "reset", True, False),
     ("engine.flags", "reset", True, True),
@@ -242,6 +244,7 @@ def test_mace_stages_mutate_only_registered_tensors(mace_engine, family, npt):
         if not polar_available():
             pytest.skip("PolarMACE needs MACE's polar module")
     engine = mace_engine(family, npt)
+    assert {"force_field.positions", "force_field.node_e0"} <= set(engine.registry.tensors())
     assert unregistered_mutations(engine, lambda: exercise(engine)) == []
 
 

@@ -95,6 +95,7 @@ T04 registers them and adds anything its version-counter test finds. The table i
 | `neighbours.cell` (copy of the current cell, T04) | derived from `state.cell` (`set_cell`) | capture |
 | force-field `cell`, `volume`, `rcell` | derived from `state.cell` | capture |
 | force-field `positions` (the model's input leaf, T04) | derived (refilled before every force call) | capture |
+| force-field `node_e0` (float64 per-atom E0, T03) | derived from the species | capture |
 | `polar.*` k-vector set and bounds | reset (rebuild from the cell) | capture |
 | `polar.overflow` | reset | capture, **sticky** |
 | `engine.flags`, `pipe_flags`, `spec_flags`, `rebuild_needed` | reset (quiesce) | capture, **sticky** (overflow bits) |

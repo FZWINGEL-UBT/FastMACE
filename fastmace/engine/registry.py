@@ -113,6 +113,8 @@ POLICIES = (
     *(_policy(f"force_field.{name}", "force_field", "derived", "ForceField.set_cell")
       for name in ("cell", "volume", "rcell")),
     _policy("force_field.positions", "force_field", "derived"),  # refilled before every force call
+    # Float64 per-atom E0 (1b-T03), from the species; changes only with a species event (phase 3).
+    _policy("force_field.node_e0", "force_field", "derived", "fastmace.model.energy.node_e0_float64"),
     # PolarMACE k-space state: the overflow flag is sticky (``|=``), the k-vector set comes from the cell.
     _policy("force_field.polar.overflow", "polar", "reset", "fastmace.longrange.polar.reset_overflow",
             sticky=True),
@@ -173,7 +175,7 @@ class Registry:
 
     def snapshot(self) -> RegistrySnapshot:
         """Copies of every captured buffer, sticky flags included."""
-        return RegistrySnapshot({name: (_identity(tensor), tensor.clone())
+        return RegistrySnapshot({name: (_identity(tensor), tensor.detach().clone())
                                  for name, (policy, tensor) in self.entries().items() if policy.capture})
 
     def restore(self, snapshot: RegistrySnapshot) -> None:
@@ -184,8 +186,11 @@ class Registry:
                 raise RegistryError(f"cannot restore the runtime buffer {name}: it moved since the snapshot",
                                     why="A neighbour rebuild that grew the capacity reallocates its buffers; a "
                                         "snapshot restores values in place, not addresses.")
-        for name, (_, value) in snapshot.values.items():
-            current[name].copy_(value)
+        import torch
+
+        with torch.no_grad():  # the force field's positions are a leaf that requires grad
+            for name, (_, value) in snapshot.values.items():
+                current[name].copy_(value)
 
 
 # --------------------------------------------------------------------------- the CI check (SPEC §12.2)

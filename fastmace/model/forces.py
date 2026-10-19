@@ -577,8 +577,18 @@ class MACEForceField:
         return polar.get_state(self._polar_model)
 
     def buffers(self):
-        """Persistent device buffers the graph-level methods write (and the polar state they read), by name."""
+        """Persistent device buffers the graph-level methods write (and the polar state they read), by name.
+
+        The engine registers them as ``force_field.<name>`` (``fastmace.engine.registry.POLICIES``):
+        the neighbour list, the positions leaf the model differentiates (refilled before every
+        call), the float64 per-atom E0 (from the species), the cell inputs and the polar state.
+        """
+        from fastmace.model import energy as energy64
+
         out = {f"neighbours.{name}": tensor for name, tensor in self.neighbours.buffers().items()}
+        out["positions"] = self.positions
+        if energy64.NODE_E0_KEY in self.data:
+            out["node_e0"] = self.data[energy64.NODE_E0_KEY]
         if self._compute_stress:
             for name in ("cell", "volume", "rcell"):
                 if name in self.data:
