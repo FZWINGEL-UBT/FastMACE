@@ -197,6 +197,7 @@ class Simulation:
         self._window_clock = None
         self._restart_points = []
         self._host_writes = 0
+        self._sinks = []  # (interval, sink): add_sink
         setup = {}
 
         planner = minimal.default_planner(ff)
@@ -270,6 +271,19 @@ class Simulation:
         momenta, forces, energy, kinetic; cell and stress for NPT). The copies run behind the GPU;
         ``sink`` is called after the next step has been launched, or by ``flush_output``."""
         self._queue.submit(self._engine.snapshot(), sink)
+
+    def add_sink(self, sink: Callable[[int, Mapping[str, Any]], Any], interval: int) -> None:
+        """Call ``sink(step, values)`` for every step of ``run`` that is a multiple of ``interval``, with
+        the values of ``submit_frame``, through the same asynchronous queue as the chunked output (for
+        ``fastmace.ase``'s trajectory and log files). ``interval`` is independent of the ``Output``
+        cadences; the queue is drained, oldest first, at every restart point and at the end of each
+        ``run``, so a sink has seen every due step up to there. Step 0 is the caller's
+        (``submit_frame``)."""
+        if not callable(sink):
+            raise TypeError(f"sink must be callable, got {type(sink).__name__}")
+        if isinstance(interval, bool) or not isinstance(interval, int) or interval < 1:
+            raise ValueError(f"interval must be a positive int (steps), got {interval!r}")
+        self._sinks.append((interval, sink))
 
     def flush_output(self) -> None:
         """Write everything queued and flush the output files."""
@@ -423,6 +437,10 @@ class Simulation:
                 frame = frame_every is not None and step % frame_every == 0
                 if row or frame:
                     self._submit_output(step, row=row, frame=frame)
+                if self._sinks:
+                    for interval, sink in self._sinks:
+                        if step % interval == 0:
+                            self._queue.submit(engine.snapshot(), sink)
                 if restart_every is not None and step % restart_every == 0:
                     self.save_restart(Path(output.directory) / RESTART_NAME)
                 if step == window_first:

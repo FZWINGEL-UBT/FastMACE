@@ -540,6 +540,23 @@ def test_trajectory_reads_back_frame_for_frame(loaded, tmp_path):
         np.testing.assert_array_equal(frame.get_forces(), reference.get_forces())
 
 
+def test_the_files_never_stop_the_run(loaded, monkeypatch):
+    """trajectory= and logfile= are written by the Simulation's sink: one Simulation.run per run()."""
+    from fastmace import simulation
+
+    calls = []
+    original = simulation.Simulation.run
+
+    def run(self, steps=None, schedule=None, mc=...):
+        calls.append(steps)
+        return original(self, steps=steps, schedule=schedule, mc=mc)
+
+    monkeypatch.setattr(simulation.Simulation, "run", run)
+    dyn = _langevin(loaded, trajectory="run.traj", logfile="run.log", loginterval=2)
+    dyn.run(6)
+    assert calls == [6]
+
+
 def test_append_trajectory_keeps_frames_as_ase(loaded):
     from ase.io import read
 

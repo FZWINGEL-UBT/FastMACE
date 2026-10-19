@@ -277,6 +277,8 @@ class _Dynamics:
         output = Output(self.output, trajectory_every=None)
         self._sim = sim = simulation.Simulation(self.atoms, self._model, integrator=self.integrator, seed=self.seed,
                                                 output=output, check=self.check)
+        if self._has_files():
+            sim.add_sink(self._write_frame, self.loginterval)  # in the step loop, behind the GPU
         report = sim.report
         files = [str(path) for path in (self._trajectory, self._logfile) if path not in (None, "-")
                  and isinstance(path, (str, os.PathLike))]
@@ -327,17 +329,12 @@ class _Dynamics:
     def _has_files(self):
         return self._trajectory is not None or self._trajectory_writer is not None or self._logger is not None
 
-    def _files_due(self, step):
-        return self._has_files() and step % self.loginterval == 0
-
     def _next_stop(self):
-        """The next step after ``nsteps`` where an observer or a file is due, at most ``max_steps``."""
+        """The next step after ``nsteps`` where an observer is due, at most ``max_steps`` (the files are
+        written by the ``Simulation``'s sink and never stop the run)."""
         now = self.nsteps
         stops = [self.max_steps]
-        intervals = [interval for _, interval, _, _ in self.observers]
-        if self._has_files():
-            intervals.append(self.loginterval)
-        for interval in intervals:
+        for _, interval, _, _ in self.observers:
             if interval > 0:
                 stops.append((now // interval + 1) * interval)
             elif abs(interval) > now:
@@ -345,8 +342,9 @@ class _Dynamics:
         return min(stops)
 
     def _at(self, step):
-        """Step ``step`` is committed: queue the files, then call the observers due with the state in ``atoms``."""
-        if self._files_due(step):
+        """Step ``step`` is committed: queue the step-0 files (the sink has the others), then call the
+        observers due with the state in ``atoms``."""
+        if step == 0 and self._has_files():
             self._sim.submit_frame(self._write_frame)
         due = self._due(step)
         if not due:
