@@ -28,7 +28,8 @@ What ``load`` does, in order:
 4. **Build** MACE's calculator (MACE's own loader and cuEq/OEq converters), with
    the fused cuEq convolution of MACE PR 1641 for plain cuEq
    (``_patches.cueq_conv_fusion``, in force for this conversion only) and, for the hybrid, the converter fix
-   that keeps the last layer's irreps (``hybrid_keeps_last_layer_irreps``).
+   that keeps the last layer's irreps (``hybrid_keeps_last_layer_irreps``),
+   between fresh cuEquivariance group-theory caches (``_fresh_cueq_basis_cache``).
 5. **Check** that the backend asked for was built (no silent e3nn fallback), that
    cuEquivariance's fused kernels did not fall back to its naive ones
    (``require_fused_cueq``), the head, and OMOL-0's joint embedding.
@@ -40,10 +41,12 @@ from __future__ import annotations
 
 import contextlib
 import dataclasses
+import functools
 import hashlib
 import importlib
 import importlib.util
 import inspect
+import logging
 import os
 import sys
 import tempfile
@@ -481,6 +484,60 @@ def checkpoint_warning_filter():
         yield
 
 
+LOGGER = logging.getLogger("fastmace.model.loading")
+
+# cuequivariance's reduced-tensor-product module and its dict of basis products (0.12.0).
+_BASIS_MODULE = "cuequivariance.group_theory.irreps_array.reduced_tensor_product"
+_BASIS_DICT = "_cache_reduce_basis_product"
+
+
+@functools.cache
+def _note_basis_cache_missing(reason):
+    """Log once per reason that the clearing was skipped (another cuequivariance version)."""
+    LOGGER.debug("cuEquivariance basis caches not cleared: %s", reason)
+
+
+def clear_cueq_basis_caches():
+    """Empty cuequivariance's group-theory caches: the basis-product dict and the memoised bases and descriptors.
+
+    MACE 0.3.16's ``O3_e3nn.clebsch_gordan`` computes Clebsch-Gordan coefficients in torch's default
+    dtype, and cuequivariance 0.12.0 keeps what it builds from them (``_cache_reduce_basis_product``,
+    a module dict, and ``functools`` caches such as the reduced bases and the symmetric-contraction
+    descriptor), keyed without that dtype. After a float32 conversion, every later float64 conversion
+    in the process took float32-rounded coefficients (up to 1.3e-8 in the basis; 2-T14). Only modules
+    already imported are touched; nothing is imported here.
+    """
+    module = sys.modules.get(_BASIS_MODULE)
+    if module is None:
+        if any(name.startswith("cuequivariance.group_theory") for name in list(sys.modules)):
+            _note_basis_cache_missing(f"{_BASIS_MODULE} is not part of this cuequivariance")
+    else:
+        store = getattr(module, _BASIS_DICT, None)
+        if isinstance(store, dict):
+            store.clear()
+        else:
+            _note_basis_cache_missing(f"{_BASIS_MODULE} has no dict {_BASIS_DICT}")
+    for name, loaded in list(sys.modules.items()):
+        if loaded is not None and name.startswith("cuequivariance.group_theory"):
+            for value in list(vars(loaded).values()):
+                if callable(getattr(value, "cache_clear", None)) and hasattr(value, "cache_info"):
+                    value.cache_clear()
+
+
+@contextmanager
+def _fresh_cueq_basis_cache():
+    """A conversion that depends only on its own dtype, as the first one of a process does (2-T14).
+
+    The caches are cleared before (so the conversion does not take what another dtype left) and after
+    (so it leaves nothing of its own dtype for a later one, including MACE's converter called directly).
+    """
+    clear_cueq_basis_caches()
+    try:
+        yield
+    finally:
+        clear_cueq_basis_caches()
+
+
 @contextmanager
 def capture_atomic_energies():
     """Keep an exact float64 copy of the E0 table of every model ``torch.load`` returns in the block.
@@ -617,7 +674,8 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
     if naive:
         from fastmace.model import compile as compiling
     naive_scope = compiling.naive_cueq() if naive else contextlib.nullcontext()
-    with checkpoint_warning_filter(), scope, naive_scope, capture_atomic_energies() as tables:
+    with _fresh_cueq_basis_cache(), checkpoint_warning_filter(), scope, naive_scope, \
+            capture_atomic_energies() as tables:
         from mace.calculators import MACECalculator
         try:
             if backend == "hybrid":
