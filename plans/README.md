@@ -21,7 +21,7 @@ phase before it is under way, not all in advance. Worker rules are in
 All phase 2 tasks (2-T01 to 2-T23) were prestarted on 19 October 2026 and
 wait for the conductor's go message (`CONDUCTOR.md`, "Prestarted phase
 workers"). 2-T21 works in the ResearchModule worktree
-`D:\Margraf\ResearchModule-wt-T21` (branch `fastmace/2-T21`).
+`D:/Margraf/ResearchModule-wt/2-T21` (branch `fastmace/2-T21`).
 
 - Phase 1b: done, apart from 1b-T27 (the GPU acceptance tier), which is
   finishing its acceptance-tier run on murphy. 2-T01's go waits for it.
