@@ -9,7 +9,7 @@ locally and 135 min on murphy, plus 25 min of research-engine comparisons.
 | --- | --- | ---: | ---: |
 | fast | `pytest tests/gpu -m "not slow and not acceptance"` | 190 | 7.9 min ¹ |
 | full | `pytest tests/gpu -m "not acceptance"` | 244 ² | **38.7 min** ³ (was 142 min) |
-| acceptance | `pytest tests/gpu -m acceptance` | 10 | murphy: ACCEPTANCE-RESULT |
+| acceptance | `pytest tests/gpu -m acceptance` | 10 | murphy: **103 min**, 10 passed |
 
 1. The sum of the fast-tier tests' times in the full-tier run (the tool's total).
 2. Collected; the run had 241 passed and 3 skipped, without the OMOL-0 XL gate case.
@@ -102,4 +102,28 @@ Fed 1b-T23's junit files, the tool flags four tiny-model tests in the fast tier 
 
 ## Acceptance tier on murphy
 
-ACCEPTANCE-SECTION
+murphy (NVIDIA RTX 4000 Ada Generation 20 GB; GPU idle before each run, margraf's CPU jobs running),
+NAS environments `mace_cueq_latest` with `mace_cueq_oeq` as `FASTMACE_HYBRID_PYTHON`,
+`FASTMACE_BASELINE=/mnt/homes/zwingel/fastmace-baseline/1a-T18` (research engine
+`research-engine-baseline-20261017`, d2faa9fd), `FASTMACE_MODELS=/mnt/homes/zwingel/ResearchModule/Models`,
+`TORCHINDUCTOR_COMPILE_THREADS=4`. The detached copy is `/mnt/homes/zwingel/fastmace-t27`; run root
+`/mnt/homes/zwingel/fastmace-acceptance/1b-T27-murphy-20261019` (`run.sh`, logs).
+
+| Test | Time |
+| --- | ---: |
+| `test_ase_equivalence_gpu.py::test_langevin_reproduces_ase_in_every_50_K_bin` | 3749 s |
+| `test_ase_equivalence_gpu.py::test_baoab_variants_reproduce_their_references` | 936 s |
+| `test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine` | 365 s |
+| `test_canonical_restart_gpu.py::test_mh1_hybrid_resumes_statistically` | 347 s |
+| `test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine` | 259 s |
+| `test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine` | 202 s |
+| `test_forces_gpu.py::test_mh1_agrees_with_maceforces[hybrid-float32-compiled-production]` | 96 s |
+| `test_forces_gpu.py::test_mh1_agrees_with_maceforces[cueq-float64-compiled-production]` | 80 s |
+| `test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[omol0-xl]` | 73 s |
+| `test_selfcheck_gpu.py::test_gate_time_on_nbcl5` | 47 s |
+
+- **Main run** at 28932d1: 9 passed in 101.4 min.
+- **OMOL-0 XL case** at 153329e, after it moved to acceptance: 1 passed in 1.3 min.
+
+The three research-engine comparisons in `test_engine_gpu.py` failed in 1b-T23's murphy rerun
+(phase-1b.md items 4 and 5) and pass here. Junit: `results/1b-T27-murphy-20261019/`.
