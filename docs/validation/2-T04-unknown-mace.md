@@ -19,7 +19,19 @@ string. The version only appears in reasons and in the reference record's id.
 | `cueq_conv_fusion` | installed | not installed; MACE's own conversion rule stays |
 
 `fastmace.rewrites.versions.treatments()` lists these decisions with their reasons.
-`effective_precision`, `polar_support` and `capture_support` are what the planner asks.
+
+**Planner** (`MinimalPlanner._common`):
+- The `force_precision` decision is the effective precision. A promotion carries a
+  `Reason` with code `precision-promoted-unqualified-energy`, and the requested precision is kept
+  in `plan.requested`. This happens at revision 0, before anything is built, so no `Plan.revise`
+  is involved.
+- The run report prints the promotion as a downgrade ("why") line.
+- PolarMACE without its hashed forward is refused (rule 1, code `polar-unqualified-source`).
+- The default never promotes: on MACE 0.3.16 every hash matches (tested).
+
+Still open: `capture_support` is not yet a planner decision (`fixed.py` belongs to T02). Without
+it, a multi-head model on a MACE with an unhashed mask fails at capture (`UnqualifiedPatchError`),
+and the fallback (T15) takes it to eager. On 0.3.15 the mask hashes.
 
 **Hash gates.** Every process-wide patch in `fastmace._patches` checks each source it replaces
 against `SOURCE_PINS` and raises `UnqualifiedPatchError` otherwise.
@@ -40,7 +52,11 @@ resume on the same MACE re-plans the same way.
 (`record_for(version, family)`, `record.qualified` is False):
 - stock equivalence only;
 - PR 1498's strain is stock only when its source hashes;
-- the yardstick's float64 accumulation only when the float64 forward hashes;
+- the yardstick's float64 accumulation only when the float64 forward hashes. Otherwise the
+  `float32_sum_unqualified` entry keeps MACE's own float32 sum, with
+  `info()["energy_bound"]` set to the looser bound, which the gate record carries under
+  `references.yardstick` and the report's gate line names. Production then runs float64 (the
+  promotion), so its own energy error stays small;
 - PolarMACE is refused.
 
 `content_digest()` is the digest without the version, for 2-T09's resume rule. The 0.3.16
@@ -65,7 +81,10 @@ If the failed record had installed a process-wide patch, that patch is undone.
 The revision is built again from the pristine model (decision 24). The fallback (2-T15) calls
 it. 2-T04 does not touch `planner/minimal.py`.
 
-Per-record self-check results: `MACEForceField.selfcheck_records()` (`registry.selfcheck_records`).
+Per-record self-check results:
+- `MACEForceField.selfcheck_records()` (`registry.selfcheck_records`);
+- `Plan.selfchecks` (`SelfCheck` records) on the plan that `MinimalPlanner.build` attaches to the
+  engine (`engine.plan`). `Simulation` (T15) and provenance (T17) pick it up from there.
 
 ## MACE 0.3.15 against the pins
 
