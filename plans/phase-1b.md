@@ -1361,6 +1361,20 @@ points here.
   `cuequivariance_ops_torch` created `~/.cache/cuequivariance-triton`, and
   `doctor` must change nothing.
 
+### After T04, T13, T18 (19 October 2026)
+
+- T13: the POLAR-1-S reference matches 1a-T19's stored float64 references
+  to 5e-15 on murphy (the same hardware as leto, where they were made). The
+  finite-difference self-test gives 6.9e-9.
+- **T18 finding, a follow-up for the compiled tier:** `fm.calc` compiles a
+  second time at its second call (4.5 s on plain cuEq, 19 s on hybrid,
+  NaCl 2×2×2). The likely cause is `torch.compile` switching to dynamic
+  shapes when the edge count changes. After that a call takes about 15 ms.
+  Few-call tools (phonopy, NEB) mostly pay compile time. The fix (compile
+  the evaluation plan dynamic from the first call) belongs in the planner
+  or `model/compile.py`; it is phase 2 planner work unless 1b-T23 shows it
+  matters for acceptance.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
