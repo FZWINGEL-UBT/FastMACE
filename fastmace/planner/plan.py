@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from fastmace.config import (
@@ -31,6 +31,8 @@ if TYPE_CHECKING:
 # The schema of Plan.to_restart; a change of its keys or meaning increases it.
 PLAN_RECORD_VERSION = 1
 # The resolved config parts of a plan, by attribute name, and their classes in fastmace.config.
+# Where a plan runs (SPEC §8.7): in this process, or in a child through the subprocess runner (2-T07).
+RUNNERS = ("in-process", "subprocess")
 _PARTS = (("rewrites", "RewriteConfig"), ("engine", "EngineConfig"), ("precision", "PrecisionConfig"),
           ("neighbours", "NeighbourConfig"), ("polar", "PolarConfig"), ("integrator", "IntegratorConfig"))
 
@@ -102,7 +104,10 @@ class Plan:
     - ``allowances``: the ``allow_*`` flags the plan used (``"allow_naive_cueq"``), recorded;
     - ``revision``, ``predecessor``, ``reason``, ``step``: a plan never changes in place; a runtime
       switch or fallback makes a new revision (``revise``) that points at the one before, with the
-      step it takes effect at.
+      step it takes effect at;
+    - ``runner``: ``"in-process"``, or ``"subprocess"`` where a process constraint of §8.7 forbids the
+      plan in this process and the subprocess runner runs it in a child (2-T07). Not in the restart
+      record: the child resumes the plan in its own process.
     """
 
     tier: str
@@ -125,6 +130,11 @@ class Plan:
     predecessor: Plan | None = None
     reason: str = "initial plan"
     step: int | None = None
+    runner: Literal["in-process", "subprocess"] = "in-process"
+
+    def __post_init__(self):
+        if self.runner not in RUNNERS:
+            raise ValueError(f"Plan.runner {self.runner!r} is not one of {RUNNERS}")
 
     def decision(self, key: str) -> tuple[str, str, str]:
         """The decision with ``key``; ``KeyError`` if the plan has none."""
@@ -161,6 +171,8 @@ class Plan:
             lines.append("  requested: " + ", ".join(f"{item}={value}" for item, value in self.requested))
         if self.allowances:
             lines.append("  allowed: " + ", ".join(self.allowances))
+        if self.runner != "in-process":
+            lines.append(f"  runner: {self.runner} (SPEC §8.7)")
         if self.predecessor is not None:
             lines.append(f"  predecessor: revision {self.predecessor.revision}")
         return "\n".join(lines)

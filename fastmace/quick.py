@@ -26,7 +26,7 @@ record (phase 3b, the record shown) and MC after its §7.7 checks (phase 3).
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
 
@@ -71,7 +71,9 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
        pressure_GPa: float = 0.0, cell_mode: str = "hydrostatic", timestep_fs: float = 0.5,
        steps: int | None = None, mc: Any = None, min_mc_temperature_K: float | None = None,
        dispersion: Any = None, repeat: tuple[int, int, int] = (1, 1, 1), output: Any = None,
-       seed: int | None = None, check: str = "skip", integrator: Any = None) -> RunResult:
+       seed: int | None = None, check: str = "skip", integrator: Any = None, mode: str = "graph",
+       allow_reference: bool = False, fallback: Any = None, gate: Any = None, runner: Any = None,
+       engine: Any = None, neighbours: Any = None) -> RunResult:
     """Run MD on ``structure`` (path or ``Atoms``) with ``model`` and return a ``RunResult``.
 
     Arguments as SPEC §7.7 level 2:
@@ -89,7 +91,9 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     - ``output``: a directory or an ``fm.Output``; default ``./<structure stem>.fastmace/``, or
       ``./fastmace-run/`` for an ``Atoms``;
     - ``seed``: the noise seed; ``None`` draws one, recorded in ``metadata.json``;
-    - ``check``: as ``Simulation`` (the gate is opt-in, ``check="gate"``).
+    - ``check``: as ``Simulation`` (the gate is opt-in, ``check="gate"``);
+    - ``mode``, ``allow_reference``, ``fallback``, ``gate``, ``runner``, ``engine``, ``neighbours``:
+      the planner inputs, passed to ``Simulation`` as they are (``simulation.PlannerOptions``).
 
     Every ``ValueError`` and refusal comes before the model is loaded.
     """
@@ -99,9 +103,11 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     from fastmace.model.loading import LoadedModel
     from fastmace.planner.workload import SPECIES_MOVES, Workload
     from fastmace.protocols import Schedule, ScheduleState
-    from fastmace.simulation import Simulation, _steps, check_mode
+    from fastmace.simulation import Simulation, _steps, check_mode, planner_options
 
     check_mode(check)
+    planner_inputs = planner_options(mode=mode, allow_reference=allow_reference, fallback=fallback, gate=gate,
+                                     runner=runner, engine=engine, neighbours=neighbours)
     repeat = _repeat(repeat)
     if not isinstance(ensemble, str) or ensemble.upper() not in ENSEMBLES:
         raise ValueError(f"ensemble={ensemble!r} is not one of {ENSEMBLES} (SPEC §7.7)")
@@ -226,7 +232,8 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
 
         model = load_pristine(name, head, sha256=sha256, trusted=trusted, charge=charge,
                               spin_multiplicity=spin_multiplicity)
-    sim = Simulation(atoms, model, integrator=integrator, workload=workload, output=output, seed=seed, check=check)
+    sim = Simulation(atoms, model, integrator=integrator, workload=workload, output=output, seed=seed, check=check,
+                     **{field.name: getattr(planner_inputs, field.name) for field in fields(planner_inputs)})
     sim.report.repeat = repeat
     sim.run(steps=steps, schedule=schedule)
     sim.flush_output()

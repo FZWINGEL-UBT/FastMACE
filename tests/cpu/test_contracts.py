@@ -360,7 +360,8 @@ def test_simulation_signature():
     signature = inspect.signature(Simulation)
     assert list(signature.parameters)[:2] == ["atoms", "force_field"]
     assert _keyword_only(signature) == ["species", "integrator", "workload", "output", "seed", "check",
-                                        "allow_naive_cueq"]
+                                        "allow_naive_cueq", "mode", "allow_reference", "fallback", "gate",
+                                        "runner", "engine", "neighbours"]  # the planner inputs: 2-T01
     assert signature.parameters["check"].default == "skip"  # owner decision D1: opt-in gate
     assert signature.parameters["workload"].default is None  # owner decision D7
     assert signature.parameters["integrator"].default is inspect.Parameter.empty
@@ -406,7 +407,8 @@ def test_md_signature():
     assert list(signature.parameters)[0] == "structure"
     expected = {"model", "head", "charge", "spin_multiplicity", "sha256", "trusted", "ensemble", "temperature_K",
                 "schedule", "pressure_GPa", "cell_mode", "timestep_fs", "steps", "mc", "min_mc_temperature_K",
-                "dispersion", "repeat", "output", "seed", "check", "integrator"}
+                "dispersion", "repeat", "output", "seed", "check", "integrator",
+                "mode", "allow_reference", "fallback", "gate", "runner", "engine", "neighbours"}  # 2-T01
     assert set(_keyword_only(signature)) == expected
     assert signature.parameters["repeat"].default == (1, 1, 1)
     assert signature.parameters["check"].default == "skip"

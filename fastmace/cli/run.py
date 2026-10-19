@@ -121,8 +121,22 @@ def _output(value):
     return value
 
 
+def _config(key, name):
+    """The converter of a ``[key]`` table to the ``fastmace.config`` record ``name`` (the planner options)."""
+    def convert(value):
+        from fastmace import config
+
+        record_type = getattr(config, name)
+        return record_type(**_fields(record_type, value, key))
+
+    return convert
+
+
 _CONVERT = {"schedule": _schedule, "integrator": _integrator, "dispersion": _dispersion, "mc": _mc,
-            "output": _output, "repeat": lambda value: tuple(value) if isinstance(value, list) else value}
+            "output": _output, "repeat": lambda value: tuple(value) if isinstance(value, list) else value,
+            "engine": _config("engine", "EngineConfig"), "neighbours": _config("neighbours", "NeighbourConfig"),
+            "fallback": _config("fallback", "FallbackConfig"), "gate": _config("gate", "GateConfig"),
+            "runner": _config("runner", "RunnerConfig")}
 
 
 def md_arguments(data):

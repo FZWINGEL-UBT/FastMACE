@@ -10,7 +10,9 @@ What the constructor does, in this order (``docs/design/contracts-1b.md``):
    species=species)`` (§7.6 "Simulation inputs");
 2. ``workload=None`` becomes ``Workload(max_temperature_K=integrator.temperature_K)`` (owner
    decision D7), recorded in the plan;
-3. plan through the minimal planner; ``PlanRefused`` here carries every reason;
+3. plan through the minimal planner, with the caller's planner inputs (``PlannerOptions``: mode,
+   ``allow_reference``, fallback, gate, runner, engine and neighbour options; plan task 2-T01);
+   ``PlanRefused`` here carries every reason;
 4. with ``check="gate"`` or ``"allow_unavailable"``: the gate's references (§12.3, 1b-T16),
    before any production engine exists in the process;
 5. build the engine through the planner;
@@ -34,9 +36,11 @@ import math
 import time
 from collections import deque
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
+
+from fastmace.config import EngineConfig, FallbackConfig, GateConfig, Mode, NeighbourConfig, RunnerConfig
 
 if TYPE_CHECKING:
     import numpy as np
@@ -57,7 +61,7 @@ CONSTANT_PHASE = "constant"  # the thermo phase column without a schedule
 ENGINE_NAME = "fastmace"  # the restart file's engine entry
 RESTART_NAME = "restart.npz"  # io.restart.RESTART_NAME (that module imports torch)
 SIMULATION_NAME = "simulation.json"  # next to the restart: what the restart format does not hold
-SIMULATION_RECORD_VERSION = 1
+SIMULATION_RECORD_VERSION = 2  # 2: the planner options (2-T01); version 1 records resume with the defaults
 HOST_WRITE_WARNING = ("host writes of positions or momenta run at a canonical point (quiesce, write, rebuild, "
                       "re-evaluate; owner decision D4): correct, and slower than a step")
 
@@ -67,6 +71,81 @@ def check_mode(check: Any) -> str:
     if check not in CHECK_MODES:
         raise ValueError(f"check={check!r} is not one of {CHECK_MODES}; the gate is opt-in: check='gate' (SPEC §12.3)")
     return check
+
+
+@dataclass(frozen=True)
+class PlannerOptions:
+    """The planner inputs of ``Simulation`` and ``fm.md`` (plan task 2-T01), validated, recorded in
+    ``simulation.json`` and used again by ``Simulation.resume``.
+
+    - ``mode``: the execution mode (``config.Mode``, §9.3); ``allow_reference``: rule 1's flag;
+    - ``fallback``, ``gate``, ``runner``: the safety records of phase 2 (§9.4, §12.3, §8.7);
+    - ``engine``, ``neighbours``: the planner-level options; ``None`` keeps the default planner's
+      (``planner.minimal.default_planner``: CUDA if available, else the CPU without compilation).
+    """
+
+    mode: Mode = "graph"
+    allow_reference: bool = False
+    fallback: FallbackConfig = field(default_factory=FallbackConfig)
+    gate: GateConfig = field(default_factory=GateConfig)
+    runner: RunnerConfig = field(default_factory=RunnerConfig)
+    engine: EngineConfig | None = None
+    neighbours: NeighbourConfig | None = None
+
+    def to_record(self) -> dict[str, Any]:
+        """A JSON-safe mapping (``simulation.json``'s ``planner_options``)."""
+        import dataclasses
+
+        from fastmace.planner.plan import _json_safe
+
+        def part(value):
+            return None if value is None else _json_safe(dataclasses.asdict(value))
+
+        return {"mode": self.mode, "allow_reference": self.allow_reference, "fallback": part(self.fallback),
+                "gate": part(self.gate), "runner": part(self.runner), "engine": part(self.engine),
+                "neighbours": part(self.neighbours)}
+
+    @classmethod
+    def from_record(cls, record: Mapping[str, Any] | None) -> PlannerOptions:
+        """The options of a ``to_record`` mapping; ``None`` (a version 1 record) gives the defaults."""
+        if record is None:
+            return cls()
+        from fastmace.planner.plan import _from_json
+
+        def part(name, kind):
+            values = record.get(name)
+            if values is None:
+                return None
+            return kind(**{key: _from_json(value) for key, value in values.items()})
+
+        return planner_options(mode=record.get("mode", "graph"), allow_reference=record.get("allow_reference", False),
+                               fallback=part("fallback", FallbackConfig), gate=part("gate", GateConfig),
+                               runner=part("runner", RunnerConfig), engine=part("engine", EngineConfig),
+                               neighbours=part("neighbours", NeighbourConfig))
+
+
+def planner_options(mode: Any = "graph", allow_reference: Any = False, fallback: Any = None, gate: Any = None,
+                    runner: Any = None, engine: Any = None, neighbours: Any = None) -> PlannerOptions:
+    """The validated ``PlannerOptions``: ``ValueError`` or ``TypeError`` before anything is loaded."""
+    from fastmace.config import MODES
+
+    if not isinstance(mode, str) or mode not in MODES:
+        raise ValueError(f"mode={mode!r} is not one of {MODES} (SPEC §9.3)")
+    if not isinstance(allow_reference, bool):
+        raise TypeError(f"allow_reference must be a bool, got {allow_reference!r}")
+    parts = {}
+    for name, value, kind, default in (("fallback", fallback, FallbackConfig, FallbackConfig),
+                                       ("gate", gate, GateConfig, GateConfig),
+                                       ("runner", runner, RunnerConfig, RunnerConfig),
+                                       ("engine", engine, EngineConfig, None),
+                                       ("neighbours", neighbours, NeighbourConfig, None)):
+        if value is None:
+            parts[name] = None if default is None else default()
+        elif isinstance(value, kind):
+            parts[name] = value
+        else:
+            raise TypeError(f"{name} must be a fastmace.config.{kind.__name__} or None, got {type(value).__name__}")
+    return PlannerOptions(mode=mode, allow_reference=allow_reference, **parts)
 
 
 def _steps(steps: Any) -> int:
@@ -124,7 +203,8 @@ class Simulation:
     """MD on the graph engine with a plan, an optional gate, schedules and complete restarts.
 
     ``Simulation(atoms, force_field, *, species=None, integrator, workload=None, output=None, seed,
-    check="skip", allow_naive_cueq=False)``:
+    check="skip", allow_naive_cueq=False, mode="graph", allow_reference=False, fallback=None, gate=None,
+    runner=None, engine=None, neighbours=None)``:
 
     - ``atoms``: ASE ``Atoms``, full 3D PBC (§4.4); copied, the caller's object is never changed;
     - ``force_field``: a ``fm.ForceField``, an ``fm.load`` result or a label; a model is wrapped in
@@ -137,13 +217,24 @@ class Simulation:
       directory, in chunks (§10.6). ``None`` writes no file;
     - ``seed``: the integrator's noise seed, recorded;
     - ``check``: one of ``CHECK_MODES``;
-    - ``allow_naive_cueq``: accept cuEquivariance's naive kernels (§9.2), recorded.
+    - ``allow_naive_cueq``: accept cuEquivariance's naive kernels (§9.2), recorded;
+    - the planner inputs (``PlannerOptions``, recorded in ``simulation.json``): ``mode`` (§9.3),
+      ``allow_reference`` (rule 1), ``fallback`` (``FallbackConfig``, §9.4), ``gate``
+      (``GateConfig``, §12.3 "Resources"; the record is ``sim.gate_config``, the result
+      ``sim.gate``), ``runner`` (``RunnerConfig``, §8.7), ``engine`` (``EngineConfig``) and
+      ``neighbours`` (``NeighbourConfig``). ``None`` takes the defaults, and for ``engine`` and
+      ``neighbours`` the default planner's.
     """
 
     def __init__(self, atoms: Any, force_field: Any, *, species: Any = None, integrator: Any,
                  workload: Workload | None = None, output: Output | None = None, seed: int,
-                 check: Check = "skip", allow_naive_cueq: bool = False):
+                 check: Check = "skip", allow_naive_cueq: bool = False, mode: Mode = "graph",
+                 allow_reference: bool = False, fallback: FallbackConfig | None = None,
+                 gate: GateConfig | None = None, runner: RunnerConfig | None = None,
+                 engine: EngineConfig | None = None, neighbours: NeighbourConfig | None = None):
         check_mode(check)
+        options = planner_options(mode=mode, allow_reference=allow_reference, fallback=fallback, gate=gate,
+                                  runner=runner, engine=engine, neighbours=neighbours)
         from fastmace import integrators as records
         from fastmace.errors import PlanRefused, Reason
         from fastmace.io.output import Output
@@ -182,6 +273,7 @@ class Simulation:
         self.seed = seed
         self.check = check
         self.allow_naive_cueq = bool(allow_naive_cueq)
+        self.options = options
         self._atoms = atoms.copy()
         self._config = integrator.to_config(seed=seed)
         self._npt = self._config.ensemble == "npt"
@@ -200,9 +292,10 @@ class Simulation:
         self._sinks = []  # (interval, sink): add_sink
         setup = {}
 
-        planner = minimal.default_planner(ff)
+        planner = _planner(minimal.default_planner(ff), options)
         started = time.perf_counter()
-        self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq)
+        self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq,
+                                  allow_reference=options.allow_reference, mode=options.mode)
         setup["plan"] = time.perf_counter() - started
 
         # The gate's references before any production engine exists (§12.3); under check="gate" an
@@ -246,6 +339,21 @@ class Simulation:
     def plan(self) -> Any:
         """The active ``Plan`` revision (§9.5)."""
         return self._plan
+
+    @property
+    def fallback(self) -> FallbackConfig:
+        """The ``FallbackConfig`` this simulation was made with (§9.4)."""
+        return self.options.fallback
+
+    @property
+    def gate_config(self) -> GateConfig:
+        """The ``GateConfig`` this simulation was made with (§12.3 "Resources"); ``gate`` is the result."""
+        return self.options.gate
+
+    @property
+    def runner(self) -> RunnerConfig:
+        """The ``RunnerConfig`` this simulation was made with (§8.7)."""
+        return self.options.runner
 
     @property
     def gate(self) -> Any:
@@ -565,7 +673,8 @@ class Simulation:
         reads it there. The output queue is drained and the output chunks end here (§10.6), the
         engine is canonicalised and written by ``io.restart.write_engine_restart`` (T05's format),
         and ``simulation.json`` next to it holds what that format does not: the model source, the
-        integrator record, workload, ``Output``, seed, ``allow_naive_cueq``, species, masses and PBC.
+        integrator record, workload, ``Output``, seed, ``allow_naive_cueq``, the planner options,
+        species, masses and PBC.
         """
         from fastmace.io import restart
 
@@ -614,6 +723,7 @@ class Simulation:
             "output": output,
             "seed": self.seed,
             "allow_naive_cueq": self.allow_naive_cueq,
+            "planner_options": self.options.to_record(),
             "structure": {"numbers": [int(z) for z in atoms.numbers],
                           "masses": [float(m) for m in atoms.get_masses()],
                           "pbc": [bool(p) for p in atoms.pbc]},
@@ -647,9 +757,10 @@ class Simulation:
             raise FileNotFoundError(f"no {SIMULATION_NAME} next to the restart file {file}; Simulation.resume "
                                     "continues runs that Simulation.save_restart wrote")
         record = json.loads(record_path.read_text(encoding="utf-8"))
-        if record.get("simulation_record_version") != SIMULATION_RECORD_VERSION:
+        if record.get("simulation_record_version") not in (1, SIMULATION_RECORD_VERSION):
             raise ValueError(f"{record_path}: record version {record.get('simulation_record_version')!r} is not "
-                             f"{SIMULATION_RECORD_VERSION}")
+                             f"1 or {SIMULATION_RECORD_VERSION}")
+        options = PlannerOptions.from_record(record.get("planner_options"))
         stored = restart.read_restart(file, engine=ENGINE_NAME)
         loaded = _load_model(record["model"])
         rewrites = record["force_field"]["rewrites"]
@@ -669,7 +780,9 @@ class Simulation:
             output = Output(**output)
         sim = cls(_restart_atoms(record["structure"], stored), ff, integrator=_integrator(record["integrator"]),
                   workload=_workload(record["workload"]), output=None, seed=record["seed"], check=check,
-                  allow_naive_cueq=record["allow_naive_cueq"])
+                  allow_naive_cueq=record["allow_naive_cueq"], mode=options.mode,
+                  allow_reference=options.allow_reference, fallback=options.fallback, gate=options.gate,
+                  runner=options.runner, engine=options.engine, neighbours=options.neighbours)
         sim._resume(stored, record, output, allow_plan_change)
         return sim
 
@@ -770,6 +883,24 @@ class Simulation:
 _PLAN_FIELDS = ("tier", "rewrites", "engine", "precision", "neighbours", "polar", "integrator", "superset",
                 "workload")
 _PLAN_RECORDS = ("decisions", "requested", "auto_options_off", "software", "allowances")
+
+
+def _planner(default, options):
+    """``default`` (``minimal.default_planner``'s) with ``options``' engine and neighbour options, if given.
+
+    A copy: the default planner's process record, software and test settings stay, and the default
+    planner itself is not changed.
+    """
+    if options.engine is None and options.neighbours is None:
+        return default
+    import copy
+
+    planner = copy.copy(default)
+    if options.engine is not None:
+        planner.engine = options.engine
+    if options.neighbours is not None:
+        planner.neighbours = options.neighbours
+    return planner
 
 
 def _write_json(path, record):
