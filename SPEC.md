@@ -1376,7 +1376,9 @@ The option therefore means:
 ### 9.4 Fallback algorithm
 
 A failure (rewrite self-check, gate, replay or transition check, compilation
-error) triggers this algorithm, not a fixed "one tier down":
+error) triggers this algorithm, not a fixed "one tier down". It is automatic
+by default; `fallback="refuse"` turns it off, and a failure then raises with
+the record (decision 29):
 1. **Candidates** are points in the five dimensions above, never a change of
    physics. Each candidate is built from a pristine copy of the loaded model
    (the checkpoint state before any rewrite), not by undoing rewrites in
@@ -2261,7 +2263,13 @@ Open decisions for the owner:
    `Experiments/`, `Structures/` or `environment/` in this specification
    are paths in ResearchModule, which keeps the research engine and the
    frozen baseline tag `research-engine-baseline-20261017`.
-2. Minimum MACE version to support beyond 0.3.16.
+2. Minimum MACE version — **decided (user, 19 October 2026, phase 2 D1):
+   0.3.16 is the minimum and the only qualified version.** Other versions
+   run through the versioned registry (§6.3): rewrites whose pinned sources
+   do not hash are off with their reason, and the always-on treatments
+   follow the rule of plan task 2-T04, possibly the reference tier.
+   Qualifying a newer release waits until the environments move to
+   Python ≥ 3.11, which is a later decision.
 3. Gate on the user's structure — **decided (user, 19 October 2026): opt-in**
    (`check="gate"`), off by default and then recorded as `skipped`. A
    requested gate that is `unavailable` refuses the run unless
@@ -2305,8 +2313,20 @@ Open decisions for the owner:
      plain cuEq float64, statistical on the hybrid), `run.json` keeps its
      keys, and `--engine gpu` and the old adapter stay for one phase (28).
 4. Licence — **decided (user, 17 October 2026): MIT** (§14).
-5. Which GPUs to provide as CI runners (local RTX 5060 Ti, a workstation
-   RTX 4000 Ada).
+29–30. Decided (user, 19 October 2026, the phase 2 plan's D3 and D4):
+   - the fallback of §9.4 is automatic by default, with `fallback="refuse"`
+     to opt out. A fallback is never silent: plan revision, report line and
+     metadata (29);
+   - `main.py`'s output after its move to `Simulation` (decision 28): crash-safe
+     chunks while running, then a single `md.traj` and thermo log assembled
+     when the run completes or stops cleanly, so `--quench` and the analysis
+     scripts keep working (30).
+5. CI GPU runners — **decided (user, 19 October 2026, phase 2 D2): the
+   local RTX 5060 Ti (WSL, Blackwell sm_120) and murphy (RTX 4000 Ada,
+   sm_89)** as user-level self-hosted GitHub Actions runners. murphy's
+   runner waits while another user's process is on the GPU, and keeps its
+   files under `/mnt/homes/zwingel`. The owner registers the runners
+   themselves, so the token never passes through an agent (plan task 2-T18).
 6. Constant-pressure melt–quench of the chlorides — **decided (user,
    16 October 2026): part of the first production deliverable**, so GPU D3
    is on the critical path (phase 3b, §16). If the chlorides fail
@@ -2632,3 +2652,7 @@ from the float32 autograd (equivalent, 1b-T03); §7.7 ASE shim also refuses
 **Draft 0.12, seventh amendment (19 October 2026):** owner decisions 22–28
 (the phase 1b review list) recorded in §18; §10.6 and the restart text:
 a version change alone warns instead of refusing (decision 23).
+
+**Draft 0.12, eighth amendment (19 October 2026):** owner decisions 2 and 5
+decided, and 29–30 added (the phase 2 plan's D1–D4), in §18; §9.4 states the
+automatic default and the `fallback="refuse"` opt-out.

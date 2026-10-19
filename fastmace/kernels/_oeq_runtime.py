@@ -31,6 +31,17 @@ processes copy the finished build into their own fresh ``TORCH_EXTENSIONS_DIR``,
 where ninja finds it up to date. Renaming needs no lock, so the cache may lie
 on NFS (SPEC §14), and two processes that build at once both use the build that
 was renamed first.
+
+Stale build locks (plan task 2-T11). OEq 0.7 waits up to 300 s, silently, while
+``<build directory>/lock`` exists; torch's ``FileBaton`` creates that file with
+``O_CREAT | O_EXCL`` and holds it open until the build ends, so a killed build
+leaves it behind for good. ``stale_build_locks`` finds such locks without
+writing anything: older than ``STALE_LOCK_AGE`` and open in no process
+(``/proc/<pid>/fd``; without ``/proc`` the holder is unknown and the lock is not
+called stale). ``fastmace doctor`` lists them. The preparation waits at most
+``lock_wait`` seconds for a lock in this process's extension directory, then
+gives up with "OEq unavailable: stale build lock", and the planner falls to
+plain cuEq with that reason.
 """
 
 from __future__ import annotations
@@ -45,6 +56,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import warnings
 from dataclasses import dataclass, field
 from importlib import metadata
 from pathlib import Path
@@ -66,6 +78,12 @@ NOT_COPIED = ("lock",)  # torch's build lock, which OEq 0.7 waits on when torch 
 BUILD_VARIABLES = ("CUDA_HOME", "CPATH", "CXX", "OEQ_JIT_EXTENSION")  # change what the compiler produces
 CHILD_BUILD = "import openequivariance"  # OEq builds its host extension at import
 CHILD_BUILD_TIMEOUT = 900
+BUILD_LOCK = "lock"  # torch.utils.file_baton.FileBaton's file in <build directory>, OEq 0.7 polls for it
+LOCK_PATTERNS = (f"*/{BUILD_LOCK}", f"*/*/{BUILD_LOCK}")  # <root>/<name>/lock and <root>/<py>_<cu>/<name>/lock
+STALE_LOCK_AGE = 3600.0  # seconds; a host build takes minutes (CHILD_BUILD_TIMEOUT)
+LOCK_WAIT = 30.0  # seconds the preparation waits for a lock in its own extension directory
+LOCK_POLL = 1.0
+PROC = Path("/proc")
 
 
 @dataclass(frozen=True)
@@ -285,6 +303,119 @@ def child_build(environ, python=None, timeout=CHILD_BUILD_TIMEOUT):
     return build
 
 
+@dataclass(frozen=True)
+class BuildLock:
+    """A torch-extension build lock: its age in seconds and the processes that hold it open."""
+
+    path: Path
+    age: float
+    holders: tuple | None  # pids; None: unknown (no readable /proc)
+    threshold: float = STALE_LOCK_AGE
+
+    @property
+    def stale(self):
+        """Old, and no process holds it: a killed build left it."""
+        return self.holders == () and self.age > self.threshold
+
+
+def torch_extensions_root(environ):
+    """Where torch builds extensions by default: TORCH_EXTENSIONS_DIR, else <user cache>/torch_extensions."""
+    configured = environ.get("TORCH_EXTENSIONS_DIR")
+    if configured:
+        return Path(os.path.expanduser(configured))
+    home = environ.get("HOME") or os.path.expanduser("~")
+    return Path(environ.get("XDG_CACHE_HOME") or os.path.join(home, ".cache")) / "torch_extensions"
+
+
+def lock_holders(path, proc=PROC):
+    """The pids that hold ``path`` open, from ``/proc/<pid>/fd``; None when ``/proc`` cannot be read.
+
+    Only this user's processes on this host are visible: a build on another NFS client is not, which
+    the age threshold covers.
+    """
+    target = os.path.realpath(path)
+    try:
+        entries = list(Path(proc).iterdir())
+    except OSError:
+        return None
+    holders = []
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        try:
+            descriptors = list((entry / "fd").iterdir())
+        except OSError:  # another user's process, or it has just ended
+            continue
+        for descriptor in descriptors:
+            try:
+                if os.readlink(descriptor) == target:
+                    holders.append(int(entry.name))
+                    break
+            except OSError:
+                continue
+    return sorted(holders)
+
+
+def _lock_files(roots):
+    found = []
+    for root in roots:
+        root = Path(root)
+        if not root.is_dir():
+            continue
+        for pattern in LOCK_PATTERNS:
+            found += [path for path in root.glob(pattern) if path.is_file() and path not in found]
+    return found
+
+
+def build_locks(roots, threshold=STALE_LOCK_AGE, now=None, holders=None):
+    """Every build lock under ``roots`` (``LOCK_PATTERNS``), with its age and holders. Reads only."""
+    now = time.time() if now is None else now
+    holders = lock_holders if holders is None else holders
+    locks = []
+    for path in _lock_files(roots):
+        try:
+            age = now - path.stat().st_mtime
+        except OSError:  # removed meanwhile
+            continue
+        pids = holders(path)
+        locks.append(BuildLock(path=path, age=age, holders=None if pids is None else tuple(pids),
+                               threshold=threshold))
+    return locks
+
+
+def stale_build_locks(roots, threshold=STALE_LOCK_AGE, now=None, holders=None):
+    """The build locks under ``roots`` older than ``threshold`` seconds that no process holds."""
+    return [lock for lock in build_locks(roots, threshold, now, holders) if lock.stale]
+
+
+def wait_for_build_locks(directory, wait=LOCK_WAIT, poll=LOCK_POLL, clock=time.monotonic, sleep=time.sleep):
+    """Wait at most ``wait`` seconds for the build locks under ``directory`` to go; returns those left."""
+    locks = _lock_files([directory])
+    deadline = clock() + wait
+    while locks and clock() < deadline:
+        sleep(min(poll, max(deadline - clock(), 0.0)))
+        locks = [path for path in locks if os.path.lexists(path)]
+    return locks
+
+
+def _remove_hint(locks):
+    return "If no build is running, delete " + ", ".join(str(path) for path in locks)
+
+
+def _check_build_locks(directory, wait):
+    """Before OEq is imported: OEq 0.7 would wait 300 s silently for a lock in ``directory``."""
+    locks = _lock_files([directory])
+    if not locks:
+        return
+    warnings.warn(f"torch-extension build lock {', '.join(map(str, locks))}: OpenEquivariance would wait 300 s "
+                  f"for it; waiting at most {wait:g} s. {_remove_hint(locks)}.", UserWarning, stacklevel=3)
+    left = wait_for_build_locks(directory, wait=wait)
+    if left:
+        raise OEqRuntimeError(f"OEq unavailable: stale build lock {', '.join(map(str, left))}",
+                              why=f"it was still there after {wait:g} s; a killed torch-extension build leaves it",
+                              next_step=f"{_remove_hint(left)} and run again (`fastmace doctor` lists build locks).")
+
+
 def _check_not_too_late():
     if "openequivariance" in sys.modules:
         raise OEqRuntimeError("openequivariance is already imported; prepare the OEq runtime before it")
@@ -301,13 +432,14 @@ def _plan_for(cache, environ):
     return plan(find_runtime(), find_driver(environ), cache, environ, extensions, Path(sys.executable).parent)
 
 
-def prepare_in_process(cache, preload=True, environ=None, build=None):
+def prepare_in_process(cache, preload=True, environ=None, build=None, *, lock_wait=LOCK_WAIT):
     """Prepare the OEq runtime in this process, before OpenEquivariance is imported; returns (plan, handles).
 
     The fresh TORCH_EXTENSIONS_DIR of this process is seeded with the persistent build of this build
     identity (``reuse_extension``); ``build`` replaces the child-interpreter build (``child_build``).
-    The plan's ``extension`` records which. The handles of the preloaded libraries must stay alive
-    while the process uses OEq.
+    The plan's ``extension`` records which. A build lock left in that directory is waited for at most
+    ``lock_wait`` seconds, with a warning, then ``OEqRuntimeError`` ("OEq unavailable: stale build
+    lock"). The handles of the preloaded libraries must stay alive while the process uses OEq.
     """
     environ = os.environ if environ is None else environ
     _check_not_too_late()
@@ -317,6 +449,7 @@ def prepare_in_process(cache, preload=True, environ=None, build=None):
     extensions = Path(runtime_plan.environment["TORCH_EXTENSIONS_DIR"])
     extension = reuse_extension(extensions.parent, extensions, build_identity(runtime_plan, environ),
                                 build or child_build(dict(environ)))
+    _check_build_locks(extensions, lock_wait)
     runtime_plan = dataclasses.replace(runtime_plan, extension=extension)
     handles = preload_libraries(runtime_plan) if preload else []
     return runtime_plan, handles

@@ -1,0 +1,159 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0 -- /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python
+rootdir: /mnt/homes/zwingel/fastmace-branches/1b-T09
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+collecting ... collected 2 items
+
+tests/gpu/test_ase_equivalence_gpu.py::test_langevin_reproduces_ase_in_every_50_K_bin 
+1b-T09-langevin-ase-equivalence: {
+ "bins": {
+  "heat 0-50 K": {
+   "dT_K": -1.1657341758564144e-12,
+   "dPE_meV_per_atom": 0.0,
+   "T_K": 2.2888134867133236
+  },
+  "heat 50-100 K": {
+   "dT_K": 5.266898028821743e-12,
+   "dPE_meV_per_atom": 1.7763568394002505e-12,
+   "T_K": 12.79311606749346
+  },
+  "heat 100-150 K": {
+   "dT_K": 1.1262102361797588e-11,
+   "dPE_meV_per_atom": -1.7763568394002505e-12,
+   "T_K": 31.78274122184722
+  },
+  "heat 150-200 K": {
+   "dT_K": -1.0480505352461478e-11,
+   "dPE_meV_per_atom": 5.329070518200751e-12,
+   "T_K": 57.97801351293156
+  },
+  "heat 200-250 K": {
+   "dT_K": 4.9894310905074235e-11,
+   "dPE_meV_per_atom": 3.552713678800501e-12,
+   "T_K": 85.72152941897754
+  },
+  "heat 250-300 K": {
+   "dT_K": 1.0891199053730816e-10,
+   "dPE_meV_per_atom": -1.7763568394002505e-12,
+   "T_K": 130.58529087430952
+  },
+  "heat 300-350 K": {
+   "dT_K": 1.3147882782504894e-10,
+   "dPE_meV_per_atom": 2.1316282072803006e-11,
+   "T_K": 176.83453701611836
+  },
+  "heat 350-400 K": {
+   "dT_K": 4.8345327741117217e-11,
+   "dPE_meV_per_atom": 1.687538997430238e-11,
+   "T_K": 219.01400991513253
+  },
+  "cool 0-50 K": {
+   "dT_K": 2.7711166694643907e-13,
+   "dPE_meV_per_atom": 3.552713678800501e-12,
+   "T_K": 48.292752977892356
+  },
+  "cool 50-100 K": {
+   "dT_K": -5.260858415567782e-11,
+   "dPE_meV_per_atom": -4.440892098500626e-12,
+   "T_K": 93.28122250953774
+  },
+  "cool 100-150 K": {
+   "dT_K": 1.5148771126405336e-11,
+   "dPE_meV_per_atom": 1.7763568394002505e-12,
+   "T_K": 146.13533337901083
+  },
+  "cool 150-200 K": {
+   "dT_K": 6.755840331607033e-11,
+   "dPE_meV_per_atom": 6.217248937900877e-12,
+   "T_K": 200.31189197766304
+  },
+  "cool 200-250 K": {
+   "dT_K": -5.985612006043084e-11,
+   "dPE_meV_per_atom": -6.217248937900877e-12,
+   "T_K": 248.5835496213718
+  },
+  "cool 250-300 K": {
+   "dT_K": 2.9899638320785016e-11,
+   "dPE_meV_per_atom": 3.552713678800501e-12,
+   "T_K": 292.1749980107023
+  },
+  "cool 300-350 K": {
+   "dT_K": -3.532818482199218e-10,
+   "dPE_meV_per_atom": -3.8191672047105385e-11,
+   "T_K": 328.51521851472074
+  },
+  "cool 350-400 K": {
+   "dT_K": 2.3533175408374518e-11,
+   "dPE_meV_per_atom": 6.217248937900877e-12,
+   "T_K": 301.05346163130133
+  }
+ },
+ "max_abs_dT_K": 3.532818482199218e-10,
+ "max_abs_dPE_meV_per_atom": 3.8191672047105385e-11,
+ "final_T_K": [
+  23.342225790442047,
+  23.342225790394295
+ ],
+ "final_positions_max_diff_A": 1.0043521569969016e-11,
+ "seconds": {
+  "ase": 1990.0492014121264,
+  "fastmace": 1738.103508271277
+ },
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "mode": "pipelined",
+ "records": [
+  "single_graph_strain"
+ ],
+ "plan": "Plan revision 0, tier graph: fixed plan of phase 1a (main.py)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = cueq  (requested 'cueq': graph engine)\n  PrecisionConfig.dtype = float64  (auto (float32_for_hybrid_float64_for_cueq): cueq backend)\n  EngineConfig.cueq_conv_fusion = on  (auto (on_for_plain_cueq_unless_reproducible): plain cuEq: cuEquivariance's fused convolution (MACE PR 1641))\n  RewriteConfig.factor_species = off  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: plain cuEq backend)\n  RewriteConfig.fold_cutoff = off  (auto (on_with_factor_species_if_model_supports): stage 1: off (without factor_species))\n  RewriteConfig.density_first = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.reassociate_first = off  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.joint_radial_input = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.fused_folded_backward = off  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.segmented_first_sum = off  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: off (without reassociate_first and sort_receivers))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = off  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: off (without the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)))\n  RewriteConfig.block_linear = off  (auto (on_for_hybrid_graph_engine): stage 1: plain cuEq backend)\n  RewriteConfig.grouped_linear = off  (auto (on_with_block_linear): stage 1: off (without block_linear))\n  RewriteConfig.merged_residual = off  (auto (on_with_block_linear): stage 1: off (without block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = off  (auto (on_for_hybrid_graph_engine): plain cuEq backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=cueq"
+}
+PASSED
+tests/gpu/test_ase_equivalence_gpu.py::test_baoab_variants_reproduce_their_references 
+1b-T09-baoab-ase-equivalence: {
+ "ase_variant_vs_ase": {
+  "positions_A": 4.760636329592671e-13,
+  "cell_A": 1.8118839761882555e-13,
+  "T_K": 5.4569682106375694e-11,
+  "PE_meV_per_atom": 1.0658141036401503e-11,
+  "volume_A3": 2.4010660126805305e-10
+ },
+ "production_vs_corrected": {
+  "positions_A": 4.658495811327157e-13,
+  "cell_A": 1.4921397450962104e-13,
+  "T_K": 6.531308827106841e-11,
+  "PE_meV_per_atom": 1.0658141036401503e-11,
+  "volume_A3": 1.8826540326699615e-10
+ },
+ "variants": {
+  "positions_A": 6.130584249142146e-06,
+  "cell_A": 3.541254045558162e-08,
+  "T_K": 0.0008292308474437959,
+  "PE_meV_per_atom": 9.915784815461848e-05,
+  "volume_A3": 1.9048748072236776e-05
+ },
+ "references": {
+  "positions_A": 6.130584400576566e-06,
+  "cell_A": 3.541236992532504e-08,
+  "T_K": 0.0008292308441468776,
+  "PE_meV_per_atom": 9.91578446019048e-05,
+  "volume_A3": 1.9048664398724213e-05
+ },
+ "volume_change": -0.01969760396014908,
+ "seconds": {
+  "ase": 220.02745292708278,
+  "corrected": 220.28728367947042,
+  "fastmace": [
+   238.3150918520987,
+   200.85867529176176
+  ]
+ },
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "mode": "pipelined",
+ "records": [
+  "single_graph_strain"
+ ]
+}
+PASSED
+
+======================== 2 passed in 4772.07s (1:19:32) ========================
+exit 0
