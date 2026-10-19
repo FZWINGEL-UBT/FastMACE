@@ -385,13 +385,6 @@ def test_simulation_stub_refuses_an_unknown_check_mode():
         Simulation(None, None, integrator=None, seed=1, check="maybe")
 
 
-def test_simulation_stub_says_which_task_fills_it():
-    from fastmace.simulation import Simulation
-
-    with pytest.raises(NotImplementedError, match="1b-T17"):
-        Simulation(None, None, integrator=None, seed=1)
-
-
 def test_force_field_signature():
     from fastmace.model.forcefield import ForceField
 
