@@ -25,8 +25,10 @@ workers"). 2-T21 works in the ResearchModule worktree
 
 - Phase 1b: done, apart from 1b-T27 (the GPU acceptance tier), which is
   finishing its acceptance-tier run on murphy. 2-T01's go waits for it.
-- Working in phase 2: none yet (all preparing read-only).
-- Waiting for go: 2-T01 to 2-T23.
+- Working in phase 2: 2-T11 (stale locks), 2-T14 (flaky test, murphy CPUs).
+- Next: 2-T01 once 1b-T27 merges; 2-T12 when the local machine is quiet.
+- Waiting for go: the rest. Answers to all prestart reports are in
+  `phase-2.md`, "Conductor answers to the prestart reports".
 
 ## Open owner decisions
 
