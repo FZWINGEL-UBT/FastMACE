@@ -84,11 +84,18 @@ class LangevinBAOAB(Integrator):
     """``ase.md.langevinbaoab.LangevinBAOAB`` (NPT, temperature set) with the state on the device.
 
     ``config`` maps as the research engine's ``workflow.baoab_settings``: ``T_tau = 1 / friction``,
-    ``P_tau = barostat_tau_fs`` (default 20 ``T_tau``, ASE's), ``externalstress = -pressure_GPa``,
-    hydrostatic or full cell from ``cell_mode``, ASE's heuristic barostat mass times
-    ``barostat_mass_factor``. ``externalstress`` (ASE units: a scalar, 3-, 6- or 3 x 3 stress)
-    replaces the pressure when given, and ``disable_cell_langevin`` turns the barostat's
-    thermostat off, as ASE's options of the same names.
+    ``P_tau = barostat_tau_fs`` (default 20 ``T_tau``, ASE's), hydrostatic or full cell from
+    ``cell_mode``, ASE's heuristic barostat mass times ``barostat_mass_factor``. The external
+    stress is ``config.effective_external_stress_GPa()`` (``external_stress_GPa``, else
+    ``-pressure_GPa``) in ASE units, and ``config.disable_cell_langevin`` turns the barostat's
+    thermostat off, as ASE's options of the same names. The 1a keywords ``externalstress`` (ASE
+    units: a scalar, 3-, 6- or 3 x 3 stress) and ``disable_cell_langevin`` replace the config's
+    values when given; they stay for one release (``planner/fixed.py`` passes them).
+
+    The barostat momentum and cell force are physical state (SPEC §10.6): they live in
+    ``state.p_eps`` and ``state.force_eps``, which the constructor allocates unless the state
+    already holds tensors of the right shape; ``self.p_eps`` and ``self.force_eps`` are the same
+    tensors.
 
     Random numbers come from ``state.rng`` ``noise_batch`` steps at a time, in ASE's order: per step
     3N atom numbers, then 1 (hydrostatic) or 9 (full cell) barostat numbers (none when the cell
@@ -101,7 +108,7 @@ class LangevinBAOAB(Integrator):
     """
 
     def __init__(self, state: SimulationState, config: IntegratorConfig | None = None, *,
-                 temperature_K: float = 0.0, externalstress: Any = None, disable_cell_langevin: bool = False):
+                 temperature_K: float = 0.0, externalstress: Any = None, disable_cell_langevin: bool | None = None):
         config = IntegratorConfig(ensemble="npt") if config is None else config
         check_ensemble(config, "npt", "LangevinBAOAB")
         if state.stress is None:
@@ -116,14 +123,21 @@ class LangevinBAOAB(Integrator):
         self.P_tau = 20.0 * self.T_tau if config.barostat_tau_fs is None else config.barostat_tau_fs * units.fs
         self.barostat_mass = barostat_mass(self.P_tau, self.natoms, None, config.barostat_mass_factor)
         self.Ndof = 3 * self.natoms  # Atoms.get_number_of_degrees_of_freedom() without constraints
+        if disable_cell_langevin is None:
+            disable_cell_langevin = config.disable_cell_langevin
         self.disable_cell_langevin = bool(disable_cell_langevin)
         if externalstress is None:
-            externalstress = -config.pressure_GPa * units.GPa
+            externalstress = np.asarray(config.effective_external_stress_GPa()) * units.GPa
         f64 = dict(dtype=torch.float64, device=state.positions.device)
 
         shape = () if self.hydrostatic else (3, 3)
-        self.p_eps = torch.zeros(shape, **f64)
-        self.force_eps = torch.zeros(shape, **f64)
+        for name in ("p_eps", "force_eps"):
+            tensor = getattr(state, name)
+            if (tensor is None or tuple(tensor.shape) != shape or tensor.dtype != torch.float64
+                    or tensor.device != state.positions.device):
+                setattr(state, name, torch.zeros(shape, **f64))
+        self.p_eps = state.p_eps
+        self.force_eps = state.force_eps
         self.externalstress = torch.tensor(external_stress(externalstress, self.hydrostatic), **f64)
         self.eye = torch.eye(3, **f64)
 
@@ -251,12 +265,15 @@ class LangevinBAOAB(Integrator):
         return det_3x3(state.cell)
 
     def state_dict(self) -> dict[str, Any]:
-        """The barostat momentum and cell force (``p_eps``, ``force_eps``), as the research engine saves them."""
-        return dict(p_eps=self.p_eps.cpu().numpy().copy(), force_eps=self.force_eps.cpu().numpy().copy())
+        """Empty: the barostat momentum and cell force are in ``SimulationState`` since 1b (SPEC §10.6)."""
+        return {}
 
     def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
+        """Nothing, or a 1a ``state_dict`` (``p_eps``, ``force_eps``), copied into the state's tensors."""
+        if not state_dict:
+            return
         if set(state_dict) != {"p_eps", "force_eps"}:
-            raise ValueError(f"LangevinBAOAB's state is p_eps and force_eps, got {sorted(state_dict)}")
+            raise ValueError(f"LangevinBAOAB's 1a state is p_eps and force_eps, got {sorted(state_dict)}")
         for name in ("p_eps", "force_eps"):
             target = getattr(self, name)
             source = torch.from_numpy(np.array(state_dict[name], dtype=np.float64))  # 0-d stays 0-d

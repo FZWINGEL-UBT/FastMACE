@@ -432,7 +432,7 @@ def test_restart_write_is_atomic(tmp_path):
     restart_io.write_restart(path, state, engine="gpu")
     before = path.read_bytes()
     fake_step(state, 300.0, FakeIntegrator(state))
-    with patch.object(np, "savez", side_effect=OSError("disk full")), pytest.raises(OSError):
+    with patch.object(np.lib.format, "write_array", side_effect=OSError("disk full")), pytest.raises(OSError):
         restart_io.write_restart(path, state, engine="gpu")
     assert path.read_bytes() == before
     restart_io.write_restart(path, state, engine="gpu")

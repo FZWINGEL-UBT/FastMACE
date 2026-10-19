@@ -408,20 +408,23 @@ def test_state_dict_round_trip():
             with pytest.raises(ValueError):
                 dyn.load_state_dict({"p_eps": np.zeros(())})
             continue
-        assert set(saved) == {"p_eps", "force_eps"}
-        assert all(isinstance(value, np.ndarray) for value in saved.values())
+        # 1b: the barostat state is in SimulationState (SPEC §10.6), so BAOAB has no state of its own.
+        assert saved == {}
+        assert dyn.p_eps is state.p_eps and dyn.force_eps is state.force_eps
+        dyn.load_state_dict({})
+        # a 1a state_dict (p_eps, force_eps) still loads, into the state's tensors
+        legacy = {"p_eps": state.p_eps.numpy().copy(), "force_eps": state.force_eps.numpy().copy()}
         pointer = dyn.p_eps.data_ptr()
-        expected = {key: value.copy() for key, value in saved.items()}
         dyn.p_eps.zero_()
         dyn.force_eps.zero_()
-        dyn.load_state_dict(saved)
-        assert dyn.p_eps.data_ptr() == pointer
-        np.testing.assert_array_equal(dyn.p_eps.numpy(), expected["p_eps"])
-        np.testing.assert_array_equal(dyn.force_eps.numpy(), expected["force_eps"])
+        dyn.load_state_dict(legacy)
+        assert dyn.p_eps.data_ptr() == pointer and state.p_eps is dyn.p_eps
+        np.testing.assert_array_equal(state.p_eps.numpy(), legacy["p_eps"])
+        np.testing.assert_array_equal(state.force_eps.numpy(), legacy["force_eps"])
         with pytest.raises(ValueError):
-            dyn.load_state_dict({"p_eps": np.zeros((2, 2)), "force_eps": expected["force_eps"]})
+            dyn.load_state_dict({"p_eps": np.zeros((2, 2)), "force_eps": legacy["force_eps"]})
         with pytest.raises(ValueError):
-            dyn.load_state_dict({"p_eps": expected["p_eps"]})
+            dyn.load_state_dict({"p_eps": legacy["p_eps"]})
 
 
 def assert_same_run(a, b):
@@ -458,6 +461,112 @@ def test_restart_round_trip(tmp_path, which):
     run_md(state, dyn, field, 20, lambda step: heating(30)(10 + step))
     run_md(resumed, resumed_dyn, resumed_field, 20, lambda step: heating(30)(10 + step))
     assert_same_run(resumed, state)
+
+
+# -------------------------------------------------------------------------- 1b: barostat state and config
+
+def baoab_1a():
+    """``fastmace/integrators/baoab.py`` at tag ``fastmace-1a`` (p_eps on the integrator), from git."""
+    import subprocess
+
+    root = Path(__file__).resolve().parents[2]
+    try:
+        source = subprocess.run(["git", "show", "fastmace-1a:fastmace/integrators/baoab.py"], cwd=root,
+                                capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        pytest.skip("git tag fastmace-1a is not available (shallow checkout)")
+    module = types.ModuleType("fastmace.integrators._baoab_1a")
+    module.__package__ = "fastmace.integrators"
+    exec(compile(source, "baoab_1a.py", "exec"), module.__dict__)
+    return module
+
+
+@pytest.mark.parametrize("hydrostatic", [True, False], ids=["hydrostatic", "full"])
+def test_baoab_with_the_barostat_in_the_state_equals_1a_bitwise(hydrostatic):
+    """p_eps and force_eps in SimulationState: the same 20 eager steps as phase 1a (CPU float64)."""
+    old_module = baoab_1a()
+    atoms = baseline_atoms()
+    config = npt_config(hydrostatic, noise_batch=7, pressure_GPa=1.5, barostat_mass_factor=0.01)
+    old_state, state = new_state(atoms, compute_stress=True), new_state(atoms, compute_stress=True)
+    old, dyn = old_module.LangevinBAOAB(old_state, config), LangevinBAOAB(state, config)
+    assert old_state.p_eps is None and state.p_eps is dyn.p_eps
+    old_field, field = HarmonicForces(old_state), HarmonicForces(state)
+    start(old_state, old, old_field)
+    start(state, dyn, field)
+    for step in range(1, 21):
+        old.set_temperature(20.0 * step)
+        dyn.set_temperature(20.0 * step)
+        md_step(old_state, old, old_field)
+        md_step(state, dyn, field)
+        for name in ("positions", "velocities", "cell", "forces", "energy", "stress"):
+            assert torch.equal(getattr(state, name), getattr(old_state, name)), f"step {step}: {name}"
+        assert torch.equal(state.p_eps, old.p_eps) and torch.equal(state.force_eps, old.force_eps), step
+    assert torch.equal(state.rng.batch, old_state.rng.batch) and state.rng.cursor == old_state.rng.cursor
+    assert not torch.equal(state.cell, torch.tensor(atoms.cell.array))
+
+
+def test_baoab_keeps_an_allocated_barostat_state():
+    """A state that already holds p_eps of the right shape keeps its tensors (fixed addresses)."""
+    state = new_state(argon(), compute_stress=True)
+    first = LangevinBAOAB(state, npt_config(False))
+    first.p_eps.fill_(0.25)
+    pointers = state.p_eps.data_ptr(), state.force_eps.data_ptr()
+    second = LangevinBAOAB(state, npt_config(False))
+    assert (state.p_eps.data_ptr(), state.force_eps.data_ptr()) == pointers and second.p_eps is state.p_eps
+    assert float(state.p_eps[0, 0]) == 0.25
+    state.rng.batch = None  # another noise layout too
+    hydrostatic = LangevinBAOAB(state, npt_config(True))  # another shape: new tensors
+    assert tuple(state.p_eps.shape) == () and hydrostatic.p_eps is state.p_eps
+
+
+def test_six_component_external_stress_equals_ases_externalstress():
+    """IntegratorConfig.external_stress_GPa (Voigt, ASE sign) against ASE's externalstress, 20 steps."""
+    voigt = (-0.3, -0.45, -0.3, 0.05, -0.02, 0.01)
+    reference, test = argon(seed=3), argon(seed=3)
+    reference.calc = lj_calculator()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ase_dyn = ASELangevinBAOAB(reference, timestep=2 * units.fs, T_tau=100 * units.fs, P_tau=400 * units.fs,
+                                   hydrostatic=False, externalstress=np.array(voigt) * units.GPa,
+                                   temperature_K=100, rng=np.random.default_rng(SEED))
+    state = new_state(test, compute_stress=True)
+    field = ASEForces(test)
+    config = npt_config(False, pressure_GPa=0.0, external_stress_GPa=voigt, ase_trace_drag_all_elements=True,
+                        noise_batch=7)
+    dyn = LangevinBAOAB(state, config, temperature_K=100)
+    np.testing.assert_array_equal(dyn.externalstress.numpy(), ase_dyn.externalstress)
+    start(state, dyn, field)
+    ase_dyn.run(20)
+    run_md(state, dyn, field, 20)
+    np.testing.assert_allclose(state.cell.numpy(), reference.cell.array, atol=1e-9)
+    np.testing.assert_allclose(state.positions.numpy(), reference.positions, atol=1e-9)
+    np.testing.assert_allclose(state.velocities.numpy(), reference.get_velocities(), atol=1e-9)
+    with pytest.raises(ValueError, match="scalar when hydrostatic"):
+        LangevinBAOAB(new_state(argon(), compute_stress=True),
+                      npt_config(True, pressure_GPa=0.0, external_stress_GPa=voigt))
+
+
+def test_external_stress_from_the_pressure_is_1as():
+    """Without external_stress_GPa the target is -pressure_GPa in ASE units, the 1a value exactly."""
+    for hydrostatic in (True, False):
+        state = new_state(argon(), compute_stress=True)
+        dyn = LangevinBAOAB(state, npt_config(hydrostatic))
+        np.testing.assert_array_equal(dyn.externalstress.numpy(), external_stress(-0.3 * units.GPa, hydrostatic))
+        scalar = LangevinBAOAB(new_state(argon(), compute_stress=True),
+                               npt_config(hydrostatic, pressure_GPa=0.0, external_stress_GPa=-0.3))
+        np.testing.assert_array_equal(scalar.externalstress.numpy(), dyn.externalstress.numpy())
+
+
+def test_disable_cell_langevin_from_the_config():
+    config = npt_config(True, disable_cell_langevin=True)
+    dyn = LangevinBAOAB(new_state(argon(), compute_stress=True), config)
+    assert dyn.disable_cell_langevin and dyn.cell_numbers == 0
+    # the 1a keyword still wins for one release (planner/fixed.py passes it)
+    keyword = LangevinBAOAB(new_state(argon(), compute_stress=True), config, disable_cell_langevin=False)
+    assert not keyword.disable_cell_langevin and keyword.cell_numbers == 1
+    stress = LangevinBAOAB(new_state(argon(), compute_stress=True), npt_config(True),
+                           externalstress=-0.1 * units.GPa)
+    assert float(stress.externalstress) == -0.1 * units.GPa
 
 
 # -------------------------------------------------------------------------- baseline equality
