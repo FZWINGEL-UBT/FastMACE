@@ -99,10 +99,14 @@ EDITS = {
 
 
 class EnergyReductionError(FastMACEError):
-    """The float64 energy reduction does not apply to this model; ``reason`` says why."""
+    """The float64 energy reduction does not apply to this model; ``reason`` says why (SPEC §7.3, §6.2)."""
 
-    def __init__(self, reason):
-        super().__init__(reason)
+    default_next_step = ("Use the qualified MACE version (0.3.16) and a MACE, ScaleShiftMACE or PolarMACE model; "
+                         "float64_energy=False gives 1a's float32 sum, for A/B against the research engine only.")
+
+    def __init__(self, reason, why=None, next_step=None, record=None, environment=None):
+        super().__init__(f"the float64 energy reduction is unavailable: {reason}", why, next_step, record,
+                         environment)
         self.reason = reason
 
 

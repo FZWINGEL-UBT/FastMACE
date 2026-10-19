@@ -367,3 +367,15 @@ def test_fixed_planner_passes_float64_energy_through(e0_checkpoint, enabled):
     engine = planner.build(plan, loaded, atoms, temperature_K=300.0, constraints=constraints.ProcessRecord())
     assert engine.force_field.float64_energy is enabled
     assert engine.force_field.info()["float64_energy"] is enabled
+
+
+def test_refusal_has_the_message_shape_and_pickles():
+    import pickle
+
+    from fastmace.errors import FastMACEError
+
+    error = energy.EnergyReductionError("X.forward is not MACE 0.3.16's")
+    assert isinstance(error, FastMACEError) and error.reason == "X.forward is not MACE 0.3.16's"
+    text = str(error)
+    assert text.startswith("the float64 energy reduction is unavailable: X.forward") and "\nNext: " in text
+    assert str(pickle.loads(pickle.dumps(error))) == text
