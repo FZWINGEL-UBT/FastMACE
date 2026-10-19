@@ -81,7 +81,8 @@ no float64 sum, and the streaming-counter test, which patches the class
 `forward` (the float64 forward is built from MACE's own source).
 
 `tests/gpu/test_energy_gpu.py`: the float64 energy replays in a CUDA graph
-exactly as eager, eager and compiled, float32 and float64.
+as eager (to the order of the GPU's atomic float64 adds), eager and compiled,
+float32 and float64.
 
 ## GPU
 

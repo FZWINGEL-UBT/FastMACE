@@ -3,7 +3,8 @@
 A tiny MH-1-class cuEquivariance model with a synthetic all-electron E0 table, in float32 and
 float64, eager and compiled:
 
-- the float64 energy replays in a CUDA graph exactly as the eager call computes it;
+- the float64 energy replays in a CUDA graph as the eager call computes it (to the order of the
+  GPU's atomic float64 adds);
 - forces and stress equal those of 1a's energy sum (``float64_energy=False``) to rounding;
 - in float32 the energy is closer to the float64 model's than the stock float32 sum.
 
@@ -60,7 +61,7 @@ def evaluate(field, positions):
     count = int(field.edge_count)
     field.use_edges(round_up_edges(count, field.edge_capacity, edge_bucket(count, 0.25, 256)))
     out = field(positions)
-    return [value.detach().clone() for value in out]
+    return [value.detach().clone() for value in out if value is not None]
 
 
 def captured(field, positions):
@@ -94,7 +95,8 @@ def test_float64_energy_replays_and_keeps_forces(dtype, compile_mode):
     eager = {flag: evaluate(field, positions) for flag, field in fields.items()}
     replayed = {flag: captured(field, positions) for flag, field in fields.items()}
     assert eager[True][0].dtype == torch.float64
-    assert torch.equal(replayed[True][0], eager[True][0])
+    # The float64 sums use atomic adds on the GPU: the same value up to their summation order.
+    np.testing.assert_allclose(float(replayed[True][0][0]), float(eager[True][0][0]), rtol=1e-13, atol=0)
     # Forces and stress: MACE's autograd of its own scalar either way (design A). Bitwise on the CPU
     # (tests/cpu/test_energy.py); here two graphs with atomic scatters, so to rounding.
     tolerance = 1e-12 if dtype == torch.float64 else 1e-5

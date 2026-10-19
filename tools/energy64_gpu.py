@@ -51,6 +51,8 @@ def parse_args(argv=None):
     p.add_argument("--warmup", type=int, default=300)
     p.add_argument("--block", type=int, default=300)
     p.add_argument("--blocks", type=int, default=12)
+    p.add_argument("--first", choices=("float64_sum", "float32_sum_1a"), default="float64_sum",
+                   help="ab: the side built (and timed) first, to control for build order")
     return p.parse_args(argv)
 
 
@@ -148,7 +150,8 @@ def command_ab(args):
     record = constraints.ProcessRecord()
     cache = compiling.CompiledModelCache()
     sides, plans = {}, {}
-    for side, flag in (("float64_sum", True), ("float32_sum_1a", False)):
+    order = (("float64_sum", True), ("float32_sum_1a", False))
+    for side, flag in (order if args.first == "float64_sum" else order[::-1]):
         p = planner(args, flag)
         hardware = p.hardware()
         loaded = p.load(args.model, **load_kwargs(args))
@@ -162,9 +165,11 @@ def command_ab(args):
     meta = dict(command="ab", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 gpu=gpu_name(), python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(),
                 model=args.model, structure=name, natoms=len(atoms), protocol=protocol.as_dict(), plans=plans,
+                first=args.first,
                 result=result.as_dict(), observables={side: s.observables() for side, s in sides.items()})
     (args.output / "metadata.json").write_text(json.dumps(meta, indent=2) + "\n")
-    print(f"{name}: float32_sum_1a / float64_sum = {result.ratio:.4f} "
+    a, b = result.names
+    print(f"{name}: {b} / {a} = {result.ratio:.4f} "
           f"({', '.join(f'{r:.4f}' for r in result.pair_ratios)})")
 
 
