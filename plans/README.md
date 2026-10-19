@@ -23,11 +23,9 @@ wait for the conductor's go message (`CONDUCTOR.md`, "Prestarted phase
 workers"). 2-T21 works in the ResearchModule worktree
 `D:/Margraf/ResearchModule-wt/2-T21` (branch `fastmace/2-T21`).
 
-- Phase 1b: done, apart from 1b-T27 (the GPU acceptance tier), which is
-  finishing its acceptance-tier run on murphy. 2-T01's go waits for it.
-- Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09 (20 October 2026); 1b-T27 too,
-  tagged `fastmace-1b`.
-- Working in phase 2: 2-T04, 2-T05, 2-T07, 2-T10, 2-T18, and 2-T12 (report).
+- Phase 1b: done, tagged `fastmace-1b` (673a8a1, with 1b-T27).
+- Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12 (20 October 2026).
+- Working in phase 2: 2-T04, 2-T05 (local GPU), 2-T07, 2-T10, 2-T18.
 - Waiting for go: the rest. Answers to all prestart reports are in
   `phase-2.md`, "Conductor answers to the prestart reports".
 
