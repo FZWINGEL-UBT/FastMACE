@@ -107,7 +107,7 @@ registry change. The pipeline floor and next bucket are host integers, not tenso
 
 ## SimulationState fields 1b adds (T05)
 
-These are the keys of `state.FIELDS_ADDED_IN_1B`:
+T05 added them to `SimulationState`; `state.FIELDS_ADDED_IN_1B` keeps only `mc`:
 
 - `charges` (N,) float64 or `None`; host `total_charge`, `spin_multiplicity`;
 - `pbc` (3 bools); `constraints` (always empty in 1b);

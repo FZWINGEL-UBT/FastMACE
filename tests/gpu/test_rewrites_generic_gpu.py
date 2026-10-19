@@ -131,7 +131,7 @@ def check(result, labels_applied):
 def expected_records(label, backend):
     names = ["generic_species_skip", "generic_fused_radial_backward"]
     if not label.startswith("off"):
-        names.append("generic_reassociate")
+        names += ["generic_reassociate", "generic_segmented_first_sum"]  # SEGMENTED_FIRST_SUM acts on it (1b-T11)
     if backend == "hybrid":
         names.append("generic_streaming")
     return names

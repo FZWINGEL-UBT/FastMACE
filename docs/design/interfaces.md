@@ -76,9 +76,10 @@ The cell lives in `SimulationState.cell`, the same tensor for both ensembles.
 BAOAB updates it in place in `first_half` and declares `variable_cell = True`.
 The engine then requires `ff.compute_stress`, passes the cell to
 `ff.set_cell` inside stage A, and the force stage fills `state.stress`. The
-barostat momentum `p_eps` and cell force `force_eps` are integrator state in
-1a (`state_dict`). §10.6 lists them as physical state, so 1b may move them
-into `SimulationState` (`FIELDS_ADDED_IN_1B["barostat"]`). BAOAB's noise row
+barostat momentum `p_eps` and cell force `force_eps` were integrator state in
+1a (`state_dict`). §10.6 lists them as physical state, so 1b-T05 moved them
+into `SimulationState` (`state.p_eps`, `state.force_eps`; BAOAB allocates
+them and keeps `self.p_eps` as the same tensor). BAOAB's noise row
 is `3N + {0, 1, 9}` wide, which is why the integrator owns the batch layout.
 Speculative graphs stay refused for NPT, as today.
 

@@ -1,0 +1,495 @@
+{
+ "created_utc": "2026-10-18T22:48:09.752580+00:00",
+ "host": "murphy",
+ "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+ "fastmace_commit": "2da309e190163b0d69b2d4d0a495317bfb52d2e6",
+ "baseline": "None",
+ "model": "mp0-medium",
+ "side": "fastmace",
+ "check": "off",
+ "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/mnt/homes/zwingel/fastmace-cache/1b-T11-murphy/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:CXX', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+ "structures": {
+  "NaCl": {
+   "natoms": 216,
+   "setup_s": 13.145035784691572,
+   "setup_stages": {
+    "plan": {
+     "total_s": 0.005292294546961784,
+     "calls": 1,
+     "each_s": [
+      0.005292294546961784
+     ]
+    },
+    "compile: private_copy (deepcopy)": {
+     "total_s": 0.600712887942791,
+     "calls": 1,
+     "each_s": [
+      0.600712887942791
+     ]
+    },
+    "apply: generic_species_skip": {
+     "total_s": 0.07905873283743858,
+     "calls": 1,
+     "each_s": [
+      0.07905873283743858
+     ]
+    },
+    "apply: generic_reassociate": {
+     "total_s": 0.05487445741891861,
+     "calls": 1,
+     "each_s": [
+      0.05487445741891861
+     ]
+    },
+    "apply: generic_fused_radial_backward": {
+     "total_s": 4.5008957386016846e-05,
+     "calls": 1,
+     "each_s": [
+      4.5008957386016846e-05
+     ]
+    },
+    "apply: generic_streaming": {
+     "total_s": 0.09058500453829765,
+     "calls": 1,
+     "each_s": [
+      0.09058500453829765
+     ]
+    },
+    "apply: block_linear": {
+     "total_s": 0.0146513432264328,
+     "calls": 1,
+     "each_s": [
+      0.0146513432264328
+     ]
+    },
+    "apply: grouped_linear": {
+     "total_s": 0.0006588418036699295,
+     "calls": 1,
+     "each_s": [
+      0.0006588418036699295
+     ]
+    },
+    "apply: single_graph_strain": {
+     "total_s": 6.737373769283295e-05,
+     "calls": 1,
+     "each_s": [
+      6.737373769283295e-05
+     ]
+    },
+    "compile: simplify_traceable": {
+     "total_s": 0.002184813842177391,
+     "calls": 1,
+     "each_s": [
+      0.002184813842177391
+     ]
+    },
+    "build: force field (total)": {
+     "total_s": 1.7284103110432625,
+     "calls": 1,
+     "each_s": [
+      1.7284103110432625
+     ]
+    },
+    "build: initial forces (first compiled call)": {
+     "total_s": 11.356689164415002,
+     "calls": 1,
+     "each_s": [
+      11.356689164415002
+     ]
+    }
+   },
+   "warmup_s": 8.634826896712184,
+   "warmup_stages": {
+    "warm-up: capture ACP": {
+     "total_s": 0.02380426414310932,
+     "calls": 1,
+     "each_s": [
+      0.02380426414310932
+     ]
+    },
+    "warm-up: capture B": {
+     "total_s": 8.168379846960306,
+     "calls": 1,
+     "each_s": [
+      8.168379846960306
+     ]
+    }
+   },
+   "step_ms": 1.4591504260897636,
+   "info": {
+    "engine": "graph",
+    "mode": "pipelined",
+    "capture": true,
+    "pad_edges": true,
+    "variable_cell": false,
+    "initial_edges": 6912,
+    "edge_bucket": 512,
+    "edge_sizes_used": [
+     7168
+    ],
+    "neighbour_rebuilds": 23,
+    "graphs": [
+     "ACP",
+     "('B', 7168)"
+    ],
+    "pool_resets": 0,
+    "capture_memory": [
+     {
+      "key": "ACP",
+      "warmup_in_pool": false,
+      "max_reserved_after_warmup_MiB": 158.0,
+      "max_reserved_after_capture_MiB": 158.0
+     },
+     {
+      "key": "('B', 7168)",
+      "warmup_in_pool": false,
+      "max_reserved_after_warmup_MiB": 220.0,
+      "max_reserved_after_capture_MiB": 238.0
+     }
+    ],
+    "speculative_launches": 0,
+    "speculative_rollbacks": 0,
+    "speculative_rebuild_rollbacks": 0,
+    "speculative_bucket_rollbacks": 0,
+    "pipelined_redos": 0,
+    "pipelined_rebuild_redos": 0,
+    "pipelined_early_rebuilds": 23,
+    "process": {
+     "allocator": "expandable_segments:True",
+     "dynamo_cache_size_limit": 64,
+     "compile_family": "oeq"
+    }
+   },
+   "force_field": {
+    "backend": "hybrid",
+    "dtype": "float32",
+    "device": "cuda:0",
+    "compile_mode": "default",
+    "training": false,
+    "compute_stress": false,
+    "padding_exact": true,
+    "rewrites": [
+     "generic_species_skip",
+     "generic_reassociate",
+     "generic_fused_radial_backward",
+     "generic_streaming",
+     "block_linear",
+     "grouped_linear",
+     "single_graph_strain"
+    ],
+    "decisions": {
+     "factor_species": "off",
+     "fold_cutoff": "off",
+     "density_first": "off",
+     "joint_radial_input": "off",
+     "fused_folded_backward": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field fused_folded_backward honoured by generic_fused_radial_backward)",
+     "fused_radial_hidden": "off",
+     "streaming_conv": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field streaming_conv honoured by generic_streaming)",
+     "reassociate_first": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field reassociate_first honoured by generic_reassociate)",
+     "segmented_first_sum": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (RewriteConfig.segmented_first_sum is on; this record stays off)",
+     "generic_species_skip": "on",
+     "generic_reassociate": "on",
+     "generic_fused_radial_backward": "on",
+     "generic_streaming": "on",
+     "block_linear": "on",
+     "grouped_linear": "on",
+     "merged_residual": "no ('RealAgnosticResidualNonLinearInteractionBlock',) interaction with cuEquivariance linear_1 and linear_res (RewriteConfig.merged_residual is on; this record stays off)",
+     "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+     "single_graph_strain": "on"
+    },
+    "selfchecks": {
+     "generic_species_skip": null,
+     "generic_reassociate": null,
+     "generic_fused_radial_backward": null,
+     "generic_streaming": null,
+     "block_linear": null,
+     "grouped_linear": null,
+     "single_graph_strain": null
+    },
+    "streaming_interactions": 1,
+    "sort_receivers": true,
+    "gpu_neighbour_list": true,
+    "neighbour_rebuilds": 24,
+    "edge_capacity": 14080,
+    "candidates": 10206,
+    "species_columns": [
+     10,
+     16
+    ],
+    "charge": null,
+    "spin_multiplicity": null,
+    "dynamo_reset": false,
+    "polar": null
+   }
+  },
+  "NbCl5": {
+   "natoms": 1944,
+   "setup_s": 11.212178982794285,
+   "setup_stages": {
+    "plan": {
+     "total_s": 0.001539791002869606,
+     "calls": 1,
+     "each_s": [
+      0.001539791002869606
+     ]
+    },
+    "compile: private_copy (deepcopy)": {
+     "total_s": 0.40963186509907246,
+     "calls": 1,
+     "each_s": [
+      0.40963186509907246
+     ]
+    },
+    "apply: generic_species_skip": {
+     "total_s": 0.003874942660331726,
+     "calls": 1,
+     "each_s": [
+      0.003874942660331726
+     ]
+    },
+    "apply: generic_reassociate": {
+     "total_s": 0.0009560585021972656,
+     "calls": 1,
+     "each_s": [
+      0.0009560585021972656
+     ]
+    },
+    "apply: generic_fused_radial_backward": {
+     "total_s": 3.896839916706085e-05,
+     "calls": 1,
+     "each_s": [
+      3.896839916706085e-05
+     ]
+    },
+    "apply: generic_streaming": {
+     "total_s": 0.054945001378655434,
+     "calls": 1,
+     "each_s": [
+      0.054945001378655434
+     ]
+    },
+    "apply: block_linear": {
+     "total_s": 0.01162378303706646,
+     "calls": 1,
+     "each_s": [
+      0.01162378303706646
+     ]
+    },
+    "apply: grouped_linear": {
+     "total_s": 0.0007255356758832932,
+     "calls": 1,
+     "each_s": [
+      0.0007255356758832932
+     ]
+    },
+    "apply: single_graph_strain": {
+     "total_s": 8.938834071159363e-06,
+     "calls": 1,
+     "each_s": [
+      8.938834071159363e-06
+     ]
+    },
+    "compile: simplify_traceable": {
+     "total_s": 0.002060951665043831,
+     "calls": 1,
+     "each_s": [
+      0.002060951665043831
+     ]
+    },
+    "build: force field (total)": {
+     "total_s": 0.5000173896551132,
+     "calls": 1,
+     "each_s": [
+      0.5000173896551132
+     ]
+    },
+    "build: initial forces (first compiled call)": {
+     "total_s": 10.690406331792474,
+     "calls": 1,
+     "each_s": [
+      10.690406331792474
+     ]
+    }
+   },
+   "warmup_s": 3.080804519355297,
+   "warmup_stages": {
+    "warm-up: capture ACP": {
+     "total_s": 0.01989234983921051,
+     "calls": 1,
+     "each_s": [
+      0.01989234983921051
+     ]
+    },
+    "warm-up: capture B": {
+     "total_s": 0.11213617771863937,
+     "calls": 2,
+     "each_s": [
+      0.06627281941473484,
+      0.04586335830390453,
+      0.051574090495705605
+     ]
+    }
+   },
+   "step_ms": 9.885289675245684,
+   "info": {
+    "engine": "graph",
+    "mode": "pipelined",
+    "capture": true,
+    "pad_edges": true,
+    "variable_cell": false,
+    "initial_edges": 51084,
+    "edge_bucket": 2560,
+    "edge_sizes_used": [
+     51200,
+     53760,
+     56320
+    ],
+    "neighbour_rebuilds": 23,
+    "graphs": [
+     "ACP",
+     "('B', 51200)",
+     "('B', 53760)",
+     "('B', 56320)"
+    ],
+    "pool_resets": 0,
+    "capture_memory": [
+     {
+      "key": "ACP",
+      "warmup_in_pool": false,
+      "max_reserved_after_warmup_MiB": 866.0,
+      "max_reserved_after_capture_MiB": 866.0
+     },
+     {
+      "key": "('B', 51200)",
+      "warmup_in_pool": false,
+      "max_reserved_after_warmup_MiB": 910.0,
+      "max_reserved_after_capture_MiB": 910.0
+     },
+     {
+      "key": "('B', 53760)",
+      "warmup_in_pool": true,
+      "max_reserved_after_warmup_MiB": 946.0,
+      "max_reserved_after_capture_MiB": 946.0
+     },
+     {
+      "key": "('B', 56320)",
+      "warmup_in_pool": true,
+      "max_reserved_after_warmup_MiB": 966.0,
+      "max_reserved_after_capture_MiB": 966.0
+     }
+    ],
+    "speculative_launches": 0,
+    "speculative_rollbacks": 0,
+    "speculative_rebuild_rollbacks": 0,
+    "speculative_bucket_rollbacks": 0,
+    "pipelined_redos": 2,
+    "pipelined_rebuild_redos": 0,
+    "pipelined_early_rebuilds": 23,
+    "process": {
+     "allocator": "expandable_segments:True",
+     "dynamo_cache_size_limit": 64,
+     "compile_family": "oeq"
+    }
+   },
+   "force_field": {
+    "backend": "hybrid",
+    "dtype": "float32",
+    "device": "cuda:0",
+    "compile_mode": "default",
+    "training": false,
+    "compute_stress": false,
+    "padding_exact": true,
+    "rewrites": [
+     "generic_species_skip",
+     "generic_reassociate",
+     "generic_fused_radial_backward",
+     "generic_streaming",
+     "block_linear",
+     "grouped_linear",
+     "single_graph_strain"
+    ],
+    "decisions": {
+     "factor_species": "off",
+     "fold_cutoff": "off",
+     "density_first": "off",
+     "joint_radial_input": "off",
+     "fused_folded_backward": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field fused_folded_backward honoured by generic_fused_radial_backward)",
+     "fused_radial_hidden": "off",
+     "streaming_conv": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field streaming_conv honoured by generic_streaming)",
+     "reassociate_first": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (field reassociate_first honoured by generic_reassociate)",
+     "segmented_first_sum": "interactions ['RealAgnosticResidualInteractionBlock'] are not ('RealAgnosticResidualNonLinearInteractionBlock',) (RewriteConfig.segmented_first_sum is on; this record stays off)",
+     "generic_species_skip": "on",
+     "generic_reassociate": "on",
+     "generic_fused_radial_backward": "on",
+     "generic_streaming": "on",
+     "block_linear": "on",
+     "grouped_linear": "on",
+     "merged_residual": "no ('RealAgnosticResidualNonLinearInteractionBlock',) interaction with cuEquivariance linear_1 and linear_res (RewriteConfig.merged_residual is on; this record stays off)",
+     "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+     "single_graph_strain": "on"
+    },
+    "selfchecks": {
+     "generic_species_skip": null,
+     "generic_reassociate": null,
+     "generic_fused_radial_backward": null,
+     "generic_streaming": null,
+     "block_linear": null,
+     "grouped_linear": null,
+     "single_graph_strain": null
+    },
+    "streaming_interactions": 1,
+    "sort_receivers": true,
+    "gpu_neighbour_list": true,
+    "neighbour_rebuilds": 24,
+    "edge_capacity": 76032,
+    "candidates": 67760,
+    "species_columns": [
+     16,
+     40
+    ],
+    "charge": null,
+    "spin_multiplicity": null,
+    "dynamo_reset": false,
+    "polar": null
+   }
+  }
+ },
+ "inductor_cache": "/mnt/homes/zwingel/fastmace-cache/1b-T11-murphy/inductor",
+ "process": {
+  "stages": {
+   "prepare_hybrid (OEq runtime env)": 0.07003631256520748,
+   "load (checkpoint, conversion)": 24.078700859099627
+  },
+  "load_stages": {
+   "load: sha256": {
+    "total_s": 0.02943951077759266,
+    "calls": 1,
+    "each_s": [
+     0.02943951077759266
+    ]
+   },
+   "load: check_cueq": {
+    "total_s": 19.755168987438083,
+    "calls": 1,
+    "each_s": [
+     19.755168987438083
+    ]
+   },
+   "load: check_oeq (OEq extension)": {
+    "total_s": 0.00010912120342254639,
+    "calls": 1,
+    "each_s": [
+     0.00010912120342254639
+    ]
+   },
+   "load: require_fused_cueq": {
+    "total_s": 0.00033308565616607666,
+    "calls": 1,
+    "each_s": [
+     0.00033308565616607666
+    ]
+   }
+  }
+ },
+ "process_wall_s": 68.00506983138621
+}

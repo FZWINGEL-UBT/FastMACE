@@ -178,3 +178,10 @@ commands. Never print the token.
   `~/models` (WSL). Pass them as paths or through `FASTMACE_MODELS`.
 - WSL has 15 GB RAM: check `free -g` before suites, and never run two
   `-n 8` suites at once.
+- **WSL crashed on 19 October 2026 (about 01:16)** when a local GPU-suite child
+  started compiling MH-1 (24 Inductor workers) while two CPU suites ran:
+  `Wsl/Service/E_UNEXPECTED`, every WSL process killed, recovered with
+  `wsl --shutdown`. Since then: a GPU suite runs with
+  `TORCHINDUCTOR_COMPILE_THREADS=4`, starts only with at least 10 GB
+  available, and no CPU suite starts while it runs. CPU suites need at
+  least 6 GB available.

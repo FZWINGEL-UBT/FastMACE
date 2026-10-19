@@ -513,7 +513,8 @@ class FixedPlanner:
         Each record is asked for "on" when its field resolved on (polar_uvu: its default) and "off"
         otherwise. A record that cannot be enabled is off with its reason, as the research engine's
         switches are no-ops on models they do not fit (``merged_residual`` without ``density_first``,
-        ``segmented_first_sum`` beside ``generic_reassociate``, MACE-OFF's non-generic first block).
+        MH-1's ``segmented_first_sum`` beside ``generic_reassociate``, which has its own
+        ``generic_segmented_first_sum``; MACE-OFF's non-generic first block).
         Only a field the caller set to "on" explicitly with no record of it enabled is refused.
         """
         from fastmace.rewrites import registry as reg

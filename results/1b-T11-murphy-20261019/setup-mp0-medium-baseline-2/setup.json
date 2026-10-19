@@ -1,0 +1,249 @@
+{
+ "created_utc": "2026-10-18T22:45:43.997639+00:00",
+ "host": "murphy",
+ "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+ "fastmace_commit": "2da309e190163b0d69b2d4d0a495317bfb52d2e6",
+ "baseline": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+ "model": "mp0-medium",
+ "side": "baseline",
+ "check": "on",
+ "oeq_runtime": null,
+ "structures": {
+  "NaCl": {
+   "natoms": 216,
+   "setup_s": 14.899733640253544,
+   "setup_stages": {
+    "compile: deepcopy (module)": {
+     "total_s": 0.6166459824889898,
+     "calls": 5,
+     "each_s": [
+      0.6115913446992636,
+      0.00012331269681453705,
+      0.001365460455417633,
+      0.0009983163326978683,
+      0.002567548304796219
+     ]
+    },
+    "compile: restore OEq wrappers": {
+     "total_s": 0.005458442494273186,
+     "calls": 1,
+     "each_s": [
+      0.005458442494273186
+     ]
+    },
+    "rewrites: generic_rewrites": {
+     "total_s": 0.9047368075698614,
+     "calls": 1,
+     "each_s": [
+      0.9047368075698614
+     ]
+    },
+    "rewrites: block_linears": {
+     "total_s": 0.019928162917494774,
+     "calls": 1,
+     "each_s": [
+      0.019928162917494774
+     ]
+    },
+    "rewrites: merge_residual_linears": {
+     "total_s": 1.2597069144248962e-05,
+     "calls": 1,
+     "each_s": [
+      1.2597069144248962e-05
+     ]
+    },
+    "compile: simplify_traceable": {
+     "total_s": 0.002343980595469475,
+     "calls": 1,
+     "each_s": [
+      0.002343980595469475
+     ]
+    },
+    "compile_model (total)": {
+     "total_s": 2.099869880825281,
+     "calls": 1,
+     "each_s": [
+      2.099869880825281
+     ]
+    },
+    "build: force field (total)": {
+     "total_s": 2.5933348070830107,
+     "calls": 1,
+     "each_s": [
+      2.5933348070830107
+     ]
+    },
+    "build: initial forces (first compiled call)": {
+     "total_s": 12.299807043746114,
+     "calls": 1,
+     "each_s": [
+      12.299807043746114
+     ]
+    }
+   },
+   "warmup_s": 8.67211776599288,
+   "warmup_stages": {
+    "warm-up: capture ACP": {
+     "total_s": 0.02612137794494629,
+     "calls": 1,
+     "each_s": [
+      0.02612137794494629
+     ]
+    },
+    "warm-up: capture B": {
+     "total_s": 8.202077321708202,
+     "calls": 1,
+     "each_s": [
+      8.202077321708202
+     ]
+    }
+   },
+   "step_ms": 1.443147292981545,
+   "info": {
+    "capture_memory": [
+     {
+      "key": "ACP",
+      "warmup_in_pool": false,
+      "max_reserved_after_warmup_MiB": 158.0,
+      "max_reserved_after_capture_MiB": 158.0
+     },
+     {
+      "key": "('B', 7168)",
+      "warmup_in_pool": false,
+      "max_reserved_after_warmup_MiB": 220.0,
+      "max_reserved_after_capture_MiB": 238.0
+     }
+    ]
+   }
+  },
+  "NbCl5": {
+   "natoms": 1944,
+   "setup_s": 11.62848013266921,
+   "setup_stages": {
+    "compile: deepcopy (module)": {
+     "total_s": 0.41660594567656517,
+     "calls": 5,
+     "each_s": [
+      0.41124984063208103,
+      0.00013598427176475525,
+      0.0014166012406349182,
+      0.0010560043156147003,
+      0.0027475152164697647
+     ]
+    },
+    "compile: restore OEq wrappers": {
+     "total_s": 0.005810068920254707,
+     "calls": 1,
+     "each_s": [
+      0.005810068920254707
+     ]
+    },
+    "rewrites: generic_rewrites": {
+     "total_s": 0.4319362733513117,
+     "calls": 1,
+     "each_s": [
+      0.4319362733513117
+     ]
+    },
+    "rewrites: block_linears": {
+     "total_s": 0.01613815501332283,
+     "calls": 1,
+     "each_s": [
+      0.01613815501332283
+     ]
+    },
+    "rewrites: merge_residual_linears": {
+     "total_s": 1.2975186109542847e-05,
+     "calls": 1,
+     "each_s": [
+      1.2975186109542847e-05
+     ]
+    },
+    "compile: simplify_traceable": {
+     "total_s": 0.0022517945617437363,
+     "calls": 1,
+     "each_s": [
+      0.0022517945617437363
+     ]
+    },
+    "compile_model (total)": {
+     "total_s": 0.8701273538172245,
+     "calls": 1,
+     "each_s": [
+      0.8701273538172245
+     ]
+    },
+    "build: force field (total)": {
+     "total_s": 0.8841217067092657,
+     "calls": 1,
+     "each_s": [
+      0.8841217067092657
+     ]
+    },
+    "build: initial forces (first compiled call)": {
+     "total_s": 10.743496716022491,
+     "calls": 1,
+     "each_s": [
+      10.743496716022491
+     ]
+    }
+   },
+   "warmup_s": 3.001571472734213,
+   "warmup_stages": {
+    "warm-up: capture ACP": {
+     "total_s": 0.019778620451688766,
+     "calls": 1,
+     "each_s": [
+      0.019778620451688766
+     ]
+    },
+    "warm-up: capture B": {
+     "total_s": 0.11233664117753506,
+     "calls": 2,
+     "each_s": [
+      0.06579220481216908,
+      0.04654443636536598,
+      0.05484947748482227
+     ]
+    }
+   },
+   "step_ms": 9.627057276666164,
+   "info": {
+    "capture_memory": [
+     {
+      "key": "ACP",
+      "warmup_in_pool": false,
+      "max_reserved_after_warmup_MiB": 864.0,
+      "max_reserved_after_capture_MiB": 864.0
+     },
+     {
+      "key": "('B', 51200)",
+      "warmup_in_pool": false,
+      "max_reserved_after_warmup_MiB": 906.0,
+      "max_reserved_after_capture_MiB": 906.0
+     },
+     {
+      "key": "('B', 53760)",
+      "warmup_in_pool": true,
+      "max_reserved_after_warmup_MiB": 942.0,
+      "max_reserved_after_capture_MiB": 942.0
+     },
+     {
+      "key": "('B', 56320)",
+      "warmup_in_pool": true,
+      "max_reserved_after_warmup_MiB": 986.0,
+      "max_reserved_after_capture_MiB": 986.0
+     }
+    ]
+   }
+  }
+ },
+ "inductor_cache": "/mnt/homes/zwingel/fastmace-cache/1b-T11-murphy/oeq-launcher/mace/inductor-cache",
+ "process": {
+  "stages": {
+   "load (checkpoint, conversion)": 24.913713231682777
+  },
+  "load_stages": {}
+ },
+ "process_wall_s": 70.98774091526866
+}

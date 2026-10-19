@@ -119,13 +119,14 @@ class Integrator(abc.ABC):
 
     @abc.abstractmethod
     def state_dict(self) -> dict[str, Any]:
-        """Internal state for a restart (host arrays): e.g. BAOAB's ``p_eps`` and ``force_eps``.
+        """Internal state for a restart (host arrays) that ``SimulationState`` does not hold.
 
-        The noise stream is in ``SimulationState.rng``, not here.
+        Empty for both integrators since 1b: the noise stream is in ``SimulationState.rng`` and
+        BAOAB's barostat state (``p_eps``, ``force_eps``) in ``SimulationState`` (SPEC §10.6).
         """
         raise NotImplementedError
 
     @abc.abstractmethod
     def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
-        """Restore ``state_dict()`` in place (fixed addresses kept)."""
+        """Restore ``state_dict()`` in place (fixed addresses kept); BAOAB also takes its 1a state."""
         raise NotImplementedError
