@@ -484,10 +484,12 @@ def gpu_suite_jobs(machine: Machine, run_root: Path) -> list:
     restart, the hybrid restart statistics), with hybrid children in the OEq environment."""
     run_root = Path(run_root)
     output = check_location(machine, run_root / "gpu-suite")
-    basetemp = check_location(machine, run_root / "gpu-suite" / "pytest")
+    # pytest creates --basetemp but not its parent: keep it directly under the run root (the 21 setup errors of
+    # run 1b-T23-local-20261019 came from a basetemp inside the not yet created output directory).
+    basetemp = check_location(machine, run_root / "gpu-suite-pytest")
     tests = machine.path(machine.fastmace) / "tests" / "gpu"
     argv = [machine.python("mace_cueq_latest"), "-m", "pytest", str(tests), "-p", "no:cacheprovider",
-            f"--basetemp={basetemp}", "--durations=40", f"--junitxml={output / 'junit.xml'}"]
+            f"--basetemp={basetemp}", "--durations=40", "-rfEs", f"--junitxml={output / 'junit.xml'}"]
     return [Job(name="gpu-suite", argv=tuple(argv), output=str(output),
                 env={"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq")}, note="full tier, one process")]
 
@@ -497,7 +499,7 @@ def adapter_jobs(machine: Machine, run_root: Path) -> list:
     (no bytecode, no pytest cache, temporary files outside its tree; conductor answer to 1b-T23)."""
     run_root = Path(run_root)
     output = check_location(machine, run_root / "adapter-tests")
-    basetemp = check_location(machine, run_root / "adapter-tests" / "pytest")
+    basetemp = check_location(machine, run_root / "adapter-tests-pytest")  # pytest creates it; its parent exists
     tests = machine.path(machine.research_module) / "Experiments" / "Langevin_Thermostat" / "tests" / "core"
     argv = [machine.python("mace_cueq_oeq"), "-m", "pytest", str(tests / "test_fastmace_engine.py"),
             "-p", "no:cacheprovider", f"--basetemp={basetemp}", f"--junitxml={output / 'junit.xml'}"]
