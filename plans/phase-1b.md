@@ -1387,6 +1387,19 @@ points here.
 - Not covered: compiled PolarMACE NPT on the GPU, which may recompile if
   its k-vector set changes shape at a restart. That is for 1b-T23.
 
+### After T16 (19 October 2026)
+
+- The gate passes 46 CPU and 7 GPU tests (murphy). The registered state is
+  bitwise unchanged after the gate. An E0 offset of 1 meV per Na atom fails
+  on energy alone.
+- Conductor decision: on NaCl 3×3×3 the 0.05 Å rattle pulls the 6.306 Å
+  shell inside the 6.3 Å build radius, so the neighbour capacity grows
+  during the gate. The gate keeps the larger capacity, recaptures, and
+  records it in `GateRecord.notes`. That is accepted: the gate is opt-in,
+  and the run's first thermal rebuild would grow it anyway. A gated plain
+  cuEq float64 run therefore need not stay within 1e-12 Å of an ungated
+  one on the GPU.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
