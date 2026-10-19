@@ -206,7 +206,7 @@ def _check_hybrid(out, dtype):
 
 
 @needs_oeq
-@pytest.mark.parametrize("dtype", ["float32", "float64"])
+@pytest.mark.parametrize("dtype", ["float32", pytest.param("float64", marks=pytest.mark.slow)])
 def test_streaming_attaches_on_a_tiny_hybrid_model(tmp_path, dtype):
     from _support.tiny_models import FAMILIES, tiny_mace_model
 
@@ -240,6 +240,7 @@ def mace_conv_fusion_rule():
     _patches.set_cueq_conv_fusion(None)
 
 
+@pytest.mark.slow
 @needs_mh1
 def test_mh1_float64_package_agrees_with_the_unrewritten_model(mace_conv_fusion_rule):
     """MH-1 (matpes_r2scan), plain cuEq, float64, NaCl 2x2x2: the stacked package against the unrewritten model."""
@@ -273,6 +274,7 @@ def test_mh1_float64_package_agrees_with_the_unrewritten_model(mace_conv_fusion_
     assert report["energy_relative"] <= 1e-10 and report["force_relative"] <= 1e-10
 
 
+@pytest.mark.slow
 @needs_mh1
 @needs_oeq
 def test_mh1_hybrid_float32_with_streaming():

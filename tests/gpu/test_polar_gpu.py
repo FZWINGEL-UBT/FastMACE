@@ -190,6 +190,7 @@ def polar1_s_float64():
     return loading.load("polar1-s", backend="cueq", dtype="float64", device=DEVICE)
 
 
+@pytest.mark.slow
 @needs_polar1_s
 def test_polar1_s_float64_forces_and_stress(polar1_s_float64):
     calc = polar1_s_float64.calculator
@@ -212,6 +213,7 @@ def test_polar1_s_float64_forces_and_stress(polar1_s_float64):
     assert not overflow
 
 
+@pytest.mark.slow
 @needs_polar1_s
 def test_polar1_s_uvu_self_check(polar1_s_float64):
     model = polar1_s_float64.model
@@ -225,6 +227,7 @@ def test_polar1_s_uvu_self_check(polar1_s_float64):
 # --------------------------------------------------------------------------- POLAR-1-S hybrid float32
 
 
+@pytest.mark.slow
 @needs_polar1_s
 @pytest.mark.skipif(not _hybrid_has("openequivariance"), reason="OpenEquivariance is not installed")
 def test_polar1_s_hybrid_float32_in_a_fresh_process(polar1_s_float64):

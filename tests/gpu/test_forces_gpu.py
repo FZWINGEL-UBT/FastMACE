@@ -276,7 +276,7 @@ print(json.dumps(result))
 
 @needs_oeq
 @pytest.mark.parametrize("compile_mode", ["none", "default"])
-@pytest.mark.parametrize("dtype", ["float32", "float64"])
+@pytest.mark.parametrize("dtype", ["float32", pytest.param("float64", marks=pytest.mark.slow)])
 def test_two_force_fields_from_one_model_step_independently(tmp_path, dtype, compile_mode):
     """The bind_streaming_count failure as a regression test: each field reads its own edge count."""
     from _support.tiny_models import FAMILIES, tiny_mace_model
@@ -433,6 +433,7 @@ def _compare(ours, theirs):
     return report
 
 
+@pytest.mark.slow
 @needs_mh1_baseline
 @pytest.mark.parametrize("case", list(MH1_CASES))
 def test_mh1_agrees_with_maceforces(case):

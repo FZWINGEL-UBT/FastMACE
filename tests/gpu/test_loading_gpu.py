@@ -63,6 +63,7 @@ def evaluate(calculator, repeat=2, rattle=0.05, seed=17):
     return atoms.get_potential_energy(), atoms.get_forces()
 
 
+@pytest.mark.slow
 @needs_models
 @pytest.mark.skipif(not has_checkpoint("mh1-r2scan"), reason="MH-1 checkpoint not in FASTMACE_MODELS")
 def test_mh1_plain_cueq_float64():
@@ -80,6 +81,7 @@ def test_mh1_plain_cueq_float64():
     assert np.isfinite(energy) and np.isfinite(forces).all() and forces.shape == (64, 3)
 
 
+@pytest.mark.slow
 @needs_models
 @needs_oeq
 @pytest.mark.skipif(not has_checkpoint("mh1-r2scan"), reason="MH-1 checkpoint not in FASTMACE_MODELS")
