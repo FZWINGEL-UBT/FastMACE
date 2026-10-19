@@ -1538,6 +1538,15 @@ below is kept as the record.
   second editor of `provenance.py` and `simulation.py` for this only. Short
   local GPU A/B.
 
+- **Finding from 1b-T27:** a stale torch-extension build lock
+  (`~/.cache/torch_extensions/py310_cu130/libtorch_tp_jit/lock`, left by a
+  killed OEq JIT build on 8 October) made every local process that imports
+  MACE before FastMACE wait 300 s in OEq's `_wait_for_torch_build_lock`.
+  OEq then went on without its extension. The conductor deleted the lock;
+  the workstation caches had none. Follow-up candidate for phase 2:
+  `fastmace doctor` reports stale build locks, and the OEq preparation warns
+  instead of waiting silently.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
