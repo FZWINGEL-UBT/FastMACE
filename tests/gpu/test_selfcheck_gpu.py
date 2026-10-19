@@ -180,6 +180,7 @@ def test_a_broken_captured_graph_fails_while_eager_passes():
 
 
 @pytest.mark.slow
+@pytest.mark.acceptance
 @pytest.mark.skipif(not _available("mh1-r2scan"), reason="needs MH-1 in FASTMACE_MODELS")
 def test_gate_time_on_nbcl5():
     out = run_gate(dict(label="mh1-r2scan", structure="nbcl5", repeat=2))
