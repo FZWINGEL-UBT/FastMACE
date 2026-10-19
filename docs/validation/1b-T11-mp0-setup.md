@@ -235,7 +235,8 @@ captures.
 
 - CPU suite, `fastmace_cpu` (WSL, `-n 4`): 873 passed, 200 skipped.
 - CPU suite, `mace_cueq_latest`: the local WSL run failed when WSL itself crashed (`Wsl/Service/E_UNEXPECTED`), so it
-  ran on murphy in the NAS `mace_cueq_latest` at `cad3a1e`: 1071 passed, 2 skipped (`-n 8`, CUDA hidden).
+  ran on murphy in the NAS `mace_cueq_latest` at `cad3a1e`: 1071 passed, 2 skipped (`-n 8`, CUDA hidden). After
+  the conductor restarted WSL, the local run at `54c16ea` gave 899 passed, 174 skipped (`-n 4`).
 - ruff: clean (`fastmace tests tools results/1b-T11-probes`).
 - GPU suite on murphy (NAS `mace_cueq_latest`, hybrid children in `mace_cueq_oeq`, idle check first):
   - at `efd617f`: 218 passed, 2 skipped, 3 failed. All three failures were
