@@ -9,7 +9,8 @@ Test: `tests/gpu/test_canonical_restart_gpu.py`. JSON:
   RAM never fell below 10.2 GB (`free.log`).
 - **Environments:** pytest in `mace_cueq_latest`; hybrid children in
   `mace_cueq_oeq` (`FASTMACE_HYBRID_PYTHON`). Both from the checkout with
-  `PYTHONPATH`.
+  `PYTHONPATH`. Both have torch 2.14.1+cu130 and mace-torch 0.3.16;
+  cuequivariance-torch 0.12.0 and OpenEquivariance 0.7.0.
 - **FastMACE:** branch `fastmace/1b-T14` at 7df77ff (`commit.txt`). No
   research-engine baseline is involved: the comparison is FastMACE against
   itself.
