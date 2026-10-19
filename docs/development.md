@@ -75,9 +75,12 @@ A test is also marked `@pytest.mark.acceptance` (and keeps `slow`, so that the o
 - a statistical check over tens of thousands of steps (ASE equivalence, the hybrid restart);
 - a timing record (the gate's time on NbCl5).
 
-`tests/conftest.py` refuses an `acceptance` mark without `slow`. A run that selects acceptance
-tests stops with a usage error if `FASTMACE_BASELINE`, `FASTMACE_HYBRID_PYTHON` or
-`FASTMACE_MODELS` is unset or names nothing: acceptance never skips silently.
+`tests/cpu/test_tiers.py` fails for an `acceptance` mark without `slow`. When a `-m` expression
+selects acceptance tests (`-m acceptance`, or `-m slow`), `tests/conftest.py` stops the run with a
+usage error if `FASTMACE_BASELINE`, `FASTMACE_HYBRID_PYTHON` or `FASTMACE_MODELS` is unset or names
+nothing, so the acceptance tier never skips silently. The check runs in the controller before
+collection, so xdist workers never see it. A run without `-m` keeps the tests' own skips.
+Run CPU suites under xdist (`-n 2` or more) whenever you change `conftest.py` or a pytest plugin.
 
 Every behaviour tested on the GPU keeps at least one test in the fast tier, usually on a
 tiny model or the Lennard-Jones force field in the pytest process, except those listed

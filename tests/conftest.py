@@ -5,8 +5,9 @@ Tests import helpers as ``from _support import ...``: pytest puts this directory
 
 Test tiers (plan tasks 1b-T24, 1b-T27, ``_support.tiers``, ``docs/development.md``): fast
 ``-m "not slow and not acceptance"`` (workers), full ``-m "not acceptance"`` (merges) and
-``-m acceptance`` (phase acceptance). An acceptance test must also be ``slow``, and a run that
-selects acceptance tests fails without the research engine, the hybrid Python or the models.
+``-m acceptance`` (phase acceptance). An acceptance test must also be ``slow``
+(``tests/cpu/test_tiers.py`` checks it), and a ``-m`` that selects acceptance tests stops the run
+without the research engine, the hybrid Python or the models.
 """
 
 import fastmace  # noqa: F401  (before torch: it switches PyTorch's file locks, SPEC §14)
@@ -35,6 +36,21 @@ def pytest_addoption(parser):
                           "(default: the FastMACE cache root's, shared by all runs)")
 
 
+def _check_acceptance_environment(config):
+    """A -m expression that selects acceptance tests needs their environment, or the run stops (1b-T27).
+
+    In the controller, before collection: an error raised in xdist workers' collection crashes them.
+    A run without -m keeps the acceptance tests' own skips.
+    """
+    from _support import tiers
+
+    if tiers.selects_acceptance(config.getoption("markexpr", "")):
+        problems = tiers.acceptance_environment_problems()
+        if problems:
+            raise pytest.UsageError("\n".join(["-m selects the acceptance tier (docs/development.md, "
+                                               "'Test tiers'), which needs:", *problems]))
+
+
 def pytest_configure(config):
     """One Inductor/Triton cache root for the whole run, inherited by every child process (1b-T24).
 
@@ -46,6 +62,7 @@ def pytest_configure(config):
     """
     if hasattr(config, "workerinput"):  # an xdist worker inherits the controller's variables
         return
+    _check_acceptance_environment(config)
     from fastmace import _cache
     from fastmace.kernels.triton import cache
 
@@ -79,19 +96,6 @@ def pytest_collection_modifyitems(config, items):
             cuda = torch.cuda.is_available()
         if not cuda:
             item.add_marker(pytest.mark.skip(reason=_NO_CUDA))
-
-
-# After -m has deselected (trylast): only the tests that will run.
-@pytest.hookimpl(trylast=True, specname="pytest_collection_modifyitems")
-def pytest_collection_modifyitems_tiers(config, items):
-    """Refuse tier marks that break the rules, and an acceptance run without its environment."""
-    from _support import tiers
-
-    problems = tiers.marker_problems({item.nodeid: [mark.name for mark in item.iter_markers()] for item in items})
-    if any(item.get_closest_marker("acceptance") for item in items):
-        problems += [f"acceptance tier: {problem}" for problem in tiers.acceptance_environment_problems()]
-    if problems:
-        raise pytest.UsageError("\n".join(["the GPU test tiers (docs/development.md, 'Test tiers'):", *problems]))
 
 
 @pytest.fixture

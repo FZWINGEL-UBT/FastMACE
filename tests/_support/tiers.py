@@ -6,8 +6,8 @@
   or ``kernels/``).
 
 An acceptance test also carries ``slow``, so that the older fast command (``-m "not slow"``) leaves it
-out too. The acceptance tier needs the research engine, the hybrid interpreter and the released
-models; without them it fails instead of skipping its tests.
+out too. A ``-m`` that selects acceptance tests needs the research engine, the hybrid interpreter
+and the released models; without them the run stops instead of skipping those tests.
 """
 
 from __future__ import annotations
@@ -35,10 +35,14 @@ def tier(marks) -> str:
     return "full" if "slow" in marks else "fast"
 
 
-def marker_problems(tests) -> list[str]:
-    """Tests (``{node id: mark names}``) whose marks break the tier rules: acceptance without slow."""
-    return [f"{node}: marked acceptance but not slow; add @pytest.mark.slow"
-            for node, marks in tests.items() if "acceptance" in set(marks) and "slow" not in set(marks)]
+def selects_acceptance(markexpr: str) -> bool:
+    """True when ``-m markexpr`` (non-empty) selects an acceptance test (marks: acceptance, slow, gpu)."""
+    if not markexpr:
+        return False
+    from _pytest.mark.expression import Expression
+
+    marks = {"acceptance", "slow", "gpu"}
+    return Expression.compile(markexpr).evaluate(lambda name, **kwargs: name in marks)
 
 
 def acceptance_environment_problems(environ=None) -> list[str]:

@@ -83,9 +83,15 @@ murphy.
 ## Tier rules and tools
 
 - `pyproject.toml` registers `acceptance`. `tests/_support/tiers.py` defines the tiers.
-  `tests/conftest.py` refuses an `acceptance` mark without `slow`. It stops a run that selects
-  acceptance tests with a usage error when `FASTMACE_BASELINE`, `FASTMACE_HYBRID_PYTHON` or
-  `FASTMACE_MODELS` is unset or names nothing.
+  `tests/cpu/test_tiers.py` fails for an `acceptance` mark without `slow`. When `-m` selects
+  acceptance tests, `tests/conftest.py` stops the run in `pytest_configure` (controller only) with a
+  usage error if `FASTMACE_BASELINE`, `FASTMACE_HYBRID_PYTHON` or `FASTMACE_MODELS` is unset or
+  names nothing.
+- **Fixed after review:** the first version checked during collection, in every xdist worker. A run
+  without `-m` over `tests/cpu tests/gpu` therefore collected the acceptance tests, and without the
+  three variables it crashed every worker. xdist then reported an INTERNALERROR, blaming each
+  worker's first test (`test_acceptance_1b.py::test_rename_source[...]`, an ID with newlines, which
+  was only the symptom). The conductor found it on murphy at `-n 8`.
 - `tools/test_budget.py` prints the tier totals against 10 min (fast) and 40 min (full) as a warning,
   then fails for:
   - a fast-tier test over 60 s;
