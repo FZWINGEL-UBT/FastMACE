@@ -1447,6 +1447,27 @@ points here.
   takes about 310 s even with a tiny model, against 10 s for the hybrid
   case. A user who imports MACE before FastMACE would pay this.
 
+### During 1b-T23 (19 October 2026)
+
+- Passing:
+  - the `main.py` smoke run (`--engine gpu` against `--engine fastmace`,
+    NaNbO3, 2000 steps): final temperature 161.48171 against 161.48177 K,
+    with a 0.035 meV/atom energy offset from D2;
+  - compiled PolarMACE NPT across five canonical restarts: no recompile,
+    resumed to 2.1e-7 Å.
+- 116 previously skipped GPU tests pass. **Three in `test_engine_gpu.py`
+  fail and are assigned to 1b-T03b:** the plain cuEq float64 research
+  comparisons (stage B's kernel sequence differs, likely the float64
+  energy), and a hybrid capture crash ("stale reference to the default
+  stream from warmup" in the float64-energy `ScaleShiftMACE.forward`)
+  inside that test's eager warm-up check.
+- Setup takes 4–10 s longer than 1a in single-version processes on NaCl
+  (murphy 19.5 s against 15.3 s; local 24.0 s against 14.4 s). A screen
+  candidate after 1b, beside 1a's setup finding.
+- The local RTX 5060 Ti has no noise floor of its own (1a-T18 measured
+  murphy only), and its per-block-pair ratios scatter widely (NaCl
+  0.987–1.014).
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
