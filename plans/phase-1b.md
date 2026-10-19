@@ -1433,6 +1433,20 @@ points here.
   only (approved). It lets the ASE shim write trajectory and log at
   `loginterval` without ending a `run()` chunk.
 
+### After T21, T22, T23 tools, T26 (19 October 2026)
+
+- Every 1b implementation task is merged. The trial passed in both CPU
+  environments (murphy `mace_cueq_latest`: 2128 passed; local
+  `fastmace_cpu`: 2081 passed).
+- T26: the warm fast GPU tier went from 24.3 to 8.0 min (186 tests); 13
+  tests were marked slow and 2 tiny tests added. Tiny versions of the
+  others cost almost as much, because processes, compiles and child
+  processes dominate, and two fail on a random model. Those behaviours are
+  listed as full-tier only in `docs/development.md`.
+- **Possible library issue for 1b-T23 to measure:** "MACE imported first"
+  takes about 310 s even with a tiny model, against 10 s for the hybrid
+  case. A user who imports MACE before FastMACE would pay this.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
