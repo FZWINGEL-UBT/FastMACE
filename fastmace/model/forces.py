@@ -576,6 +576,41 @@ class MACEForceField:
 
         return polar.get_state(self._polar_model)
 
+    def reset_polar(self, cell) -> tuple[bool, bool]:
+        """Canonical restart point (1b-T14, SPEC §10.6): the polar state a fresh build at ``cell`` has.
+
+        The k-vector set is rebuilt from the (float64 host) ``cell`` when it is not the one it was
+        built for, which happens only for a variable cell; it is refilled in place when its shapes
+        stay. The sticky overflow flag is cleared (registry: ``reset``). Returns ``(moved,
+        overflowed)``: whether the polar buffers moved (captured graphs are stale) and whether the flag
+        was set. ``(False, False)`` without a polar state.
+        """
+        import numpy as np
+        import torch
+
+        from fastmace.longrange import polar
+
+        state = self._polar_state()
+        if state is None:
+            return False, False
+        overflowed = bool(state.overflow.item())
+        state.overflow.zero_()
+        cell = np.asarray(cell, dtype=np.float64)
+        if np.array_equal(state.cell, cell):
+            return False, overflowed
+        fresh = polar.PolarState(self._polar_model, cell, state.headroom)
+        old, new = state.buffers(), fresh.buffers()
+        if any(old[name].shape != new[name].shape for name in old):
+            polar.set_state(self._polar_model, fresh)
+            self.polar_info = fresh.info()
+            return True, overflowed
+        with torch.no_grad():
+            for name in old:
+                old[name].copy_(new[name])
+        state.bounds, state.cell, state.superset_size = fresh.bounds, fresh.cell, fresh.superset_size
+        self.polar_info = state.info()
+        return False, overflowed
+
     def buffers(self):
         """Persistent device buffers the graph-level methods write (and the polar state they read), by name.
 
