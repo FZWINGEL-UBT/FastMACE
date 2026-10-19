@@ -1,0 +1,34 @@
+{
+  "task": "1b-T13",
+  "test": "tests/gpu/test_reference_gpu.py::test_polar1s_reference_equals_1a_t19",
+  "status": "passed",
+  "machine": "murphy",
+  "gpu": "NVIDIA RTX 4000 Ada Generation 20 GB, driver 595.58.03",
+  "idle_check": "no compute process before start (idle_check.txt)",
+  "started_utc": "2026-10-19T03:21:28Z",
+  "environment": "/mnt/homes/zwingel/environments/mace_cueq_latest (torch 2.14.1+cu130, cuequivariance 0.12.0, mace-torch 0.3.16, graph-longrange 0.4.0)",
+  "backend": "cueq (MACE's conversion, conv fusion off), one-graph strain on",
+  "precision": "float64",
+  "model": "MACE-POLAR-1-S (/mnt/homes/zwingel/ResearchModule/Models/MACE-POLAR-1-S.model, SHA-256 from the 1a-T19 run metadata)",
+  "fastmace_commit": "ae96ba5",
+  "compared_with": {
+    "run": "1a-T19-gate-leto-20261018/gate-polar1-s",
+    "values": "values/reference-NaCl-f64.npz (fresh reference process on leto, research engine export 1a-T18, FastMACE e05dd55)",
+    "configurations": "configs/NaCl.npz: NaCl 3x3x3, 216 atoms, 3 hydrostatic and 3 full-cell configurations"
+  },
+  "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+  "worst": {
+    "energy_relative": 0.0,
+    "forces_eV_per_A": 5.134781488891349e-15,
+    "stress_eV_per_A3": 1.2663481374630692e-16
+  },
+  "tolerance": 1e-12,
+  "fd_stress_check": {
+    "configuration": "hydrostatic-0",
+    "strain": 1e-4,
+    "max_abs_eV_per_A3": 6.928687559457081e-09,
+    "tolerance_eV_per_A3": 1e-06,
+    "1a_T19_value": 6.92868758894738e-09
+  },
+  "wall_s": 16.55
+}
