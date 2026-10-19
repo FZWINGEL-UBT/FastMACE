@@ -258,9 +258,15 @@ class _Dynamics:
 
     @property
     def metadata(self) -> dict[str, Any] | None:
-        """The ``metadata.json`` record: the ``Simulation``'s, with this shim's ``"ase"`` block."""
+        """The ``metadata.json`` record: the ``Simulation``'s, with this shim's ``"ase"`` block (as written
+        at the end of the last ``run``, like ``fm.md``'s ``RunResult.metadata``)."""
         if self._sim is None:
             return None
+        path = Path(self.output) / METADATA_NAME
+        if path.is_file():
+            import json
+
+            return json.loads(path.read_text(encoding="utf-8"))
         return {**self._sim.metadata(), "ase": self._ase_record()}
 
     # ------------------------------------------------------------------ the Simulation
@@ -303,11 +309,22 @@ class _Dynamics:
         self._write_records()
 
     def _write_records(self):
+        """Add the ``"ase"`` block to the ``metadata.json`` the ``Simulation`` has just written, and write
+        the report. The record is not built again: its software block (``provenance.fastmace_block``)
+        costs about 0.25 s, which made each ``run()`` that much slower than ``Simulation.run`` (1b-T21b)."""
+        import json
+
         from fastmace import provenance
 
         directory = Path(self.output)
         directory.mkdir(parents=True, exist_ok=True)
-        provenance.write_metadata(directory / METADATA_NAME, self.metadata)
+        path = directory / METADATA_NAME
+        if path.is_file():
+            record = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            record = self._sim.metadata()
+        record["ase"] = self._ase_record()
+        provenance.write_metadata(path, record)
         (directory / REPORT_NAME).write_text(self.summary + "\n", encoding="utf-8")
 
     def _ase_record(self):
