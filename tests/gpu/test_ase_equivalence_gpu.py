@@ -172,6 +172,7 @@ def max_position_difference(a, b):
 
 
 @pytest.mark.slow
+@pytest.mark.acceptance
 @needs_mh1
 def test_langevin_reproduces_ase_in_every_50_K_bin():
     ase, ours = run("ase", "langevin"), run("fastmace", "langevin")
@@ -197,6 +198,7 @@ def test_langevin_reproduces_ase_in_every_50_K_bin():
 
 
 @pytest.mark.slow
+@pytest.mark.acceptance
 @needs_mh1
 def test_baoab_variants_reproduce_their_references():
     stock, corrected = run("ase", "baoab", trace_all=True), run("ase", "baoab", trace_all=False)

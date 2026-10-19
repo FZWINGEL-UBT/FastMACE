@@ -15,8 +15,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
-from dataclasses import dataclass, fields
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, fields, replace
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -32,6 +32,8 @@ FIELDS_ADDED_IN_1B = {
 
 IDENTITY_SCHEMA = "fastmace.identity/1"
 FORCE_PRECISIONS = ("float32", "float64")
+# The identity fields a resume takes with a warning instead of refusing (SPEC §10.6, owner decision 23).
+VERSION_FIELDS = ("mace_version", "fastmace_version")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
@@ -63,7 +65,8 @@ class ForceFieldIdentity:
 
     ``digest`` is the SHA-256 of the canonical JSON of ``to_dict()``, schema name included: equal
     records have equal digests in every process and on every machine. Every field is part of it,
-    the versions too, so in 1b a resume refuses another MACE or FastMACE version (SPEC §10.6).
+    the versions too. A resume takes another MACE or FastMACE version with a warning
+    (``version_changes``, owner decision 23) and refuses every other difference (SPEC §10.6).
     Plan task 1b-T12 fills the record (``fm.ForceField``); 1b-T17 compares it on resume.
     """
 
@@ -136,6 +139,27 @@ class ForceFieldIdentity:
     def differences(self, other: ForceFieldIdentity) -> tuple[str, ...]:
         """The names of the fields in which ``other`` differs, in field order."""
         return tuple(field.name for field in fields(self) if getattr(self, field.name) != getattr(other, field.name))
+
+    def version_changes(self, other: ForceFieldIdentity,
+                        same_reference: Callable[[str, str], bool] | None = None) -> dict[str, tuple[Any, Any]]:
+        """The version fields in which ``other`` differs: ``{name: (this record's, other's)}``.
+
+        The reference record's id carries the MACE version, so ``reference_record_id`` counts as a
+        version change too when both records exist and ``same_reference(this id, other id)`` says
+        their content is the same (owner decision 23). Without ``same_reference`` it never does.
+        """
+        names = list(VERSION_FIELDS)
+        mine, theirs = self.reference_record_id, other.reference_record_id
+        if (same_reference is not None and mine is not None and theirs is not None and mine != theirs
+                and same_reference(mine, theirs)):
+            names.append("reference_record_id")
+        return {name: (getattr(self, name), getattr(other, name)) for name in names
+                if getattr(self, name) != getattr(other, name)}
+
+    def with_versions_of(self, other: ForceFieldIdentity,
+                         names: tuple[str, ...] = VERSION_FIELDS) -> ForceFieldIdentity:
+        """A copy with ``other``'s values of ``names`` (the version fields): the rest is compared as it is."""
+        return replace(self, **{name: getattr(other, name) for name in names})
 
 
 @dataclass

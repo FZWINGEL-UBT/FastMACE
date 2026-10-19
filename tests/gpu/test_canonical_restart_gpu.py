@@ -150,6 +150,7 @@ def differences(a, b):
 
 
 @pytest.mark.slow
+@pytest.mark.acceptance
 @ENGINE.needs_oeq
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_mh1_hybrid_resumes_statistically(tmp_path):

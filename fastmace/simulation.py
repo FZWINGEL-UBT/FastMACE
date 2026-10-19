@@ -734,10 +734,12 @@ class Simulation:
     @classmethod
     def resume(cls, directory: Any, *, allow_plan_change: bool = False, check: Check = "skip") -> Simulation:
         """Continue from the restart in ``directory``. A different force-field identity raises
-        ``RestartMismatch``; a different plan needs ``allow_plan_change=True`` and makes a new
-        revision (§9.5, §10.6). ``check`` as in the constructor.
+        ``RestartMismatch``, except that another MACE or FastMACE version alone warns and is recorded
+        as a plan revision and in the report (owner decision 23); a different plan needs
+        ``allow_plan_change=True`` and makes a new revision (§9.5, §10.6). ``check`` as in the
+        constructor.
 
-        The model is loaded again from ``simulation.json``'s source, checked against its SHA-256; the
+        The model is loaded again from ``simulation.json``'s file, checked against its SHA-256; the
         engine is built at the restart's positions and cell through the planner, then takes the
         restart's state, edge bucket and neighbour capacity (``io.restart.resume_engine``). Output
         chunks after the restart point are deleted and new ones opened; nothing is rewritten.
@@ -770,7 +772,11 @@ class Simulation:
             rewrites = RewriteConfig(**rewrites)
         ff = ForceField(loaded, precision=record["force_field"]["precision"], rewrites=rewrites,
                         species=record["force_field"]["species"])
-        restart.check_identity(stored, ff.identity)
+        versions = _resume_identity(stored, ff.identity)
+        if versions:
+            import warnings
+
+            warnings.warn(_versions_text(versions), UserWarning, stacklevel=2)
         output = record["output"]
         if output is not None:
             from fastmace.io.output import Output
@@ -783,10 +789,10 @@ class Simulation:
                   allow_naive_cueq=record["allow_naive_cueq"], mode=options.mode,
                   allow_reference=options.allow_reference, fallback=options.fallback, gate=options.gate,
                   runner=options.runner, engine=options.engine, neighbours=options.neighbours)
-        sim._resume(stored, record, output, allow_plan_change)
+        sim._resume(stored, record, output, allow_plan_change, versions)
         return sim
 
-    def _resume(self, stored, record, output, allow_plan_change):
+    def _resume(self, stored, record, output, allow_plan_change, versions=None):
         from fastmace.errors import RestartMismatch
         from fastmace.io import restart
         from fastmace.planner.plan import Plan
@@ -810,6 +816,8 @@ class Simulation:
                 **{name: getattr(fresh, name) for name in (*_PLAN_FIELDS, *_PLAN_RECORDS)})
         else:
             self._plan = previous
+        if versions:  # recorded as a revision of the same plan (owner decision 23)
+            self._plan = self._plan.revise(_versions_text(versions), step)
         engine.state.plan_revision = self._plan.revision
         protocol = restart.protocol_record(stored)
         self._schedule = None if protocol is None else ScheduleState.from_restart(protocol)
@@ -821,6 +829,8 @@ class Simulation:
         self._started = True
         self._restart_points = [dict(point) for point in record.get("restart_points", ())]
         self._report = self._new_report()
+        if versions:
+            self._report.add_warning(_versions_text(versions))
         if output is not None:
             self.output = output
             self._open_output(resume_from=restart.output_indices(stored))
@@ -920,13 +930,75 @@ def _write_json(path, record):
 
 
 def _load_model(source):
-    """The pristine model of a ``simulation.json`` source: a label as it is, a path with its SHA-256."""
+    """The pristine model of a ``simulation.json`` source: the recorded file, checked by its SHA-256.
+
+    A label loads from its recorded path when that file is there (a run started with an explicit
+    checkpoint resumes on that file), else wherever the label finds it (a run moved to another
+    machine); the hash is the trust decision either way.
+    """
     from fastmace.model import loading
 
-    options = dict(charge=source.get("charge"), spin_multiplicity=source.get("spin_multiplicity"))
+    options = dict(sha256=source["sha256"], charge=source.get("charge"),
+                   spin_multiplicity=source.get("spin_multiplicity"))
     if source.get("label"):
+        if source.get("path") and Path(source["path"]).is_file():
+            options["checkpoint"] = source["path"]
         return loading.load_pristine(source["label"], **options)
-    return loading.load_pristine(source["path"], source.get("head"), sha256=source["sha256"], **options)
+    return loading.load_pristine(source["path"], source.get("head"), **options)
+
+
+def _resume_identity(stored, identity):
+    """``RestartMismatch`` unless the restart's force field is ``identity`` up to its versions.
+
+    Returns the version changes (``ForceFieldIdentity.version_changes``), which a resume takes with
+    a warning (owner decision 23); every other difference refuses through ``check_identity``.
+    """
+    from fastmace.io import restart
+
+    previous = restart.stored_identity(stored)
+    versions = {} if previous is None else previous.version_changes(identity, _same_reference)
+    restart.check_identity(stored, identity.with_versions_of(previous, tuple(versions)) if versions else identity)
+    return versions
+
+
+def _versions_text(versions):
+    changes = "; ".join(f"{name} {old!r} in the file, {new!r} now" for name, (old, new) in versions.items())
+    return (f"resumed under other versions than the restart's ({changes}): the same force field and corrections, "
+            "recorded as a plan revision (SPEC §10.6, owner decision 23)")
+
+
+def _reference_content_digest(record):
+    """SHA-256 of a reference record's content without its MACE version (owner decision 23).
+
+    A stand-in for 2-T04's ``ReferenceRecord.content_digest()``, used until that merges.
+    """
+    import hashlib
+
+    from fastmace.state import canonical_json
+
+    content = {name: value for name, value in record.to_dict().items() if name not in ("mace_version", "id")}
+    return hashlib.sha256(canonical_json(content).encode()).hexdigest()
+
+
+def _known_reference_record(record_id):
+    """The default reference record with this id that this FastMACE builds, or ``None``."""
+    from fastmace.errors import FastMACEError
+    from fastmace.reference import records
+
+    parts = str(record_id).split("/")
+    if len(parts) != 4 or parts[0] != records.ID_PREFIX:
+        return None
+    try:
+        record = records.record_for(parts[1], parts[2])
+    except FastMACEError:
+        return None
+    return record if record.id == record_id else None
+
+
+def _same_reference(first, second):
+    """Whether two reference record ids name the same content (they may differ in the MACE version)."""
+    records = [_known_reference_record(record_id) for record_id in (first, second)]
+    return None not in records and _reference_content_digest(records[0]) == _reference_content_digest(records[1])
 
 
 def _restart_atoms(structure, stored):

@@ -157,14 +157,18 @@ def naive_cueq():
 
     Without it, an importable ``cuequivariance_ops_torch`` makes the conversion pick the CUDA-only
     ``uniform_1d`` kernel even for ``device="cpu"``, and the first forward pass fails without a GPU.
-    Process-local and undone on exit; the package is not modified.
+    Process-local and undone on exit; the package is not modified. The conversion also runs between
+    fresh cuEquivariance basis caches (``loading._fresh_cueq_basis_cache``, 2-T14).
     """
     from cuequivariance_torch.primitives import segmented_polynomial
+
+    from fastmace.model import loading
 
     previous = segmented_polynomial.HAS_CUE_OPS
     segmented_polynomial.HAS_CUE_OPS = False
     try:
-        yield
+        with loading._fresh_cueq_basis_cache():
+            yield
     finally:
         segmented_polynomial.HAS_CUE_OPS = previous
 

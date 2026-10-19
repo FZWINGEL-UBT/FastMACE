@@ -567,6 +567,7 @@ FLOAT64_LIMIT = 1e-12
 
 
 @pytest.mark.slow
+@pytest.mark.acceptance
 @needs_mh1_baseline
 def test_mh1_plain_cueq_float64_against_the_research_engine():
     ours = fastmace_run(spec("cueq", modes=[("eager", 200), ("checked", 500), ("repeat", 500), ("pipelined", 500),
@@ -605,6 +606,7 @@ def test_mh1_plain_cueq_float64_against_the_research_engine():
 
 
 @pytest.mark.slow
+@pytest.mark.acceptance
 @needs_mh1_baseline
 def test_mh1_plain_cueq_float64_npt_against_the_research_engine():
     options = spec("cueq", ensemble="npt", modes=[("checked", 500), ("pipelined", 500)])
@@ -627,6 +629,7 @@ def test_mh1_plain_cueq_float64_npt_against_the_research_engine():
 
 
 @pytest.mark.slow
+@pytest.mark.acceptance
 @needs_oeq
 @needs_mh1_baseline
 def test_mh1_hybrid_float32_against_the_research_engine():
