@@ -102,8 +102,8 @@ T04 registers them and adds anything its version-counter test finds. The table i
 | `engine.flags_host`, `pipe_flags_host`, `spec_flags_host` (host mirrors, T04) | derived (overwritten before read) | no capture |
 
 `sqrt_kT` is read by the engine from the integrator (it is not in 1a's `Integrator.buffers`).
-`p_eps` and `force_eps` have policies under both `integrator.` and `state.`, so T05's move needs no
-registry change. The pipeline floor and next bucket are host integers, not tensors: T14 resets them.
+`p_eps` and `force_eps` are registered as `state.p_eps` and `state.force_eps` (T05 moved them into
+the state; the integrator's names are aliases, registered once). `state.charges` is saved. The pipeline floor and next bucket are host integers, not tensors: T14 resets them.
 
 ## SimulationState fields 1b adds (T05)
 

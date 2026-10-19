@@ -98,11 +98,10 @@ def _policy(name, owner, restart, recompute=None, *, capture=True, sticky=False)
 POLICIES = (
     # The physical state of the committed step (T05 writes it to the restart file).
     *(_policy(f"state.{name}", "state", "save") for name in (
-        "positions", "velocities", "cell", "species", "masses", "forces", "energy", "stress")),
+        "positions", "velocities", "cell", "species", "masses", "charges", "forces", "energy", "stress")),
     _policy("state.rng.batch", "state", "save"),  # drawn-ahead noise; generator and cursor are host state
-    # BAOAB's barostat momentum and cell force: the integrator's in 1a, the state's after T05.
-    *(_policy(f"{owner}.{name}", owner, "save") for owner in ("integrator", "state")
-      for name in ("p_eps", "force_eps")),
+    # BAOAB's barostat momentum and cell force (in the state since 1b-T05; the integrator aliases them).
+    *(_policy(f"state.{name}", "state", "save") for name in ("p_eps", "force_eps")),
     # Integrator scratch, written before it is read in every step.
     *(_policy(f"integrator.{name}", "integrator", "derived") for name in (
         "x_old", "rnd_pos", "rnd_vel", "xi", "eta", "zeta")),

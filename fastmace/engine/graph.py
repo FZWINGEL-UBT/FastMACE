@@ -237,14 +237,14 @@ class GraphEngine(Engine):
     def _registered_buffers(self) -> dict[str, torch.Tensor]:
         """The registry's sources: every tensor a stage writes and that lives across steps, by name.
 
-        The state first (its positions are the integrator's too), then ``integrator.buffers`` and
+        The state first (its positions and barostat state are the integrator's too), then ``integrator.buffers`` and
         its temperature target, ``force_field.buffers``, the engine's flags, their host mirrors and
         the mid-step copies. ``fastmace.engine.registry.POLICIES`` has the policy of each.
         """
         state = self.state
         named = {f"state.{name}": getattr(state, name) for name in (
-            "positions", "velocities", "cell", "species", "masses", "forces", "energy", "stress")
-            if getattr(state, name) is not None}
+            "positions", "velocities", "cell", "species", "masses", "charges", "forces", "energy", "stress",
+            "p_eps", "force_eps") if getattr(state, name, None) is not None}
         if state.rng.batch is not None:
             named["state.rng.batch"] = state.rng.batch
         named.update({f"integrator.{name}": tensor for name, tensor in self.integrator.buffers(state).items()})

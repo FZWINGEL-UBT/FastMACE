@@ -132,7 +132,7 @@ def test_mh1_plain_cueq_float64():
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_mh1_npt_baoab_full_cell():
     result = registry_run("mh1-r2scan", "auto", ENGINE.HYBRID_PYTHON, ensemble="npt")
-    assert {"integrator.p_eps", "force_field.neighbours.build_cell"} & set(result["registered"])
+    assert {"state.p_eps", "state.force_eps", "force_field.neighbours.build_cell"} <= set(result["registered"])
     check(result, "mh1-hybrid-npt-full")
 
 

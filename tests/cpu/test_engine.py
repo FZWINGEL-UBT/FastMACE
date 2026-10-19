@@ -357,7 +357,7 @@ def test_registry_covers_every_writer():
     engine = build(replay=True, npt=True, engine=EngineConfig(pipelined="on", device="cpu"))
     names = set(engine.registry.tensors())
     assert {"state.forces", "state.energy", "state.stress", "state.positions", "state.velocities",
-            "integrator.p_eps", "integrator.force_eps", "state.cell", "force_field.neighbours.edge_index",
+            "state.p_eps", "state.force_eps", "state.cell", "force_field.neighbours.edge_index",
             "force_field.neighbours.count", "force_field.neighbours.cell", "engine.rebuild_needed",
             "engine.flags", "engine.pipe_flags", "engine.spec_flags", "engine.mid.0", "engine.mid.1"} <= names
     # one tensor appears once even when two owners name it (state.positions is the integrator's too)

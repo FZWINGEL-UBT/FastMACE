@@ -68,7 +68,7 @@ def test_policy_table_records_are_valid_and_unique():
     ("state.positions", "save", True, False),
     ("state.forces", "save", True, False),
     ("state.rng.batch", "save", True, False),
-    ("integrator.p_eps", "save", True, False),
+    ("state.p_eps", "save", True, False),
     ("integrator.x_old", "derived", True, False),
     ("force_field.neighbours.edge_index", "reset", True, False),
     ("force_field.volume", "derived", True, False),
@@ -101,13 +101,13 @@ def test_registry_lists_each_tensor_once_with_its_policy():
     entries = engine.registry.entries()
     names = set(entries)
     assert {"state.positions", "state.velocities", "state.cell", "state.forces", "state.energy", "state.stress",
-            "state.species", "state.masses", "state.rng.batch", "integrator.p_eps", "integrator.force_eps",
+            "state.species", "state.masses", "state.rng.batch", "state.p_eps", "state.force_eps",
             "integrator.xi", "integrator.zeta", "integrator.sqrt_kT", "force_field.neighbours.edge_index",
             "force_field.neighbours.count", "force_field.neighbours.cell", "force_field.neighbours.build_cell",
             "engine.rebuild_needed", "engine.flags", "engine.pipe_flags", "engine.spec_flags", "engine.mid.0",
             "engine.mid.1", "engine.flags_host", "engine.pipe_flags_host", "engine.spec_flags_host"} <= names
     # state.positions is the integrator's "positions" too: one tensor, the state's name
-    assert "integrator.positions" not in names
+    assert {"integrator.positions", "integrator.p_eps"}.isdisjoint(names)
     pointers = [tensor.data_ptr() for _, tensor in entries.values()]
     assert len(pointers) == len(set(pointers))
     assert all(policy.name == name for name, (policy, _) in entries.items())
