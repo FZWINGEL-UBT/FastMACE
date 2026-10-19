@@ -54,10 +54,13 @@ PLAN = """
 """
 
 
-def run_plan(python, before=""):
+def run_plan(python, extensions_dir, before=""):
     code = textwrap.dedent(PLAN).format(before=before)
+    # An empty TORCH_EXTENSIONS_DIR of its own: when MACE comes first, OEq 0.7 (no precompiled extension)
+    # tries a JIT build in torch's default directory, where a lock left by a killed build makes it wait
+    # 5 minutes (1b-T27: ~/.cache/torch_extensions/.../libtorch_tp_jit/lock from 8 October, 310 s).
     env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), str(REPOSITORY_ROOT / "tests")]),
-               PYTHONDONTWRITEBYTECODE="1")
+               PYTHONDONTWRITEBYTECODE="1", TORCH_EXTENSIONS_DIR=str(extensions_dir))
     if python != sys.executable:
         env.pop("LD_LIBRARY_PATH", None)  # set for this environment; the in-process OEq runtime needs none
     done = subprocess.run([python, "-c", code], cwd=REPOSITORY_ROOT, env=env, capture_output=True,
@@ -70,21 +73,20 @@ pytestmark = [needs_cuda, needs_planner, needs_mh1]
 
 
 @needs_oeq
-def test_fm_load_then_minimal_planner_gives_the_hybrid():
-    assert run_plan(HYBRID_PYTHON) == {"oeq_runtime": "prepared", "backend": "hybrid", "code": "backend-hybrid"}
+def test_fm_load_then_minimal_planner_gives_the_hybrid(tmp_path):
+    assert run_plan(HYBRID_PYTHON, tmp_path) == {"oeq_runtime": "prepared", "backend": "hybrid", "code": "backend-hybrid"}
 
 
-@pytest.mark.slow
 @needs_oeq
-def test_mace_imported_first_gives_plain_cueq_with_the_reason():
-    result = run_plan(HYBRID_PYTHON, before="import mace.calculators")
+def test_mace_imported_first_gives_plain_cueq_with_the_reason(tmp_path):
+    result = run_plan(HYBRID_PYTHON, tmp_path, before="import mace.calculators")
     assert result == {"oeq_runtime": "too late: mace was imported first", "backend": "cueq",
                       "code": "backend-cueq-mace-imported-first"}
 
 
 @pytest.mark.skipif(importlib.util.find_spec("openequivariance") is not None,
                     reason="this interpreter has OpenEquivariance; the plain case needs one without it")
-def test_without_oeq_fm_load_gives_plain_cueq():
-    result = run_plan(sys.executable)
+def test_without_oeq_fm_load_gives_plain_cueq(tmp_path):
+    result = run_plan(sys.executable, tmp_path)
     assert result == {"oeq_runtime": "skipped: OpenEquivariance is not installed", "backend": "cueq",
                       "code": "backend-cueq-oeq-unavailable"}
