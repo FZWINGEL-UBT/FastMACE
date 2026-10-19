@@ -95,9 +95,9 @@ def test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell(label):
     steps = gate["steps"]
     print(f"\n{label} on {out['gpu']} ({out['gpu_bytes'] / 1e9:.1f} GB), {out['atoms']} atoms: {gate['status']}, "
           f"device {gate['device']}, reduced cell {gate['reduced_cell']}, seconds {out['seconds']}")
-    for step in steps:
+    for index, step in enumerate(steps, 1):
         print(f"  {step['device']} {step['cell']} {step['repeat']} {step['atoms']} atoms: {step['outcome']} "
-              f"({step['seconds']:.1f} s) {step['reason'] or ''}")
+              f"({gate['seconds'][f'step_{index}_s']:.1f} s) {step['reason'] or ''}")
     print(json.dumps({"case": label, **out}, default=str))
     if out["gpu_bytes"] >= CASES[label]:
         assert steps[0]["outcome"] == "ran", "the reference fits this card: acceptance 3 needs a 16 GB card"

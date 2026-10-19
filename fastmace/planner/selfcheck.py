@@ -941,6 +941,13 @@ class _Ladder:
         return f"{head}; tried " + "; ".join(parts)
 
 
+def _split_steps(steps):
+    """The steps without their timings, and the timings as ``step_<i>_s`` (the record's ``seconds``),
+    so a record without ``seconds`` is the same in every run."""
+    plain = tuple({key: value for key, value in step.items() if key != "seconds"} for step in steps)
+    return plain, {f"step_{index}_s": float(step["seconds"]) for index, step in enumerate(steps, 1)}
+
+
 class _Unavailable(Exception):
     """No step of the ladder ran (internal; ``references`` turns it into the record)."""
 
@@ -969,12 +976,12 @@ def references(plan, force_field, atoms, integrator, *, check: str, seed: int, g
     try:
         values, info, device, reduced, reference_copies = ladder.run()
     except _Unavailable as error:
-        steps = tuple(ladder.steps)
+        steps, step_seconds = _split_steps(ladder.steps)
         copies = ladder._copies(atoms)
         description = describe_copies(copies, cell_mode)
         record = GateRecord(status="unavailable", check=check, reason=str(error), copies=description,
-                            references={"ran": ran}, seconds={"references_s": time.perf_counter() - started},
-                            steps=steps)
+                            references={"ran": ran},
+                            seconds={"references_s": time.perf_counter() - started, **step_seconds}, steps=steps)
         if check == "gate":
             raise GateUnavailable(
                 "the gate's reference could not run", why=record.reason,
@@ -1266,10 +1273,11 @@ def production(engine, references: References, *, check: str, quantities=None) -
         copies=references.description, quantities=result["quantities"], nonfinite=tuple(result["nonfinite"]),
         mode=mode, references={"ran": references.ran, "record_id": references.info["reference"]["record_id"],
                                **references.info},
-        seconds={"references_s": references.seconds, "production_s": time.perf_counter() - started},
+        seconds={"references_s": references.seconds, "production_s": time.perf_counter() - started,
+                 **_split_steps(references.steps)[1]},
         notes=tuple(notes), device=references.device,
         reduced_cell=None if references.reduced is None else tuple(references.reduced.repeat),
-        steps=tuple(references.steps), replay=replay, **worst)
+        steps=_split_steps(references.steps)[0], replay=replay, **worst)
     if not record.passed:
         raise GateFailed(f"the gate on this structure failed: {record.reason}",
                          why="the production path's error against the float64 reference exceeds the ratio rule "

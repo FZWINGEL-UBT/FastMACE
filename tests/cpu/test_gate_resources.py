@@ -393,6 +393,7 @@ def test_passed_reduced_on_the_cpu(pristine, no_engines_yet, monkeypatch, integr
     assert record.reduced_cell == (3, 3, 2) and record.device == "cpu"
     metadata = record.to_metadata()
     assert [s["outcome"] for s in metadata["steps"]] == ["out of memory", "ran"]
+    assert "seconds" not in metadata["steps"][0] and set(metadata["seconds"]) >= {"step_1_s", "step_2_s"}
     assert metadata["replay"]["passed"] and metadata["replay"]["cell"] == "production"
     assert metadata["replay"]["copies"] == len(refs.copies)
     assert metadata["force_eV_per_A"] is not None
