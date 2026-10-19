@@ -11,6 +11,10 @@ unavailable, and the run report says which.
 - OpenEquivariance and MACE are looked up, never imported: importing either
   builds OEq's host extension. A previously built extension under the cache
   root is reported as built.
+- cuEquivariance's ops wheels are checked from their metadata (installed, and
+  every shared library they list present), not imported: the import creates a
+  Triton cache directory. A library that is present but does not load (CUDA or
+  torch ABI mismatch) therefore shows only at the first model load.
 - The cache root and the models directory are not created.
 - The process sets ``CUDA_CACHE_DISABLE=1`` before CUDA starts, so the CUDA
   driver writes no JIT cache. The file-lock check reports the driver-cache
@@ -41,6 +45,8 @@ QUALIFIED_MACE = "0.3.16"  # SPEC §4.1
 TORCH_INSTALL = "https://pytorch.org/get-started/locally/"
 CUEQ_INSTALL = ("pip install cuequivariance-torch cuequivariance-ops-torch-cu13 "
                 "(cuequivariance-ops-torch-cu12 for a CUDA 12 torch)")
+OPS_DISTRIBUTIONS = ("cuequivariance-ops-torch-cu13", "cuequivariance-ops-cu13",
+                     "cuequivariance-ops-torch-cu12", "cuequivariance-ops-cu12")
 
 
 def add_arguments(parser):
@@ -84,13 +90,21 @@ def _version(*names):
     return None
 
 
-def _import_error(name):
-    """None if ``name`` imports, else the error text."""
-    try:
-        importlib.import_module(name)
-    except Exception as error:  # an ImportError, or a shared library failing to load behind it
-        return f"{type(error).__name__}: {error}"
-    return None
+def _ops_wheels():
+    """The installed cuEquivariance ops wheels: {distribution: (version, shared libraries it lists but lacks)}.
+
+    Read from the wheels' metadata, without importing them: importing
+    ``cuequivariance_ops_torch`` creates its Triton cache directory.
+    """
+    wheels = {}
+    for name in OPS_DISTRIBUTIONS:
+        try:
+            distribution = importlib.metadata.distribution(name)
+        except importlib.metadata.PackageNotFoundError:
+            continue
+        libraries = [f for f in distribution.files or () if f.name.endswith(".so") or ".so." in f.name]
+        wheels[name] = (distribution.version, [str(f) for f in libraries if not Path(f.locate()).is_file()])
+    return wheels
 
 
 def _driver_version():
@@ -233,15 +247,20 @@ def check_cueq(context):
         return _fail(f"not installed: {', '.join(missing)}", CUEQ_INSTALL)
     versions = (f"cuequivariance {_version('cuequivariance')}, "
                 f"cuequivariance-torch {_version('cuequivariance-torch')}")
-    if not _find_spec("cuequivariance_ops_torch"):
+    wheels = _ops_wheels()
+    if not _find_spec("cuequivariance_ops_torch") or not any(name.startswith("cuequivariance-ops-torch")
+                                                             for name in wheels):
         return _fail(f"{versions}; the fused-kernel ops package cuequivariance_ops_torch is not installed, so "
                      "MACE would use the naive kernels", CUEQ_INSTALL)
-    error = _import_error("cuequivariance_ops_torch")
-    if error is not None:
-        return _fail(f"{versions}; the fused kernels do not load ({error})",
-                     f"{CUEQ_INSTALL}, matching torch's CUDA version")
-    ops = _version("cuequivariance-ops-torch-cu13", "cuequivariance-ops-torch-cu12")
-    return _ok(f"{versions}; fused kernels load (cuequivariance-ops-torch {ops})")
+    missing = [f"{name}: {library}" for name, (_, libraries) in wheels.items() for library in libraries]
+    if missing:
+        return _fail(f"{versions}; the ops wheels lack their fused-kernel libraries ({'; '.join(missing)})",
+                     f"Reinstall: {CUEQ_INSTALL}, matching torch's CUDA version")
+    ops = ", ".join(f"{name} {version}" for name, (version, _) in wheels.items())
+    # Not imported (that writes a Triton cache), so a library that is present but fails to load
+    # (a CUDA or torch ABI mismatch) shows only at the first model load, as NaiveCueqError or BackendError.
+    return _ok(f"{versions}; fused-kernel libraries present ({ops}); not imported, so a load failure "
+               "shows at the first model load")
 
 
 def _built_extensions(environ):

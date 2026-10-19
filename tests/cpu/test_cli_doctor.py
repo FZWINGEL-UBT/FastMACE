@@ -2,6 +2,7 @@
 
 import dataclasses
 import hashlib
+import importlib
 import os
 import subprocess
 import sys
@@ -87,7 +88,8 @@ def healthy(monkeypatch, tmp_path):
              "openequivariance", "graph_longrange", "torch_dftd", "triton"}
     monkeypatch.setattr(doctor, "_find_spec", lambda name: name in specs)
     monkeypatch.setattr(doctor, "_version", lambda *names: "1.2.3")
-    monkeypatch.setattr(doctor, "_import_error", lambda name: None)
+    monkeypatch.setattr(doctor, "_ops_wheels", lambda: {"cuequivariance-ops-torch-cu13": ("0.12.0", []),
+                                                        "cuequivariance-ops-cu13": ("0.12.0", [])})
     monkeypatch.setattr(doctor, "_cuda", lambda: {"available": True, "devices": ["NVIDIA RTX 4000 Ada"],
                                                   "cuda": "13.0", "driver": "580.1", "error": None})
     monkeypatch.setattr(doctor, "_triton", lambda: Availability(True, "triton 3.5 is importable"))
@@ -135,8 +137,9 @@ FAILURES = {
             False, "nvidia-smi"),
     "torch": (lambda m: m.setattr(doctor, "_find_spec", lambda name: name != "torch"), True, "pip install torch"),
     "mace": (lambda m: m.setattr(doctor, "_find_spec", lambda name: name != "mace"), True, "pip install mace-torch"),
-    "cueq": (lambda m: m.setattr(doctor, "_import_error",
-                                 lambda name: "OSError: libcue_ops.so: cannot open shared object file"),
+    "cueq": (lambda m: m.setattr(doctor, "_ops_wheels", lambda: {
+                 "cuequivariance-ops-torch-cu13": ("0.12.0", []),
+                 "cuequivariance-ops-cu13": ("0.12.0", ["cuequivariance_ops/lib/libcue_ops.so"])}),
              True, "cuequivariance-ops-torch-cu13"),
     "oeq": (lambda m: m.setattr(doctor, "_find_spec", lambda name: name != "openequivariance"),
             False, "fastmace[oeq]"),
@@ -168,13 +171,37 @@ def test_cueq_missing_package(healthy, monkeypatch):
     assert "pip install cuequivariance-torch" in item.fix
 
 
-def test_oeq_never_imported(healthy, monkeypatch):
+def test_cueq_ops_wheel_missing(healthy, monkeypatch):
+    monkeypatch.setattr(doctor, "_ops_wheels", lambda: {"cuequivariance-ops-cu13": ("0.12.0", [])})
+    item = _item("cueq", healthy)
+    assert not item.ok and item.required
+    assert "naive kernels" in item.detail
+
+
+def test_cueq_lack_of_library_named(healthy, monkeypatch):
+    FAILURES["cueq"][0](monkeypatch)
+    assert "libcue_ops.so" in _item("cueq", healthy).detail
+
+
+def test_cueq_ops_wheels_read_from_metadata():
+    """The real probe, on whatever this environment has: versions and missing libraries, nothing imported."""
+    before = set(sys.modules)
+    wheels = doctor._ops_wheels()
+    assert set(wheels) <= set(doctor.OPS_DISTRIBUTIONS)
+    for version, missing in wheels.values():
+        assert version and missing == []
+    assert not {name for name in set(sys.modules) - before if name.startswith("cuequivariance_ops")}
+
+
+def test_heavy_modules_never_imported(healthy, monkeypatch):
+    """OEq, MACE and the cuEq ops are looked up, never imported (importing them writes files)."""
     imported = []
-    monkeypatch.setattr(doctor, "_import_error", lambda name: imported.append(name))
+    real = importlib.import_module
+    monkeypatch.setattr(importlib, "import_module", lambda name, *a: imported.append(name) or real(name, *a))
     for check in doctor.CHECKS:
         check(doctor.Context(environ=healthy))
-    assert "openequivariance" not in imported
-    assert not any(name.startswith("mace") for name in imported)
+    assert not [name for name in imported if name.split(".")[0] in
+                ("openequivariance", "mace", "cuequivariance_ops_torch", "cuequivariance_ops")]
 
 
 def test_oeq_missing_toolchain_names_the_document(healthy, monkeypatch):
