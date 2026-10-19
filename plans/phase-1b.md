@@ -1517,6 +1517,27 @@ Item 2 needs code: `Simulation.resume` must warn instead of refusing on a
 version-only change. That goes in phase 2's first wave. The review list
 below is kept as the record.
 
+### Follow-ups started by the owner (19 October 2026)
+
+- **1b-T27 GPU acceptance tier** (T26's session; branch `fastmace/1b-T27`):
+  - a new `acceptance` marker for the long statistical and baseline tests:
+    ASE equivalence, hybrid restart statistics, the NbCl5 gate timing and
+    the research-engine comparisons;
+  - the duplicate MH-1 planner tests merged into one;
+  - the slow "MACE imported first" test investigated;
+  - acceptance runs fail instead of skipping when their environment is
+    missing;
+  - `tools/test_budget.py` added.
+  Target: full tier 30–40 min. Local GPU, then murphy for one acceptance
+  tier run.
+- **1b-T28 software block once per process** (T21's session; branch
+  `fastmace/1b-T28`): cache `provenance.fastmace_block` per process, built
+  at `Simulation` setup; read the git commit from `.git` files or
+  `.source_commit`, with no subprocess per call; run the dirtiness check
+  once, with a timeout. The per-call `metadata.json` write stays. The
+  second editor of `provenance.py` and `simulation.py` for this only. Short
+  local GPU A/B.
+
 ### For the owner's review (not blocking)
 
 1. `fm.md`'s friction default follows `main.py` (ASE units), not SPEC's
