@@ -1279,6 +1279,18 @@ notes folder of the conductor's session (`2-T0x-…md`).
     tools that built float64 references in a process after a float32
     conversion had float32-precision coefficients.
 
+- **2-T04's extra editor rights** (conductor, 20 October 2026), all narrow:
+  - `planner/minimal.py`'s `_common` precision decision (code
+    `precision-promoted-unqualified-energy`, merging before T02) and one line
+    in `MinimalPlanner.build` (`Plan.selfchecks`);
+  - the `Plan.selfchecks` field in `planner/plan.py`;
+  - one `DOWNGRADES` entry in `report.py` (before T05 and T15);
+  - about 3 lines in `reference/calculators.py`, so that under the unknown-MACE
+    record's `float32_sum_unqualified` entry the float32 yardstick keeps MACE's
+    float32 sum, recorded as the looser bound (T03 and T05 rebase).
+  The precision promotion is revision 0's decision, not a `Plan.revise`,
+  because it happens at planning time.
+
 ## Phase 1b items carried into phase 2
 
 | Item (where found or decided) | Phase 2 task |
