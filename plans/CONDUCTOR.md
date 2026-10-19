@@ -148,6 +148,9 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
    `tests/cpu`, then `~/environments/fastmace_cpu/bin/ruff check fastmace tests`.
    Run once more, alone, any test that passes only in the full run:
    first-model-per-process rounding exists (`docs/development.md`).
+   On a workstation (murphy's CPUs while the local machine is busy), run the
+   suite with `set -o pipefail` and `-rf`. Never pipe it into `tail` in an
+   `&&` chain that merges: on 19 October 2026 that hid a failure.
 4. If green: merge each branch with `git merge --no-ff` in the main
    checkout, check that the tree equals the trial tree, remove the trial
    worktree and push.

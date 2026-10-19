@@ -1,8 +1,8 @@
 """The D3 dispersion record, ``fm.D3`` (SPEC §11.2, §7.7 "Dispersion").
 
 Plan task 1b-T01 fixes the record; 1b-T20 adds the ``"d3bj"`` expansion from the head's training
-functional. The GPU kernel is phase 3b: until then a complete record is refused at plan time
-("D3: phase 3b"), with the record shown.
+functional (``expand``). The GPU kernel is phase 3b: until then ``fm.md`` refuses a complete
+record at plan time ("D3: phase 3b"), with the record shown (``describe``).
 
 "D3(BJ)" alone does not identify the correction, so every choice is a field, and the whole record
 is part of the force-field identity (§10.6). The defaults are the §11.2 table (the 15 October
@@ -52,3 +52,59 @@ class D3:
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) \
                     or value <= 0:
                 raise ValueError(f"D3.{name} must be positive and finite, got {value!r}")
+
+
+# Training functionals (label-table names, ``fastmace.model.labels``) whose D3(BJ) parameter set
+# ``"d3bj"`` expands to; the set has the functional's name. SPEC §7.7: ``pbe`` for the PBE-trained
+# models and heads, ``r2scan`` for ``matpes_r2scan`` and MatPES r2SCAN.
+D3BJ_PARAMETER_SETS = ("pbe", "r2scan")
+
+# Training functionals that already contain dispersion: D3 on top would count it twice (§7.7).
+DISPERSION_INCLUDED = {
+    "wb97m-d3bj": "D3(BJ) is part of the ωB97M-D3(BJ) training reference (MACE-OFF, MH-1's spice_wB97M head)",
+    "wb97m-v": "ωB97M-V includes the VV10 nonlocal dispersion term (OMOL-0, MH-1's omol head)",
+}
+
+
+def describe(record: D3) -> str:
+    """The record as one line, every field named: what the report, metadata and refusals show."""
+    import dataclasses
+
+    return "D3(" + ", ".join(f"{field.name}={getattr(record, field.name)}"
+                             for field in dataclasses.fields(record)) + ")"
+
+
+def expand(dispersion, *, functional, model):
+    """The complete record for ``fm.md``'s ``dispersion=``, and its warnings: ``(D3 | None, (str, ...))``.
+
+    - ``None``: no dispersion;
+    - ``"d3bj"``: Becke–Johnson with the parameter set of ``functional`` (the head's training
+      functional from the label table, ``None`` if unknown) and the §11.2 defaults. ``ValueError``,
+      naming ``model`` and the reason, when the functional already contains dispersion or is
+      unknown or has no D3(BJ) parameter set here; then only an explicit ``fm.D3`` is accepted;
+    - an ``fm.D3``: used as given; a functional other than the training one is a warning.
+    """
+    if dispersion is None:
+        return None, ()
+    if isinstance(dispersion, D3):
+        if functional is not None and dispersion.functional != functional:
+            return dispersion, (f"D3 functional {dispersion.functional!r} differs from the training functional "
+                                f"{functional!r} of {model} (SPEC §7.7)",)
+        return dispersion, ()
+    if not isinstance(dispersion, str):
+        raise TypeError(f"dispersion must be None, 'd3bj' or an fm.D3 record, got {type(dispersion).__name__}")
+    if dispersion != "d3bj":
+        raise ValueError(f"dispersion={dispersion!r} is not 'd3bj'; pass dispersion='d3bj' or an explicit "
+                         "fm.D3(functional=...) record (SPEC §7.7)")
+    if functional in DISPERSION_INCLUDED:
+        raise ValueError(f"dispersion='d3bj' for {model}: its training functional {functional!r} already contains "
+                         f"dispersion ({DISPERSION_INCLUDED[functional]}), so D3 would count it twice (SPEC §7.7)")
+    if functional is None:
+        raise ValueError(f"dispersion='d3bj' for {model}: the training functional is unknown (a model outside the "
+                         "label table, or a label whose release names none), so no D3 parameter set follows from it; "
+                         "pass an explicit fm.D3(functional=...) (SPEC §7.7)")
+    if functional not in D3BJ_PARAMETER_SETS:
+        raise ValueError(f"dispersion='d3bj' for {model}: no D3(BJ) parameter set is mapped for its training "
+                         f"functional {functional!r} (mapped: {', '.join(D3BJ_PARAMETER_SETS)}); pass an explicit "
+                         "fm.D3(functional=...) (SPEC §7.7)")
+    return D3(functional=functional), ()

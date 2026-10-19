@@ -76,11 +76,12 @@ starting 24 compile workers per process. Without it, WSL's 15 GB ran out on
 TORCHINDUCTOR_COMPILE_THREADS=4 FASTMACE_HYBRID_PYTHON=~/environments/mace_cueq_oeq/bin/python FASTMACE_MODELS=~/models FASTMACE_BASELINE=~/fastmace-baseline/1a-T18 PYTHONPATH=$PWD PYTHONDONTWRITEBYTECODE=1 ~/environments/mace_cueq_latest/bin/python -m pytest -m "not slow" tests/gpu
 ```
 
-Two behaviours are tested only in the full tier, because no tiny-model test of
-them exists yet: no compile at a later edge bucket
-(`test_no_compile_at_a_later_edge_bucket_*`) and a planned engine equal to a
-hand-built one on the GPU (`test_mh1_*_planned_equals_hand_built`; the CPU suite
-has the tiny-model version).
+Two MH-1 behaviours have tiny-model versions in the fast tier
+(`tests/gpu/test_tiny_engine_gpu.py`, plan task 1b-T25): no compile at a later
+edge bucket, from a fresh Inductor cache (`test_no_compile_at_a_later_edge_bucket_tiny_plain_cueq`),
+and a planned engine equal to a hand-built one
+(`test_tiny_plain_cueq_float64_planned_equals_hand_built`). The MH-1 versions stay
+in the full tier, and the hybrid edge-bucket case is tested only there.
 
 ### Caches the suite shares
 
