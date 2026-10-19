@@ -174,6 +174,23 @@ def test_run_ab_pairs_blocks_in_order():
     assert result.pair_ratios == pytest.approx((1.01, 1.03))
 
 
+def test_run_ab_calls_before_ahead_of_each_warm_up_and_each_block_outside_the_clock():
+    """1b-T23: two FastMACE versions in one process swap their process-wide patches before each side runs."""
+    clock, log = FakeClock(), []
+    sides = {"a": FakeEngine("a", clock, [0.002], log), "b": FakeEngine("b", clock, [0.003], log)}
+
+    def before(name):
+        clock.now += 100.0  # a hook that takes time must not reach the timed blocks
+        log.append((name, "before"))
+
+    result = ab.run_ab(sides, step_time.TimingProtocol(warmup=2, block=2, blocks=2), clock=clock, before=before)
+    calls = [(name, call) for name, call in log if call in ("before", "prepare")]
+    assert calls[:2] == [("a", "before"), ("b", "before")]  # warm-ups
+    assert calls[2:] == [("a", "before"), ("a", "prepare"), ("b", "before"), ("b", "prepare")] * 2
+    assert result.statistics["a"].median_ms == pytest.approx(2.0)
+    assert result.statistics["b"].median_ms == pytest.approx(3.0)
+
+
 def test_run_ab_needs_two_sides():
     clock, log = FakeClock(), []
     with pytest.raises(ValueError):
@@ -257,8 +274,33 @@ def test_errors():
 
 
 def test_floors_are_the_spec_floors():
-    assert gate.GATE_RATIO == 2.0
-    assert gate.FLOORS == {"forces": 1e-5, "stress": 1e-7}
+    from fastmace.planner import selfcheck
+
+    assert gate.GATE_RATIO == 2.0 == selfcheck.RATIO
+    assert gate.FLOORS == {"energy": 0.01, "forces": 1e-5, "stress": 1e-7}  # meV/atom, eV/A, eV/A^3 (§12.3)
+    assert gate.QUANTITIES == ("energy", "forces", "stress")
+
+
+def test_the_rule_is_selfchecks_rule():
+    """The acceptance driver and the in-library gate apply one rule (1b-T23): selfcheck.verdict."""
+    from fastmace.planner import selfcheck
+
+    for quantity, production, yardstick in (("energy", 0.03, 0.01), ("forces", 3e-5, 1e-5), ("stress", 2e-7, 1e-7),
+                                            ("energy", 0.009, 0.0)):
+        ours = gate.quantity_verdict(quantity, production, yardstick)
+        name = gate.SELFCHECK_NAMES[quantity]
+        zeros = {q: 0.0 for q in selfcheck.QUANTITIES}
+        row = {"production": dict(zeros), "yardstick": dict(zeros)}
+        row["production"][name], row["yardstick"][name] = production, yardstick
+        theirs = selfcheck.verdict([row])["quantities"][name]
+        assert ours["passed"] is theirs["passed"] and ours["limit"] == theirs["limit"]
+
+
+def test_energy_floor():
+    # 0.01 meV/atom (SPEC §12.3): float32 with float64 accumulation can be nearly exact in energy.
+    verdict = gate.quantity_verdict("energy", 0.009, 0.0001)
+    assert verdict["passed"] and verdict["limit"] == 0.01
+    assert not gate.quantity_verdict("energy", 0.011, 0.0001)["passed"]
 
 
 @pytest.mark.parametrize("production, yardstick, passed", [
@@ -303,12 +345,27 @@ def test_summary_takes_the_worst_configuration_of_each_path():
     assert summary["forces"]["ratio"] == pytest.approx(1.5) and summary["forces"]["passed"]
     assert summary["stress"]["production_max_abs"] == 5e-6
     assert summary["stress"]["ratio"] == pytest.approx(2.5) and not summary["stress"]["passed"]
-    assert summary["energy_meV_atom"] == dict(production=0.001, ase_f32=0.002)
+    assert summary["energy"]["production_max_abs"] == 0.001 and summary["energy"]["ase_f32_max_abs"] == 0.002
+    assert summary["energy"]["passed"]
     assert summary["passed"] is False
 
 
-def test_summary_passes_when_both_quantities_pass():
+def test_summary_passes_when_every_quantity_passes():
     assert gate.summarize([_config(1e-4, 1e-4, 1e-6, 1e-6)])["passed"] is True
+
+
+def test_energy_is_gated():
+    """1b: energy per atom is gated (§12.3), against the float32 yardstick with float64 accumulation."""
+    summary = gate.summarize([_config(1e-4, 1e-4, 1e-6, 1e-6, e_prod=0.05, e_f32=0.002)])
+    assert not summary["energy"]["passed"] and summary["energy"]["limit"] == 0.01
+    assert summary["forces"]["passed"] and summary["stress"]["passed"] and summary["passed"] is False
+
+
+def test_energy_can_be_reported_only():
+    """The research engine as production sums its energy in float32: --engine baseline reports energy, gates
+    forces and stress (its 1a rule)."""
+    summary = gate.summarize([_config(1e-4, 1e-4, 1e-6, 1e-6, e_prod=0.05, e_f32=0.002)], gated=("forces", "stress"))
+    assert summary["passed"] is True and summary["energy"]["gated"] is False and not summary["energy"]["passed"]
 
 
 def test_random_strain_is_symmetric_and_bounded(rng):
@@ -331,6 +388,12 @@ def test_nonfinite_errors_fail_in_either_order(bad, where):
     for configs in ([good, broken], [broken, good]):
         summary = gate.summarize(configs)
         assert summary["passed"] is False and summary["nonfinite"]
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_a_nonfinite_energy_fails(bad):
+    broken = _config(1e-4, 1e-4, 1e-6, 1e-6, e_prod=bad)
+    assert gate.summarize([broken])["passed"] is False
 
 
 def test_an_infinite_yardstick_does_not_license_any_error():

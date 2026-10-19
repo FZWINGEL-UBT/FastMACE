@@ -1,4 +1,4 @@
-"""Phase 1a acceptance runs (plan task 1a-T19): machines, suites and the command of every job.
+"""Acceptance runs of phases 1a (1a-T19) and 1b (1b-T23): machines, suites and the command of every job.
 
 Standard library only: ``run.py`` imports this module on the target machine before anything else,
 with any Python, and the CPU tests check the job lists without a GPU.
@@ -70,6 +70,7 @@ class Machine:
     environments: str  # directory of mace_cueq_oeq and mace_cueq_latest
     cache: str  # FASTMACE_CACHE, inductor, Triton, OEq and temporary files
     windows_smi: str | None = None  # local: Windows' nvidia-smi.exe, which also sees desktop programs
+    versions: str = ""  # renamed earlier releases (fastmace.bench.versions export): <versions>/fastmace_1a
 
     def path(self, value: str) -> Path:
         return Path(os.path.expanduser(value))
@@ -83,12 +84,13 @@ MACHINES = {
         name="local", kind="local", root="~/fastmace-acceptance", fastmace="/mnt/d/Margraf/FastMACE",
         baseline="~/fastmace-baseline/1a-T18", models="~/models", research_module="/mnt/g/Margraf/ResearchModule",
         environments="~/environments", cache="~/fastmace-cache/acceptance",
-        windows_smi="/mnt/c/Windows/System32/nvidia-smi.exe"),
+        windows_smi="/mnt/c/Windows/System32/nvidia-smi.exe", versions="~/fastmace-versions"),
     **{name: Machine(
         name=name, kind="workstation", root=str(NAS_HOME / "fastmace-acceptance"),
         fastmace=str(NAS_HOME / "FastMACE"), baseline=str(NAS_HOME / "fastmace-baseline" / "1a-T18"),
         models=str(NAS_HOME / "ResearchModule" / "Models"), research_module=str(NAS_HOME / "ResearchModule"),
-        environments=str(NAS_HOME / "environments"), cache=str(NAS_HOME / "fastmace-cache" / f"acceptance-{name}"))
+        environments=str(NAS_HOME / "environments"), cache=str(NAS_HOME / "fastmace-cache" / f"acceptance-{name}"),
+        versions=str(NAS_HOME / "fastmace-versions"))
        for name in ("murphy", "leto", "coraline")},
 }
 
@@ -391,6 +393,134 @@ def alternating_cueq_jobs(machine: Machine, run_root: Path) -> list:
     return alternating_jobs(machine, run_root, models=("mh1-cueq",))
 
 
+# ------------------------------------------------------------------ phase 1b (plan task 1b-T23)
+
+# The gate subset on the RTX 5060 Ti (plan 1b-T23): MH-1, POLAR-1-S, OMOL-0 XL and OFF24-M.
+LOCAL_GATE_SUBSET = ("mh1-r2scan", "polar1-s", "omol0-xl", "off24-medium")
+REGRESSION_STRUCTURES = ("NaCl", "NbCl5")  # acceptance item 5: MH-1 NaCl and NbCl5, hybrid NVT
+
+
+def gate_1b_jobs(machine: Machine, run_root: Path, labels=GATE_LABELS) -> list:
+    """Acceptance item 1: the rebuilt driver (fastmace.reference, selfcheck's rule, energy gated) through the
+    minimal planner, on 1a's structures that count (the same cases as ``gate_jobs``)."""
+    jobs = []
+    for job in gate_jobs(machine, run_root, labels=labels):
+        argv = list(job.argv)
+        at = argv.index("--baseline")
+        argv[at:at + 2] = ["--structures-root", argv[at + 1], "--planner", "minimal"]
+        jobs.append(Job(name=job.name, argv=tuple(argv), output=job.output, note=job.note))
+    return jobs
+
+
+def gate_1b_subset_jobs(machine: Machine, run_root: Path) -> list:
+    return gate_1b_jobs(machine, run_root, labels=LOCAL_GATE_SUBSET)
+
+
+def _counting_structure(label):
+    """One structure that counts for ``label`` (the in-library gate of acceptance item 1): NaCl for the
+    crystal labels and the long-range ones (NaCl counts for every POLAR size and OMOL-0 XL), urea for MACE-OFF."""
+    if label in MACE_OFF_LABELS:
+        return ORGANIC_STRUCTURES[0]
+    return "NaCl"
+
+
+def library_gate_jobs(machine: Machine, run_root: Path, labels=GATE_LABELS) -> list:
+    """Acceptance item 1, second half: the in-library gate (check="gate", NVT and NPT) once per label."""
+    run_root = Path(run_root)
+    jobs = []
+    for label in labels:
+        output = check_location(machine, run_root / f"library-gate-{label}")
+        spec = _counting_structure(label)
+        structure = str(machine.path(machine.research_module) / spec) if spec.startswith("Structures/") else spec
+        argv = [machine.python("mace_cueq_oeq"), _tool(machine, "library_gate.py"), "--output", str(output),
+                "--model", label, "--structure", structure, "--check", "gate"]
+        jobs.append(Job(name=f"library-gate-{label}", argv=tuple(argv), output=str(output),
+                        note="in-library reduced gate (1b-T16), captured replay"))
+    return jobs
+
+
+def _regression_job(machine, run_root, name, sides, *, blocks, pattern="abab", note=""):
+    output = check_location(machine, run_root / name)
+    argv = [machine.python("mace_cueq_oeq"), _tool(machine, "ab_fastmace.py"), "--output", str(output),
+            "--model", PRIMARY_MODEL, "--checkpoint", checkpoint_path(machine, PRIMARY_MODEL),
+            "--structures", *REGRESSION_STRUCTURES, "--sides", *sides, "--warmup", str(WARMUP), "--block", str(BLOCK),
+            "--blocks", str(blocks), "--pattern", pattern, "--dump-forces"]
+    if "1a" in sides:
+        argv += ["--renamed", str(machine.path(machine.versions))]
+    return Job(name=name, argv=tuple(argv), output=str(output), timing=True, note=note)
+
+
+def regression_jobs(machine: Machine, run_root: Path) -> list:
+    """Acceptance item 5: 1b against the 1a tag in one process (three A/B processes), then one control per side."""
+    run_root = Path(run_root)
+    jobs = [
+        _regression_job(machine, run_root, "regression-ab-abab", ("1a", "1b"), blocks=AB_BLOCKS,
+                        note="ABAB, 1a built first"),
+        _regression_job(machine, run_root, "regression-ab-1b-first", ("1b", "1a"), blocks=AB_BLOCKS,
+                        note="ABAB, 1b built first"),
+        _regression_job(machine, run_root, "regression-ab-abba", ("1a", "1b"), blocks=AB_BLOCKS, pattern="abba",
+                        note="ABBA, 1a built first"),
+    ]
+    jobs += [_regression_job(machine, run_root, f"regression-control-{side}", (side,), blocks=CONTROL_BLOCKS,
+                             note="one version alone: setup per stage, forces outside an A/B process")
+             for side in ("1a", "1b")]
+    return jobs
+
+
+def frontends_jobs(machine: Machine, run_root: Path) -> list:
+    """Acceptance item 4: Simulation, fm.md and fastmace.ase.Langevin on MH-1 NaCl 3x3x3 in one process."""
+    output = check_location(machine, Path(run_root) / "frontends-mh1-nacl")
+    argv = [machine.python("mace_cueq_oeq"), _tool(machine, "ab_frontends.py"), "--output", str(output),
+            "--model", PRIMARY_MODEL, "--structure", "NaCl", "--blocks", str(AB_BLOCKS), "--warmup", str(WARMUP),
+            "--block", str(BLOCK)]
+    return [Job(name="frontends-mh1-nacl", argv=tuple(argv), output=str(output), timing=True,
+                note="three front ends, round-robin blocks")]
+
+
+def gpu_suite_jobs(machine: Machine, run_root: Path) -> list:
+    """Acceptance items 2 and 3: the full GPU suite in one process (registry and capture state, canonical
+    restart, the hybrid restart statistics), with hybrid children in the OEq environment."""
+    run_root = Path(run_root)
+    output = check_location(machine, run_root / "gpu-suite")
+    basetemp = check_location(machine, run_root / "gpu-suite" / "pytest")
+    tests = machine.path(machine.fastmace) / "tests" / "gpu"
+    argv = [machine.python("mace_cueq_latest"), "-m", "pytest", str(tests), "-p", "no:cacheprovider",
+            f"--basetemp={basetemp}", "--durations=40", f"--junitxml={output / 'junit.xml'}"]
+    return [Job(name="gpu-suite", argv=tuple(argv), output=str(output),
+                env={"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq")}, note="full tier, one process")]
+
+
+def adapter_jobs(machine: Machine, run_root: Path) -> list:
+    """Acceptance item 6: ResearchModule's adapter tests against this checkout, reading ResearchModule only
+    (no bytecode, no pytest cache, temporary files outside its tree; conductor answer to 1b-T23)."""
+    run_root = Path(run_root)
+    output = check_location(machine, run_root / "adapter-tests")
+    basetemp = check_location(machine, run_root / "adapter-tests" / "pytest")
+    tests = machine.path(machine.research_module) / "Experiments" / "Langevin_Thermostat" / "tests" / "core"
+    argv = [machine.python("mace_cueq_oeq"), "-m", "pytest", str(tests / "test_fastmace_engine.py"),
+            "-p", "no:cacheprovider", f"--basetemp={basetemp}", f"--junitxml={output / 'junit.xml'}"]
+    return [Job(name="adapter-tests", argv=tuple(argv), output=str(output), env={"PYTHONDONTWRITEBYTECODE": "1"},
+                note="ResearchModule tests/core/test_fastmace_engine.py, read only")]
+
+
+def compile_checks_jobs(machine: Machine, run_root: Path) -> list:
+    """Items left to 1b-T23: compiled PolarMACE NPT across restart points (1b-T14), and fm.calc's compiles at
+    its first calls on both backends (1b-T18, measured only)."""
+    run_root = Path(run_root)
+    jobs = []
+    for name, environment, argv in (
+            ("compile-polar1s-npt-restart", "mace_cueq_oeq", ["polar-npt", "--model", "polar1-s"]),
+            ("compile-fm-calc-hybrid", "mace_cueq_oeq", ["calc", "--model", PRIMARY_MODEL]),
+            ("compile-fm-calc-cueq", "mace_cueq_latest", ["calc", "--model", PRIMARY_MODEL])):
+        output = check_location(machine, run_root / name)
+        jobs.append(Job(name=name, argv=(machine.python(environment), _tool(machine, "compile_checks.py"), *argv[:1],
+                                         "--output", str(output), *argv[1:]), output=str(output), timing=True))
+    return jobs
+
+
 SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun_jobs, "alternating": alternating_jobs,
           "alternating-cueq": alternating_cueq_jobs,
-          "gate": gate_jobs, "workflow": workflow_jobs}
+          "gate": gate_jobs, "workflow": workflow_jobs,
+          "gate-1b": gate_1b_jobs, "gate-1b-subset": gate_1b_subset_jobs, "library-gate": library_gate_jobs,
+          "regression": regression_jobs, "frontends": frontends_jobs, "gpu-suite": gpu_suite_jobs,
+          "adapter-tests": adapter_jobs, "compile-checks": compile_checks_jobs}

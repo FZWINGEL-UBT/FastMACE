@@ -1,16 +1,20 @@
-"""Force and stress gate: the production path against the float64 calculator, by today's rule (SPEC §12.2, §12.3).
+"""Force, stress and energy gate: the production path against the float64 reference (SPEC §12.1-§12.3).
 
 For rattled and strained supercells it evaluates, on the same configuration,
 
-  f64         cuEquivariance float64 ASE calculator (reference)
-  ase_f32     cuEquivariance float32 ASE calculator (ordinary float32 rounding, the yardstick)
+  f64         the float64 reference of fastmace.reference (MACE's calculator, cuEquivariance float64,
+              with the reference record's corrections: 1b-T13)
+  ase_f32     the float32 yardstick of fastmace.reference: the same calculator in float32 with its
+              energy accumulated in float64 (§12.1), so that it measures the forward pass, not the
+              float32 sum of the E0 table
   production  the production force field (hybrid FP32 by default, every default optimisation,
               compiled, padded edges as in the CUDA-graph path)
 
-Rule: for forces and for stress, the production path's maximum error against float64 is at most
-GATE_RATIO times that of ase_f32, or at most the absolute floor of SPEC §12.3 (1e-5 eV/A for forces,
-1e-7 eV/A^3 for stress) where the float32 yardstick happens to be nearly exact. Energy per atom is
-reported, not gated: the float32 yardstick with float64 accumulation of §12.1 does not exist yet.
+Rule (fastmace.planner.selfcheck's ratio rule, 1b-T16): for energy per atom, forces and stress, the
+production path's largest error against float64 is at most GATE_RATIO times that of ase_f32, or at
+most the quantity's floor of SPEC §12.3 (0.01 meV/atom, 1e-5 eV/A, 1e-7 eV/A^3) where the yardstick
+happens to be nearly exact. Any NaN or inf fails. With the research engine as production
+(--engine baseline), energy is reported and not gated: that engine sums its energy in float32.
 
 Processes (plan task 1a-T19; conductor decisions "after T10" and "Second outside review"). The driver
 (``run``, the default) builds no model and imports neither torch nor the research engine. It writes
@@ -21,27 +25,34 @@ the configurations to files and starts one fresh child process per job, one afte
               one process per structure and calculator; configuration: one per configuration and
               calculator). Every reference runs before the production process starts.
   production  the production path (--engine), one process for all structures:
-                baseline  the research engine's force field from the export, built as its main.py
-                          builds it (needs the hybrid launcher for the hybrid backend)
-                fastmace  FastMACE's force field through the fixed-plan planner (no launcher)
+                fastmace  FastMACE's force field through the minimal planner of 1b (--planner minimal,
+                          the default; the public path of Simulation and fm.md) or the fixed-plan
+                          planner of main.py (--planner fixed); no launcher
+                baseline  the research engine's force field from the export (--baseline), built as its
+                          main.py builds it (needs the hybrid launcher for the hybrid backend)
 
 A research-engine process that had built the hybrid engine moved the float64 POLAR-1-S reference by
-up to 7.8e-7 eV/A (1a-T10), so no reference shares a process with a production engine.
+up to 7.8e-7 eV/A (1a-T10), so no reference shares a process with a production engine. The first
+float64 reference of a PolarMACE run checks its stress against finite differences of its energy on
+NaCl 3x3x3 (ReferenceCalculator.check_stress_fix), so a reference without the k-space correction of
+MACE issue 1642 cannot pass unnoticed (1a-T19).
 
-The references are today's: the research engine's benchmark calculators (common.load_calculator)
-from the export given by --baseline (with a COMMIT file and Structures/Benchmark), with MACE 0.3.16's
-cuEq conversion, main.py's one-graph strain formula and, for PolarMACE, the corrected long-range
-stress (polar_gpu). --reference-command and --production-command give each kind of child its
-interpreter, with an optional launcher prefix (shell words), for example
+Structures: benchmark names resolve to r2SCAN CIFs under --structures-root (a directory holding
+Structures/Benchmark/R2SCAN, such as the baseline export, which is the default root when --baseline
+is given), or files with an optional repeat. The checkpoint is the label's release file: the children
+load the label with FASTMACE_MODELS set to --checkpoint's directory and its SHA-256 as the trust
+decision. --reference-command and --production-command give each kind of child its interpreter, with
+an optional launcher prefix (shell words), for example
   --reference-command "$ENVS/mace_cueq_latest/bin/python"
   --production-command "bash $B/.../oeq_no_nvcc.sh $ENV $CACHE $ENV/bin/python"
 Children inherit the driver's environment (PYTHONPATH=<FastMACE checkout>). Output:
 <output>/metadata.json, with the configurations, job files, values and logs of every child beside it.
 
 Copied from the research engine's tools/validation/npt_stress_reference.py (with the ratio summary of
-tools/validation/roundoff_reference.py) and refactored: the rule has floors, the production path is
-chosen by --engine, the research engine is loaded only from the export given by path, and every
-evaluation runs in a child process of its own kind.
+tools/validation/roundoff_reference.py) and refactored: the rule has floors and gates energy, the
+references are the library's, the production path is chosen by --engine, the research engine is
+loaded only from the export given by path, and every evaluation runs in a child process of its own
+kind (1a-T19, rebuilt on fastmace.reference and selfcheck in 1b-T23).
 """
 
 from __future__ import annotations
@@ -59,11 +70,16 @@ from pathlib import Path
 
 import numpy as np
 
-GATE_RATIO = 2.0
-# SPEC §12.3: absolute floors of the rule, eV/A for the maximum force component and eV/A^3 for the
-# maximum stress component (decision 7).
-FLOORS = {"forces": 1e-5, "stress": 1e-7}
-QUANTITIES = ("forces", "stress")
+# numpy and fastmace.errors only: the driver still imports neither torch nor MACE.
+from fastmace.planner import selfcheck
+
+GATE_RATIO = selfcheck.RATIO
+# This driver's names for selfcheck's quantities; floors of SPEC §12.3 (decision 7): meV/atom for energy
+# per atom, eV/A for the maximum force component, eV/A^3 for the maximum stress component.
+SELFCHECK_NAMES = {"energy": "energy_meV_per_atom", "forces": "force_eV_per_A", "stress": "stress_eV_per_A3"}
+QUANTITIES = tuple(SELFCHECK_NAMES)
+FLOORS = {quantity: selfcheck.FLOORS[name] for quantity, name in SELFCHECK_NAMES.items()}
+PLANNERS = ("minimal", "fixed")
 CELL_MODES = ("hydrostatic", "full")
 # Reference calculators, in the order they run: (name in the rows, dtype).
 REFERENCES = (("f64", "float64"), ("ase_f32", "float32"))
@@ -96,7 +112,7 @@ class GateJobError(RuntimeError):
     """A child process of the gate failed or left no result."""
 
 
-# ------------------------------------------------------------------ the rule (unchanged since 1a-T18)
+# ------------------------------------------------------------------ the rule (selfcheck's, 1b-T16)
 
 
 def errors(reference, candidate):
@@ -108,44 +124,48 @@ def errors(reference, candidate):
 
 
 def quantity_verdict(quantity, production_max_abs, ase_f32_max_abs, ratio=GATE_RATIO):
-    """Today's rule for one quantity: production <= max(ratio x float32 calculator, floor)."""
+    """The rule for one quantity: production <= max(ratio x float32 yardstick, floor) (selfcheck.verdict)."""
     limit = max(ratio * ase_f32_max_abs, FLOORS[quantity])
     return dict(production_max_abs=production_max_abs, ase_f32_max_abs=ase_f32_max_abs,
                 ratio=production_max_abs / ase_f32_max_abs if ase_f32_max_abs else None,
                 floor=FLOORS[quantity], limit=limit, passed=bool(production_max_abs <= limit))
 
 
-def _nonfinite(configs):
-    """Every non-finite error value in ``configs``, as "configuration index/path/quantity" strings."""
-    bad = []
-    for index, config in enumerate(configs):
-        for path in ("production", "ase_f32"):
-            for quantity in QUANTITIES:
-                if not np.isfinite(config[path][quantity]["max_abs"]):
-                    bad.append(f"{index}/{path}/{quantity}")
-            if not np.isfinite(config[path].get("energy_meV_atom", 0.0)):
-                bad.append(f"{index}/{path}/energy_meV_atom")
-    return bad
+def _value(config, path, quantity):
+    if quantity == "energy":
+        return config[path]["energy_meV_atom"]
+    return config[path][quantity]["max_abs"]
 
 
-def summarize(configs, ratio=GATE_RATIO):
+def selfcheck_rows(configs):
+    """The configurations' errors in fastmace.planner.selfcheck's row layout (path "yardstick" is ase_f32)."""
+    return [{"production": {SELFCHECK_NAMES[q]: _value(c, "production", q) for q in QUANTITIES},
+             "yardstick": {SELFCHECK_NAMES[q]: _value(c, "ase_f32", q) for q in QUANTITIES}} for c in configs]
+
+
+def summarize(configs, ratio=GATE_RATIO, gated=QUANTITIES):
     """Worst configuration of each path, the verdict per quantity, and the overall verdict.
 
-    A non-finite error anywhere (NaN or inf, in the production path or in the float32 yardstick)
-    fails the gate before any maximum is taken: Python's max can drop a NaN depending on order,
-    and an infinite yardstick would make the limit infinite.
+    The verdict is ``selfcheck.verdict``'s: a non-finite error anywhere (NaN or inf, in the production
+    path or in the float32 yardstick, energy included) fails the gate before any maximum is taken.
+    Quantities outside ``gated`` are reported with their verdict but do not decide the result.
     """
-    bad = _nonfinite(configs)
-    if bad:
-        return {"passed": False, "nonfinite": bad}
+    names = {name: quantity for quantity, name in SELFCHECK_NAMES.items()}
+    result = selfcheck.verdict(selfcheck_rows(configs), ratio)
+    if result["nonfinite"]:
+        nonfinite = []
+        for entry in result["nonfinite"]:
+            index, path, name = entry.split("/")
+            nonfinite.append(f"{index}/{'ase_f32' if path == 'yardstick' else path}/{names[name]}")
+        return {"passed": False, "nonfinite": nonfinite}
     summary = {}
     for quantity in QUANTITIES:
-        summary[quantity] = quantity_verdict(quantity,
-                                             max(c["production"][quantity]["max_abs"] for c in configs),
-                                             max(c["ase_f32"][quantity]["max_abs"] for c in configs), ratio)
-    summary["energy_meV_atom"] = {path: max(c[path]["energy_meV_atom"] for c in configs)
-                                  for path in ("production", "ase_f32")}
-    summary["passed"] = all(summary[quantity]["passed"] for quantity in QUANTITIES)
+        verdict = quantity_verdict(quantity, max(_value(c, "production", quantity) for c in configs),
+                                   max(_value(c, "ase_f32", quantity) for c in configs), ratio)
+        if verdict["passed"] != result["quantities"][SELFCHECK_NAMES[quantity]]["passed"]:
+            raise AssertionError(f"{quantity}: this driver's verdict differs from selfcheck.verdict")
+        summary[quantity] = dict(verdict, gated=quantity in gated)
+    summary["passed"] = all(summary[quantity]["passed"] for quantity in gated)
     return summary
 
 
@@ -260,7 +280,7 @@ def reference_jobs(structures, keys, scope="calculator"):
             for group in groups:
                 suffix = "" if scope == "calculator" else f"-{group[0]}"
                 jobs.append(dict(kind="reference", name=f"reference-{structure}-{name}{suffix}", structure=structure,
-                                 reference=name, dtype=dtype, keys=group))
+                                 reference=name, dtype=dtype, keys=group, implementation="fastmace.reference"))
     return jobs
 
 
@@ -351,10 +371,14 @@ def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--output", required=True, type=Path, help="Fresh directory")
     p.add_argument("--engine", choices=("baseline", "fastmace"), default="baseline")
-    p.add_argument("--baseline", required=True, type=Path,
-                   help="Exported research-engine directory with a COMMIT file and Structures/Benchmark "
-                        "(the references are the research engine's calculators)")
-    p.add_argument("--checkpoint", required=True, type=Path)
+    p.add_argument("--planner", choices=PLANNERS, default="minimal",
+                   help="FastMACE production: the minimal planner of 1b (Simulation, fm.md) or main.py's fixed one")
+    p.add_argument("--baseline", type=Path,
+                   help="Exported research-engine directory with a COMMIT file (needed for --engine baseline; "
+                        "the default --structures-root)")
+    p.add_argument("--structures-root", type=Path,
+                   help="Directory holding Structures/Benchmark/R2SCAN for benchmark names (default: --baseline)")
+    p.add_argument("--checkpoint", required=True, type=Path, help="The label's release file")
     p.add_argument("--model", default="mh1-r2scan", help="MACE model label (main.py --model)")
     p.add_argument("--structures", nargs="+", default=["NaCl", "NaNbO3", "NbCl5"],
                    help="Benchmark names, or structure files with an optional repeat as PATH@NXxNYxNZ")
@@ -380,6 +404,10 @@ def parse_args(argv=None):
         p.error("configs and rattle amplitude must be positive, strain nonnegative")
     if args.engine == "fastmace" and args.main_args.strip():
         p.error("--main-args are main.py options for the baseline engine; FastMACE plans its own options")
+    if args.engine == "baseline" and args.baseline is None:
+        p.error("--engine baseline builds the research engine from its export: give --baseline DIR")
+    if args.baseline is None and args.structures_root is None:
+        p.error("give --structures-root DIR (or --baseline DIR) for the benchmark structures")
     return args
 
 
@@ -414,8 +442,12 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
     args = parse_args(argv)
     from ase.io import read
 
-    export = _read_export(args.baseline)
+    export = _read_export(args.baseline) if args.baseline is not None else None
+    structures_root = args.structures_root if args.structures_root is not None else export.root
     checkpoint = args.checkpoint.expanduser().resolve(strict=True)
+    checkpoint_sha256 = _sha256(checkpoint)
+    energy_gated = args.engine == "fastmace"
+    gated = QUANTITIES if energy_gated else ("forces", "stress")
     if gpu_check():
         raise RuntimeError("GPU must be idle")
     output = args.output
@@ -423,16 +455,21 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
     for sub in ("configs", "jobs", "values", "logs"):
         (output / sub).mkdir()
     meta = dict(status="running", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
-                engine=args.engine, baseline=export.as_dict(), fastmace_commit=_repository_commit(),
-                python=sys.executable, checkpoint=str(checkpoint), checkpoint_sha256=_sha256(checkpoint), tf32=False,
+                engine=args.engine, planner=args.planner if args.engine == "fastmace" else None,
+                baseline=export.as_dict() if export else None, structures_root=str(structures_root),
+                fastmace_commit=_repository_commit(),
+                python=sys.executable, checkpoint=str(checkpoint), checkpoint_sha256=checkpoint_sha256, tf32=False,
                 model=args.model, backend=args.backend, dtype=args.dtype,
-                rule=dict(ratio=GATE_RATIO, floors=FLOORS),
+                rule=dict(ratio=GATE_RATIO, floors=FLOORS, gated=list(gated), source="fastmace.planner.selfcheck"),
+                energy_gated=energy_gated,
+                references="fastmace.reference (1b-T13): float64 reference, float32 yardstick with float64 energy",
                 processes_rule=("every reference in a fresh process that builds no production engine, before the "
                                 f"production process (scope {args.reference_scope!r}); conductor decision after T10"),
                 protocol=(f"unrelaxed {'x'.join(map(str, args.repeat))} supercells, symmetric strain "
                           f"+-{args.strain:g} (hydrostatic: isotropic; full: anisotropic and shear), "
-                          f"Gaussian rattle {args.rattle_A:g} A; float64 calculator as reference; gate: "
-                          f"max error <= max({GATE_RATIO:g} x that of the float32 calculator, floor)"),
+                          f"Gaussian rattle {args.rattle_A:g} A; float64 reference; gate: max error <= "
+                          f"max({GATE_RATIO:g} x that of the float32 yardstick, floor), for "
+                          f"{', '.join(gated)}"),
                 args={k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
                 structures={}, processes=[], summary={})
     meta_path = output / "metadata.json"
@@ -444,7 +481,7 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
     try:
         keys, files = {}, {}
         for spec in args.structures:
-            structure, source, repeat = structure_spec(spec, args.repeat, export.root)
+            structure, source, repeat = structure_spec(spec, args.repeat, structures_root)
             if structure in keys:
                 raise ValueError(f"structure {structure} given twice")
             base = read(source).repeat(repeat)
@@ -459,12 +496,13 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
                                                  configs=[])
         save()
         # md_dtype is the production path's --dtype; a reference job's own dtype is its calculator's.
-        common = dict(model=args.model, checkpoint=str(checkpoint), baseline=str(export.root), backend=args.backend,
-                      md_dtype=args.dtype, main_args=args.main_args)
+        common = dict(model=args.model, label=args.model, checkpoint=str(checkpoint),
+                      checkpoint_sha256=checkpoint_sha256, baseline=str(export.root) if export else None,
+                      backend=args.backend, md_dtype=args.dtype, main_args=args.main_args)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
         # One finite-difference self-test, by the first float64 reference (it acts for polar models only), on
         # the gate's first NaCl 3x3x3 configuration (the same draw as a NaCl run's own hydrostatic-0).
-        fd_name, fd_source, fd_repeat = structure_spec(FD_STRUCTURE, FD_REPEAT, export.root)
+        fd_name, fd_source, fd_repeat = structure_spec(FD_STRUCTURE, FD_REPEAT, structures_root)
         fd_base = read(fd_source).repeat(fd_repeat)
         fd_base.set_pbc(True)
         fd_file = output / "configs" / "fd-selftest.npz"
@@ -472,6 +510,7 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
             fd_base, "hydrostatic", 1, args.seed, args.strain, args.rattle_A)})
         next(job for job in jobs if job["dtype"] == "float64")["fd_check"] = str(fd_file)
         jobs.append(dict(kind="production", name=f"production-{args.engine}", engine=args.engine,
+                         planner=args.planner,
                          structures={s: dict(configurations=str(files[s]), keys=keys[s]) for s in keys}))
         script = Path(__file__).resolve()
         references, production = {}, None
@@ -519,7 +558,7 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
                 entry["configs"].append(assemble_row(key, entry["natoms"], references[structure, "f64"][where],
                                                      references[structure, "ase_f32"][where], production[where],
                                                      extra))
-            meta["summary"][structure] = summarize(entry["configs"])
+            meta["summary"][structure] = summarize(entry["configs"], gated=gated)
             print(structure, "summary", json.dumps(meta["summary"][structure]), flush=True)
         meta["passed"] = all(s["passed"] for s in meta["summary"].values())
         meta["status"] = "complete"
@@ -589,66 +628,65 @@ def _torch_record(torch, result):
                   peak_memory_bytes=int(torch.cuda.max_memory_reserved()))
 
 
+def _models_environment(job):
+    """This process's environment with FASTMACE_MODELS at the checkpoint's directory: the label resolves to it."""
+    return {**os.environ, "FASTMACE_MODELS": str(Path(job["checkpoint"]).parent)}
+
+
+def _evaluate_reference(reference, atoms):
+    """(energy, forces, stress) of one configuration; a strained PolarMACE cell outside the reference's k-space
+    headroom resizes it for that cell first (as selfcheck does)."""
+    from fastmace.reference.records import ReferencePolicyError
+
+    try:
+        return reference.evaluate(atoms)
+    except ReferencePolicyError as error:
+        if not (reference.is_polar and "overflowed" in str(error)):
+            raise
+        reference.rebase(atoms)
+        return reference.evaluate(atoms)
+
+
 def reference_child(job, result):
-    """One reference calculator on its configurations, one at a time; this process builds no production engine."""
+    """One reference calculator (fastmace.reference, 1b-T13) on its configurations, one at a time; this process
+    builds no production engine."""
     # Expandable segments only place memory differently: a float64 POLAR-1-M reference on NaNbO3 3x3x3 ran
     # out of memory with 12.5 GiB reserved but unallocated (leto, 18 October 2026).
     os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-    experiment, md = _activate_baseline(job)
-    from langevin import polar_gpu, upstream_mace
-    # main.py's stress path, before any model is built: the references take the same one-graph strain
-    # formula as the production path (exact up to rounding), as in every earlier gate run.
-    upstream_mace.use_single_graph_strain(md.single_graph_strain)
-    # The calculator as workflow.load_md_calculator loads it, without the hybrid and with MACE 0.3.16's
-    # cuEq conversion (upstream_mace.use_cueq_conv_fusion(None)), as in every earlier gate run.
-    os.environ.update(OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", MACE_BENCH_DEVICE="cuda:0",
-                      MACE_BENCH_DTYPE=job["dtype"], MACE_BENCH_CUEQ="1", MACE_BENCH_CHECKPOINT=job["checkpoint"])
-    import common
+    os.environ.update(OMP_NUM_THREADS="1", MKL_NUM_THREADS="1")
     import torch
-    common.set_threads(1)
-    torch.set_num_interop_threads(1)
-    upstream_mace.use_cueq_conv_fusion(None)
-    started = time.perf_counter()
-    calc = common.load_calculator(job["model"], dtype=job["dtype"], enable_cueq=True)
+
+    import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
+    from fastmace.reference import calculators
+    torch.set_num_threads(1)
     base, configs = read_configurations(job["configurations"])
-    model = calc.models[0]
-    if polar_gpu.is_polar(model):
-        # MACE 0.3.16's PolarMACE stress misses the k-space cell dependence (MACE issue 1642); the
-        # references take the corrected long-range path, sized for the unstrained cell. Enable it
-        # before configure_md_calculator: that stores each model's bound forward, and polar_gpu's
-        # corrected forward is installed on the class by the first enable(). The other way round the
-        # references silently ran MACE 0.3.16's own stress (1a-T19, 18 October 2026).
-        polar_gpu.enable(model, base.cell.array, headroom=0.1)
-    experiment.configure_md_calculator(calc, compute_stress=True)
-    if polar_gpu.is_polar(model):
-        if getattr(model.forward, "__func__", None) is not type(model).forward:
-            raise GateJobError("the polar reference does not run polar_gpu's corrected forward")
-        result["polar_reference"] = "polar_gpu (corrected stress), active forward checked"
+    started = time.perf_counter()
+    # The label's record (family, head, model type) with the checkpoint's hash as the trust decision; MACE's
+    # calculator, MACE 0.3.16's cuEq conversion and the record's corrections in the safe order (calculators.load).
+    reference = calculators.load(job["label"], base, dtype=job["dtype"], device="cuda:0",
+                                 sha256=job["checkpoint_sha256"], environ=_models_environment(job))
+    loaded_sha256 = reference.loaded.sha256 if reference.loaded is not None else None
+    if loaded_sha256 != job["checkpoint_sha256"]:
+        raise GateJobError(f"the reference loaded {loaded_sha256}, not the checkpoint {job['checkpoint_sha256']}")
     result["load_s"] = time.perf_counter() - started
+    result["reference"] = json.loads(json.dumps(reference.info(), default=str))
     values = {}
     for key in job["keys"]:
-        values[f"{job['structure']}/{key}"] = calculator_values(configs[key], calc)
+        values[f"{job['structure']}/{key}"] = _evaluate_reference(reference, configs[key])
         print(job["name"], key, flush=True)
-    if polar_gpu.is_polar(model) and job.get("fd_check"):
+    if reference.is_polar and job.get("fd_check"):
         # The self-test: a reference without the k-space stress correction must not pass unnoticed. It runs
         # on NaCl 3x3x3 (FD_STRUCTURE), then the long-range state goes back to this job's structure.
         fd_base, fd_configs = read_configurations(job["fd_check"])
-        key = FD_KEY
-        polar_gpu.enable(model, fd_base.cell.array, headroom=0.1)
+        reference.rebase(fd_configs[FD_KEY])
         try:
-            analytic = calculator_values(fd_configs[key], calc)[2]
-            fd = finite_difference_stress(lambda atoms: calculator_values(atoms, calc)[0], fd_configs[key])
+            check = reference.check_stress_fix(fd_configs[FD_KEY], tolerance=FD_TOLERANCE, h=FD_STRAIN)
         finally:
-            polar_gpu.enable(model, base.cell.array, headroom=0.1)
-        delta = float(np.abs(analytic - fd).max())
-        result["fd_stress_check"] = dict(structure=f"{FD_STRUCTURE} {'x'.join(map(str, FD_REPEAT))}", key=key,
-                                         strain=FD_STRAIN, tolerance=FD_TOLERANCE, max_abs=delta,
-                                         fd_stress=fd.tolist(), passed=bool(delta <= FD_TOLERANCE))
-        print(job["name"], "finite-difference stress check", key, f"{delta:.2e}", flush=True)
-        if delta > FD_TOLERANCE:
-            raise GateJobError(f"polar reference stress differs from finite differences by {delta:.2e} eV/A^3 "
-                               f"(tolerance {FD_TOLERANCE:g}): the k-space stress correction is not active")
-    result.update(single_graph_strain=bool(md.single_graph_strain), dtype=job["dtype"])
+            reference.rebase(base)
+        result["fd_stress_check"] = dict(structure=f"{FD_STRUCTURE} {'x'.join(map(str, FD_REPEAT))}", key=FD_KEY,
+                                         **check)
+        print(job["name"], "finite-difference stress check", FD_KEY, f"{check['max_abs']:.2e}", flush=True)
+    result.update(dtype=job["dtype"], role=reference.role, record_id=reference.record.id)
     _torch_record(torch, result)
     return values
 
@@ -733,38 +771,78 @@ def fastmace_values(engine, atoms):
             out.stress.detach().double().cpu().numpy(), dict(edges=count, padded_edges=padded))
 
 
-def fastmace_production_child(job, result):
-    """FastMACE's production force field through the fixed-plan planner (NPT, so with stress), on every configuration.
-
-    Needs no launcher: the planner's loading prepares the OEq runtime in this process before MACE is imported.
-    """
+def _fastmace_build(job, result):
+    """``build(structure, base, cell_mode) -> (engine, plan record)`` through the planner the job names."""
     import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
     from fastmace import config
-    from fastmace.planner.fixed import FixedPlanner, auto_options_off, enabled_options
 
-    planner = FixedPlanner(engine=config.EngineConfig(backend="hybrid" if job["backend"] == "auto" else "cueq"),
-                           precision=config.PrecisionConfig(dtype=job["md_dtype"]))
-    hardware = planner.hardware()  # the allocator before the first CUDA allocation
+    backend = "hybrid" if job["backend"] == "auto" else "cueq"
+    precision = "float32" if job["md_dtype"] in ("auto", "float32") else "float64"
+    if job.get("planner", "fixed") == "fixed":
+        from fastmace.planner.fixed import FixedPlanner, auto_options_off, enabled_options
+
+        planner = FixedPlanner(engine=config.EngineConfig(backend=backend),
+                               precision=config.PrecisionConfig(dtype=job["md_dtype"]))
+        hardware = planner.hardware()  # the allocator before the first CUDA allocation
+        from fastmace.model.compile import CompiledModelCache
+        started = time.perf_counter()
+        loaded = planner.load(job["model"], checkpoint=job["checkpoint"])
+        cache = CompiledModelCache()
+
+        def build(structure, base, cell_mode):
+            plan = planner.plan(loaded, base, config.IntegratorConfig(ensemble="npt", cell_mode=cell_mode, seed=0),
+                                hardware)
+            engine = planner.build(plan, loaded, base.copy(), temperature_K=0.0, compile_cache=cache)
+            return engine, dict(describe=plan.describe(), enabled=list(enabled_options(plan)),
+                                auto_options_off=auto_options_off(plan))
+    else:
+        from fastmace.model import loading
+        from fastmace.model.forcefield import ForceField
+        from fastmace.planner import minimal
+        from fastmace.planner.fixed import auto_options_off, enabled_options
+        from fastmace.planner.workload import Workload
+
+        planner = minimal.MinimalPlanner(engine=config.EngineConfig(backend=backend))
+        started = time.perf_counter()
+        # fm.load: prepares the OEq runtime before MACE is imported (1b-T08b), the hash as the trust decision.
+        loaded = loading.load_pristine(job["model"], checkpoint=job["checkpoint"], sha256=job["checkpoint_sha256"])
+        hardware = planner.hardware()
+
+        def build(structure, base, cell_mode):
+            # One ForceField per structure: its species superset is the structure's (owner decision D3).
+            force_field = ForceField(loaded, base, precision=precision)
+            plan = planner.plan(force_field, base, config.IntegratorConfig(ensemble="npt", cell_mode=cell_mode,
+                                                                           seed=0, temperature_K=300.0),
+                                Workload(max_temperature_K=300.0), hardware)
+            engine = planner.build(plan, force_field, base.copy(), temperature_K=0.0)
+            return engine, dict(describe=plan.describe(), enabled=list(enabled_options(plan)),
+                                auto_options_off=auto_options_off(plan), backend=plan.engine.backend,
+                                float64_energy=plan.precision.float64_energy)
+    result.update(load_s=time.perf_counter() - started, planner=job.get("planner", "fixed"),
+                  checkpoint_sha256=loaded.sha256)
+    if loaded.sha256 != job.get("checkpoint_sha256", loaded.sha256):
+        raise GateJobError(f"production loaded {loaded.sha256}, not the checkpoint {job['checkpoint_sha256']}")
+    return build
+
+
+def fastmace_production_child(job, result):
+    """FastMACE's production force field through the job's planner (NPT, so with stress), on every configuration.
+
+    Needs no launcher: loading prepares the OEq runtime in this process before MACE is imported.
+    """
+    build = _fastmace_build(job, result)
     import torch
 
     from fastmace import _patches
-    from fastmace.model.compile import CompiledModelCache
-    started = time.perf_counter()
-    loaded = planner.load(job["model"], checkpoint=job["checkpoint"])
-    result.update(load_s=time.perf_counter() - started, backend=loaded.backend, dtype=loaded.dtype,
-                  checkpoint_sha256=loaded.sha256, edges={}, setup_s={}, plans={}, force_fields={})
-    cache = CompiledModelCache()
+    result.update(edges={}, setup_s={}, plans={}, force_fields={})
     values = {}
     for structure, entry in job["structures"].items():
         base, configs = read_configurations(entry["configurations"])
         for cell_mode in CELL_MODES:
             started = time.perf_counter()
-            plan = planner.plan(loaded, base, config.IntegratorConfig(ensemble="npt", cell_mode=cell_mode, seed=0),
-                                hardware)
-            engine = planner.build(plan, loaded, base.copy(), temperature_K=0.0, compile_cache=cache)
+            engine, plan = build(structure, base, cell_mode)
             result["setup_s"][f"{structure}/{cell_mode}"] = time.perf_counter() - started
-            result["plans"][f"{structure}/{cell_mode}"] = dict(
-                describe=plan.describe(), enabled=list(enabled_options(plan)), auto_options_off=auto_options_off(plan))
+            result["plans"][f"{structure}/{cell_mode}"] = plan
             result["force_fields"][f"{structure}/{cell_mode}"] = dict(engine.force_field.info())
             for key in entry["keys"]:
                 if key.rsplit("-", 1)[0] != cell_mode:

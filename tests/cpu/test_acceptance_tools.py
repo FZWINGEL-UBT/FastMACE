@@ -212,12 +212,15 @@ def test_finite_difference_stress_of_a_known_energy():
 def test_assemble_row():
     f64 = (10.0, np.zeros((2, 3)), np.zeros((3, 3)))
     f32 = (10.001, np.full((2, 3), 1e-6), np.full((3, 3), 1e-8))
-    prod = (10.002, np.full((2, 3), 2e-6), np.full((3, 3), 3e-8))
+    prod = (10.0015, np.full((2, 3), 2e-6), np.full((3, 3), 3e-8))
     row = gate.assemble_row("full-2", 2, f64, f32, prod)
     assert (row["cell_mode"], row["index"]) == ("full", 2)
     assert row["production"]["forces"]["max_abs"] == pytest.approx(2e-6)
     assert row["ase_f32"]["energy_meV_atom"] == pytest.approx(0.5)
+    assert row["production"]["energy_meV_atom"] == pytest.approx(0.75)
     assert gate.summarize([row])["passed"]
+    worse = gate.assemble_row("full-2", 2, f64, f32, (10.0021, *prod[1:]))  # 1.05 meV/atom > 2 x 0.5
+    assert not gate.summarize([worse])["energy"]["passed"]
 
 
 # --- the driver ----------------------------------------------------------------------------------------
@@ -260,6 +263,13 @@ def test_driver_fails_when_a_production_error_exceeds_the_rule(tmp_path, export,
     assert not meta["summary"]["NaCl"]["forces"]["passed"]
 
 
+def test_driver_summary_shows_worst_energy_ratio(tmp_path, export, checkpoint):
+    meta = gate.main(_gate_argv(tmp_path, export, checkpoint, "--engine", "fastmace"), runner=_fake_child([]),
+                     gpu_check=lambda: [])
+    row = summarize.gate_row("gate-mh1-r2scan", meta)
+    assert row["passed"] and row["worst_energy_ratio"] == pytest.approx(1.5)
+
+
 def test_driver_reports_a_failed_child(tmp_path, export, checkpoint):
     with pytest.raises(gate.GateJobError, match="reference-NaCl-f64"):
         gate.main(_gate_argv(tmp_path, export, checkpoint), runner=lambda argv, log: 3, gpu_check=lambda: [])
@@ -278,9 +288,68 @@ def test_driver_refuses_main_args_for_fastmace(tmp_path, export, checkpoint):
         gate.parse_args(_gate_argv(tmp_path, export, checkpoint, "--engine", "fastmace", "--main-args", "--no-x"))
 
 
-def test_driver_needs_the_baseline_export_for_its_references(tmp_path, checkpoint):
+def test_driver_needs_a_structure_source(tmp_path, checkpoint):
     with pytest.raises(SystemExit):
-        gate.parse_args(["--output", str(tmp_path / "o"), "--checkpoint", str(checkpoint)])
+        gate.parse_args(["--output", str(tmp_path / "o"), "--checkpoint", str(checkpoint), "--engine", "fastmace"])
+
+
+def test_driver_needs_the_export_for_the_research_engine(tmp_path, export, checkpoint):
+    with pytest.raises(SystemExit):
+        gate.parse_args(["--output", str(tmp_path / "o"), "--checkpoint", str(checkpoint), "--engine", "baseline",
+                         "--structures-root", str(export)])
+
+
+def _fastmace_argv(tmp_path, export, checkpoint, *extra):
+    """1b: FastMACE as production needs no research-engine export, only a directory with the structures."""
+    return ["--output", str(tmp_path / "out"), "--engine", "fastmace", "--structures-root", str(export),
+            "--checkpoint", str(checkpoint), "--structures", "NaCl", "--repeat", "1", "1", "1", "--configs", "2",
+            *extra]
+
+
+def test_driver_1b_references_are_the_librarys(tmp_path, export, checkpoint):
+    """References come from fastmace.reference (1b-T13), with the label and the checkpoint's hash."""
+    jobs = []
+    meta = gate.main(_fastmace_argv(tmp_path, export, checkpoint), runner=_fake_child(jobs), gpu_check=lambda: [])
+    references = [job for job in jobs if job["kind"] == "reference"]
+    assert {job["implementation"] for job in references} == {"fastmace.reference"}
+    assert {job["label"] for job in references} == {"mh1-r2scan"}
+    assert {job["checkpoint_sha256"] for job in references} == {meta["checkpoint_sha256"]}
+    assert jobs[-1]["planner"] == "minimal"
+    assert meta["baseline"] is None and meta["energy_gated"] is True
+    assert meta["rule"]["floors"] == {"energy": 0.01, "forces": 1e-5, "stress": 1e-7}
+    assert meta["summary"]["NaCl"]["energy"]["passed"] and meta["passed"]
+
+
+def test_driver_fixed_planner_on_request(tmp_path, export, checkpoint):
+    jobs = []
+    gate.main(_fastmace_argv(tmp_path, export, checkpoint, "--planner", "fixed"), runner=_fake_child(jobs),
+              gpu_check=lambda: [])
+    assert jobs[-1]["planner"] == "fixed"
+
+
+def test_driver_fails_on_energy_alone(tmp_path, export, checkpoint):
+    """A species-dependent energy offset (forces and stress unchanged) fails the 1b gate on energy."""
+    jobs = []
+    runner = _fake_child(jobs)
+
+    def offset(argv, log_path):
+        code = runner(argv, log_path)
+        job = jobs[-1]
+        if job["kind"] == "production":
+            values = {k: (e + 0.001, f, s) for k, (e, f, s) in gate.load_values(job["values"]).items()}
+            gate.save_values(job["values"], values)
+        return code
+
+    meta = gate.main(_fastmace_argv(tmp_path, export, checkpoint), runner=offset, gpu_check=lambda: [])
+    summary = meta["summary"]["NaCl"]
+    assert summary["forces"]["passed"] and summary["stress"]["passed"]
+    assert not summary["energy"]["passed"] and not meta["passed"]
+
+
+def test_driver_baseline_engine_reports_energy_without_gating_it(tmp_path, export, checkpoint):
+    """The research engine sums its energy in float32 (1a): as production its energy is reported only."""
+    meta = gate.main(_gate_argv(tmp_path, export, checkpoint), runner=_fake_child([]), gpu_check=lambda: [])
+    assert meta["energy_gated"] is False and meta["summary"]["NaCl"]["energy"]["gated"] is False
 
 
 def test_driver_imports_neither_torch_nor_the_research_engine(tmp_path, export, checkpoint):
@@ -302,7 +371,7 @@ def runner(argv, log):
     gate.save_values(job["values"], values)
     return 0
 gate.main({_gate_argv(tmp_path, export, checkpoint)!r}, runner=runner, gpu_check=lambda: [])
-bad = sorted(m for m in sys.modules if m == "torch" or m.startswith(("torch.", "langevin", "mace")))
+bad = sorted(m for m in sys.modules if m == "torch" or m.startswith(("torch.", "langevin", "mace", "e3nn")))
 print(json.dumps(bad))
 """
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}

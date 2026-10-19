@@ -129,14 +129,24 @@ class ABResult:
 
 
 def run_ab(sides: Mapping[str, TimedEngine], protocol: TimingProtocol = TimingProtocol(), pattern: str = "abab",
-           clock: Callable[[], float] = time.perf_counter) -> ABResult:
-    """Warm up both sides, then time ``protocol.blocks`` blocks of each, alternating by ``pattern``."""
+           clock: Callable[[], float] = time.perf_counter,
+           before: Callable[[str], None] | None = None) -> ABResult:
+    """Warm up both sides, then time ``protocol.blocks`` blocks of each, alternating by ``pattern``.
+
+    ``before(name)``, if given, runs ahead of each side's warm-up and each of its blocks, outside the
+    clock: two FastMACE versions in one process put their own process-wide patches back there
+    (``fastmace.bench.versions.ProcessPatches``).
+    """
     names = tuple(sides)
     order = block_order(names, protocol.blocks, pattern)
     for name in names:
+        if before is not None:
+            before(name)
         warm_up(sides[name], protocol.warmup)
     blocks = {name: [] for name in names}
     for name in order:
+        if before is not None:
+            before(name)
         blocks[name].append(time_block(sides[name], protocol.block, clock))
     return ABResult(names=names, order=tuple(order), pattern=pattern,
                     statistics={name: BlockStatistics.from_blocks(blocks[name]) for name in names})
