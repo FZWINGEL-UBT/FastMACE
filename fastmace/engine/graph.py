@@ -172,6 +172,8 @@ class GraphEngine(Engine):
         self.pipelined_redos = 0
         self.pipelined_rebuild_redos = 0
         self.pipelined_early_rebuilds = 0
+        self.canonical_points = 0
+        self.polar_overflow_steps = []  # steps whose canonical point found the sticky polar flag set
         # What stage A produces and stage B changes (Langevin v; BAOAB v, p_eps), saved inside the
         # pipelined and speculative graphs so that a failed step can redo stage B alone.
         self._mids = tuple(torch.zeros_like(tensor) for tensor in integrator.mid_step_tensors(state))
@@ -231,8 +233,76 @@ class GraphEngine(Engine):
             "speculative_rebuild_rollbacks": self.speculative_rebuild_rollbacks,
             "speculative_bucket_rollbacks": self.speculative_bucket_rollbacks, "pipelined_redos": self.pipelined_redos,
             "pipelined_rebuild_redos": self.pipelined_rebuild_redos,
-            "pipelined_early_rebuilds": self.pipelined_early_rebuilds, "process": dict(self.process),
+            "pipelined_early_rebuilds": self.pipelined_early_rebuilds, "canonical_points": self.canonical_points,
+            "polar_overflow_steps": list(self.polar_overflow_steps), "process": dict(self.process),
         }
+
+    # ------------------------------------------------------------------ canonical restart points
+
+    def canonicalise(self, *, reevaluate: bool = False) -> None:
+        """Put the engine into the state a fresh build at the current positions, cell and species has (SPEC §10.6).
+
+        Called by every restart write, in interrupted and uninterrupted runs alike, so that a resumed
+        run continues bit for bit as an uninterrupted run with the same restart cadence. It quiesces
+        the pipeline (``flush``), rebuilds the neighbour list from the current positions and cell (h0
+        becomes the current cell; a variable-cell PolarMACE k-vector set is rebuilt too), compacts it
+        and resets the registry's other ``reset`` buffers: the device flags, their host mirrors, the
+        mid-step copies, the sticky polar overflow flag (its steps are recorded in
+        ``polar_overflow_steps``) and the pipeline's padded-size floor and next sizes. The ``save``
+        buffers are not touched. A rebuild that moved buffers drops the captured graphs.
+
+        ``reevaluate=True`` (host writes of positions or momenta, owner decision D4) also evaluates the
+        forces at the current positions and calls ``integrator.start``, as building does.
+        """
+        self.flush()
+        state, field = self.state, self.force_field
+        if self.variable_cell:
+            field.set_cell(state.cell)
+        moved = False
+        reset_polar = getattr(field, "reset_polar", None)
+        if reset_polar is not None:
+            polar_moved, overflowed = reset_polar(state.cell.detach().cpu().numpy())
+            moved |= polar_moved
+            if overflowed:
+                self.polar_overflow_steps.append(state.step)
+        moved |= bool(field.rebuild(state.positions))
+        if moved:
+            self._clear_graphs()
+        field.compact(state.positions)  # as the build does: eager, then the exact count
+        count = int(field.edge_count)  # host sync
+        field.use_edges(count)
+        with torch.no_grad():
+            for tensor in (self.rebuild_needed, self._flags, self._pipe_flags, self._spec_flags, self._flags_host,
+                           self._pipe_flags_host, self._spec_flags_host, *self._mids):
+                tensor.zero_()
+        self._pipe_floor = 0
+        self._pipe_edges = self._padded(count)
+        self._spec_edges = self._padded(count)
+        if reevaluate:
+            self._force_stage()
+            self.integrator.start(state)
+        self.canonical_points += 1
+
+    def restart_buckets(self) -> dict[str, int]:
+        """The edge bucket and neighbour capacity for the restart's plan record (SPEC §10.6, ``Plan.to_restart``)."""
+        return {"edge_bucket": int(self.edge_bucket), "neighbour_capacity": int(self.force_field.edge_capacity)}
+
+    def restore_restart_point(self, *, edge_bucket: int | None = None, neighbour_capacity: int | None = None) -> None:
+        """Resume: take a restart's edge bucket and neighbour capacity, then ``canonicalise``.
+
+        Call it on a freshly built engine after the restart's state is loaded
+        (``fastmace.io.restart.resume_engine``). ``None`` keeps the fresh build's value (files
+        without a plan record).
+        """
+        if edge_bucket is not None:
+            self.edge_bucket = int(edge_bucket)
+        if neighbour_capacity is not None:
+            neighbours = getattr(self.force_field, "neighbours", None)
+            if not callable(getattr(neighbours, "set_capacity", None)):
+                raise TypeError(f"{type(self.force_field).__name__} has no neighbour list whose capacity can be set")
+            if neighbours.set_capacity(neighbour_capacity):
+                self._clear_graphs()
+        self.canonicalise()
 
     def _registered_buffers(self) -> dict[str, torch.Tensor]:
         """The registry's sources: every tensor a stage writes and that lives across steps, by name.

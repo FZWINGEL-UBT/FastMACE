@@ -124,8 +124,8 @@ class SkinNeighbourList:
         self._set_padding()
         self.build_cell.copy_(self.cell_t)
 
-    def _allocate(self, needed):
-        capacity = edge_capacity(needed, self.headroom, self.edge_multiple)
+    def _allocate(self, needed, exact=False):
+        capacity = needed if exact else edge_capacity(needed, self.headroom, self.edge_multiple)
         self.capacity = capacity
 
         def new(*shape, dtype):
@@ -140,6 +140,21 @@ class SkinNeighbourList:
         self.edge_index = new(2, capacity, dtype=torch.int64)
         self.unit_shifts = new(capacity, 3, dtype=self.float_dtype)
         self.shifts = new(capacity, 3, dtype=self.float_dtype)
+
+    def set_capacity(self, capacity: int) -> bool:
+        """Reallocate the edge buffers to exactly ``capacity`` (a resumed run's, SPEC §10.6). True if they moved.
+
+        The buffers are zero until the next ``build`` fills them, so call ``build`` (and ``compact``)
+        before the next force call. A capacity below the candidates of the last build is refused.
+        """
+        capacity = int(capacity)
+        if capacity < max(self.num_candidates, 1):
+            raise ValueError(f"neighbour capacity {capacity} is below the {self.num_candidates} candidates of the "
+                             "last build")
+        if capacity == self.capacity:
+            return False
+        self._allocate(capacity, exact=True)
+        return True
 
     def build(self, positions) -> bool:
         """Rebuild from (N, 3) float64 positions (NumPy or tensor). Returns True if the capacity grew.
