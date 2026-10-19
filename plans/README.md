@@ -18,20 +18,15 @@ phase before it is under way, not all in advance. Worker rules are in
 
 ## Ready to start
 
-Tasks whose dependencies are merged and whose brief is ready. The owner
-starts all of them with one message, "start all ready" (see
-[CONDUCTOR.md](CONDUCTOR.md)).
+All phase 2 tasks (2-T01 to 2-T23) were prestarted on 19 October 2026 and
+wait for the conductor's go message (`CONDUCTOR.md`, "Prestarted phase
+workers"). 2-T21 works in the ResearchModule worktree
+`D:\Margraf\ResearchModule-wt-T21` (branch `fastmace/2-T21`).
 
-All remaining 1b tasks were prestarted on 19 October 2026 (owner request)
-and wait for the conductor's go message (`CONDUCTOR.md`, "Prestarted phase
-workers"). No "start all ready" is needed in phase 1b.
-
-- Merged: 1b-T01, T02, T03, T05, T04, T06, T06b, T07, T08, T08b, T08c, T09, T10, T11, T12, T13, T14, T15, T16 to T22, T23 tools, T24 to T26 (19 October 2026).
-- Merged since: 1b-T28 (software block once per process).
-- Working: 1b-T27 (GPU acceptance tier). Owner checkpoint decided (SPEC §18 decisions 22–28).
-- Waiting for go: none. Answers to their prestart
-  reports, and three items for the owner's review, are in `phase-1b.md`,
-  "Conductor answers to the prestart reports".
+- Phase 1b: done, apart from 1b-T27 (the GPU acceptance tier), which is
+  finishing its acceptance-tier run on murphy. 2-T01's go waits for it.
+- Working in phase 2: none yet (all preparing read-only).
+- Waiting for go: 2-T01 to 2-T23.
 
 ## Open owner decisions
 
