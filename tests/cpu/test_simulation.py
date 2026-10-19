@@ -514,3 +514,190 @@ def test_submit_frame_writes_through_the_async_queue(loaded):
     sim.submit_frame(lambda step, values: frames.append((step, None)))
     sim.flush_output()
     assert [step for step, _ in frames] == [2, 3]
+
+
+# --------------------------------------------------------------------------- restart and resume (§10.6, after 1b-T14)
+
+
+def _restart_output(directory, every=3):
+    return Output(directory, thermo_every=1, trajectory_every=1, restart_every=every)
+
+
+def test_interrupted_equals_uninterrupted_with_the_same_cadence(loaded, tmp_path):
+    from fastmace.simulation import Simulation
+
+    schedule = ramp(300.0, 250.0, ps=0.007)  # 7 steps at 1 fs
+    whole = _simulation(loaded, seed=11, output=_restart_output(tmp_path / "whole"))
+    whole.run(schedule=schedule)
+    whole.close()
+
+    first = _simulation(loaded, seed=11, output=_restart_output(tmp_path / "parts"))
+    first.run(schedule=schedule, steps=5)  # the restart file is from step 3; steps 4 and 5 are lost
+    del first  # killed: nothing closed or flushed beyond what the run wrote
+    resumed = Simulation.resume(tmp_path / "parts")
+    assert resumed.committed().step == 3
+    assert resumed.schedule.step == 3 and resumed.schedule.remaining == 4
+    resumed.run()
+    resumed.close()
+
+    np.testing.assert_array_equal(_positions(resumed), _positions(whole))
+    np.testing.assert_array_equal(resumed.committed().momenta, whole.committed().momenta)
+    assert resumed.committed().energy == whole.committed().energy
+    want_header, want_rows = output_io.read_thermo(tmp_path / "whole")
+    got_header, got_rows = output_io.read_thermo(tmp_path / "parts")
+    assert got_header == want_header and got_rows == want_rows  # no duplicate or missing row
+    frames = output_io.read_frames(tmp_path / "parts")
+    assert len(frames) == len(output_io.read_frames(tmp_path / "whole")) == 8
+    metadata = json.loads((tmp_path / "parts" / "metadata.json").read_text())
+    assert [point["step"] for point in metadata["restart_points"]] == [3, 6]
+
+
+def test_npt_interrupted_equals_uninterrupted(loaded, tmp_path):
+    from fastmace.simulation import Simulation
+
+    baoab = integrators.LangevinBAOAB(timestep_fs=TIMESTEP_FS, temperature_K=300.0, friction_per_fs=0.01,
+                                      pressure_GPa=0.5, cell_mode="full")
+    whole = _simulation(loaded, integrator=baoab, seed=4, output=_restart_output(tmp_path / "whole", every=2))
+    whole.run(steps=5)
+    first = _simulation(loaded, integrator=baoab, seed=4, output=_restart_output(tmp_path / "parts", every=2))
+    first.run(steps=3)
+    del first
+    resumed = Simulation.resume(tmp_path / "parts")
+    assert resumed.committed().step == 2
+    resumed.run(steps=3)
+    np.testing.assert_array_equal(_positions(resumed), _positions(whole))
+    np.testing.assert_array_equal(resumed.committed().cell, whole.committed().cell)
+
+
+def test_save_load_save_gives_identical_files(loaded, tmp_path):
+    from fastmace.simulation import Simulation
+
+    sim = _simulation(loaded, seed=2)
+    sim.run(schedule=hold(300.0, ps=0.005), steps=2)
+    sim.save_restart(tmp_path / "a" / "restart.npz")
+    resumed = Simulation.resume(tmp_path / "a")
+    resumed.save_restart(tmp_path / "b" / "restart.npz")
+    assert (tmp_path / "a" / "restart.npz").read_bytes() == (tmp_path / "b" / "restart.npz").read_bytes()
+    first = json.loads((tmp_path / "a" / "simulation.json").read_text())
+    second = json.loads((tmp_path / "b" / "simulation.json").read_text())
+    # The resume loads the checkpoint again, checked by its SHA-256: that is its trust decision.
+    assert (first["model"].pop("trust"), second["model"].pop("trust")) == ("trusted", "sha256")
+    assert first == second
+    assert first["model"]["sha256"] == loaded.sha256
+    assert first["structure"]["numbers"] == [int(z) for z in nacl(repeat=1).numbers]
+
+
+def test_resume_continues_the_target_without_a_schedule(loaded, tmp_path):
+    from fastmace.simulation import Simulation
+
+    sim = _simulation(loaded, workload=Workload(max_temperature_K=400.0))
+    sim.run(schedule=ramp(300.0, 350.0, ps=0.005))  # finished at 350 K
+    sim.save_restart(tmp_path / "restart.npz")
+    resumed = Simulation.resume(tmp_path)
+    assert float(resumed._engine.integrator.temperature_K) == 350.0
+    assert resumed.schedule.finished
+    assert resumed.plan.workload == Workload(max_temperature_K=400.0)
+
+
+def test_resume_refuses_another_force_field_identity(loaded, tmp_path):
+    from fastmace.errors import RestartMismatch
+    from fastmace.simulation import Simulation
+
+    sim = _simulation(loaded)
+    sim.run(steps=1)
+    sim.save_restart(tmp_path / "restart.npz")
+    path = tmp_path / "simulation.json"
+    record = json.loads(path.read_text())
+    record["force_field"]["precision"] = "float32"
+    path.write_text(json.dumps(record))
+    with pytest.raises(RestartMismatch, match="force_precision"):
+        Simulation.resume(tmp_path)
+
+
+def test_a_plan_change_needs_the_flag_and_makes_revision_1(loaded, tmp_path, monkeypatch, cpu_planner):
+    from fastmace.config import NeighbourConfig
+    from fastmace.errors import RestartMismatch
+    from fastmace.simulation import Simulation
+
+    sim = _simulation(loaded)
+    sim.run(steps=2)
+    sim.save_restart(tmp_path / "restart.npz")
+    assert Simulation.resume(tmp_path).plan.revision == 0  # same plan: same revision
+    other = minimal.MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"), environ={},
+                                   neighbours=NeighbourConfig(skin=0.5), process=constraints.ProcessRecord())
+    monkeypatch.setattr(minimal, "default_planner", lambda force_field: other)
+    with pytest.raises(RestartMismatch, match="allow_plan_change"):
+        Simulation.resume(tmp_path)
+    resumed = Simulation.resume(tmp_path, allow_plan_change=True)
+    assert resumed.plan.revision == 1
+    assert resumed.plan.predecessor.revision == 0
+    assert resumed.plan.step == 2
+    assert resumed.plan.neighbours.skin == 0.5
+    assert resumed._engine.state.plan_revision == 1
+    resumed.run(steps=2)
+    resumed.save_restart(tmp_path / "again" / "restart.npz")
+    again = json.loads((tmp_path / "again" / "simulation.json").read_text())
+    assert again["plan_revision"] == 1
+
+
+def test_resume_refuses_a_restart_without_identity(loaded, tmp_path):
+    from fastmace.errors import RestartMismatch
+    from fastmace.io import restart
+    from fastmace.simulation import Simulation
+
+    sim = _simulation(loaded)
+    sim.save_restart(tmp_path / "restart.npz")
+    state = sim._engine.state
+    state.force_field_identity = None  # the main.py adapter writes no identity
+    restart.write_restart(tmp_path / "restart.npz", state, engine="fastmace")
+    with pytest.raises(RestartMismatch, match="identity"):
+        Simulation.resume(tmp_path)
+
+
+def test_resume_without_a_restart_file(tmp_path):
+    from fastmace.simulation import Simulation
+
+    with pytest.raises(FileNotFoundError, match="restart"):
+        Simulation.resume(tmp_path)
+
+
+# --------------------------------------------------------------------------- host writes (owner decision D4)
+
+
+def test_set_positions_equals_a_fresh_simulation_at_those_positions(loaded):
+    sim = _simulation(loaded, seed=6)
+    sim.run(steps=3)
+    moved = sim.committed().positions + 0.01
+    momenta = sim.committed().momenta
+    sim.set_positions(moved)
+    committed = sim.committed()
+    np.testing.assert_array_equal(committed.positions, moved)
+    np.testing.assert_array_equal(committed.momenta, momenta)
+    atoms = nacl(repeat=1)
+    atoms.set_positions(moved)
+    fresh = _simulation(loaded, atoms=atoms)
+    np.testing.assert_array_equal(committed.forces, fresh.committed().forces)
+    assert committed.energy == fresh.committed().energy
+    assert committed.step == 3
+    sim.run(steps=2)
+    assert sim.committed().step == 5
+
+
+def test_set_momenta(loaded):
+    sim = _simulation(loaded, seed=6)
+    sim.run(steps=2)
+    momenta = np.full((8, 3), 0.01)
+    sim.set_momenta(momenta)
+    np.testing.assert_allclose(sim.committed().momenta, momenta, rtol=1e-14, atol=0)
+    sim.run(steps=1)
+
+
+@pytest.mark.parametrize("bad", [np.zeros((7, 3)), np.full((8, 3), np.nan)])
+def test_host_writes_refuse_wrong_shapes_and_non_finite_values(loaded, bad):
+    sim = _simulation(loaded)
+    before = _positions(sim)
+    with pytest.raises(ValueError):
+        sim.set_positions(bad)
+    with pytest.raises(ValueError):
+        sim.set_momenta(bad)
+    np.testing.assert_array_equal(_positions(sim), before)

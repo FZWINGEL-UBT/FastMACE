@@ -55,6 +55,12 @@ THERMO_HEADER = ("step", "time_ps", "phase", "target_K", "temperature_K", "poten
                  "total_eV_atom")
 NPT_COLUMNS = ("volume_A3_atom", "pressure_GPa")
 CONSTANT_PHASE = "constant"  # the thermo phase column without a schedule
+ENGINE_NAME = "fastmace"  # the restart file's engine entry
+RESTART_NAME = "restart.npz"  # io.restart.RESTART_NAME (that module imports torch)
+SIMULATION_NAME = "simulation.json"  # next to the restart: what the restart format does not hold
+SIMULATION_RECORD_VERSION = 1
+HOST_WRITE_WARNING = ("host writes of positions or momenta run at a canonical point (quiesce, write, rebuild, "
+                      "re-evaluate; owner decision D4): correct, and slower than a step")
 
 
 def check_mode(check: Any) -> str:
@@ -199,6 +205,8 @@ class Simulation:
         self._loop_s = 0.0
         self._run_started = None
         self._window_clock = None
+        self._restart_points = []
+        self._host_writes = 0
         setup = {}
 
         planner = minimal.default_planner(ff)
@@ -424,6 +432,7 @@ class Simulation:
         output = self.output
         thermo_every = output.thermo_every if output is not None else None
         frame_every = output.trajectory_every if output is not None else None
+        restart_every = output.restart_every if output is not None else None
         window_first, window_last = self._report.window
         cuda = engine.device.type == "cuda"
 
@@ -453,6 +462,8 @@ class Simulation:
                 frame = frame_every is not None and step % frame_every == 0
                 if row or frame:
                     self._submit_output(step, row=row, frame=frame)
+                if restart_every is not None and step % restart_every == 0:
+                    self.save_restart(Path(output.directory) / RESTART_NAME)
                 if step == window_first:
                     self._window_clock = synchronised_clock()
                 elif step == window_last and self._window_clock is not None and self._report.measured is None:
@@ -485,13 +496,13 @@ class Simulation:
 
     # ------------------------------------------------------------------ output
 
-    def _open_output(self):
+    def _open_output(self, resume_from=None):
         from fastmace.io.output import ChunkedOutput
 
         directory = Path(self.output.directory)
         directory.mkdir(parents=True, exist_ok=True)
         header = THERMO_HEADER + (NPT_COLUMNS if self._npt else ())
-        self._writer = ChunkedOutput(directory, self._atoms.copy(), header)
+        self._writer = ChunkedOutput(directory, self._atoms.copy(), header, resume_from=resume_from)
 
     def _sample(self, step):
         position = self._schedule
@@ -548,8 +559,9 @@ class Simulation:
         return provenance.metadata_record(
             checkpoint=self.force_field.model, identity=self.force_field.identity, plan=self._plan, seed=self.seed,
             generators={"integrator": state.rng.generator}, cursors={"integrator": int(state.rng.cursor)},
-            schedule=self._schedule, gate=self._gate, engine_info=self._engine.info(), setup=self._setup_s,
-            timing=timing, report=self._report, device=str(self._engine.device))
+            schedule=self._schedule, gate=self._gate, engine_info=self._engine.info(),
+            restart_points=self._restart_points, setup=self._setup_s, timing=timing, report=self._report,
+            device=str(self._engine.device))
 
     def _write_metadata(self):
         if self.output is None:
@@ -558,25 +570,274 @@ class Simulation:
 
         provenance.write_metadata(Path(self.output.directory) / "metadata.json", self._metadata_record())
 
-    # ------------------------------------------------------------------ restart (after 1b-T14)
+    # ------------------------------------------------------------------ restart (§10.6)
 
     def save_restart(self, path: Any) -> None:
-        """Write the complete §10.6 state at the current committed step (a canonical point)."""
-        raise NotImplementedError("Simulation.save_restart comes with plan task 1b-T14's canonical restart points")
+        """Write the complete §10.6 state at the current committed step, a canonical restart point.
+
+        ``path`` is ``<directory>/restart.npz`` (or the directory): ``Simulation.resume(directory)``
+        reads it there. The output queue is drained and the output chunks end here (§10.6), the
+        engine is canonicalised and written by ``io.restart.write_engine_restart`` (T05's format),
+        and ``simulation.json`` next to it holds what that format does not: the model source, the
+        integrator record, workload, ``Output``, seed, ``allow_naive_cueq``, species, masses and PBC.
+        """
+        from fastmace.io import restart
+
+        path = Path(path)
+        if path.suffix != ".npz":
+            path = path / RESTART_NAME
+        if path.name != RESTART_NAME:
+            raise ValueError(f"save_restart writes {RESTART_NAME!r} (Simulation.resume reads <directory>/"
+                             f"{RESTART_NAME}), got {path.name!r}")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._queue.drain()
+        outputs = self._writer.restart_point() if self._writer is not None else None
+        restart.write_engine_restart(path, self._engine, name=ENGINE_NAME, plan=self._plan, outputs=outputs)
+        if outputs is not None:
+            point = {"step": int(self._engine.state.step), **outputs}
+            if not self._restart_points or self._restart_points[-1] != point:
+                self._restart_points.append(point)
+        _write_json(path.parent / SIMULATION_NAME, self._simulation_record(path.parent))
+        self._write_metadata()
+
+    def _simulation_record(self, directory):
+        import dataclasses
+
+        model = self.force_field.model
+        atoms = self._atoms
+        output = None
+        if self.output is not None:
+            output = dataclasses.asdict(self.output)
+            if Path(self.output.directory).resolve() == Path(directory).resolve():
+                output["directory"] = "."  # the restart's own directory, wherever it is moved
+        workload = dataclasses.asdict(self.workload)
+        workload["needs_per_atom"] = sorted(workload["needs_per_atom"])
+        workload["mc_moves"] = list(workload["mc_moves"])
+        integrator = dataclasses.asdict(self.integrator)
+        if isinstance(integrator.get("external_stress_GPa"), tuple):
+            integrator["external_stress_GPa"] = list(integrator["external_stress_GPa"])
+        return {
+            "simulation_record_version": SIMULATION_RECORD_VERSION,
+            "model": {"label": model.label, "path": str(model.path), "head": model.head, "sha256": model.sha256,
+                      "trust": model.trust, "charge": model.charge, "spin_multiplicity": model.spin_multiplicity},
+            "force_field": {"precision": self.force_field.precision, "species": list(self.force_field.species),
+                            "rewrites": "auto" if self.force_field.rewrites == "auto"
+                            else dataclasses.asdict(self.force_field.rewrites)},
+            "integrator": {"class": type(self.integrator).__name__, "fields": integrator},
+            "workload": workload,
+            "output": output,
+            "seed": self.seed,
+            "allow_naive_cueq": self.allow_naive_cueq,
+            "structure": {"numbers": [int(z) for z in atoms.numbers],
+                          "masses": [float(m) for m in atoms.get_masses()],
+                          "pbc": [bool(p) for p in atoms.pbc]},
+            "plan_revision": int(self._plan.revision),
+            "restart_points": list(self._restart_points),
+        }
 
     @classmethod
     def resume(cls, directory: Any, *, allow_plan_change: bool = False, check: Check = "skip") -> Simulation:
         """Continue from the restart in ``directory``. A different force-field identity raises
         ``RestartMismatch``; a different plan needs ``allow_plan_change=True`` and makes a new
-        revision (§9.5, §10.6). ``check`` as in the constructor."""
+        revision (§9.5, §10.6). ``check`` as in the constructor.
+
+        The model is loaded again from ``simulation.json``'s source, checked against its SHA-256; the
+        engine is built at the restart's positions and cell through the planner, then takes the
+        restart's state, edge bucket and neighbour capacity (``io.restart.resume_engine``). Output
+        chunks after the restart point are deleted and new ones opened; nothing is rewritten.
+        """
+        import json
+
+        from fastmace.io import restart
+        from fastmace.model.forcefield import ForceField
+
         check_mode(check)
-        raise NotImplementedError("Simulation.resume comes with plan task 1b-T14's canonical restart points")
+        directory = Path(directory)
+        file = directory / RESTART_NAME
+        if not file.is_file():
+            raise FileNotFoundError(f"no restart file {file}; Simulation.save_restart writes it")
+        record_path = directory / SIMULATION_NAME
+        if not record_path.is_file():
+            raise FileNotFoundError(f"no {SIMULATION_NAME} next to the restart file {file}; Simulation.resume "
+                                    "continues runs that Simulation.save_restart wrote")
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        if record.get("simulation_record_version") != SIMULATION_RECORD_VERSION:
+            raise ValueError(f"{record_path}: record version {record.get('simulation_record_version')!r} is not "
+                             f"{SIMULATION_RECORD_VERSION}")
+        stored = restart.read_restart(file, engine=ENGINE_NAME)
+        loaded = _load_model(record["model"])
+        rewrites = record["force_field"]["rewrites"]
+        if rewrites != "auto":
+            from fastmace.config import RewriteConfig
+
+            rewrites = RewriteConfig(**rewrites)
+        ff = ForceField(loaded, precision=record["force_field"]["precision"], rewrites=rewrites,
+                        species=record["force_field"]["species"])
+        restart.check_identity(stored, ff.identity)
+        output = record["output"]
+        if output is not None:
+            from fastmace.io.output import Output
+
+            if output["directory"] == ".":
+                output["directory"] = str(directory)
+            output = Output(**output)
+        sim = cls(_restart_atoms(record["structure"], stored), ff, integrator=_integrator(record["integrator"]),
+                  workload=_workload(record["workload"]), output=None, seed=record["seed"], check=check,
+                  allow_naive_cueq=record["allow_naive_cueq"])
+        sim._resume(stored, record, output, allow_plan_change)
+        return sim
+
+    def _resume(self, stored, record, output, allow_plan_change):
+        from fastmace.errors import RestartMismatch
+        from fastmace.io import restart
+        from fastmace.planner.plan import Plan
+        from fastmace.protocols import ScheduleState
+
+        engine = self._engine
+        restart.resume_engine(stored, engine)
+        step = int(engine.state.step)
+        previous = Plan.from_restart(restart.plan_record(stored))
+        changed = [name for name in _PLAN_FIELDS if getattr(previous, name) != getattr(self._plan, name)]
+        if changed:
+            if not allow_plan_change:
+                raise RestartMismatch(
+                    f"the plan differs from the restart's in {', '.join(changed)}",
+                    why="a different plan (another GPU, software or rewrite set) is the same physics but no "
+                        "bitwise continuation, so it is never taken silently (SPEC §10.6)",
+                    next_step="pass allow_plan_change=True to resume on the new plan, recorded as a new revision")
+            fresh = self._plan
+            self._plan = previous.revise(
+                f"resumed with a different plan ({', '.join(changed)}; allow_plan_change=True)", step,
+                **{name: getattr(fresh, name) for name in (*_PLAN_FIELDS, *_PLAN_RECORDS)})
+        else:
+            self._plan = previous
+        engine.state.plan_revision = self._plan.revision
+        protocol = restart.protocol_record(stored)
+        self._schedule = None if protocol is None else ScheduleState.from_restart(protocol)
+        engine.state.protocol = self._schedule
+        target = (restart.integrator_record(stored) or {}).get("temperature_K")
+        if target is not None:
+            engine.integrator.set_temperature(target)
+        self._fill.reset()
+        self._started = True
+        self._restart_points = [dict(point) for point in record.get("restart_points", ())]
+        self._report = self._new_report()
+        if output is not None:
+            self.output = output
+            self._open_output(resume_from=restart.output_indices(stored))
+        self._write_metadata()
+
+    # ------------------------------------------------------------------ host writes (owner decision D4)
+
+    def _host_values(self, values, name):
+        import numpy as np
+
+        array = np.asarray(values, dtype=np.float64)
+        expected = (len(self._atoms), 3)
+        if array.shape != expected:
+            raise ValueError(f"{name} must have shape {expected}, got {array.shape}")
+        if not np.isfinite(array).all():
+            raise ValueError(f"{name} must be finite")
+        return array
+
+    def _host_write(self, write):
+        import torch
+
+        self._queue.drain()
+        engine = self._engine
+        engine.flush()
+        with torch.no_grad():
+            write(engine.state)
+        engine.canonicalise(reevaluate=True)
+        if not self._host_writes:
+            self._report.add_warning(HOST_WRITE_WARNING)
+        self._host_writes += 1
 
     def set_positions(self, positions: Any) -> None:
         """Host write of positions at a canonical point: quiesce, write, rebuild, re-evaluate (owner
-        decision D4)."""
-        raise NotImplementedError("Simulation.set_positions comes with plan task 1b-T14's canonicalise()")
+        decision D4). ``positions`` in Å, shape ``(N, 3)``; the momenta stay."""
+        import torch
+
+        array = self._host_values(positions, "positions")
+
+        def write(state):
+            state.positions.copy_(torch.as_tensor(array, dtype=state.positions.dtype))
+
+        self._host_write(write)
 
     def set_momenta(self, momenta: Any) -> None:
-        """Host write of momenta at a canonical point (owner decision D4)."""
-        raise NotImplementedError("Simulation.set_momenta comes with plan task 1b-T14's canonicalise()")
+        """Host write of momenta at a canonical point (owner decision D4). ``momenta`` in ASE units,
+        shape ``(N, 3)``; the engine integrates velocities, ``momenta / masses``."""
+        import torch
+
+        array = self._host_values(momenta, "momenta")
+
+        def write(state):
+            momenta = torch.as_tensor(array, dtype=state.velocities.dtype, device=state.velocities.device)
+            state.velocities.copy_(momenta / state.masses)
+
+        self._host_write(write)
+
+
+# What a resume compares to decide whether the plan changed (§10.6: "another GPU or rewrite set"), and
+# the rest of the record a revision carries over from the new plan.
+_PLAN_FIELDS = ("tier", "rewrites", "engine", "precision", "neighbours", "polar", "integrator", "superset",
+                "workload")
+_PLAN_RECORDS = ("decisions", "requested", "auto_options_off", "software", "allowances")
+
+
+def _write_json(path, record):
+    """Canonical JSON (sorted keys), written atomically: temporary file, then rename."""
+    import json
+    import os
+
+    text = json.dumps(record, indent=2, sort_keys=True, allow_nan=False) + "\n"
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+        os.replace(temporary, path)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def _load_model(source):
+    """The pristine model of a ``simulation.json`` source: a label as it is, a path with its SHA-256."""
+    from fastmace.model import loading
+
+    options = dict(charge=source.get("charge"), spin_multiplicity=source.get("spin_multiplicity"))
+    if source.get("label"):
+        return loading.load_pristine(source["label"], **options)
+    return loading.load_pristine(source["path"], source.get("head"), sha256=source["sha256"], **options)
+
+
+def _restart_atoms(structure, stored):
+    """The run's ``Atoms`` at the restart's positions and cell (species, masses and PBC from the record)."""
+    from ase import Atoms
+
+    cell = stored["cell_state"] if "cell_state" in stored else stored["cell"]
+    atoms = Atoms(numbers=structure["numbers"], positions=stored["positions"], cell=cell, pbc=structure["pbc"])
+    atoms.set_masses(structure["masses"])
+    return atoms
+
+
+def _integrator(record):
+    from fastmace import integrators
+
+    classes = {"Langevin": integrators.Langevin, "LangevinBAOAB": integrators.LangevinBAOAB}
+    if record["class"] not in classes:
+        raise ValueError(f"unknown integrator record {record['class']!r}; this FastMACE has {sorted(classes)}")
+    fields = dict(record["fields"])
+    if isinstance(fields.get("external_stress_GPa"), list):
+        fields["external_stress_GPa"] = tuple(fields["external_stress_GPa"])
+    return classes[record["class"]](**fields)
+
+
+def _workload(record):
+    from fastmace.planner.workload import Workload
+
+    fields = dict(record)
+    fields["needs_per_atom"] = frozenset(fields["needs_per_atom"])
+    fields["mc_moves"] = tuple(fields["mc_moves"])
+    return Workload(**fields)
