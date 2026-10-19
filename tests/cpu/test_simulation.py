@@ -108,23 +108,94 @@ def test_default_workload_is_the_integrator_temperature(loaded):  # owner decisi
     assert sim.plan.tier == "graph"
 
 
-def test_gate_is_opt_in_and_skipped_by_default(loaded):  # owner decision D1
-    sim = _simulation(loaded)
-    assert sim.gate["status"] == "skipped"
-    assert sim.gate["reason"] == 'opt-in: check="gate"'
+def test_gate_is_opt_in_and_skipped_by_default(loaded, tmp_path):  # owner decision D1
+    from fastmace.planner.selfcheck import GateRecord
+
+    sim = _simulation(loaded, output=Output(tmp_path / "run", trajectory_every=None, restart_every=None))
+    assert isinstance(sim.gate, GateRecord)
+    assert (sim.gate.status, sim.gate.check, sim.gate.reason) == ("skipped", "skip", 'opt-in: check="gate"')
     assert "gate:    not run" in sim.report.text()
+    metadata = json.loads((tmp_path / "run" / "metadata.json").read_text())
+    assert metadata["gate"]["status"] == "skipped"
 
 
-def test_check_gate_without_the_gate_task_refuses_or_records(loaded, monkeypatch):
-    from fastmace import simulation
+# --------------------------------------------------------------------------- the gate (1b-T16), opt-in
+
+
+@pytest.fixture
+def no_engines_yet():
+    """No production engine built in this process yet, so the gate's references run in-process (as T16's tests)."""
+    from fastmace.engine import base
+
+    saved = (base._PRODUCTION_ENGINES.count, base._PRODUCTION_ENGINES.first)
+    base._forget_production_engines()
+    yield
+    base._PRODUCTION_ENGINES.count, base._PRODUCTION_ENGINES.first = saved
+
+
+def _no_reference(*args, **kwargs):
+    raise torch.cuda.OutOfMemoryError("CUDA out of memory. Tried to allocate 12.00 GiB")
+
+
+@pytest.mark.parametrize("npt", [False, True], ids=["nvt", "npt"])
+def test_check_gate_passes_and_leaves_the_trajectory(loaded, no_engines_yet, tmp_path, npt):
+    integrator = LANGEVIN
+    if npt:
+        integrator = integrators.LangevinBAOAB(timestep_fs=TIMESTEP_FS, temperature_K=300.0, friction_per_fs=0.01,
+                                               pressure_GPa=0.5)
+    gated = _simulation(loaded, integrator=integrator, check="gate", seed=8,
+                        output=Output(tmp_path / "run", trajectory_every=None, restart_every=None))
+    assert gated.gate.status == "passed"
+    assert gated.gate.check == "gate"
+    assert gated.gate.references["ran"] == "in-process"
+    assert (gated.gate.stress_eV_per_A3 is None) == (not npt)
+    assert "gate:    passed" in gated.report.text()
+    assert "gate" in gated.report.setup_s
+    metadata = json.loads((tmp_path / "run" / "metadata.json").read_text())
+    assert metadata["gate"]["status"] == "passed"
+    plain = _simulation(loaded, integrator=integrator, seed=8)
+    for sim in (gated, plain):
+        sim.run(steps=3)
+    np.testing.assert_array_equal(_positions(gated), _positions(plain))  # the gate restores the state
+
+
+def test_a_requested_gate_that_is_unavailable_refuses(loaded, no_engines_yet, monkeypatch):
+    from fastmace.engine import base
     from fastmace.errors import GateUnavailable
+    from fastmace.planner import selfcheck
 
-    if simulation._selfcheck() is not None:
-        pytest.skip("1b-T16's gate is merged; its own tests cover check='gate'")
-    with pytest.raises(GateUnavailable, match="allow_unavailable"):
+    monkeypatch.setattr(selfcheck, "_load_reference", _no_reference)
+    with pytest.raises(GateUnavailable, match="allow_unavailable") as raised:
         _simulation(loaded, check="gate")
+    assert raised.value.gate_record.status == "unavailable"
+    assert not base.production_engine_built()  # refused before any engine was built
+
+
+def test_allow_unavailable_records_it_and_runs(loaded, no_engines_yet, monkeypatch):
+    from fastmace.planner import selfcheck
+
+    monkeypatch.setattr(selfcheck, "_load_reference", _no_reference)
     sim = _simulation(loaded, check="allow_unavailable")
-    assert sim.gate["status"] == "unavailable"
+    assert sim.gate.status == "unavailable" and "out of memory" in sim.gate.reason
+    assert "gate:    unavailable" in sim.report.text()
+    sim.run(steps=2)
+    assert sim.committed().step == 2
+
+
+def test_a_failing_gate_refuses_before_any_step(loaded, no_engines_yet, monkeypatch):
+    from fastmace.errors import GateFailed
+    from fastmace.planner import selfcheck
+
+    original = selfcheck._read_outputs
+
+    def poisoned(engine, stress):
+        energy, forces, values = original(engine, stress)
+        return energy + 1.0, forces, values  # 1 eV off: fails on energy
+
+    monkeypatch.setattr(selfcheck, "_read_outputs", poisoned)
+    with pytest.raises(GateFailed) as raised:
+        _simulation(loaded, check="gate")
+    assert raised.value.gate_record.status == "failed"
 
 
 def test_unknown_check_mode_is_refused():

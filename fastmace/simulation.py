@@ -50,7 +50,6 @@ Check = Literal["skip", "gate", "allow_unavailable"]
 # check="allow_unavailable": as "gate", but an unavailable gate is recorded and the run goes on.
 CHECK_MODES = ("skip", "gate", "allow_unavailable")
 
-GATE_SKIPPED = {"status": "skipped", "reason": 'opt-in: check="gate"'}
 THERMO_HEADER = ("step", "time_ps", "phase", "target_K", "temperature_K", "potential_eV_atom", "kinetic_eV_atom",
                  "total_eV_atom")
 NPT_COLUMNS = ("volume_A3_atom", "pressure_GPa")
@@ -68,15 +67,6 @@ def check_mode(check: Any) -> str:
     if check not in CHECK_MODES:
         raise ValueError(f"check={check!r} is not one of {CHECK_MODES}; the gate is opt-in: check='gate' (SPEC §12.3)")
     return check
-
-
-def _selfcheck():
-    """The gate module (1b-T16), or ``None`` while it is not part of this FastMACE."""
-    try:
-        from fastmace.planner import selfcheck
-    except ImportError:
-        return None
-    return selfcheck
 
 
 def _steps(steps: Any) -> int:
@@ -158,7 +148,7 @@ class Simulation:
         from fastmace.errors import PlanRefused, Reason
         from fastmace.io.output import Output
         from fastmace.model.forcefield import ForceField
-        from fastmace.planner import minimal
+        from fastmace.planner import minimal, selfcheck
         from fastmace.planner.workload import Workload
 
         if not isinstance(integrator, (records.Langevin, records.LangevinBAOAB)):
@@ -214,12 +204,11 @@ class Simulation:
         self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq)
         setup["plan"] = time.perf_counter() - started
 
-        gate = _selfcheck() if check != "skip" else None
-        references = None
-        if check != "skip" and gate is not None:
-            started = time.perf_counter()
-            references = gate.references(self._plan, ff, atoms, self._config, check=check, seed=seed)
-            setup["gate"] = time.perf_counter() - started
+        # The gate's references before any production engine exists (§12.3); under check="gate" an
+        # unavailable reference raises GateUnavailable here, before the build. "skip" computes nothing.
+        started = time.perf_counter()
+        references = selfcheck.references(self._plan, ff, atoms, integrator, check=check, seed=seed)
+        gate_s = time.perf_counter() - started
 
         started = time.perf_counter()
         self._engine = planner.build(self._plan, ff, atoms)
@@ -231,46 +220,17 @@ class Simulation:
 
         self._fill = TargetFill(self._engine.integrator)
 
-        if check == "skip":
-            self._gate = dict(GATE_SKIPPED)
-        elif gate is None:
-            self._gate = self._gate_unavailable("the gate (plan task 1b-T16) is not part of this FastMACE")
-        else:
-            started = time.perf_counter()
-            self._gate = self._gate_verdict(gate.production(self._engine, references, check=check))
-            setup["gate"] = setup.get("gate", 0.0) + time.perf_counter() - started
+        # The production half through this engine; GateFailed (and the unavailable record under
+        # check="allow_unavailable") come from selfcheck. The record is final: sim.gate.
+        started = time.perf_counter()
+        self._gate = selfcheck.production(self._engine, references, check=check)
+        if check != "skip":
+            setup["gate"] = gate_s + time.perf_counter() - started
         self._setup_s = setup
         self._report = self._new_report()
         if output is not None:
             self._open_output()
         self._write_metadata()
-
-    # ------------------------------------------------------------------ gate
-
-    def _gate_unavailable(self, reason):
-        record = {"status": "unavailable", "reason": reason}
-        if self.check == "gate":
-            from fastmace.errors import GateUnavailable
-
-            raise GateUnavailable(f"the requested gate is unavailable: {reason}",
-                                  why="check='gate' runs only with a gate verdict (owner decision D1, SPEC §12.3)",
-                                  next_step='pass check="allow_unavailable" to run with the gate recorded as '
-                                            'unavailable, or check="skip"', gate_record=record)
-        return record
-
-    def _gate_verdict(self, record):
-        from fastmace.errors import GateFailed
-
-        mapping = record.to_metadata() if hasattr(record, "to_metadata") else dict(record)
-        status = mapping.get("status")
-        if status == "failed":
-            raise GateFailed(f"the gate failed on this structure: {mapping.get('reason') or 'see the record'}",
-                             why="production and the corrected references disagree beyond the ratio rule "
-                                 "(SPEC §12.3); a failing gate never runs silently (§9.3 rule 14)",
-                             gate_record=record)
-        if status == "unavailable":
-            return self._gate_unavailable(mapping.get("reason") or "no reference ran")
-        return mapping
 
     # ------------------------------------------------------------------ public state
 
@@ -281,7 +241,8 @@ class Simulation:
 
     @property
     def gate(self) -> Any:
-        """The gate record (§12.3): status ``passed``, ``failed``, ``unavailable`` or ``skipped``."""
+        """The gate record (``planner.selfcheck.GateRecord``, §12.3): status ``passed``, ``unavailable`` (with
+        ``check="allow_unavailable"``) or ``skipped``; a failed gate raised ``GateFailed`` at construction."""
         return self._gate
 
     @property
@@ -545,7 +506,7 @@ class Simulation:
             model=model.label or Path(str(model.path)).name, head=model.head, sha256=model.sha256,
             structure=atoms.get_chemical_formula(), n_atoms=len(atoms), pbc=tuple(bool(p) for p in atoms.pbc),
             species=_symbols(self._plan.superset).split(), plan=self._plan,
-            gate=None if self._gate.get("status") == "skipped" else self._gate, setup_s=self._setup_s,
+            gate=None if self._gate.status == "skipped" else self._gate, setup_s=self._setup_s,
             outputs=outputs, charge_spin=(model.charge, model.spin_multiplicity) if reads_charge else None,
             cell_heights_A=tuple(float(h) for h in heights), cutoff_A=self.force_field.traits.r_max,
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,

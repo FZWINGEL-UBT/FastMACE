@@ -79,7 +79,7 @@ def simulation():
     frames = output_io.read_frames(SPEC["directory"])
     plan = sim.plan
     return {"rows": rows, "backend": plan.engine.backend, "dtype": plan.precision.dtype,
-            "options": fixed.enabled_options(plan), "gate": sim.gate["status"], "setup_s": setup_s,
+            "options": fixed.enabled_options(plan), "gate": sim.gate.status, "setup_s": setup_s,
             "thermo_steps": [int(row[0]) for row in thermo],
             "thermo_energy": [float(row[header.index("potential_eV_atom")]) for row in thermo],
             "frames": len(frames), "frame_positions": frames[-1].get_positions().tolist(),
