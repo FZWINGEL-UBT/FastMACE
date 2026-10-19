@@ -294,7 +294,8 @@ def require_record_for_model(record, model):
 
 
 __all__ = [
-    "ENERGY_BOUND_UNQUALIFIED", "FAMILIES", "FLOAT32_SUM_UNQUALIFIED", "FLOAT64_ACCUMULATION", "ID_PREFIX", "OPTIONAL_PHYSICS", "POLAR_STRESS_FIX", "QUALIFIED_MACE_VERSIONS",
+    "ENERGY_BOUND_UNQUALIFIED", "FAMILIES", "FLOAT32_SUM_UNQUALIFIED",
+    "FLOAT64_ACCUMULATION", "ID_PREFIX", "OPTIONAL_PHYSICS", "POLAR_STRESS_FIX", "QUALIFIED_MACE_VERSIONS",
     "ReferencePolicyError", "ReferenceRecord", "SCHEMA", "STOCK", "family_of", "mace_version", "record_for",
     "require_record_for_model",
 ]

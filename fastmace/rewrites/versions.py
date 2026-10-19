@@ -115,8 +115,8 @@ def polar_support():
     problems = _problems("polar_forward")
     if not problems:
         return RewriteSupport(True, "ok")
-    return RewriteSupport(False, f"PolarMACE needs its hashed forward for the stress fix (MACE issue 1642, SPEC §12.1): "
-                                 f"unqualified source ({'; '.join(problems)})")
+    return RewriteSupport(False, "PolarMACE needs its hashed forward for the stress fix (MACE issue 1642, "
+                                 f"SPEC §12.1): unqualified source ({'; '.join(problems)})")
 
 
 def head_count(model):

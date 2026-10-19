@@ -105,3 +105,34 @@ its wheel on `PYTHONPATH` in front of `mace_cueq_latest` (torch 2.14.1, graph_lo
 So on 0.3.15, MH-1 runs with its factored and folded rewrites off, MACE's own strain and the
 patched float64 energy, with no precision promotion. The promotion and the PolarMACE refusal are
 tested with fake hashes (`tests/cpu/test_versioned_registry.py`).
+
+## The other-MACE environment and its run
+
+`~/environments/fastmace_mace_other` (local WSL, 20 October 2026) is a copy of
+`mace_cueq_latest` (torch 2.14.1+cu130, cuEquivariance 0.12.0, graph_longrange 0.4.0) with
+mace-torch 0.3.15 instead of 0.3.16:
+- the dry run changed nothing else;
+- `pip check` is clean;
+- the list is `~/environments/fastmace_mace_other.requirements.txt`, which differs from
+  `mace_cueq_latest`'s in the MACE line only.
+
+FastMACE runs there from the checkout (`PYTHONPATH`), as on every GPU environment:
+
+```bash
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=1 PYTHONPATH=$PWD ~/environments/fastmace_mace_other/bin/python -m pytest -n 0 tests/cpu/test_unknown_mace.py
+```
+
+Both tests pass there: 2 passed, and `test_versioned_registry.py`'s fake-hash tests skip off
+0.3.16. The tiny MH-1 `fm.md` run on NaCl completes with `check="gate"` and the gate passes. Every
+unhashed record is off in the built force field, and every patch in force hashes.
+
+Two compatibility fixes came out of that run:
+- `_patches.cueq_conv_fusion(enabled, device)` patches nothing on an unhashed converter when
+  MACE's own rule already gives the asked-for fusion on that device (the CPU reference);
+- `loading` recognises a cuEquivariance calculator of a MACE that does not record
+  `_enable_cueq` (0.3.15) by its modules.
+
+Still open: plain cuEq on the GPU asks for the fused convolution on `cuda:0`, which MACE's own
+rule does not give. On an unhashed converter that conversion raises `UnqualifiedPatchError`. The
+planner's `cueq_conv_fusion` decision is `fixed.py`'s (T02), and the hybrid default does not
+convert through this path.

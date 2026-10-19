@@ -439,7 +439,7 @@ def test_force_field_identity_takes_the_effective_precision(monkeypatch, tmp_pat
     assert ff.effective_precision(float64_energy=False) == ("float32", None)
 
 
-# --------------------------------------------------------------------------- the planner, the gate's yardstick, the report
+# --------------------------------------------------------------------------- planner, gate yardstick, report
 
 
 @pytest.fixture
