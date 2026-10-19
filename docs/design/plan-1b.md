@@ -69,7 +69,7 @@ A reason that reports or tests match on is a `fastmace.errors.Reason` (a `str` w
 | `workload.max_temperature_K` | `max-temperature-recorded` (rule 11: 1a's skin and buckets) |
 | `workload.mc_moves` | `no-mc`, `mc-phase-3` |
 | `superset` | `superset` |
-| `allow_naive_cueq` | `allow-naive-cueq` |
+| `allow_naive_cueq` | `fused-cueq` (the fused kernels load), `allow-naive-cueq` (naive kernels allowed: the report warns) |
 
 The other keys are minimal-plan facts: `force_precision`, `software.oeq`, `software.triton`,
 `software.nvrtc`, `software.fused_cueq`, `software.mace_imported_first`,
