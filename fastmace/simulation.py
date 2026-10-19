@@ -227,6 +227,13 @@ class Simulation:
         self._gate = selfcheck.production(self._engine, references, check=check)
         if check != "skip":
             setup["gate"] = gate_s + time.perf_counter() - started
+        # The software block of metadata.json, built once per process here, in the setup time,
+        # not at the first run() (provenance.fastmace_block, 1b-T28).
+        from fastmace import provenance
+
+        started = time.perf_counter()
+        provenance.fastmace_block(str(self._engine.device))
+        setup["provenance"] = time.perf_counter() - started
         self._setup_s = setup
         self._report = self._new_report()
         if output is not None:

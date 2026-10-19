@@ -27,6 +27,7 @@ and CUDA is available.
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import hashlib
 import importlib.metadata
@@ -34,6 +35,7 @@ import json
 import math
 import os
 import platform
+import re
 import subprocess
 import sys
 from collections.abc import Mapping
@@ -73,6 +75,12 @@ PACKAGES = ("torch", "numpy", "ase", "mace-torch", "e3nn", "triton", "cuequivari
             "cuequivariance-ops-torch-cu12", "cuequivariance-ops-torch-cu13", "openequivariance", "cuda-bindings",
             "jinja2", "filelock")
 _CHUNK = 1 << 20
+# git status runs once per process and checkout, never in the step loop; over WSL's 9P it can take
+# seconds, and the record then says "unknown" (1b-T28).
+GIT_STATUS_TIMEOUT_S = 2.0
+_OBJECT_ID = re.compile(r"[0-9a-f]{40}(?:[0-9a-f]{24})?")  # SHA-1 or SHA-256
+_DIRTY = {}  # checkout -> dirty (bool, None or "unknown")
+_SOFTWARE = {}  # device -> the static part of fastmace_block
 
 
 # ------------------------------------------------------------------------ helpers
@@ -128,25 +136,99 @@ def _uses_cuda(device):
     return torch.cuda.is_available()
 
 
+def _host_path(text, base):
+    """A path written in a ``.git`` file or ``commondir``: absolute, or relative to ``base``. A Windows
+    path (``D:/...``, a worktree made by Windows git) maps to ``/mnt/d/...`` under WSL."""
+    match = re.match(r"^([A-Za-z]):[\\/](.*)$", text)
+    if match and os.name != "nt":
+        return Path("/mnt") / match.group(1).lower() / match.group(2).replace("\\", "/")
+    path = Path(text)
+    return path if path.is_absolute() else base / path
+
+
+def _read_ref(git_dir, common, ref):
+    """The object a ref names: a loose ref file (the worktree's own, then the common one), else
+    ``packed-refs``; None if neither has it."""
+    for root in (git_dir, common):
+        loose = root / ref
+        if loose.is_file():
+            return loose.read_text(encoding="utf-8").strip()
+    packed = common / "packed-refs"
+    if packed.is_file():
+        for line in packed.read_text(encoding="utf-8").splitlines():
+            if line and line[0] not in "#^":
+                value, _, name = line.partition(" ")
+                if name.strip() == ref:
+                    return value
+    return None
+
+
+def head_commit(directory):
+    """The commit ``HEAD`` of the checkout at ``directory`` points to, read from its ``.git`` files
+    without starting git (a branch, a detached HEAD, loose or packed refs, a worktree's ``.git``
+    file); None when it cannot be read (no checkout, another ref storage)."""
+    directory = Path(directory)
+    dot = directory / ".git"
+    try:
+        if dot.is_file():
+            text = dot.read_text(encoding="utf-8").strip()
+            if not text.startswith("gitdir:"):
+                return None
+            git_dir = _host_path(text[len("gitdir:"):].strip(), directory)
+        else:
+            git_dir = dot
+        if not (git_dir / "HEAD").is_file():
+            return None
+        common = git_dir
+        if (git_dir / "commondir").is_file():
+            common = _host_path((git_dir / "commondir").read_text(encoding="utf-8").strip(), git_dir)
+        value = (git_dir / "HEAD").read_text(encoding="utf-8").strip()
+        for _ in range(5):  # symbolic refs may point to symbolic refs
+            if not value.startswith("ref:"):
+                return value if _OBJECT_ID.fullmatch(value) else None
+            value = _read_ref(git_dir, common, value[len("ref:"):].strip())
+            if value is None:
+                return None
+    except OSError:
+        return None
+    return None
+
+
+def _dirty(directory):
+    """Whether tracked files differ from HEAD: ``git status`` once per process and checkout, with a
+    ``GIT_STATUS_TIMEOUT_S`` timeout ("unknown" when it runs out; None without a usable git)."""
+    key = str(directory)
+    if key not in _DIRTY:
+        try:
+            status = subprocess.run(["git", "-C", key, "status", "--porcelain", "--untracked-files=no"],
+                                    capture_output=True, text=True, timeout=GIT_STATUS_TIMEOUT_S)
+        except subprocess.TimeoutExpired:  # git status over WSL's 9P takes seconds (1b-T28)
+            _DIRTY[key] = "unknown"
+        except (OSError, subprocess.SubprocessError):  # no git executable
+            _DIRTY[key] = None
+        else:
+            _DIRTY[key] = bool(status.stdout.strip()) if status.returncode == 0 else None
+    return _DIRTY[key]
+
+
 def git_commit(directory=None):
     """(commit, dirty) of the git checkout holding ``directory`` (default: FastMACE's own), else (None, None).
 
-    ``dirty`` counts changes to tracked files only. Installed from a wheel, the package has no
+    The commit is read from the ``.git`` files (``head_commit``); a copy without ``.git``, such as
+    the NAS checkout, gives the content of its ``.source_commit`` and ``dirty`` None. ``dirty``
+    counts changes to tracked files only; the check runs once per process and checkout with a
+    short timeout and is "unknown" when that runs out. Installed from a wheel, the package has no
     checkout around it and both are None.
     """
     directory = Path(fastmace.__file__).resolve().parent.parent if directory is None else Path(directory)
-    if not (directory / ".git").exists():  # a directory in a worktree has a .git file, a checkout a directory
-        return None, None
-    try:
-        head = subprocess.run(["git", "-C", str(directory), "rev-parse", "HEAD"], capture_output=True, text=True,
-                              timeout=30)
-        if head.returncode != 0:
-            return None, None
-        status = subprocess.run(["git", "-C", str(directory), "status", "--porcelain", "--untracked-files=no"],
-                                capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):  # no git executable, or it hangs
-        return None, None
-    return head.stdout.strip(), (bool(status.stdout.strip()) if status.returncode == 0 else None)
+    if (directory / ".git").exists():  # a directory in a worktree has a .git file, a checkout a directory
+        commit = head_commit(directory)
+        return (None, None) if commit is None else (commit, _dirty(directory))
+    source = directory / ".source_commit"
+    if source.is_file():
+        text = source.read_text(encoding="utf-8").strip()
+        return (text or None), None
+    return None, None
 
 
 def _resolved(name, value):
@@ -186,8 +268,9 @@ def environment(device="cuda:0"):
     }
 
 
-def fastmace_block(device="cuda:0"):
-    """FastMACE's additions: version, git commit, patches in force, file locks, kernels, versions, GPU."""
+def _software(device):
+    """The parts of ``fastmace_block`` that do not change within a process: git commit, kernel
+    probes, package versions and the GPU (1b-T28: about 0.13 s from ext4, seconds over 9P)."""
     commit, dirty = git_commit()
     probes = (("triton", kernels.triton_available), ("nvrtc", kernels.nvrtc_available),
               ("streaming", kernels.streaming_available))
@@ -196,22 +279,35 @@ def fastmace_block(device="cuda:0"):
         found = _distribution_version(name)
         if found is not None:
             versions[name] = found
-    block = {
-        "version": fastmace.__version__,
-        "git_commit": commit,
-        "git_dirty": dirty,
-        "patches": _patches.provenance(),
-        "runtime": dataclasses.asdict(fastmace.runtime_info()),
-        "kernels": {name: dataclasses.asdict(probe()) for name, probe in probes},
-        "versions": versions,
-        "gpu": None,
-    }
+    gpu = None
     if _uses_cuda(device):
         import torch
 
         major, minor = torch.cuda.get_device_capability(device)
-        block["gpu"] = {"name": torch.cuda.get_device_name(device), "compute_capability": f"{major}.{minor}"}
-    return block
+        gpu = {"name": torch.cuda.get_device_name(device), "compute_capability": f"{major}.{minor}"}
+    return {"git_commit": commit, "git_dirty": dirty,
+            "kernels": {name: dataclasses.asdict(probe()) for name, probe in probes}, "versions": versions, "gpu": gpu}
+
+
+def fastmace_block(device="cuda:0"):
+    """FastMACE's additions: version, git commit, patches in force, file locks, kernels, versions, GPU.
+
+    The static part is built once per process and device (``_software``); the patches in force and
+    the runtime are read at every call. Each call returns a new dictionary."""
+    key = str(device)
+    if key not in _SOFTWARE:
+        _SOFTWARE[key] = _software(device)
+    static = copy.deepcopy(_SOFTWARE[key])
+    return {
+        "version": fastmace.__version__,
+        "git_commit": static["git_commit"],
+        "git_dirty": static["git_dirty"],
+        "patches": _patches.provenance(),
+        "runtime": dataclasses.asdict(fastmace.runtime_info()),
+        "kernels": static["kernels"],
+        "versions": static["versions"],
+        "gpu": static["gpu"],
+    }
 
 
 def collect(device="cuda:0"):
