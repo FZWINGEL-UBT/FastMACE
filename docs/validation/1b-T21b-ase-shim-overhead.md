@@ -45,7 +45,8 @@ The shim now costs what `Simulation.run` costs. The local GPU has no noise floor
 `fastmace_block` once per call too: ≈0.13 s per call from the `/mnt/d` worktree (4.12 against
 3.67 ms/step over 300 steps), and ≈13 s per call from the `/mnt/d/Margraf/FastMACE` checkout,
 where `git_commit` succeeds and is slow over WSL's 9P file system (the before row: 48 ms/step for
-`Simulation` alone). The software block does not change within a process; caching it in
+`Simulation` alone; measured directly in `mace_cueq_oeq`: `git_commit` 11.7 s and `fastmace_block`
+13.5 s per call there). The software block does not change within a process; caching it in
 `provenance` (or writing `metadata.json` only at restart points and at the end of a run) would
 remove this from `Simulation`, `fm.md`, the CLI and the shim alike. Proposed as a follow-up for the
 owner of `provenance.py`/`simulation.py`.
