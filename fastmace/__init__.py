@@ -34,7 +34,7 @@ def runtime_info():
 # The public API of SPEC §7 (docs/design/contracts-1b.md), resolved at first use so that
 # `import fastmace` imports neither torch nor MACE: name -> (module, attribute or None for the module).
 _PUBLIC = {
-    "load": ("fastmace.model.loading", "load"),
+    "load": ("fastmace.model.loading", "load_pristine"),
     "ForceField": ("fastmace.model.forcefield", "ForceField"),
     "Simulation": ("fastmace.simulation", "Simulation"),
     "Workload": ("fastmace.planner.workload", "Workload"),
