@@ -380,7 +380,7 @@ def build(mode):
     atoms = structure()
     field = MACEForceField(loaded, atoms, rewrites=rewrites, engine=EngineConfig(compile_mode="default"),
                            neighbours=NeighbourConfig(skin=0.3, sort_receivers=SPEC["sort"], gpu_neighbour_list="on"),
-                           compute_stress=npt, compile_cache=cache)
+                           compute_stress=npt, compile_cache=cache, float64_energy=SPEC["float64_energy"])
     state = SimulationState.from_atoms(atoms, "cuda:0", SPEC["seed"], compute_stress=npt)
     if npt:
         dyn = LangevinBAOAB(state, IntegratorConfig(ensemble="npt", timestep_fs=0.5, friction=0.02),
@@ -403,7 +403,11 @@ def warmup_check(engine, keys):
     engine.integrator.prepare_step(engine.state)
     bad = []
     for key in keys:
-        before = {{name: (t.data_ptr(), t.clone()) for name, t in engine.registry.tensors().items()}}
+        # detach(): the force field's positions are a leaf that requires grad. A plain clone made here, on
+        # the default stream and kept alive across the capture, creates the leaf's AccumulateGrad node
+        # on that stream, and the hybrid's eager autograd.grad then refuses the capture ("stale
+        # reference to the default stream from warmup"; 1b-T03b). The registry's own snapshot detaches.
+        before = {{name: (t.data_ptr(), t.detach().clone()) for name, t in engine.registry.tensors().items()}}
         engine._capture(key)
         torch.cuda.synchronize()
         after = engine.registry.tensors()
@@ -482,9 +486,12 @@ def _baseline_options(rewrites):
     return options
 
 
-def spec(backend, ensemble="nvt", modes=(), warmups=False):
+def spec(backend, ensemble="nvt", modes=(), warmups=False, float64_energy=False):
+    """The run of both children. ``float64_energy`` is False against the research engine, which sums the
+    energy in the model's precision (1b-T03): its float64 reduction adds kernels to stage B."""
     rewrites = HYBRID_REWRITES if backend == "hybrid" else CUEQ_REWRITES
     return {"backend": backend, "dtype": "float32" if backend == "hybrid" else "float64", "ensemble": ensemble,
+            "float64_energy": float64_energy,
             "rewrites": rewrites, "sort": "on" if backend == "hybrid" else "off", "seed": 20261018,
             "temperature": 300.0, "every": 50, "timed": 100, "modes": list(modes), "warmups": warmups,
             "baseline_options": _baseline_options(rewrites)}

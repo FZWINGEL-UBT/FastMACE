@@ -161,6 +161,8 @@ def environment(machine: Machine, run_root: Path) -> dict:
         "TORCHINDUCTOR_CACHE_DIR": str(cache / "inductor"), "TRITON_CACHE_DIR": str(cache / "triton"),
         "MACE_COMPILE_CACHE": str(cache / "compile"), "XDG_CACHE_HOME": str(cache / "xdg"),
         "TMPDIR": str(tmp), "TMP": str(tmp), "TEMP": str(tmp),
+        # Inductor's compile workers (conductor rule for 1b-T23: 4, so a compile cannot crowd out the machine).
+        "TORCHINDUCTOR_COMPILE_THREADS": "4",
     }
 
 
@@ -316,7 +318,9 @@ def gate_jobs(machine: Machine, run_root: Path, labels=GATE_LABELS, engine="fast
         if label not in GATE_LABELS:
             raise ValueError(f"{label!r} is not one of the 19 labels")
         cases = gate_cases(label) if structures is None else (
-            ("-" + "-".join(structures), tuple(structures), 3, "check"),)
+            # job names are file names: each structure by its stem and repeat, never a path
+            ("-" + "-".join(PurePosixPath(spec).name.replace(".", "_") for spec in structures), tuple(structures), 3,
+             "check"),)
         for suffix, specs, configs, role in cases:
             name = f"gate-{label}{suffix}" + ("" if engine == "fastmace" else f"-{engine}")
             output = check_location(machine, run_root / name)
@@ -482,12 +486,18 @@ def gpu_suite_jobs(machine: Machine, run_root: Path) -> list:
     restart, the hybrid restart statistics), with hybrid children in the OEq environment."""
     run_root = Path(run_root)
     output = check_location(machine, run_root / "gpu-suite")
-    basetemp = check_location(machine, run_root / "gpu-suite" / "pytest")
+    # pytest creates --basetemp but not its parent: keep it directly under the run root (the 21 setup errors of
+    # run 1b-T23-local-20261019 came from a basetemp inside the not yet created output directory).
+    basetemp = check_location(machine, run_root / "gpu-suite-pytest")
     tests = machine.path(machine.fastmace) / "tests" / "gpu"
     argv = [machine.python("mace_cueq_latest"), "-m", "pytest", str(tests), "-p", "no:cacheprovider",
-            f"--basetemp={basetemp}", "--durations=40", f"--junitxml={output / 'junit.xml'}"]
-    return [Job(name="gpu-suite", argv=tuple(argv), output=str(output),
-                env={"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq")}, note="full tier, one process")]
+            f"--basetemp={basetemp}", "--durations=40", "-rfEs", f"--junitxml={output / 'junit.xml'}"]
+    # The comparisons against the research engine need its export, and test_reference_gpu 1a-T19's stored POLAR-1-S
+    # references (on the NAS only); without them 77 tests skip (run 1b-T23-murphy-20261019).
+    env = {"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq"),
+           "FASTMACE_BASELINE": str(machine.path(machine.baseline)),
+           "FASTMACE_1A_T19_POLAR1S": str(machine.path(machine.root) / "1a-T19-gate-leto-20261018" / "gate-polar1-s")}
+    return [Job(name="gpu-suite", argv=tuple(argv), output=str(output), env=env, note="full tier, one process")]
 
 
 def adapter_jobs(machine: Machine, run_root: Path) -> list:
@@ -495,7 +505,7 @@ def adapter_jobs(machine: Machine, run_root: Path) -> list:
     (no bytecode, no pytest cache, temporary files outside its tree; conductor answer to 1b-T23)."""
     run_root = Path(run_root)
     output = check_location(machine, run_root / "adapter-tests")
-    basetemp = check_location(machine, run_root / "adapter-tests" / "pytest")
+    basetemp = check_location(machine, run_root / "adapter-tests-pytest")  # pytest creates it; its parent exists
     tests = machine.path(machine.research_module) / "Experiments" / "Langevin_Thermostat" / "tests" / "core"
     argv = [machine.python("mace_cueq_oeq"), "-m", "pytest", str(tests / "test_fastmace_engine.py"),
             "-p", "no:cacheprovider", f"--basetemp={basetemp}", f"--junitxml={output / 'junit.xml'}"]
@@ -511,7 +521,8 @@ def compile_checks_jobs(machine: Machine, run_root: Path) -> list:
     for name, environment, argv in (
             ("compile-polar1s-npt-restart", "mace_cueq_oeq", ["polar-npt", "--model", "polar1-s"]),
             ("compile-fm-calc-hybrid", "mace_cueq_oeq", ["calc", "--model", PRIMARY_MODEL]),
-            ("compile-fm-calc-cueq", "mace_cueq_latest", ["calc", "--model", PRIMARY_MODEL])):
+            ("compile-fm-calc-cueq", "mace_cueq_latest", ["calc", "--model", PRIMARY_MODEL]),
+            ("setup-mace-imported-first", "mace_cueq_oeq", ["mace-first", "--model", PRIMARY_MODEL])):
         output = check_location(machine, run_root / name)
         jobs.append(Job(name=name, argv=(machine.python(environment), _tool(machine, "compile_checks.py"), *argv[:1],
                                          "--output", str(output), *argv[1:]), output=str(output), timing=True))

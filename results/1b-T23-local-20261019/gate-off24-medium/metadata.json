@@ -1,0 +1,380 @@
+{
+  "status": "failed",
+  "created_utc": "2026-10-19T08:30:25.737242+00:00",
+  "host": "Fabi-PC",
+  "engine": "fastmace",
+  "planner": "minimal",
+  "baseline": null,
+  "structures_root": "/home/fzwin/fastmace-baseline/1a-T18",
+  "fastmace_commit": null,
+  "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+  "checkpoint": "/home/fzwin/models/MACE-OFF24_medium.model",
+  "checkpoint_sha256": "e5ccf5837f685899811a68754e7c994393bfd1a81720393b03c643b46c70bc69",
+  "tf32": false,
+  "model": "off24-medium",
+  "backend": "auto",
+  "dtype": "auto",
+  "rule": {
+    "ratio": 2.0,
+    "floors": {
+      "energy": 0.01,
+      "forces": 1e-05,
+      "stress": 1e-07
+    },
+    "gated": [
+      "energy",
+      "forces",
+      "stress"
+    ],
+    "source": "fastmace.planner.selfcheck"
+  },
+  "energy_gated": true,
+  "references": "fastmace.reference (1b-T13): float64 reference, float32 yardstick with float64 energy",
+  "processes_rule": "every reference in a fresh process that builds no production engine, before the production process (scope 'calculator'); conductor decision after T10",
+  "protocol": "unrelaxed 3x3x3 supercells, symmetric strain +-0.02 (hydrostatic: isotropic; full: anisotropic and shear), Gaussian rattle 0.05 A; float64 reference; gate: max error <= max(2 x that of the float32 yardstick, floor), for energy, forces, stress",
+  "args": {
+    "output": "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium",
+    "engine": "fastmace",
+    "planner": "minimal",
+    "baseline": null,
+    "structures_root": "/home/fzwin/fastmace-baseline/1a-T18",
+    "checkpoint": "/home/fzwin/models/MACE-OFF24_medium.model",
+    "model": "off24-medium",
+    "structures": [
+      "/mnt/g/Margraf/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+      "/mnt/g/Margraf/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+      "/mnt/g/Margraf/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif",
+      "/mnt/g/Margraf/ResearchModule/Structures/Organic/water_216.extxyz@1x1x1"
+    ],
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "configs": 3,
+    "rattle_A": 0.05,
+    "strain": 0.02,
+    "backend": "auto",
+    "dtype": "auto",
+    "main_args": "",
+    "seed": 20261015,
+    "reference_scope": "calculator",
+    "reference_command": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+    "production_command": "/home/fzwin/environments/mace_cueq_oeq/bin/python"
+  },
+  "structures": {
+    "urea_cod1008787": {
+      "natoms": 432,
+      "source": "/mnt/g/Margraf/ResearchModule/Structures/Organic/urea_cod1008787.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "f95db254423e06ed6da2d013991b4967b1c78913bcaec85b7d1d2826fc92382f",
+      "configurations": "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium/configs/urea_cod1008787.npz",
+      "configs": []
+    },
+    "naphthalene_cod2311090": {
+      "natoms": 972,
+      "source": "/mnt/g/Margraf/ResearchModule/Structures/Organic/naphthalene_cod2311090.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "fcfa0cc14c0ed167664be484bc38618f76a9b2a24084e63535821a635d377c85",
+      "configurations": "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium/configs/naphthalene_cod2311090.npz",
+      "configs": []
+    },
+    "paracetamol_cod2104364": {
+      "natoms": 2160,
+      "source": "/mnt/g/Margraf/ResearchModule/Structures/Organic/paracetamol_cod2104364.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "3db1149c5f9d35d794f5cda8608b463cc7924f9c4d793eaf67d1cada5756d41a",
+      "configurations": "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium/configs/paracetamol_cod2104364.npz",
+      "configs": []
+    },
+    "water_216": {
+      "natoms": 648,
+      "source": "/mnt/g/Margraf/ResearchModule/Structures/Organic/water_216.extxyz",
+      "repeat": [
+        1,
+        1,
+        1
+      ],
+      "source_sha256": "fb1dec83bfff0568a11d174c7785465be5cdff4361d96de7e314c07e331acc3a",
+      "configurations": "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium/configs/water_216.npz",
+      "configs": []
+    }
+  },
+  "processes": [
+    {
+      "name": "reference-urea_cod1008787-f64",
+      "kind": "reference",
+      "argv": [
+        "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium/jobs/reference-urea_cod1008787-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 21.16015774799962,
+      "result": {
+        "name": "reference-urea_cod1008787-f64",
+        "kind": "reference",
+        "pid": 9978,
+        "host": "Fabi-PC",
+        "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-19T08:30:27.536612+00:00",
+        "hybrid_launcher": false,
+        "load_s": 8.140331182999944,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/fzwin/models/MACE-OFF24_medium.model",
+            "sha256": "e5ccf5837f685899811a68754e7c994393bfd1a81720393b03c643b46c70bc69",
+            "label": "off24-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "polar": null
+        },
+        "dtype": "float64",
+        "role": "reference",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 3944742912,
+        "status": "complete",
+        "wall_s": 19.769049115999223
+      }
+    },
+    {
+      "name": "reference-urea_cod1008787-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium/jobs/reference-urea_cod1008787-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 19.36747635100255,
+      "result": {
+        "name": "reference-urea_cod1008787-ase_f32",
+        "kind": "reference",
+        "pid": 10213,
+        "host": "Fabi-PC",
+        "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-19T08:30:48.880305+00:00",
+        "hybrid_launcher": false,
+        "load_s": 8.831661702002748,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "yardstick",
+          "dtype": "float32",
+          "float64_energy": true,
+          "e0_table": "checkpoint",
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/fzwin/models/MACE-OFF24_medium.model",
+            "sha256": "e5ccf5837f685899811a68754e7c994393bfd1a81720393b03c643b46c70bc69",
+            "label": "off24-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "polar": null
+        },
+        "dtype": "float32",
+        "role": "yardstick",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 2032140288,
+        "status": "complete",
+        "wall_s": 18.08972431499933
+      }
+    },
+    {
+      "name": "reference-naphthalene_cod2311090-f64",
+      "kind": "reference",
+      "argv": [
+        "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium/jobs/reference-naphthalene_cod2311090-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 25.093616612000915,
+      "result": {
+        "name": "reference-naphthalene_cod2311090-f64",
+        "kind": "reference",
+        "pid": 10440,
+        "host": "Fabi-PC",
+        "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-19T08:31:08.588699+00:00",
+        "hybrid_launcher": false,
+        "load_s": 8.432758227001614,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/fzwin/models/MACE-OFF24_medium.model",
+            "sha256": "e5ccf5837f685899811a68754e7c994393bfd1a81720393b03c643b46c70bc69",
+            "label": "off24-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "polar": null
+        },
+        "dtype": "float64",
+        "role": "reference",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 8355053568,
+        "status": "complete",
+        "wall_s": 23.697843591999117
+      }
+    },
+    {
+      "name": "reference-naphthalene_cod2311090-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium/jobs/reference-naphthalene_cod2311090-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 20.700660885002435,
+      "result": {
+        "name": "reference-naphthalene_cod2311090-ase_f32",
+        "kind": "reference",
+        "pid": 10661,
+        "host": "Fabi-PC",
+        "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-19T08:31:33.789483+00:00",
+        "hybrid_launcher": false,
+        "load_s": 8.514054587001738,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "yardstick",
+          "dtype": "float32",
+          "float64_energy": true,
+          "e0_table": "checkpoint",
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/fzwin/models/MACE-OFF24_medium.model",
+            "sha256": "e5ccf5837f685899811a68754e7c994393bfd1a81720393b03c643b46c70bc69",
+            "label": "off24-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "polar": null
+        },
+        "dtype": "float32",
+        "role": "yardstick",
+        "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 4213178368,
+        "status": "complete",
+        "wall_s": 19.40387352199832
+      }
+    },
+    {
+      "name": "reference-paracetamol_cod2104364-f64",
+      "kind": "reference",
+      "argv": [
+        "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "/mnt/d/Margraf/FastMACE/.claude/worktrees/1b-t23-7a6a52/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/fzwin/fastmace-acceptance/1b-T23-local-20261019/gate-off24-medium/jobs/reference-paracetamol_cod2104364-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 1,
+      "wall_s": 18.386537960999704,
+      "result": {
+        "name": "reference-paracetamol_cod2104364-f64",
+        "kind": "reference",
+        "pid": 10890,
+        "host": "Fabi-PC",
+        "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-19T08:31:54.806208+00:00",
+        "hybrid_launcher": false,
+        "load_s": 7.596957660000044,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/off/5c21034da7365bf0",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/fzwin/models/MACE-OFF24_medium.model",
+            "sha256": "e5ccf5837f685899811a68754e7c994393bfd1a81720393b03c643b46c70bc69",
+            "label": "off24-medium",
+            "head": "Default"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "polar": null
+        },
+        "status": "failed",
+        "error": "RuntimeError: CUDA driver error: device not ready\nThe CUDA driver logged these messages, which may provide useful details:\nFailed to create GPU mapping\n",
+        "wall_s": 16.57463550600005
+      }
+    }
+  ],
+  "summary": {},
+  "error": "GateJobError: reference-paracetamol_cod2104364-f64 exited with 1; see logs/reference-paracetamol_cod2104364-f64.log",
+  "finished_utc": "2026-10-19T08:32:12.806118+00:00"
+}

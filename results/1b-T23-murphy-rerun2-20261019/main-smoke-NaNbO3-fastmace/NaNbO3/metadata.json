@@ -1,0 +1,616 @@
+{
+  "status": "complete",
+  "model": {
+    "model": "mh1-r2scan",
+    "mace_mp_name": "mh-1",
+    "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+    "heads": [
+      "matpes_r2scan",
+      "mp_pbe_refit_add",
+      "spice_wB97M",
+      "oc20_usemppbe",
+      "omol",
+      "omat_pbe"
+    ],
+    "head": "matpes_r2scan",
+    "dtype": "float32",
+    "device": "cuda:0",
+    "torch": "2.14.1+cu130",
+    "cuda_version": "13.0",
+    "gpu": "NVIDIA RTX 4000 Ada Generation",
+    "threads": 1,
+    "dispersion_d3": false,
+    "mace_torch": "0.3.16",
+    "ase": "3.27.0",
+    "host": "murphy",
+    "enable_cueq": true,
+    "enable_oeq": true,
+    "equivariance_backend": "hybrid",
+    "cuequivariance": "0.12.0",
+    "cuequivariance_torch": "0.12.0",
+    "cuequivariance_ops_torch": "0.12.0 (cu13)",
+    "openequivariance": "0.7.0",
+    "auto_options_off": {
+      "species_skip": "no MACE-MP-0 or density-family interaction"
+    },
+    "compute_stress": false,
+    "single_graph_strain": true,
+    "cueq_kernels": {
+      "device": "cuda",
+      "fused_cueq_modules": 2,
+      "checked": true,
+      "cuequivariance_ops_torch_imports": true,
+      "naive": [],
+      "allowed_naive": false
+    },
+    "cueq_conv_fusion": null,
+    "file_locks": "soft",
+    "convolution": {
+      "conv_tp": [
+        "TensorProductConv"
+      ],
+      "conv_fusion": [
+        "atomic",
+        "atomic"
+      ]
+    },
+    "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+    "trust": "label",
+    "md_backend": "hybrid",
+    "factor_species_radial": true,
+    "fold_radial_cutoff": true,
+    "density_before_linear": true,
+    "reassociate_first_interaction": true,
+    "joint_radial_input": true,
+    "fused_folded_backward": true,
+    "segmented_first_sum": true,
+    "gpu_neighbour_list": true,
+    "block_linear": true,
+    "grouped_linear": true,
+    "merged_residual": true,
+    "species_skip": false,
+    "polar_uvu": "on",
+    "polar_fukui_regularisation": 0.0,
+    "polar_dipole_cap": null,
+    "streaming_conv": true,
+    "fused_radial_hidden": false,
+    "oeq_wrapper": {
+      "OEQ_JIT_EXTENSION": "1",
+      "TORCH_EXTENSIONS_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/torch-extensions-0nyofktd",
+      "OEQ_NVCC_ATTEMPTS": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/nvcc-attempts.log",
+      "CUDA_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/cuda-runtime",
+      "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+      "OEQ_EXTENSION_SEED": null
+    },
+    "fastmace": {
+      "version": "0.0.1.dev0",
+      "git_commit": null,
+      "git_dirty": null,
+      "patches": [
+        {
+          "name": "oeq_runtime",
+          "value": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/cuda-runtime",
+          "targets": [
+            "env:CMAKE_CUDA_COMPILER",
+            "env:CPATH",
+            "env:CUDACXX",
+            "env:CUDA_HOME",
+            "env:CUDA_PATH",
+            "env:CXX",
+            "env:MAX_JOBS",
+            "env:OEQ_JIT_EXTENSION",
+            "env:OEQ_NVCC_ATTEMPTS",
+            "env:PATH",
+            "env:PYTORCH_NVCC",
+            "env:TORCH_EXTENSIONS_DIR"
+          ],
+          "detail": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13"
+        }
+      ],
+      "runtime": {
+        "file_locks": "soft",
+        "file_lock_source": "start-up hook (nfs_soft_locks)",
+        "file_lock_switch_late": false,
+        "cuda_driver_cache": "enabled"
+      },
+      "kernels": {
+        "triton": {
+          "available": true,
+          "reason": "triton 3.8.0 is importable"
+        },
+        "nvrtc": {
+          "available": true,
+          "reason": "NVRTC 13.0 loads through cuda.bindings"
+        },
+        "streaming": {
+          "available": true,
+          "reason": "NVRTC 13.0 loads through cuda.bindings; jinja2 and openequivariance are installed"
+        }
+      },
+      "versions": {
+        "python": "3.10.12",
+        "torch": "2.14.1+cu130",
+        "numpy": "2.2.6",
+        "ase": "3.27.0",
+        "mace-torch": "0.3.16",
+        "e3nn": "0.4.4",
+        "triton": "3.8.0",
+        "cuequivariance": "0.12.0",
+        "cuequivariance-torch": "0.12.0",
+        "cuequivariance-ops-torch-cu13": "0.12.0",
+        "openequivariance": "0.7.0",
+        "cuda-bindings": "13.3.1",
+        "jinja2": "3.1.6",
+        "filelock": "3.32.3"
+      },
+      "gpu": {
+        "name": "NVIDIA RTX 4000 Ada Generation",
+        "compute_capability": "8.9"
+      },
+      "checkout": {
+        "path": "/mnt/homes/zwingel/fastmace-t23d",
+        "commit": "f6b7b86140bb8e408a91be5627a136aab0689ae0",
+        "dirty": null,
+        "source": ".source_commit"
+      }
+    }
+  },
+  "protocol": {
+    "profile": "slow",
+    "structures": [
+      "NaNbO3"
+    ],
+    "structure_file": null,
+    "name": null,
+    "heat_ps": 0.5,
+    "cool_ps": 0.5,
+    "hold_ps": 0.0,
+    "peak_K": 400.0,
+    "final_K": 0.0,
+    "relax_fmax": 0.0,
+    "relax_optimizer": "LBFGS",
+    "timestep_fs": 0.5,
+    "friction": 0.02,
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "sample_interval": 100,
+    "trajectory_interval": 100,
+    "seed": 20261001,
+    "initial_displacement_A": 0.0,
+    "device": "cuda:0",
+    "dtype": "float32",
+    "engine": "fastmace",
+    "compile_mode": "default",
+    "backend": "hybrid",
+    "factor_species": true,
+    "fold_cutoff": true,
+    "sort_receivers": true,
+    "density_first": true,
+    "reassociate_first": true,
+    "joint_radial_input": true,
+    "fused_folded_backward": true,
+    "segmented_first_sum": true,
+    "gpu_neighbour_list": true,
+    "block_linear": true,
+    "grouped_linear": true,
+    "merged_residual": true,
+    "polar_uvu": "on",
+    "polar_fukui_regularisation": 0.0,
+    "polar_dipole_cap": null,
+    "species_skip": false,
+    "fused_radial_hidden": false,
+    "streaming_conv": true,
+    "pipelined": true,
+    "async_output": true,
+    "speculative_graph": false,
+    "ensemble": "nvt",
+    "pressure_GPa": 0.0,
+    "cell_mode": "hydrostatic",
+    "barostat_tau_fs": null,
+    "barostat_mass_factor": 1.0,
+    "skin": 0.3,
+    "stress_mode": "full",
+    "single_graph_strain": true,
+    "cueq_conv_fusion": null,
+    "restart_interval": 10000,
+    "model": "mh1-r2scan",
+    "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+    "output": "/mnt/homes/zwingel/fastmace-acceptance/1b-T23-murphy-rerun2-20261019/main-smoke-NaNbO3-fastmace",
+    "resume": null,
+    "dry_run": false,
+    "quench": null,
+    "quench_min_K": 500.0,
+    "quench_bin_K": 100.0,
+    "quench_per_bin": 2,
+    "quench_plot_only": false,
+    "quench_optimizer": "LBFGS",
+    "quench_threads": 16,
+    "quench_fmax": null,
+    "auto_options": [
+      "factor_species",
+      "fold_cutoff",
+      "density_first",
+      "reassociate_first",
+      "joint_radial_input",
+      "fused_folded_backward",
+      "segmented_first_sum",
+      "species_skip",
+      "streaming_conv",
+      "fused_radial_hidden"
+    ],
+    "fastmace_requests": {
+      "backend": "auto",
+      "dtype": "auto",
+      "factor_species": "auto",
+      "fold_cutoff": "auto",
+      "sort_receivers": "auto",
+      "density_first": "auto",
+      "reassociate_first": "auto",
+      "joint_radial_input": "auto",
+      "fused_folded_backward": "auto",
+      "segmented_first_sum": "auto",
+      "gpu_neighbour_list": "auto",
+      "block_linear": "auto",
+      "grouped_linear": "auto",
+      "merged_residual": "auto",
+      "species_skip": "auto",
+      "fused_radial_hidden": "auto",
+      "streaming_conv": "auto",
+      "pipelined": "auto",
+      "async_output": "auto",
+      "single_graph_strain": "auto",
+      "cueq_conv_fusion": "auto"
+    },
+    "heat_steps": 1000,
+    "hold_steps": 0,
+    "cool_steps": 1000
+  },
+  "source": "/mnt/homes/zwingel/ResearchModule/Structures/Benchmark/R2SCAN/NaNbO3.cif",
+  "source_sha256": "2bcf5cd8cf837f5437670e80314684381ba67a532787ae74d78ee4b87f54c326",
+  "reference_method": "Materials Project r\u00b2SCAN input geometry",
+  "ensemble": "fixed-cell Langevin NVT with changing target temperature",
+  "initial_relaxation": false,
+  "pbc": [
+    true,
+    true,
+    true
+  ],
+  "friction_inverse_fs": 0.0019645389576928127,
+  "fixcm": true,
+  "code_sha256": {
+    "Experiments/Langevin_Thermostat/langevin/workflow.py": "5ce33756a7127539e3035c09a0d3c70540732b02fa66f65d44576dcca9f654af",
+    "Experiments/Langevin_Thermostat/langevin/gpu_langevin.py": "2cd33ea65f9d5fb624e23faca7c6b2b18608292d11bc958d88ce9e67181d8e93",
+    "Experiments/Langevin_Thermostat/langevin/edge_outer_sum.py": "39d155ec80d011b0bb14a3684445eef618e4b0fa2b00c9a7ee82140e7fcee276",
+    "Experiments/Langevin_Thermostat/langevin/quench.py": "91b20b397dbd6a994f29f6aa4be422e97e4f2d0a55ab587f1f08cb462495aaf8",
+    "Experiments/Langevin_Thermostat/langevin/gpu_npt.py": "9e26363e8fbea2cd4ca28b2bce7e8240043dd4c7a18821f9a06937221f557704",
+    "Experiments/Langevin_Thermostat/langevin/upstream_mace.py": "02687f5d9724c928c6122709f34e4b7797063b64454d28e6b00f0e33e51659c5",
+    "Experiments/Langevin_Thermostat/langevin/file_locks.py": "4bf19b958528c0544dcef15c8acc3f07ae129e4c0b5af62af1464d72afcf2a2a",
+    "Experiments/Langevin_Thermostat/langevin/compile_cache.py": "c61896aa6ce4fa8ef047b9155988084418459f13c1c0d9a5b224ba2bbaa5eec5",
+    "Experiments/Benchmark_MACE_GPU_OPTIMIZATIONS/scripts/common.py": "5ca67b68bf3e84aa38bdb288ed1eab3ed6842fe2eb3095148aaa486aa314f331",
+    "Experiments/Langevin_Thermostat/langevin/fastmace_engine.py": "7c279b037d23d09e0b97134dc32fcbc9b1d5c052d8915cd9a7abe2daf380cd50"
+  },
+  "created_utc": "2026-10-19T13:10:08.903580+00:00",
+  "compile_cache": {
+    "directory": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+    "shared": true
+  },
+  "cuda_allocator": "expandable_segments:True",
+  "seed": 20261004,
+  "engine": "fastmace",
+  "natoms": 1080,
+  "cell_A": [
+    [
+      16.5746184,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      16.8337551,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      46.64013858
+    ]
+  ],
+  "final_temperature_K": 161.48177387896203,
+  "engine_info": {
+    "engine": "graph",
+    "mode": "pipelined",
+    "capture": true,
+    "pad_edges": true,
+    "variable_cell": false,
+    "initial_edges": 83808,
+    "edge_bucket": 4352,
+    "edge_sizes_used": [
+      87040
+    ],
+    "neighbour_rebuilds": 71,
+    "graphs": [
+      "ACP",
+      "('B', 87040)"
+    ],
+    "pool_resets": 0,
+    "capture_memory": [
+      {
+        "key": "ACP",
+        "warmup_in_pool": false,
+        "max_reserved_after_warmup_MiB": 1424.0,
+        "max_reserved_after_capture_MiB": 1424.0
+      },
+      {
+        "key": "('B', 87040)",
+        "warmup_in_pool": false,
+        "max_reserved_after_warmup_MiB": 1484.0,
+        "max_reserved_after_capture_MiB": 1484.0
+      }
+    ],
+    "speculative_launches": 0,
+    "speculative_rollbacks": 0,
+    "speculative_rebuild_rollbacks": 0,
+    "speculative_bucket_rollbacks": 0,
+    "pipelined_redos": 0,
+    "pipelined_rebuild_redos": 0,
+    "pipelined_early_rebuilds": 70,
+    "canonical_points": 0,
+    "polar_overflow_steps": [],
+    "process": {
+      "allocator": "expandable_segments:True",
+      "dynamo_cache_size_limit": 64,
+      "compile_family": "oeq"
+    },
+    "engine_rebuilds": 70,
+    "force_field": {
+      "backend": "hybrid",
+      "dtype": "float32",
+      "device": "cuda:0",
+      "compile_mode": "default",
+      "training": false,
+      "compute_stress": false,
+      "padding_exact": true,
+      "rewrites": [
+        "factor_species",
+        "fold_cutoff",
+        "density_first",
+        "joint_radial_input",
+        "fused_folded_backward",
+        "streaming_conv",
+        "reassociate_first",
+        "segmented_first_sum",
+        "block_linear",
+        "grouped_linear",
+        "merged_residual",
+        "single_graph_strain"
+      ],
+      "decisions": {
+        "factor_species": "on",
+        "fold_cutoff": "on",
+        "density_first": "on",
+        "joint_radial_input": "on",
+        "fused_folded_backward": "on",
+        "fused_radial_hidden": "off",
+        "streaming_conv": "on",
+        "reassociate_first": "on",
+        "segmented_first_sum": "on",
+        "generic_species_skip": "off",
+        "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+        "generic_segmented_first_sum": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field segmented_first_sum honoured by segmented_first_sum)",
+        "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+        "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+        "block_linear": "on",
+        "grouped_linear": "on",
+        "merged_residual": "on",
+        "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+        "single_graph_strain": "on"
+      },
+      "selfchecks": {
+        "factor_species": 5.158211517392229e-07,
+        "fold_cutoff": 6.2352458495086e-07,
+        "density_first": 9.170151706404755e-07,
+        "joint_radial_input": 6.877615356522971e-07,
+        "fused_folded_backward": 8.902531523864126e-07,
+        "streaming_conv": 9.737143854226388e-07,
+        "reassociate_first": 1.1625694368161736e-06,
+        "segmented_first_sum": 9.112031866220793e-07,
+        "block_linear": 6.039514733043886e-07,
+        "grouped_linear": 6.039514733043886e-07,
+        "merged_residual": 2.7917198334199386e-07,
+        "single_graph_strain": 0.0
+      },
+      "streaming_interactions": 2,
+      "sort_receivers": true,
+      "gpu_neighbour_list": true,
+      "neighbour_rebuilds": 71,
+      "edge_capacity": 104448,
+      "candidates": 91130,
+      "species_columns": [
+        7,
+        10,
+        40
+      ],
+      "charge": null,
+      "spin_multiplicity": null,
+      "dynamo_reset": false,
+      "polar": null,
+      "float64_energy": true
+    },
+    "plan": [
+      [
+        "tier",
+        "graph",
+        "the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1)"
+      ],
+      [
+        "workload",
+        "ok",
+        "1080 atoms, 3D PBC, no constraints"
+      ],
+      [
+        "hardware",
+        "NVIDIA RTX 4000 Ada Generation",
+        "compute capability 8.9, 19.5 GiB (recorded only)"
+      ],
+      [
+        "EngineConfig.backend",
+        "hybrid",
+        "auto (backend_hybrid_for_graph_engine): graph engine"
+      ],
+      [
+        "PrecisionConfig.dtype",
+        "float32",
+        "auto (float32_for_hybrid_float64_for_cueq): hybrid backend"
+      ],
+      [
+        "EngineConfig.cueq_conv_fusion",
+        "off",
+        "auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None)"
+      ],
+      [
+        "RewriteConfig.factor_species",
+        "on",
+        "auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok)"
+      ],
+      [
+        "RewriteConfig.fold_cutoff",
+        "on",
+        "auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok)"
+      ],
+      [
+        "RewriteConfig.density_first",
+        "on",
+        "auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)"
+      ],
+      [
+        "RewriteConfig.reassociate_first",
+        "on",
+        "auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)"
+      ],
+      [
+        "RewriteConfig.joint_radial_input",
+        "on",
+        "auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)"
+      ],
+      [
+        "RewriteConfig.fused_folded_backward",
+        "on",
+        "auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)"
+      ],
+      [
+        "RewriteConfig.segmented_first_sum",
+        "on",
+        "auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok)"
+      ],
+      [
+        "RewriteConfig.fused_radial_hidden",
+        "off",
+        "auto (never_automatic): off: only an explicit 'on' enables it (no measured gain)"
+      ],
+      [
+        "RewriteConfig.streaming_conv",
+        "on",
+        "auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok)"
+      ],
+      [
+        "RewriteConfig.block_linear",
+        "on",
+        "auto (on_for_hybrid_graph_engine): stage 1: hybrid backend"
+      ],
+      [
+        "RewriteConfig.grouped_linear",
+        "on",
+        "auto (on_with_block_linear): stage 1: on (with block_linear)"
+      ],
+      [
+        "RewriteConfig.merged_residual",
+        "on",
+        "auto (on_with_block_linear): stage 1: on (with block_linear)"
+      ],
+      [
+        "RewriteConfig.species_skip",
+        "off",
+        "auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction)"
+      ],
+      [
+        "RewriteConfig.single_graph_strain",
+        "on",
+        "auto (on): process-wide; acts only where stress is computed"
+      ],
+      [
+        "NeighbourConfig.sort_receivers",
+        "on",
+        "auto (on_for_hybrid_graph_engine): hybrid backend"
+      ],
+      [
+        "NeighbourConfig.gpu_neighbour_list",
+        "on",
+        "auto (on_with_graph_engine): graph engine"
+      ],
+      [
+        "RewriteConfig.inplace_block_linear",
+        "off",
+        "not carried over in 1a (SPEC \u00a76.2: opt-in, slower)"
+      ],
+      [
+        "RewriteConfig.polar_uvu",
+        "on",
+        "no effect: not a PolarMACE model"
+      ],
+      [
+        "PolarConfig.kspace_headroom",
+        "n/a",
+        "auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range"
+      ],
+      [
+        "EngineConfig.expandable_segments",
+        "on",
+        "auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation"
+      ],
+      [
+        "EngineConfig.compile_mode",
+        "default",
+        "main.py's --compile-mode"
+      ],
+      [
+        "EngineConfig.speculative_graph",
+        "off",
+        "off unless requested (main.py default)"
+      ],
+      [
+        "EngineConfig.pipelined",
+        "on",
+        "auto (on_with_graph_engine_unless_speculative): graph engine"
+      ],
+      [
+        "EngineConfig.async_output",
+        "on",
+        "auto (on_with_graph_engine): graph engine; the run loop's choice"
+      ],
+      [
+        "capture",
+        "on",
+        "CUDA graphs"
+      ],
+      [
+        "integrator",
+        "Langevin",
+        "NVT, fixcm=True (workflow.GPUEngine)"
+      ],
+      [
+        "compute_stress",
+        "off",
+        "fixed cell: the graph engine computes no stress"
+      ]
+    ],
+    "auto_options_off": {
+      "species_skip": "no MACE-MP-0 or density-family interaction"
+    },
+    "peak_reserved_bytes": 1556086784
+  },
+  "completed_steps": 2000,
+  "wall_s": 79.64605232141912
+}

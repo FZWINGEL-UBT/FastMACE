@@ -170,3 +170,36 @@ Commands (from the repository root in WSL, `PYTHONPATH=$PWD`,
 python tools/energy64_gpu.py energy --side reference --model polar1-s --structure ~/fastmace-baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl5.cif@2x2x2 --output out.json
 python tools/energy64_gpu.py ab --model mh1-r2scan --structure NaCl --first float32_sum_1a --output ab-dir
 ```
+
+## 1b-T03b: the research-engine comparisons in `test_engine_gpu.py`
+
+murphy, RTX 4000 Ada (idle GPU), NAS `mace_cueq_latest` and `mace_cueq_oeq`,
+20 October 2026, branch `fastmace/1b-T03b`; research engine from
+`/mnt/homes/zwingel/fastmace-baseline/1a-T18` (tag
+`research-engine-baseline-20261017`). Scripts and reports in
+`results/1b-T03b-murphy/`.
+
+- **Stage B's kernels.** Plain cuEq float64, FastMACE against FastMACE with
+  and without the float64 sum: graphs A and C are identical, stage B has the
+  same node count (235) but different kernels. The reduction is part of the
+  compiled graph, so Inductor fuses and numbers its Triton kernels
+  differently. The research-engine comparisons (kernel sequence and
+  trajectory) therefore run FastMACE with `float64_energy=False`
+  (`spec(float64_energy=False)`), as the other research-engine comparisons
+  do; the trajectory limits are unchanged.
+- **Hybrid capture crash.** Not the float64 sum: it occurs with
+  `float64_energy=False` too, and without the eager engine before. The
+  test's own warm-up check stored `t.clone()` of every registered tensor on
+  the default stream before calling `engine._capture`. One of them is the
+  force field's positions, a leaf that requires grad; the clone created the
+  leaf's `AccumulateGrad` node on the default stream and kept it alive, and
+  the hybrid's eager `autograd.grad` (OEq differentiates outside the
+  compiled graph) refused the capture. The library's `registry.snapshot()`
+  already detaches; the test now does too (`t.detach().clone()`). Plain cuEq
+  differentiates inside the compiled graph and was not affected.
+- **Results:** the three tests pass (`-m slow -k against_the_research_engine`,
+  966 s). Plain cuEq NVT: FastMACE against the research engine 2.5e-13 Å
+  after 500 steps (the engines' own repeat scatter 2.5–2.9e-13 Å); NPT
+  7.1e-15 Å; hybrid 1.0e-7 Å against a research-engine run-to-run scatter of
+  8.7e-8 Å; warm-up checks empty in every mode. With the fix, the hybrid with
+  the float64 sum also passes its captures and warm-up check.

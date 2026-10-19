@@ -59,7 +59,60 @@ def parse_args(argv=None):
     calc.add_argument("--repeat", nargs=3, type=int, default=[2, 2, 2])
     calc.add_argument("--calls", type=int, default=6)
     calc.add_argument("--seed", type=int, default=1)
+    first = sub.add_parser("mace-first")
+    first.add_argument("--output", required=True, type=Path)
+    first.add_argument("--model", default="mh1-r2scan")
+    first.add_argument("--structure", default="NaCl")
+    first.add_argument("--repeat", nargs=3, type=int, default=[3, 3, 3])
     return p.parse_args(argv)
+
+
+# One Simulation built in a fresh process, MACE imported before FastMACE or not (plan 1b, "After T21, T22, T23
+# tools, T26": about 310 s against 10 s). Python's own clock from the first line; nothing else imported first.
+SETUP_CHILD = """
+import time
+started = time.perf_counter()
+{before}
+import json, sys
+import fastmace
+from ase import units
+from fastmace import integrators
+from fastmace.model import loading
+from fastmace.simulation import Simulation
+sys.path.insert(0, {tools!r})
+import library_gate
+loaded = loading.load_pristine({model!r})
+loaded_s = time.perf_counter() - started
+name, atoms = library_gate.read_structure({structure!r}, {repeat!r})
+sim = Simulation(atoms, loaded, seed=1, integrator=integrators.Langevin(timestep_fs=0.5, temperature_K=300.0,
+                 friction_per_fs=0.02 * units.fs))
+built_s = time.perf_counter() - started
+sim.run(steps=20)
+import torch
+torch.cuda.synchronize()
+plan = sim.plan
+print("RESULT " + json.dumps(dict(load_s=loaded_s, built_s=built_s, first_20_steps_s=time.perf_counter() - started
+                                   - built_s, setup_s=dict(sim._setup_s), backend=plan.engine.backend,
+                                   backend_decisions=[list(d) for d in plan.decisions if "backend" in d[0]])))
+sim.close()
+"""
+
+
+def mace_first(args):
+    args.output.mkdir(parents=True, exist_ok=False)
+    meta = dict(command="mace-first", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
+                fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, structure=args.structure, runs={})
+    for case, before in (("fastmace-first", ""), ("mace-first", "import mace.calculators")):
+        code = SETUP_CHILD.format(before=before, tools=str(Path(__file__).resolve().parent), model=args.model,
+                                  structure=args.structure, repeat=list(args.repeat))
+        started = time.perf_counter()
+        done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+        (args.output / f"{case}.log").write_text(done.stdout + done.stderr)
+        lines = [line for line in done.stdout.splitlines() if line.startswith("RESULT ")]
+        meta["runs"][case] = dict(exit_code=done.returncode, process_wall_s=time.perf_counter() - started,
+                                  **(json.loads(lines[-1][7:]) if lines else {}))
+        print(case, json.dumps(meta["runs"][case]), flush=True)
+    return meta
 
 
 def _counters():
@@ -91,10 +144,11 @@ def polar_npt(args):
     output = Output(str(args.output / "run"), trajectory_every=None, restart_every=None)
     meta = dict(command="polar-npt", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, structure=name, natoms=len(atoms),
-                gpu=torch.cuda.get_device_name(0), torch=torch.__version__, chunks=[])
+                torch=torch.__version__, chunks=[])
     started = time.perf_counter()
     sim = Simulation(atoms, loaded, integrator=integrator, output=output, seed=args.seed)
-    meta.update(setup_s=time.perf_counter() - started, plan=sim.plan.describe())
+    # The GPU's name only now: the planner sets the CUDA allocator before anything touches CUDA.
+    meta.update(setup_s=time.perf_counter() - started, plan=sim.plan.describe(), gpu=torch.cuda.get_device_name(0))
     sim.run(steps=args.warmup)
     restart = None
     for index in range(args.chunks):
@@ -157,7 +211,7 @@ def calc_compiles(args):
     args.output.mkdir(parents=True, exist_ok=False)
     meta = dict(command="calc", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, structure=name, natoms=len(atoms),
-                gpu=torch.cuda.get_device_name(0), torch=torch.__version__, calls=[])
+                torch=torch.__version__, calls=[])
     for index in range(args.calls):
         copy = atoms.copy()
         copy.positions += 0.05 * rng.standard_normal(copy.positions.shape)
@@ -171,7 +225,8 @@ def calc_compiles(args):
         meta["calls"].append(dict(index=index, wall_s=time.perf_counter() - started, compiled=recompiled,
                                   changes=changes))
         print(f"call {index}: {meta['calls'][-1]['wall_s']:.2f} s compiled={recompiled}", flush=True)
-    meta.update(plan=calculator.plan.describe() if calculator.plan is not None else None, notes=list(calculator.notes),
+    meta.update(gpu=torch.cuda.get_device_name(0),
+                plan=calculator.plan.describe() if calculator.plan is not None else None, notes=list(calculator.notes),
                 compiles=[call["index"] for call in meta["calls"] if call["compiled"]])
     return meta
 
@@ -180,7 +235,8 @@ def main(argv=None):
     args = parse_args(argv)
     if args.command == "polar-npt-resume":
         return polar_npt_resume(args)
-    meta = polar_npt(args) if args.command == "polar-npt" else calc_compiles(args)
+    commands = {"polar-npt": polar_npt, "calc": calc_compiles, "mace-first": mace_first}
+    meta = commands[args.command](args)
     meta["finished_utc"] = datetime.now(timezone.utc).isoformat()
     (args.output / "metadata.json").write_text(json.dumps(meta, indent=2, default=str) + "\n")
     return meta
