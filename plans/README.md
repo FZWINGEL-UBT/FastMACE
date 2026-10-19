@@ -9,7 +9,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
 | 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phase-1a.md`); owner checkpoint 3 decided (19 October: `main.py` defaults to FastMACE) |
 | 1b. Contracts | [phase-1b.md](phase-1b.md) | **all tasks merged; acceptance report** `docs/validation/phase-1b.md` (19 October 2026); follow-ups and addendum merged; **done apart from the owner checkpoint** |
-| 2. Safety | [phase-2.md](phase-2.md) | planned (draft, 19 October 2026); owner decisions D1–D4 open |
+| 2. Safety | [phase-2.md](phase-2.md) | planned (19 October 2026); D1–D4 decided; all workers prestarted |
 | 3. Dynamic topology and MC | — | |
 | 3b. NPT for the chlorides | — | |
 | 4. Physics | — | |
@@ -35,9 +35,9 @@ workers"). No "start all ready" is needed in phase 1b.
 
 ## Open owner decisions
 
-Open owner decisions that phases wait on (SPEC §18; licence decided: MIT):
-minimum MACE version (2, by phase 2), gate default (3, phase 1b), CI GPU
-runners (5, phase 2).
+Open owner decisions that phases wait on (SPEC §18): none open. Decided on
+19 October 2026: minimum MACE version (2), gate default (3), CI GPU runners
+(5), and 22–30.
 
 Task IDs are `<phase>-T<nn>`. Worker branches are `fastmace/<phase>-T<nn>`.
 

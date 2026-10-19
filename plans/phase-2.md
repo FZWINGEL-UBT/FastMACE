@@ -1,7 +1,8 @@
 # Phase 2: safety
 
-Status: **planned (draft)**, 19 October 2026, written by the conductor for
-the owner's decisions (D1–D4 below). Spec: [SPEC.md](../SPEC.md) §16 row
+Status: **planned**, 19 October 2026. The owner accepted the recommendations
+for D1–D4 the same day (SPEC §18 decisions 2, 5, 29 and 30), and all workers
+were prestarted. Spec: [SPEC.md](../SPEC.md) §16 row
 "2. Safety" and the sections it cites: §6.1, §6.3 and §6.4 (registry,
 versions, self-checks), §8.7 (process constraints, the subprocess runner,
 instance isolation), §9.3 rule 5 and rules 13–14, §9.4 (fallback), §9.5
@@ -838,6 +839,11 @@ Wave 4   T23 acceptance
    decision 28 implies.
 
 ## Owner decisions
+
+**Decided (user, 19 October 2026): the recommendation of each, (a) in D1–D4.**
+They are recorded as SPEC §18 decisions 2 and 5 (D1, D2), 29 (D3) and 30 (D4).
+For D2 the owner registers the runners himself (2-T18 gives the commands).
+
 
 **D1. Minimum MACE version (SPEC §18 open decision 2).** FastMACE is
 qualified on MACE 0.3.16. MACE's develop branch drops Python 3.10, and every
