@@ -157,16 +157,24 @@ def forces_rows(ab_jobs, control_jobs):
 
 
 def gate_row(name, meta):
-    """The verdict of one gate run and its worst force and stress ratios over the structures."""
+    """The verdict of one gate run and its worst energy, force and stress ratios over the structures.
+
+    Energy is gated from 1b-T23 on (``energy_gated`` in the run's metadata); a 1a run has no energy verdict.
+    """
     summaries = meta.get("summary", {})
-    worst = {}
-    for quantity in ("forces", "stress"):
+    worst, worst_error = {}, {}
+    for quantity in ("energy", "forces", "stress"):
         ratios = [s[quantity]["ratio"] for s in summaries.values()
-                  if quantity in s and s[quantity]["ratio"] is not None]
+                  if quantity in s and s[quantity].get("ratio") is not None]
         worst[quantity] = max(ratios) if ratios else None
-    return dict(job=name, model=meta.get("model"), engine=meta.get("engine"), status=meta.get("status"),
-                passed=bool(meta.get("passed")) and meta.get("status") == "complete",
-                structures=sorted(summaries), worst_force_ratio=worst["forces"], worst_stress_ratio=worst["stress"],
+        errors = [s[quantity]["production_max_abs"] for s in summaries.values()
+                  if quantity in s and "production_max_abs" in s[quantity]]
+        worst_error[quantity] = max(errors) if errors else None
+    return dict(job=name, model=meta.get("model"), engine=meta.get("engine"), planner=meta.get("planner"),
+                status=meta.get("status"), passed=bool(meta.get("passed")) and meta.get("status") == "complete",
+                energy_gated=bool(meta.get("energy_gated")), structures=sorted(summaries),
+                worst_energy_ratio=worst["energy"], worst_force_ratio=worst["forces"],
+                worst_stress_ratio=worst["stress"], worst_energy_meV_per_atom=worst_error["energy"],
                 failed_structures=sorted(k for k, s in summaries.items() if not s.get("passed")))
 
 
@@ -235,12 +243,14 @@ def markdown(summary):
         delta = "–" if r["max_abs"] is None else f"{r['max_abs']:.1e}"
         lines.append(f"| {r['job']} | {r['control']} | {r['structure']} | {delta} | {'yes' if r['bitwise'] else 'no'} "
                      f"| {'yes' if r['passed'] else '**no**'} |")
-    lines += ["", "| Label | Engine | Structures | Worst force ratio | Worst stress ratio | Pass |",
-              "| --- | --- | --- | ---: | ---: | --- |"]
+    lines += ["", "| Label | Engine | Structures | Worst energy ratio (gated) | Worst force ratio | Worst stress ratio "
+              "| Pass |", "| --- | --- | --- | ---: | ---: | ---: | --- |"]
     for r in summary["gate"]:
+        energy = "–" if r.get("worst_energy_ratio") is None else (
+            f"{r['worst_energy_ratio']:.2f}" + ("" if r.get("energy_gated") else " (reported)"))
         force = "–" if r["worst_force_ratio"] is None else f"{r['worst_force_ratio']:.2f}"
         stress = "–" if r["worst_stress_ratio"] is None else f"{r['worst_stress_ratio']:.2f}"
-        lines.append(f"| {r['model']} | {r['engine']} | {', '.join(r['structures'])} | {force} | {stress} "
+        lines.append(f"| {r['model']} | {r['engine']} | {', '.join(r['structures'])} | {energy} | {force} | {stress} "
                      f"| {'yes' if r['passed'] else '**no**'} |")
     return "\n".join(lines) + "\n"
 
