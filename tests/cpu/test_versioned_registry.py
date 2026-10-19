@@ -351,7 +351,7 @@ def test_an_unqualified_record_follows_the_installed_sources(monkeypatch):
     monkeypatch.setattr(energy, "SOURCE_HASHES", {key: WRONG for key in energy.SOURCE_HASHES})
     record = records.record_for("0.3.15", "mh1")
     assert record.stock["single_graph_strain"] is False
-    assert record.numerical == ()
+    assert record.numerical == (records.FLOAT32_SUM_UNQUALIFIED,)
     assert record.content_digest() != records.record_for("0.3.16", "mh1").content_digest()
     # The qualified record never changes with the sources: on 0.3.16 they hash by definition.
     assert records.record_for("0.3.16", "mh1").id == MH1_ID
@@ -432,3 +432,163 @@ def test_force_field_identity_takes_the_effective_precision(monkeypatch, tmp_pat
     assert precision == "float64" and reason.code == versions.PROMOTION_CODE
     assert ff.identity.force_precision == "float64" and ff.precision == "float32"
     assert ff.effective_precision(float64_energy=False) == ("float32", None)
+
+
+# --------------------------------------------------------------------------- the planner, the gate's yardstick, the report
+
+
+@pytest.fixture
+def tiny_mh1(tmp_path):
+    pytest.importorskip("cuequivariance_torch")
+    import torch
+
+    from _support.tiny_models import FAMILIES, tiny_mace_model
+    from fastmace.model import loading
+
+    path = tmp_path / "tiny-mh1-11-17.model"
+    torch.save(tiny_mace_model([11, 17], **FAMILIES["mh1"]), path)
+    loading._LICENCES_SHOWN.add(str(path))
+    return loading.load_pristine(str(path), trusted=True)
+
+
+def _cpu_planner():
+    from fastmace.config import EngineConfig
+    from fastmace.engine import constraints
+    from fastmace.planner import minimal
+
+    return minimal.MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"), environ={},
+                                  process=constraints.ProcessRecord())
+
+
+def _langevin():
+    from fastmace.config import IntegratorConfig
+
+    return IntegratorConfig(temperature_K=300.0)
+
+
+def _md_plan(planner, loaded, precision="float32"):
+    from _support.structures import nacl
+    from fastmace.model.forcefield import ForceField
+    from fastmace.planner.workload import Workload
+
+    atoms = nacl(repeat=1)
+    ff = ForceField(loaded, atoms, precision=precision)
+    return planner.plan(ff, atoms, _langevin(), Workload(max_temperature_K=300.0)), ff, atoms
+
+
+def test_the_default_never_promotes(tiny_mh1):
+    """MACE 0.3.16, every hash matches: the plan keeps the ForceField's precision and records no request."""
+    assert energy.source_problems() == []
+    planner = _cpu_planner()
+    for precision in ("float32", "float64"):
+        plan, ff, atoms = _md_plan(planner, tiny_mh1, precision)
+        key, choice, reason = plan.decision("force_precision")
+        assert choice == precision and getattr(reason, "code", None) is None
+        assert "force_precision" not in dict(plan.requested)
+        assert planner.plan_evaluation(ff, atoms).decision("force_precision")[1] == precision
+
+
+def test_the_planner_promotes_on_an_unhashed_energy_forward(monkeypatch, tiny_mh1):
+    from fastmace import report
+
+    monkeypatch.setattr(energy, "SOURCE_HASHES", {key: WRONG for key in energy.SOURCE_HASHES})
+    monkeypatch.setattr(energy, "_FORWARDS", {})
+    planner = _cpu_planner()
+    plan, ff, atoms = _md_plan(planner, tiny_mh1, "float32")
+    key, choice, reason = plan.decision("force_precision")
+    assert choice == "float64" and reason.code == versions.PROMOTION_CODE
+    assert dict(plan.requested)["force_precision"] == "float32"
+    assert plan.precision.dtype == "float64" and plan.revision == 0
+    assert ff.identity.force_precision == "float64"
+    assert versions.PROMOTION_CODE in report.DOWNGRADES
+    lines = report.Report(model="tiny", structure="NaCl", n_atoms=len(atoms), plan=plan)._why()
+    assert any("promoted from float32" in text for _, text in lines)
+    assert planner.plan_evaluation(ff, atoms).decision("force_precision")[1] == "float64"
+    engine = planner.build(plan, ff, atoms, check=False)
+    assert engine.force_field.energy_treatment == "native"
+
+
+def test_polar_is_refused_by_the_planner_without_its_forward(monkeypatch):
+    pytest.importorskip("cuequivariance_torch")
+    from _support.structures import nacl
+    from _support.tiny_models import FAMILIES, polar_available, tiny_mace_model
+
+    if not polar_available():
+        pytest.skip("PolarMACE needs graph_longrange")
+    from fastmace.errors import PlanRefused
+    from fastmace.longrange import polar
+    from fastmace.model import capabilities
+    from fastmace.planner.workload import Workload
+
+    traits = capabilities.model_traits(tiny_mace_model([11, 17], **FAMILIES["polar"]))
+    planner = _cpu_planner()
+    arguments = dict(precision="float32")
+    planner.plan_traits(traits, nacl(repeat=1), _langevin(), Workload(max_temperature_K=300.0), planner.hardware(),
+                        **arguments)
+    monkeypatch.setattr(polar, "SOURCE_HASHES", {key: WRONG for key in polar.SOURCE_HASHES})
+    with pytest.raises(PlanRefused) as caught:
+        planner.plan_traits(traits, nacl(repeat=1), _langevin(), Workload(max_temperature_K=300.0),
+                            planner.hardware(), **arguments)
+    assert "polar-unqualified-source" in [getattr(r, "code", None) for r in caught.value.reasons]
+
+
+def test_build_records_the_selfchecks(tiny_mh1):
+    planner = _cpu_planner()
+    plan, ff, atoms = _md_plan(planner, tiny_mh1)
+    engine = planner.build(plan, ff, atoms)
+    built = engine.plan
+    assert built == dataclasses.replace(plan, selfchecks=built.selfchecks)
+    assert built.selfchecks and plan.selfchecks == ()
+    assert [check.name for check in built.selfchecks] == [entry.name for entry in engine.force_field.applied]
+    assert all(check.passed for check in built.selfchecks)
+    assert f"self-checks: {len(built.selfchecks)} records" in built.describe()
+    hash(built)  # still a hashable frozen record
+
+
+def test_the_unqualified_yardstick_keeps_mace_float32_sum(monkeypatch):
+    pytest.importorskip("cuequivariance_torch")
+    import copy
+
+    from mace.calculators import MACECalculator
+    from mace.cli.convert_e3nn_cueq import run
+
+    from _support.structures import nacl
+    from _support.tiny_models import FAMILIES, tiny_mace_model
+    from fastmace.model import compile as fc
+    from fastmace.reference import calculators, records
+
+    model = tiny_mace_model([11, 17], **FAMILIES["mh1"])
+    atoms = nacl(repeat=2, rattle=0.1, seed=8)
+
+    def calculator():
+        calc = MACECalculator(models=[copy.deepcopy(model)], device="cpu", default_dtype="float32")
+        with fc.naive_cueq():
+            calc.models = [run(calc.models[0], device="cpu", return_model=True)]
+        return calc
+
+    qualified = calculators.ReferenceCalculator.from_calculator(calculator(), records.record_for("0.3.15", "mh1"),
+                                                                atoms)
+    assert qualified.info()["energy_bound"] == "float64 accumulation"
+    monkeypatch.setattr(energy, "SOURCE_HASHES", {key: WRONG for key in energy.SOURCE_HASHES})
+    monkeypatch.setattr(energy, "_FORWARDS", {})
+    record = records.record_for("0.3.15", "mh1")
+    yardstick = calculators.ReferenceCalculator.from_calculator(calculator(), record, atoms)
+    info = yardstick.info()
+    assert info["role"] == "yardstick" and info["float64_energy"] is False
+    assert info["energy_bound"] == records.ENERGY_BOUND_UNQUALIFIED
+    stock = atoms.copy()
+    stock.calc = calculator()
+    assert yardstick.evaluate(atoms)[0] == pytest.approx(stock.get_potential_energy(), rel=1e-6)
+
+
+def test_the_report_names_the_looser_energy_bound():
+    from fastmace import report
+    from fastmace.reference import records
+
+    gate = {"status": "passed", "copies": "2 rattled copies", "energy_meV_per_atom": 0.1,
+            "references": {"yardstick": {"energy_bound": records.ENERGY_BOUND_UNQUALIFIED}}}
+    text = report.Report(model="tiny", structure="NaCl", n_atoms=8, plan=Plan(tier="graph"), gate=gate)._gate()
+    assert "energy bound looser" in text
+    gate["references"]["yardstick"]["energy_bound"] = "float64 accumulation"
+    assert "energy bound" not in report.Report(model="tiny", structure="NaCl", n_atoms=8, plan=Plan(tier="graph"),
+                                               gate=gate)._gate()

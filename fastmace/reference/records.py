@@ -29,8 +29,9 @@ version compares it (2-T09, decision 23).
 **Unqualified versions** (SPEC §18 decision 2; plan task 2-T04). A MACE other than 0.3.16 gets an
 "unqualified stock" record: stock equivalence only, with the stock entries the installed sources
 allow. PR 1498's one-graph strain is stock only when its pinned source hashes, and the yardstick's
-float64 accumulation only when the float64 energy forward hashes (without it the yardstick, and so
-the gate, is unavailable). PolarMACE is refused: its stress fix needs the patched forward. The
+float64 accumulation only when the float64 energy forward hashes (otherwise the
+``float32_sum_unqualified`` entry: MACE's own float32 sum, a looser energy bound that the gate
+record and the report name). PolarMACE is refused: its stress fix needs the patched forward. The
 qualified records never depend on the installed sources.
 """
 
@@ -105,6 +106,19 @@ FLOAT64_ACCUMULATION = {
     "polar_note": "the yardstick runs the corrected long-range path, so the electrostatic energy is reduced per k "
                   "into float64; MACE's own long-range code would give only the float32 total, upcast",
 }
+
+# The yardstick of an unqualified MACE whose float64 energy forward does not hash (2-T04): MACE's
+# own float32 sum. The energy bound of the ratio rule is then the looser one; production runs at
+# float64 there (the precision promotion), so its own energy error stays small.
+FLOAT32_SUM_UNQUALIFIED = {
+    "name": "float32_sum_unqualified",
+    "applies_to": "yardstick",
+    "what": "the float32 yardstick's energy is MACE's own float32 sum: the float64 energy forward does not hash on "
+            "this MACE",
+    "consequence": "the energy bound of the ratio rule is looser (up to the float32 E0 sum's error); forces and "
+                   "stress are unaffected",
+}
+ENERGY_BOUND_UNQUALIFIED = "looser: unqualified MACE, float32 yardstick energy sum (SPEC §18 decision 2)"
 
 
 class ReferencePolicyError(FastMACEError):
@@ -260,7 +274,7 @@ def record_for(mace_version, family, *, polar=None, d3=None):
 
         stock = {**STOCK, "single_graph_strain": not _patches.patch_problems("single_graph_strain")}
         if versions.treatment("float64_energy").qualified is False:
-            numerical = ()
+            numerical = (FLOAT32_SUM_UNQUALIFIED,)
     return ReferenceRecord(schema=SCHEMA, mace_version=mace_version, family=family, stock=stock,
                            upstream_fixes=fixes, optional_physics=optional, integrator_corrections=(correction,),
                            numerical=numerical)
@@ -280,7 +294,7 @@ def require_record_for_model(record, model):
 
 
 __all__ = [
-    "FAMILIES", "FLOAT64_ACCUMULATION", "ID_PREFIX", "OPTIONAL_PHYSICS", "POLAR_STRESS_FIX", "QUALIFIED_MACE_VERSIONS",
+    "ENERGY_BOUND_UNQUALIFIED", "FAMILIES", "FLOAT32_SUM_UNQUALIFIED", "FLOAT64_ACCUMULATION", "ID_PREFIX", "OPTIONAL_PHYSICS", "POLAR_STRESS_FIX", "QUALIFIED_MACE_VERSIONS",
     "ReferencePolicyError", "ReferenceRecord", "SCHEMA", "STOCK", "family_of", "mace_version", "record_for",
     "require_record_for_model",
 ]

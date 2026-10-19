@@ -464,8 +464,13 @@ def test_charge_needs_a_joint_embedding():
 
 
 @pytest.fixture
-def clean_patches():
-    """MACE's own converter in place and an empty registry; the process's patches come back afterwards."""
+def clean_patches(monkeypatch):
+    """MACE's own converter in place and an empty registry; the process's patches come back afterwards.
+
+    A polar test earlier in the same worker leaves ``polar_longrange`` installed (recorded by its own
+    module); it is hidden here, so the registry is empty whatever ran before (order under xdist).
+    """
+    monkeypatch.setattr(_patches, "_RECORDED_ELSEWHERE", ())
     import mace.calculators.mace  # noqa: F401
     from mace.cli import convert_e3nn_cueq
     calculator_module = sys.modules["mace.calculators.mace"]
@@ -537,7 +542,8 @@ def test_conv_fusion_patch_refuses_another_signature(clean_patches, monkeypatch)
 
     monkeypatch.setattr(convert, "run", other)
     monkeypatch.setattr(_patches, "_ORIGINALS", {})
-    with pytest.raises(RuntimeError, match="0.3.16 parameters"):
+    # The hash gate (2-T04) refuses it before the signature check.
+    with pytest.raises(_patches.UnqualifiedPatchError, match="convert_e3nn_cueq:run"):
         _patches.set_cueq_conv_fusion(True)
     assert _patches.applied() == ()
 

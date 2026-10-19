@@ -87,6 +87,9 @@ DOWNGRADES = {
     "backend-cueq-requested": "plain cuEq as requested (backend='cueq'); auto would choose hybrid where it builds",
     "host-callbacks-graph-sync": "frequent host callbacks: graph tier with a host sync at each callback (rule 9, "
                                  "owner decision D6); correct but slower",
+    "precision-promoted-unqualified-energy": "float64 forces, promoted from float32: this MACE is not the "
+                                             "qualified 0.3.16 and its float64 energy forward does not hash, so a "
+                                             "float64 model sums the energy (SPEC §18 decision 2)",
     "allow-naive-cueq": "naive cuEq allowed (allow_naive_cueq=True): cuEquivariance's fused kernels do not load, "
                         "so this run is slow; install cuequivariance-ops-torch (`fastmace doctor`)",
 }
@@ -289,6 +292,9 @@ class Report:
                 numbers.append(f"{gate[key]:.2g} {unit}")
         parts = [part for part in (gate.get("copies"), ", ".join(numbers)) if part]
         detail = "; ".join(parts + ["floors §12.3"])
+        yardstick = (gate.get("references") or {}).get("yardstick") or {}
+        if str(yardstick.get("energy_bound", "")).startswith("looser"):  # 2-T04: unqualified MACE
+            detail = f"{detail}; energy bound {yardstick['energy_bound']}"
         if gate.get("reason") and status != "passed":
             detail = f"{gate['reason']}; {detail}"
         return f"{status} ({detail})"
