@@ -100,7 +100,10 @@ def tree_digest(root) -> str:
 
 
 def _git(repository, *args) -> bytes:
-    done = subprocess.run(["git", "-C", str(repository), *args], capture_output=True, check=False)
+    # safe.directory=*: on NFS (the NAS home) the repository's owner uid differs from the login's, and git
+    # refuses a "dubious ownership" repository otherwise. We only read from it.
+    done = subprocess.run(["git", "-c", "safe.directory=*", "-C", str(repository), *args], capture_output=True,
+                          check=False)
     if done.returncode != 0:
         raise VersionError(f"git {' '.join(args)} failed in {repository}: "
                            f"{done.stderr.decode(errors='replace').strip()}")

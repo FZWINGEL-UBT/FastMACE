@@ -19,6 +19,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import types
@@ -79,15 +80,23 @@ def test_rename_refuses_a_bad_name():
 
 
 def _git(repository, *args):
+    # safe.directory=*: on NFS (murphy's NAS --basetemp) the files' owner uid differs from the login's, and git
+    # refuses the repository as of "dubious ownership" otherwise (exit 128).
     env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
-           "GIT_COMMITTER_EMAIL": "t@t", "GIT_CONFIG_NOSYSTEM": "1", "HOME": str(repository)}
-    return subprocess.run(["git", "-C", str(repository), "-c", "core.autocrlf=false", *args], check=True,
-                          capture_output=True, text=True, env=env).stdout.strip()
+           "GIT_COMMITTER_EMAIL": "t@t", "GIT_CONFIG_NOSYSTEM": "1", "HOME": str(repository),
+           "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "safe.directory", "GIT_CONFIG_VALUE_0": "*"}
+    done = subprocess.run(["git", "-c", "safe.directory=*", "-C", str(repository), "-c", "core.autocrlf=false",
+                           *args], capture_output=True, text=True, env=env, check=False)
+    if done.returncode != 0:
+        raise RuntimeError(f"git {' '.join(args)} failed ({done.returncode}): {done.stderr.strip()}")
+    return done.stdout.strip()
 
 
 @pytest.fixture
 def old_release(tmp_path):
     """A repository whose tag ``fastmace-1a`` holds a tiny ``fastmace`` package."""
+    if shutil.which("git") is None:
+        pytest.skip("git is not installed")
     repository = tmp_path / "repo"
     package = repository / "fastmace"
     (package / "sub").mkdir(parents=True)
@@ -227,7 +236,8 @@ def test_patch_targets_cover_every_patch_both_versions_install():
 
 def _tag_source(path):
     try:
-        return subprocess.run(["git", "-C", str(REPOSITORY_ROOT), "show", f"fastmace-1a:{path}"], check=True,
+        return subprocess.run(["git", "-c", "safe.directory=*", "-C", str(REPOSITORY_ROOT), "show",
+                               f"fastmace-1a:{path}"], check=True,
                               capture_output=True, text=True).stdout
     except (OSError, subprocess.CalledProcessError):
         return None  # a checkout without the tag (the NAS copy)
