@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Callable, Mapping, MutableSequence, Sequence
 
 from fastmace.bench.step_time import BlockStatistics, TimedEngine, TimingProtocol, time_block, warm_up
-from fastmace.errors import FastMACEError
+from fastmace.errors import BaselineExportError  # noqa: F401 (re-exported: the 1a names)
 
 COMMIT_FILE = "COMMIT"
 ENGINE_DIRECTORY = Path("Experiments", "Langevin_Thermostat")
@@ -31,10 +31,6 @@ BENCHMARK_SCRIPTS_DIRECTORY = Path("Experiments", "Benchmark_MACE_GPU_OPTIMIZATI
 ENGINE_PACKAGE = "langevin"
 _COMMIT = re.compile(r"[0-9a-f]{7,40}")
 PATTERNS = ("abab", "abba")
-
-
-class BaselineExportError(FastMACEError):
-    """A baseline directory is not a usable export of the research engine."""
 
 
 @dataclass(frozen=True)

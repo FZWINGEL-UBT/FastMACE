@@ -34,12 +34,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastmace.errors import FastMACEError
-
-
-class ProcessConstraintError(FastMACEError, RuntimeError):
-    """An engine would break a process-wide constraint (SPEC §8.7); joins fastmace.errors in 1b."""
-
+from fastmace.errors import ProcessConstraintError  # noqa: F401 (re-exported: the 1a names)
 
 # Compile families by MACE's autograd-compile policy: the force derivative traced into the
 # compiled graph ("autograd-in-graph": cuEquivariance, e3nn) or taken outside it ("oeq": hybrid).

@@ -51,7 +51,7 @@ from fastmace.config import (
     PrecisionConfig,
     RewriteConfig,
 )
-from fastmace.errors import FastMACEError
+from fastmace.errors import PlanRefused  # noqa: F401 (re-exported: the 1a names)
 
 from .plan import Hardware, Plan
 
@@ -107,14 +107,6 @@ WORKLOAD_CONSTRAINTS = (SINGLE_GRAPH, FIXED_SPECIES_SUPERSET, SORT_RECEIVERS, OE
 NOT_CARRIED_OVER_1A = "not carried over in 1a (SPEC §6.2: opt-in, slower)"
 PLAIN_CUEQ_REASSOCIATION = ("the reassociation probe refuses plain cuEq (coefficients differ within a path; "
                             "conductor decision after T11)")
-
-
-class PlanRefused(FastMACEError, ValueError):
-    """The planner cannot plan this workload; ``reasons`` lists every hard constraint that refused."""
-
-    def __init__(self, reasons):
-        self.reasons = tuple(reasons)
-        super().__init__("plan refused: " + "; ".join(self.reasons))
 
 
 @dataclass(frozen=True)
