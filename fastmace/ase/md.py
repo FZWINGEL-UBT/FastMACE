@@ -119,16 +119,14 @@ class _Dynamics:
         if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
             raise TypeError(f"seed must be an int, got {seed!r}")
         self._model = _model(model, force_field, head)
-        if dispersion is not None:
-            raise _refuse(f"dispersion={dispersion!r}: D3 is phase 3b (SPEC §11.2); run without dispersion",
-                          code="d3-phase-3b")
+        _dispersion(dispersion, self._model)
         _check_constraints(atoms)
 
         self.atoms = atoms
         self.dt = timestep
         self.integrator = record
         self.check = check
-        self.seed = secrets.randbelow(2**63) if seed is None else seed  # drawn and recorded, as fm.md
+        self.seed = secrets.randbelow(2**31) if seed is None else seed  # drawn and recorded, as fm.md
         self.observers: list[tuple[Any, int, tuple, dict]] = []
         self.nsteps = 0
         self.max_steps = 0
@@ -596,6 +594,22 @@ def _model(model, force_field, head):
         raise ValueError(f"head={head!r} does not match the loaded model's head {getattr(model, 'head', None)!r}; "
                          "pass head= to fm.load instead")
     return model
+
+
+def _dispersion(dispersion, model):
+    """``dispersion=`` as ``fm.md``: ``"d3bj"`` expands from the training functional (``ValueError`` when
+    it already contains dispersion or is unknown), and a complete record is refused until phase 3b."""
+    from fastmace.longrange import d3
+    from fastmace.model.forcefield import ForceField
+
+    loaded = model.model if isinstance(model, ForceField) else model
+    name = loaded.label or str(loaded.path)
+    record, notes = d3.expand(dispersion, functional=loaded.functional, model=name)
+    if record is not None:
+        text = f"D3: phase 3b; the expanded record is {d3.describe(record)}"
+        if notes:
+            text += f" ({'; '.join(notes)})"
+        raise _refuse(text + " (SPEC §11.2)", code="d3-phase-3b")
 
 
 def _check_constraints(atoms):

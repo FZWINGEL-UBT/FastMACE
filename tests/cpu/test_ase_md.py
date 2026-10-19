@@ -207,9 +207,32 @@ def test_fix_atoms_is_refused_with_the_phase_4_reason(loaded):
         _langevin(loaded, atoms=atoms)
 
 
-def test_dispersion_is_refused_until_phase_3b(loaded):
-    with pytest.raises(PlanRefused, match="phase 3b"):
+def test_dispersion_follows_fm_md(loaded):
+    """'d3bj' expands from the training functional as fm.md does (a model loaded from a path has none,
+    so only an explicit fm.D3 is accepted); a complete record is refused until phase 3b, shown."""
+    import fastmace as fm
+
+    with pytest.raises(ValueError, match="training functional is unknown") as error:
         _langevin(loaded, dispersion="d3bj")
+    assert not isinstance(error.value, PlanRefused)
+    with pytest.raises(PlanRefused, match=r"D3: phase 3b; the expanded record is D3\(functional=pbe"):
+        _langevin(loaded, dispersion=fm.D3(functional="pbe"))
+    with pytest.raises(ValueError, match="not 'd3bj'"):
+        _langevin(loaded, dispersion="d4")
+
+
+def test_d3bj_expansion_for_a_label_matches_fm_md(loaded, monkeypatch):
+    """The label path: MH-1's r2SCAN head expands to the r2scan set, MACE-OFF raises (D3 counted twice)."""
+    import dataclasses
+
+    from fastmace.ase import md
+
+    r2scan = dataclasses.replace(loaded, label="mh1", head="matpes_r2scan", functional="r2scan")
+    with pytest.raises(PlanRefused, match="functional=r2scan"):
+        md._dispersion("d3bj", r2scan)
+    off = dataclasses.replace(loaded, label="mace-off-small", functional="wb97m-d3bj")
+    with pytest.raises(ValueError, match="count it twice"):
+        md._dispersion("d3bj", off)
 
 
 def test_check_is_passed_through(loaded):
@@ -640,6 +663,23 @@ def test_summary_is_the_simulations_report(loaded, capsys):
     skip = ("setup:", "speed:", "output:")
     assert [line for line in dyn.summary.splitlines() if not line.startswith(skip)] == \
         [line for line in reference if not line.startswith(skip)]
+
+
+def test_summary_equals_fm_md_report_for_the_same_run(loaded, tmp_path):
+    """SPEC §7.7: fm.md and the fastmace.ase integrators keep one report. Same model, structure,
+    integrator, seed and steps; the setup times, the speed line and the output paths differ by nature."""
+    import fastmace as fm
+
+    atoms = _atoms()
+    dyn = _langevin(loaded, atoms=atoms.copy(), trajectory="run.traj")
+    dyn.run(3)
+    record = integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.01)
+    run = fm.md(atoms.copy(), model=loaded, integrator=record, steps=3, seed=1, output=tmp_path / "md")
+    skip = ("setup:", "speed:", "output:")
+    assert [line for line in dyn.summary.splitlines() if not line.startswith(skip)] == \
+        [line for line in run.summary.splitlines() if not line.startswith(skip)]
+    _plans_equal(dyn.plan, run.plan)
+    assert dyn.gate.status == run.gate.status == "skipped"
 
 
 def test_step_advances_one_step_and_returns_forces(loaded):
