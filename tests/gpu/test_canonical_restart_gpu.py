@@ -111,6 +111,7 @@ def max_deviation(rows, reference):
                for a, b in zip(rows, reference, strict=True))
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_mh1_plain_cueq_float64_resumes_within_1e_12(tmp_path):
     every_restart = [100, 200, 300, 400]

@@ -46,8 +46,8 @@ Plan task 1b-T24 (19 October 2026). The GPU suite has two tiers:
 
 | Tier | Command | Who runs it, when | Local RTX 5060 Ti, warm caches |
 | --- | --- | --- | ---: |
-| fast (worker) | `pytest tests/gpu -m "not slow"` | every worker, for every change, as often as needed | 3.4 min (178 tests) |
-| full (merge, acceptance) | `pytest tests/gpu` | the conductor, at merges that touch `model/`, `rewrites/`, `kernels/` or `engine/`, and acceptance runs | 28.7 min (223 tests) |
+| fast (worker) | `pytest tests/gpu -m "not slow"` | every worker, for every change, as often as needed | 8.0 min (189 tests, 1b-T26) |
+| full (merge, acceptance) | `pytest tests/gpu` | the conductor, at merges that touch `model/`, `rewrites/`, `kernels/` or `engine/`, and acceptance runs | 28.7 min (223 tests, 1b-T24; not measured since) |
 
 The first run after a change of environment, or with emptied caches, is slower
 (5.7 and 34.8 min), because it compiles everything and builds the OEq extension
@@ -63,9 +63,9 @@ A test is marked `@pytest.mark.slow` when it needs one of these:
 - a cold compiler cache (the edge-bucket regression tests).
 
 Every behaviour tested on the GPU keeps at least one test in the fast tier, usually on a
-tiny model or the Lennard-Jones force field in the pytest process. When you add a GPU test
-that is slow for one of these reasons, mark it `slow` and check that a fast test still
-covers the behaviour.
+tiny model or the Lennard-Jones force field in the pytest process, except those listed
+below. When you add a GPU test that is slow for one of these reasons, mark it `slow` and
+check that a fast test still covers the behaviour. If none can, add the behaviour to that list.
 
 GPU command for workers on the local PC (one process; `FASTMACE_HYBRID_PYTHON` runs the
 hybrid tests in the OEq environment). `TORCHINDUCTOR_COMPILE_THREADS=4` keeps Inductor from
@@ -82,6 +82,28 @@ edge bucket, from a fresh Inductor cache (`test_no_compile_at_a_later_edge_bucke
 and a planned engine equal to a hand-built one
 (`test_tiny_plain_cueq_float64_planned_equals_hand_built`). The MH-1 versions stay
 in the full tier, and the hybrid edge-bucket case is tested only there.
+
+Plan task 1b-T26 marked `slow` the GPU tests merged after 1b-T24 that run MH-1 or
+POLAR-1-S (30 s to 5 min each). Two of them have tiny-model versions in the fast tier
+(`tests/gpu/test_tiny_released_gpu.py`): the runtime-state registry in plain cuEq float64
+(capture warm-ups leave no trace, the registry covers what the stages mutate), and the gate
+failing a broken captured graph while the eager stages pass. Tiny versions of the others were
+tried. They cost almost as much as the MH-1 tests, because fresh processes, compiles and the
+tests' own child processes dominate, so they were left out
+([validation/1b-T26-gpu-retiering.md](validation/1b-T26-gpu-retiering.md)). These behaviours
+are tested **only in the full tier**:
+
+- fm.load after MACE was imported gives plain cuEq with its reason
+  (`test_load_hybrid_gpu.py::test_mace_imported_first_gives_plain_cueq_with_the_reason`, 310 s);
+- an engine resumed from canonical restart points follows the uninterrupted run within 1e-12 Å
+  (`test_canonical_restart_gpu.py`; the CPU suite has tiny-model restart tests);
+- the gate passes in graph mode, NVT with fresh references and full-cell NPT
+  (`test_selfcheck_gpu.py::test_gate_passes_in_graph_mode`);
+- `fm.Simulation` reaches `FixedPlanner`'s trajectory, plain cuEq and hybrid (`test_simulation_gpu.py`);
+- LBFGS with `fm.calc` reaches MACE's minimum (`test_ase_calculator_gpu.py`; a tiny random model
+  does not converge);
+- the registry checks in hybrid pipelined NVT, hybrid full-cell NPT and POLAR-1-S
+  (`test_registry_gpu.py`).
 
 ### Caches the suite shares
 

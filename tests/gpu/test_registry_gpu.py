@@ -127,6 +127,7 @@ def check(result, name):
     assert any(key.startswith("('B'") for key in result["captured"]), result["captured"]
 
 
+@pytest.mark.slow
 @ENGINE.needs_oeq
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_mh1_hybrid_pipelined_nvt():
@@ -135,6 +136,7 @@ def test_mh1_hybrid_pipelined_nvt():
     check(result, "mh1-hybrid-nvt")
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_mh1_plain_cueq_float64():
     result = registry_run("mh1-r2scan", "cueq", sys.executable)
@@ -142,6 +144,7 @@ def test_mh1_plain_cueq_float64():
     check(result, "mh1-cueq-float64")
 
 
+@pytest.mark.slow
 @ENGINE.needs_oeq
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_mh1_npt_baoab_full_cell():
@@ -150,6 +153,7 @@ def test_mh1_npt_baoab_full_cell():
     check(result, "mh1-hybrid-npt-full")
 
 
+@pytest.mark.slow
 @ENGINE.needs_oeq
 @pytest.mark.skipif(not ENGINE.MODELS, reason="FASTMACE_MODELS is not set")
 def test_polar_1_s():
