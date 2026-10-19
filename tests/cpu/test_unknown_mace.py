@@ -2,7 +2,7 @@
 
 Runs only where the installed mace-torch is not the qualified 0.3.16, which is
 ``~/environments/fastmace_mace_other`` (mace-torch 0.3.15; the recipe is in
-``docs/validation/phase-2-unknown-mace.md``). On 0.3.16 every test here is skipped. A tiny
+``docs/validation/2-T04-unknown-mace.md``). On 0.3.16 every test here is skipped. A tiny
 MH-1-class model on NaCl, the minimal planner on the CPU without compilation, as in
 ``test_quick.py``:
 
