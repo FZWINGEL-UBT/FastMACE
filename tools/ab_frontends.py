@@ -220,7 +220,7 @@ def main(argv=None):
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, sha256=loaded.sha256,
                 structure=structure, natoms=len(atoms), temperature_K=args.temperature_K, check=args.check,
                 timestep_fs=TIMESTEP_FS, friction_ase=FRICTION_ASE, protocol=protocol.as_dict(), sides=args.sides,
-                gpu=torch.cuda.get_device_name(0), torch=torch.__version__, setup_s={}, plans={}, gates={})
+                torch=torch.__version__, setup_s={}, plans={}, gates={})
     path = args.output / "metadata.json"
 
     def save():
@@ -237,6 +237,8 @@ def main(argv=None):
             meta["plans"][name] = plans[name].describe() if plans[name] is not None else None
             meta["gates"][name] = gates[name].to_metadata() if gates[name] is not None else None
             save()
+        # Only after the first build: the planner sets the CUDA allocator before anything touches CUDA.
+        meta["gpu"] = torch.cuda.get_device_name(0)
         first = args.sides[0]
         meta["same_plan"] = {name: plans[name] is not None and plans_equal(plans[first], plans[name])
                              for name in args.sides[1:]}

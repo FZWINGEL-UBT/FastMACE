@@ -91,10 +91,11 @@ def polar_npt(args):
     output = Output(str(args.output / "run"), trajectory_every=None, restart_every=None)
     meta = dict(command="polar-npt", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, structure=name, natoms=len(atoms),
-                gpu=torch.cuda.get_device_name(0), torch=torch.__version__, chunks=[])
+                torch=torch.__version__, chunks=[])
     started = time.perf_counter()
     sim = Simulation(atoms, loaded, integrator=integrator, output=output, seed=args.seed)
-    meta.update(setup_s=time.perf_counter() - started, plan=sim.plan.describe())
+    # The GPU's name only now: the planner sets the CUDA allocator before anything touches CUDA.
+    meta.update(setup_s=time.perf_counter() - started, plan=sim.plan.describe(), gpu=torch.cuda.get_device_name(0))
     sim.run(steps=args.warmup)
     restart = None
     for index in range(args.chunks):
@@ -157,7 +158,7 @@ def calc_compiles(args):
     args.output.mkdir(parents=True, exist_ok=False)
     meta = dict(command="calc", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, structure=name, natoms=len(atoms),
-                gpu=torch.cuda.get_device_name(0), torch=torch.__version__, calls=[])
+                torch=torch.__version__, calls=[])
     for index in range(args.calls):
         copy = atoms.copy()
         copy.positions += 0.05 * rng.standard_normal(copy.positions.shape)
@@ -171,7 +172,8 @@ def calc_compiles(args):
         meta["calls"].append(dict(index=index, wall_s=time.perf_counter() - started, compiled=recompiled,
                                   changes=changes))
         print(f"call {index}: {meta['calls'][-1]['wall_s']:.2f} s compiled={recompiled}", flush=True)
-    meta.update(plan=calculator.plan.describe() if calculator.plan is not None else None, notes=list(calculator.notes),
+    meta.update(gpu=torch.cuda.get_device_name(0),
+                plan=calculator.plan.describe() if calculator.plan is not None else None, notes=list(calculator.notes),
                 compiles=[call["index"] for call in meta["calls"] if call["compiled"]])
     return meta
 
