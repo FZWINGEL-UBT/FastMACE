@@ -19,7 +19,8 @@ Sources of the processes (``--source``, default ``$FASTMACE_CI_GPU_SOURCE``, els
   Windows programs and the desktop are not visible by pid, so the local runner also sets
   ``--max-memory-mib`` (the desktop's own use plus a margin) and ``--max-utilization``, with
   ``--idle-samples`` consecutive idle samples, and ``--min-available-gib`` (WSL's 15 GB: 10 GB free before a
-  GPU suite);
+  GPU suite); and a live local GPU reservation of someone else (``--reservation``, tools/ci/local_gpu.py) is
+  busy;
 - ``auto``: ``wsl`` when the kernel is WSL's, else ``nvidia-smi``.
 
 ``watch`` runs beside the tests and appends a JSON line whenever another user's compute process is on the
@@ -43,6 +44,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import local_gpu  # noqa: E402
+
 GPU_QUERY = ["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total",
              "--format=csv,noheader,nounits"]
 APPS_QUERY = ["nvidia-smi", "--query-compute-apps=pid,used_memory", "--format=csv,noheader,nounits"]
@@ -186,8 +190,9 @@ def _users(run, pids):
 
 
 def sample(run, own_user, source, proc_root="/proc", max_memory_mib=None, max_utilization=None,
-           min_available_gib=None):
-    """One idle record of this moment."""
+           min_available_gib=None, reservation=None):
+    """One idle record of this moment. ``reservation``: the local GPU marker (tools/ci/local_gpu.py), whose live
+    holder makes the GPU busy."""
     pids, failure = _pids(run, source, proc_root)
     gpus = parse_gpus(run(GPU_QUERY) or "")
     idle, reasons, processes = decide(pids, _users(run, pids), gpus, own_user, ignore_pids={os.getpid()},
@@ -196,6 +201,9 @@ def sample(run, own_user, source, proc_root="/proc", max_memory_mib=None, max_ut
                                       min_available_gib=min_available_gib)
     if failure:
         idle, reasons = False, [failure] + reasons
+    holder = local_gpu.live_holder(reservation, proc_root) if reservation else None
+    if holder is not None:
+        idle, reasons = False, reasons + [local_gpu.describe(holder)]
     return dict(utc=_now(), source=source, idle=idle, reasons=reasons, processes=processes, gpus=gpus)
 
 
@@ -310,6 +318,8 @@ def main(argv=None):
     check.add_argument("--max-memory-mib", type=float, default=_optional_float("FASTMACE_CI_MAX_MEMORY_MIB"))
     check.add_argument("--max-utilization", type=float, default=_optional_float("FASTMACE_CI_MAX_UTILIZATION"))
     check.add_argument("--min-available-gib", type=float, default=_optional_float("FASTMACE_CI_MIN_AVAILABLE_GIB"))
+    check.add_argument("--reservation", default=os.environ.get("FASTMACE_LOCAL_GPU_MARKER"),
+                       help="the local GPU reservation's marker (tools/ci/local_gpu.py); a live one is busy")
     check.add_argument("--record", help="write the final record as JSON here")
     watcher = commands.add_parser("watch", help="record other users' compute processes during the run")
     watcher.add_argument("--out", required=True)
@@ -336,7 +346,8 @@ def main(argv=None):
         return 0
     result = wait_for_idle(
         lambda: sample(_run, args.user, source, max_memory_mib=args.max_memory_mib,
-                       max_utilization=args.max_utilization, min_available_gib=args.min_available_gib),
+                       max_utilization=args.max_utilization, min_available_gib=args.min_available_gib,
+                       reservation=args.reservation),
         wait_s=args.wait_minutes * 60.0, interval_s=args.interval_seconds, idle_samples=args.idle_samples)
     if args.record:
         Path(args.record).write_text(json.dumps(result, indent=1) + "\n")

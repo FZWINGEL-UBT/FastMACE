@@ -96,9 +96,25 @@ jobs:
         if: steps.recheck.outputs.idle == 'true'
         run: |
           marks=$(python3 tools/ci/gpu_idle.py marks "${{ inputs.tier }}")
-          "$FASTMACE_CI_PYTHON" -m pytest tests/gpu -m "$marks" -rs -p no:cacheprovider \
+          # On the PC the run holds the local GPU reservation (tools/ci/local_gpu.py), which first waits until
+          # no other pytest runs and 10 GiB are available; status 75: not reserved in time, the tests skip.
+          wrap=()
+          if [ -n "${FASTMACE_LOCAL_GPU_MARKER:-}" ]; then
+            wrap=(python3 tools/ci/local_gpu.py run --purpose "GPU CI ${{ inputs.tier }} tier, run ${GITHUB_RUN_ID}"
+                  --wait-minutes 30 --)
+          fi
+          set +e
+          "${wrap[@]}" "$FASTMACE_CI_PYTHON" -m pytest tests/gpu -m "$marks" -rs -p no:cacheprovider \
             --basetemp="$FASTMACE_CI_BASETEMP/run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --junitxml="$OUT/junit.xml" 2>&1 | tee "$OUT/pytest.log"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" = 75 ]; then
+            echo "::notice title=Local GPU not free, tests skipped::$(tail -1 "$OUT/pytest.log")"
+            echo "### Local GPU not free within 30 minutes: tests skipped" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          exit "$status"
 
       - name: Time budgets
         if: always() && steps.recheck.outputs.idle == 'true' && hashFiles('ci-out/junit.xml') != ''
@@ -110,6 +126,9 @@ jobs:
         if: always() && steps.recheck.outputs.idle == 'true'
         run: |
           [ -f "$OUT/watch.pid" ] && kill "$(cat "$OUT/watch.pid")" 2>/dev/null || true
+          # Release: local_gpu.py run releases on any exit; a reservation left by a killed run is stale, and
+          # check removes it here.
+          if [ -n "${FASTMACE_LOCAL_GPU_MARKER:-}" ]; then python3 tools/ci/local_gpu.py check || true; fi
           python3 tools/ci/gpu_idle.py summarize "$OUT/other-users.jsonl" >> "$GITHUB_STEP_SUMMARY"
           if [ -f "$OUT/budget.txt" ]; then
             echo '#### Time budgets (tools/test_budget.py)${{ !inputs.enforce_budget && ', informational on this runner' || '' }}' >> "$GITHUB_STEP_SUMMARY"

@@ -10,8 +10,13 @@ name: gpu
 
 on:
   push:
-    # TEMPORARY (2-T18): fastmace/2-T18 runs the fast tier before the merge; remove it before merging.
-    branches: [main, fastmace/2-T18]
+    branches: [main]
+    # Plan, docs and result updates start no GPU run; a push that also touches code still does.
+    paths-ignore:
+      - "plans/**"
+      - "docs/**"
+      - "results/**"
+      - "**/*.md"
   schedule:
     - cron: "30 0 * * *"  # 01:30 CET / 02:30 CEST
   workflow_dispatch:
@@ -27,17 +32,18 @@ on:
         options: [both, murphy, local]
         default: both
 
-# One GPU run per ref and event at a time; a newer one waits instead of cancelling a run halfway.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
+# Concurrency per runner and ref: at most one run in progress and one pending per runner, so a burst of
+# merges runs once more, not once per merge (a newer pending run replaces an older pending one; a running
+# one is never cancelled).
 jobs:
   murphy:
     if: github.event_name != 'workflow_dispatch' || inputs.runner != 'local'
+    concurrency:
+      group: gpu-murphy-${{ github.ref }}
+      cancel-in-progress: false
     uses: ./.github/workflows/gpu-tier.yml
     with:
       runner: murphy
@@ -51,6 +57,9 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && inputs.runner != 'murphy')
+    concurrency:
+      group: gpu-local-5060ti-${{ github.ref }}
+      cancel-in-progress: false
     uses: ./.github/workflows/gpu-tier.yml
     with:
       runner: local-5060ti

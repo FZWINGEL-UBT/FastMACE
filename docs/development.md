@@ -244,6 +244,10 @@ What runs when:
 | nightly, 00:30 UTC | full tier | — (the PC is not always on or idle) |
 | by hand (`gh workflow run gpu.yml -f tier=full -f runner=local`) | any tier | any tier |
 
+A push that changes only `plans/`, `docs/`, `results/` or Markdown files starts no GPU run. Each runner
+has at most one run in progress and one waiting per ref (`concurrency`, never cancelling a running one).
+A burst of merges therefore runs once more, not once per merge.
+
 `gpu.yml` calls `gpu-tier.yml` once per runner. It has two jobs:
 
 - **idle** waits until the GPU is free (`tools/ci/gpu_idle.py check`), for at most 30 minutes, or 150
@@ -251,10 +255,12 @@ What runs when:
   from another task, or one whose owner `ps` cannot name. It is also busy if `nvidia-smi` fails. WSL's
   `nvidia-smi` lists no processes, so the local runner counts the processes that hold `/dev/dxg`. It
   also needs three consecutive samples under its memory, utilization and RAM limits. The desktop uses
-  about 4.3 GB, and WSL needs 10 GB available. A GPU that stays busy is not a failure: the tests job
-  shows as **skipped**, and the idle job's summary names the processes.
+  about 4.3 GB, and WSL needs 10 GB available. Someone else's live local GPU reservation (see the
+  next section) also counts as busy. A GPU that stays busy is not a failure: the tests job shows as
+  **skipped**, and the idle job's summary names the processes.
 - **tests** checks once more, then runs `pytest tests/gpu -m <tier>` with the runner's
-  `FASTMACE_CI_PYTHON` and `PYTHONPATH` set to the checkout. Nothing is installed. Then it runs
+  `FASTMACE_CI_PYTHON` and `PYTHONPATH` set to the checkout. Nothing is installed. On the PC the run holds
+  the local GPU reservation, and skips if it does not get it within 30 minutes. Then it runs
   `tools/test_budget.py` on the junit file. Over budget fails the job on the local runner, where the
   budgets were measured. On murphy it is informational. While the tests run, a watcher records any
   other user's process that appears on the GPU. It does not stop the run, and the job summary lists
@@ -265,6 +271,41 @@ Each runner's `.env` file holds its paths and limits (`tools/ci/runner/env.murph
 `tools/ci/runner/env.local`), so the workflow names no machine path. On murphy everything stays under
 `/mnt/homes/zwingel`: the runner, its `_work` checkout, `HOME`, `TMPDIR` and a cache of its own
 (`fastmace-cache/ci-murphy`).
+
+### The local GPU reservation
+
+WSL on the PC has 15 GB of RAM for every session. A GPU suite started while sibling CPU suites ran
+crashed WSL on 19 October 2026. WSL's `nvidia-smi` does not show who is on the GPU. So every local GPU
+run holds one reservation, `tools/ci/local_gpu.py`: the GPU CI runner, a worker's GPU suite and a
+timing run alike. Every local CPU suite checks it first.
+
+- **Reserve** creates the marker `~/.fastmace-local-gpu` atomically (`mkdir`), with `holder.json`:
+  owner, purpose, pid, the pid's start time and the time of the reservation. While another live holder
+  has it, reserve waits.
+- **Then wait:** holding the marker, it waits until no other `pytest` process runs and at least 10 GiB
+  of RAM are available. Then the run starts. New CPU suites do not start meanwhile, because they check
+  the marker. If either wait takes longer than `--wait-minutes` (default 60), it releases the marker
+  and exits with status 75.
+- **Release** removes the marker, only for the pid that holds it.
+- **A stale marker** is reported and removed by the next reserve or check. It is stale when its holder
+  process is gone, or when its pid now belongs to another process.
+- **Check** exits 1 while a live marker exists.
+
+Worker commands on the PC, from the checkout (`python3` is WSL's system Python):
+
+```bash
+# A local GPU suite or timing run: reserve, run, release (on any exit; the command's status is returned)
+python3 tools/ci/local_gpu.py run --purpose "2-Tnn fast tier" -- <the GPU command>
+# The same in a shell script that runs several commands
+python3 tools/ci/local_gpu.py reserve --purpose "2-Tnn timing" --pid $$ && trap 'python3 tools/ci/local_gpu.py release --pid $$' EXIT
+# Before every local CPU suite: no reservation, and 6 GB available
+python3 tools/ci/local_gpu.py check --min-available-gib 6 && <the CPU suite command>
+# Who holds it
+python3 tools/ci/local_gpu.py status
+```
+
+The local runner sets `FASTMACE_LOCAL_GPU_MARKER` to the same marker by its absolute path, because
+`keepalive.sh` moves its `HOME`.
 
 ### Keeping the runners up without root
 
@@ -282,9 +323,14 @@ The runner updates itself (owner, 20 October 2026). It was installed at v2.338.0
 
 ### Registering the runners (the owner)
 
-The owner runs these from Git Bash in `D:\Margraf\FastMACE`, on `main` after the merge. `gh` passes the
-registration token, valid for one hour, straight into a pipe, so it is never shown or written down. The
-`git show` copies keep LF line endings.
+The owner runs these from Git Bash in `D:\Margraf\FastMACE`, on `main` after the merge. Both runners can
+be registered at once. The local runner starts a job only when the reservation and its idle rule allow
+it, so it never runs beside a worker's suite.
+
+`gh` passes the registration token, valid for one hour, straight into a pipe, so it is never shown or
+written down. Registering needs admin rights on the repository, which the `FZWINGEL-UBT` account has
+(`GH_TOKEN=$(gh auth token --user FZWINGEL-UBT)`, for that one command). The `git show` copies keep LF
+line endings.
 
 murphy:
 
@@ -293,7 +339,7 @@ R=/mnt/homes/zwingel/actions-runner/murphy
 ssh murphy "mkdir -p $R"
 for f in keepalive.sh env.murphy crontab.murphy; do git -c core.autocrlf=false show main:tools/ci/runner/$f | ssh murphy "cat > $R/$f"; done
 ssh murphy "chmod +x $R/keepalive.sh && cd $R && curl -fsSLo runner.tar.gz https://github.com/actions/runner/releases/download/v2.338.0/actions-runner-linux-x64-2.338.0.tar.gz && echo 'af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32  runner.tar.gz' | sha256sum -c - && tar xzf runner.tar.gz && rm runner.tar.gz"
-gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/registration-token --jq .token | ssh murphy "read -r T && cd $R && ./config.sh --unattended --url https://github.com/FZWINGEL-UBT/FastMACE --token \"\$T\" --name murphy-sm89 --labels fastmace-gpu,sm_89,murphy --work _work --replace"
+GH_TOKEN=$(gh auth token --user FZWINGEL-UBT) gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/registration-token --jq .token | ssh murphy "read -r T && cd $R && ./config.sh --unattended --url https://github.com/FZWINGEL-UBT/FastMACE --token \"\$T\" --name murphy-sm89 --labels fastmace-gpu,sm_89,murphy --work _work --replace"
 ssh murphy "cd $R && cat env.murphy >> .env && (crontab -l 2>/dev/null; cat crontab.murphy) | crontab - && setsid -f $R/keepalive.sh $R < /dev/null > /dev/null 2>&1"
 ```
 
@@ -306,7 +352,7 @@ R=/home/fzwin/actions-runner/local
 wsl -e mkdir -p $R
 for f in keepalive.sh env.local; do git -c core.autocrlf=false show main:tools/ci/runner/$f | wsl -e sh -c "cat > $R/$f"; done
 wsl -e bash -c "chmod +x $R/keepalive.sh && cd $R && curl -fsSLo runner.tar.gz https://github.com/actions/runner/releases/download/v2.338.0/actions-runner-linux-x64-2.338.0.tar.gz && echo 'af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32  runner.tar.gz' | sha256sum -c - && tar xzf runner.tar.gz && rm runner.tar.gz"
-gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/registration-token --jq .token | wsl -e bash -c "read -r T && cd $R && ./config.sh --unattended --url https://github.com/FZWINGEL-UBT/FastMACE --token \"\$T\" --name local-5060ti-sm120 --labels fastmace-gpu,sm_120,local-5060ti --work _work --replace && cat env.local >> .env"
+GH_TOKEN=$(gh auth token --user FZWINGEL-UBT) gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/registration-token --jq .token | wsl -e bash -c "read -r T && cd $R && ./config.sh --unattended --url https://github.com/FZWINGEL-UBT/FastMACE --token \"\$T\" --name local-5060ti-sm120 --labels fastmace-gpu,sm_120,local-5060ti --work _work --replace && cat env.local >> .env"
 ```
 
 Then, in PowerShell, the Startup shortcut. The second line starts the runner now:
@@ -330,7 +376,7 @@ gh api repos/FZWINGEL-UBT/FastMACE/actions/runners --jq '.runners[] | [.name, .s
   Never use a broad `pkill`. While `PAUSED` exists, cron and the shortcut start nothing. Remove it to
   resume. The runner shows as offline. Jobs for it wait in the queue, and fail after 24 hours.
 - **Remove a runner:** pause it, then
-  `gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/remove-token --jq .token | ssh murphy 'read -r T && cd /mnt/homes/zwingel/actions-runner/murphy && ./config.sh remove --token "$T"'`
+  `GH_TOKEN=$(gh auth token --user FZWINGEL-UBT) gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/remove-token --jq .token | ssh murphy 'read -r T && cd /mnt/homes/zwingel/actions-runner/murphy && ./config.sh remove --token "$T"'`
   (through `wsl -e bash -c` for the local one). Then delete the cron lines (`crontab -e`) or the Startup
   shortcut, and the runner directory. GitHub also drops a runner that has been offline for 14 days.
 - **Clean up:** each job deletes its own pytest temporary directory. `_work` holds one checkout, and

@@ -221,6 +221,22 @@ def test_sample_wsl_uses_dxg_holders(tmp_path):
     assert not any(arg.startswith("--query-compute-apps") for argv in run.calls for arg in argv)
 
 
+def test_a_live_local_reservation_is_busy(tmp_path):
+    # The local runner treats someone else's live reservation (tools/ci/local_gpu.py) as a busy GPU.
+    proc = tmp_path / "proc"
+    (proc / "4040").mkdir(parents=True)  # the holder: alive, no /dev/dxg open
+    (proc / "4040" / "stat").write_text("4040 (bash) S 1 " + "0 " * 17 + "5 0 0\n")
+    marker = tmp_path / "gpu"
+    marker.mkdir()
+    (marker / "holder.json").write_text(json.dumps(dict(owner="fzwin", purpose="2-T05 OOM cases", pid=4040,
+                                                        start_ticks=5, started="T")))
+    run = fake_runner(dict(gpus=GPU_DESKTOP))
+    result = gi.sample(run, own_user="fzwin", source="wsl", proc_root=proc, reservation=marker)
+    assert not result["idle"]
+    assert any("2-T05 OOM cases" in reason for reason in result["reasons"])
+    assert gi.sample(run, own_user="fzwin", source="wsl", proc_root=proc, reservation=tmp_path / "none")["idle"]
+
+
 def test_check_writes_github_output_and_summary(tmp_path, monkeypatch):
     output, summary = tmp_path / "out", tmp_path / "summary.md"
     monkeypatch.setenv("GITHUB_OUTPUT", str(output))
