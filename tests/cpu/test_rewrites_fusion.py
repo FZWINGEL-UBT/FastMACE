@@ -100,7 +100,8 @@ def test_record_applies_and_selfchecks_on_the_tiny_model():
     assert resolution.decision("gated_rows").enabled
     entry = next(entry for entry in applied if entry.name == "gated_rows")
     assert entry.result.passed and entry.result.modules == len(model.interactions)
-    assert entry.result.max_relative_error == 0.0
+    # Against the unrewritten cuEq modules, so the block linears' own rounding shows (float64).
+    assert entry.result.max_relative_error <= 1e-12
     assert all(isinstance(i.gated_rows, fm.GatedRows) for i in model.interactions)
     with torch.no_grad():
         model.interactions[1].gated_rows.second.weight_0.mul_(1 + 1e-8)
