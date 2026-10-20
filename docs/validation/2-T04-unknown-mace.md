@@ -212,3 +212,47 @@ unhashed record is off, nothing unhashed is patched, and the decisions are recor
 - or makes the first capture happen inside the fallback window (a warm-up at build).
 
 Reported to the conductor on 20 October 2026.
+
+## Acceptance 1 on the GPU, MACE 0.3.15: after 2-T15b (passed)
+
+Run on 20 October 2026, with the same machine, environment and case as above, and FastMACE main
+at 46bd9a1 (2-T15b merged: the first capture is forced inside the fallback window). The driver,
+`result.json` and the log are in `results/2-T04-acc1-0315-local-20261020b/`. The run was MH-1
+`matpes_r2scan` on NaCl 3x3x3, NVT at 300 K, 200 steps, `check="gate"`, with no engine overrides.
+The wall time was 63 s, setup included.
+
+**Revision chain:**
+- **Revision 0**, graph tier: capture on, plain cuEq (OpenEquivariance is not installed in this
+  environment), `compile_mode="none"` (`compile-unavailable`), conv fusion off (`conv-fusion-mace-rule`),
+  float32 forces with the patched float64 energy.
+- **Revision 1**, eager tier, step 0. The plan's reason: "fallback: mode eager: eager passes the
+  reduced gate: the fault is in capture or compilation (AcceleratorError: ... during capture)".
+- `Plan.fallbacks` records the eager diagnosis, which passed with 1 reduced-gate run, and its
+  activation, with 1 full-gate run.
+
+**Gate:** `passed`, `check="gate"`, 2 rattled copies (0.05 Å), in eager stages. The errors were
+6.8e-4 meV/atom and 2.7e-6 eV/Å. No stress, since this is a fixed-cell run.
+
+**The run report:**
+- plan: eager, plain cuEq (unfused convolution), float32;
+- why: "eager tier: no CUDA graphs, no compilation; correct but slower";
+- why: "plain cuEq, not hybrid: OpenEquivariance cannot build";
+- gate: passed.
+
+**Records and patches:**
+- **Rewrite records off** because their sources differ on 0.3.15: `factor_species`, `fold_cutoff`,
+  `polar_uvu` and `single_graph_strain`. Each is off in the built force field with its reason.
+- **Patch in force:** only `capture_safe_mask_head`, which hashes. `patch_problems` is empty for
+  every patch with a pin.
+- **Treatment decisions:**
+  - float64 energy: patched (its forward hashes);
+  - PolarMACE: refused (no `PolarMACE` in 0.3.15);
+  - strain: not installed (unhashed);
+  - conv fusion: MACE's own rule.
+
+Acceptance 1 therefore holds on the local machine:
+- every record whose source does not hash is off, with its reason;
+- the always-on treatments follow 2-T04's rule;
+- the MD run of MH-1 on NaCl completes on the path the planner reports (the eager tier, after a
+  recorded fallback revision) and passes the gate;
+- no source was patched that was not hashed.
