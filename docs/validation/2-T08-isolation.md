@@ -80,3 +80,39 @@ graph_longrange; the GPU test covers POLAR-1-S), in 28 s. Covered there:
 - two engines stepped in turn are bitwise equal to each engine run alone,
   across neighbour rebuilds;
 - finding 1, pinned.
+
+## 2-T08b: the strain path per model
+
+Finding 1 of the audit is closed: each force field binds its strain path into
+its own forward ([strain-per-model.md](../design/strain-per-model.md)), so a
+failing `single_graph_strain` self-check or the reference calculators'
+process patch no longer changes a force field built earlier.
+
+All runs are at a3ecb2f (main f0bde74 merged in), 20 October 2026.
+
+- **CPU, murphy's CPUs** (NAS `mace_cueq_latest`, `-n 8`,
+  `FASTMACE_BASELINE=/mnt/homes/zwingel/fastmace-baseline/20261017`):
+  - `tests/cpu`: 2454 passed, 8 skipped (for platform or checkout reasons).
+  - 5 failed, and all 5 now pass:
+    - 4 `test_output_chunks` failures were my runner's missing `PYTHONPATH`;
+      the tests pass with it set;
+    - `test_energy.py::test_compile_cache_key_includes_float64_energy`
+      pinned "no instance forward without the float64 energy". Every
+      private copy now binds its strain path, so the test now checks which
+      forward's code is bound, and it passes.
+  - The CPU PolarMACE isolation test runs there (graph_longrange installed)
+    and passes.
+- **GPU, murphy** (RTX 4000 Ada; the GPU was shared only with zwingel's
+  untimed jobs):
+  - full tier of `test_forces_gpu`, `test_polar_gpu`, `test_engine_gpu`,
+    `test_tiny_engine_gpu` and `test_planner_gpu`: 38 passed;
+  - `test_isolation_gpu`: 3 passed. POLAR-1-S again recompiled 21 graphs
+    after the dynamo reset, and was within 1.9e-6 of its fresh value after
+    it;
+  - acceptance tier of the same files: 4 passed, 1 failed. The MH-1 NPT A/B
+    against the research engine, which runs the strain path, passed. The
+    failure is
+    `test_mh1_plain_cueq_float64_against_the_research_engine`: the stage-B
+    graph has 12 more kernels than the baseline's (249 vs 237). `main`
+    14a5e20 fails it the same way on murphy (248 vs 236), so the gap is
+    older than 2-T08b; it was reported to the conductor.
