@@ -3,6 +3,7 @@
 # NaCl and NbCl5 3x3x3, local RTX 5060 Ti (WSL2). Launch detached, holding the local GPU reservation:
 #   setsid -f python3 tools/ci/local_gpu.py run --purpose "2-T20a step breakdown" -- \
 #     bash results/2-T20a-step-breakdown-20261020/run.sh smoke|breakdown ROOT >/dev/null 2>&1
+#   (nsys ROOT STRUCTURE repeats one structure's nsys pass of an earlier breakdown, e.g. after a busy GPU)
 # smoke: NaCl, 20 + 50 + 50 steps, 2 calls (checks the tool and the profilers). breakdown: NaCl, then NbCl5,
 # each one fresh process with 300 equilibration steps, 1,000 steps per window and 10 profiled force calls,
 # as the research engine's 15 October probe; then per crystal an ncu process (one eager force call: FLOPs,
@@ -84,7 +85,13 @@ breakdown() {  # name structure; extra args: the main pass, then the ncu and nsy
   step "$name-ncu-csv" bash -c "'$NCU' --import '$dir/ncu.ncu-rep' --csv --page raw --print-units base \
     > '$dir/ncu_raw.csv'" &&
   step "$name-ncu-join" "$PY" "$TOOL" --output "$dir" --summarize-ncu "$dir/ncu_raw.csv"
-  # nsys: --calls replays of the force graph with every graph node traced.
+  nsys_pass "$name" "$structure" "$@"
+  return 0
+}
+
+nsys_pass() {  # name structure; extra args: --calls replays of the force graph with every graph node traced
+  local name=$1 structure=$2; shift 2
+  local dir=$ROOT/$name
   idle_check "$name-nsys" &&
   step "$name-nsys" "$NSYS" profile -t cuda,nvtx --cuda-graph-trace=node --capture-range=cudaProfilerApi \
     --capture-range-end=stop -o "$dir/nsys" --force-overwrite true \
@@ -92,7 +99,6 @@ breakdown() {  # name structure; extra args: the main pass, then the ncu and nsy
   step "$name-nsys-csv" "$NSYS" stats --report cuda_gpu_trace --format csv --output "$dir/nsys_stats" \
     --force-export true "$dir/nsys.nsys-rep" &&
   step "$name-nsys-gaps" "$PY" "$TOOL" --output "$dir" --summarize-nsys "$dir/nsys_stats_cuda_gpu_trace.csv" "$@"
-  return 0
 }
 
 monitor & MON=$!
@@ -101,5 +107,6 @@ echo "$(date -u +%FT%TZ) mode=$MODE fastmace=$(git -C $FM rev-parse HEAD)" >> "$
 case $MODE in
   smoke) breakdown smoke NaCl --equilibrate-steps 20 --steps 50 --calls 2 ;;
   breakdown) breakdown NaCl NaCl; breakdown NbCl5 NbCl5 ;;
+  nsys) nsys_pass "$3" "$3" ;;  # a pass again, into ROOT/<structure> of an earlier breakdown
 esac
 echo "$(date -u +%FT%TZ) done" >> "$ROOT/run.log"
