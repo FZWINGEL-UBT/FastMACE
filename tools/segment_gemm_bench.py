@@ -34,6 +34,8 @@ ATOMS = 1944
 HIDDEN = ((0, 1, 512), (1, 3, 512), (2, 5, 512), (3, 7, 512))
 # Residual inputs (segments of the [N, W] message after the convolution): l, components, channels, N out.
 RESIDUAL = ((0, 1, 384, 2048), (2, 5, 384, 512), (3, 7, 256, 512))
+# The shared shape rule's one configuration (tile_rule.BLOCK_M, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES).
+RULE = (64, 64, 32, 4, 3)
 CONFIGS = ((64, 64, 32, 4, 3), (128, 64, 32, 4, 3), (64, 128, 32, 4, 3), (128, 128, 32, 8, 3), (32, 64, 32, 4, 3))
 
 
@@ -87,6 +89,9 @@ def main(argv=None):
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--atoms", type=int, default=ATOMS)
     p.add_argument("--repeats", type=int, default=50)
+    p.add_argument("--rule", action="store_true",
+                   help="Only the shared shape rule's configuration (fastmace.kernels.triton.tile_rule), as the "
+                        "segment_gemm record uses it, instead of the best of CONFIGS")
     args = p.parse_args(argv)
     import torch
     import triton
@@ -112,7 +117,7 @@ def main(argv=None):
 
     def best(fn):
         results = []
-        for config in CONFIGS:
+        for config in (RULE,) if args.rule else CONFIGS:
             try:
                 fn(config)
             except Exception:  # noqa: BLE001  (a configuration the compiler refuses)
@@ -245,7 +250,7 @@ def main(argv=None):
     summary = dict(tool="segment_gemm_bench", created_utc=datetime.now(timezone.utc).isoformat(),
                    host=os.uname().nodename, gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                    triton=triton.__version__, fastmace_commit=ab_step_time.fastmace_commit(), atoms=n,
-                   load=list(os.getloadavg()), cases=cases,
+                   load=list(os.getloadavg()), cases=cases, rule_only=args.rule,
                    go=all(c["segment_over_cublas_plus_copy"] < 1.0 for c in cases.values()))
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print("go" if summary["go"] else "stop", flush=True)
