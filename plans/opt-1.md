@@ -63,9 +63,19 @@ accuracy.
 
    For each: which GPUs (sm_89, sm_120), whether it works inside CUDA-graph
    capture and torch.compile, and its documented accuracy.
-2. **Micro-benchmark (local, then murphy).** The model's real GEMM shapes
-   (M = 216 to 2,000 rows; take K and N from MH-1): SIMT FP32 against each
-   mode. Report speed and max/relative error against float64.
+   The external research report (`docs/design/2026-10-20-megakernel-research.md`)
+   says cuBLAS BF16×9 is limited to compute capabilities 10.0 and 10.3, so
+   unavailable on both our GPUs. Verify it against the cuBLAS documentation.
+   If it holds, 3×TF32 (Triton `tf32x3`, CUTLASS) is the candidate.
+2. **Micro-benchmark (local, then murphy).**
+   - Shapes: export the production GEMM shapes and strides from the compiled
+     force call. Irrep layouts can fold components into rows, so M is not
+     always the atom count. Cover 216 to 2,000 atoms.
+   - Comparison: SIMT FP32 against each mode, for the forward products and
+     their input gradients. Report speed and max/relative error against
+     float64.
+   - Precision control: set the precision explicitly per custom (Triton)
+     kernel; torch's TF32 flag does not govern them.
 3. **Model-level screen.** Switch the mode on for the force call. Measure the
    float32-against-float64 force error (the 2× rule), the step time A/B for
    NaCl, NaNbO3 and NbCl5, and the step breakdown.
@@ -79,8 +89,13 @@ recommendation.
 ### Later in this round (ordered by expected gain; each starts after the previous one reports)
 
 - **OPT-T02 Epilogue fusion of linear + elementwise:** gate, product,
-  residual and bias in the GEMM epilogue. Target: part of the 1.66 + 0.41 ms;
-  5–10 % of the step.
+  residual and bias in the GEMM epilogue, plus removal of layout copies
+  around the atom linears. Target: part of the 1.66 + 0.41 ms; 5–15 % of the
+  step (the report ranks this first).
+  - Candidates: Triton GEMMs with an epilogue, CUTLASS epilogue visitor trees,
+    and cuBLASDx device-callable block GEMMs.
+  - Count the backward pass too. Saved preactivations can cancel the forward
+    traffic savings.
 - **OPT-T03 Small-M schedules and cross-layer grouping:** split-K or stream-K
   chosen by a shape rule; grouped GEMMs across independent layers. Only if
   2-T20a's occupancy columns show underfilled grids.
@@ -88,6 +103,18 @@ recommendation.
   unused paths or heads; species-only work hoisted out of the step. Expected
   0–5 %.
 
-Not in this round: a persistent megakernel (ceiling 8–16 % on NaCl, months of
-work); batching and larger cells (owner decisions: one crystal at a time,
-3×3×3).
+- **OPT-T05 Regional persistence experiment (optional, last).** Only after
+  OPT-T02, and only if 2-T20a's Nsight Systems trace shows removable
+  transitions between kernels.
+  - Method: take OPT-T02's fused atom block and run it as a persistent region
+    (tiled tasks, dependency counters, reusable workspace), so that
+    persistence's own gain is isolated.
+  - Stopping rules (the report's milestones C–D): it must beat OPT-T02's
+    block, and needs ≥ 10 % whole-step gain on both GPUs before it grows
+    beyond one interaction.
+
+Not in this round:
+- a complete force megakernel. Our fit gives a ceiling of 8–16 % on NaCl, and
+  the report budgets 0–15 % with regression possible. Months of work.
+- batching and larger cells (owner decisions: one crystal at a time,
+  3×3×3).
