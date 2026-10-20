@@ -37,8 +37,8 @@ workers"). 2-T21 works in the ResearchModule worktree
     no reference cache for now);
   - 2-T07b, 2-T15c, 2-T04e (fixes from an outside review, 20 October:
     durable subprocess checkpoint save; failed engine released before the
-    fallback's next candidate; hosted CPU CI red on torch 2.13). 2-T07b is
-    merged (a8cd333);
+    fallback's next candidate; hosted CPU CI red on torch 2.13): all merged
+    (a8cd333, fe1dac0, 05ecbe6). 2-T14e is merged too (edba9f3);
   - 2-T08c (why `test_mh1_plain_cueq_float64_against_the_research_engine`
     fails on murphy: 12 extra kernels in the stage-B graph, recorded by
     2-T08b; it passes locally).
