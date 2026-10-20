@@ -476,8 +476,8 @@ SPEC_13_KEYS = (
 INTEGRATION_PRECISION = "float64"
 # D1: the gate is opt-in. Without a gate record the run says why it did not run.
 GATE_SKIPPED = {"status": "skipped", "reason": 'opt-in: check="gate"', "selfchecks": None}
-# Keys every gate record has (2-T05's resource fields): null or empty where no gate ran.
-GATE_DEFAULTS = (("selfchecks", None), ("device", None), ("reduced_cell", None), ("steps", ()))
+# Keys every gate record has (2-T05's resource fields): null where no gate ran, ``steps`` then [].
+GATE_RECORD_KEYS = ("selfchecks", "device", "reduced_cell", "steps")
 CHECKPOINT_KEYS = ("path", "sha256", "head", "licence", "label", "trust")
 # The subprocess runner's block (2-T07, ``engine.subprocess.SubprocessRunner.record``) and its last child.
 SUBPROCESS_KEYS = ("python", "reason", "directory", "children", "seconds", "failed", "last")
@@ -673,16 +673,17 @@ def _plan_revisions(plan):
 
 
 def _gate(gate, plan):
-    """The gate record with ``GATE_DEFAULTS``; its ``selfchecks`` default to the plan's (2-T04)."""
+    """The gate record with ``GATE_RECORD_KEYS``; its ``selfchecks`` default to the plan's (2-T04)."""
     if isinstance(gate, Mapping) or gate is None:
         record = dict(GATE_SKIPPED) if gate is None else _plain(gate, "gate")
     else:
         record = _record(gate, "gate")
     if "status" not in record:
         raise ValueError(f"gate record without a status (SPEC §12.3): {record!r}")
-    for key, default in GATE_DEFAULTS:
-        if record.get(key) is None:
-            record[key] = list(default) if isinstance(default, tuple) else default
+    for key in GATE_RECORD_KEYS:
+        record.setdefault(key, None)
+    if record["steps"] is None:
+        record["steps"] = []
     if record["selfchecks"] is None and plan is not None:
         record["selfchecks"] = _plain(list(plan.selfchecks), "plan.selfchecks")
     return record
