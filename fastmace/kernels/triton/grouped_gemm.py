@@ -73,8 +73,8 @@ def _offset(tensor, base):
     return diff // tensor.element_size()
 
 
-def _launch(lefts, weights, out, out_offsets):
-    """One launch for ``lefts[i] @ weights[i]`` written at ``out_offsets[i]`` of the flat ``out``."""
+def _launch(lefts, weights, outs):
+    """One launch for ``outs[i] = lefts[i] @ weights[i]`` (``outs[i]`` contiguous ``[M_i, N_i]``)."""
     import triton
 
     bm, bn, bk = tile_rule.BLOCK_M, tile_rule.BLOCK_N, tile_rule.BLOCK_K
@@ -85,49 +85,39 @@ def _launch(lefts, weights, out, out_offsets):
         starts.append(tiles)
         tiles += triton.cdiv(x.shape[0], bm) * triton.cdiv(w.shape[1], bn)
     pad = MAX_GROUPS - count
-    a0, w0 = lefts[0], weights[0]
+    a0, w0, c0 = lefts[0], weights[0], outs[0]
     ao = [_offset(x, a0) for x in lefts[1:]] + [0] * pad
     wo = [_offset(w, w0) for w in weights[1:]] + [0] * pad
-    co = [int(o) for o in out_offsets[1:]] + [0] * pad
+    co = [_offset(c, c0) for c in outs[1:]] + [0] * pad
     ts = starts[1:] + [_BIG] * pad
     lda = [x.stride(0) for x in lefts] + [0] * pad
     ms = [x.shape[0] for x in lefts] + [0] * pad
     ks = [x.shape[1] for x in lefts] + [0] * pad
     ns = [w.shape[1] for w in weights] + [1] * pad
-    _kernel()[(tiles,)](a0, w0, out[out_offsets[0]:], *ao, *wo, *co, *ts, *lda, *ms, *ks, *ns,
+    _kernel()[(tiles,)](a0, w0, c0, *ao, *wo, *co, *ts, *lda, *ms, *ks, *ns,
                         BLOCK_M=bm, BLOCK_N=bn, BLOCK_K=bk, num_warps=tile_rule.NUM_WARPS,
                         num_stages=tile_rule.NUM_STAGES)
 
 
 def _products(lefts, weights):
-    sizes = [int(x.shape[0]) * int(w.shape[1]) for x, w in zip(lefts, weights)]
-    like = lefts[0]
-    out = like.new_empty((sum(sizes),))
-    offsets, total = [], 0
-    for size in sizes:
-        offsets.append(total)
-        total += size
-    if like.is_cuda and like.dtype == torch.float32:
-        for start in range(0, len(lefts), MAX_GROUPS):
-            stop = start + MAX_GROUPS
-            base = offsets[start]
-            _launch(lefts[start:stop], weights[start:stop], out[base:],
-                    [o - base for o in offsets[start:stop]])
-    else:
-        for x, w, offset, size in zip(lefts, weights, offsets, sizes):
-            out[offset:offset + size] = (x @ w).reshape(-1)
-    return out
+    if not (lefts[0].is_cuda and lefts[0].dtype == torch.float32):
+        return [x @ w for x, w in zip(lefts, weights)]
+    outs = [x.new_empty((x.shape[0], w.shape[1])) for x, w in zip(lefts, weights)]
+    for start in range(0, len(lefts), MAX_GROUPS):
+        stop = start + MAX_GROUPS
+        _launch(lefts[start:stop], weights[start:stop], outs[start:stop])
+    return outs
 
 
 @torch.library.custom_op("fastmace::grouped_products", mutates_args=())
-def grouped_products_op(lefts: List[torch.Tensor], weights: List[torch.Tensor]) -> torch.Tensor:
-    """The flat concatenation of ``lefts[i] @ weights[i]`` (each ``[M_i, N_i]``, row-major)."""
+def grouped_products_op(lefts: List[torch.Tensor], weights: List[torch.Tensor]) -> List[torch.Tensor]:
+    """``[lefts[i] @ weights[i]]``, each its own contiguous ``[M_i, N_i]`` tensor."""
     return _products(lefts, weights)
 
 
 @grouped_products_op.register_fake
 def _(lefts, weights):
-    return lefts[0].new_empty((sum(x.shape[0] * w.shape[1] for x, w in zip(lefts, weights)),))
+    return [x.new_empty((x.shape[0], w.shape[1])) for x, w in zip(lefts, weights)]
 
 
 class _GroupedProducts(torch.autograd.Function):
@@ -137,35 +127,23 @@ class _GroupedProducts(torch.autograd.Function):
         ctx.count = count
         ctx.shapes = [(x.shape[0], w.shape[1]) for x, w in zip(lefts, weights)]
         ctx.save_for_backward(*weights_t)
-        return grouped_products_op(list(lefts), list(weights))
+        return tuple(grouped_products_op(list(lefts), list(weights)))
 
     @staticmethod
-    def backward(ctx, grad):
+    def backward(ctx, *grads):
         weights_t = ctx.saved_tensors
-        grads, offset = [], 0
-        for m, n in ctx.shapes:
-            grads.append(grad.narrow(0, offset, m * n).view(m, n))
-            offset += m * n
-        flat = grouped_products_op(grads, list(weights_t))
-        out, offset = [], 0
-        for (m, _), wt in zip(ctx.shapes, weights_t):
-            size = m * wt.shape[1]
-            out.append(flat.narrow(0, offset, size).view(m, wt.shape[1]))
-            offset += size
+        # An output without a gradient contributes none: zeros keep the launch's shapes (never the case in the
+        # model, where every product feeds the energy).
+        grads = [g if g is not None else wt.new_zeros(shape) for g, wt, shape in zip(grads, weights_t, ctx.shapes)]
+        out = grouped_products_op(list(grads), list(weights_t))
         return (None, *out, *([None] * (2 * ctx.count)))
 
 
 def grouped_products(lefts, weights, weights_t):
     """``[lefts[i] @ weights[i]]`` in one launch per ``MAX_GROUPS`` products; ``weights_t[i]`` is the
-    contiguous transpose of ``weights[i]`` (the input gradient's operand). The weights get no gradient."""
-    count = len(lefts)
-    flat = _GroupedProducts.apply(count, *lefts, *weights, *weights_t)
-    out, offset = [], 0
-    for x, w in zip(lefts, weights):
-        size = x.shape[0] * w.shape[1]
-        out.append(flat.narrow(0, offset, size).view(x.shape[0], w.shape[1]))
-        offset += size
-    return out
+    contiguous transpose of ``weights[i]`` (the input gradient's operand). The weights get no gradient. Each
+    output is its own tensor, so the consumers' fused kernels and the gradients stay per product."""
+    return list(_GroupedProducts.apply(len(lefts), *lefts, *weights, *weights_t))
 
 
 __all__ = ["MAX_GROUPS", "grouped_products", "grouped_products_op"]

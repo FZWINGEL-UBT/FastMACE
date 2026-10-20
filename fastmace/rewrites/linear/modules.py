@@ -42,9 +42,11 @@ def block_products(module, lefts):
     """``lefts[k] @ weight_k`` for every product of a BlockLinear or ResidualBlockLinear.
 
     With ``module.grouped_launch`` (record ``grouped_launch``, OPT-T03 candidate 2) the products the shared
-    shape rule calls small (``tile_rule.uses_triton`` false: too few row tiles for the GPU) run together in one
-    Triton launch, if there are at least two of them; the others, and everything on the CPU or in other
-    dtypes (``module.sms`` None), keep cuBLAS."""
+    shape rule calls small (``tile_rule.uses_triton`` false: too few row tiles for the GPU) and that have the
+    same weight shape run together in one Triton launch, if there are at least two of them. Equal K and N give
+    every tile of the launch, forward and input gradient, the same work: a larger-K product's tiles would run
+    several times longer and set the launch's length, where cuBLAS splits K (OPT-T03b diagnosis). The others,
+    and everything on the CPU or in other dtypes (``module.sms`` None), keep cuBLAS."""
     count = len(lefts)
     weights = [getattr(module, f"weight_{k}") for k in range(count)]
     weights_t = [getattr(module, f"weight_t_{k}") for k in range(count)]
@@ -53,13 +55,18 @@ def block_products(module, lefts):
     if getattr(module, "grouped_launch", False) and sms:
         from fastmace.kernels.triton import tile_rule
 
-        small = [k for k, x in enumerate(lefts) if not tile_rule.uses_triton(x.shape[0], sms)]
-        if len(small) >= 2:
+        groups = {}
+        for k, x in enumerate(lefts):
+            if not tile_rule.uses_triton(x.shape[0], sms):
+                groups.setdefault(tuple(weights[k].shape), []).append(k)
+        for members in groups.values():
+            if len(members) < 2:
+                continue
             from fastmace.kernels.triton.grouped_gemm import grouped_products
 
-            done = grouped_products([lefts[k] for k in small], [weights[k] for k in small],
-                                    [weights_t[k] for k in small])
-            for k, part in zip(small, done):
+            done = grouped_products([lefts[k] for k in members], [weights[k] for k in members],
+                                    [weights_t[k] for k in members])
+            for k, part in zip(members, done):
                 parts[k] = part
     return [part if part is not None else ConstantMatmul.apply(x, w, wt)
             for part, x, w, wt in zip(parts, lefts, weights, weights_t)]
