@@ -21,6 +21,9 @@ optimised main. This draft records the state at that point:
   fixes, and (held by the conductor) the three murphy NaCl processes, whose rule is below;
 - **deferred by the owner, not a blocker:** item 7, GPU CI.
 
+**Combined acceptance:** the runbook for the deferred runs, on the optimised main together with
+optimisation round 1, is [combined-acceptance-runbook.md](combined-acceptance-runbook.md).
+
 **Library.** Every 2-T23 run imports a `git archive` of a 2-T23 tools commit whose `fastmace/` tree is
 main `85360cc`'s. The tools commits are `d885b12` (batch 1), `37c4014` (local batches 2 and 3, murphy
 untimed suites), `4b35b60` (local batch 4, murphy timed suites, item 4's first comparison),
