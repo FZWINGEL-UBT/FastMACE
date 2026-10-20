@@ -268,3 +268,51 @@ def test_run_takes_the_versions_directory(tmp_path, capsys):
               "--versions", "/mnt/homes/zwingel/f-2-T23/versions", "--dry-run"])
     out = capsys.readouterr().out
     assert "--renamed /mnt/homes/zwingel/f-2-T23/versions" in out and "/mnt/homes/zwingel/f-2-T23/src/tools" in out
+
+
+# --- tools/runner_statistics.py ---------------------------------------------------------------------------
+
+runner_statistics = _load(TOOLS / "runner_statistics.py", "_tool_runner_statistics_2t23")
+
+
+def _runner_case(directory, case, rows_by_seed):
+    directory.mkdir()
+    seeds = list(rows_by_seed)
+    meta = dict(status="complete", seeds=seeds, runs={str(seed): dict(runner=case) for seed in seeds})
+    (directory / "statistics.json").write_text(json.dumps(meta))
+    return directory
+
+
+def test_runner_statistics_compare(tmp_path, monkeypatch):
+    rows = {("f", "1"): (300.0, -1.0), ("f", "2"): (302.0, -1.0002), ("r", "1"): (300.5, -1.00001),
+            ("r", "2"): (302.0, -1.0002)}
+
+    def fake_rows(directory):
+        kind = "f" if directory.parent.name == "fresh" else "r"
+        temperature, energy = rows[(kind, directory.name.split("-")[1])]
+        return [{"step": s, "target": 300.0 + s, "temperature": temperature, "energy": energy}
+                for s in range(20, 301, 20)]
+
+    monkeypatch.setattr(runner_statistics, "thermo_rows", fake_rows)
+    fresh = _runner_case(tmp_path / "fresh", "in-process", {1: None, 2: None})
+    runner = _runner_case(tmp_path / "runner", "subprocess", {1: None, 2: None})
+    result = runner_statistics.compare(fresh, runner)
+    assert result["passed"] and result["limits"]["temperature_K"] == pytest.approx(4.0)
+    rows[("r", "1")] = (310.0, -1.0)
+    assert not runner_statistics.compare(fresh, runner)["passed"]
+    rows[("r", "1")] = (300.5, -1.00001)
+    in_process = _runner_case(tmp_path / "runner2", "in-process", {1: None, 2: None})
+    monkeypatch.setattr(runner_statistics, "thermo_rows",
+                        lambda d: fake_rows(d.parent.with_name("runner") / d.name))
+    assert not runner_statistics.compare(fresh, in_process)["passed"]  # the runner must really have run
+
+
+def test_runner_statistics_reads_simulation_thermo_columns(tmp_path):
+    from fastmace.simulation import THERMO_HEADER
+    assert {"step", "target_K", "temperature_K", "potential_eV_atom"} <= set(THERMO_HEADER)
+
+
+def test_runner_statistics_suite():
+    jobs = suites.runner_statistics_jobs(suites.MACHINES["murphy"], Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
+    assert [job.name for job in jobs] == ["runner-statistics-fresh", "runner-statistics-runner"]
+    assert all("mace_cueq_oeq" in job.argv[0] and not job.timing for job in jobs)

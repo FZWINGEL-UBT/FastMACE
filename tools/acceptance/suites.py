@@ -594,6 +594,19 @@ def trajectory2_jobs(machine: Machine, run_root: Path) -> list:
             _trajectory2_job(machine, run_root, "hybrid", "1b"), _trajectory2_job(machine, run_root, "hybrid", "2")]
 
 
+def runner_statistics_jobs(machine: Machine, run_root: Path) -> list:
+    """Phase 2 acceptance item 4, hybrid: MH-1 NaCl in subprocess-runner children (after a compiled plain cuEq)
+    against a fresh process, 20,000 steps, two seeds, 1b-T14's measure. Untimed."""
+    jobs = []
+    for case in ("fresh", "runner"):
+        name = f"runner-statistics-{case}"
+        output = check_location(machine, Path(run_root) / name)
+        argv = [machine.python("mace_cueq_oeq"), _tool(machine, "runner_statistics.py"), "run", "--case", case,
+                "--output", str(output), "--model", PRIMARY_MODEL]
+        jobs.append(Job(name=name, argv=tuple(argv), output=str(output), note="hybrid, 1b-T14's measure"))
+    return jobs
+
+
 def _tier_job(machine, run_root, name, marker, *, timing, note):
     output = check_location(machine, run_root / name)
     basetemp = check_location(machine, run_root / f"{name}-pytest")
@@ -626,5 +639,5 @@ SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun
           "gate-1b": gate_1b_jobs, "gate-1b-subset": gate_1b_subset_jobs, "library-gate": library_gate_jobs,
           "regression": regression_jobs, "frontends": frontends_jobs, "gpu-suite": gpu_suite_jobs,
           "adapter-tests": adapter_jobs, "compile-checks": compile_checks_jobs,
-          "regression2": regression2_jobs, "trajectory2": trajectory2_jobs,
+          "regression2": regression2_jobs, "trajectory2": trajectory2_jobs, "runner-statistics": runner_statistics_jobs,
           "acceptance-tier": acceptance_tier_jobs, "full-tier": full_tier_jobs}
