@@ -54,6 +54,10 @@ def main(argv=None):
     if ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     planner = minimal.MinimalPlanner(engine=EngineConfig(backend=args.backend))
+    if args.reproducible:  # before CUDA starts (SPEC §8.7): the deterministic flags and CUBLAS_WORKSPACE_CONFIG
+        from fastmace.planner import reproducible as reproducible_mode
+
+        reproducible_mode.prepare_process(planner.process, owner="gpu_check --reproducible")
     hardware = planner.hardware()
     sha = hashlib.sha256(args.checkpoint.read_bytes()).hexdigest()
     loaded = loading.load_pristine(args.model, checkpoint=str(args.checkpoint), sha256=sha)
