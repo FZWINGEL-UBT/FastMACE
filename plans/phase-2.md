@@ -1299,8 +1299,16 @@ notes folder of the conductor's session (`2-T0x-…md`).
   `tools/ab_frontends.py`. Local effects below these figures go to murphy
   when it is idle, or get more processes. The go messages of T13, T19, T20
   and T23 carry these figures.
-- **2-T05 has the local GPU** for its out-of-memory cases (untimed; siblings'
-  CPU tests may run alongside, but no other GPU job).
+- **2-T05 has the local GPU** for its out-of-memory cases. The run is untimed,
+  but the WSL memory rule (`CONDUCTOR.md`, the crash on 19 October) still
+  applies:
+  - it starts only with at least 10 GB available;
+  - no local CPU suite runs alongside it;
+  - T05 announces the start and end to the conductor;
+  - the siblings (T04, T07, T10, T18) run further suites on murphy until
+    the conductor sends "local GPU run done".
+  The conductor's first grant wrongly allowed sibling CPU suites alongside
+  it and was corrected within minutes.
 
 ## Phase 1b items carried into phase 2
 
