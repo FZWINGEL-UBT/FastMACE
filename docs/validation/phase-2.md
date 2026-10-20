@@ -31,9 +31,12 @@ them and `85360cc`.
 message). 2-T23 reran what needs final main: item 1's GPU check, items 4 (hybrid) and 8, the acceptance
 and full GPU tiers on the local card, and the acceptance tier on murphy until it was stopped.
 
-**Data.** The raw files are on the machines (`~/fastmace-acceptance/2-T23-local-20261020/` on the PC,
-`/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020*/` on the NAS). Copying the summaries
-into `results/` waits until the PC is free again (the owner needs it).
+**Data.** Summaries, metadata, manifests, junit files, thermo rows and the batch scripts and logs are in
+`results/2-T23-local-20261020/`, `results/2-T23-murphy-20261020/` and
+`results/2-T23-murphy-20261020-runner2/` (`summary.md` and `summary.json` from
+`tools/acceptance/summarize2.py`; item 4's comparison in `compare.json`). Large files (forces, trajectories,
+caches) stay on the machines: `~/fastmace-acceptance/2-T23-local-20261020/` on the PC and
+`/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020*/` on the NAS.
 
 ## Verdict
 

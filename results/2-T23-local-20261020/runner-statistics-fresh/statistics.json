@@ -1,0 +1,45 @@
+{
+ "tool": "runner_statistics",
+ "status": "complete",
+ "case": "fresh",
+ "created_utc": "2026-10-20T15:29:44.165786+00:00",
+ "host": "Fabi-PC",
+ "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+ "fastmace_commit": "4b35b60bf4c8dccdd07c956b7c705988743b7dee",
+ "model": "mh1-r2scan",
+ "structure": "NaCl",
+ "steps": 20000,
+ "every": 20,
+ "seeds": [
+  20261001,
+  20261101
+ ],
+ "targets": [
+  300.0,
+  600.0
+ ],
+ "timestep_fs": 2.0,
+ "runs": {
+  "20261001": {
+   "backend": "hybrid",
+   "dtype": "float32",
+   "runner": "in-process",
+   "setup_s": 19.594745857000817,
+   "run_s": 87.44012638199638,
+   "subprocess": null,
+   "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 12 rewrites on, 2 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nsetup:   20 s (plan 0.014 s, build 19 s, capture 0.16 s, provenance 0.0054 s)\nspeed:   4.36 ms/step, whole-run mean over steps 1\u201320,000\noutput:  /home/fzwin/fastmace-acceptance/2-T23-local-20261020/runner-statistics-fresh/seed-20261001\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+  },
+  "20261101": {
+   "backend": "hybrid",
+   "dtype": "float32",
+   "runner": "in-process",
+   "setup_s": 14.235604006003996,
+   "run_s": 78.51028552299977,
+   "subprocess": null,
+   "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 12 rewrites on, 2 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nsetup:   14 s (plan 0.0042 s, build 14 s, capture 0.15 s, provenance 8e-05 s)\nspeed:   3.86 ms/step, whole-run mean over steps 1\u201320,000\noutput:  /home/fzwin/fastmace-acceptance/2-T23-local-20261020/runner-statistics-fresh/seed-20261101\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+  }
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "finished_utc": "2026-10-20T15:33:11.123112+00:00"
+}
