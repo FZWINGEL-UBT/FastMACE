@@ -225,6 +225,7 @@ class MACEForceField:
                  check=True, float64_energy=True, atomic_energies=None):
         import torch
 
+        from fastmace import _patches
         from fastmace.config import EngineConfig, NeighbourConfig, RewriteConfig
         from fastmace.longrange import polar as longrange
         from fastmace.model import compile as compiling
@@ -323,6 +324,14 @@ class MACEForceField:
         context = reg.Context(config=rewrites if isinstance(rewrites, RewriteConfig) else RewriteConfig(),
                               inputs={"node_attrs": node_attrs})
         model_records = [name for name in enabled if name not in engine_rewrites.RECORDS]
+        # The strain path, bound per model (2-T08b, docs/design/strain-per-model.md): the one-graph
+        # function with the record on, else MACE's own, so that neither another instance nor the
+        # reference calculators' process patch can change it. None (left as MACE has it) when the
+        # strain sources do not hash or the forward cannot be rebound; "on" then fails loudly.
+        strain = "single_graph_strain" in enabled
+        if not strain and (_patches.patch_problems("single_graph_strain") or (
+                not self.is_polar and engine_rewrites.strain_problems(type(source).forward))):
+            strain = None
         self.applied = ()
         self.dynamo_reset = False
         self._polar_model = None
@@ -340,6 +349,8 @@ class MACEForceField:
                     longrange.set_float64_energy(private)
                 else:
                     energy64.install(private)
+            if strain is not None:  # last: it rebinds whichever forward is in force
+                engine_rewrites.bind_strain_path(private, strain)
             return private
 
         if self.compile_mode != "none":
@@ -385,8 +396,15 @@ class MACEForceField:
         # The calculator's own model (eager, no private copy) is never changed: its float64 forward
         # is called as a function.
         self._model_call = self.model
-        if energy_forward is not None and self.model is source:
-            self._model_call = functools.partial(energy_forward, self.model)
+        if self.model is source:
+            forward = energy_forward
+            if strain is not None:
+                forward = engine_rewrites.strain_forward(forward or type(source).forward, strain)
+            if forward is not None:
+                self._model_call = functools.partial(forward, self.model)
+            self.strain_path = None if strain is None else ("one_graph" if strain else "mace")
+        else:
+            self.strain_path = engine_rewrites.strain_path(getattr(self.model, "_orig_mod", self.model))
         self.atomic_energies = None
         if self.energy_treatment == "patched":
             if atomic_energies is None:
@@ -675,5 +693,5 @@ class MACEForceField:
             "species_columns": list(self.species_columns), "charge": self.charge,
             "spin_multiplicity": self.spin_multiplicity, "dynamo_reset": self.dynamo_reset,
             "polar": None if state is None else state.info(), "float64_energy": self.float64_energy,
-            "energy_treatment": self.energy_treatment,
+            "energy_treatment": self.energy_treatment, "strain_path": self.strain_path,
         }

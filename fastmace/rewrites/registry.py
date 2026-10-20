@@ -586,8 +586,7 @@ class Registry:
         passes the model it copied); by default a deep copy of ``model`` is taken first. Returns a
         tuple of AppliedRewrite. A failed check raises SelfCheckError with ``rewrite``, ``result``,
         ``applied`` (the records applied before it) and ``reaction`` (rule 13); ``model`` is then
-        half rewritten and must be discarded, and a process-wide patch the record installed is
-        undone.
+        half rewritten and must be discarded.
         """
         context = context or Context()
         if check and original is None:
@@ -639,11 +638,12 @@ class Registry:
         return Reaction(name, str(reason), disabled, fields, Resolution(tuple(decisions)))
 
     def _selfcheck_failure(self, name, result, detail, resolution, applied):
-        """The SelfCheckError for record ``name``, carrying rule 13's reaction; a process-wide patch is undone."""
-        from fastmace import _patches
+        """The SelfCheckError for record ``name``, carrying rule 13's reaction.
 
-        if isinstance(detail, _patches.PatchRecord):  # process-wide records install a patch
-            _patches.restore(detail.name)
+        Nothing process-wide is undone: no registry record installs a process-wide patch since
+        2-T08b (``single_graph_strain`` is bound per model), so a failure here cannot change a force
+        field built earlier (SPEC §8.7, docs/design/isolation.md).
+        """
         reaction = self.disable_with_dependants(resolution, name, result.detail)
         error = SelfCheckError(
             f"rewrite {name} failed its self-check: {result.detail}",
