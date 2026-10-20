@@ -59,6 +59,8 @@ job gpu-cueq64 "$latest" "$latest/bin/python" "$here/gpu_check.py" --output "$ru
   --checkpoint "$checkpoint" --backend cueq
 job gpu-cueq64-npt "$latest" "$latest/bin/python" "$here/gpu_check.py" --output "$run/gpu-cueq64-npt" \
   --checkpoint "$checkpoint" --backend cueq --stress
+job gpu-cueq64-repro "$latest" "$latest/bin/python" "$here/gpu_check.py" --output "$run/gpu-cueq64-repro"   --checkpoint "$checkpoint" --backend cueq --reproducible
+job gpu-cueq64-repro-npt "$latest" "$latest/bin/python" "$here/gpu_check.py" --output "$run/gpu-cueq64-repro-npt"   --checkpoint "$checkpoint" --backend cueq --reproducible --stress
 job gpu-hybrid32 "$oeq" "${launcher[@]}" "$here/gpu_check.py" --output "$run/gpu-hybrid32" \
   --checkpoint "$checkpoint" --backend hybrid
 job gate "$oeq" "$oeq/bin/python" "$src/tools/force_stress_gate.py" --output "$run/gate" --engine fastmace \

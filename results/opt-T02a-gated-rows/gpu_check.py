@@ -36,6 +36,9 @@ def main(argv=None):
     p.add_argument("--backend", choices=("hybrid", "cueq"), required=True)
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5"])
     p.add_argument("--stress", action="store_true", help="NPT engines (stress path)")
+    p.add_argument("--reproducible", action="store_true",
+                   help="Workload(reproducible=True): plain cuEq with deterministic kernels (2-T16), so that off "
+                        "against off is bitwise and on against off decides")
     args = p.parse_args(argv)
     if args.backend == "hybrid":
         ab_step_time.prepare_fastmace_hybrid()
@@ -57,6 +60,7 @@ def main(argv=None):
     precision = "float32" if args.backend == "hybrid" else "float64"
     out = dict(model=args.model, backend=args.backend, precision=precision, gpu=torch.cuda.get_device_name(),
                torch=torch.__version__, fastmace_commit=ab_step_time.fastmace_commit(), stress=args.stress,
+               reproducible=args.reproducible,
                package=CUEQ_PACKAGE if args.backend == "cueq" else "planner defaults",
                structures={})
     integrator = IntegratorConfig(ensemble="npt" if args.stress else "nvt", temperature_K=300.0)
@@ -70,7 +74,8 @@ def main(argv=None):
             request = "on" if setting == "on" else "off"
             rewrites = (RewriteConfig(**base, gated_rows=request) if request == "on" or base else "auto")
             field = ForceField(loaded, atoms, precision=precision, rewrites=rewrites)
-            plan = planner.plan(field, atoms, integrator, Workload(max_temperature_K=300.0), hardware)
+            plan = planner.plan(field, atoms, integrator, Workload(max_temperature_K=300.0,
+                                                                       reproducible=args.reproducible), hardware)
             engine = planner.build(plan, field, atoms.copy(), temperature_K=0.0)
             state = engine.state
             enabled = [line for line in plan.describe().splitlines() if "gated_rows" in line]
