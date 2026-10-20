@@ -197,8 +197,11 @@ def compare(release, current, repeat=None):
         if a[key] != b[key]:
             raise ValueError(f"the runs differ in {key}: {a[key]!r} against {b[key]!r}")
     seeds = [str(seed) for seed in a["seeds"]]
-    result = dict(backend=a["backend"], release=dict(side=a["side"], commit=a["fastmace_commit"]),
-                  current=dict(side=b["side"], commit=b["fastmace_commit"]),
+    def commit(meta):  # the release copy's own commit, else this checkout's
+        return (meta.get("release_source") or {}).get("commit") or meta["fastmace_commit"]
+
+    result = dict(backend=a["backend"], release=dict(side=a["side"], commit=commit(a)),
+                  current=dict(side=b["side"], commit=commit(b)),
                   plans_equal={seed: a["runs"][seed]["plan"]["options"] == b["runs"][seed]["plan"]["options"]
                                for seed in seeds})
     if a["backend"] == "cueq":
