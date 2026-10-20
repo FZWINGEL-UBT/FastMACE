@@ -6,7 +6,10 @@ plan with its revision chain, the force-field identity, the gate record, the ref
 restart points with their output chunk indices, the setup stages, the report) and
 ``write_metadata`` writes it atomically. Every §13 item has a key (``SPEC_13_KEYS``); items a later
 phase fills are an explicit ``null``. Generators appear only as hashes and cursors: full states and
-prefetched random batches live in the restart file (§10.6).
+prefetched random batches live in the restart file (§10.6). Phase 2 (plan task 2-T17) fills its
+keys: the fallbacks tried and the revision each became, the per-record self-checks, the always-on
+treatments, the gate's device, reduced cell and resource steps, the runner and its child records
+(``subprocess``), and the force field's own record with the strain path it bound (``force_field``).
 
 Phase 1a's blocks stay as they were, so that ``main.py`` on FastMACE (1a-T17) writes the same files:
 
@@ -48,6 +51,7 @@ from fastmace.io import durable
 
 __all__ = ["SCHEMA", "SPEC_13_KEYS", "collect", "cueq_versions", "environment", "fastmace_block",
            "generator_digest", "git_commit", "metadata_record", "model_block", "run_record", "sha256_file",
+           "subprocess_block",
            "write_metadata"]
 
 # Environment variables the research engine's hybrid launcher recorded as ``oeq_wrapper``
@@ -456,13 +460,29 @@ SPEC_13_KEYS = (
     ("1a model block", "model"),
     ("checkpoint trust (1b-T08)", "checkpoint.trust"),
     ("float64 energy accumulation (1b-T03)", "precision.float64_energy"),
+    # plan task 2-T17: what phase 2 records
+    ("plan runner (2-T07)", "plan.runner"),
+    ("per-record self-checks (2-T04)", "gate.selfchecks"),
+    ("always-on treatments (2-T04)", "software.treatments"),
+    ("gate reference device (2-T05)", "gate.device"),
+    ("gate reduced cell (2-T05)", "gate.reduced_cell"),
+    ("gate resource steps (2-T05)", "gate.steps"),
+    ("subprocess runner and its children (2-T07)", "subprocess"),
+    ("strain path bound by the force field (2-T08b)", "force_field.strain_path"),
+    ("compiled with dynamic edges (2-T13)", "plan.engine.dynamic_edges"),
+    ("reproducible mode (2-T16)", "plan.workload.reproducible"),
 )
 # Integration is always float64 (SPEC §7.3); only the force precision is a choice.
 INTEGRATION_PRECISION = "float64"
 # D1: the gate is opt-in. Without a gate record the run says why it did not run.
 GATE_SKIPPED = {"status": "skipped", "reason": 'opt-in: check="gate"', "selfchecks": None}
+# Keys every gate record has (2-T05's resource fields): null where no gate ran, ``steps`` then [].
+GATE_RECORD_KEYS = ("selfchecks", "device", "reduced_cell", "steps")
 CHECKPOINT_KEYS = ("path", "sha256", "head", "licence", "label", "trust")
-# Counters the caller fills in 1b, and those a later phase fills (tier switches: phase 2; MC: phase 3).
+# The subprocess runner's block (2-T07, ``engine.subprocess.SubprocessRunner.record``) and its last child.
+SUBPROCESS_KEYS = ("python", "reason", "directory", "children", "seconds", "failed", "last")
+SUBPROCESS_CHILD_KEYS = ("action", "stage", "pid", "exit_code", "seconds", "steps")
+# Counters the caller fills, and those a later phase fills (tier switches: phase 5, §9.6; MC: phase 3).
 COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone")
 LATER_COUNTER_KEYS = ("tier_switches", "mc")
 # A restart point: its step and the output chunk indices of io.restart.OUTPUT_KEYS (1b-T06).
@@ -634,8 +654,9 @@ def _plan(plan):
         "workload": config(plan.workload, "workload"),
         "software": None if plan.software is None else _plain(plan.software.to_dict(), "plan.software"),
         "allowances": list(plan.allowances),
-        "fallbacks_tried": _plain(list(plan.fallbacks), "plan.fallbacks"),  # () until phase 2 (§9.4)
+        "fallbacks_tried": _plain(list(plan.fallbacks), "plan.fallbacks"),  # TriedCandidate, §9.4 (2-T15)
         "predicted_memory_bytes": plan.predicted_memory_bytes,
+        "runner": plan.runner,
     }
 
 
@@ -643,8 +664,67 @@ def _plan_revisions(plan):
     """The revision chain, oldest first, the active revision last (SPEC §9.5)."""
     if plan is None:
         return []
+    # ``fallback``: the tried candidate that became this revision (§9.4, 2-T15), else null.
+    activated = {tried.revision: tried for tried in plan.fallbacks if tried.outcome == "activated"}
     return [{"revision": entry.revision, "tier": entry.tier, "step": entry.step, "reason": str(entry.reason),
-             "description": entry.describe()} for entry in (*plan.chain(), plan)]
+             "description": entry.describe(), "runner": entry.runner,
+             "fallback": _plain(activated.get(entry.revision), "plan.fallbacks")}
+            for entry in (*plan.chain(), plan)]
+
+
+def _gate(gate, plan):
+    """The gate record with ``GATE_RECORD_KEYS``; its ``selfchecks`` default to the plan's (2-T04)."""
+    if isinstance(gate, Mapping) or gate is None:
+        record = dict(GATE_SKIPPED) if gate is None else _plain(gate, "gate")
+    else:
+        record = _record(gate, "gate")
+    if "status" not in record:
+        raise ValueError(f"gate record without a status (SPEC §12.3): {record!r}")
+    for key in GATE_RECORD_KEYS:
+        record.setdefault(key, None)
+    if record["steps"] is None:
+        record["steps"] = []
+    if record["selfchecks"] is None and plan is not None:
+        record["selfchecks"] = _plain(list(plan.selfchecks), "plan.selfchecks")
+    return record
+
+
+def _treatments(plan):
+    """The always-on treatments' decisions (2-T04, ``rewrites.versions``); null without a plan (no MACE import)."""
+    if plan is None:
+        return None
+    from fastmace.rewrites import versions
+
+    return [_plain(item, "software.treatments") for item in versions.treatments()]
+
+
+def _force_field(force_field):
+    """The engine's force field record (its ``info()``): backend, rewrites applied, the strain path bound."""
+    if force_field is None:
+        return None
+    if not isinstance(force_field, Mapping) and callable(getattr(force_field, "info", None)):
+        force_field = force_field.info()
+    if not isinstance(force_field, Mapping):
+        raise ValueError(f"force_field: expected a mapping or a force field with info(), got "
+                         f"{type(force_field).__name__}")
+    return _plain(force_field, "force_field")
+
+
+def subprocess_block(runner):
+    """The ``subprocess`` block of ``metadata.json`` (2-T07): ``SUBPROCESS_KEYS``, checked.
+
+    ``runner`` is a ``SubprocessRunner`` (its ``record()``) or the mapping it gives; ``last``, the
+    last child, is null or has ``SUBPROCESS_CHILD_KEYS``. ``ValueError`` for a missing or unknown key.
+    """
+    record = _plain(runner.record() if callable(getattr(runner, "record", None)) else runner, "subprocess")
+    if not isinstance(record, dict) or set(record) != set(SUBPROCESS_KEYS):
+        found = sorted(record) if isinstance(record, dict) else type(record).__name__
+        raise ValueError(f"subprocess block: expected the keys {SUBPROCESS_KEYS}, got {found}")
+    last = record["last"]
+    if last is not None and (not isinstance(last, dict) or set(last) != set(SUBPROCESS_CHILD_KEYS)):
+        found = sorted(last) if isinstance(last, dict) else type(last).__name__
+        raise ValueError(f"subprocess block: last child: expected the keys {SUBPROCESS_CHILD_KEYS}, got {found}")
+    return {key: record[key] for key in SUBPROCESS_KEYS}
 
 
 def _precision(plan, identity):
@@ -674,7 +754,7 @@ def _counters(counters, engine_info):
     given = dict(counters or {})
     for key in given:
         if key in LATER_COUNTER_KEYS:
-            raise ValueError(f"counters: {key!r} is filled by a later phase (tier switches: phase 2, MC: phase 3)")
+            raise ValueError(f"counters: {key!r} is filled by a later phase (tier switches: phase 5, MC: phase 3)")
         if key not in COUNTER_KEYS:
             raise ValueError(f"counters: unknown key {key!r}; 1b records {COUNTER_KEYS}")
     out = {key: _plain(given.get(key), f"counters.{key}") for key in COUNTER_KEYS}
@@ -714,7 +794,7 @@ def _timing(setup, timing):
 def metadata_record(*, model=None, checkpoint=None, identity=None, reference_record=None, plan=None, seed=None,
                     generators=None, cursors=None, integrator=None, schedule=None, gate=None, counters=None,
                     engine_info=None, restart_points=(), setup=None, timing=None, report=None, created_utc=None,
-                    device="cpu"):
+                    device="cpu", force_field=None, subprocess=None):
     """``metadata.json`` version 1 (``SCHEMA``) of a run; every input is optional.
 
     - ``model``: the 1a ``model_block`` (nested unchanged under ``"model"``);
@@ -732,7 +812,14 @@ def metadata_record(*, model=None, checkpoint=None, identity=None, reference_rec
     - ``counters``: ``COUNTER_KEYS``; ``engine_info``: the engine's ``info()`` as it is;
     - ``restart_points``: mappings with ``RESTART_POINT_KEYS`` (T06's chunk indices);
     - ``setup``: {stage: seconds} with §12.5's stage names; ``timing``: the timing summary;
-    - ``report``: the run report (1b-T15), a mapping or a record with ``to_metadata()``.
+    - ``report``: the run report (1b-T15), a mapping or a record with ``to_metadata()``;
+    - ``force_field``: the engine's force field (its ``info()``) or a mapping: the rewrites applied
+      and the strain path bound (2-T08b);
+    - ``subprocess``: the subprocess runner (2-T07) or its ``record()``, checked by
+      ``subprocess_block``; null for a plan that runs in this process.
+
+    The gate's ``selfchecks`` default to the plan's per-record self-checks (2-T04); with a plan,
+    the always-on treatments (2-T04) go to ``software.treatments``.
 
     ``device`` is where the run ran: CUDA is queried only for a CUDA device. A full generator
     state or random batch anywhere raises ``ValueError``.
@@ -741,13 +828,7 @@ def metadata_record(*, model=None, checkpoint=None, identity=None, reference_rec
     identity_record = _identity(identity)
     plan_record = _plan(plan)
     oeq = plan is not None and plan.engine.backend == "hybrid"
-    if isinstance(gate, Mapping) or gate is None:
-        gate_record = dict(GATE_SKIPPED) if gate is None else _plain(gate, "gate")
-    else:
-        gate_record = _record(gate, "gate")
-    if "status" not in gate_record:
-        raise ValueError(f"gate record without a status (SPEC §12.3): {gate_record!r}")
-    gate_record.setdefault("selfchecks", None)  # part of the gate record; filled by 1b-T16
+    gate_record = _gate(gate, plan)
     if schedule is not None and not isinstance(schedule, Mapping) and callable(getattr(schedule, "to_restart", None)):
         schedule = schedule.to_restart()
     if integrator is None:
@@ -769,7 +850,8 @@ def metadata_record(*, model=None, checkpoint=None, identity=None, reference_rec
         "software": {"versions": block["versions"], "kernels": block["kernels"], "patches": block["patches"],
                      "triton": block["versions"].get("triton"),
                      "oeq_extension": ({name: os.environ.get(name) for name in OEQ_ENVIRONMENT_VARIABLES}
-                                       if oeq else None)},
+                                       if oeq else None),
+                     "treatments": _treatments(plan)},
         "hardware": _hardware(device),
         "random": {"seed": _plain(seed, "seed"),
                    "generators": None if generators is None else {
@@ -782,6 +864,8 @@ def metadata_record(*, model=None, checkpoint=None, identity=None, reference_rec
         "restart_points": _restart_points(restart_points),
         "timing": _timing(setup, timing),
         "report": None if report is None else _record(report, "report"),
+        "force_field": _force_field(force_field),
+        "subprocess": None if subprocess is None else subprocess_block(subprocess),
     }
 
 

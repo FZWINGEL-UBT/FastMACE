@@ -2,9 +2,11 @@
 
 Plan task 1b-T10, 19 October 2026. Spec: SPEC §13, §10.6 (restart points and output chunks),
 §12.1 (reference record id), owner decision D1 (opt-in gate). Code: `fastmace/provenance.py`.
-Tests: `tests/cpu/test_metadata_schema.py`.
+Tests: `tests/cpu/test_metadata_schema.py`. Phase 2 additions: plan task 2-T17, 20 October 2026
+(tests also in `tests/cpu/test_metadata_simulation.py`).
 
-Phase 1b writes version 1. Phase 2 ("provenance schema") freezes and validates it.
+Phase 1b writes version 1. Phase 2 adds keys and changes none, so the schema stays
+`fastmace.metadata/1`. See "What phase 2 adds" below.
 
 ## How a run writes it
 
@@ -14,7 +16,8 @@ from fastmace import provenance
 record = provenance.metadata_record(model=..., checkpoint=loaded, identity=ff.identity, plan=plan,
                                     seed=seed, generators={...}, cursors={...}, gate=sim.gate,
                                     counters={...}, engine_info=engine.info(), restart_points=[...],
-                                    setup={...}, timing={...}, report=report, device=device)
+                                    setup={...}, timing={...}, report=report, device=device,
+                                    force_field=engine.force_field, subprocess=None)
 provenance.write_metadata(directory / "metadata.json", record)
 ```
 
@@ -60,20 +63,22 @@ Top-level keys, in order. "Source" is the input of `metadata_record`.
 | `model` | the 1a `model_block`, unchanged | `model` |
 | `force_field_identity` | `ForceFieldIdentity.to_dict()` plus `digest` | `identity` (T05's record or its dict) |
 | `reference_record` | the §12.1 record; at least `id` | `reference_record`: a mapping, `to_dict()`, or `.id`; must equal the identity's `reference_record_id` |
-| `plan` | active revision: `revision`, `tier`, `reason`, `step`, `description` (`str(plan)`), `backend`, `conv_fusion`, `rewrites`, `engine`, `neighbours`, `polar`, `integrator`, `decisions` (`key`, `choice`, `reason`, `code`, `rule`), `requested`, `auto_options_off`, `superset`, `workload`, `software`, `allowances`, `fallbacks_tried` (`[]` until phase 2), `predicted_memory_bytes` | `plan` (T12's `Plan`) |
-| `plan_revisions` | `[{revision, tier, step, reason, description}]`, oldest first, active last (§9.5) | `plan.chain()` and `plan` |
+| `plan` | active revision: `revision`, `tier`, `reason`, `step`, `description` (`str(plan)`), `backend`, `conv_fusion`, `rewrites`, `engine`, `neighbours`, `polar`, `integrator`, `decisions` (`key`, `choice`, `reason`, `code`, `rule`), `requested`, `auto_options_off`, `superset`, `workload`, `software`, `allowances`, `fallbacks_tried` (each `TriedCandidate` of 2-T06/2-T15: `dimension`, `change`, `outcome`, `reason`, `stage`, `revision`, `reduced_gate_runs`, `full_gate_runs`; `[]` when no fallback ran), `predicted_memory_bytes`, `runner` (`"in-process"` or `"subprocess"`, 2-T07) | `plan` (T12's `Plan`) |
+| `plan_revisions` | `[{revision, tier, step, reason, description, runner, fallback}]`, oldest first, active last (§9.5); `fallback` is the activated candidate that became the revision, else `null` | `plan.chain()` and `plan` |
 | `precision` | `force`, `integration` (always `"float64"`, §7.3), `tf32`, `float64_energy` (T03, D2) | `plan.precision`; without a plan, the identity's force precision |
 | `runtime` | `RuntimeInfo`: `file_locks`, `file_lock_source`, `file_lock_switch_late`, `cuda_driver_cache` (§14) | `fastmace.runtime_info()` |
-| `software` | `versions` (Python and packages), `kernels` (Triton, NVRTC, streaming probes), `patches`, `triton` (version), `oeq_extension` (the OEq build variables for a hybrid plan, else `null`) | `fastmace_block` |
+| `software` | `versions` (Python and packages), `kernels` (Triton, NVRTC, streaming probes), `patches`, `triton` (version), `oeq_extension` (the OEq build variables for a hybrid plan, else `null`), `treatments` (each always-on treatment of 2-T04: `name`, `qualified`, `decision`, `reason`; `null` without a plan, so MACE is not imported) | `fastmace_block`; `rewrites.versions.treatments()` |
 | `hardware` | `gpu`, `driver`, `compute_capability`; `null` off CUDA | `device` |
 | `random` | `seed`, `generators` (hashes), `cursors` | `seed`, `generators`, `cursors` |
 | `integrator` | integrator parameters | `integrator`, default the plan's `IntegratorConfig` |
 | `schedule` | the schedule and its position | `schedule`: a mapping or `to_restart()` (T07) |
-| `gate` | `status`, `reason`, `selfchecks`, and the rest of the gate record | `gate`; default `{"status": "skipped", "reason": "opt-in: check=\"gate\"", "selfchecks": null}` (D1) |
-| `counters` | `recaptures`, `neighbour_lists` (`{name: {rebuilds, build_time_s, skin_A}}` for MACE and D3), `overflows_redone`; `tier_switches` and `mc` always `null` in 1b; `engine` (the engine's `info()`) | `counters`, `engine_info` |
+| `gate` | `status`, `reason`, `selfchecks`, `device`, `reduced_cell`, `steps`, and the rest of the gate record (2-T05: `copies`, `quantities`, `references`, `seconds`, `replay`, …). `selfchecks` defaults to the plan's per-record self-checks (2-T04 `SelfCheck`: `name`, `passed`, `max_relative_error`, `threshold`, `modules`, `dtype`, `detail`) | `gate`; default `{"status": "skipped", "reason": "opt-in: check=\"gate\"", ...}` (D1), with `device` and `reduced_cell` `null` and `steps` `[]` |
+| `counters` | `recaptures`, `neighbour_lists` (`{name: {rebuilds, build_time_s, skin_A}}` for MACE and D3), `overflows_redone`; `tier_switches` (phase 5) and `mc` (phase 3) always `null`; `engine` (the engine's `info()`) | `counters`, `engine_info` |
 | `restart_points` | `[{step, output_chunk, output_rows, output_frames, ...}]` (T06's indices, §10.6) | `restart_points` |
 | `timing` | `setup_s` (`{stage: seconds}`), `setup_total_s`, then the timing summary | `setup`, `timing` |
 | `report` | the run report | `report`: T15's `to_metadata()` or a mapping |
+| `force_field` | the engine's force field record: backend, dtype, rewrites applied, their decisions and self-check errors, `energy_treatment`, `strain_path` (`"one_graph"`, `"mace"`, or `null` if not bound; 2-T08b), … | `force_field`: the engine's force field (`info()`) or a mapping |
+| `subprocess` | `null` in-process; for a plan in a child (2-T07): `python`, `reason`, `directory`, `children`, `seconds`, `failed`, `last` (`action`, `stage`, `pid`, `exit_code`, `seconds`, `steps`, or `null`) | `subprocess`: a `SubprocessRunner` or its `record()`, checked by `provenance.subprocess_block` |
 
 Setup stages use §12.5's names: load, rewrites, compilation, capture, gate. 1b-T11 split them
 further: load, plan, rewrites, self-checks, model copy, first compiled call, captures. The
@@ -100,7 +105,7 @@ are refused as inputs, so that 1b cannot fill them by accident.
 | integrator parameters, schedule | `integrator`, `schedule` |
 | gate status, self-check results | `gate.status`, `gate.selfchecks` |
 | re-captures; rebuilds, build times, skins; overflows redone | `counters.recaptures`, `.neighbour_lists`, `.overflows_redone` |
-| tier switches; MC counters | `counters.tier_switches`, `counters.mc`: `null` (phases 2 and 3) |
+| tier switches; MC counters | `counters.tier_switches`, `counters.mc`: `null` (phases 5 and 3) |
 | restart points with chunk indices; timing summary | `restart_points`; `timing` |
 | code version (package + git hash) | `code.version`, `code.git_commit` |
 
@@ -114,10 +119,34 @@ What 1b-T10 adds:
 - the trust: `checkpoint.trust`;
 - the float64 energy: `precision.float64_energy`.
 
+## What phase 2 adds (plan task 2-T17)
+
+`SPEC_13_KEYS` lists these too. A run that takes the path behind a key leaves it non-null
+(`test_no_phase_2_key_is_null_on_the_paths_that_fill_it`; a real run in
+`test_metadata_simulation.py`).
+
+| Item | Key | Filled by |
+| --- | --- | --- |
+| fallbacks tried, with reasons, and the revision each became | `plan.fallbacks_tried`, `plan_revisions[].fallback` | 2-T06, 2-T15 |
+| where the plan runs | `plan.runner`, `plan_revisions[].runner` | 2-T07 |
+| per-record self-checks | `gate.selfchecks` (the plan's `SelfCheck`s) | 2-T04 |
+| always-on treatments | `software.treatments` | 2-T04 |
+| gate reference device, reduced cell, resource steps | `gate.device`, `gate.reduced_cell`, `gate.steps` | 2-T05 |
+| the subprocess runner and its children | `subprocess` | 2-T07 |
+| strain path bound by the force field | `force_field.strain_path` | 2-T08b |
+| compiled with dynamic edges | `plan.engine.dynamic_edges` (and its decision) | 2-T13 |
+| reproducible mode | `plan.workload.reproducible`; the verdict and its environment are the `reproducible` decisions | 2-T16 |
+| versions changed on a resume | the revision's `reason` in `plan_revisions`, and a report warning | 2-T09 |
+
+`Simulation` records the built plan (`MinimalPlanner.build` adds the self-checks to the engine's
+`plan`) when its revision is the active one.
+
+A self-check result marked "cached" is not recorded, because 2-T19 added no qualification cache.
+
 ## Not in version 1
 
 - **OEq extension build id.** The OEq runtime of 1a-T00 has no build id. The record keeps
   the build variables instead (`OEQ_JIT_EXTENSION`, `OEQ_EXTENSION_SEED` and the others of
   `OEQ_ENVIRONMENT_VARIABLES`), the same ones `model_block` writes under `oeq_wrapper`.
-- **Self-check results** are part of the gate record. Until 1b-T16 they are `null`.
-- **Validation against a schema file** comes in phase 2.
+- **Validation against a schema file.** No phase 2 task has it. `metadata_record` checks its
+  inputs, and `subprocess_block` checks the runner's block.
