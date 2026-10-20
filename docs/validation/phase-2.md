@@ -14,8 +14,8 @@ optimised main. This draft records the state at that point:
   by the heating transient; owner's repeat pending); item 8's murphy NaCl, one of three processes 0.004
   points over the floor (three more processes pending); the local full tier's one failure is the suite
   definition's, not the library's;
-- **stopped:** the murphy acceptance tier, ordered stopped at about 17:46 UTC at about 23 % (the first 7
-  of 30 tests had passed; see [Stopped](#stopped-and-deferred));
+- **stopped:** the murphy acceptance tier, stopped at 17:53 UTC by the conductor on the owner's order,
+  after 14 of its 30 tests, all passed (see [Stopped](#stopped-and-deferred));
 - **deferred to after the optimisation round:** the murphy acceptance tier, item 4's repeat
   (its protocol is below, written before any run), the final re-run on main after the outside-review
   fixes, and (held by the conductor) the three murphy NaCl processes, whose rule is below;
@@ -48,7 +48,7 @@ into `results/` waits until the PC is free again (the owner needs it).
 | 7 | GPU CI on two architectures | – | – | **deferred by the owner** (20 October 2026, SPEC draft 0.12 eleventh amendment): `gpu.yml` runs by hand only; not a phase 2 blocker. GPU coverage comes from the trial tiers and these acceptance runs |
 | 8 | No regression against `fastmace-1b` | plans equal; trajectories pass; NaCl within floor; NbCl5 2 of 3 within floor, one process main 0.55 % *faster* (accepted) | plans equal; trajectories pass; NbCl5 3 of 3 within floor; NaCl 2 of 3, one process 1.00164 against 1.0016 | plans and trajectories **pass**; step times **pass** except murphy NaCl, **open** until the 3 held processes run |
 | 9 | Carry-overs | | | `main.py` on `Simulation`: from 2-T21's report once merged (not merged at this draft); resume warning (2-T09, 2-T09b), doctor's stale locks (2-T11), `fm.calc` one compile (2-T13): **pass**; coraline (2-T22): **still waiting** for an idle GPU |
-| – | Acceptance GPU tier | **30 / 30 passed** | **stopped** at ~23 %: 7 / 7 passed, including the kernel-count comparison that failed under 2-T08b | murphy deferred |
+| – | Acceptance GPU tier | **30 / 30 passed** | **stopped** after 14 of 30, all passed, including the kernel-count comparison that failed under 2-T08b | murphy deferred |
 | – | Full GPU tier | 244 passed, 2 skipped, 1 failed (suite definition, below) | merge trials (below) | |
 
 ## Runs
@@ -62,7 +62,7 @@ into `results/` waits until the PC is free again (the owner needs it).
 | `2-T23-murphy-20261020` | murphy | RTX 4000 Ada 20 GB | trajectories; runner statistics with backend "auto" (invalid, below) | `37c4014` | 15:04–15:28 |
 | `2-T23-murphy-20261020-runner2` | murphy | same | item 4, first comparison | `4b35b60` | 15:29–15:40 |
 | `2-T23-murphy-20261020` | murphy | same | item 8 A/B (timed), acceptance tier (timed) | `4b35b60` | 15:42– |
-| `2-T23-murphy-20261020` (acceptance tier) | murphy | same | stopped by the owner's decision | `4b35b60` | 16:05–~17:46 |
+| `2-T23-murphy-20261020` (acceptance tier) | murphy | same | stopped by the owner's decision | `4b35b60` | 16:05–17:53 |
 | – | murphy | – | NaCl processes, item 4's repeat: queued, not run | `a8eee21` | – |
 
 - **Environments:** `mace_cueq_oeq` (torch 2.14.1+cu130, MACE 0.3.16, cuEquivariance 0.12.0, OEq 0.7.0)
@@ -228,7 +228,7 @@ version per process, 4 blocks): local NaCl 3.486 → 3.471 ms, NbCl5 27.137 → 
 
 - **Acceptance tier, local:** 30 / 30 passed in 2 h 59 min (12:30–15:29 UTC, quiet PC), including the
   planner's two step-time tests (2-T14d) and all three research-engine comparisons.
-- **Acceptance tier, murphy:** stopped (next section) after 7 of 30, all passed. That includes
+- **Acceptance tier, murphy:** stopped (next section) after 14 of 30, all passed. That includes
   `test_mh1_plain_cueq_float64_against_the_research_engine`, which failed under 2-T08b on murphy (stage-B
   kernel count 249 against 237, [2-T08-isolation.md](2-T08-isolation.md)).
 - **Full tier, local:** 244 passed, 2 skipped (the OEq streaming kernels need OEq in the pytest
@@ -239,11 +239,13 @@ version per process, 4 blocks): local NaCl 3.486 → 3.471 ms, NbCl5 27.137 → 
 
 ## Stopped and deferred
 
-**Stopped (owner's decision, 20 October 2026, about 17:45 UTC):** the murphy acceptance tier
-(`2-T23-murphy-20261020/acceptance-tier`, tools `4b35b60`), at about 23 %: ASE equivalence 2/2,
-canonical restart 1/1, `test_engine_gpu.py` 3/3, fallback 1, all passed. Its partial log and results stay
-on murphy. The permission check refused 2-T23's own stop command on murphy, so the stop was handed to the
-conductor and the owner.
+**Stopped (owner's decision, 20 October 2026):** the murphy acceptance tier
+(`2-T23-murphy-20261020/acceptance-tier`, tools `4b35b60`), at 17:53 UTC, in its gate-resources file.
+By then 14 of 30 tests had passed, none failed: ASE equivalence 2/2, canonical restart 1/1,
+`test_engine_gpu.py` 3/3, `test_fallback_gpu.py` 6/6, `test_forces_gpu.py` 2/2. The permission check
+refused 2-T23's own stop command on murphy. On the owner's direct instruction the conductor killed both
+2-T23 process groups (the tier, and the waiter that would have started the NaCl processes and item 4's
+repeat) and cleared the queue; murphy's GPU was then empty. The partial log and results stay on murphy.
 
 **Deferred to the combined acceptance after the optimisation round (`plans/opt-1.md`):**
 
