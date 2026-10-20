@@ -30,7 +30,6 @@ workers"). 2-T21 works in the ResearchModule worktree
   (the fallback; acceptance 2), 2-T04c, 2-T16, 2-T15b, 2-T17, 2-T19b (20 October 2026).
 - Working in phase 2:
   - 2-T14e (float64 reuse in the test tiers: measuring);
-
   - 2-T21 (`main.py` on `Simulation`, its A/B on murphy);
   - 2-T04's acceptance 1 GPU re-check (MACE 0.3.15, local).
 - Next go messages: 2-T23 (acceptance) once 2-T21 is in.
