@@ -47,6 +47,13 @@ Owner action pending: register the two GPU CI runners, murphy and the local
 PC (`docs/development.md`, "Registering the runners"; 2-T18 is merged). 2-T18's
 done-when, both runners green from a push, waits for it.
 
+Owner question pending: whether to delete 2-T14's scratch folders. The owner
+rejected their deletion in that session, so they stay until the owner
+decides; nothing in them is needed.
+- `/mnt/homes/zwingel/fastmace-2-T14c` (197 MB)
+- `/mnt/homes/zwingel/fastmace-2-T14d` (0.3 GB)
+- WSL `~/fastmace-2-T14c` (68 KB)
+
 Task IDs are `<phase>-T<nn>`. Worker branches are `fastmace/<phase>-T<nn>`.
 
 Conductor sessions start with [CONDUCTOR.md](CONDUCTOR.md).
