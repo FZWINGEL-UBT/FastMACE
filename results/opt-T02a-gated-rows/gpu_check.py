@@ -1,7 +1,7 @@
 """OPT-T02 stage A on the GPU: ``gated_rows`` off against on, same process, same structure (one backend family).
 
 For each structure (3x3x3, rattled 0.05 A, seed 20261020) it builds two engines through the minimal planner,
-one with ``RewriteConfig(gated_rows="on")``, and compares their first force evaluation (the compiled force
+one with ``RewriteConfig(gated_rows="on")``, and a third with it off again as a control, and compares their first force evaluation (the compiled force
 call the engine starts with): energy, forces and, with ``--stress``, stress. Plain cuEq float64
 (``--backend cueq``) is expected to be bitwise equal; the hybrid float32 result is recorded the same way.
 Plain cuEq plans leave the MH-1 package and the block linears off (they are ``auto`` for the hybrid only),
@@ -65,9 +65,10 @@ def main(argv=None):
         rng = np.random.default_rng(20261020)
         atoms.positions += rng.normal(scale=0.05, size=atoms.positions.shape)
         results = {}
-        for setting in ("off", "on"):
+        for setting in ("off", "on", "off2"):  # off2: an off-against-off control in the same process
             base = CUEQ_PACKAGE if args.backend == "cueq" else {}
-            rewrites = (RewriteConfig(**base, gated_rows=setting) if setting == "on" or base else "auto")
+            request = "on" if setting == "on" else "off"
+            rewrites = (RewriteConfig(**base, gated_rows=request) if request == "on" or base else "auto")
             field = ForceField(loaded, atoms, precision=precision, rewrites=rewrites)
             plan = planner.plan(field, atoms, integrator, Workload(max_temperature_K=300.0), hardware)
             engine = planner.build(plan, field, atoms.copy(), temperature_K=0.0)
@@ -80,14 +81,17 @@ def main(argv=None):
                                     plan_line=enabled)
             del engine, field
             torch.cuda.empty_cache()
-        off, on = results["off"], results["on"]
+        off = results["off"]
         entry = dict(natoms=len(atoms), plan_lines={k: v["plan_line"] for k, v in results.items()})
-        for key in ("energy", "forces", "stress"):
-            if off[key] is None:
-                continue
-            delta = np.abs(on[key] - off[key])
-            entry[key] = dict(bitwise_equal=bool(np.array_equal(on[key], off[key])), max_abs_diff=float(delta.max()),
-                              max_abs=float(np.abs(off[key]).max()))
+        for other, label in (("on", "on_vs_off"), ("off2", "off_vs_off")):
+            entry[label] = {}
+            for key in ("energy", "forces", "stress"):
+                if off[key] is None:
+                    continue
+                b = results[other][key]
+                entry[label][key] = dict(bitwise_equal=bool(np.array_equal(b, off[key])),
+                                         max_abs_diff=float(np.abs(b - off[key]).max()),
+                                         max_abs=float(np.abs(off[key]).max()))
         out["structures"][name] = entry
         print(name, json.dumps({k: v for k, v in entry.items() if k != "plan_lines"}), flush=True)
     args.output.with_suffix(".json").write_text(json.dumps(out, indent=2) + "\n")
