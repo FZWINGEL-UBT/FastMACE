@@ -348,6 +348,38 @@ def _prepare(engine) -> None:
         prepare()
 
 
+def detach(error: BaseException | None) -> BaseException | None:
+    """``error`` without the frames its traceback holds (plan task 2-T15c), for every error the fallback keeps.
+
+    A traceback holds each frame it passed through, and those frames hold their locals: the failed
+    engine (``selfcheck.production(engine, ...)``, a caller's ``engine``), and on CUDA its memory,
+    which then stays allocated while the next candidate is built. The type, message and chain stay;
+    the formatted traceback is kept as text in ``error.fastmace_traceback``; then the frames of the
+    error and of its ``__cause__``/``__context__`` chain are cleared and dropped. Idempotent.
+    """
+    import traceback
+
+    if error is None:
+        return None
+    if getattr(error, "fastmace_traceback", None) is None:
+        text = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+        try:
+            error.fastmace_traceback = text
+        except AttributeError:  # pragma: no cover - an exception type without a __dict__
+            pass
+    seen, todo = set(), [error]
+    while todo:
+        current = todo.pop()
+        if current is None or id(current) in seen:
+            continue
+        seen.add(id(current))
+        if current.__traceback__ is not None:
+            traceback.clear_frames(current.__traceback__)  # frames still executing are left as they are
+            current.__traceback__ = None
+        todo += [current.__cause__, current.__context__]
+    return error
+
+
 def _text(error) -> str:
     """The error's class and first line; a gate error adds its record's reason."""
     first = str(error).splitlines()[0] if str(error) else ""
@@ -389,6 +421,7 @@ def activate(candidate: Any, planner: Any, force_field: Any, atoms: Any, *, refe
             "validated there, through the subprocess runner (SPEC §8.7, §9.4 step 3)")
 
     def failed(stage, error, gate=None, runs=0):
+        detach(error)  # the Activation keeps it; its frames would keep this candidate's engine (2-T15c)
         tried = TriedCandidate(dimension=dimension, change=change, outcome="failed",
                                reason=f"{why}; failed at {stage}: {_text(error)}", stage=stage,
                                reduced_gate_runs=runs if reduced else 0, full_gate_runs=0 if reduced else runs)
@@ -778,18 +811,18 @@ class Fallback:
         except Exception as error:
             if _propagates(error):
                 raise
-            return False, _build_stage(error), error
+            return False, _build_stage(error), detach(error)
         extra = {} if quantities is None else {"quantities": tuple(quantities)}
         try:
             record = selfcheck.production(engine, references, check=references.check, **extra)
         except GateFailed as error:
             _release(engine)
-            return False, "gate", error
+            return False, "gate", detach(error)
         except Exception as error:
             if _propagates(error):
                 raise
             _release(engine)
-            return False, stage_of(error, "gate"), error
+            return False, stage_of(error, "gate"), detach(error)
         _release(engine)
         if not record.passed:
             return False, "gate", RuntimeError(f"gate {record.status}: {record.reason}")
@@ -905,6 +938,9 @@ class Fallback:
             raise failure.error
         if not isinstance(failure, Failure):
             raise TypeError(f"Fallback.run takes a fallback.Failure, got {type(failure).__name__}")
+        # The failed engine must be gone before the first candidate is built (2-T15c); "refuse"
+        # above raises the error with its traceback intact.
+        detach(failure.error)
         self.failed = failure.plan
         self.first = failure
         self.quantities = failure.quantities()
