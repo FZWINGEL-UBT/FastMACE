@@ -8,15 +8,16 @@
   ``linear_2``, the chain residual products -> gate -> ``linear_2`` runs on per-segment rows
   (``modules.GatedRows``). It removes the joins and copies between them and their backward,
   about 1.9 ms of a 27 ms NbCl5 3x3x3 step on the RTX 5060 Ti (2-T20a). The products and the
-  elementwise formulas are unchanged, so the record is ``exact``. It is opt-in
-  (``RewriteConfig.gated_rows``, default off) until the A/B on both GPUs.
+  elementwise formulas are unchanged, so the record is ``exact``. On by default wherever
+  ``merged_residual`` is (owner decision, 20 October 2026, after the A/B on both GPUs).
 
 - ``segment_gemm`` (stage B, first part): ``linear_2``'s products in those chains write straight into its
   joined output, and their input gradients read the gradient's rows in place
   (``fastmace.kernels.triton.segment_gemm``), where the shared shape rule
   (``fastmace.kernels.triton.tile_rule``) picks the Triton GEMM; cuBLAS otherwise. It removes the join
   before the symmetric contraction and its backward. ``rounding`` (another GEMM), deterministic (no
-  atomics). Opt-in (``RewriteConfig.segment_gemm``).
+  atomics). On by default with ``gated_rows`` in float32 plans that are not reproducible (owner decision,
+  20 October 2026); float64 and ``reproducible=True`` keep the stock products and join.
 
 The self-check compares each chain with the unrewritten interaction's ``linear_2(gate(linear_1(x)
 + linear_res(y)))``, values and both input gradients, in the model's dtype (SPEC §6.4). The gate's
@@ -197,11 +198,11 @@ RECORDS = {
     "gated_rows": Rewrite(
         name="gated_rows", applies_to=_support, requires=("block_linear", "merged_residual"), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={GATE_FORWARD: GATE_FORWARD_SHA256}, exactness="exact",
-        default="off", deterministic=True, workload_constraints=(), apply=_apply, selfcheck=_selfcheck),
+        default="auto", deterministic=True, workload_constraints=(), apply=_apply, selfcheck=_selfcheck),
     "segment_gemm": Rewrite(
         name="segment_gemm", applies_to=_segment_support, requires=("gated_rows",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={RESHAPE_FORWARD: RESHAPE_FORWARD_SHA256}, exactness="rounding",
-        default="off", deterministic=True, workload_constraints=(), apply=_apply_segment,
+        default="auto", deterministic=True, workload_constraints=(), apply=_apply_segment,
         selfcheck=_segment_selfcheck),
 }
 
