@@ -414,9 +414,9 @@ class Simulation:
         if step == "gate" and stage != "capture":
             if not isinstance(error, GateFailed):
                 raise error
-            self._engine = None
+            self._engine = self._fill = None
             return fallback.Failure(plan=self._plan, stage="gate", error=error, gate=error.gate_record)
-        self._engine = None
+        self._engine = self._fill = None  # nothing here keeps the failed engine alive (2-T15c)
         return fallback.Failure(plan=self._plan, stage=stage, error=error)
 
     def _start_runner(self, setup):

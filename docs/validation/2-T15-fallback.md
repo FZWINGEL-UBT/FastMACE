@@ -61,3 +61,23 @@ record requires. The algorithm is unchanged.
   pair through the real gate (slow).
 - The CPU fast tier (`-m "not slow and not acceptance"`, `-n 2`) on the branch before the main merge:
   2284 passed, 232 skipped.
+
+## 2-T15c: a failed candidate's memory is freed before the next build
+
+An outside review found that the fallback kept each failure's exception, whose traceback frames held the
+failed engine. Reproduced on the CPU with weakrefs (`tests/cpu/test_fallback_memory.py`: the first failed
+engine was alive at every later build, a failed validation's engine at the next one). Fixed by
+`fallback.detach` (type, message, chain and the traceback text kept; frames dropped), for every failure
+the search keeps.
+
+GPU check (`tests/gpu/test_fallback_gpu.py::test_a_failed_candidates_memory_is_freed_before_the_next_build`):
+local NVIDIA GeForce RTX 5060 Ti 16 GB, driver 610.88, desktop holding about 4.6 GB, through
+`tools/ci/local_gpu.py run`; `mace_cueq_oeq` hybrid float32, MH-1 on NaCl 3×3×3, the broken-rewrite
+case; FastMACE commit `48878d2`; untimed; 1 passed in 281 s. `torch.cuda.memory_allocated` at the start
+of each of the 9 builds after the first (8 eager diagnosis runs, the graph candidate), above the first
+build's start; one engine is 156 MiB:
+
+| Run | Extra at each later build |
+| --- | --- |
+| with `detach` | 64.0 MiB at every build (library workspaces, no engine) |
+| control, `detach` disabled (as before 2-T15c) | 220.3 MiB at every build (the same 64 MiB plus the first, failed engine) |
