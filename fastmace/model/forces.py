@@ -261,6 +261,9 @@ class MACEForceField:
                 raise ValueError(f"NeighbourConfig.{name} is 'auto'; the planner resolves it, so pass 'on' or 'off'")
         sort_receivers = neighbours.sort_receivers == "on"
         self.compile_mode = engine.compile_mode
+        # Evaluation plans (2-T13): the compiled model sees the edge dimension as dynamic from the
+        # first call, so a changed edge count does not compile again.
+        self.dynamic_edges = bool(engine.dynamic_edges) and self.compile_mode != "none"
         problems = compiling.cpu_cueq_problems(source)
         if problems:
             raise loading.BackendError(
@@ -346,7 +349,7 @@ class MACEForceField:
             key = None if self.is_polar else (
                 id(source), self.compile_mode, self.backend, self.oeq, accelerated, tuple(enabled),
                 self.species_columns if species_dependent else None, engine.first_derivative_only,
-                engine.unfuse_full_addmm, self.energy_treatment)
+                engine.unfuse_full_addmm, self.energy_treatment, self.dynamic_edges)
             entry = cache.get(key, source) if key is not None else None
             if entry is None:
                 if self.is_polar:
@@ -522,6 +525,10 @@ class MACEForceField:
     def use_edges(self, num_edges):
         """Let the model read the first ``num_edges`` compacted edges (views, no copy)."""
         self.data["edge_index"], self.data["shifts"], self.data["unit_shifts"] = self.neighbours.edges(num_edges)
+        if self.dynamic_edges:
+            from fastmace.model import compile as compiling
+
+            compiling.mark_edges_dynamic(self.data)
 
     # ------------------------------------------------------------------ one-off evaluation
 
