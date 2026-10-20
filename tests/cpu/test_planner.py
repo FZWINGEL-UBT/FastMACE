@@ -612,7 +612,11 @@ def test_plans_equal_the_research_engine(label, capsys):
     model = stand_in(label)
     # The stand-ins give the baseline's own verdicts too.
     assert {k: tuple(v) for k, v in gpu_langevin.rewrite_support(model).items()} == \
-           {k: tuple(v) for k, v in capabilities.rewrite_support(model).items()}
+           {k: tuple(v) for k, v in capabilities.rewrite_support(model).items() if k not in FASTMACE_ONLY_DEFAULTS}
+    for name in FASTMACE_ONLY_DEFAULTS:  # unknown to the research engine; not applicable without the factored block
+        if name in capabilities.rewrite_support(model):
+            supported, _ = capabilities.rewrite_support(model)[name]
+            assert supported == (label in FACTORED_LABELS), name
     compared = 0
     for argv in ARGV_CASES:
         research, off = research_engine(argv, model, label)
@@ -629,7 +633,13 @@ def test_plans_equal_the_research_engine(label, capsys):
         if _plain_cueq_reassociation(argv, research):
             research = dict(research, reassociate_first=False, segmented_first_sum=False)
         assert plan_options(plan) == research, (label, argv)
-        assert dict(plan.auto_options_off) == off, (label, argv)
+        got_off = dict(plan.auto_options_off)
+        assert {k: v for k, v in got_off.items() if k not in FASTMACE_ONLY_DEFAULTS} == off, (label, argv)
+        # The FastMACE-only rewrites, unknown to the research engine, are switched off only where they do not
+        # apply: models without the factored interaction.
+        for name in FASTMACE_ONLY_DEFAULTS:
+            if name in got_off:
+                assert label not in FACTORED_LABELS and " are not " in got_off[name], (label, argv, name)
         compared += 1
     assert compared >= len(ARGV_CASES) - 8
     capsys.readouterr()  # adapt_options_to_model prints what it switched off
