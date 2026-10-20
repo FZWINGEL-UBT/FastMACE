@@ -157,7 +157,7 @@ def test_gate_passes_in_graph_mode(name):
     gate = out["gate"]
     assert out["capture"] and gate["mode"] == "captured replay of stages C, B"
     assert gate["status"] == "passed", gate
-    assert gate["references"]["ran"] == "in-process"
+    assert gate["references"]["ran"] == "child process"  # a CUDA plan's GPU references: always a child (2-T05)
     if "npt" in name:
         assert gate["stress_eV_per_A3"] is not None
     else:

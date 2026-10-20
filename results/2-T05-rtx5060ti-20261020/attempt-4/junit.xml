@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="595.121" timestamp="2026-10-20T03:42:35.663175+02:00" hostname="Fabi-PC"><testcase classname="tests.gpu.test_gate_resources_gpu" name="test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[polar1-l]" time="357.255"><failure message="AssertionError: {'device': 'cuda:0', 'cell': 'production', 'repeat': None, 'atoms': 1944, ...}&#10;assert 'device failure' == 'out of memory'&#10;  &#10;  - out of memory&#10;  + device failure">label = 'polar1-l'
+
+    @pytest.mark.parametrize("label", list(CASES))
+    def test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell(label):
+        torch = pytest.importorskip("torch")
+        if not torch.cuda.is_available():
+            pytest.skip("needs a CUDA GPU")
+        if not _available(label):
+            pytest.skip(f"{label} is not under FASTMACE_MODELS")
+        out = run_gate({"label": label, "repeat": [3, 3, 6]})
+        gate = out["gate"]
+        steps = gate["steps"]
+        print(f"\n{label} on {out['gpu']} ({out['gpu_bytes'] / 1e9:.1f} GB), {out['atoms']} atoms: {gate['status']}, "
+              f"device {gate['device']}, reduced cell {gate['reduced_cell']}, seconds {out['seconds']}")
+        for index, step in enumerate(steps, 1):
+            print(f"  {step['device']} {step['cell']} {step['repeat']} {step['atoms']} atoms: {step['outcome']} "
+                  f"({gate['seconds'][f'step_{index}_s']:.1f} s) {step['reason'] or ''}")
+        print(json.dumps({"case": label, **out}, default=str))
+        if steps[0]["outcome"] == "ran":  # a card large enough for the reference: nothing to walk
+            assert out["gpu_bytes"] &gt; 1.05 * CASES[label], f"the reference ran on a {out['gpu_bytes'] / 1e9:.1f} GB card"
+            return
+&gt;       assert steps[0]["outcome"] == "out of memory", steps[0]
+E       AssertionError: {'device': 'cuda:0', 'cell': 'production', 'repeat': None, 'atoms': 1944, ...}
+E       assert 'device failure' == 'out of memory'
+E         
+E         - out of memory
+E         + device failure
+
+tests/gpu/test_gate_resources_gpu.py:108: AssertionError</failure></testcase><testcase classname="tests.gpu.test_gate_resources_gpu" name="test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[omol0-xl]" time="234.875"><failure message="AssertionError: {'status': 'failed', 'check': 'allow_unavailable', 'reason': 'replay on the production cell differs from a direct evaluation: force 6.03e-05 eV/Å above the floor 1e-05', 'copies': '2 rattled (0.05 Å)', ...}&#10;assert 'failed' in ('passed', 'passed-reduced')">label = 'omol0-xl'
+
+    @pytest.mark.parametrize("label", list(CASES))
+    def test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell(label):
+        torch = pytest.importorskip("torch")
+        if not torch.cuda.is_available():
+            pytest.skip("needs a CUDA GPU")
+        if not _available(label):
+            pytest.skip(f"{label} is not under FASTMACE_MODELS")
+        out = run_gate({"label": label, "repeat": [3, 3, 6]})
+        gate = out["gate"]
+        steps = gate["steps"]
+        print(f"\n{label} on {out['gpu']} ({out['gpu_bytes'] / 1e9:.1f} GB), {out['atoms']} atoms: {gate['status']}, "
+              f"device {gate['device']}, reduced cell {gate['reduced_cell']}, seconds {out['seconds']}")
+        for index, step in enumerate(steps, 1):
+            print(f"  {step['device']} {step['cell']} {step['repeat']} {step['atoms']} atoms: {step['outcome']} "
+                  f"({gate['seconds'][f'step_{index}_s']:.1f} s) {step['reason'] or ''}")
+        print(json.dumps({"case": label, **out}, default=str))
+        if steps[0]["outcome"] == "ran":  # a card large enough for the reference: nothing to walk
+            assert out["gpu_bytes"] &gt; 1.05 * CASES[label], f"the reference ran on a {out['gpu_bytes'] / 1e9:.1f} GB card"
+            return
+        assert steps[0]["outcome"] == "out of memory", steps[0]
+&gt;       assert gate["status"] in ("passed", "passed-reduced"), gate
+E       AssertionError: {'status': 'failed', 'check': 'allow_unavailable', 'reason': 'replay on the production cell differs from a direct evaluation: force 6.03e-05 eV/Å above the floor 1e-05', 'copies': '2 rattled (0.05 Å)', ...}
+E       assert 'failed' in ('passed', 'passed-reduced')
+
+tests/gpu/test_gate_resources_gpu.py:109: AssertionError</failure></testcase></testsuite></testsuites>
