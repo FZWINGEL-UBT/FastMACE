@@ -108,8 +108,10 @@ def run(args):
             ff = fm.ForceField(model, template, precision="float32")
             output = fm.Output(directory, thermo_every=args.every, trajectory_every=None, restart_every=None)
             started = time.perf_counter()
+            # The hybrid is asked for explicitly, as in 2-T07's test: with backend "auto" the planner keeps the
+            # process's plain-cuEq family in-process, and no child would run.
             sim = fm.Simulation(template.copy(), ff, integrator=integrator, seed=seed, workload=workload,
-                                output=output)
+                                output=output, engine=EngineConfig(backend="hybrid"))
             setup_s = time.perf_counter() - started
             started = time.perf_counter()
             sim.run(steps=half, schedule=protocols.ramp(args.targets[0], args.targets[1], ps=ps))
@@ -148,8 +150,10 @@ def compare(fresh, runner):
     across = {seed: trajectory_versions.differences(stats["runner"][seed], stats["fresh"][seed]) for seed in seeds}
     limits = {key: max(2.0 * between[key], floor) for key, floor in trajectory_versions.STATISTIC_FLOORS.items()}
     runners = {name: {seed: metas[name]["runs"][seed]["runner"] for seed in seeds} for name in metas}
-    return dict(runners=runners, between_seeds=between, runner_vs_fresh=across, limits=limits,
-                passed=(all(value == "subprocess" for value in runners["runner"].values())
+    backends = {name: {seed: metas[name]["runs"][seed].get("backend") for seed in seeds} for name in metas}
+    return dict(runners=runners, backends=backends, between_seeds=between, runner_vs_fresh=across, limits=limits,
+                passed=(all(value == "hybrid" for side in backends.values() for value in side.values())
+                        and all(value == "subprocess" for value in runners["runner"].values())
                         and all(value == "in-process" for value in runners["fresh"].values())
                         and all(across[seed][key] <= limits[key] for seed in seeds for key in limits)))
 

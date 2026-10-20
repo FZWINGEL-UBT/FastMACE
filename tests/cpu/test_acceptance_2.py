@@ -278,7 +278,7 @@ runner_statistics = _load(TOOLS / "runner_statistics.py", "_tool_runner_statisti
 def _runner_case(directory, case, rows_by_seed):
     directory.mkdir()
     seeds = list(rows_by_seed)
-    meta = dict(status="complete", seeds=seeds, runs={str(seed): dict(runner=case) for seed in seeds})
+    meta = dict(status="complete", seeds=seeds, runs={str(seed): dict(runner=case, backend="hybrid") for seed in seeds})
     (directory / "statistics.json").write_text(json.dumps(meta))
     return directory
 
