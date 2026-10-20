@@ -333,10 +333,13 @@ def _selfcheck_streaming(original, rewritten, context):
 # --------------------------------------------------------------------------- records
 
 
-def _record(name, config_field, applies_to, exactness, constraints, apply, selfcheck, requires=()):
+def _record(name, config_field, applies_to, exactness, constraints, apply, selfcheck, requires=(),
+            deterministic=True):
+    # deterministic as the MH-1 records (SPEC §9.3, 2-T16): the streaming and segmented variants are not.
     return dict(name=name, config_field=config_field, applies_to=applies_to, requires=requires, conflicts=(),
                 mace_versions=MACE_VERSIONS, source_hashes=gm.source_hashes(), exactness=exactness,
-                default="auto", workload_constraints=constraints, apply=apply, selfcheck=selfcheck)
+                default="auto", workload_constraints=constraints, apply=apply, selfcheck=selfcheck,
+                deterministic=deterministic)
 
 
 # In the research engine's order (generic_rewrites): skip, reassociation, fused backward, streaming.
@@ -351,13 +354,13 @@ RECORDS = {
     "generic_segmented_first_sum": _record(
         "generic_segmented_first_sum", "segmented_first_sum", _support_reassociate, "exact",
         ("single_graph", "fixed_species_superset", "sort_receivers"), apply_segmented_first_sum,
-        _selfcheck_segmented_first_sum, requires=("generic_reassociate",)),
+        _selfcheck_segmented_first_sum, requires=("generic_reassociate",), deterministic=False),
     "generic_fused_radial_backward": _record(
         "generic_fused_radial_backward", "fused_folded_backward", _support_fused_radial_backward, "rounding", (),
         apply_fused_radial_backward, _selfcheck_fused_radial_backward),
     "generic_streaming": _record(
         "generic_streaming", "streaming_conv", _support_streaming, "exact",
-        ("sort_receivers", "per_engine_edge_counter"), apply_streaming, _selfcheck_streaming),
+        ("sort_receivers", "per_engine_edge_counter"), apply_streaming, _selfcheck_streaming, deterministic=False),
 }
 
 __all__ = ["NODE_ATTRS", "RECORDS", "apply_fused_radial_backward", "apply_reassociate", "apply_species_skip",

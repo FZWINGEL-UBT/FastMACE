@@ -233,15 +233,16 @@ RECORDS = {
     "block_linear": Rewrite(
         name="block_linear", applies_to=_block_linear_support, requires=(), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
-        workload_constraints=(), apply=_apply_block_linear, selfcheck=_block_linear_selfcheck),
+        deterministic=True, workload_constraints=(), apply=_apply_block_linear, selfcheck=_block_linear_selfcheck),
     "grouped_linear": Rewrite(
         name="grouped_linear", applies_to=_block_linear_support, requires=("block_linear",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
-        workload_constraints=(), apply=_apply_grouped_linear, selfcheck=_grouped_linear_selfcheck),
+        deterministic=True, workload_constraints=(), apply=_apply_grouped_linear, selfcheck=_grouped_linear_selfcheck),
     "merged_residual": Rewrite(
         name="merged_residual", applies_to=_merged_residual_support, requires=("block_linear", "density_first"),
         conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
-        workload_constraints=(), apply=_apply_merged_residual, selfcheck=_merged_residual_selfcheck),
+        deterministic=True, workload_constraints=(), apply=_apply_merged_residual,
+        selfcheck=_merged_residual_selfcheck),
 }
 
 __all__ = ["READS_RESIDUAL_LINEAR", "RECORDS", "block_linears", "group_linears", "merge_residual_linears"]

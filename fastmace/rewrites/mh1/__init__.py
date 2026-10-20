@@ -471,8 +471,11 @@ def _apply_reassociate(model, context):
 
 
 def _record(name, applies_to, apply, requires=(), exactness="rounding", default="auto", constraints=(),
-            hashes=None):
+            hashes=None, deterministic=True):
+    # deterministic (SPEC §9.3, 2-T16): torch reformulations, MACE's scatter_add_ and FastMACE's Triton
+    # kernels without atomics are; the streaming convolution and the segmented forward are not.
     return Rewrite(name=name, applies_to=applies_to, requires=requires, conflicts=(), mace_versions=MACE_VERSIONS,
+                   deterministic=deterministic,
                    source_hashes=hashes or {}, exactness=exactness, default=default,
                    workload_constraints=constraints, apply=apply, selfcheck=_selfcheck)
 
@@ -493,11 +496,13 @@ RECORDS = {
                                    ("fold_cutoff",), default="off"),
     "streaming_conv": _record("streaming_conv", _streaming_support, _apply(streaming_convolutions),
                               ("fold_cutoff",), exactness="exact",
-                              constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER)),
+                              constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
+                              deterministic=False),  # OEq kernels add sender gradients atomically
     "reassociate_first": _record("reassociate_first", _reassociate_support, _apply_reassociate, ("fold_cutoff",),
                                  constraints=_FIRST),
     "segmented_first_sum": _record("segmented_first_sum", _reassociate_support, _apply(segment_first_sum),
-                                   ("reassociate_first",), exactness="exact", constraints=(*_FIRST, SORT_RECEIVERS)),
+                                   ("reassociate_first",), exactness="exact", constraints=(*_FIRST, SORT_RECEIVERS),
+                                   deterministic=False),  # float32 Triton forward: relaxed atomics across chunks
 }
 
 __all__ = [

@@ -212,7 +212,7 @@ BACKEND_CODES = [code for code in _codes_of_table("**Decision codes**", 2) if co
 
 
 def test_published_tables_were_read():
-    assert "reproducible-no-family-qualified" in REFUSAL_CODES and len(REFUSAL_CODES) >= 25
+    assert "reproducible-family-not-qualified" in REFUSAL_CODES and len(REFUSAL_CODES) >= 25
     assert set(BACKEND_CODES) >= {"backend-cueq-oeq-unavailable", "backend-cueq-mace-imported-first"}
 
 
@@ -226,7 +226,8 @@ def test_every_refusal_code_has_a_reason(code):
     assert any(line.startswith("refused:") and report.REFUSALS[code] in line for line in lines)
 
 
-@pytest.mark.parametrize("code", BACKEND_CODES + ["host-callbacks-graph-sync", "allow-naive-cueq"])
+@pytest.mark.parametrize("code", BACKEND_CODES + ["host-callbacks-graph-sync", "allow-naive-cueq",
+                                                  "reproducible-qualified"])
 def test_every_downgrade_code_has_a_reason(code):
     if code.startswith("backend-cueq"):
         plan = make_plan(backend="cueq", backend_code=code)
@@ -276,10 +277,10 @@ def test_unknown_code_is_named_not_dropped():
 def test_reproducible_shows_the_9_3_refusal():
     test_minimal_planner = pytest.importorskip("test_minimal_planner")
     with pytest.raises(PlanRefused) as caught:
-        test_minimal_planner.plan_label("mh1-r2scan", workload=Workload(max_temperature_K=300.0, reproducible=True))
-    assert "reproducible-no-family-qualified" in caught.value.codes
+        test_minimal_planner.plan_label("mp0-medium", workload=Workload(max_temperature_K=300.0, reproducible=True))
+    assert "reproducible-family-not-qualified" in caught.value.codes
     text = make_report(plan=None, refusal=caught.value, integrator=IntegratorConfig()).setup_text()
-    assert "reproducible=True: no backend and model family is qualified yet (§9.3); phase 2" in text
+    assert "reproducible=True is qualified for plain cuEq MH-1 only (rule 5, §9.3)" in text
 
 
 def test_real_plans_from_the_minimal_planner():

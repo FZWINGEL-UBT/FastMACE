@@ -129,6 +129,7 @@ class SubprocessRunner:
         self._step = 0
         self._metadata: dict[str, Any] | None = None
         self._host_writes: list[tuple[str, Any]] = []
+        self._reproducible = False  # the children get the reproducible process environment (2-T16)
 
     # ------------------------------------------------------------------ Simulation's hooks
 
@@ -250,6 +251,8 @@ class SubprocessRunner:
         self.root = handoff_root(None if output is None else Path(output.directory).resolve())
         self.root.mkdir(parents=True, exist_ok=True)
         self._decision = next((entry for entry in sim.plan.decisions if entry[0] == "runner"), None)
+        workload = getattr(sim.plan, "workload", None)
+        self._reproducible = bool(workload is not None and workload.reproducible)
         self.reason = None if self._decision is None else str(self._decision[2])
 
     def _stage(self):
@@ -287,6 +290,10 @@ class SubprocessRunner:
         python = self.config.resolved_python()
         environment = dict(os.environ) if self.config.inherit_environment else {}
         environment.update(dict(self.config.environment))
+        if self._reproducible:  # set before the child's CUDA starts (SPEC §8.7, owner decision 14)
+            from fastmace.planner.reproducible import PROCESS_ENVIRONMENT
+
+            environment.update(PROCESS_ENVIRONMENT)
         package_root = str(Path(__file__).resolve().parents[2])  # the directory holding fastmace/
         paths = [part for part in environment.get("PYTHONPATH", "").split(os.pathsep) if part]
         environment["PYTHONPATH"] = os.pathsep.join([package_root, *[p for p in paths if p != package_root]])

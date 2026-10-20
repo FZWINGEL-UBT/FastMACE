@@ -357,8 +357,8 @@ def test_reproducible_stubs():
     qualification = reproducible.Qualification(backend="cueq", family="mh1", qualified=False,
                                                blocking=["edge_outer_sum (segmented)"])
     assert qualification.blocking == ("edge_outer_sum (segmented)",) and qualification.entries == ()
-    assert reproducible.ALLOW_LIST == ()
-    _raises_naming("2-T16", lambda: reproducible.qualify(None))
+    # Filled by 2-T16 (tests/cpu/test_reproducible.py).
+    assert reproducible.ALLOW_LIST and all(isinstance(e, reproducible.AllowListEntry) for e in reproducible.ALLOW_LIST)
 
 
 def test_stub_modules_are_torch_free():

@@ -48,9 +48,16 @@ REFUSALS = {
                                  "hybrid backend (OEq; `fastmace doctor` names a missing piece)",
     "inexact-padding": "padded edges would change this model's energies (rule 4); the compiled MD tier with exact "
                        "edge counts comes in phase 3",
-    "reproducible-no-family-qualified": "reproducible=True: no backend and model family is qualified yet (§9.3); "
-                                        "phase 2 qualifies the first; drop reproducible=True for statistical "
-                                        "reproducibility",
+    "reproducible-backend": "reproducible=True needs plain cuEq (rule 5): the hybrid's OEq kernels sum atomically; "
+                            "leave the backend on auto",
+    "reproducible-conv-fusion": "reproducible=True needs the unfused convolution (rule 5, owner decision 13); leave "
+                                "cueq_conv_fusion on auto",
+    "reproducible-family-not-qualified": "reproducible=True is qualified for plain cuEq MH-1 only (rule 5, §9.3); "
+                                         "drop reproducible=True for statistical reproducibility",
+    "reproducible-cueq-version": "reproducible=True: cuEquivariance's run-time kernel choice is pinned for "
+                                 "cuequivariance_ops 0.12.0 only (rule 5); install it, or drop reproducible=True",
+    "reproducible-kernel-not-deterministic": "reproducible=True: a rewrite in use is not declared deterministic "
+                                             "(rule 5); switch it off, or drop reproducible=True",
     "naive-cueq": "cuEquivariance's fused kernels do not load (rule 6); install cuequivariance-ops-torch "
                   "(`fastmace doctor`), or pass allow_naive_cueq=True to run slowly, recorded",
     "atom-count-changes": "a changing atom count is not in 1.0 (rule 7, §8.6)",
@@ -92,6 +99,11 @@ DOWNGRADES = {
                                              "float64 model sums the energy (SPEC §18 decision 2)",
     "allow-naive-cueq": "naive cuEq allowed (allow_naive_cueq=True): cuEquivariance's fused kernels do not load, "
                         "so this run is slow; install cuequivariance-ops-torch (`fastmace doctor`)",
+    "backend-cueq-reproducible": "plain cuEq with the unfused convolution, not hybrid: reproducible=True (rule 5, "
+                                 "owner decision 13), slower than the default plan",
+    "reproducible-qualified": "reproducible=True relies on CUEQUIVARIANCE_OPS_U1D_ALGOS, an undocumented internal "
+                              "of cuequivariance_ops 0.12.0, to pin cuEq's run-time kernel choice (checked at "
+                              "build: two evaluations bitwise equal)",
 }
 
 # SPEC §4.3 model-level known issues, as data (conductor answer for 1b): labels, the species the
