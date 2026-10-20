@@ -294,9 +294,10 @@ def test_ab_fastmace_ratio_is_1b_over_1a_whatever_the_order():
 
 def test_ab_fastmace_plan_check():
     same = ab_fastmace.compare_options({"a": True, "b": False}, {"a": True, "b": False})
-    assert same == {"equal": True, "differences": {}}
+    assert (same["equal"], same["differences"], same["as_expected"]) == (True, {}, True)
     different = ab_fastmace.compare_options({"a": True, "b": False}, {"a": True, "b": True, "c": True})
-    assert different == {"equal": False, "differences": {"b": [False, True], "c": [None, True]}}
+    assert (different["equal"], different["differences"]) == (False, {"b": [False, True], "c": [None, True]})
+    assert not different["as_expected"]  # with no allowed changes (2-T23), every difference is unexpected
 
 
 def test_ab_fastmace_regression_suite():

@@ -399,3 +399,52 @@ def test_tier_suite_sets_the_polar_references_only_where_they_exist(tmp_path):
     (tmp_path / "1a-T19-gate-leto-20261018" / "gate-polar1-s").mkdir(parents=True)
     (job,) = suites.full_tier_jobs(machine, tmp_path / "run")
     assert job.env["FASTMACE_1A_T19_POLAR1S"].endswith("gate-polar1-s")
+
+
+# --- the combined acceptance (optimisation round 1) -------------------------------------------------------
+
+
+def test_compare_options_allows_the_expected_changes():
+    release = {"block_linear": True}
+    current = {"block_linear": True, "gated_rows": True, "off:segment_gemm": "fused only"}
+    check = ab_fastmace.compare_options(release, current, allowed=("gated_rows", "segment_gemm"))
+    assert not check["equal"] and check["as_expected"] and check["unexpected"] == []
+    check = ab_fastmace.compare_options(release, {**current, "block_linear": None}, allowed=("gated_rows",))
+    assert set(check["unexpected"]) == {"block_linear", "off:segment_gemm"} and not check["as_expected"]
+
+
+def test_regression2_expects_the_round_changes_only():
+    (job, *_) = suites.regression2_jobs(suites.MACHINES["murphy"], Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
+    argv = list(job.argv)
+    at = argv.index("--allow-option-changes")
+    assert argv[at + 1:at + 3] == ["gated_rows", "segment_gemm"]
+    args = ab_fastmace.parse_args(argv[2:])
+    assert args.allow_option_changes == ["gated_rows", "segment_gemm"]
+
+
+def test_trajectory_compare_with_expected_option_changes(tmp_path):
+    release = _write(tmp_path / "a", "1b", "cueq", [_rows(100, 10, -1.0, 300.0)], [1])
+    current = _write(tmp_path / "b", "2", "cueq", [_rows(100, 10, -1.0, 300.0, 5e-13)], [1])
+    meta = json.loads((current / "trajectory.json").read_text())
+    meta["runs"]["1"]["plan"]["options"]["gated_rows"] = True
+    (current / "trajectory.json").write_text(json.dumps(meta))
+    assert not trajectory_versions.compare(release, current)["passed"]
+    assert trajectory_versions.compare(release, current, allowed=("gated_rows",))["passed"]
+
+
+def test_gate_split_covers_the_19_labels_once():
+    assert sorted(suites.LOCAL_GATE_LABELS + suites.MURPHY_GATE_LABELS) == sorted(suites.GATE_LABELS)
+    assert len(suites.GATE_LABELS) == 19 and not set(suites.LOCAL_GATE_LABELS) & set(suites.MURPHY_GATE_LABELS)
+    root = Path("/home/u/fastmace-acceptance/r")
+    local = {job.name for job in suites.gate_local_jobs(suites.MACHINES["local"], root)}
+    assert local and all(name.startswith("gate-") for name in local)
+
+
+def test_round_tests_job_selects_the_round_files_outside_the_acceptance_tier():
+    import dataclasses
+    machine = dataclasses.replace(suites.MACHINES["local"], fastmace=str(REPOSITORY_ROOT))
+    (job,) = suites.round_tests_jobs(machine, Path("/home/u/fastmace-acceptance/r"))
+    argv = list(job.argv)
+    assert argv[argv.index("-m", argv.index("pytest")) + 1] == "not acceptance" and not job.timing
+    files = [Path(item).name for item in argv if item.endswith(".py")]
+    assert "test_canonical_restart_gpu.py" in files and "test_reproducible_gpu.py" in files

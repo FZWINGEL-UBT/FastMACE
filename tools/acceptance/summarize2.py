@@ -49,6 +49,8 @@ def regression_rows(name, meta, machine):
                          build_order=meta["build_order"], release_ms=a["median_ms"], current_ms=b["median_ms"],
                          ratio=ratio, deviation=ratio - 1, pair_ratio_min=min(pairs), pair_ratio_max=max(pairs),
                          noise_floor=floor, plan_equal=entry["plan_check"]["equal"],
+                         plan_as_expected=entry["plan_check"].get("as_expected", entry["plan_check"]["equal"]),
+                         plan_differences=entry["plan_check"].get("differences"),
                          plan_describe_equal=entry.get("plan_describe_equal"),
                          observables_difference=entry.get("observables_difference"),
                          valid=valid, passed=bool(valid and abs(ratio - 1) <= floor)))
@@ -103,7 +105,7 @@ def junit_totals(path):
     return totals
 
 
-def summarize_run(run_root, machine):
+def summarize_run(run_root, machine, allowed=()):
     run_root = Path(run_root)
     summary = dict(run_root=str(run_root), machine=machine, regression=[], controls=[], forces=[], trajectories={},
                    tiers={})
@@ -132,7 +134,8 @@ def summarize_run(run_root, machine):
             repeat = run_root / f"trajectory2-{backend}-2-repeat"
             try:
                 result = trajectory_versions.compare(release, current,
-                                                     repeat if (repeat / "trajectory.json").is_file() else None)
+                                                     repeat if (repeat / "trajectory.json").is_file() else None,
+                                                     allowed)
                 result.pop("statistics", None)
             except ValueError as exc:
                 result = dict(error=str(exc), passed=False)
@@ -147,7 +150,7 @@ def summarize_run(run_root, machine):
 def markdown(summary):
     lines = []
     if summary["regression"]:
-        lines += ["| Process | Structure | 1b (ms) | 2 (ms) | 2/1b | pair range | floor | plan equal | valid | pass |",
+        lines += ["| Process | Structure | 1b (ms) | 2 (ms) | 2/1b | pair range | floor | plan ok | valid | pass |",
                   "| --- | --- | ---: | ---: | ---: | --- | ---: | --- | --- | --- |"]
         for row in summary["regression"]:
             if "ratio" not in row:
@@ -155,7 +158,7 @@ def markdown(summary):
                 continue
             lines.append(f"| {row['job']} | {row['structure']} | {row['release_ms']:.3f} | {row['current_ms']:.3f} | "
                          f"{row['ratio']:.4f} | {row['pair_ratio_min']:.4f}–{row['pair_ratio_max']:.4f} | "
-                         f"{row['noise_floor'] * 100:.2f} % | {row['plan_equal']} | {row['valid']} | "
+                         f"{row['noise_floor'] * 100:.2f} % | {row['plan_as_expected']} | {row['valid']} | "
                          f"{'yes' if row['passed'] else 'NO'} |")
     if summary["controls"]:
         lines += ["", "| Control | Side | Structure | load (s) | setup (s) | median (ms) |",
@@ -179,8 +182,10 @@ def main(argv=None):
     p.add_argument("run_root", type=Path)
     p.add_argument("--machine", required=True, choices=sorted(NOISE_FLOORS))
     p.add_argument("--output", type=Path, help="Write the summary JSON here")
+    p.add_argument("--allow-option-changes", nargs="*", default=[], metavar="OPTION",
+                   help="Plan options whose difference between the versions is expected (the trajectory checks)")
     args = p.parse_args(argv)
-    summary = summarize_run(args.run_root, args.machine)
+    summary = summarize_run(args.run_root, args.machine, args.allow_option_changes)
     if args.output:
         args.output.write_text(json.dumps(summary, indent=2, default=str) + "\n")
     print(markdown(summary))

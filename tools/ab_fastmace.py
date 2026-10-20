@@ -108,6 +108,9 @@ def parse_args(argv=None):
     p.add_argument("--ensemble", choices=("nvt", "npt"), default="nvt")
     p.add_argument("--cell-mode", choices=("hydrostatic", "full"), default="hydrostatic")
     p.add_argument("--dump-forces", action="store_true", help="Write each side's starting forces per structure")
+    p.add_argument("--allow-option-changes", nargs="*", default=[], metavar="OPTION",
+                   help="Options whose difference between the sides is expected (rewrites a later release turned "
+                        "on by default); any other difference makes the process invalid")
     p.add_argument("--dump-final", action="store_true",
                    help="Write each side's positions and forces after its last timed block, per structure")
     args = p.parse_args(argv)
@@ -146,11 +149,17 @@ def ratio_current_over_release(medians, current, release):
     return medians[current] / medians[release]
 
 
-def compare_options(first, second):
-    """Equality of two plans' engine options ({option: value}), with each differing option's two values."""
+def compare_options(first, second, allowed=()):
+    """Equality of two plans' engine options ({option: value}), with each differing option's two values.
+
+    ``allowed`` names options whose difference is expected (rewrites that a later release turned on by
+    default, e.g. ``gated_rows``; an option counts with its ``off:`` key too): ``unexpected`` lists the
+    other differences, and ``as_expected`` is true when there are none."""
     differences = {key: [first.get(key), second.get(key)] for key in sorted(set(first) | set(second))
                    if first.get(key) != second.get(key)}
-    return {"equal": not differences, "differences": differences}
+    unexpected = sorted(key for key in differences if key.removeprefix("off:") not in set(allowed))
+    return {"equal": not differences, "differences": differences, "allowed": sorted(allowed),
+            "unexpected": unexpected, "as_expected": not unexpected}
 
 
 class Version:
@@ -294,7 +303,8 @@ def main(argv=None):
                 patches.leave(name)
             if len(names) == 2:
                 entry["plan_check"] = compare_options(entry["plans"][args.release]["options"],
-                                                      entry["plans"][args.current]["options"])
+                                                      entry["plans"][args.current]["options"],
+                                                      allowed=args.allow_option_changes)
                 entry["plan_describe_equal"] = (entry["plans"][args.release]["describe"]
                                                 == entry["plans"][args.current]["describe"])
             changed = []
@@ -324,7 +334,7 @@ def main(argv=None):
             entry["compile_during_timing"] = dict(changes=changes, recompiled=recompiled)
             entry["patches_changed_while_timed"] = changed
             entry["valid"] = (not recompiled and not changed
-                              and entry.get("plan_check", {"equal": True})["equal"])
+                              and entry.get("plan_check", {"as_expected": True})["as_expected"])
             peak = torch.cuda.max_memory_reserved()
             for name in names:
                 info = dict(sides[name].engine.info())

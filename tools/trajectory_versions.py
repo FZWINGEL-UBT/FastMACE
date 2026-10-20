@@ -63,6 +63,8 @@ def parse_args(argv=None):
     compare.add_argument("--release", required=True, type=Path, help="Output directory of the 1b side")
     compare.add_argument("--current", required=True, type=Path, help="Output directory of this checkout's side")
     compare.add_argument("--repeat", type=Path, help="A second run of this checkout (the plain cuEq floor)")
+    compare.add_argument("--allow-option-changes", nargs="*", default=[], metavar="OPTION",
+                         help="Plan options whose difference between the versions is expected")
     args = p.parse_args(argv)
     if args.command == "run" and args.side == "1b" and args.renamed is None:
         p.error("--side 1b needs --renamed DIR (python -m fastmace.bench.versions export --ref fastmace-1b "
@@ -190,18 +192,22 @@ def _load(directory):
     return meta
 
 
-def compare(release, current, repeat=None):
+def compare(release, current, repeat=None, allowed=()):
     """The verdict record of two (or three) ``run`` outputs with the same backend, steps and seeds."""
     a, b = _load(release), _load(current)
     for key in ("backend", "steps", "every", "seeds", "targets", "structure", "model"):
         if a[key] != b[key]:
             raise ValueError(f"the runs differ in {key}: {a[key]!r} against {b[key]!r}")
     seeds = [str(seed) for seed in a["seeds"]]
+
     def commit(meta):  # the release copy's own commit, else this checkout's
         return (meta.get("release_source") or {}).get("commit") or meta["fastmace_commit"]
 
     result = dict(backend=a["backend"], release=dict(side=a["side"], commit=commit(a)),
                   current=dict(side=b["side"], commit=commit(b)),
+                  plan_checks={seed: ab_fastmace.compare_options(a["runs"][seed]["plan"]["options"],
+                                                                 b["runs"][seed]["plan"]["options"], allowed)
+                               for seed in seeds},
                   plans_equal={seed: a["runs"][seed]["plan"]["options"] == b["runs"][seed]["plan"]["options"]
                                for seed in seeds})
     if a["backend"] == "cueq":
@@ -212,7 +218,7 @@ def compare(release, current, repeat=None):
             result["repeat_positions_max_A"] = {seed: max_deviation(c["runs"][seed]["rows"], b["runs"][seed]["rows"])
                                                 for seed in seeds}
         result["limit_A"] = FLOAT64_LIMIT_A
-        result["passed"] = (all(result["plans_equal"].values())
+        result["passed"] = (all(check["as_expected"] for check in result["plan_checks"].values())
                             and all(value <= FLOAT64_LIMIT_A for value in result["positions_max_A"].values()))
         return result
     stats = {side: {seed: statistics(meta["runs"][seed]["rows"]) for seed in seeds}
@@ -223,7 +229,7 @@ def compare(release, current, repeat=None):
     # widen its own limit.
     limits = {key: max(2.0 * between["release"][key], floor) for key, floor in STATISTIC_FLOORS.items()}
     result.update(statistics=stats, between_seeds=between, across_versions=across, limits=limits,
-                  passed=(all(result["plans_equal"].values())
+                  passed=(all(check["as_expected"] for check in result["plan_checks"].values())
                           and all(across[seed][key] <= limits[key] for seed in seeds for key in limits)))
     return result
 
@@ -232,7 +238,7 @@ def main(argv=None):
     args = parse_args(argv)
     if args.command == "run":
         return run(args)
-    result = compare(args.release, args.current, args.repeat)
+    result = compare(args.release, args.current, args.repeat, args.allow_option_changes)
     print(json.dumps({key: value for key, value in result.items() if key != "statistics"}, indent=2))
     return result
 

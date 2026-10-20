@@ -532,12 +532,18 @@ def compile_checks_jobs(machine: Machine, run_root: Path) -> list:
 # --- phase 2 (plan task 2-T23) ------------------------------------------------------------------------------
 
 
+# Options whose default changed after fastmace-1b by owner decision (optimisation round 1, 20 October 2026: OPT-T02
+# stages A and B on by default). Item 8 of the combined acceptance expects exactly these plan differences.
+ROUND_OPTION_CHANGES = ("gated_rows", "segment_gemm")
+
+
 def _regression2_job(machine, run_root, name, sides, *, blocks, pattern="abab", note=""):
     output = check_location(machine, run_root / name)
     argv = [machine.python("mace_cueq_oeq"), _tool(machine, "ab_fastmace.py"), "--release", "1b",
             "--output", str(output), "--model", PRIMARY_MODEL, "--checkpoint", checkpoint_path(machine, PRIMARY_MODEL),
             "--structures", *REGRESSION_STRUCTURES, "--sides", *sides, "--warmup", str(WARMUP), "--block", str(BLOCK),
-            "--blocks", str(blocks), "--pattern", pattern, "--dump-forces"]
+            "--blocks", str(blocks), "--pattern", pattern, "--dump-forces",
+            "--allow-option-changes", *ROUND_OPTION_CHANGES]
     if "1b" in sides:
         argv += ["--renamed", str(machine.path(machine.versions))]
     return Job(name=name, argv=tuple(argv), output=str(output), timing=True, note=note)
@@ -650,11 +656,12 @@ def runner_statistics_repeat_jobs(machine: Machine, run_root: Path) -> list:
     return jobs
 
 
-def _tier_job(machine, run_root, name, marker, *, timing, note):
+def _tier_job(machine, run_root, name, marker, *, timing, note, files=None):
     output = check_location(machine, run_root / name)
     basetemp = check_location(machine, run_root / f"{name}-pytest")
-    tests = machine.path(machine.fastmace) / "tests" / "gpu"
-    argv = [machine.python("mace_cueq_latest"), "-m", "pytest", str(tests), "-m", marker, "-p", "no:cacheprovider",
+    gpu = machine.path(machine.fastmace) / "tests" / "gpu"
+    tests = [str(gpu / file) for file in files] if files else [str(gpu)]
+    argv = [machine.python("mace_cueq_latest"), "-m", "pytest", *tests, "-m", marker, "-p", "no:cacheprovider",
             f"--basetemp={basetemp}", "--durations=60", "-rfEs", f"--junitxml={output / 'junit.xml'}"]
     env = {"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq"),
            "FASTMACE_BASELINE": str(machine.path(machine.baseline)),
@@ -674,6 +681,36 @@ def acceptance_tier_jobs(machine: Machine, run_root: Path) -> list:
                       note="pytest tests/gpu -m acceptance")]
 
 
+# The combined acceptance's own GPU files (optimisation round 1): the non-acceptance tests of the restart,
+# reproducible-mode and runner files with the round's rewrites on by default, stage B's kernel test, and OPT-T06/T07's
+# GPU tests if merged at the freeze (their files are added here then). The acceptance-marked tests of these files run
+# in the acceptance tier.
+ROUND_TEST_FILES = ("test_canonical_restart_gpu.py", "test_reproducible_gpu.py", "test_subprocess_runner_gpu.py",
+                    "test_segment_gemm_cuda.py")
+
+
+def round_tests_jobs(machine: Machine, run_root: Path) -> list:
+    """The round's GPU files outside the acceptance tier, one process (untimed)."""
+    present = [file for file in ROUND_TEST_FILES if (machine.path(machine.fastmace) / "tests" / "gpu" / file).is_file()]
+    return [_tier_job(machine, Path(run_root), "round-tests", "not acceptance", timing=False, files=present,
+                      note="restart, reproducible, runner and round files outside the acceptance tier")]
+
+
+# The 19-label gate split over the two cards: labels whose float64 references fit the RTX 5060 Ti's 16 GB (1b-T23's
+# local runs and 1b-T03's peaks) run there; the polar, MACE-OFF and MP-0 large labels run on murphy's 20 GB.
+LOCAL_GATE_LABELS = ("mp0-medium", "mp0b3-medium", "mpa0-medium", "omat0-medium", "matpes-pbe", "matpes-r2scan",
+                     "mh1-omat", "mh1-mp", "mh1-r2scan", "omol0-xl")
+MURPHY_GATE_LABELS = tuple(label for label in GATE_LABELS if label not in LOCAL_GATE_LABELS)
+
+
+def gate_local_jobs(machine: Machine, run_root: Path) -> list:
+    return gate_1b_jobs(machine, run_root, labels=LOCAL_GATE_LABELS)
+
+
+def gate_murphy_jobs(machine: Machine, run_root: Path) -> list:
+    return gate_1b_jobs(machine, run_root, labels=MURPHY_GATE_LABELS)
+
+
 def full_tier_jobs(machine: Machine, run_root: Path) -> list:
     """The full GPU tier (merge tier) on final main, one process; no step-time assertions."""
     return [_tier_job(machine, Path(run_root), "full-tier", "not acceptance", timing=False,
@@ -689,4 +726,5 @@ SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun
           "regression2": regression2_jobs, "regression2-nacl": regression2_nacl_jobs, "trajectory2": trajectory2_jobs,
           "runner-statistics": runner_statistics_jobs,
           "runner-repeat": runner_statistics_repeat_jobs,
-          "acceptance-tier": acceptance_tier_jobs, "full-tier": full_tier_jobs}
+          "acceptance-tier": acceptance_tier_jobs, "full-tier": full_tier_jobs, "round-tests": round_tests_jobs,
+          "gate-local": gate_local_jobs, "gate-murphy": gate_murphy_jobs}
