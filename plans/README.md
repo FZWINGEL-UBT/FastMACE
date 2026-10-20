@@ -24,11 +24,11 @@ workers"). 2-T21 works in the ResearchModule worktree
 `D:/Margraf/ResearchModule-wt/2-T21` (branch `fastmace/2-T21`).
 
 - Phase 1b: done, tagged `fastmace-1b` (673a8a1, with 1b-T27).
-- Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12, 2-T10, 2-T18, 2-T04, 2-T09b (20 October 2026).
-- Working in phase 2: 2-T02 (rebased, trial next), 2-T03, 2-T05 (GPU rerun with its memory cap), 2-T06,
-  2-T14c; 2-T07 in trial (CPU green, full
+- Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12, 2-T10, 2-T18, 2-T04, 2-T09b, 2-T07 (20 October 2026).
+- Working in phase 2: 2-T03, 2-T05 (replay bound, then its GPU rerun), 2-T06, 2-T16,
+  2-T14c (local runs); 2-T02 in trial (CPU green, full
   GPU tier running on murphy). 2-T04b waits for 2-T02.
-- Next go messages: 2-T04b after 2-T02 merges, then 2-T21, 2-T08 and 2-T13.
+- Next go messages: 2-T04b after 2-T02 merges, then 2-T21, 2-T08 and 2-T13; 2-T17 prepares.
 - Waiting for go: the rest. Answers to all prestart reports are in
   `phase-2.md`, "Conductor answers to the prestart reports".
 
