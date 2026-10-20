@@ -337,7 +337,7 @@ def _text(error) -> str:
     first = str(error).splitlines()[0] if str(error) else ""
     text = f"{type(error).__name__}: {first}" if first else type(error).__name__
     record = getattr(error, "gate_record", None)
-    if record is not None and getattr(record, "reason", None):
+    if record is not None and getattr(record, "reason", None) and record.reason not in text:
         text += f" ({record.reason})"
     return text
 
