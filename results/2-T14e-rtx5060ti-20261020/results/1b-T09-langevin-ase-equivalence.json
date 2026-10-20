@@ -1,0 +1,101 @@
+{
+ "bins": {
+  "heat 0-50 K": {
+   "dT_K": -1.3460343950555398e-12,
+   "dPE_meV_per_atom": 0.0,
+   "T_K": 2.2888134867133028
+  },
+  "heat 50-100 K": {
+   "dT_K": 6.9757533083247836e-12,
+   "dPE_meV_per_atom": 8.881784197001252e-13,
+   "T_K": 12.793116067492377
+  },
+  "heat 100-150 K": {
+   "dT_K": 1.0594192190183094e-11,
+   "dPE_meV_per_atom": -1.7763568394002505e-12,
+   "T_K": 31.782741221848823
+  },
+  "heat 150-200 K": {
+   "dT_K": -8.533618256478803e-12,
+   "dPE_meV_per_atom": 2.6645352591003757e-12,
+   "T_K": 57.97801351294624
+  },
+  "heat 200-250 K": {
+   "dT_K": 3.5001335163542535e-11,
+   "dPE_meV_per_atom": 1.7763568394002505e-12,
+   "T_K": 85.72152941900983
+  },
+  "heat 250-300 K": {
+   "dT_K": 4.487787919060793e-11,
+   "dPE_meV_per_atom": -7.105427357601002e-12,
+   "T_K": 130.58529087434778
+  },
+  "heat 300-350 K": {
+   "dT_K": 1.2454393072403036e-10,
+   "dPE_meV_per_atom": 1.865174681370263e-11,
+   "T_K": 176.83453701613493
+  },
+  "heat 350-400 K": {
+   "dT_K": 8.500933290633839e-11,
+   "dPE_meV_per_atom": 1.687538997430238e-11,
+   "T_K": 219.0140099151339
+  },
+  "cool 0-50 K": {
+   "dT_K": -7.958078640513122e-13,
+   "dPE_meV_per_atom": -1.2434497875801753e-11,
+   "T_K": 155.88314922154822
+  },
+  "cool 50-100 K": {
+   "dT_K": -5.263700586510822e-11,
+   "dPE_meV_per_atom": 3.552713678800501e-12,
+   "T_K": 184.0559140631804
+  },
+  "cool 100-150 K": {
+   "dT_K": 1.5046452972455882e-10,
+   "dPE_meV_per_atom": 1.1546319456101628e-11,
+   "T_K": 209.2924976660012
+  },
+  "cool 150-200 K": {
+   "dT_K": 4.6782133722444996e-11,
+   "dPE_meV_per_atom": 4.440892098500626e-12,
+   "T_K": 246.600940699907
+  },
+  "cool 200-250 K": {
+   "dT_K": 1.2039436114719138e-10,
+   "dPE_meV_per_atom": 4.440892098500626e-12,
+   "T_K": 264.0418478593783
+  },
+  "cool 250-300 K": {
+   "dT_K": 2.135038812411949e-10,
+   "dPE_meV_per_atom": 2.930988785010413e-11,
+   "T_K": 272.40607696715426
+  },
+  "cool 300-350 K": {
+   "dT_K": 2.5437429940211587e-10,
+   "dPE_meV_per_atom": 3.6415315207705135e-11,
+   "T_K": 282.80383303676115
+  },
+  "cool 350-400 K": {
+   "dT_K": 2.3166535356722306e-10,
+   "dPE_meV_per_atom": 2.3092638912203256e-11,
+   "T_K": 242.2153002191847
+  }
+ },
+ "max_abs_dT_K": 2.5437429940211587e-10,
+ "max_abs_dPE_meV_per_atom": 3.6415315207705135e-11,
+ "final_T_K": [
+  140.2328508341474,
+  140.2328508340834
+ ],
+ "final_positions_max_diff_A": 8.812506280264643e-12,
+ "seconds": {
+  "ase": 519.0997633130028,
+  "fastmace": 418.56273008699645
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "mode": "pipelined",
+ "records": [
+  "single_graph_strain"
+ ],
+ "plan": "Plan revision 0, tier graph: fixed plan of phase 1a (main.py)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = cueq  (requested 'cueq': graph engine)\n  PrecisionConfig.dtype = float64  (auto (float32_for_hybrid_float64_for_cueq): cueq backend)\n  EngineConfig.cueq_conv_fusion = on  (auto (on_for_plain_cueq_unless_reproducible): plain cuEq: cuEquivariance's fused convolution (MACE PR 1641))\n  RewriteConfig.factor_species = off  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: plain cuEq backend)\n  RewriteConfig.fold_cutoff = off  (auto (on_with_factor_species_if_model_supports): stage 1: off (without factor_species))\n  RewriteConfig.density_first = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.reassociate_first = off  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.joint_radial_input = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.fused_folded_backward = off  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.segmented_first_sum = off  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: off (without reassociate_first and sort_receivers))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = off  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: off (without the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)))\n  RewriteConfig.block_linear = off  (auto (on_for_hybrid_graph_engine): stage 1: plain cuEq backend)\n  RewriteConfig.grouped_linear = off  (auto (on_with_block_linear): stage 1: off (without block_linear))\n  RewriteConfig.merged_residual = off  (auto (on_with_block_linear): stage 1: off (without block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = off  (auto (on_for_hybrid_graph_engine): plain cuEq backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=cueq"
+}

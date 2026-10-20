@@ -227,12 +227,32 @@ Before the test changes, one MH-1 run of the chosen schedule on an idle murphy G
 final temperature and the bin agreement on the real model. The stand-in shows the integrator-level
 behaviour, not MH-1's.
 
+## The change (owner decisions, 20 October 2026)
+
+The owner chose 4,000 steps and the tighter limits: 1e-6 K and 1e-7 meV/atom per bin. The BAOAB pairs
+share the energy limit. The final-temperature check became "below half the peak" (200 K). SPEC §12.2
+is amended (tenth amendment).
+
+**MH-1 check on the local RTX 5060 Ti** (under the reservation, 16:28–17:03 UTC; murphy was reserved
+for 2-T23), [results/2-T14e-rtx5060ti-20261020/](../../results/2-T14e-rtx5060ti-20261020/README.md):
+
+| Measure | Result | New limit | Margin |
+| --- | ---: | ---: | ---: |
+| Langevin, largest bin dT (16 bins) | 2.5e-10 K | 1e-6 K | 3,900× |
+| Langevin, largest bin dPE | 3.6e-11 meV/atom | 1e-7 meV/atom | 2,700× |
+| Langevin, final T (ASE / FastMACE) | 140.2 / 140.2 K | < 200 K | |
+| Langevin, final positions | 8.8e-12 Å | | |
+| BAOAB, ASE variant vs ASE, PE | 1.4e-11 meV/atom | 1e-7 meV/atom | 7,000× |
+| BAOAB, production vs corrected reference, PE | 1.6e-11 meV/atom | 1e-7 meV/atom | 6,200× |
+
+Both tests passed. The Langevin test took 988 s (ASE 519 s, FastMACE 419 s for 4,000 steps); the
+18,000-step version took 3,749 s on murphy. The final temperature (140 K) is as the stand-in predicted
+(154 K at 4,000 steps). murphy's check of the changed test comes with 2-T23's final re-run.
+
 ## Next steps (for the conductor's decision)
 
 - Win 1 is done (above).
-- The owner chose to shorten first; the reference cache waits for that result. Choose 4,000 (recommended)
-  or 12,000 steps, and amend SPEC §12.2. Then one MH-1 run of that schedule on an idle murphy GPU, and
-  the test change.
+- Done: 4,000 steps and the tighter limits (above).
 - With 4,000 steps the acceptance tier falls from about 103 to about 54 min, and its cacheable part
   from about 49 to about 23 min (43 %: ASE Langevin 7 min, ASE BAOAB 7 min, research engine 8 min).
   Decide on the cache with those numbers.
