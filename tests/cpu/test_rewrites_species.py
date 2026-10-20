@@ -266,3 +266,117 @@ def test_simulation_with_both_records_follows_the_default_to_round_off(tmp_path,
     assert all(decisions[f"RewriteConfig.{name}"] == "on" for name in NAMES)
     assert float(np.abs(new_positions - positions).max()) <= 1e-12
     assert abs(new_energy - energy) <= 1e-10 * abs(energy)
+
+
+# --------------------------------------------------------------------------- conductor conditions (OPT-T08 go)
+
+
+def _with_species(batch, atom, column):
+    """``batch`` with atom ``atom`` given the species of one-hot column ``column`` (phase 3 swaps)."""
+    out = dict(batch)
+    attrs = batch["node_attrs"].clone()
+    attrs[atom] = 0
+    attrs[atom, column] = 1
+    out["node_attrs"] = attrs
+    return out
+
+
+def test_tables_follow_a_species_change_between_evaluations():
+    """Tables cover every element of the model and are gathered per step: changing one atom's species
+    between two evaluations of the same rewritten model follows the unrewritten model."""
+    _, without, batch, _, _ = rewritten()
+    _, folded, _, _, _ = rewritten(species_tables="on", fold_product_linear="on", fold_readout_tail="on")
+    _, tables, _, _, _ = rewritten(species_tables="on")
+    current = int(batch["node_attrs"][0].argmax())
+    changed = _with_species(batch, 0, (current + 1) % batch["node_attrs"].shape[1])
+    energy_and_forces(without, batch)
+    for state in (batch, changed, batch):
+        energy, forces = energy_and_forces(without, state)
+        new_energy, new_forces = energy_and_forces(folded, state)
+        assert relative(new_energy, energy) <= 1e-12 and relative(new_forces, forces) <= 1e-10
+        assert torch.equal(energy_and_forces(tables, state)[0], energy)
+    assert not torch.equal(energy_and_forces(without, changed)[0], energy_and_forces(without, batch)[0])
+
+
+def test_species_tables_alone_are_bitwise_on_the_cpu():
+    """A one-hot row times a weight is the weight row, and the tables' products give the same rows: on the CPU
+    (float64) energy and forces are bitwise equal. The record stays rounding class (a GPU GEMM's summation
+    order may depend on the row count)."""
+    _, without, batch, _, _ = rewritten()
+    _, tables, _, _, _ = rewritten(species_tables="on")
+    energy_and_forces(without, batch)
+    energy, forces = energy_and_forces(without, batch)
+    new_energy, new_forces = energy_and_forces(tables, batch)
+    assert torch.equal(new_energy, energy) and torch.equal(new_forces, forces)
+
+
+@pytest.mark.parametrize("family", ["omol"])
+def test_fold_readout_tail_is_exact_to_round_off_on_other_families(family):
+    _, without, batch, _, _ = rewritten(family)
+    _, folded, _, resolution, _ = rewritten(family, fold_readout_tail="on")
+    assert resolution.decision("fold_readout_tail").enabled
+    energy_and_forces(without, batch)
+    energy, forces = energy_and_forces(without, batch)
+    new_energy, new_forces = energy_and_forces(folded, batch)
+    assert relative(new_energy, energy) <= 1e-12 and relative(new_forces, forces) <= 1e-10
+
+
+@pytest.mark.parametrize(("family", "words"), [
+    ("omol", "joint"), ("residual", "first interaction"), ("density", "first interaction"),
+    ("off", "first interaction")])
+@pytest.mark.parametrize("name", ["species_tables", "fold_product_linear"])
+def test_tables_and_product_fold_refuse_other_models(family, words, name):
+    supported, reason = species.RECORDS[name].applies_to(tiny(family, backend="cueq")[0])
+    assert not supported and words in reason
+
+
+@pytest.mark.parametrize("family", ["residual", "density", "off"])
+def test_fold_readout_tail_refuses_an_element_dependent_skip(family):
+    supported, reason = species.RECORDS["fold_readout_tail"].applies_to(tiny(family, backend="cueq")[0])
+    assert not supported and "skip_tp" in reason
+
+
+def _stand_in(label):
+    """A stand-in with the structure the records check, as the released checkpoint of ``label`` has it."""
+    import types
+
+    import test_planner as tp
+
+    model_class, interactions, _, joint = tp.LABEL_FACTS[label]
+    model = type(model_class, (), {})()
+    model.atomic_numbers = list(range(5))
+    model.node_embedding = types.SimpleNamespace(linear=object())
+    model.interactions = []
+    for name in interactions:
+        block = type(name, (), {})()
+        block.skip_tp = type("Linear" if name == tp.MH1 else "FullyConnectedTensorProduct", (), {})()
+        block.linear_up = object()
+        model.interactions.append(block)
+    model.products = [types.SimpleNamespace(use_sc=True) for _ in interactions]
+    model.readouts = ([type("LinearReadoutBlock", (), {})() for _ in interactions[:-1]]
+                      + [type("NonLinearReadoutBlock", (), {})()])
+    if joint:
+        model.joint_embedding = object()
+    return model
+
+
+def test_which_of_the_19_labels_each_record_applies_to():
+    """species_tables and fold_product_linear: the three MH-1 labels. fold_readout_tail: those and
+    OMOL-0 (MH-1 class). POLAR-1 (PolarMACE, external fields) is refused by all three, the residual, density
+    and OFF labels by their element-dependent skip (and the first interaction's class)."""
+    import test_planner as tp
+
+    applies = {name: {label for label in tp.LABELS if species.RECORDS[name].applies_to(_stand_in(label))[0]}
+               for name in NAMES}
+    mh1_labels = {"mh1-omat", "mh1-mp", "mh1-r2scan"}
+    polar = {"polar1-s", "polar1-m", "polar1-l"}
+    assert applies["species_tables"] == applies["fold_product_linear"] == mh1_labels
+    assert applies["fold_readout_tail"] == mh1_labels | {"omol0-xl"}
+    assert not polar & set().union(*applies.values())
+
+
+def test_fold_readout_tail_refuses_an_unpinned_last_interaction():
+    model = _stand_in("mp0-medium")
+    model.interactions[-1] = type("RealAgnosticInteractionBlock", (), {})()
+    supported, reason = species.RECORDS["fold_readout_tail"].applies_to(model)
+    assert not supported and "RealAgnosticInteractionBlock" in reason

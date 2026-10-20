@@ -24,7 +24,7 @@
   both (``modules.compose``) and replaced by the identity. Products of 512 columns become
   products of the readout's width (96 on MH-1, all heads kept): 2.0 % of NaCl's B stage, 1.2 % of
   NbCl5's. MACE's ``node_feats`` descriptor output changes meaning; FastMACE never reads it.
-  Needs ``block_linear``.
+  Needs ``block_linear``; MH-1 class only (the other classes' skip is element-dependent).
 
 Each self-check compares the rewritten modules with what they replaced, values and input gradients,
 in the model's dtype (SPEC §6.4).
@@ -40,6 +40,12 @@ MODEL_FORWARD = "mace.modules.models:ScaleShiftMACE.forward"
 MODEL_FORWARD_SHA256 = "7f4daea32cb9b55c59db5ee623f8310ef65e41cf0f717278f743ae8bd2782e1d"
 INTERACTION_FORWARD = "mace.modules.blocks:RealAgnosticResidualNonLinearInteractionBlock.forward"
 INTERACTION_FORWARD_SHA256 = "727c37b796de7d3b33793ae6317a6d09c1f4c8677b28c04963ffbb34899b0b44"
+# fold_readout_tail: the last interaction must return skip_tp(node_feats) only as the product's skip term, with
+# skip_tp a linear layer. That holds for the MH-1 class (MH-1, OMOL-0). MACE-MP-0, the density family and
+# MACE-OFF use an element-dependent skip (a tensor product with node_attrs): no linear layer to fold into.
+TAIL_FORWARDS = {
+    "RealAgnosticResidualNonLinearInteractionBlock": (INTERACTION_FORWARD, INTERACTION_FORWARD_SHA256),
+}
 _PROBE_ROWS = 7
 
 
@@ -157,6 +163,13 @@ def _tail_support(model):
         return Support(False, f"last readout {kind} is not MACE's linear or nonlinear readout")
     if not getattr(products[-1], "use_sc", True):
         return Support(False, "the last product has no skip connection")
+    last = type(interactions[-1]).__name__
+    if last not in TAIL_FORWARDS:
+        return Support(False, f"last interaction {last} is not one of {tuple(TAIL_FORWARDS)} (its skip_tp is "
+                              "not a linear layer of the features alone)")
+    skip = type(getattr(interactions[-1], "skip_tp", None)).__name__
+    if skip not in ("Linear", "BlockLinear", "SpeciesTable"):
+        return Support(False, f"the last skip_tp is a {skip}, not a linear layer")
     return Support(True, "ok")
 
 
@@ -321,7 +334,8 @@ RECORDS = {
         apply=_apply_tables, selfcheck=_tables_selfcheck, deterministic=True),
     "fold_readout_tail": Rewrite(
         name="fold_readout_tail", applies_to=_tail_support, requires=("block_linear",), conflicts=(),
-        mace_versions=MACE_VERSIONS, source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256},
+        mace_versions=MACE_VERSIONS,
+        source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256, **dict(TAIL_FORWARDS.values())},
         exactness="rounding", default="off", workload_constraints=(),
         apply=_apply_tail, selfcheck=_tail_selfcheck, deterministic=True),
     "fold_product_linear": Rewrite(

@@ -174,9 +174,13 @@ by four `512 → 16` products.
 
 **Exactness.** Rounding (folded weights).
 
-**Generality.** Any MACE whose last product feeds only a readout with a linear first layer (all the
-benchmark models). The head is the force field's, fixed per plan. Single-head models keep all their
-columns.
+The estimate assumes the 16-column head slice. The built record keeps all 96 columns, so it saves
+about 10 µs less on NaCl and 40 µs less on NbCl5.
+
+**Generality.** The MH-1 class (MH-1, OMOL-0): there the last `skip_tp` is a linear layer. The
+residual, density and OFF families use an element-dependent skip, so they are refused (section 3).
+The built record keeps all heads' columns (`512 → 96`), so it needs no fixed head. The head slice
+(`512 → 16`) is left for later.
 
 ### Smaller items
 
@@ -210,26 +214,55 @@ columns.
 - **Backward equivalents:** the folds above change the forward products. Their backward products
   shrink the same way through autograd. No backward-only merge was found beyond C6.
 
-## 3. Other benchmark models (applicability; 2-T20a profiled MH-1 only)
+## 3. Which of the 19 labels each record applies to
 
-| Model class | C1 | C2 | C3 | C6 |
+Checked by each record's applicability test, on tiny models of every family and on stand-ins of the
+19 labels (`tests/cpu/test_rewrites_species.py`).
+
+| Labels | `species_tables` (C1) | `fold_product_linear` (C3) | `fold_readout_tail` (C2) | Why not |
 | --- | --- | --- | --- | --- |
-| MH-1 (nonlinear residual interaction) | yes | yes | yes | yes |
-| MACE-MP-0, density family, MACE-OFF (residual or density interactions) | yes | yes | yes | yes |
-| OMOL-0 (joint charge/spin embedding) | embeddings only (layer 0 input is not species-only) | yes | no (needs C1's layer-0 part) | yes |
-| POLAR-1 (PolarMACE) | yes for the embeddings; the polar parts are left alone | yes | yes | yes |
+| `mh1-omat`, `mh1-mp`, `mh1-r2scan` | yes | yes | yes | |
+| `omol0-xl` | no | no | yes | The joint charge/spin embedding is added to layer 0's input, which is then not species-only. The tail does not depend on it |
+| `polar1-s`, `-m`, `-l` | no | no | no | PolarMACE: external fields and its own forward; only `ScaleShiftMACE.forward` is pinned |
+| `mp0-*`, `mp0b3-medium`, `mpa0-medium`, `omat0-medium`, `matpes-*`, `off23-*`, `off24-medium` | no | no | no | Their interactions' `skip_tp` is element-dependent, a tensor product of the features with `node_attrs`, not a linear layer. C1 and C3 also need the MH-1 class's pinned forward. Folding the tail there would add a product, not remove one |
 
-## 4. Phase 2 plan
+So the gains apply to the MH-1 labels: the benchmark model, NaCl and NbCl5.
+- The residual, density and OFF families could in principle get C1 and C2 through their element-dependent
+  skip: per species, it is a linear layer, which could be tabulated or composed per species.
+- That is not built.
 
-Opt-in rewrite records in the `gated_rows`/`segment_gemm` pattern: a self-check against the
-unrewritten model in its own dtype, an off switch (`RewriteConfig`, default off), and a source-hash
-pin on every MACE forward they rely on.
+## 4. Phase 2: built (CPU), GPU pending
 
-1. **`species_tables` (C1) and `constant_node_attrs` (C6),** for the MH-1 class's folded forward
-   first. Tables are built on the identity rows at apply time.
-2. **`fold_product_linear` (C3),** requiring `species_tables`.
-3. **`fold_readout_tail` (C2),** for the plan's head.
+Three opt-in records in `fastmace/rewrites/species/`:
+- `species_tables`, `fold_readout_tail` and `fold_product_linear`;
+- each is a module replacement, with no forward edits;
+- each is `RewriteConfig` "auto" = off (`never_automatic`), deterministic, and self-checked against what it
+  replaced. A perturbed table or fold fails the check;
+- each pins `ScaleShiftMACE.forward` and the MH-1-class interaction forward.
 
-CPU tests first, against the current default, in float64 (round-off) and float32: values and
-forces, and bitwise for C6. Then the GPU A/B on both cards (same process, pinned copies, both
-orders, NaCl and NbCl5) and the force gate, once the GPUs are free.
+| Record | Class | CPU evidence (tiny MH-1, float64, `tests/cpu/test_rewrites_species.py`) |
+| --- | --- | --- |
+| `species_tables` (C1) | rounding by declaration; **bitwise on the CPU** | Energy and forces are bitwise equal to the default. A one-hot row times a weight is the weight row, and the tables are the same modules' outputs on the identity rows. On the GPU a GEMM over 89 rows may sum in another order than over n rows; the GPU check decides |
+| `fold_product_linear` (C3) | rounding | Energy within 1e-12 and forces within 1e-10 relative of the default, with and without C2 |
+| `fold_readout_tail` (C2) | rounding | The same, on MH-1 and OMOL-0 |
+
+**Species superset and phase 3.**
+- The tables have one row per element of the model (89 on MH-1), which covers every possible
+  `species=` superset.
+- They are gathered by species index at every evaluation, and no atom-to-species assignment is
+  stored. Under C3, layer 0's output carries the one-hot itself.
+- A test changes one atom's species between two evaluations of the same rewritten model. The result
+  follows the unrewritten model, and C1 alone stays bitwise.
+
+**C6 (the `node_attrs` gradient) is not built separately.** Under C1 the tables take no gradient, so the
+four 89-wide backward products disappear. Only the cat `[node_feats, node_attrs]` and MACE's E0 lookup
+`[n, 89] → 6` remain on that path, both a few µs.
+
+**A CPU `Simulation`** with all three records follows the default plan within 1e-12 Å over 6 Langevin
+steps.
+
+**GPU (after the acceptance, on the conductor's go):** `results/opt-T08-linear-audit/run.sh`:
+- the first force on and off (plain cuEq float64, hybrid float32);
+- the force gate with all three, float32 target;
+- the A/B of all three in both orders, NaCl and NbCl5, on both GPUs;
+- attribution runs of C1, C1 + C3 and C2.
