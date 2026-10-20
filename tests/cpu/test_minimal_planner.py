@@ -130,7 +130,6 @@ def _slab():
     (1, "non-3d-pbc", dict(atoms=_slab())),
     (1, "constraints", dict(atoms=_with_constraint(nacl()))),
     (1, "variable-cell-without-barostat", dict(variable_cell=True)),
-    (1, "reference-tier-not-in-1b", dict(allow_reference=True)),
     (2, "species-not-in-superset", dict(species=["Na"])),
     (5, "reproducible-no-family-qualified", dict(workload=Workload(max_temperature_K=300.0, reproducible=True))),
     (7, "atom-count-changes", dict(workload=Workload(max_temperature_K=300.0, atom_count_changes=True))),
@@ -201,11 +200,22 @@ def test_d3_superset_beyond_the_structure_is_phase_3():
     assert plan_label("mh1-r2scan", species=[17, 11]).superset == NA_CL
 
 
-@pytest.mark.parametrize(("mode", "phase"), [("compiled", "phase 3"), ("reference", "1b")])  # eager: 2-T02
+@pytest.mark.parametrize(("mode", "phase"), [("compiled", "phase 3")])  # eager: 2-T02, reference: 2-T03
 def test_other_modes_are_refused_with_their_phase(mode, phase):
     with pytest.raises(PlanRefused) as caught:
         plan_label("mh1-r2scan", mode=mode)
     assert codes(caught.value) == [f"mode-{mode}"] and phase in caught.value.reasons[0]
+
+
+@pytest.mark.parametrize("label", tp.LABELS)
+def test_mode_reference_plans_the_reference_tier_for_every_label(label):
+    """2-T03: no rewrites, the stock uncompiled cuEq backend, no capture; padding and polar refusals lifted."""
+    plan = plan_label(label, mode="reference")
+    assert plan.tier == "reference"
+    assert (plan.engine.backend, plan.engine.compile_mode, plan.engine.pipelined) == ("cueq", "none", "off")
+    assert not [name for name in fixed.REWRITE_FIELDS if getattr(plan.rewrites, name) == "on"]
+    assert plan.decision("capture")[1] == "off" and plan.decision("tier")[1] == "reference"
+    assert {choice for key, choice, _ in plan.decisions if key.startswith("RewriteConfig.")} <= {"off"}
 
 
 def test_unknown_mode_is_a_value_error():

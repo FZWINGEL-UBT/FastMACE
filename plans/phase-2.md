@@ -1449,6 +1449,40 @@ notes folder of the conductor's session (`2-T0x-…md`).
 - **2-T08's audit, decision:** see 2-T08b above. Option a now, the per-model
   strain path (option c) as 2-T08b.
 - **Started:** 2-T06 (pushed 737527d; in trial with 2-T02), 2-T08, 2-T13 and 2-T16.
+- **2-T02 and 2-T06 merged** (28c4978, 875f8a2), trial-merged together.
+  - CPU: 2425 passed.
+  - The combined full GPU tier was killed externally by SIGKILL at 98 %
+    (05:04 CEST). Murphy shows no limit, and no worker kill was found. The
+    last 4 tests then passed on a rerun.
+  - 2-T02's own tier failed only the step-time assertion under GPU sharing.
+- **2-T08 merged** (ba782a5): tests and docs, CPU 2435 passed. A → B → A
+  passes on all three GPU paths, and no lease was needed. 2-T08b started.
+- **2-T13 pushed** (5db9daf). `fm.calc`'s LBFGS compiles once on both
+  backends: call 2 drops from 33.3 s to 0.016 s (plain cuEq) and from
+  23.1 s to 0.024 s (hybrid). The steady-state per-call time is unchanged
+  within the local A/B's resolution (about 2 %). It is in trial now.
+- **2-T16:** acceptance 6 passes bitwise on murphy with
+  `CUEQUIVARIANCE_OPS_U1D_ALGOS=1,1`. Unpinned, 1 of 3 fresh runs differed.
+  The second machine (the local card) is running now.
+- **Order change:** 2-T03 merges before 2-T04b (2-T15 needs 2-T03, and
+  2-T04b is small), and 2-T04b rebases.
+- **2-T13 merged** (f0bde74). CPU 2442 passed; the full GPU tier gave 243
+  passed.
+- **2-T05 merged** (af52f82), with SPEC §12.3's ninth amendment (c88d618).
+  CPU 2485 passed. The full GPU tier gave 242 passed, and the plain-cuEq
+  step-time assertion failed (172 against 98 ms/step) while 2-T08b's GPU
+  test shared the GPU; it then passed twice on the idle GPU.
+- **2-T14d started:** both step-time assertions move from the full tier to
+  `acceptance`. The numerical parts stay in the full tier.
+- **2-T15 started.** It builds against 2-T03's interface until 2-T03
+  merges.
+- **2-T14d merged** (326e7fa): the planner's two step-time assertions are
+  now acceptance tests of their own, sharing one three-engine run per
+  process. Fast- and full-tier tests make no step-time assertions
+  (`docs/development.md`). The new tests still need one run on an idle GPU,
+  in the next acceptance window.
+- **2-T16** synced with main 14a5e20 (7b9980e; murphy CPU 2348 passed). Its
+  trial follows 2-T03's.
 
 ## Phase 1b items carried into phase 2
 

@@ -2016,6 +2016,16 @@ configurable limit, then a reduced cell. If all fail, the status is
 recorded. A more memory-hungry
 reference is never a fallback for a plan that failed for memory.
 
+On a CUDA plan, each GPU reference step runs in a child process. A GPU
+out-of-memory error can leave a process's CUDA context unusable (sticky
+errors, seen on WSL2). A CUDA error, non-zero exit or kill of that child
+counts as a device failure for the ladder, and its text is recorded. A CPU
+reference child runs under a hard memory cap (`RLIMIT_DATA`, at most the
+available memory less a reserve), so an underestimate fails in the child
+instead of exhausting the host. Under `passed-reduced`, the replay check on
+the production cell is bounded by the gate's own limit per quantity (plan
+task 2-T05).
+
 ### 12.4 CI matrix
 
 - **CPU:** Linux, Python 3.10–3.12, two torch versions.
@@ -2656,3 +2666,9 @@ a version change alone warns instead of refusing (decision 23).
 **Draft 0.12, eighth amendment (19 October 2026):** owner decisions 2 and 5
 decided, and 29–30 added (the phase 2 plan's D1–D4), in §18; §9.4 states the
 automatic default and the `fallback="refuse"` opt-out.
+
+**Draft 0.12, ninth amendment (20 October 2026, conductor, from 2-T05):**
+§12.3 "Resources" now says three things:
+- GPU reference steps run in child processes on CUDA plans;
+- CPU reference children run under a hard memory cap;
+- the replay check under `passed-reduced` uses the gate's own limit.

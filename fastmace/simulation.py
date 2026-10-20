@@ -308,7 +308,8 @@ class Simulation:
         # The gate's references before any production engine exists (§12.3); under check="gate" an
         # unavailable reference raises GateUnavailable here, before the build. "skip" computes nothing.
         started = time.perf_counter()
-        references = selfcheck.references(self._plan, ff, atoms, integrator, check=check, seed=seed)
+        references = selfcheck.references(self._plan, ff, atoms, integrator, check=check, seed=seed,
+                                         gate=options.gate)
         gate_s = time.perf_counter() - started
 
         started = time.perf_counter()

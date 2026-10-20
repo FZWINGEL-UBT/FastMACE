@@ -3,7 +3,8 @@
 MH-1 (``matpes_r2scan``) on rattled NaCl 2x2x2: ``ase.optimize.LBFGS`` with ``fm.calc`` (float32
 forces, float64 energy, compiled tier) reaches the minimum that LBFGS reaches with MACE's own
 calculator (float64). The relaxation runs in a child process: the calculator's compiled plan fixes
-the process's compile family (SPEC §8.7), which must not depend on the tests run before it.
+the process's compile family (SPEC §8.7), which must not depend on the tests run before it. The
+relaxation compiles once, although the edge count changes between its calls (2-T13).
 """
 
 import json
@@ -32,6 +33,7 @@ CHILD = textwrap.dedent("""
     import json, sys, time
     import fastmace as fm  # before MACE, so the planner may choose the hybrid backend
     import numpy as np
+    from torch._dynamo.utils import counters
     sys.path.insert(0, sys.argv[2])
     from _support.structures import nacl
     from ase.optimize import LBFGS
@@ -47,16 +49,18 @@ CHILD = textwrap.dedent("""
                            fmax=float(np.abs(atoms.get_forces()).max()))
 
     calc = fm.calc("mh1", head="matpes_r2scan")
-    calls, calculate = [], calc.calculate
+    calls, graphs, edges, calculate = [], [], [], calc.calculate
 
     def timed(*args, **kwargs):
         start = time.perf_counter()
         calculate(*args, **kwargs)
         calls.append(round(time.perf_counter() - start, 4))
+        graphs.append(counters["stats"]["unique_graphs"])
+        edges.append(int(calc._evaluator.neighbours.count))
 
     calc.calculate = timed
     ours, ours_info = relax(calc)
-    ours_info["call_seconds"] = calls
+    ours_info.update(call_seconds=calls, graphs_after_call=graphs, edges=edges)
     plan = calc.plan
     from mace.calculators import MACECalculator
     theirs, theirs_info = relax(MACECalculator(model_paths=sys.argv[1], device="cuda", default_dtype="float64",
@@ -64,7 +68,8 @@ CHILD = textwrap.dedent("""
     delta = ours.get_positions() - theirs.get_positions()  # same start, LBFGS does not wrap
     print(json.dumps(dict(ours=ours_info, theirs=theirs_info, atoms=len(ours),
                           max_displacement=float(np.abs(delta).max()), tier=plan.tier,
-                          backend=plan.engine.backend, dtype=plan.precision.dtype, notes=calc.notes)))
+                          backend=plan.engine.backend, dtype=plan.precision.dtype,
+                          dynamic_edges=plan.engine.dynamic_edges, notes=calc.notes)))
 """)
 
 
@@ -86,9 +91,13 @@ def test_lbfgs_with_fm_calc_reaches_maces_minimum(python):
     assert done.returncode == 0, done.stderr[-4000:]
     result = json.loads(done.stdout.strip().splitlines()[-1])
     print(json.dumps(result, indent=1))
-    assert result["tier"] == "compiled" and result["dtype"] == "float32"
+    assert result["tier"] == "compiled" and result["dtype"] == "float32" and result["dynamic_edges"]
     if python == "hybrid":
         assert result["backend"] == "hybrid", result["notes"]
     assert result["ours"]["converged"] and result["theirs"]["converged"]
     assert abs(result["ours"]["energy"] - result["theirs"]["energy"]) / result["atoms"] < 1e-4  # eV/atom
     assert result["max_displacement"] < 5e-3  # Å
+    # One compile (2-T13): the edge count changes, no graph is added after the first call.
+    graphs, edges = result["ours"]["graphs_after_call"], result["ours"]["edges"]
+    assert len(set(edges)) > 1, edges
+    assert graphs[0] > 0 and set(graphs) == {graphs[0]}, graphs

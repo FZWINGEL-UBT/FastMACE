@@ -1,0 +1,159 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0 -- /home/fzwin/environments/mace_cueq_latest/bin/python
+compile caches (shared): inductor /home/fzwin/.cache/fastmace/inductor, triton /home/fzwin/.cache/fastmace/triton
+rootdir: /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collecting ... collected 2 items
+
+tests/gpu/test_gate_resources_gpu.py::test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[polar1-l] 
+polar1-l on NVIDIA GeForce RTX 5060 Ti (17.1 GB), 1944 atoms: unavailable, device None, reduced cell None, seconds {'references': 13.578678112011403, 'total': 78.89761727700534}
+  cuda:0 production None 1944 atoms: failed (13.4 s) reference failed: RuntimeError: CUDA driver error: device not ready
+{"case": "polar1-l", "backend": "hybrid", "dtype": "float32", "atoms": 1944, "gpu": "NVIDIA GeForce RTX 5060 Ti", "gpu_bytes": 17102864384, "gate": {"status": "unavailable", "check": "allow_unavailable", "reason": "reference failed: RuntimeError: CUDA driver error: device not ready", "copies": "2 rattled (0.05 \u00c5)", "energy_meV_per_atom": null, "force_eV_per_A": null, "stress_eV_per_A3": null, "quantities": {}, "nonfinite": [], "mode": null, "references": {"ran": "in-process"}, "seconds": {"references_s": 13.4977293839911, "step_1_s": 13.36975515600352}, "notes": [], "device": null, "reduced_cell": null, "steps": [{"device": "cuda:0", "cell": "production", "repeat": null, "atoms": 1944, "outcome": "failed", "reason": "reference failed: RuntimeError: CUDA driver error: device not ready"}], "replay": null}, "seconds": {"references": 13.578678112011403, "total": 78.89761727700534}}
+FAILED
+tests/gpu/test_gate_resources_gpu.py::test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[omol0-xl] FAILED
+
+=================================== FAILURES ===================================
+________ test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[polar1-l] ________
+
+label = 'polar1-l'
+
+    @pytest.mark.parametrize("label", list(CASES))
+    def test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell(label):
+        torch = pytest.importorskip("torch")
+        if not torch.cuda.is_available():
+            pytest.skip("needs a CUDA GPU")
+        if not _available(label):
+            pytest.skip(f"{label} is not under FASTMACE_MODELS")
+        out = run_gate({"label": label, "repeat": [3, 3, 6]})
+        gate = out["gate"]
+        steps = gate["steps"]
+        print(f"\n{label} on {out['gpu']} ({out['gpu_bytes'] / 1e9:.1f} GB), {out['atoms']} atoms: {gate['status']}, "
+              f"device {gate['device']}, reduced cell {gate['reduced_cell']}, seconds {out['seconds']}")
+        for index, step in enumerate(steps, 1):
+            print(f"  {step['device']} {step['cell']} {step['repeat']} {step['atoms']} atoms: {step['outcome']} "
+                  f"({gate['seconds'][f'step_{index}_s']:.1f} s) {step['reason'] or ''}")
+        print(json.dumps({"case": label, **out}, default=str))
+        if out["gpu_bytes"] >= CASES[label]:
+            assert steps[0]["outcome"] == "ran", "the reference fits this card: acceptance 3 needs a 16 GB card"
+            return
+>       assert steps[0]["outcome"] == "out of memory"
+E       AssertionError: assert 'failed' == 'out of memory'
+E         
+E         - out of memory
+E         + failed
+
+tests/gpu/test_gate_resources_gpu.py:108: AssertionError
+________ test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[omol0-xl] ________
+
+label = 'omol0-xl'
+
+    @pytest.mark.parametrize("label", list(CASES))
+    def test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell(label):
+        torch = pytest.importorskip("torch")
+        if not torch.cuda.is_available():
+            pytest.skip("needs a CUDA GPU")
+        if not _available(label):
+            pytest.skip(f"{label} is not under FASTMACE_MODELS")
+>       out = run_gate({"label": label, "repeat": [3, 3, 6]})
+
+tests/gpu/test_gate_resources_gpu.py:96: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+spec = {'label': 'omol0-xl', 'repeat': [3, 3, 6]}, timeout = 5400
+
+    def run_gate(spec, timeout=5400):
+        python = HYBRID_PYTHON or sys.executable
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(REPOSITORY_ROOT), str(REPOSITORY_ROOT / "tests")]),
+                   PYTHONDONTWRITEBYTECODE="1")
+        if python != sys.executable:
+            env.pop("LD_LIBRARY_PATH", None)
+        result = subprocess.run([python, "-c", CHILD, json.dumps(spec)], cwd=REPOSITORY_ROOT, env=env,
+                                capture_output=True, text=True, timeout=timeout, check=False)
+>       assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-6000:]
+E       AssertionError: GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+E         o `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py:556: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py:556: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py:556: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py:556: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py:556: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py:556: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py:556: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+E           value = original(*args, **kwargs)
+E         Traceback (most recent call last):
+E           File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py", line 683, in load
+E             calculator = MACECalculator(**kwargs)
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/calculators/mace.py", line 225, in __init__
+E             self.models = [
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/calculators/mace.py", line 226, in <listcomp>
+E             torch.load(f=model_path, map_location=device)
+E           File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py", line 556, in load
+E             value = original(*args, **kwargs)
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/serialization.py", line 1615, in load
+E             return _load(
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/serialization.py", line 2241, in _load
+E             result = unpickler.load()
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/serialization.py", line 2205, in persistent_load
+E             typed_storage = load_tensor(
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/serialization.py", line 2167, in load_tensor
+E             wrap_storage = restore_location(storage, location)
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/serialization.py", line 1964, in restore_location
+E             return default_restore_location(storage, map_location)
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/serialization.py", line 734, in default_restore_location
+E             result = fn(storage, location)
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/serialization.py", line 668, in _deserialize
+E             return obj.to(device=device)
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/storage.py", line 298, in to
+E             return _to(self, device, non_blocking)
+E           File "/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/_utils.py", line 110, in _to
+E             untyped_storage.copy_(self, non_blocking)
+E         torch.AcceleratorError: CUDA error: out of memory
+E         Search for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.
+E         The CUDA driver logged these messages, which may provide useful details:
+E         Sticky error detected
+E         Returning 2 (CUDA_ERROR_OUT_OF_MEMORY) from cuStreamIsCapturing
+E         
+E         
+E         
+E         The above exception was the direct cause of the following exception:
+E         
+E         Traceback (most recent call last):
+E           File "<string>", line 25, in <module>
+E           File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/planner/minimal.py", line 417, in build
+E             model = self._execution_model(plan, force_field)
+E           File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/planner/minimal.py", line 396, in _execution_model
+E             return force_field.execution_model(plan)
+E           File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/forcefield.py", line 123, in execution_model
+E             return loading.load(
+E           File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py", line 689, in load
+E             raise BackendError(f"{backend} initialization failed: {error}") from error
+E         fastmace.errors.BackendError: hybrid initialization failed: CUDA error: out of memory
+E         Search for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.
+E         The CUDA driver logged these messages, which may provide useful details:
+E         Sticky error detected
+E         Returning 2 (CUDA_ERROR_OUT_OF_MEMORY) from cuStreamIsCapturing
+E         
+E         
+E         Next: Install the backend's packages, or choose another backend.
+E         Environment: run `fastmace doctor` to check this installation.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['/home/fzwin/environments/mace_cueq_oeq/bin/python', '-c', '\nimport json, sys, time\nimport fastmace  # before MACE, so the planner may choose the hybrid backend\nfrom fastmace.config import GateConfig, IntegratorConfig\nfrom fastmace.errors import GateFailed\nfrom fastmace.model import loading\nfrom fastmace.model.forcefield import ForceField\nfrom fastmace.planner import minimal, selfcheck\nfrom fastmace.planner.workload import Workload\nfrom _support import structures\nimport torch\n\nSPEC = json.loads(sys.argv[1])\nloaded = loading.load_pristine(SPEC["label"])\natoms = structures.nbcl5(repeat=1).repeat(tuple(SPEC["repeat"]))\natoms.rattle(0.03, seed=1)\nintegrator = IntegratorConfig(temperature_K=300.0)\nff = ForceField(loaded, atoms)\nplanner = minimal.default_planner(ff)\nplan = planner.plan(ff, atoms, integrator, Workload(max_temperature_K=300.0), planner.hardware())\nstarted = time.perf_counter()\nreferences = selfcheck.references(plan, ff, atoms, integrator, check="allow_unavailable", seed=1,\n                                  gate=GateConfig(**SPEC.get("gate", {})))\nreferenced = time.perf_counter()\nengine = planner.build(plan, ff, atoms)\ntry:\...File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/planner/minimal.py", line 417, in build\n    model = self._execution_model(plan, force_field)\n  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/planner/minimal.py", line 396, in _execution_model\n    return force_field.execution_model(plan)\n  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/forcefield.py", line 123, in execution_model\n    return loading.load(\n  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/fastmace/model/loading.py", line 689, in load\n    raise BackendError(f"{backend} initialization failed: {error}") from error\nfastmace.errors.BackendError: hybrid initialization failed: CUDA error: out of memory\nSearch for `cudaErrorMemoryAllocation\' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\nThe CUDA driver logged these messages, which may provide useful details:\nSticky error detected\nReturning 2 (CUDA_ERROR_OUT_OF_MEMORY) from cuStreamIsCapturing\n\n\nNext: Install the backend\'s packages, or choose another backend.\nEnvironment: run `fastmace doctor` to check this installation.\n').returncode
+
+tests/gpu/test_gate_resources_gpu.py:81: AssertionError
+- generated xml file: /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t05-b56d7a/results/2-T05-rtx5060ti-20261020/junit.xml -
+=========================== short test summary info ============================
+FAILED tests/gpu/test_gate_resources_gpu.py::test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[polar1-l]
+FAILED tests/gpu/test_gate_resources_gpu.py::test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[omol0-xl]
+======================== 2 failed in 344.15s (0:05:44) =========================
+exit 1

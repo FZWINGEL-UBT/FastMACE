@@ -24,11 +24,16 @@ workers"). 2-T21 works in the ResearchModule worktree
 `D:/Margraf/ResearchModule-wt/2-T21` (branch `fastmace/2-T21`).
 
 - Phase 1b: done, tagged `fastmace-1b` (673a8a1, with 1b-T27).
-- Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12, 2-T10, 2-T18, 2-T04, 2-T09b, 2-T07, 2-T14c (20 October 2026).
-- Working in phase 2: 2-T03, 2-T05 (GPU cases passed; report), 2-T08, 2-T13, 2-T16;
-  2-T02 and 2-T06 in trial (CPU green, full
-  GPU tiers running on murphy). 2-T04b waits for 2-T02.
-- Next go messages: 2-T04b after 2-T02 merges, 2-T15 after 2-T02, T03, T05 and T06, then 2-T21 and 2-T19.
+- Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12, 2-T10, 2-T18, 2-T04,
+  2-T09b, 2-T07, 2-T14c, 2-T02, 2-T06, 2-T08, 2-T13, 2-T05 (20 October 2026).
+- Working in phase 2:
+  - 2-T15, the fallback algorithm (critical path);
+  - 2-T03 (rebase; merges before 2-T04b);
+  - 2-T04b and 2-T08b;
+  - 2-T14d (step-time asserts out of the full tier);
+  - 2-T16 (second machine on the local card).
+- Merge queue on murphy's GPU, one tier at a time: 2-T03, 2-T16.
+- Next go messages: 2-T21, 2-T19 and 2-T17 (after 2-T15).
 - Waiting for go: the rest. Answers to all prestart reports are in
   `phase-2.md`, "Conductor answers to the prestart reports".
 
@@ -41,6 +46,8 @@ Open owner decisions that phases wait on (SPEC §18): none open. Decided on
 Owner action pending: register the two GPU CI runners, murphy and the local
 PC (`docs/development.md`, "Registering the runners"; 2-T18 is merged). 2-T18's
 done-when, both runners green from a push, waits for it.
+
+2-T14's scratch folders were deleted on the owner's word (20 October 2026).
 
 Task IDs are `<phase>-T<nn>`. Worker branches are `fastmace/<phase>-T<nn>`.
 
