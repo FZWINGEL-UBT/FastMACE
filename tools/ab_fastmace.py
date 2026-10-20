@@ -1,25 +1,36 @@
-"""Alternating A/B MD step time of FastMACE 1b against the 1a release, in one process (1b-T23, acceptance item 5).
+"""Alternating A/B MD step time of this checkout against an earlier FastMACE release, in one process.
 
-Sides (--sides, two for an A/B process, one for a control or an alternating-process run):
+1b-T23 (acceptance item 5) timed 1b against the 1a release; 2-T23 (phase 2 acceptance item 8) times
+this checkout against the 1b release with ``--release 1b``. Sides (--sides, two for an A/B process,
+one for a control or an alternating-process run):
 
-  1b  this checkout's graph engine through the minimal planner of 1b (``--planner-1b minimal``, the
-      default: what ``Simulation`` and ``fm.md`` build) or the fixed-plan planner (``fixed``, main.py's)
-  1a  the release at tag ``fastmace-1a`` (bb35363), exported as the renamed package ``fastmace_1a``
-      (``python -m fastmace.bench.versions export --ref fastmace-1a --destination DIR``; --renamed DIR),
-      through its fixed-plan planner
+  --release 1a (the default):
+    1b  this checkout's graph engine through the minimal planner (``--planner-1b minimal``, the
+        default: what ``Simulation`` and ``fm.md`` build) or the fixed-plan planner (``fixed``, main.py's)
+    1a  the release at tag ``fastmace-1a`` (bb35363), exported as the renamed package ``fastmace_1a``
+        (``python -m fastmace.bench.versions export --ref fastmace-1a --destination DIR``; --renamed DIR),
+        through its fixed-plan planner
+  --release 1b:
+    2   this checkout, through the planner ``--planner-1b`` names, as above
+    1b  the release at tag ``fastmace-1b`` (673a8a1), exported as ``fastmace_1b``
+        (``... export --ref fastmace-1b --name fastmace_1b ...``), through its own minimal planner, so
+        both sides build what ``Simulation`` builds
 
 Both are FastMACE, so they patch the same process-wide objects (fastmace.bench.versions): this tool
 gives each side its own patches (``ProcessPatches``) before its load, build, warm-up and every timed
-block, outside the clock, and shares this process's OEq runtime with the 1a copy. It records every
+block, outside the clock, and shares this process's OEq runtime with the release's copy. It records every
 patch each side left, and a run is invalid when anything compiled or any patch changed while timed,
 or when the two plans' engine options differ. PolarMACE (a class patch), plain cuEq (a conversion
 patch per load) and NPT (the strain patch with a stress path) are refused with two sides: those run in
 alternating processes, one side each (--sides 1a, then --sides 1b, ...), with the cross-process noise.
+With --dump-final each side's positions and forces after its last timed block are written too: one-side
+processes of the same seed and protocol compare trajectories across versions (plain cuEq float64).
 
 Both sides start from the same structure with the same seed, at 0 K, with the thermostat at
 --temperature-K. Hybrid FP32, NVT, one backend family. Use an otherwise idle GPU; no launcher is
 needed. Output: <output>/metadata.json (fastmace.bench.step_time records per side, the A/B result,
-ratio 1b / 1a, plans, patches, compile counters), and with --dump-forces the starting forces per side.
+ratio of this checkout over the release, plans, patches, compile counters), and with --dump-forces the
+starting forces per side.
 """
 
 from __future__ import annotations
@@ -43,10 +54,26 @@ from fastmace.bench import ab, step_time, versions
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ab_step_time  # noqa: E402  (tools/: FastMACESide, compile counters, structures)
 
+
+@dataclasses.dataclass(frozen=True)
+class Release:
+    """An earlier release as one side: tag, commit, renamed package, planner, and this checkout's side name."""
+
+    tag: str
+    commit: str
+    renamed: str
+    planner: str  # "fixed" or "minimal": the planner the release's own Simulation path used
+    current: str  # the side name of this checkout when timed against this release
+
+
+RELEASES = {
+    "1a": Release("fastmace-1a", "bb35363", versions.DEFAULT_NAME, "fixed", "1b"),
+    "1b": Release("fastmace-1b", "673a8a1", "fastmace_1b", "minimal", "2"),
+}
 SIDES = ("1a", "1b")
-FASTMACE_1A_TAG = "fastmace-1a"
-FASTMACE_1A_COMMIT = "bb35363"
-RENAMED = versions.DEFAULT_NAME
+FASTMACE_1A_TAG = RELEASES["1a"].tag
+FASTMACE_1A_COMMIT = RELEASES["1a"].commit
+RENAMED = RELEASES["1a"].renamed
 ALTERNATING = "run alternating processes instead, one side each (--sides 1a, then --sides 1b, ...)"
 
 
@@ -60,10 +87,12 @@ def _is_polar(label):
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--output", required=True, type=Path, help="Fresh directory")
-    p.add_argument("--sides", nargs="+", choices=SIDES, default=list(SIDES),
-                   help="Build order; two sides for an A/B process, one for a control")
-    p.add_argument("--renamed", type=Path, help=f"Directory holding the exported {RENAMED} package")
-    p.add_argument("--expected-commit", default=FASTMACE_1A_COMMIT, help="Commit (prefix) the 1a copy must be")
+    p.add_argument("--release", choices=sorted(RELEASES), default="1a",
+                   help="The earlier release timed against this checkout (1a: sides 1a and 1b; 1b: sides 1b and 2)")
+    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2"),
+                   help="Build order; two sides for an A/B process, one for a control (default: release, checkout)")
+    p.add_argument("--renamed", type=Path, help="Directory holding the release's exported renamed package")
+    p.add_argument("--expected-commit", help="Commit (prefix) the release's copy must be (default: the release's)")
     p.add_argument("--planner-1b", choices=("minimal", "fixed"), default="minimal")
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--checkpoint", required=True, type=Path)
@@ -79,11 +108,23 @@ def parse_args(argv=None):
     p.add_argument("--ensemble", choices=("nvt", "npt"), default="nvt")
     p.add_argument("--cell-mode", choices=("hydrostatic", "full"), default="hydrostatic")
     p.add_argument("--dump-forces", action="store_true", help="Write each side's starting forces per structure")
+    p.add_argument("--dump-final", action="store_true",
+                   help="Write each side's positions and forces after its last timed block, per structure")
     args = p.parse_args(argv)
-    if len(args.sides) not in (1, 2) or len(set(args.sides)) != len(args.sides):
-        p.error("--sides takes one side, or the two sides 1a and 1b in build order")
-    if "1a" in args.sides and args.renamed is None:
-        p.error(f"a 1a side needs --renamed DIR (python -m fastmace.bench.versions export --ref {FASTMACE_1A_TAG})")
+    release = RELEASES[args.release]
+    args.current = release.current
+    if args.sides is None:
+        args.sides = [args.release, args.current]
+    if args.expected_commit is None:
+        args.expected_commit = release.commit
+    allowed = (args.release, args.current)
+    if (len(args.sides) not in (1, 2) or len(set(args.sides)) != len(args.sides)
+            or not set(args.sides) <= set(allowed)):
+        p.error(f"--sides takes one side, or the two sides {allowed[0]} and {allowed[1]} in build order "
+                f"(--release {args.release})")
+    if args.release in args.sides and args.renamed is None:
+        p.error(f"a {args.release} side needs --renamed DIR (python -m fastmace.bench.versions export "
+                f"--ref {release.tag} --name {release.renamed})")
     if len(args.sides) == 2:
         if _is_polar(args.model):
             p.error(f"PolarMACE ({args.model}) patches its class process-wide, which two versions cannot share; "
@@ -100,6 +141,11 @@ def ratio_1b_over_1a(medians):
     return medians["1b"] / medians["1a"]
 
 
+def ratio_current_over_release(medians, current, release):
+    """Median step time of this checkout's side over the release's, whatever the build order."""
+    return medians[current] / medians[release]
+
+
 def compare_options(first, second):
     """Equality of two plans' engine options ({option: value}), with each differing option's two values."""
     differences = {key: [first.get(key), second.get(key)] for key in sorted(set(first) | set(second))
@@ -114,6 +160,10 @@ class Version:
         self.side, self.args, self.package = side, args, package
         self.loaded = self.planner = self.hardware = self.force_field_class = None
         self.cache = None
+        if side == args.current:
+            self.minimal = args.planner_1b == "minimal"
+        else:
+            self.minimal = RELEASES[args.release].planner == "minimal"
 
     def module(self, name):
         """This side's ``<package>.<name>`` (fastmace.config or fastmace_1a.config, ...)."""
@@ -124,17 +174,16 @@ class Version:
         """The planner and its allocator rule, before the first CUDA allocation."""
         config = self.module("config")
         engine = config.EngineConfig(backend=self.args.backend)
-        if self.side == "1b" and self.args.planner_1b == "minimal":
-            from fastmace.planner import minimal
-            self.planner = minimal.MinimalPlanner(engine=engine)
+        if self.minimal:
+            self.planner = self.module("planner.minimal").MinimalPlanner(engine=engine)
         else:
             self.planner = self.module("planner.fixed").FixedPlanner(engine=engine)
         self.hardware = self.planner.hardware()
 
     def load(self, checkpoint):
         started = time.perf_counter()
-        if self.side == "1b" and self.args.planner_1b == "minimal":
-            from fastmace.model import loading
+        if self.minimal:
+            loading = self.module("model.loading")
             self.loaded = loading.load_pristine(self.args.model, checkpoint=str(checkpoint), sha256=_sha256(checkpoint))
         else:
             self.loaded = self.planner.load(self.args.model, checkpoint=str(checkpoint))
@@ -147,13 +196,15 @@ class Version:
         integrator = config.IntegratorConfig(ensemble=self.args.ensemble, cell_mode=self.args.cell_mode,
                                              seed=self.args.seed)
         fixed = self.module("planner.fixed")
-        if self.side == "1b" and self.args.planner_1b == "minimal":
-            from fastmace.model.forcefield import ForceField
-            from fastmace.planner.workload import Workload
+        if self.minimal:
+            ForceField = self.module("model.forcefield").ForceField
+            Workload = self.module("planner.workload").Workload
             force_field = ForceField(self.loaded, base, precision="float32" if self.args.backend == "hybrid"
                                      else "float64")
             integrator = dataclasses.replace(integrator, temperature_K=self.args.temperature_K)
-            plan = self.planner.plan(force_field, base, integrator, Workload(max_temperature_K=self.args.temperature_K),
+            # A ramped run (tools/trajectory_versions.py) plans for its highest target.
+            highest = getattr(self.args, "max_temperature_K", None) or self.args.temperature_K
+            plan = self.planner.plan(force_field, base, integrator, Workload(max_temperature_K=highest),
                                      self.hardware)
             engine = self.planner.build(plan, force_field, base.copy(), temperature_K=self.args.temperature_K)
         else:
@@ -172,13 +223,17 @@ def main(argv=None):
     from fastmace import _patches
     from fastmace.model import loading
     oeq_runtime = str(loading.prepare_hybrid()) if hybrid else None  # 1b's, before anything imports MACE
-    packages, source, shared = {"1b": fastmace}, None, None
-    if "1a" in args.sides:
-        old, source = versions.load_renamed(args.renamed, RENAMED, args.expected_commit)
+    release = RELEASES[args.release]
+    packages, source, shared = {args.current: fastmace}, None, None
+    if args.release in args.sides:
+        old, source = versions.load_renamed(args.renamed, release.renamed, args.expected_commit)
         import importlib
-        for name in ("config", "planner.fixed", "model.compile", "_patches"):
-            importlib.import_module(f"{RENAMED}.{name}")
-        packages["1a"] = old
+        modules = ["config", "planner.fixed", "model.compile", "_patches"]
+        if release.planner == "minimal":
+            modules += ["planner.minimal", "model.loading", "model.forcefield", "planner.workload"]
+        for name in modules:
+            importlib.import_module(f"{release.renamed}.{name}")
+        packages[args.release] = old
         if hybrid:
             shared = versions.share_record(_patches, old._patches, "oeq_runtime")
     if ab_step_time.gpu_processes():
@@ -189,7 +244,9 @@ def main(argv=None):
     names = list(args.sides)
     meta = dict(schema_version=step_time.SCHEMA_VERSION, status="running", tool="ab_fastmace",
                 created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename, python=sys.executable,
-                fastmace_commit=ab_step_time.fastmace_commit(), fastmace_1a=source, model=args.model,
+                fastmace_commit=ab_step_time.fastmace_commit(), release=dataclasses.asdict(release),
+                release_source=source, current_side=args.current, release_side=args.release,
+                **({"fastmace_1a": source} if args.release == "1a" else {}), model=args.model,
                 checkpoint=str(checkpoint), checkpoint_sha256=_sha256(checkpoint), backend=args.backend,
                 dtype="float32" if hybrid else "float64", tf32=False, ensemble=args.ensemble,
                 temperature_K=args.temperature_K, protocol=protocol.as_dict(), pattern=args.pattern, sides=names,
@@ -236,7 +293,10 @@ def main(argv=None):
                 warmup_s[name] = time.perf_counter() - started
                 patches.leave(name)
             if len(names) == 2:
-                entry["plan_check"] = compare_options(entry["plans"]["1a"]["options"], entry["plans"]["1b"]["options"])
+                entry["plan_check"] = compare_options(entry["plans"][args.release]["options"],
+                                                      entry["plans"][args.current]["options"])
+                entry["plan_describe_equal"] = (entry["plans"][args.release]["describe"]
+                                                == entry["plans"][args.current]["describe"])
             changed = []
 
             def before(name):
@@ -251,7 +311,9 @@ def main(argv=None):
                 result = ab.run_ab(sides, timed, pattern=args.pattern, before=before)
                 entry["ab"] = result.as_dict()
                 statistics_by_side = result.statistics
-                entry["ratio_1b_over_1a"] = ratio_1b_over_1a({n: s.median_ms for n, s in statistics_by_side.items()})
+                medians = {n: s.median_ms for n, s in statistics_by_side.items()}
+                entry["ratio"] = ratio_current_over_release(medians, args.current, args.release)
+                entry[f"ratio_{args.current}_over_{args.release}"] = entry["ratio"]
             else:
                 before(names[0])
                 statistics_by_side = {names[0]: step_time.time_engine(sides[names[0]], timed)}
@@ -270,6 +332,14 @@ def main(argv=None):
                 entry["sides"][name] = step_time.result_record(
                     statistics_by_side[name], setup_s=setup[name], peak_memory_bytes=peak,
                     observables=sides[name].observables(), info=info)
+            if args.dump_final:
+                directory = args.output / "final"
+                directory.mkdir(exist_ok=True)
+                for name in names:
+                    sides[name].engine.flush()
+                    state = sides[name].engine.state
+                    np.save(directory / f"{structure}-{name}-positions.npy", state.positions.detach().cpu().numpy())
+                    np.save(directory / f"{structure}-{name}-forces.npy", state.forces.detach().cpu().numpy())
             if len(names) == 2:
                 a, b = (entry["sides"][name]["observables"] for name in names)
                 entry["observables_difference"] = {key: abs(a[key] - b[key]) for key in a}
@@ -277,7 +347,7 @@ def main(argv=None):
             entry["other_gpu_processes"] = [pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()]
             save()
             print(structure, " ".join(f"{name} {entry['sides'][name]['median_ms']:.3f} ms" for name in names),
-                  f"1b/1a {entry['ratio_1b_over_1a']:.4f}" if "ratio_1b_over_1a" in entry else "",
+                  f"{args.current}/{args.release} {entry['ratio']:.4f}" if "ratio" in entry else "",
                   "valid" if entry["valid"] else "INVALID", flush=True)
             sides = engine = None
             torch.cuda.empty_cache()

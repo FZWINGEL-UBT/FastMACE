@@ -529,9 +529,102 @@ def compile_checks_jobs(machine: Machine, run_root: Path) -> list:
     return jobs
 
 
+# --- phase 2 (plan task 2-T23) ------------------------------------------------------------------------------
+
+
+def _regression2_job(machine, run_root, name, sides, *, blocks, pattern="abab", note=""):
+    output = check_location(machine, run_root / name)
+    argv = [machine.python("mace_cueq_oeq"), _tool(machine, "ab_fastmace.py"), "--release", "1b",
+            "--output", str(output), "--model", PRIMARY_MODEL, "--checkpoint", checkpoint_path(machine, PRIMARY_MODEL),
+            "--structures", *REGRESSION_STRUCTURES, "--sides", *sides, "--warmup", str(WARMUP), "--block", str(BLOCK),
+            "--blocks", str(blocks), "--pattern", pattern, "--dump-forces"]
+    if "1b" in sides:
+        argv += ["--renamed", str(machine.path(machine.versions))]
+    return Job(name=name, argv=tuple(argv), output=str(output), timing=True, note=note)
+
+
+def regression2_jobs(machine: Machine, run_root: Path) -> list:
+    """Phase 2 acceptance item 8: this checkout (side 2) against the tag fastmace-1b in one process, MH-1 NaCl
+    and NbCl5 hybrid NVT, 12 blocks, three A/B processes, then one control per side."""
+    run_root = Path(run_root)
+    jobs = [
+        _regression2_job(machine, run_root, "regression2-ab-abab", ("1b", "2"), blocks=AB_BLOCKS,
+                         note="ABAB, 1b built first"),
+        _regression2_job(machine, run_root, "regression2-ab-2-first", ("2", "1b"), blocks=AB_BLOCKS,
+                         note="ABAB, 2 built first"),
+        _regression2_job(machine, run_root, "regression2-ab-abba", ("1b", "2"), blocks=AB_BLOCKS, pattern="abba",
+                         note="ABBA, 1b built first"),
+    ]
+    jobs += [_regression2_job(machine, run_root, f"regression2-control-{side}", (side,), blocks=CONTROL_BLOCKS,
+                              note="one version alone: setup, forces outside an A/B process")
+             for side in ("1b", "2")]
+    return jobs
+
+
+# 1b-T14's protocols: plain cuEq float64 500 steps (positions every 50), hybrid 20,000 steps (every 20), two seeds;
+# the target ramps from 300 to 600 K.
+TRAJECTORY_CASES = {"cueq": dict(environment="mace_cueq_latest", steps=500, every=50, seeds=(20261019,),
+                                 positions=True),
+                    "hybrid": dict(environment="mace_cueq_oeq", steps=20_000, every=20, seeds=(20261001, 20261101),
+                                   positions=False)}
+
+
+def _trajectory2_job(machine, run_root, backend, side, suffix=""):
+    case = TRAJECTORY_CASES[backend]
+    name = f"trajectory2-{backend}-{side}{suffix}"
+    output = check_location(machine, run_root / name)
+    argv = [machine.python(case["environment"]), _tool(machine, "trajectory_versions.py"), "run", "--side", side,
+            "--output", str(output), "--model", PRIMARY_MODEL, "--checkpoint", checkpoint_path(machine, PRIMARY_MODEL),
+            "--structure", "NaCl", "--backend", backend, "--steps", str(case["steps"]), "--every", str(case["every"]),
+            "--seeds", *(str(seed) for seed in case["seeds"])]
+    if case["positions"]:
+        argv.append("--positions")
+    if side == "1b":
+        argv += ["--renamed", str(machine.path(machine.versions))]
+    return Job(name=name, argv=tuple(argv), output=str(output),
+               note="default trajectory, one version per process (1b-T14's measures)")
+
+
+def trajectory2_jobs(machine: Machine, run_root: Path) -> list:
+    """Phase 2 acceptance item 8, trajectories: MH-1 NaCl 3x3x3 on this checkout and on fastmace-1b, one version per
+    process; plain cuEq float64 (with a repeat of this checkout as the floor) and hybrid statistics. Untimed."""
+    run_root = Path(run_root)
+    return [_trajectory2_job(machine, run_root, "cueq", "1b"), _trajectory2_job(machine, run_root, "cueq", "2"),
+            _trajectory2_job(machine, run_root, "cueq", "2", "-repeat"),
+            _trajectory2_job(machine, run_root, "hybrid", "1b"), _trajectory2_job(machine, run_root, "hybrid", "2")]
+
+
+def _tier_job(machine, run_root, name, marker, *, timing, note):
+    output = check_location(machine, run_root / name)
+    basetemp = check_location(machine, run_root / f"{name}-pytest")
+    tests = machine.path(machine.fastmace) / "tests" / "gpu"
+    argv = [machine.python("mace_cueq_latest"), "-m", "pytest", str(tests), "-m", marker, "-p", "no:cacheprovider",
+            f"--basetemp={basetemp}", "--durations=60", "-rfEs", f"--junitxml={output / 'junit.xml'}"]
+    env = {"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq"),
+           "FASTMACE_BASELINE": str(machine.path(machine.baseline)),
+           "FASTMACE_RESULTS": str(output / "results"),
+           "FASTMACE_1A_T19_POLAR1S": str(machine.path(machine.root) / "1a-T19-gate-leto-20261018" / "gate-polar1-s")}
+    return Job(name=name, argv=tuple(argv), output=str(output), env=env, timing=timing, note=note)
+
+
+def acceptance_tier_jobs(machine: Machine, run_root: Path) -> list:
+    """The acceptance GPU tier (docs/development.md, "Test tiers") on final main, one process. It holds the
+    planner's step-time assertions (2-T14d), so it needs an idle GPU."""
+    return [_tier_job(machine, Path(run_root), "acceptance-tier", "acceptance", timing=True,
+                      note="pytest tests/gpu -m acceptance")]
+
+
+def full_tier_jobs(machine: Machine, run_root: Path) -> list:
+    """The full GPU tier (merge tier) on final main, one process; no step-time assertions."""
+    return [_tier_job(machine, Path(run_root), "full-tier", "not acceptance", timing=False,
+                      note='pytest tests/gpu -m "not acceptance"')]
+
+
 SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun_jobs, "alternating": alternating_jobs,
           "alternating-cueq": alternating_cueq_jobs,
           "gate": gate_jobs, "workflow": workflow_jobs,
           "gate-1b": gate_1b_jobs, "gate-1b-subset": gate_1b_subset_jobs, "library-gate": library_gate_jobs,
           "regression": regression_jobs, "frontends": frontends_jobs, "gpu-suite": gpu_suite_jobs,
-          "adapter-tests": adapter_jobs, "compile-checks": compile_checks_jobs}
+          "adapter-tests": adapter_jobs, "compile-checks": compile_checks_jobs,
+          "regression2": regression2_jobs, "trajectory2": trajectory2_jobs,
+          "acceptance-tier": acceptance_tier_jobs, "full-tier": full_tier_jobs}

@@ -1,0 +1,262 @@
+"""Acceptance tools of plan task 2-T23, without a GPU.
+
+- ``tools/ab_fastmace.py --release 1b``: this checkout (side 2) against the tag fastmace-1b in one process;
+- ``tools/trajectory_versions.py``: default trajectories across versions, 1b-T14's measures;
+- the phase 2 suites of ``tools/acceptance/suites.py`` and ``tools/acceptance/summarize2.py``.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import json
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+from fastmace.bench import versions
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+TOOLS = REPOSITORY_ROOT / "tools"
+
+
+def _load(path, name):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+sys.path.insert(0, str(TOOLS))
+ab_fastmace = _load(TOOLS / "ab_fastmace.py", "_tool_ab_fastmace_2t23")
+trajectory_versions = _load(TOOLS / "trajectory_versions.py", "_tool_trajectory_versions_2t23")
+sys.path.insert(0, str(TOOLS / "acceptance"))
+import suites  # noqa: E402
+
+summarize2 = _load(TOOLS / "acceptance" / "summarize2.py", "_tool_summarize2_2t23")
+
+
+# --- tools/ab_fastmace.py --release 1b ---------------------------------------------------------------------
+
+
+def _args(tmp_path, *extra):
+    return ["--output", str(tmp_path / "out"), "--checkpoint", "m", "--renamed", str(tmp_path / "v"), *extra]
+
+
+def test_release_1b_defaults_are_the_acceptance_protocol(tmp_path):
+    args = ab_fastmace.parse_args(_args(tmp_path, "--release", "1b"))
+    assert args.sides == ["1b", "2"] and args.current == "2"
+    assert args.expected_commit == "673a8a1" and args.blocks == 12 and args.block == 300 and args.warmup == 300
+    assert args.model == "mh1-r2scan" and args.backend == "hybrid" and args.ensemble == "nvt"
+
+
+def test_release_1a_is_unchanged(tmp_path):
+    args = ab_fastmace.parse_args(_args(tmp_path))
+    assert args.sides == ["1a", "1b"] and args.current == "1b" and args.expected_commit == "bb35363"
+
+
+def test_release_1b_sides(tmp_path, capsys):
+    args = ab_fastmace.parse_args(_args(tmp_path, "--release", "1b", "--sides", "2", "1b", "--pattern", "abba"))
+    assert args.sides == ["2", "1b"]
+    for sides in (("1a", "2"), ("2", "2"), ("1a",)):
+        with pytest.raises(SystemExit):
+            ab_fastmace.parse_args(_args(tmp_path, "--release", "1b", "--sides", *sides))
+    with pytest.raises(SystemExit):  # side 2 belongs to --release 1b only
+        ab_fastmace.parse_args(_args(tmp_path, "--sides", "2"))
+    capsys.readouterr()
+
+
+def test_release_1b_side_needs_the_renamed_copy(tmp_path, capsys):
+    with pytest.raises(SystemExit):
+        ab_fastmace.parse_args(["--output", str(tmp_path), "--checkpoint", "m", "--release", "1b"])
+    assert "--name fastmace_1b" in capsys.readouterr().err
+    args = ab_fastmace.parse_args(["--output", str(tmp_path), "--checkpoint", "m", "--release", "1b", "--sides", "2"])
+    assert args.renamed is None
+
+
+@pytest.mark.parametrize("extra", [("--backend", "cueq"), ("--ensemble", "npt"), ("--model", "polar1-s")])
+def test_release_1b_refuses_what_one_process_cannot_hold(tmp_path, capsys, extra):
+    with pytest.raises(SystemExit):
+        ab_fastmace.parse_args(_args(tmp_path, "--release", "1b", *extra))
+    assert "alternating processes" in capsys.readouterr().err
+    assert ab_fastmace.parse_args(_args(tmp_path, "--release", "1b", *extra, "--sides", "2")).sides == ["2"]
+
+
+def test_ratio_is_this_checkout_over_the_release_whatever_the_order():
+    assert ab_fastmace.ratio_current_over_release({"1b": 10.0, "2": 10.1}, "2", "1b") == pytest.approx(1.01)
+    assert ab_fastmace.ratio_current_over_release({"2": 10.1, "1b": 10.0}, "2", "1b") == pytest.approx(1.01)
+
+
+def test_both_sides_of_release_1b_build_through_the_minimal_planner(tmp_path):
+    args = ab_fastmace.parse_args(_args(tmp_path, "--release", "1b"))
+    assert ab_fastmace.Version("1b", args, None).minimal and ab_fastmace.Version("2", args, None).minimal
+    old = ab_fastmace.parse_args(_args(tmp_path))
+    assert not ab_fastmace.Version("1a", old, None).minimal and ab_fastmace.Version("1b", old, None).minimal
+
+
+def test_the_renamed_1b_package_resolves_the_planner_modules(tmp_path):
+    args = ab_fastmace.parse_args(_args(tmp_path, "--release", "1b"))
+    side = ab_fastmace.Version("2", args, sys.modules["fastmace"])
+    assert side.module("planner.minimal").__name__ == "fastmace.planner.minimal"
+    assert side.module("planner.workload").Workload is not None
+
+
+def _tag_source(ref, path):
+    try:
+        return subprocess.run(["git", "-c", "safe.directory=*", "-C", str(REPOSITORY_ROOT), "show", f"{ref}:{path}"],
+                              check=True, capture_output=True, text=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def test_patch_targets_cover_every_patch_this_checkout_and_1b_install():
+    attributes = {attribute for _, attribute in versions.PATCH_TARGETS}
+    for source in ((REPOSITORY_ROOT / "fastmace" / "_patches.py").read_text(),
+                   _tag_source("fastmace-1b", "fastmace/_patches.py")):
+        if source is None:
+            continue
+        found = set(re.findall(r'_put\(\w+,\s*"(\w+)"', source))
+        assert found and found <= attributes, found - attributes
+
+
+# --- tools/trajectory_versions.py -----------------------------------------------------------------------
+
+
+def test_trajectory_run_needs_the_renamed_copy_for_the_release(tmp_path, capsys):
+    with pytest.raises(SystemExit):
+        trajectory_versions.parse_args(["run", "--side", "1b", "--output", str(tmp_path), "--checkpoint", "m"])
+    args = trajectory_versions.parse_args(["run", "--side", "2", "--output", str(tmp_path), "--checkpoint", "m"])
+    assert args.steps == 20_000 and args.every == 20 and args.seeds == [20261001, 20261101]
+    assert args.targets == [300.0, 600.0] and args.expected_commit == "673a8a1"
+    capsys.readouterr()
+
+
+def _rows(steps, every, energy, temperature, shift=0.0):
+    return [{"step": s, "target": trajectory_versions.target(s, steps, (300.0, 600.0)), "energy": energy,
+             "temperature": temperature, "positions": [[0.0, 0.0, shift + s * 1e-3]]}
+            for s in range(every, steps + 1, every)]
+
+
+def _write(directory, side, backend, runs, seeds):
+    directory.mkdir()
+    meta = dict(status="complete", side=side, fastmace_commit=side, backend=backend, steps=100, every=10,
+                seeds=seeds, targets=[300.0, 600.0], structure="NaCl", model="mh1-r2scan",
+                runs={str(seed): dict(plan=dict(options={"a": True}), rows=rows) for seed, rows in zip(seeds, runs)})
+    (directory / "trajectory.json").write_text(json.dumps(meta))
+    return directory
+
+
+def test_compare_plain_cueq_positions(tmp_path):
+    release = _write(tmp_path / "a", "1b", "cueq", [_rows(100, 10, -1.0, 300.0)], [1])
+    same = _write(tmp_path / "b", "2", "cueq", [_rows(100, 10, -1.0, 300.0, 5e-13)], [1])
+    off = _write(tmp_path / "c", "2", "cueq", [_rows(100, 10, -1.0, 300.0, 5e-12)], [1])
+    result = trajectory_versions.compare(release, same, repeat=off)
+    assert result["passed"] and result["positions_max_A"]["1"] == pytest.approx(5e-13)
+    assert result["repeat_positions_max_A"]["1"] == pytest.approx(4.5e-12)
+    assert not trajectory_versions.compare(release, off)["passed"]
+
+
+def test_compare_hybrid_statistics(tmp_path):
+    # Seeds differ by 2 K and 0.2 meV/atom; versions by 0.5 K and 0.01 meV/atom: within 2x the seeds.
+    release = _write(tmp_path / "a", "1b", "hybrid", [_rows(100, 10, -1.0, 300.0), _rows(100, 10, -1.0002, 302.0)],
+                     [1, 2])
+    close = _write(tmp_path / "b", "2", "hybrid", [_rows(100, 10, -1.00001, 300.5), _rows(100, 10, -1.0002, 302.0)],
+                   [1, 2])
+    far = _write(tmp_path / "c", "2", "hybrid", [_rows(100, 10, -1.002, 310.0), _rows(100, 10, -1.0002, 302.0)],
+                 [1, 2])
+    result = trajectory_versions.compare(release, close)
+    assert result["passed"] and result["limits"]["temperature_K"] == pytest.approx(4.0)
+    assert not trajectory_versions.compare(release, far)["passed"]
+
+
+def test_compare_refuses_different_protocols(tmp_path):
+    release = _write(tmp_path / "a", "1b", "cueq", [_rows(100, 10, -1.0, 300.0)], [1])
+    other = _write(tmp_path / "b", "2", "hybrid", [_rows(100, 10, -1.0, 300.0)], [1])
+    with pytest.raises(ValueError, match="backend"):
+        trajectory_versions.compare(release, other)
+
+
+# --- suites and summary ---------------------------------------------------------------------------------
+
+
+def _argv(job):
+    return list(job.argv)
+
+
+def test_regression2_suite():
+    machine = suites.MACHINES["murphy"]
+    jobs = suites.regression2_jobs(machine, Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
+    assert [job.name for job in jobs] == ["regression2-ab-abab", "regression2-ab-2-first", "regression2-ab-abba",
+                                          "regression2-control-1b", "regression2-control-2"]
+    for job in jobs:
+        argv = _argv(job)
+        assert job.timing and argv[argv.index("--release") + 1] == "1b"
+        assert argv[argv.index("--structures") + 1:argv.index("--structures") + 3] == ["NaCl", "NbCl5"]
+        assert ("--renamed" in argv) == ("1b" in argv[argv.index("--sides") + 1:argv.index("--warmup")])
+    assert _argv(jobs[1])[_argv(jobs[1]).index("--sides") + 1:][:2] == ["2", "1b"]
+    assert _argv(jobs[2])[_argv(jobs[2]).index("--pattern") + 1] == "abba"
+    assert {_argv(job)[_argv(job).index("--blocks") + 1] for job in jobs[:3]} == {"12"}
+
+
+def test_trajectory2_suite():
+    machine = suites.MACHINES["local"]
+    jobs = {job.name: job for job in suites.trajectory2_jobs(machine, Path("/home/u/fastmace-acceptance/r"))}
+    assert set(jobs) == {"trajectory2-cueq-1b", "trajectory2-cueq-2", "trajectory2-cueq-2-repeat",
+                         "trajectory2-hybrid-1b", "trajectory2-hybrid-2"}
+    cueq = _argv(jobs["trajectory2-cueq-1b"])
+    assert "mace_cueq_latest" in cueq[0] and "--positions" in cueq and "--renamed" in cueq
+    hybrid = _argv(jobs["trajectory2-hybrid-2"])
+    assert "mace_cueq_oeq" in hybrid[0] and hybrid[hybrid.index("--steps") + 1] == "20000"
+    assert "--renamed" not in hybrid and not any(job.timing for job in jobs.values())
+
+
+def test_tier_suites():
+    machine = suites.MACHINES["murphy"]
+    (acceptance,) = suites.acceptance_tier_jobs(machine, Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
+    (full,) = suites.full_tier_jobs(machine, Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
+    assert acceptance.timing and not full.timing  # the acceptance tier holds the step-time assertions
+    def marker(job):  # the -m after "python -m pytest"
+        argv = _argv(job)
+        return argv[argv.index("-m", argv.index("pytest")) + 1]
+
+    assert marker(acceptance) == "acceptance" and marker(full) == "not acceptance"
+    assert {"FASTMACE_HYBRID_PYTHON", "FASTMACE_BASELINE"} <= set(acceptance.env)
+    assert "FASTMACE_MODELS" in suites.environment(machine, Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
+
+
+def test_noise_floors_per_machine():
+    assert summarize2.noise_floor("murphy", "NaCl") == summarize2.noise_floor("murphy", "NbCl5") == 0.0016
+    assert summarize2.noise_floor("local", "NaCl") == 0.011 and summarize2.noise_floor("local", "NbCl5") == 0.004
+
+
+def _ab_meta(ratio, valid=True, equal=True):
+    blocks = [10.0] * 12
+    return dict(current_side="2", release_side="1b", pattern="abab", build_order=["1b", "2"], sides=["1b", "2"],
+                structures={"NaCl": dict(natoms=216, ratio=ratio, valid=valid, plan_check={"equal": equal},
+                                         plan_describe_equal=equal,
+                                         sides={"1b": dict(block_ms=blocks, median_ms=10.0),
+                                                "2": dict(block_ms=[b * ratio for b in blocks],
+                                                          median_ms=10.0 * ratio)})})
+
+
+@pytest.mark.parametrize("machine, ratio, valid, equal, passed", [
+    ("murphy", 1.001, True, True, True), ("murphy", 1.003, True, True, False), ("local", 1.009, True, True, True),
+    ("murphy", 1.0, False, True, False)])
+def test_regression_rows(machine, ratio, valid, equal, passed):
+    (row,) = summarize2.regression_rows("p", _ab_meta(ratio, valid, equal), machine)
+    assert row["passed"] is passed and row["ratio"] == ratio
+
+
+def test_junit_totals(tmp_path):
+    path = tmp_path / "junit.xml"
+    path.write_text('<testsuites><testsuite tests="4" failures="1" errors="0" skipped="1" time="60">'
+                    '<testcase classname="tests.gpu.test_a" name="test_x"/>'
+                    '<testcase classname="tests.gpu.test_a" name="test_y"><failure/></testcase>'
+                    '<testcase classname="tests.gpu.test_a" name="test_z"><skipped/></testcase>'
+                    '<testcase classname="tests.gpu.test_b" name="test_w"/></testsuite></testsuites>')
+    totals = summarize2.junit_totals(path)
+    assert (totals["passed"], totals["failures"], totals["skipped"]) == (2, 1, 1)
+    assert totals["failed_ids"] == ["tests.gpu.test_a::test_y"]
