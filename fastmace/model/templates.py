@@ -11,7 +11,8 @@ plans (SPEC §8.7). The template itself never reaches a plan. Design and measure
 - **Where:** CUDA with the cuEq or hybrid backend only (``applies``). On the CPU a deepcopy of a
   cuEq model rebuilds its naive kernels, as long as the reload; e3nn has no conversion to save.
 - **Key:** checkpoint hash, head, backend, dtype, device, the conversion options, the process
-  patches in force and the package versions (``conversion_key``).
+  patches that act on the conversion (``CONVERSION_PATCHES``) and the package versions
+  (``conversion_key``).
 - **Owner:** each ``ForceField`` holds its own cache; nothing is module-level. At most
   ``MAX_TEMPLATES`` templates, least recently used out; ``release`` frees them.
 - **Guard:** a template that changed since it was stored (a tensor replaced or changed in place)
@@ -31,6 +32,11 @@ from fastmace.errors import TemplateChangedError
 
 MAX_TEMPLATES = 2
 BACKENDS = ("cueq", "hybrid")
+# The process patches that change what a conversion builds: MACE's cuEq converter (conv fusion) and the
+# OEq build the converted modules use. The engine patches a build installs (mask_head, compute_forces,
+# the addmm rule, strain, polar long-range) act when MACE's functions are called, not on the modules, so
+# they stay out of the key; otherwise the first build would make every later plan miss.
+CONVERSION_PATCHES = ("cueq_conv_fusion", "oeq_runtime")
 _VERSIONED_MODULES = ("torch", "cuequivariance", "cuequivariance_torch", "cuequivariance_ops_torch",
                       "openequivariance", "e3nn")
 
@@ -53,7 +59,7 @@ def conversion_key(loaded, options) -> tuple:
 
     return (loaded.sha256, str(loaded.path), loaded.label, loaded.head, loaded.model_type,
             tuple(sorted((name, repr(value)) for name, value in options.items())),
-            repr(_patches.applied()), _versions())
+            tuple(repr(record) for record in _patches.applied() if record.name in CONVERSION_PATCHES), _versions())
 
 
 def _tensors(model):
@@ -126,5 +132,5 @@ class TemplateCache:
         return freed
 
 
-__all__ = ["BACKENDS", "MAX_TEMPLATES", "TemplateCache", "TemplateChangedError", "applies", "conversion_key",
-           "fingerprint", "nbytes", "private"]
+__all__ = ["BACKENDS", "CONVERSION_PATCHES", "MAX_TEMPLATES", "TemplateCache", "TemplateChangedError", "applies",
+           "conversion_key", "fingerprint", "nbytes", "private"]

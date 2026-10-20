@@ -174,13 +174,30 @@ def test_each_conversion_option_is_its_own_template(loads, cuda_rule, base, chan
     assert len(loads) == 2
 
 
-def test_a_changed_process_patch_misses(loads, cuda_rule, monkeypatch):
+@pytest.mark.parametrize("name", templates.CONVERSION_PATCHES)
+def test_a_changed_conversion_patch_misses(loads, cuda_rule, monkeypatch, name):
     ff = ForceField(pristine())
     ff.execution_model(plan())
     applied = _patches.applied()
-    monkeypatch.setattr(_patches, "applied", lambda: tuple(applied) + (("a patch installed since", True),))
+    record = _patches.PatchRecord(name, "another value", (), "installed since the first plan")
+    monkeypatch.setattr(_patches, "applied", lambda: tuple(applied) + (record,))
     ff.execution_model(plan())
     assert len(loads) == 2
+
+
+@pytest.mark.parametrize("name", ["capture_safe_mask_head", "first_derivative_only", "unfuse_full_addmm",
+                                  "polar_longrange"])
+def test_an_engine_patch_installed_by_the_first_build_still_hits(loads, cuda_rule, monkeypatch, name):
+    # The first plan's build installs process-wide engine patches (compile.install_engine_patches). They act
+    # when MACE's functions are called, not on the converted modules, so the next plan copies the template
+    # (murphy, opt-T06: with every patch in the key, a second Simulation missed and kept 2 templates).
+    ff = ForceField(pristine())
+    ff.execution_model(plan())
+    applied = _patches.applied()
+    record = _patches.PatchRecord(name, True, ("mace.modules.blocks.mask_head",), "installed by a build")
+    monkeypatch.setattr(_patches, "applied", lambda: tuple(applied) + (record,))
+    ff.execution_model(plan())
+    assert len(loads) == 1 and ff.template_count() == 1
 
 
 def test_naive_cueq_allowance_is_in_the_key(loads, cuda_rule):
