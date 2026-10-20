@@ -56,6 +56,7 @@ from fastmace.errors import PlanRefused, Reason
 from .plan import Hardware, Plan
 
 TIER = "graph"
+EAGER_TIER = "eager"  # the graph engine without capture or compilation (SPEC §8.3, 2-T02)
 
 # The switch map's rule for every field that admits "auto" (tests/cpu/test_config.py AUTO_RULES).
 AUTO_RULES = MappingProxyType({
@@ -607,14 +608,15 @@ class FixedPlanner:
         return resolution
 
     def build(self, plan: Plan, model, atoms, *, temperature_K: float = 0.0, compile_cache=None, constraints=None,
-              check: bool = True):
+              check: bool = True, capture: bool | None = None):
         """The ready ``GraphEngine`` of ``plan`` for ``model`` (a ``LoadedModel`` from ``load``) and ``atoms``.
 
         Builds the force field (rewrites resolved for the model and self-checked), the state, the
         integrator at ``temperature_K`` and the engine, which does the initial force evaluation.
         ``compile_cache`` (``fastmace.model.compile.CompiledModelCache``) is shared by the engines of
         one run, as the research engine shares its compiled models between crystals; ``constraints``
-        is the process record (default the process's).
+        is the process record (default the process's). ``capture`` is the engine's (default: captured
+        graphs on CUDA); the eager tier (2-T02) passes False and builds a plan of tier ``"eager"``.
         """
         from fastmace.engine.graph import GraphEngine
         from fastmace.integrators.baoab import LangevinBAOAB
@@ -622,8 +624,10 @@ class FixedPlanner:
         from fastmace.model.forces import MACEForceField
         from fastmace.state import SimulationState
 
-        if plan.tier != TIER:
-            raise ValueError(f"FixedPlanner builds tier {TIER!r} plans, not {plan.tier!r}")
+        if plan.tier not in (TIER, EAGER_TIER):
+            raise ValueError(f"FixedPlanner builds tier {TIER!r} and {EAGER_TIER!r} plans, not {plan.tier!r}")
+        if plan.tier == EAGER_TIER and capture is not False:
+            raise ValueError(f"a tier {EAGER_TIER!r} plan runs without CUDA graphs: pass capture=False")
         for part in (plan.rewrites, plan.engine, plan.precision, plan.neighbours, plan.polar):
             if part is not None and "auto" in dataclasses.astuple(part):
                 raise ValueError(f"{type(part).__name__} still has 'auto' values; build takes a plan from plan()")
@@ -656,7 +660,8 @@ class FixedPlanner:
                                        **integrator_keywords(plan.integrator))
         else:
             integrator = Langevin(state, plan.integrator, temperature_K=temperature_K)
-        return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints)
+        return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
+                           capture=capture)
 
 
 def auto_options_off(plan: Plan) -> dict[str, str]:
@@ -672,6 +677,7 @@ def enabled_options(plan: Plan) -> tuple[str, ...]:
 
 
 __all__ = (
-    "AUTO_RULES", "FixedPlanner", "ModelSettings", "PlanRefused", "STAGE2_SUPPORT", "TIER", "WORKLOAD_CONSTRAINTS",
-    "auto_options_off", "detect_hardware", "enabled_options", "integrator_keywords", "workload_problems",
+    "AUTO_RULES", "EAGER_TIER", "FixedPlanner", "ModelSettings", "PlanRefused", "STAGE2_SUPPORT", "TIER",
+    "WORKLOAD_CONSTRAINTS", "auto_options_off", "detect_hardware", "enabled_options", "integrator_keywords",
+    "workload_problems",
 )
