@@ -25,13 +25,14 @@ workers"). 2-T21 works in the ResearchModule worktree
 
 - Phase 1b: done, tagged `fastmace-1b` (673a8a1, with 1b-T27).
 - Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12, 2-T10, 2-T18, 2-T04,
-  2-T09b, 2-T07, 2-T14c, 2-T02, 2-T06, 2-T08, 2-T13, 2-T05, 2-T14d, 2-T03 (20 October 2026).
-- Working in phase 2:
-  - 2-T15, the fallback algorithm (critical path);
-  - 2-T08b in trial (CPU green; full GPU tier on murphy);
-  - 2-T04b and 2-T16 (rebasing on 2-T03).
-- Merge queue on murphy's GPU, one tier at a time: 2-T08b, then 2-T04b and 2-T16.
-- Next go messages: 2-T21, 2-T19 and 2-T17 (after 2-T15).
+  2-T09b, 2-T07, 2-T14c, 2-T02, 2-T06, 2-T08, 2-T13, 2-T05, 2-T14d, 2-T03,
+  2-T08b (20 October 2026).
+- In trial: 2-T04b with 2-T15, the fallback algorithm. Acceptance 2 passed
+  on murphy. The CPU trial is green; the full GPU tier is on murphy.
+- Working in phase 2: 2-T16 (rebases after 2-T04b and 2-T15), 2-T19 (setup
+  timing) and 2-T21 (`main.py` on `Simulation`, in ResearchModule).
+- Next go messages: 2-T17 after 2-T15 merges; then 2-T23 (acceptance).
+  2-T20 and 2-T22 as resources allow.
 - Waiting for go: the rest. Answers to all prestart reports are in
   `phase-2.md`, "Conductor answers to the prestart reports".
 
