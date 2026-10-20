@@ -46,6 +46,7 @@ How to read the tables:
 | `--grouped-linear`; `GROUPED_BLOCK_LINEAR` | `RewriteConfig.grouped_linear` | `"auto"` (global `False`) | `on_with_block_linear` | §6.2 `grouped_linear` |
 | `--merged-residual`; `MERGED_RESIDUAL_LINEAR` | `RewriteConfig.merged_residual` | `"auto"` (global `False`) | `on_with_block_linear` | §6.2 `merged_residual` |
 | — (FastMACE only: optimisation round 1, OPT-T02 stage A) | `RewriteConfig.gated_rows` | `"auto"` | `never_automatic` | `docs/design/opt-T02-fusion.md`, stage A |
+| — (FastMACE only: optimisation round 1, OPT-T02 stage B) | `RewriteConfig.segment_gemm` | `"auto"` | `never_automatic` | `docs/design/opt-T02-BC-go-no-go.md` |
 | `INPLACE_BLOCK_LINEAR` (no flag) | `RewriteConfig.inplace_block_linear` | `False` | — | §6.2 opt-in "in-place block linear (slower)" |
 | `--single-graph-strain`; `upstream_mace.use_single_graph_strain` (process-wide patch of MACE) | `RewriteConfig.single_graph_strain` | `"auto"` | `on` | §6.2 `single_graph_strain` |
 | `--polar-uvu`; `polar_gpu.REASSOCIATE_UVU` | `RewriteConfig.polar_uvu` | `True` (flag `on`) | — | §6.2 `polar_uvu` |
@@ -233,7 +234,7 @@ tier 1, §8.1); "hybrid" the resolved backend. Support keys are those of
 | `on_with_reassociate_first_and_sort_receivers` | Stage 1: on when `reassociate_first` and `sort_receivers` are on. Stage 2: off unless support `reassociate_first`. | `RewriteConfig.segmented_first_sum` |
 | `on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports` | Stage 1: on with the hybrid backend, `fold_cutoff` (stage 1) and `sort_receivers`. Stage 2: off unless support `streaming_conv` (folded MH-1 class or a `GENERIC_INTERACTIONS` model). | `RewriteConfig.streaming_conv` |
 | `on_with_graph_engine_if_model_supports` | Stage 1: on with the graph engine, **any backend**. Stage 2: off unless support `species_skip` (a `GENERIC_INTERACTIONS` model). | `RewriteConfig.species_skip` |
-| `never_automatic` | Off; only `"on"` enables it (`fused_radial_hidden` requires `fold_cutoff`, `gated_rows` requires `merged_residual`). | `RewriteConfig.fused_radial_hidden`, `RewriteConfig.gated_rows` |
+| `never_automatic` | Off; only `"on"` enables it (`fused_radial_hidden` requires `fold_cutoff`, `gated_rows` requires `merged_residual`, `segment_gemm` requires `gated_rows`). | `RewriteConfig.fused_radial_hidden`, `RewriteConfig.gated_rows`, `RewriteConfig.segment_gemm` |
 | `on_with_block_linear` | On when `block_linear` is on. `merged_residual` acts only in interactions where `density_first` applies; the rewrite's `requires` handles that, not the rule. | `RewriteConfig.grouped_linear`, `RewriteConfig.merged_residual` |
 | `on` | On for every engine; acts only where stress is computed (NPT, stress-path relaxations). | `RewriteConfig.single_graph_strain` |
 | `on_for_plain_cueq_unless_reproducible` | Plain cuEq backend: on, except in a `reproducible=True` plan, which needs the unfused convolution (§9.3, owner decision 13). Hybrid: not applicable (the research engine records `None`). | `EngineConfig.cueq_conv_fusion` |

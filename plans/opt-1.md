@@ -34,8 +34,13 @@ gets the rewrite switched off.
 Results so far in this round:
 - **OPT-T01 (tensor cores) and OPT-T01b (overlap):** rejected on sm_89.
 - **OPT-T03 candidates 1–2:** missed their rule on sm_89.
-- **Stage B (`segment_gemm`):** NbCl5 −5.1 % on top of A on murphy; still
-  opt-in.
+- **Stage B (`segment_gemm`):**
+  - NbCl5 −4.8 to −5.2 % on murphy and −4.2 to −4.3 % locally, on top of A;
+    NaCl neutral (the stock fallback).
+  - It is rounding class, not bitwise: Triton replaces cuBLAS on large shapes.
+    The force gate passes.
+  - **Default on (owner, 20 October 2026)** where the shape rule picks Triton.
+    Float64 and the reproducible mode keep the stock path.
 
 ## Starting point
 
