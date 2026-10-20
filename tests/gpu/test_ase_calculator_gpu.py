@@ -4,9 +4,12 @@ MH-1 (``matpes_r2scan``) on rattled NaCl 2x2x2: ``ase.optimize.LBFGS`` with ``fm
 forces, float64 energy, compiled tier) reaches the minimum that LBFGS reaches with MACE's own
 calculator (float64). The relaxation runs in a child process: the calculator's compiled plan fixes
 the process's compile family (SPEC §8.7), which must not depend on the tests run before it. The
-relaxation compiles once, although the edge count changes between its calls (2-T13).
+relaxation compiles once, although the edge count changes between its calls (2-T13). MACE's own
+relaxation is the same for both parametrisations, so it runs once per pytest process, in a child of
+this environment's Python (2-T14e: it took about 24 s in each before).
 """
 
+import functools
 import json
 import os
 import subprocess
@@ -14,6 +17,7 @@ import sys
 import textwrap
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -29,15 +33,7 @@ def _mh1_path():
     return path if path.is_file() else None
 
 
-CHILD = textwrap.dedent("""
-    import json, sys, time
-    import fastmace as fm  # before MACE, so the planner may choose the hybrid backend
-    import numpy as np
-    from torch._dynamo.utils import counters
-    sys.path.insert(0, sys.argv[2])
-    from _support.structures import nacl
-    from ase.optimize import LBFGS
-
+RELAX = """
     def relax(calculator):
         atoms = nacl(repeat=2, rattle=0.08, seed=21)
         atoms.calc = calculator
@@ -46,7 +42,19 @@ CHILD = textwrap.dedent("""
         converged = optimizer.run(fmax=2e-3, steps=300)
         return atoms, dict(converged=bool(converged), steps=optimizer.nsteps,
                            seconds=time.perf_counter() - start, energy=atoms.get_potential_energy(),
-                           fmax=float(np.abs(atoms.get_forces()).max()))
+                           fmax=float(np.abs(atoms.get_forces()).max()),
+                           positions=atoms.get_positions().tolist())
+"""
+
+CHILD = textwrap.dedent("""
+    import json, sys, time
+    import fastmace as fm  # before MACE, so the planner may choose the hybrid backend
+    import numpy as np
+    from torch._dynamo.utils import counters
+    sys.path.insert(0, sys.argv[2])
+    from _support.structures import nacl
+    from ase.optimize import LBFGS
+""") + textwrap.dedent(RELAX) + textwrap.dedent("""
 
     calc = fm.calc("mh1", head="matpes_r2scan")
     calls, graphs, edges, calculate = [], [], [], calc.calculate
@@ -62,15 +70,37 @@ CHILD = textwrap.dedent("""
     ours, ours_info = relax(calc)
     ours_info.update(call_seconds=calls, graphs_after_call=graphs, edges=edges)
     plan = calc.plan
+    print(json.dumps(dict(ours=ours_info, atoms=len(ours), tier=plan.tier, backend=plan.engine.backend,
+                          dtype=plan.precision.dtype, dynamic_edges=plan.engine.dynamic_edges, notes=calc.notes)))
+""")
+
+MACE_CHILD = textwrap.dedent("""
+    import json, sys, time
+    import numpy as np
+    sys.path.insert(0, sys.argv[2])
+    from _support.structures import nacl
+    from ase.optimize import LBFGS
+""") + textwrap.dedent(RELAX) + textwrap.dedent("""
     from mace.calculators import MACECalculator
     theirs, theirs_info = relax(MACECalculator(model_paths=sys.argv[1], device="cuda", default_dtype="float64",
                                                head="matpes_r2scan"))
-    delta = ours.get_positions() - theirs.get_positions()  # same start, LBFGS does not wrap
-    print(json.dumps(dict(ours=ours_info, theirs=theirs_info, atoms=len(ours),
-                          max_displacement=float(np.abs(delta).max()), tier=plan.tier,
-                          backend=plan.engine.backend, dtype=plan.precision.dtype,
-                          dynamic_edges=plan.engine.dynamic_edges, notes=calc.notes)))
+    print(json.dumps(theirs_info))
 """)
+
+
+def _run(executable, code):
+    environ = dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, [str(REPOSITORY_ROOT),
+                                                                         os.environ.get("PYTHONPATH")])))
+    done = subprocess.run([executable, "-c", code, str(_mh1_path()), str(REPOSITORY_ROOT / "tests")],
+                          capture_output=True, text=True, env=environ, timeout=1200, cwd=REPOSITORY_ROOT)
+    assert done.returncode == 0, done.stderr[-4000:]
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+@functools.cache
+def maces_minimum():
+    """LBFGS with MACE's own calculator in float64, once per pytest process (this environment's Python)."""
+    return _run(sys.executable, MACE_CHILD)
 
 
 @pytest.mark.slow
@@ -84,13 +114,12 @@ def test_lbfgs_with_fm_calc_reaches_maces_minimum(python):
             pytest.skip("FASTMACE_HYBRID_PYTHON is not set")
     else:
         executable = sys.executable
-    environ = dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, [str(REPOSITORY_ROOT),
-                                                                         os.environ.get("PYTHONPATH")])))
-    done = subprocess.run([executable, "-c", CHILD, str(_mh1_path()), str(REPOSITORY_ROOT / "tests")],
-                          capture_output=True, text=True, env=environ, timeout=1200, cwd=REPOSITORY_ROOT)
-    assert done.returncode == 0, done.stderr[-4000:]
-    result = json.loads(done.stdout.strip().splitlines()[-1])
-    print(json.dumps(result, indent=1))
+    result = _run(executable, CHILD)
+    theirs = maces_minimum()
+    # Same start, LBFGS does not wrap.
+    result.update(theirs=theirs, max_displacement=float(np.abs(np.array(result["ours"]["positions"])
+                                                                - np.array(theirs["positions"])).max()))
+    print(json.dumps({key: value for key, value in result.items() if key not in ("ours", "theirs")}, indent=1))
     assert result["tier"] == "compiled" and result["dtype"] == "float32" and result["dynamic_edges"]
     if python == "hybrid":
         assert result["backend"] == "hybrid", result["notes"]
