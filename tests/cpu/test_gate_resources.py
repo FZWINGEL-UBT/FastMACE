@@ -582,6 +582,7 @@ def test_a_replay_within_the_gates_limit_passes(pristine, no_engines_yet, monkey
     assert record.status == "passed-reduced" and replay["passed"]
     assert replay["quantities"]["force_eV_per_A"]["difference"] == pytest.approx(4e-6, rel=1e-6)
     assert "max(2 x float32 yardstick, floor)" in replay["bound"]
+    assert replay["bound_source"].startswith("the reduced cell")
 
 
 # --------------------------------------------------------------------------- the CPU step itself

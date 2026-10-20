@@ -1324,7 +1324,8 @@ def _replay_check(replayed, directs, natoms, quantities, limits):
     result = {"cell": "production", "copies": len(rows),
               "compared": "captured replay against a direct evaluation of the same force field (the model function "
                           "uncaptured, on a fresh unpadded neighbour list)",
-              "bound": "the gate's limit per quantity from the reduced cell: max(2 x float32 yardstick, floor)",
+              "bound": "the gate's limit per quantity: max(2 x float32 yardstick, floor)",
+              "bound_source": "the reduced cell's comparison with the reference (the comparison that ran)",
               "quantities": {}}
     passed = True
     for quantity in quantities:
