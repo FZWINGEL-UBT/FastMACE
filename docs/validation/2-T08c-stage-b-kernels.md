@@ -4,10 +4,19 @@ Plan task 2-T08c (conductor, 20 October 2026). The question: why does
 `tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine`
 fail on murphy? Phase 2 acceptance needs it green on both machines.
 
-Status: **analysed from recorded data only.** The kernel diff on murphy's GPU
-is on hold: the owner wants no big accuracy runs on murphy until the
-optimisation round is in. It runs with the post-optimisation acceptance if it
-is still needed. No library code was changed.
+**Cause: cuEquivariance's run-time kernel choice on a shared GPU, which the
+test's normalisation did not cover. There is no difference between FastMACE
+and the research engine.**
+- Under a GPU load, cuEquivariance picks a transposed-operand variant for one
+  forward segmented polynomial (`segmented_polynomial_tr0_1__algo…`).
+- That variant first groups the edge indices, adding 12 graph nodes.
+- `kernel_sequence` normalised neither the `tr…__` name nor the index
+  grouping.
+- Either engine can pick the variant. The test failed when one did and the
+  other did not, or when both did with different algorithm suffixes.
+- Fix (test only, in `tests/gpu/test_engine_gpu.py`): `kernel_sequence`
+  normalises the transposed variant and leaves out its index grouping. No
+  library code was changed.
 
 ## What the test compares
 
@@ -113,7 +122,53 @@ an idle GPU, as the timing jobs already require, or extend `kernel_sequence`
 to the variant names the diff shows. If run 1 fails, the test needs a warm
 cache or a normalisation of the cold compile.
 
-## Until then
+## The diagnostic on murphy (20 October 2026, 17:55–18:03 UTC)
 
-The test passes on both machines in the phase 2 acceptance tier when run as
-2-T23 runs it: an idle GPU and the acceptance compile cache.
+Conditions:
+- murphy, NVIDIA RTX 4000 Ada Generation (sm_89);
+- NAS `mace_cueq_latest` (mace-torch 0.3.16, torch 2.14.1+cu130,
+  cuequivariance 0.12.0);
+- library 85360cc, research engine `FASTMACE_BASELINE=/mnt/homes/zwingel/fastmace-baseline/1a-T18`
+  (tag `research-engine-baseline-20261017`, d2faa9fd);
+- probe `tools/validation/stage_b_kernel_diff.py`, checked mode, 100 steps;
+- the GPU had no compute process before each run (`nvidia-smi`);
+- no hash-gate problem (`patch_problems` empty).
+
+| Run | Condition | Stage B: FastMACE / baseline | Normalised length | Equal (old normalisation) |
+| --- | --- | ---: | ---: | --- |
+| i | idle GPU, fresh compile caches | 234 / 236 | 234 / 234 | yes |
+| ii | idle GPU, the same caches again (warm) | 236 / 235 | 234 / 234 | yes |
+| iii | warm caches, beside a GPU load of ours (`--load-gib 4`: 4 GiB held, continuous 4096² matmuls) | 249 / 248 | 246 / 246 | **no** |
+
+What run iii added, in both engines, compared with run i:
+- one forward polynomial became `segmented_polynomial_tr0_1__algo2_2`
+  (FastMACE) or `..._algo1_4` (baseline);
+- before it, 3 `CU_GRAPH_NODE_TYPE_MEM_ALLOC` nodes, 4
+  `kernelcatcher::equivariance::index_grouping` kernels
+  (`segmentOffsetsKernel`, `gatherStridedLanesKernel`, `iotaWithinLaneKernel`,
+  `computeIndptrBatchedKernel`) and 2 cub `DeviceSegmentedRadixSortKernel`
+  launches; after it, 3 `MEM_FREE` nodes. That makes the 12 extra nodes;
+- the other polynomials switched among `algo…` and `split…_of_…` variants,
+  which the old normalisation already handled.
+
+With the old normalisation the only remaining difference in run iii was that
+one name (`tr0_1__algo2_2` vs `tr0_1__algo1_4`). The earlier failures (248/236
+and 249/237) were the same shift in FastMACE alone: the GPU was shared with
+sibling processes, and FastMACE's process chose the transposed variant while
+the baseline's did not.
+
+Cold vs warm compile caches change nothing (runs i and ii). `LD_LIBRARY_PATH`
+was not set in any of the three runs.
+
+The new normalisation, checked against every pairing of the six recorded
+stage-B graphs (runs i, ii and iii; FastMACE and baseline; 15 pairs), finds
+all of them equal. The old one fails exactly the 9 pairs that include a run-iii
+graph.
+
+Not covered: the test's other assertions under a load, above all the 1e-12 Å
+trajectory bound (a different variant changes the summation order). The
+acceptance tier runs this test on an idle GPU (2-T23's idle check), where it
+passes on both machines.
+
+Raw data: `results/2-T08c-murphy-20261020/diag-{i,ii,iii}.json` (versions, hash gates, both
+engines' captured graphs with every node name, and the comparison).
