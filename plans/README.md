@@ -17,6 +17,18 @@ phase before it is under way, not all in advance. Worker rules are in
 | 5. Planner completion | — | |
 | 6. Release | — | |
 
+## Workstation availability (owner, 20 October 2026)
+
+- **Until Thursday 22 October 2026, evening:** jobs may run on the workstations
+  (murphy, leto, leeloo, coraline) under the usual rules.
+- **After that:** no workstation jobs until a scheduled power outage on Friday
+  23 October is over and the owner says they're back. Plan GPU work for the
+  local PC in that window.
+- **Running jobs:** stop or finish them on Thursday evening, and keep their
+  results and restart files.
+- **Coraline:** busy with another user's run until about Friday. The coraline
+  check 2-T22 is deferred by the owner and carried over.
+
 ## Ready to start
 
 All phase 2 tasks (2-T01 to 2-T23) were prestarted on 19 October 2026 and
