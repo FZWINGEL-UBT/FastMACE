@@ -8,13 +8,17 @@ What 1b decides (the rules of §9.3 that have their tiers in 1b):
 
 - **hard constraints 1-7**, every reason in one ``PlanRefused`` (``SpeciesNotInSuperset`` when rule 2
   is among them): non-3D-PBC, constraints, a variable cell without a barostat integrator,
-  ``allow_reference`` (refused in 1b, owner decision D6); a structure species outside the
+  a structure species outside the
   superset; PolarMACE on plain compiled cuEq; inexact padding for the graph tier ("compiled MD
   tier: phase 3", D6); ``reproducible=True`` (no family qualified, phase 2); naive cuEq kernels
   unless ``allow_naive_cueq``; ``atom_count_changes``;
 - **owner decision D3**: the superset must equal the structure's species (compared as sets);
   a larger one is phase 3 (§8.5);
-- **mode**: graph; every other mode refuses with the phase that brings it. ``plan_evaluation``
+- **mode**: graph, or reference (plan task 2-T03, SPEC §8.4): the reference calculator as the force
+  field of FastMACE's integrators on an uncaptured, unpadded ``GraphEngine``, every rewrite off, the
+  record's stock uncompiled cuEq backend; ``allow_reference=True`` is recorded (rule 1) and lifts no
+  §4.4 refusal, since the tier shares the integrators. ``reference_fits`` decides whether the tier
+  fits (§9.4 step 5). Other modes refuse with the phase that brings them. ``plan_evaluation``
   plans the one-off compiled evaluation of ``fm.ForceField.evaluate`` and ``fm.calc``;
 - **backend** (§9.4, 1a-T00): hybrid when OpenEquivariance can build and MACE was not imported
   before FastMACE could prepare it, else plain cuEq with the reason. The process's compile family
@@ -53,9 +57,22 @@ MODE_REFUSALS = {
                 "decision D6)",
     "eager": "mode 'eager' for MD is not in 1b: the eager tier comes with the fallback algorithm in phase 2 "
              "(SPEC §9.4, §16)",
-    "reference": "mode 'reference' is refused in 1b: reference MD needs its own loop over MACE's calculator "
-                 "(owner decision D6)",
 }
+REFERENCE_TIER = "reference"
+# The reference tier's reasons (plan task 2-T03; SPEC §8.4).
+REFERENCE_REASONS = {
+    "mode": "molecular dynamics on the reference tier: MACE's calculator with the reference record's corrections, "
+            "FastMACE's integrators, noise, output and restart (SPEC §8.4)",
+    "tier": "reference tier: MACE's calculator through the versioned reference record (SPEC §8.4, §12.1), no "
+            "CUDA graphs, no padding, MACE's own neighbour list",
+    "backend": "reference tier: the record's stock calculator, MACE's cuEquivariance model (SPEC §12.1)",
+    "rewrites": "reference tier: no rewrites (SPEC §8.4)",
+    "capture": "reference tier: eager stages, no CUDA graphs",
+    "compile": "reference tier: MACE's uncompiled model (SPEC §8.4)",
+    "pipelined": "reference tier: every step checked (the reference evaluates on a host copy of the positions)",
+}
+# Refusals of the graph tier that do not apply to the reference tier: it has no padding and no compiled model.
+REFERENCE_LIFTS = ("inexact-padding", "polar-plain-compiled-cueq")
 # 1b's wording of refusals that FixedPlanner phrases for 1a.
 TEXTS = {
     "inexact-padding": lambda text: text.replace("so the graph tier is refused (SPEC §9.3 rule 4)",
@@ -98,6 +115,18 @@ def default_planner(force_field) -> MinimalPlanner:
     if torch.cuda.is_available():
         return MinimalPlanner()
     return MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"))
+
+
+def torch_device_type(device: str) -> str:
+    import torch
+
+    return torch.device(device).type
+
+
+def _error_text(error) -> str:
+    text = getattr(error, "what", None) or (str(error).splitlines() or [""])[0]
+    why = getattr(error, "why", None)
+    return f"{type(error).__name__}: {text}" + (f" ({why})" if why else "")
 
 
 def _symbols(numbers):
@@ -161,14 +190,14 @@ class MinimalPlanner:
 
     # ------------------------------------------------------------------ helpers
 
-    def _fixed(self, rewrites, precision):
+    def _fixed(self, rewrites, precision, engine=None):
         if isinstance(rewrites, str):
             if rewrites != "auto":
                 raise ValueError(f"rewrites must be 'auto' or a RewriteConfig, got {rewrites!r}")
             rewrites = RewriteConfig()
         elif not isinstance(rewrites, RewriteConfig):
             raise TypeError(f"rewrites must be 'auto' or a RewriteConfig, got {type(rewrites).__name__}")
-        return fixed.FixedPlanner(rewrites=rewrites, engine=self.engine,
+        return fixed.FixedPlanner(rewrites=rewrites, engine=engine or self.engine,
                                   precision=dataclasses.replace(self.precision, dtype=precision),
                                   neighbours=self.neighbours, polar=self.polar, registry=self.registry,
                                   environ=self.environ, torch_version=self.torch_version)
@@ -310,13 +339,16 @@ class MinimalPlanner:
             raise TypeError(f"workload must be an fm.Workload, got {type(workload).__name__}")
         software = self.software or detect_software(self.engine.device)
         book = fixed._Book()
+        reference = mode == REFERENCE_TIER
         book.decide("mode", mode, Reason("molecular dynamics on the graph tier (SPEC §8.1)" if mode == "graph"
-                                         else MODE_REFUSALS[mode], code=f"mode-{mode}"))
-        if mode != "graph":
+                                         else REFERENCE_REASONS["mode"] if reference else MODE_REFUSALS[mode],
+                                         code=f"mode-{mode}"))
+        if mode not in ("graph", REFERENCE_TIER):
             book.refuse(MODE_REFUSALS[mode], f"mode-{mode}")
-        if allow_reference:
-            book.refuse("allow_reference=True: the reference tier is refused in 1b (owner decision D6)",
-                        "reference-tier-not-in-1b", 1)
+        book.decide("allow_reference", "on" if allow_reference else "off", Reason(
+            "allowed (SPEC §9.3 rule 1); the reference tier runs FastMACE's integrators, so it lifts no refusal of "
+            "§4.4 (3D PBC, no constraints, a barostat for a variable cell)" if allow_reference else "not requested",
+            code="allow-reference" if allow_reference else "no-allow-reference"))
         npt = integrator.ensemble == "npt"
         if variable_cell and not npt:
             book.refuse(f"a variable cell needs a barostat integrator, got ensemble={integrator.ensemble!r} "
@@ -327,17 +359,57 @@ class MinimalPlanner:
         if workload.atom_count_changes:
             book.refuse("atom_count_changes=True: changing atom counts is not in 1.0 (SPEC §8.6, §9.3 rule 7)",
                         "atom-count-changes", 7)
-        backend = self._backend(book, software)
+        if reference:
+            backend = ("cueq", Reason(REFERENCE_REASONS["backend"], code="backend-reference-stock"))
+        else:
+            backend = self._backend(book, software)
         superset = self._common(book, traits, atoms, species, precision, software, backend[0], allow_naive_cueq,
                                 loaded)
         self._workload_decisions(book, workload)
-        parts = self._fixed(rewrites, precision)._resolve(book, traits, atoms, integrator, hardware,
-                                                          backend_choice=backend, texts=TEXTS)
+        if reference:
+            parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend)
+        else:
+            parts = self._fixed(rewrites, precision)._resolve(book, traits, atoms, integrator, hardware,
+                                                              backend_choice=backend, texts=TEXTS)
         book.raise_refusals()
-        plan = Plan(**parts, superset=superset, workload=workload, software=software,
-                    allowances=("allow_naive_cueq",) if allow_naive_cueq else (), reason="minimal plan (phase 1b)")
+        allowances = tuple(name for name, used in (("allow_naive_cueq", allow_naive_cueq),
+                                                   ("allow_reference", allow_reference)) if used)
+        plan = Plan(**parts, superset=superset, workload=workload, software=software, allowances=allowances,
+                    reason="reference tier (phase 2)" if reference else "minimal plan (phase 1b)")
         self._claim_family(plan, f"a {plan.engine.backend} MD plan")
         return plan
+
+    def _reference_parts(self, book, traits, atoms, integrator, hardware, rewrites, precision, backend):
+        """The reference tier's plan parts (plan task 2-T03): 1a's resolution on the uncompiled stock backend,
+        then every rewrite off, no capture, no pipelining, and the graph tier's padding refusals lifted."""
+        from fastmace.reference import records
+
+        engine = dataclasses.replace(self.engine, backend="cueq", compile_mode="none", pipelined="off",
+                                     speculative_graph=False,
+                                     cueq_conv_fusion="on" if records.STOCK["cueq_conv_fusion"] else "off")
+        inner = fixed._Book()
+        parts = self._fixed(rewrites, precision, engine)._resolve(inner, traits, atoms, integrator, hardware,
+                                                                  backend_choice=backend, texts=TEXTS)
+        book.refusals.extend(reason for reason in inner.refusals if reason.code not in REFERENCE_LIFTS)
+        toggles = [name for name in fixed.REWRITE_FIELDS if getattr(parts["rewrites"], name) in ("on", "off")]
+        replaced = {"tier": (REFERENCE_TIER, REFERENCE_REASONS["tier"]),
+                    "capture": ("off", REFERENCE_REASONS["capture"]),
+                    "EngineConfig.compile_mode": ("none", REFERENCE_REASONS["compile"]),
+                    "EngineConfig.pipelined": ("off", REFERENCE_REASONS["pipelined"]),
+                    "EngineConfig.speculative_graph": ("off", REFERENCE_REASONS["pipelined"]),
+                    "RewriteConfig.polar_uvu": ("off", REFERENCE_REASONS["rewrites"]),
+                    "RewriteConfig.inplace_block_linear": ("off", REFERENCE_REASONS["rewrites"]),
+                    **{f"RewriteConfig.{name}": ("off", REFERENCE_REASONS["rewrites"]) for name in toggles}}
+        for item, choice, reason in inner.decisions:
+            book.decide(item, *replaced.get(item, (choice, reason)))
+        parts.update(
+            tier=REFERENCE_TIER,
+            rewrites=dataclasses.replace(parts["rewrites"], **dict.fromkeys(toggles, "off"), polar_uvu=False,
+                                         inplace_block_linear=False),
+            engine=dataclasses.replace(parts["engine"], compile_mode="none", pipelined="off", speculative_graph=False),
+            decisions=tuple(book.decisions),
+            requested=self._fixed(rewrites, precision)._requested())
+        return parts
 
     def _workload_decisions(self, book, workload):
         book.decide("workload.max_temperature_K", f"{workload.max_temperature_K:g} K", Reason(
@@ -409,7 +481,10 @@ class MinimalPlanner:
               temperature_K: float | None = None):
         """The ready ``GraphEngine`` of the MD ``plan``: an execution copy of the ForceField's model, its
         force field, state, integrator (at ``temperature_K``, default the integrator's target or 0) and
-        engine. The only place 1b's public API gets an engine from (SPEC §5)."""
+        engine. The only place 1b's public API gets an engine from (SPEC §5). A reference-tier plan gets
+        its ``ReferenceForceField`` on an uncaptured, unpadded ``GraphEngine`` (``build_reference``)."""
+        if plan.tier == REFERENCE_TIER:
+            return self.build_reference(plan, force_field, atoms, temperature_K=temperature_K)
         if plan.tier != fixed.TIER:
             raise ValueError(f"MinimalPlanner.build builds tier {fixed.TIER!r} plans, not {plan.tier!r}; "
                              "use build_evaluation for an evaluation plan")
@@ -420,6 +495,81 @@ class MinimalPlanner:
         return self._fixed(RewriteConfig(), plan.precision.dtype).build(
             plan, model, atoms, temperature_K=temperature_K, compile_cache=compile_cache, constraints=self.process,
             check=check)
+
+    def build_reference(self, plan: Plan, force_field, atoms, *, temperature_K: float | None = None):
+        """The reference tier's engine (plan task 2-T03, SPEC §8.4): the reference calculator as the force
+        field of FastMACE's state, integrator and ``GraphEngine``, without capture or padding."""
+        from fastmace.engine.graph import GraphEngine
+        from fastmace.engine.reference import ReferenceForceField
+        from fastmace.integrators.baoab import LangevinBAOAB
+        from fastmace.integrators.langevin import Langevin
+        from fastmace.state import SimulationState
+
+        if plan.tier != REFERENCE_TIER:
+            raise ValueError(f"build_reference builds reference-tier plans, not tier {plan.tier!r}")
+        book = fixed._Book()
+        if not all(atoms.pbc):
+            book.refuse("periodic boundaries in all three directions (3D PBC) are required (SPEC §4.4)",
+                        "non-3d-pbc", 1)
+        if atoms.constraints:
+            book.refuse("constraints are refused in phase 2 (SPEC §4.4)", "constraints", 1)
+        book.raise_refusals()
+        self._check_atoms(plan, atoms)
+        if temperature_K is None:
+            temperature_K = plan.integrator.temperature_K or 0.0
+        npt = plan.integrator.ensemble == "npt"
+        field = ReferenceForceField(force_field, atoms, device=plan.engine.device, dtype=plan.precision.dtype,
+                                    polar=plan.polar, compute_stress=npt)
+        state = SimulationState.from_atoms(atoms, field.device, plan.integrator.seed, compute_stress=npt)
+        if npt:
+            integrator = LangevinBAOAB(state, plan.integrator, temperature_K=temperature_K,
+                                       **fixed.integrator_keywords(plan.integrator))
+        else:
+            integrator = Langevin(state, plan.integrator, temperature_K=temperature_K)
+        return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, capture=False,
+                           pad_edges=False, constraints=self.process)
+
+    def reference_fits(self, plan: Plan, force_field, atoms, references=None) -> tuple[bool, str]:
+        """Whether the reference tier fits for ``atoms`` on ``plan``'s device (SPEC §9.4 step 5): (fits, reason).
+
+        The gate's reference result decides where there is one (``selfcheck.References``): it ran on the
+        plan's device and the production cell, or it could not run. Otherwise one trial evaluation decides:
+        in this process on the CPU, and in a child process on CUDA, because an out-of-memory error leaves
+        the process's CUDA context unusable (2-T05). Any error, non-zero exit or kill means "does not fit".
+        No table: the structure, the model and the device decide.
+        """
+        from fastmace.planner import selfcheck
+
+        if references is not None and not references.skipped:
+            if references.unavailable is not None:
+                return False, f"the gate's reference could not run: {references.unavailable.reason}"
+            info = references.info or {}
+            device = info.get("device")
+            if device is not None and str(device) != str(plan.engine.device):
+                return False, f"the gate's reference ran on {device}, not on the plan's device {plan.engine.device}"
+            if info.get("reduced_cell"):
+                return False, "the gate's reference ran on a reduced cell only, not on the production cell"
+            if references.values:
+                return True, f"the gate's reference ran on {plan.engine.device} on the production cell"
+        if torch_device_type(plan.engine.device) == "cuda":
+            copy = selfcheck.GateCopy(kind="production", atoms=atoms.copy())
+            job = selfcheck._job(plan, force_field, [copy])
+            try:
+                selfcheck.run_child(job)
+            except Exception as error:
+                return False, f"the trial evaluation in a child process failed: {_error_text(error)}"
+            return True, f"a trial evaluation on {plan.engine.device} in a child process ran"
+        try:
+            from fastmace.engine.reference import ReferenceForceField
+
+            field = ReferenceForceField(force_field, atoms, device=plan.engine.device, dtype=plan.precision.dtype,
+                                        polar=plan.polar)
+            field.evaluate(atoms)
+        except Exception as error:
+            return False, f"the trial evaluation failed: {_error_text(error)}"
+        finally:
+            field = None
+        return True, f"a trial evaluation on {plan.engine.device} ran"
 
     def build_evaluation(self, plan: Plan, force_field, atoms, *, compile_cache=None, check: bool = True):
         """The ``MACEForceField`` of an evaluation ``plan`` (``evaluate`` path, with stress, no graphs)."""

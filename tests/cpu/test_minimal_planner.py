@@ -130,7 +130,6 @@ def _slab():
     (1, "non-3d-pbc", dict(atoms=_slab())),
     (1, "constraints", dict(atoms=_with_constraint(nacl()))),
     (1, "variable-cell-without-barostat", dict(variable_cell=True)),
-    (1, "reference-tier-not-in-1b", dict(allow_reference=True)),
     (2, "species-not-in-superset", dict(species=["Na"])),
     (5, "reproducible-no-family-qualified", dict(workload=Workload(max_temperature_K=300.0, reproducible=True))),
     (7, "atom-count-changes", dict(workload=Workload(max_temperature_K=300.0, atom_count_changes=True))),

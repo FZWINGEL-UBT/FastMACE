@@ -53,8 +53,11 @@ fm.md(..., integrator=None, mode="graph", allow_reference=False, fallback=None, 
   A given `engine` or `neighbours` replaces the default planner's in a copy of it,
   keeping its process record and software traits.
 - `mode` and `allow_reference` go to `MinimalPlanner.plan`. They still refuse
-  there (codes `mode-eager`, `mode-reference`, `mode-compiled`,
-  `reference-tier-not-in-1b`) until T02 and T03 lift those refusals.
+  there (codes `mode-eager`, `mode-compiled`) until T02 lifts the eager refusal.
+  T03 lifted `mode-reference` and `reference-tier-not-in-1b`: `mode="reference"`
+  plans the reference tier, and `allow_reference=True` is recorded in
+  `Plan.allowances` (it lifts no §4.4 refusal, because the tier runs FastMACE's
+  integrators).
 - `fallback`, `gate` and `runner` are stored and recorded, with no effect until
   T05, T07 and T15. They can be read as `sim.fallback`, `sim.gate_config` and
   `sim.runner` (configs; `sim.gate` stays the gate's result) and as `sim.options`.
@@ -119,7 +122,7 @@ All four have the §7.7 message shape (what, why, next, record, environment).
 | Module | Names and signatures | Task |
 | --- | --- | --- |
 | `engine/subprocess.py` | `SubprocessRunner(config=None)`; `.run(simulation, *, steps=None, schedule=None)`; `main(argv=None)` for `python -m fastmace.engine.subprocess <directory>`; `HANDOFF_NAME = ".fastmace-handoff"` | T07 |
-| `engine/reference.py` | `ReferenceForceField(force_field, atoms, *, device=None, dtype="float64")`, implementing `model.forces.ForceField` | T03 |
+| `engine/reference.py` | `ReferenceForceField(force_field, atoms, *, device=None, dtype="float64", polar=None, compute_stress=False)`, implementing `model.forces.ForceField` (T03 added `polar` and `compute_stress`); `MinimalPlanner.build_reference(plan, force_field, atoms)` and `MinimalPlanner.reference_fits(plan, force_field, atoms, references=None) -> (bool, reason)` | T03 |
 | `planner/fallback.py` | `candidate(plan, changes, force_field, atoms)`, `activate(candidate, ...)` | T06 |
 | `planner/fallback.py` | `Fallback(planner, force_field, atoms, integrator, references, config=None).run(failure)`; `diagnose(plan, failure, ...)`; `ddmin(rewrites, test, *, requires, budget)`; `terminal_sequence(plan, ...)` | T15 |
 | `planner/fallback.py` | records `TriedCandidate`, `Budget(limit, reduced_gate_runs=0, full_gate_runs=0)` with `.spent`; `DIMENSIONS`, `OUTCOMES`, `STAGES` | complete |
