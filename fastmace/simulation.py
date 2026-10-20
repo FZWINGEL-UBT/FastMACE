@@ -960,19 +960,6 @@ def _versions_text(versions):
             "recorded as a plan revision (SPEC §10.6, owner decision 23)")
 
 
-def _reference_content_digest(record):
-    """SHA-256 of a reference record's content without its MACE version (owner decision 23).
-
-    A stand-in for 2-T04's ``ReferenceRecord.content_digest()``, used until that merges.
-    """
-    import hashlib
-
-    from fastmace.state import canonical_json
-
-    content = {name: value for name, value in record.to_dict().items() if name not in ("mace_version", "id")}
-    return hashlib.sha256(canonical_json(content).encode()).hexdigest()
-
-
 def _known_reference_record(record_id):
     """The default reference record with this id that this FastMACE builds, or ``None``."""
     from fastmace.errors import FastMACEError
@@ -991,7 +978,7 @@ def _known_reference_record(record_id):
 def _same_reference(first, second):
     """Whether two reference record ids name the same content (they may differ in the MACE version)."""
     records = [_known_reference_record(record_id) for record_id in (first, second)]
-    return None not in records and _reference_content_digest(records[0]) == _reference_content_digest(records[1])
+    return None not in records and records[0].content_digest() == records[1].content_digest()
 
 
 def _restart_atoms(structure, stored):
