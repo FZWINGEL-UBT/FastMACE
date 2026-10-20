@@ -1538,3 +1538,9 @@ notes folder of the conductor's session (`2-T0x-…md`).
 | GPU contention: leto busy with cam, murphy loaded by margraf, coraline by kaifi | the local GPU for timing; murphy for untimed GPU work; idle checks before every job; T22 not a blocker |
 | The `main.py` move changes results the owner relies on | decision 28's A/B; `run.json` unchanged; the old adapter kept for one phase; the scientific protocol unchanged (relaxation and quench on MACE's calculator) |
 | A self-hosted runner on a shared workstation disturbs other users | the idle-check wrapper; user-level service; files under `/mnt/homes/zwingel`; the owner's OK (D2) |
+- **Checkpoint 2 decided (owner, 20 October 2026): no self-check cache.**
+  2-T19 showed that the self-checks take no share of the setup gap. The
+  local gap came from running FastMACE from `/mnt/d` over 9p, and from
+  how 1b-T23 split load and setup time. A small follow-up, 2-T19b,
+  memoises `installed_mace_version()`, which `Registry.resolve` calls 19
+  times.
