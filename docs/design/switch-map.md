@@ -72,6 +72,7 @@ How to read the tables:
 | `EMPTY_CACHE_BEFORE_CAPTURE` | `EngineConfig.empty_cache_before_capture` | `True` | — | engine |
 | `WARMUP_IN_GRAPH_POOL` | `EngineConfig.warmup_in_graph_pool` | `True` | — | engine |
 | none: the research engine's `fm.calc` path recompiles on a new edge count (new in the library, 2-T01; filled by 2-T13) | `EngineConfig.dynamic_edges` | `False` | — | engine (evaluation plans; no effect until 2-T13) |
+| none: the research engine loads and converts once per process (new in the library, opt-1 OPT-T06) | `EngineConfig.model_template_cache` | `True` | — | planner (`ForceField.execution_model`: later plans copy a converted template; CUDA cuEq and hybrid only) |
 
 ## 3. Precision → `PrecisionConfig`
 
@@ -272,6 +273,8 @@ model is an error with a reason, never a silent downgrade.
   `RunnerConfig` 5), 70 in all. Two admit `"auto"` (`FallbackConfig.fallback`,
   `GateConfig.reduced_cell`).
   None comes from the research engine.
+- Optimisation round 1 (plan task OPT-T06) added `EngineConfig.model_template_cache`,
+  71 in all. It does not come from the research engine, which loaded once per process.
 
 ## Open questions for the conductor
 

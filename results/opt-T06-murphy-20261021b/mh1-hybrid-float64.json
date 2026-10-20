@@ -1,0 +1,64 @@
+{
+ "backend": "hybrid",
+ "dtype": "float64",
+ "label": "mh1-r2scan",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "execution_model_s": {
+  "first plan (load, plus template copy)": 4.270430823788047,
+  "later plan, cache on (template copy)": 0.7987975254654884,
+  "later plan, cache off (reload)": 2.8776462730020285
+ },
+ "model": {
+  "first plan rerun (noise)": {
+   "bitwise": false,
+   "energy": 5.684341886080802e-14,
+   "max_force": 7.771561172376096e-16
+  },
+  "template copy vs reload": {
+   "bitwise": false,
+   "energy": 5.684341886080802e-14,
+   "max_force": 5.828670879282072e-16
+  },
+  "template copy vs first plan": {
+   "bitwise": false,
+   "energy": 0.0,
+   "max_force": 5.93275428784068e-16
+  },
+  "reload vs first plan": {
+   "bitwise": false,
+   "energy": 5.684341886080802e-14,
+   "max_force": 6.938893903907228e-16
+  }
+ },
+ "template_bytes": 51549400,
+ "allocated_freed_by_release": 51560960,
+ "engine": {
+  "backend": "hybrid",
+  "templates_kept": {
+   "on": 2,
+   "off": 0
+  },
+  "steps": 10,
+  "first_plans": {
+   "forces": {
+    "bitwise": false,
+    "max": 6.938893903907228e-16
+   },
+   "positions": {
+    "bitwise": false,
+    "max": 1.3877787807814457e-17
+   }
+  },
+  "second_plans_copy_vs_reload": {
+   "forces": {
+    "bitwise": false,
+    "max": 6.661338147750939e-16
+   },
+   "positions": {
+    "bitwise": false,
+    "max": 3.469446951953614e-18
+   }
+  }
+ }
+}

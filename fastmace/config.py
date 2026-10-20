@@ -155,6 +155,9 @@ class EngineConfig:
     # Evaluation plans compile with the edge dimension dynamic from the first call, so a changed edge
     # count does not recompile (2-T13). No effect until 2-T13.
     dynamic_edges: bool = False
+    # Keep each conversion's model as a template and give later plans a private copy of it instead of
+    # reloading and converting the checkpoint (CUDA cuEq and hybrid only; opt-1 OPT-T06).
+    model_template_cache: bool = True
 
     def __post_init__(self):
         _check_choices(self)

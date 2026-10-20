@@ -513,6 +513,16 @@ ff = fm.ForceField(model, atoms, precision="float32", rewrites="auto",
 e, f, s = ff.evaluate(atoms, stress=True)               # one-off evaluation
 ```
 
+**Execution copies and templates** (opt-1 OPT-T06). Each plan converts its own copy of the pristine model
+(decision 24). On CUDA with the cuEq or hybrid backend, the `ForceField` keeps the first conversion of each kind
+as a template: checkpoint hash, head, backend, dtype, device, conversion options, process patches and package
+versions. Every later plan of that kind gets a private deep copy of the template instead of a reload and
+conversion; this includes the gate's reduced cell and fallback candidates. No module, tensor or calculator state
+is shared between plans (§8.7). Self-checks run on every copy as before.
+- A `ForceField` keeps at most two templates.
+- `ff.release_templates()` frees them.
+- `EngineConfig(model_template_cache=False)` turns the cache off.
+
 ### 7.2 Simulation
 
 ```python
