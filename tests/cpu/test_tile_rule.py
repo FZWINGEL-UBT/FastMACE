@@ -12,8 +12,8 @@ def test_threshold_is_in_waves_and_scales_with_the_sm_count():
     # murphy (48 SMs): 2 waves of 64-row tiles = 6144 rows; NbCl5's l = 2, 3 products qualify, l = 1 not.
     assert [tr.segment_gemm_choice(m, 512, 512, 48).backend for m in (1944, 5832, 9720, 13608)] == \
         ["cublas", "cublas", "triton", "triton"]
-    # 36 SMs: 4608 rows; l = 1 (5832) qualifies too. NaCl (at most 1512 rows) never does.
-    assert [tr.segment_gemm_choice(m, 512, 512, 36).backend for m in (1512, 4607, 4608, 5832)] == \
+    # 36 SMs: 72 tiles (4545 rows and more); l = 1 (5832) qualifies too. NaCl (at most 1512 rows) never does.
+    assert [tr.segment_gemm_choice(m, 512, 512, 36).backend for m in (1512, 4544, 4545, 5832)] == \
         ["cublas", "cublas", "triton", "triton"]
 
 
