@@ -836,6 +836,40 @@ Source: 1a open finding "coraline soft-lock check"; ResearchModule
   over. It is not an acceptance blocker (acceptance 9 allows "still
   waiting").
 
+#### Follow-ups from an outside review (20 October 2026)
+
+An outside read-only review of main at 85360cc. The conductor confirmed
+findings 1 and 3 on main; 2-T15c reproduces finding 2 before fixing it.
+
+- **2-T07b Durable subprocess checkpoint save (S).**
+  `SubprocessRunner.save_restart` copies `restart.npz` straight over the
+  destination (`shutil.copyfile`). Its `simulation.json` is renamed but never
+  fsynced. An interrupted copy loses the previous checkpoint. Both go
+  through `fastmace.io.durable` (SPEC §10.6). Test: an interrupted
+  overwrite leaves the previous checkpoint loadable.
+- **2-T15c Release the failed engine before the next candidate (S).** A
+  stored exception's traceback (and its chain) keeps the failed engine
+  alive after `Simulation` drops it, so on CUDA its memory is held while
+  the fallback builds the next candidate. Keep the diagnostics and drop the
+  frames. Tests: a weakref test on CPU, then one murphy GPU check.
+- **2-T04e Hosted CPU CI on torch 2.13 (S).** All three torch 2.13 jobs
+  fail the same three tests in `tests/cpu/test_versioned_registry.py`,
+  which assume the torch 2.14 Inductor source that `unfuse_full_addmm`
+  patches. On 2.13 the setter does nothing by design. The assertions
+  follow the applicable torch, and the strict hash checks stay where the
+  patch applies. Done when all seven jobs are green.
+- The root README's status line was still phase 1a's; the conductor updated it.
+
+**2-T14e owner decisions (20 October 2026).** Float64 reuse: no reference
+cache for now ("shorten first"). The ASE-equivalence acceptance reference
+drops from 18,000 to 4,000 steps (heat 2,000 + cool 2,000, 16 bins kept),
+and its final-T check becomes "below half the peak". The limits tighten from
+0.1 K and 0.01 meV/atom to 1e-6 K and 1e-7 meV/atom (SPEC §12.2 amendment).
+Evidence is in `docs/validation/2-T14e-reference-reuse.md`: same-seed
+trajectories agree to 1e-10 K, and a Lennard-Jones stand-in shows the same
+detection power at 4,000 steps as at 18,000. One MH-1 run of the new
+schedule on murphy comes before the test change.
+
 ### Wave 4: acceptance
 
 #### 2-T23 Acceptance runs and report (L, GPU, conductor-scheduled) — after all except T20 and T22

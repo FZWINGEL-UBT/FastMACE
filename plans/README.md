@@ -27,13 +27,17 @@ workers"). 2-T21 works in the ResearchModule worktree
 - Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12, 2-T10, 2-T18, 2-T04,
   2-T09b, 2-T07, 2-T14c, 2-T02, 2-T06, 2-T08, 2-T13, 2-T05, 2-T14d, 2-T03,
   2-T08b, 2-T19 (report; no cache: owner, checkpoint 2), 2-T04b, 2-T15
-  (the fallback; acceptance 2), 2-T04c, 2-T16, 2-T15b, 2-T17, 2-T19b (20 October 2026).
+  (the fallback; acceptance 2), 2-T04c, 2-T16, 2-T15b, 2-T17, 2-T19b, 2-T04d
+  (20 October 2026). 2-T21 is merged in the ResearchModule.
 - Working in phase 2:
-  - 2-T14e (float64 reuse in the test tiers: measuring);
-  - 2-T21 (`main.py` on `Simulation`, its A/B on murphy);
-  - 2-T04's acceptance 1 GPU re-check (MACE 0.3.15, local).
-- Next go messages: 2-T23 (acceptance) once 2-T21 is in.
-  2-T20 and 2-T22 as resources allow.
+  - 2-T23 (phase 2 acceptance; local tier running);
+  - 2-T14e (float64 reuse: duplicate removed; owner decisions of 20 October:
+    ASE-equivalence reference 4,000 steps, limits 1e-6 K and 1e-7 meV/atom;
+    no reference cache for now);
+  - 2-T07b, 2-T15c, 2-T04e (fixes from an outside review, 20 October:
+    durable subprocess checkpoint save; failed engine released before the
+    fallback's next candidate; hosted CPU CI red on torch 2.13).
+- Next: 2-T20 and 2-T22 as resources allow.
 - Waiting for go: the rest. Answers to all prestart reports are in
   `phase-2.md`, "Conductor answers to the prestart reports".
 
