@@ -12,9 +12,12 @@
   The hand-built and the minimal engine each follow the planned one within the run-to-run scatter
   (float64: 1e-12 Å, cuEq's run-time kernel choice; hybrid: three times the scatter between the
   planned engine and a second planned engine). They have the same rewrite records, options, edge
-  sizes and rebuilds, and the planned engine is less than 25 % slower than the hand-built one.
+  sizes and rebuilds (full tier). The planned engine is less than 25 % slower than the hand-built
+  one (acceptance tier, which runs on an idle GPU; 2-T14d): on a shared GPU the step times are not
+  comparable. Both use the same run when they run in one process.
 """
 
+import functools
 import importlib.util
 import os
 import sys
@@ -165,6 +168,12 @@ def three_engines(backend, python):
     return result
 
 
+@functools.cache
+def three_engines_once(backend, python):
+    """``three_engines``, once per process: the step-time test reuses the numerical test's run."""
+    return three_engines(backend, python)
+
+
 def summary(result, **extra):
     planned = result["planned"]
     return {"hand_built_vs_planned_500": ENGINE.deviation(planned["positions"], result["hand_built"]["positions"]),
@@ -191,7 +200,7 @@ def same_plan(result):
 @pytest.mark.slow
 @needs_mh1
 def test_mh1_plain_cueq_float64_planned_equals_hand_built_and_minimal():
-    result = three_engines("cueq", sys.executable)
+    result = three_engines_once("cueq", sys.executable)
     planned = result["planned"]
     report = summary(result)
     ENGINE.report("1b-T27-mh1-cueq-float64-three-engines", report)
@@ -203,14 +212,26 @@ def test_mh1_plain_cueq_float64_planned_equals_hand_built_and_minimal():
     same_plan(result)
     assert report["hand_built_vs_planned_500"] <= ENGINE.FLOAT64_LIMIT, report
     assert report["minimal_vs_planned_500"] <= ENGINE.FLOAT64_LIMIT, report
-    assert planned["ms_per_step"] < 1.25 * result["hand_built"]["ms_per_step"], report["ms_per_step"]
+
+
+def assert_planned_as_fast_as_hand_built(result):
+    """The planned engine is less than 25 % slower than the hand-built one (needs an idle GPU)."""
+    times = {name: result[name]["ms_per_step"] for name in ENGINES}
+    assert times["planned"] < 1.25 * times["hand_built"], times
+
+
+@pytest.mark.slow
+@pytest.mark.acceptance
+@needs_mh1
+def test_mh1_plain_cueq_float64_planned_is_as_fast_as_hand_built():
+    assert_planned_as_fast_as_hand_built(three_engines_once("cueq", sys.executable))
 
 
 @pytest.mark.slow
 @ENGINE.needs_oeq
 @needs_mh1
 def test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal():
-    result = three_engines("auto", HYBRID_PYTHON)
+    result = three_engines_once("auto", HYBRID_PYTHON)
     planned = result["planned"]
     scatter = ENGINE.deviation(result["planned_repeat"]["positions"], planned["positions"])
     report = summary(result, planned_scatter_500=scatter)
@@ -222,4 +243,11 @@ def test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal():
     limit = max(3 * scatter, 1e-6)
     assert report["hand_built_vs_planned_500"] <= limit, (report["hand_built_vs_planned_500"], limit)
     assert report["minimal_vs_planned_500"] <= limit, (report["minimal_vs_planned_500"], limit)
-    assert planned["ms_per_step"] < 1.25 * result["hand_built"]["ms_per_step"], report["ms_per_step"]
+
+
+@pytest.mark.slow
+@pytest.mark.acceptance
+@ENGINE.needs_oeq
+@needs_mh1
+def test_mh1_hybrid_float32_planned_is_as_fast_as_hand_built():
+    assert_planned_as_fast_as_hand_built(three_engines_once("auto", HYBRID_PYTHON))
