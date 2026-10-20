@@ -73,6 +73,7 @@ How to read the tables:
 | `EMPTY_CACHE_BEFORE_CAPTURE` | `EngineConfig.empty_cache_before_capture` | `True` | — | engine |
 | `WARMUP_IN_GRAPH_POOL` | `EngineConfig.warmup_in_graph_pool` | `True` | — | engine |
 | none: the research engine's `fm.calc` path recompiles on a new edge count (new in the library, 2-T01; filled by 2-T13) | `EngineConfig.dynamic_edges` | `False` | — | engine (evaluation plans; no effect until 2-T13) |
+| none: the research engine loads and converts once per process (new in the library, opt-1 OPT-T06) | `EngineConfig.model_template_cache` | `True` | — | planner (`ForceField.execution_model`: later plans copy a converted template; CUDA cuEq and hybrid only) |
 
 ## 3. Precision → `PrecisionConfig`
 
@@ -203,6 +204,7 @@ reach the planner through `Simulation(fallback=, gate=, runner=)` and `fm.md`
 | none (new, SPEC §8.7) | `RunnerConfig.inherit_environment` | `True` | — | subprocess runner |
 | none (new, SPEC §8.7) | `RunnerConfig.timeout_s` | `None` | — | subprocess runner |
 | none (new, SPEC §8.7) | `RunnerConfig.stall_timeout_s` | `1800.0` | — | subprocess runner |
+| none (new, OPT-T07) | `RunnerConfig.persistent` | `True` | — | subprocess runner: one worker child per `Simulation` (`False`: a fresh child per `run()`) |
 
 ## Auto resolution rules
 
@@ -272,9 +274,11 @@ model is an error with a reason, never a silent downgrade.
 - Phase 2 (plan task 2-T01) added two fields to existing records,
   `EngineConfig.dynamic_edges` and `RewriteConfig.selfcheck_cache`, and three
   records with 11 fields (section 10: `FallbackConfig` 3, `GateConfig` 3,
-  `RunnerConfig` 5), 70 in all. Two admit `"auto"` (`FallbackConfig.fallback`,
+  `RunnerConfig` 5), 70 in all. OPT-T07 added `RunnerConfig.persistent` (71). Two admit `"auto"` (`FallbackConfig.fallback`,
   `GateConfig.reduced_cell`).
   None comes from the research engine.
+- Optimisation round 1 (plan task OPT-T06) added `EngineConfig.model_template_cache`,
+  71 in all. It does not come from the research engine, which loaded once per process.
 
 ## Open questions for the conductor
 

@@ -1,0 +1,23 @@
+  import pynvml  # type: ignore[import]
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0 -- /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python
+compile caches (shared): inductor /mnt/homes/zwingel/fastmace-cache/fastmace/inductor, triton /mnt/homes/zwingel/fastmace-cache/fastmace/triton
+rootdir: /mnt/homes/zwingel/fastmace-branches/opt-T07
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+collecting ... collected 4 items
+
+tests/gpu/test_subprocess_worker_gpu.py::test_the_worker_equals_fresh_children_bitwise_and_releases_the_gpu worker: setup 44.6 s, calls [44.5, 10.2, 10.2] s; fresh: setup 32.5 s, calls [48.6, 61.5, 58.1] s; free memory after close +0 MiB; NVIDIA RTX 4000 Ada Generation
+PASSED
+  import pynvml  # type: ignore[import]
+  value = original(*args, **kwargs)
+  value = original(*args, **kwargs)
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+PASSED
+tests/gpu/test_subprocess_runner_gpu.py::test_plain_cueq_float64_after_a_hybrid_runs_in_a_child_within_1e_12 plain cuEq float64 in a child vs a fresh process: 2.17e-13 Å; setup 42.2 s; runs [37.8, 9.6, 9.6] s; NVIDIA RTX 4000 Ada Generation
+PASSED
+tests/gpu/test_subprocess_runner_gpu.py::test_hybrid_after_a_plain_cueq_runs_in_a_child PASSED
+
+- generated xml file: /mnt/homes/zwingel/fastmace-branches/opt-T07-results/junit.xml -
+======================== 4 passed in 772.61s (0:12:52) =========================
+exit 0

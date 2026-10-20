@@ -29,6 +29,20 @@ progress: the child's heartbeat file names its phase and committed step) and kil
 process group. The hand-off directory is deleted on a clean ``close()`` and kept, with its path in
 the error and in ``metadata.json``, after an error.
 
+**The persistent worker (OPT-T07, ``RunnerConfig.persistent``, the default on POSIX).** The setup
+child does not exit: it stays as the worker for the ``Simulation``'s lifetime, keeping its compiled
+engine, and serves every later ``run()`` as a call (docs/design/opt-T07-persistent-worker.md). The
+calls are the same requests in the same stage directories, and each still ends with the canonical
+restart write, so the worker is §10.6's uninterrupted run with the same restart points, and a fresh
+child per call (``persistent=False``, and always on Windows) the interrupted one: bit for bit equal
+where the plan is reproducible. The protocol: the parent writes one JSON line per call,
+``{"stage": <path>}``, to the worker's stdin; the worker answers one JSON line,
+``{"stage": <path>, "status": "ok" | "error"}``, on a reply pipe (``--reply <fd>``); EOF on stdin, or
+``{"exit": true}``, ends it. A failed call ends the worker, and the next ``run()`` starts a fresh child
+from the last good hand-off. The worker ends on ``close()`` (``CLOSE_GRACE_S``), on garbage
+collection and at the parent's exit (a ``weakref.finalize``, ``FINALIZE_GRACE_S``), and when the
+parent dies (EOF on stdin while idle; the heartbeat thread sees the parent change while busy).
+
 The child imports the same FastMACE as the parent (its package directory goes first on
 ``PYTHONPATH``) and runs in the parent's working directory, so relative paths in the records hold.
 
@@ -39,11 +53,13 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shutil
 import sys
 import threading
 import time
 import traceback
+import weakref
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -57,14 +73,19 @@ REQUEST_NAME = "request.json"
 RESULT_NAME = "result.json"
 START_NAME = "start.traj"  # the parent's Atoms for the setup child (ASE trajectory: exact float64)
 COMMITTED_NAME = "committed.npz"  # the committed step's output values (Engine.sync)
-HEARTBEAT_NAME = "heartbeat"
-LOG_NAME = "child.log"
+HEARTBEAT_NAME = "heartbeat"  # a fresh child's default: in its stage
+CHILD_NAME = "child-{:04d}"  # per child process under the hand-off directory: .log and .heartbeat
 SINKS_NAME = "sinks"
 REQUEST_VERSION = 1
 POLL_S = 0.2  # how often the parent looks at the child
 LOG_TAIL_LINES = 30  # the child's message when it left no result
-RUNNER_WARNING = ("the plan runs in a child process through the subprocess runner (SPEC §8.7): each run() "
-                  "starts a child that resumes the last restart write, so the setup cost is paid per run()")
+CLOSE_GRACE_S = 30.0  # close(): the worker's time to close its files and exit before it is killed
+FINALIZE_GRACE_S = 5.0  # the same at garbage collection and at the parent's exit
+PARENT_CHECK_S = 1.0  # how often a child's heartbeat thread checks that its parent is alive
+RUNNER_WARNING = ("the plan runs in a child process through the subprocess runner (SPEC §8.7): one worker child "
+                  "serves every run() (RunnerConfig.persistent); with a fresh child per run() each run() pays the "
+                  "child's setup")
+_EMPTY = object()  # no reply line yet
 
 
 # --------------------------------------------------------------------------- parent
@@ -130,6 +151,12 @@ class SubprocessRunner:
         self._metadata: dict[str, Any] | None = None
         self._host_writes: list[tuple[str, Any]] = []
         self._reproducible = False  # the children get the reproducible process environment (2-T16)
+        self.calls = 0  # setup and run() calls served (OPT-T07)
+        self._worker = None  # the persistent worker's Popen, while it runs
+        self._replies = None
+        self._owner = None  # the process that started the worker
+        self._finalizer = None
+        self._log = self._heartbeat = None  # the worker's log and heartbeat files
 
     # ------------------------------------------------------------------ Simulation's hooks
 
@@ -238,10 +265,23 @@ class SubprocessRunner:
         """The ``subprocess`` block of ``metadata.json`` (its shape is given to 2-T17)."""
         return {"python": self.config.resolved_python(), "reason": self.reason,
                 "directory": None if self.root is None else str(self.root), "children": self.children,
-                "seconds": self.seconds, "failed": self.failed, "last": self.last}
+                "calls": self.calls, "persistent": self.persistent, "seconds": self.seconds, "failed": self.failed,
+                "last": self.last}
+
+    @property
+    def persistent(self) -> bool:
+        """Whether one worker serves every call: ``RunnerConfig.persistent``, on POSIX (the reply pipe)."""
+        return bool(self.config.persistent) and os.name == "posix"
+
+    def restart_worker(self) -> None:
+        """End the worker; the next call starts a fresh child from the last hand-off (a plan revision
+        decided in the parent, docs/design/opt-T07-persistent-worker.md)."""
+        self._stop_worker(CLOSE_GRACE_S)
 
     def close(self) -> None:
-        """Remove the hand-off directory, unless a child failed (then it is kept for the record)."""
+        """End the worker, then remove the hand-off directory, unless a child failed (then it is kept
+        for the record)."""
+        self._stop_worker(CLOSE_GRACE_S)
         if self.root is None or self.failed is not None:
             return
         shutil.rmtree(self.root, ignore_errors=True)
@@ -294,7 +334,7 @@ class SubprocessRunner:
         if self.current != stage:  # nothing to hand on: the previous hand-off stays the current one
             shutil.rmtree(stage, ignore_errors=True)
 
-    def _command(self, stage):
+    def _command(self, stage, *arguments):
         python = self.config.resolved_python()
         environment = dict(os.environ) if self.config.inherit_environment else {}
         environment.update(dict(self.config.environment))
@@ -305,47 +345,144 @@ class SubprocessRunner:
         package_root = str(Path(__file__).resolve().parents[2])  # the directory holding fastmace/
         paths = [part for part in environment.get("PYTHONPATH", "").split(os.pathsep) if part]
         environment["PYTHONPATH"] = os.pathsep.join([package_root, *[p for p in paths if p != package_root]])
-        return [python, "-m", "fastmace.engine.subprocess", str(stage)], environment
+        return [python, "-m", "fastmace.engine.subprocess", str(stage), *arguments], environment
 
-    def _launch(self, stage, request):
-        """Run one child on ``stage``; its result, or ``SubprocessRunnerError``."""
+    def _child_files(self):
+        """The next child's log and heartbeat files, under the hand-off directory (kept after an error)."""
+        name = CHILD_NAME.format(self.children + 1)
+        return self.root / f"{name}.log", self.root / f"{name}.heartbeat"
+
+    def _popen(self, command, environment, log, **options):
         import subprocess
 
         from fastmace.errors import SubprocessRunnerError
 
+        try:
+            return subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=environment,
+                                    start_new_session=os.name == "posix", **options)
+        except OSError as error:
+            raise SubprocessRunnerError(
+                f"the subprocess runner could not start its child ({command[0]}): {error}",
+                why="a plan that a process constraint forbids here runs in a child (SPEC §8.7)",
+                next_step="Check RunnerConfig.python and RunnerConfig.environment.", exit_code=None,
+                child_message=str(error), directory=self.root) from error
+
+    def _launch(self, stage, request):
+        """Serve one call on ``stage``: by the worker, or by a fresh child; its result, or
+        ``SubprocessRunnerError``."""
         config = self.config
         request = {"request_version": REQUEST_VERSION, **request,
                    "heartbeat_s": max(0.05, min(10.0, config.stall_timeout_s / 10))}
         _write_json(stage / REQUEST_NAME, request)
-        command, environment = self._command(stage)
+        self.calls += 1
         started = time.perf_counter()
-        with open(stage / LOG_NAME, "wb") as log:
-            try:
-                process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT, env=environment,
-                                           start_new_session=os.name == "posix")
-            except OSError as error:
-                self.failed = str(stage)
-                raise SubprocessRunnerError(
-                    f"the subprocess runner could not start its child ({command[0]}): {error}",
-                    why="a plan that a process constraint forbids here runs in a child (SPEC §8.7)",
-                    next_step="Check RunnerConfig.python and RunnerConfig.environment.", exit_code=None,
-                    child_message=str(error), directory=self.root) from error
-            code, stopped = _wait(process, stage / HEARTBEAT_NAME, timeout_s=config.timeout_s,
-                                  stall_timeout_s=config.stall_timeout_s)
+        try:
+            if self.persistent:
+                code, stopped, pid, log = self._call_worker(stage)
+            else:
+                code, stopped, pid, log = self._fresh_child(stage)
+        except Exception:
+            self.failed = str(stage)
+            raise
         seconds = time.perf_counter() - started
-        self.children += 1
         self.seconds += seconds
-        self.last = {"action": request["action"], "stage": stage.name, "pid": process.pid, "exit_code": code,
+        self.last = {"action": request["action"], "stage": stage.name, "pid": pid, "exit_code": code,
                      "seconds": seconds, "steps": request.get("steps")}
         result = _read_json(stage / RESULT_NAME)
-        if code == 0 and stopped is None and result is not None and result.get("status") == "ok":
+        if code in (0, None) and stopped is None and result is not None and result.get("status") == "ok":
             return result
+        self._fail(stage, request, code, stopped, result, log)
+
+    def _fresh_child(self, stage):
+        """A child for this call alone (2-T07's path): it exits when the call is done."""
+        log_path, heartbeat = self._child_files()
+        command, environment = self._command(stage, "--heartbeat", str(heartbeat))
+        with open(log_path, "wb") as log:
+            process = self._popen(command, environment, log)
+            self.children += 1
+            code, stopped = _wait(process, heartbeat, timeout_s=self.config.timeout_s,
+                                  stall_timeout_s=self.config.stall_timeout_s)
+        return code, stopped, process.pid, log_path
+
+    def _call_worker(self, stage):
+        """The call by the persistent worker: started on this stage if there is none, else sent to it.
+        A worker that is gone, or belongs to another process (a fork), is replaced by a fresh one, which
+        resumes the request's ``source`` like any fresh child. Returns (exit code, or None while the
+        worker runs on; why it was stopped; pid; log)."""
+        worker = self._worker
+        if worker is not None and (self._owner != os.getpid() or worker.poll() is not None):
+            self._forget_worker()
+            worker = None
+        if worker is not None:
+            try:
+                worker.stdin.write((json.dumps({"stage": str(stage)}) + "\n").encode("utf-8"))
+                worker.stdin.flush()
+            except OSError:  # it died between calls
+                self._forget_worker()
+                worker = None
+        if worker is None:
+            worker = self._start_worker(stage)
+        outcome = _wait_reply(worker, self._replies, self._heartbeat, timeout_s=self.config.timeout_s,
+                              stall_timeout_s=self.config.stall_timeout_s)
+        log = self._log
+        if outcome[0] == "reply" and outcome[1].get("status") == "ok":
+            return None, None, worker.pid, log
+        if outcome[0] == "reply":  # an error: the worker exits after replying
+            try:
+                code = worker.wait(timeout=CLOSE_GRACE_S)
+            except Exception:
+                _kill(worker)
+                code = worker.wait()
+            stopped = None
+        else:
+            code, stopped = outcome[1], outcome[2]
+        self._forget_worker()
+        return code, stopped, worker.pid, log
+
+    def _start_worker(self, stage):
+        log_path, heartbeat = self._child_files()
+        read_end, write_end = os.pipe()
+        command, environment = self._command(stage, "--heartbeat", str(heartbeat), "--worker", "--reply",
+                                             str(write_end))
+        import subprocess
+
+        try:
+            with open(log_path, "wb") as log:
+                worker = self._popen(command, environment, log, stdin=subprocess.PIPE, pass_fds=(write_end,))
+        except Exception:
+            os.close(read_end)
+            raise
+        finally:
+            os.close(write_end)
+        self.children += 1
+        self._worker, self._owner = worker, os.getpid()
+        self._replies = _Replies(read_end)
+        self._log, self._heartbeat = log_path, heartbeat
+        self._finalizer = weakref.finalize(self, _terminate, worker, FINALIZE_GRACE_S, self._owner)
+        return worker
+
+    def _forget_worker(self):
+        if self._finalizer is not None:
+            self._finalizer.detach()
+        self._worker = self._finalizer = self._replies = None
+
+    def _stop_worker(self, grace):
+        worker = self._worker
+        if worker is None:
+            return
+        owner = self._owner
+        self._forget_worker()
+        _terminate(worker, grace, owner)
+
+    def _fail(self, stage, request, code, stopped, result, log):
+        from fastmace.errors import SubprocessRunnerError
+
         self.failed = str(stage)
         if result is not None and result.get("status") == "error":
             error = result["error"]
             message = f"{error['type']}: {error['message']}"
         else:
-            message = _tail(stage / LOG_NAME)
+            message = _tail(log)
         if stopped is not None:
             what = f"the subprocess runner's child {stopped} and was killed"
         elif code is not None and code < 0:
@@ -355,7 +492,7 @@ class SubprocessRunner:
         first = message.strip().splitlines()[-1] if message.strip() else "no message"
         raise SubprocessRunnerError(
             f"{what}: {first}",
-            why=f"the plan runs in a child process (SPEC §8.7); the child's log is {stage / LOG_NAME}",
+            why=f"the plan runs in a child process (SPEC §8.7); the child's log is {log}",
             exit_code=code, child_message=message, directory=self.root)
 
     def _take(self, sim, stage, result, *, gate, setup=False):
@@ -455,6 +592,85 @@ def _wait(process, heartbeat, *, timeout_s, stall_timeout_s, poll_s=POLL_S, cloc
         return process.wait(), why
 
 
+class _Replies:
+    """The worker's reply lines, read by a thread into a queue; ``None`` marks the pipe's end."""
+
+    def __init__(self, fd):
+        self._queue = queue.Queue()
+        self.ended = False
+        if fd is not None:
+            handle = os.fdopen(fd, "r", encoding="utf-8")
+            threading.Thread(target=self._read, args=(handle,), name="fastmace-replies", daemon=True).start()
+
+    def _read(self, handle):
+        with handle:
+            for line in handle:
+                self._queue.put(line)
+        self._queue.put(None)
+
+    def get(self, timeout):
+        """The next line, ``None`` at the end, or ``_EMPTY`` after ``timeout`` seconds."""
+        if self.ended:
+            time.sleep(timeout)
+            return _EMPTY
+        try:
+            line = self._queue.get(timeout=timeout)
+        except queue.Empty:
+            return _EMPTY
+        if line is None:
+            self.ended = True
+        return line
+
+
+def _wait_reply(process, replies, heartbeat, *, timeout_s, stall_timeout_s, poll_s=POLL_S, clock=time.monotonic):
+    """Wait for the worker's reply to a call. Kill its process group if the call runs longer than
+    ``timeout_s`` or its ``heartbeat`` does not change for ``stall_timeout_s``. Returns
+    ``("reply", record)``, ``("exit", exit code, None)`` or ``("stopped", exit code, why)``."""
+    started = last = clock()
+    seen = None
+    while True:
+        line = replies.get(poll_s)
+        if line is not _EMPTY and line is not None:
+            try:
+                return "reply", json.loads(line)
+            except ValueError:
+                return "reply", {"status": "error", "line": line}
+        code = process.poll()
+        if code is not None:
+            return "exit", code, None
+        now = clock()
+        beat = _read_text(heartbeat)
+        if beat != seen:
+            seen, last = beat, now
+        if timeout_s is not None and now - started > timeout_s:
+            why = f"ran longer than RunnerConfig.timeout_s={timeout_s:g} s"
+        elif now - last > stall_timeout_s:
+            why = (f"made no progress for RunnerConfig.stall_timeout_s={stall_timeout_s:g} s (last heartbeat: "
+                   f"{seen or 'none'})")
+        else:
+            continue
+        _kill(process)
+        return "stopped", process.wait(), why
+
+
+def _terminate(process, grace, owner):
+    """End a worker: close its stdin (it closes its files and exits), wait ``grace`` seconds, then kill
+    its process group. Only the process that started it does this (not a fork of it)."""
+    import subprocess
+
+    if os.getpid() != owner or process.poll() is not None:
+        return
+    try:
+        process.stdin.close()
+    except OSError:
+        pass
+    try:
+        process.wait(timeout=grace)
+    except subprocess.TimeoutExpired:
+        _kill(process)
+        process.wait()
+
+
 def _kill(process):
     import signal
 
@@ -521,6 +737,7 @@ class _Heartbeat:
 
     def __init__(self, path):
         self.path = Path(path)
+        self.parent = os.getppid()  # a child whose parent died ends itself (OPT-T07)
         self.phase = "started"
         self.simulation = None
         self.interval = 1.0
@@ -557,7 +774,10 @@ class _Heartbeat:
         self._stop.set()
 
     def _loop(self):
-        while not self._stop.wait(self.interval):
+        # Every PARENT_CHECK_S at least, for the parent check; the file is rewritten only on a change.
+        while not self._stop.wait(min(self.interval, PARENT_CHECK_S)):
+            if os.name == "posix" and os.getppid() != self.parent:
+                os._exit(3)  # the parent is gone: nobody will read this child's results; free the GPU
             try:
                 self.write()
             except Exception:  # never let the heartbeat end the child
@@ -565,35 +785,87 @@ class _Heartbeat:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """The child's entry point: ``python -m fastmace.engine.subprocess <directory>``.
+    """The child's entry point: ``python -m fastmace.engine.subprocess <directory> [--heartbeat <path>]
+    [--worker --reply <fd>]``.
 
     Reads ``request.json`` in ``directory``, does it, and writes ``result.json`` (status ``ok``, or
-    ``error`` with the exception's type and message, also on stderr). Exit code 0 or 1.
+    ``error`` with the exception's type and message, also on stderr). A fresh child then exits (code 0
+    or 1). A worker (``--worker``) answers on the reply pipe and serves the stages its stdin names until
+    EOF or ``{"exit": true}``; a failed call ends it with code 1.
     """
-    argv = sys.argv[1:] if argv is None else list(argv)
-    if len(argv) != 1:
-        print("usage: python -m fastmace.engine.subprocess <hand-off stage directory>", file=sys.stderr)
-        return 2
-    directory = Path(argv[0])
-    heartbeat = _Heartbeat(directory / HEARTBEAT_NAME)
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="python -m fastmace.engine.subprocess")
+    parser.add_argument("directory")
+    parser.add_argument("--heartbeat")
+    parser.add_argument("--worker", action="store_true")
+    parser.add_argument("--reply", type=int)
+    try:
+        arguments = parser.parse_args(sys.argv[1:] if argv is None else list(argv))
+    except SystemExit as exit:
+        return int(exit.code or 2)
+    directory = Path(arguments.directory)
+    heartbeat = _Heartbeat(arguments.heartbeat or directory / HEARTBEAT_NAME)
+    reply = None if arguments.reply is None else os.fdopen(arguments.reply, "w", encoding="utf-8")
+    worker = _Worker(persistent=arguments.worker)
+    try:
+        while True:
+            ok = _serve(directory, heartbeat, worker)
+            if reply is not None:
+                reply.write(json.dumps({"stage": str(directory), "status": "ok" if ok else "error"}) + "\n")
+                reply.flush()
+            if not ok:
+                return 1
+            if not arguments.worker:
+                return 0
+            heartbeat.mark("idle")
+            line = sys.stdin.readline()
+            if not line:
+                return 0  # EOF: the parent closed the worker, or died
+            command = json.loads(line)
+            if command.get("exit"):
+                return 0
+            directory = Path(command["stage"])
+    finally:
+        heartbeat.stop()
+        worker.close()
+
+
+class _Worker:
+    """What a child keeps between calls: its ``Simulation`` and the stage of its last hand-off."""
+
+    def __init__(self, persistent):
+        self.persistent = persistent
+        self.simulation = None
+        self.stage = None
+
+    def close(self):
+        """Close the output files; nothing else (the parent writes the final records)."""
+        sim = self.simulation
+        if sim is not None and sim._writer is not None:
+            sim._writer.close()
+            sim._writer = None
+
+
+def _serve(directory, heartbeat, worker):
+    """One call: its result in ``directory``; False if it failed."""
     try:
         request = json.loads((directory / REQUEST_NAME).read_text(encoding="utf-8"))
-        heartbeat.start(request.get("heartbeat_s", 1.0))
-        result = _child(directory, request, heartbeat)
+        if not heartbeat._thread.is_alive():
+            heartbeat.start(request.get("heartbeat_s", 1.0))
+        result = _child(directory, request, heartbeat, worker)
     except Exception as error:  # the parent raises SubprocessRunnerError with this message
         traceback.print_exc()
         sys.stderr.flush()
         _write_json(directory / RESULT_NAME, {"status": "error", "error": {
             "type": type(error).__name__, "module": type(error).__module__, "message": str(error),
             "traceback": traceback.format_exc()}})
-        return 1
-    finally:
-        heartbeat.stop()
+        return False
     _write_json(directory / RESULT_NAME, result)
-    return 0
+    return True
 
 
-def _child(directory, request, heartbeat):
+def _child(directory, request, heartbeat, worker=None):
     import fastmace  # noqa: F401  (before torch: file locks, SPEC §14)
 
     # isort: split
@@ -604,14 +876,25 @@ def _child(directory, request, heartbeat):
 
     if request.get("request_version") != REQUEST_VERSION:
         raise ValueError(f"hand-off request version {request.get('request_version')!r} is not {REQUEST_VERSION}")
+    worker = _Worker(persistent=False) if worker is None else worker
     action = request["action"]
-    heartbeat.mark("setup" if action == "setup" else "resume")
-    if action == "setup":
-        sim = _construct(directory, request)
-    elif action == "run":
-        sim = simulations.Simulation.resume(request["source"], allow_plan_change=True, check=request["check"])
-    else:
+    if action not in ("setup", "run"):
         raise ValueError(f"unknown hand-off action {action!r}")
+    if worker.simulation is not None:  # the worker's next call: the engine it has (OPT-T07)
+        if action != "run" or str(request["source"]) != str(worker.stage):
+            raise ValueError(f"the worker holds the hand-off of {worker.stage}, the request continues "
+                             f"{request.get('source')!r} ({action})")
+        sim = worker.simulation
+        heartbeat.mark("call")
+    else:
+        heartbeat.mark("setup" if action == "setup" else "resume")
+        if action == "setup":
+            sim = _construct(directory, request)
+        else:
+            sim = simulations.Simulation.resume(request["source"], allow_plan_change=True, check=request["check"])
+            worker.stage = request["source"]
+        worker.simulation = sim
+    sim._sinks = []  # this call's sinks only
     heartbeat.simulation = sim
     heartbeat.mark("running")
     if not request["started"]:
@@ -646,11 +929,11 @@ def _child(directory, request, heartbeat):
     saved = action == "setup" or bool(steps) or bool(request.get("host_writes"))
     if saved:
         sim.save_restart(directory)  # the next hand-off: a canonical restart point (§10.6)
+        worker.stage = str(directory)
     else:
         sim.flush_output()
-    if sim._writer is not None:  # the chunk opened at the restart point stays empty until the next child
-        sim._writer.close()
-        sim._writer = None
+    if not worker.persistent:  # a fresh child: the chunk opened at the restart point waits for the next child
+        worker.close()
     engine = sim._engine
     values = dict(engine.sync())
     if "cell" not in values:

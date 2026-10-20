@@ -79,7 +79,14 @@ def test_runner_config_defaults():  # SPEC §8.7
     assert runner.inherit_environment is True
     assert runner.timeout_s is None
     assert runner.stall_timeout_s == 1800.0
+    assert runner.persistent is True  # OPT-T07: one worker per Simulation
     _frozen(runner, "python", "/usr/bin/python3")
+
+
+def test_runner_config_persistent_is_a_bool():  # OPT-T07
+    assert config.RunnerConfig(persistent=False).persistent is False
+    with pytest.raises(ValueError):
+        config.RunnerConfig(persistent=1)
 
 
 def test_runner_config_normalises_the_environment():

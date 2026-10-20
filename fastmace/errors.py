@@ -165,6 +165,12 @@ class SubprocessRunnerError(FastMACEError, RuntimeError):
         self.directory = None if directory is None else str(directory)
 
 
+class TemplateChangedError(FastMACEError, RuntimeError):
+    """A cached converted model (opt-1 OPT-T06) changed after it was stored; it is never copied for a plan."""
+
+    default_next_step = "Report this as a bug; ForceField.release_templates() drops the cached models."
+
+
 class IsolationError(FastMACEError, RuntimeError):
     """An instance whose lease on a shared component was taken by another instance (SPEC §8.7).
 
@@ -338,7 +344,8 @@ class ModelLicenceWarning(UserWarning):
 
 
 __all__ = ["FastMACEError", "Reason", "PlanRefused", "SpeciesNotInSuperset", "ProcessConstraintError",
-           "FallbackExhausted", "SubprocessRunnerError", "IsolationError", "ReproducibilityError",
+           "FallbackExhausted", "SubprocessRunnerError", "IsolationError", "TemplateChangedError",
+           "ReproducibilityError",
            "GateFailed", "GateUnavailable", "ModelElementError", "RestartMismatch", "CheckpointTrustError",
            "NonFiniteError", "HybridUnavailableError", "BackendError", "NaiveCueqError", "PolarUnavailableError",
            "OEqRuntimeError", "CacheLocationError", "RewriteError", "RewriteRefusedError", "SelfCheckError",

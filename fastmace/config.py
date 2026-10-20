@@ -159,6 +159,9 @@ class EngineConfig:
     # Evaluation plans compile with the edge dimension dynamic from the first call, so a changed edge
     # count does not recompile (2-T13). No effect until 2-T13.
     dynamic_edges: bool = False
+    # Keep each conversion's model as a template and give later plans a private copy of it instead of
+    # reloading and converting the checkpoint (CUDA cuEq and hybrid only; opt-1 OPT-T06).
+    model_template_cache: bool = True
 
     def __post_init__(self):
         _check_choices(self)
@@ -369,6 +372,9 @@ class RunnerConfig:
     timeout_s: float | None = None
     # A child without progress (no committed step) for this long is killed, s.
     stall_timeout_s: float = 1800.0
+    # One child serves every run() of the Simulation, keeping its compiled engine (OPT-T07); False: a
+    # fresh child per run(), resuming the last restart write (2-T07's path; also on Windows).
+    persistent: bool = True
 
     def __post_init__(self):
         _check_choices(self)
@@ -389,6 +395,8 @@ class RunnerConfig:
         if self.timeout_s is not None:
             _positive(self, "timeout_s")
         _positive(self, "stall_timeout_s")
+        if not isinstance(self.persistent, bool):
+            raise ValueError(f"RunnerConfig.persistent must be a bool, got {self.persistent!r}")
 
     def resolved_python(self) -> str:
         """The child's interpreter: ``python``, else this process's ``sys.executable``."""

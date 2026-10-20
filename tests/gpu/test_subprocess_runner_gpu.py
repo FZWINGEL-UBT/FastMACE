@@ -118,7 +118,7 @@ def _complete_chunks(run):
     steps = list(range(0, 301, 10))
     assert run["thermo_steps"] == steps  # every row once
     assert run["frame_count"] == len(steps)  # every frame once
-    assert run["runner"] == "subprocess" and run["subprocess"]["children"] == 4
+    assert run["runner"] == "subprocess" and run["subprocess"]["calls"] == 4
     assert not run["handoff_left"]
 
 

@@ -1,0 +1,5225 @@
+{
+  "tool": "checkpoint_scan",
+  "created_utc": "2026-10-20T22:10:19.937202+00:00",
+  "torch": "2.14.1+cpu",
+  "python": "/home/fzwin/environments/fastmace_cpu/bin/python",
+  "checkpoints": {
+    "2023-12-03-mace-128-L1_epoch-199.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "heads": [],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        89
+      ],
+      "parameters": 5524232,
+      "zero_share": 0.14821987925199376,
+      "zero_tensors": [],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.0.skip_tp.output_mask",
+          "shape": [
+            512
+          ],
+          "zero_share": 0.75
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 11392
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "interactions.1.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 163840
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 128
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2048
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              89,
+              51,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              6,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "mp0-medium"
+      ]
+    },
+    "MACE_MPtrj_2022.9.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "heads": [],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        89
+      ],
+      "parameters": 16696326,
+      "zero_share": 0.04906378804534602,
+      "zero_tensors": [],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.0.skip_tp.output_mask",
+          "shape": [
+            1024
+          ],
+          "zero_share": 0.75
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 22784
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 262144
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 131072
+        },
+        "interactions.1.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 655360
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 131072
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 256
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 4096
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              256
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              256
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              256
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              89,
+              51,
+              256
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              6,
+              256
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              256
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              256
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              256
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              256
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "mp0-large"
+      ]
+    },
+    "mace-mp-0b3-medium.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "heads": [
+        "default"
+      ],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        89
+      ],
+      "parameters": 9900567,
+      "zero_share": 0.08266375047004884,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": []
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 11392
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "interactions.1.linear": {
+          "paths": 10,
+          "zero_paths": [],
+          "weights": 163840
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 128
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2048
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              89,
+              51,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              6,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "mp0b3-medium"
+      ]
+    },
+    "mace-mpa-0-medium.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "heads": [
+        "default"
+      ],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        89
+      ],
+      "parameters": 9900567,
+      "zero_share": 0.08266375047004884,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": []
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 11392
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "interactions.1.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 163840
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 128
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2048
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              89,
+              51,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              6,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "mpa0-medium"
+      ]
+    },
+    "mace-omat-0-medium.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "heads": [
+        "default"
+      ],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        89
+      ],
+      "parameters": 9900567,
+      "zero_share": 0.08266375047004884,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": []
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 11392
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "interactions.1.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 163840
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 128
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2048
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              89,
+              51,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              6,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "omat0-medium"
+      ]
+    },
+    "MACE-matpes-pbe-omat-ft.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "heads": [
+        "default"
+      ],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        1,
+        89
+      ],
+      "parameters": 9900562,
+      "zero_share": 0.08266379221704788,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": []
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 11392
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "interactions.1.linear": {
+          "paths": 10,
+          "zero_paths": [],
+          "weights": 163840
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 128
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2048
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              89,
+              51,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              6,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "matpes-pbe"
+      ]
+    },
+    "MACE-matpes-r2scan-omat-ft.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "heads": [
+        "default"
+      ],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        1,
+        89
+      ],
+      "parameters": 9900562,
+      "zero_share": 0.08266379221704788,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": [
+            1
+          ]
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 11392
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "interactions.1.linear": {
+          "paths": 10,
+          "zero_paths": [],
+          "weights": 163840
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 128
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2048
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              89,
+              51,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              6,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              89,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              89,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              89,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "matpes-r2scan"
+      ]
+    },
+    "mace-mh-1.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94
+      ],
+      "heads": [
+        "matpes_r2scan",
+        "mp_pbe_refit_add",
+        "spice_wB97M",
+        "oc20_usemppbe",
+        "omol",
+        "omat_pbe"
+      ],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "6x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "6x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        6,
+        89
+      ],
+      "parameters": 7349077,
+      "zero_share": 0.11448839085506929,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": [
+            6
+          ]
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.0.skip_tp.output_mask",
+          "shape": [
+            2048
+          ],
+          "zero_share": 0.75
+        },
+        {
+          "name": "interactions.0.linear_res.output_mask",
+          "shape": [
+            9728
+          ],
+          "zero_share": 0.3684210526315789
+        },
+        {
+          "name": "interactions.1.linear_res.output_mask",
+          "shape": [
+            9728
+          ],
+          "zero_share": 0.3684210526315789
+        },
+        {
+          "name": "atomic_energies_fn.atomic_energies",
+          "shape": [
+            6,
+            89
+          ],
+          "zero_share": 0.16104868913857678
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.weights_max",
+          "shape": [
+            1,
+            51,
+            512
+          ],
+          "zero_share": 0.05572150735294118
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.weights.0",
+          "shape": [
+            1,
+            6,
+            512
+          ],
+          "zero_share": 0.049479166666666664
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.weights.1",
+          "shape": [
+            1,
+            1,
+            512
+          ],
+          "zero_share": 0.044921875
+        },
+        {
+          "name": "products.0.linear.weight",
+          "shape": [
+            524288
+          ],
+          "zero_share": 0.023920059204101562
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 45568
+        },
+        "interactions.0.source_embedding": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 45568
+        },
+        "interactions.0.target_embedding": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 45568
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.0.skip_tp": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 262144
+        },
+        "interactions.0.linear_res": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 262144
+        },
+        "interactions.0.linear_1": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 458752
+        },
+        "interactions.0.linear_2": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 1048576
+        },
+        "interactions.1.source_embedding": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 45568
+        },
+        "interactions.1.target_embedding": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 45568
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 131072
+        },
+        "interactions.1.skip_tp": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 262144
+        },
+        "interactions.1.linear_res": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 327680
+        },
+        "interactions.1.linear_1": {
+          "paths": 10,
+          "zero_paths": [],
+          "weights": 1048576
+        },
+        "interactions.1.linear_2": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 1048576
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 524288
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 262144
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 3072
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 49152
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 576
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              1,
+              23,
+              512
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              1,
+              4,
+              512
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              1,
+              1,
+              512
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              1,
+              51,
+              512
+            ],
+            "zero_elements": [],
+            "zero_share": 0.05572150735294118
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              1,
+              6,
+              512
+            ],
+            "zero_elements": [],
+            "zero_share": 0.049479166666666664
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              1,
+              1,
+              512
+            ],
+            "zero_elements": [],
+            "zero_share": 0.044921875
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              1,
+              23,
+              512
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              1,
+              4,
+              512
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              1,
+              1,
+              512
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "mh1-omat",
+        "mh1-mp",
+        "mh1-r2scan"
+      ]
+    },
+    "MACE-OFF23_small.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        6,
+        7,
+        8,
+        9,
+        15,
+        16,
+        17,
+        35,
+        53
+      ],
+      "heads": [],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        10
+      ],
+      "parameters": 893115,
+      "zero_share": 0.21246647968066823,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": []
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 960
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 9216
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 36864
+        },
+        "interactions.1.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 9216
+        },
+        "interactions.1.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 36864
+        },
+        "products.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 9216
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 9216
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 96
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 1536
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              96
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              96
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              96
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              96
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              96
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              96
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "off23-small"
+      ]
+    },
+    "MACE-OFF23_medium.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        6,
+        7,
+        8,
+        9,
+        15,
+        16,
+        17,
+        35,
+        53
+      ],
+      "heads": [],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        10
+      ],
+      "parameters": 2265399,
+      "zero_share": 0.361268809600428,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": []
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 1280
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "interactions.1.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 163840
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 128
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2048
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              10,
+              51,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              6,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "off23-medium"
+      ]
+    },
+    "MACE-OFF23_large.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        6,
+        7,
+        8,
+        9,
+        15,
+        16,
+        17,
+        35,
+        53
+      ],
+      "heads": [],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        10
+      ],
+      "parameters": 6905528,
+      "zero_share": 0.31181279693601993,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": []
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.2.U_matrix_3",
+          "shape": [
+            5,
+            16,
+            16,
+            16,
+            65
+          ],
+          "zero_share": 0.99564453125
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.2.U_matrix_2",
+          "shape": [
+            5,
+            16,
+            16,
+            7
+          ],
+          "zero_share": 0.9856026785714286
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.2.U_matrix_1",
+          "shape": [
+            5,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_2_3_3",
+          "shape": [
+            5,
+            7,
+            7
+          ],
+          "zero_share": 0.8326530612244898
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_2_3_1",
+          "shape": [
+            5,
+            7,
+            3
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_2_2_2",
+          "shape": [
+            5,
+            5,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_2_1_3",
+          "shape": [
+            5,
+            3,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_2_1_1",
+          "shape": [
+            5,
+            3,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2240
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 50176
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 200704
+        },
+        "interactions.1.linear_up": {
+          "paths": 3,
+          "zero_paths": [],
+          "weights": 150528
+        },
+        "interactions.1.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 852992
+        },
+        "products.0.linear": {
+          "paths": 3,
+          "zero_paths": [],
+          "weights": 150528
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 50176
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 224
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 3584
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              10,
+              51,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              6,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 2,
+            "weights": "max",
+            "shape": [
+              10,
+              65,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 2,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              7,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 2,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              224
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "off23-large"
+      ]
+    },
+    "MACE-OFF23b_medium.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        6,
+        7,
+        8,
+        9,
+        15,
+        16,
+        17,
+        35,
+        53
+      ],
+      "heads": [],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        10
+      ],
+      "parameters": 2265399,
+      "zero_share": 0.361268809600428,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": []
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 1280
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "interactions.1.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 163840
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 128
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2048
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              10,
+              51,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              6,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "off23b-medium"
+      ]
+    },
+    "MACE-OFF24_medium.model": {
+      "type": "ScaleShiftMACE",
+      "elements": [
+        1,
+        6,
+        7,
+        8,
+        9,
+        15,
+        16,
+        17,
+        35,
+        53
+      ],
+      "heads": [],
+      "readouts": [
+        {
+          "index": 0,
+          "type": "LinearReadoutBlock",
+          "irreps_out": "1x0e"
+        },
+        {
+          "index": 1,
+          "type": "NonLinearReadoutBlock",
+          "irreps_out": "1x0e"
+        }
+      ],
+      "atomic_energies_shape": [
+        10
+      ],
+      "parameters": 2265399,
+      "zero_share": 0.361268809600428,
+      "zero_tensors": [
+        {
+          "name": "scale_shift.shift",
+          "shape": []
+        }
+      ],
+      "partially_zero": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_3",
+          "shape": [
+            16,
+            16,
+            16,
+            23
+          ],
+          "zero_share": 0.9962529721467391
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_3",
+          "shape": [
+            3,
+            16,
+            16,
+            16,
+            51
+          ],
+          "zero_share": 0.995458665236928
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_2",
+          "shape": [
+            3,
+            16,
+            16,
+            6
+          ],
+          "zero_share": 0.9848090277777778
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_2",
+          "shape": [
+            16,
+            16,
+            4
+          ],
+          "zero_share": 0.984375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.0.symmetric_contractions.contractions.1.U_matrix_1",
+          "shape": [
+            3,
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_share": 0.9375
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_3_2",
+          "shape": [
+            3,
+            7,
+            5
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_3",
+          "shape": [
+            3,
+            5,
+            7
+          ],
+          "zero_share": 0.8
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_2_1",
+          "shape": [
+            3,
+            5,
+            3
+          ],
+          "zero_share": 0.7555555555555555
+        },
+        {
+          "name": "interactions.1.conv_tp._compiled_main_left_right._w3j_1_1_2",
+          "shape": [
+            3,
+            3,
+            5
+          ],
+          "zero_share": 0.7555555555555555
+        }
+      ],
+      "zero_rows_or_cols": [
+        {
+          "name": "products.0.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        },
+        {
+          "name": "products.1.symmetric_contractions.contractions.0.U_matrix_1",
+          "shape": [
+            16,
+            1
+          ],
+          "zero_rows": 15,
+          "zero_cols": 0
+        }
+      ],
+      "linears": {
+        "node_embedding.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 1280
+        },
+        "interactions.0.linear_up": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "interactions.0.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 65536
+        },
+        "interactions.1.linear_up": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "interactions.1.linear": {
+          "paths": 4,
+          "zero_paths": [],
+          "weights": 163840
+        },
+        "products.0.linear": {
+          "paths": 2,
+          "zero_paths": [],
+          "weights": 32768
+        },
+        "products.1.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16384
+        },
+        "readouts.0.linear": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 128
+        },
+        "readouts.1.linear_1": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 2048
+        },
+        "readouts.1.linear_2": {
+          "paths": 1,
+          "zero_paths": [],
+          "weights": 16
+        }
+      },
+      "symmetric_contractions": {
+        "products.0.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "max",
+            "shape": [
+              10,
+              51,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              6,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 1,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ],
+        "products.1.symmetric_contractions": [
+          {
+            "contraction": 0,
+            "weights": "max",
+            "shape": [
+              10,
+              23,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.0",
+            "shape": [
+              10,
+              4,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          },
+          {
+            "contraction": 0,
+            "weights": "weights.1",
+            "shape": [
+              10,
+              1,
+              128
+            ],
+            "zero_elements": [],
+            "zero_share": 0.0
+          }
+        ]
+      },
+      "labels": [
+        "off24-medium"
+      ]
+    }
+  }
+}

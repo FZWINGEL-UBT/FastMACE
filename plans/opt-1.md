@@ -190,6 +190,38 @@ and runs in parallel with B/C, with its own worker.
   - **Checks:** repeated short calls, observer mutations, reproducible
     restart equivalence, child termination, GPU-memory release.
 
+**Overnight queue, 20–21 October 2026** (owner asleep from about 21:30 UTC,
+asked for about 10 hours of queued work):
+
+| Who | Until about 03:00 UTC (code freeze for the acceptance) |
+| --- | --- |
+| 2-T20 | Push the A+B default change (conductor trials and merges it). Then: the stage B report; the local OPT-T03 sm_120 and OPT-T01 reruns; stage C (design note, then build, gate and A/B on both GPUs if it's a go); then an OPT-T04 checkpoint scan, CPU only, report only |
+| 2-T19 | OPT-T06: build, tests, murphy bitwise check |
+| 2-T07 | OPT-T07: build, tests, murphy checks |
+| 2-T23 | Write the combined-acceptance runbook (phase 2 items plus the round's), CPU only |
+| 2-T22 | Coraline soft-lock check, only if coraline's GPU has no process of any user |
+
+**Code freeze at about 03:00 UTC:** whatever is merged by then is in the
+combined acceptance. Anything later waits for the next round.
+
+**Combined acceptance from about 03:00 UTC (2-T23):** both GPUs, the
+runbook's order, including the 19-label gate, the item 4 repeat and item 8
+against `fastmace-1b`. The phase 2 report and a round-1 summary are ready
+for the owner in the morning.
+
+- **OPT-T08 Atom-level linear audit (2-T16 worker; owner, 21 October
+  2026, night: "run the audit tonight and try out everything you can think
+  of").**
+  - **Tonight, CPU only:** an audit of the compiled force pass for
+    multiplies that share an input (merge into one wider GEMM), adjacent
+    linears without a nonlinearity between them (fold W2·W1 at load), and
+    other exact reductions.
+  - **Then:** build every candidate above about 1 % as an opt-in record, and
+    A/B it on both GPUs after the acceptance.
+- **OPT-T03 candidate 2, diagnosis (2-T20; owner):** why grouped_launch's
+  1.3× bench gain becomes a full-step loss. Local nsys/ncu until 02:45 UTC,
+  then a fix attempt.
+
 Not in this round:
 - a complete force megakernel. Our fit gives a ceiling of 8–16 % on NaCl, and
   the report budgets 0–15 % with regression possible. Months of work.
