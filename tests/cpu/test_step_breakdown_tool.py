@@ -95,6 +95,10 @@ def test_gemm_flops_from_shapes():
     assert tool.gemm_flops("aten::mm", json.dumps([[216, 512], [512, 128]])) == 2 * 216 * 512 * 128
     assert tool.gemm_flops("aten::addmm", json.dumps([[128], [216, 512], [512, 128]])) == 2 * 216 * 512 * 128
     assert tool.gemm_flops("aten::bmm", json.dumps([[3, 216, 512], [3, 512, 128]])) == 3 * 2 * 216 * 512 * 128
+    out = 2 * 512 * 512 * 512
+    assert tool.gemm_flops("aten::mm", json.dumps([[512, 512], [512, 512], [512, 512]])) == out  # out= variant
+    assert tool.gemm_flops("aten::addmm", json.dumps([[512], [512, 512], [512, 512], [512, 512]])) == out
+    assert tool.gemm_flops("aten::addmm", json.dumps([[216, 128], [216, 512], [512, 128]])) == 2 * 216 * 512 * 128
     assert tool.gemm_flops("aten::mm", json.dumps([[216, 512], [100, 128]])) is None
     assert tool.gemm_flops("aten::add", json.dumps([[216, 512], [216, 512]])) is None
     assert tool.fp32_peak_tflops(12, 0, 36, 3000) == 36 * 128 * 2 * 3000e6 / 1e12

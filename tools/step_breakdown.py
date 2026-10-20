@@ -179,16 +179,20 @@ def gemm_flops(op, dims):
     except json.JSONDecodeError:
         return None
     matrices = [s for s in shapes if len(s) in (2, 3) and all(isinstance(v, int) for v in s)]
-    if op == "aten::mm" and len(matrices) >= 2 and len(matrices[0]) == len(matrices[1]) == 2:
-        (m, k), (k2, n) = matrices[:2]
-    elif op == "aten::addmm" and len(matrices) >= 2:
-        (m, k), (k2, n) = matrices[-2:]
-    elif op == "aten::bmm" and len(matrices) >= 2 and len(matrices[0]) == len(matrices[1]) == 3:
+    # Inductor calls the out= variants, so an output matrix may follow the operands; addmm's bias comes
+    # first and is 1-D (dropped below) or a 2-D [M, N].
+    two = [s for s in matrices if len(s) == 2]
+    if op in ("aten::mm", "aten::addmm") and len(two) >= 2:
+        first = 0
+        if (op == "aten::addmm" and len(two) >= 3 and two[1][1] == two[2][0]
+                and two[0] == [two[1][0], two[2][1]]):
+            first = 1  # 2-D bias
+        (m, k), (k2, n) = two[first], two[first + 1]
+        return 2 * m * k * n if k == k2 else None
+    if op == "aten::bmm" and len(matrices) >= 2 and len(matrices[0]) == len(matrices[1]) == 3:
         (b, m, k), (b2, k2, n) = matrices[:2]
         return 2 * b * m * k * n if (b, k) == (b2, k2) else None
-    else:
-        return None
-    return 2 * m * k * n if k == k2 else None
+    return None
 
 
 def fp32_peak_tflops(major, minor, sms, clock_mhz):
@@ -209,13 +213,13 @@ def max_sm_clock_mhz():
 
 
 def new_row():
-    return dict(launches=0, us=0.0, ops=set(), grid=None, block=None, registers=None, shared_bytes=None,
+    return dict(launches=0, us=0.0, ops=set(), strides="", grid=None, block=None, registers=None, shared_bytes=None,
                 occupancy_us=0.0, occupancy_weight=0.0)
 
 
 def _owners(events):
     """(owner, launches, kernels): ``owner(launch)`` is the innermost CPU operator enclosing a kernel's launch,
-    as (name, input dims, invocation id), or ("?", "", None)."""
+    as (name, input dims, invocation id, input strides), or ("?", "", None, "")."""
     ops = defaultdict(list)
     launches, kernels = {}, []
     for e in events:
@@ -233,7 +237,7 @@ def _owners(events):
 
     def owner(launch):
         if launch is None or launch["tid"] not in index:
-            return "?", "", None
+            return "?", "", None, ""
         starts, items = index[launch["tid"]]
         best = None
         for e in reversed(items[:bisect.bisect_right(starts, launch["ts"])]):
@@ -243,9 +247,10 @@ def _owners(events):
                 if launch["ts"] - e["ts"] > 2e5:
                     break
         if best is None:
-            return "?", "", None
-        return (best["name"], json.dumps(best.get("args", {}).get("Input Dims", ""))[:4000],
-                (best["tid"], best["ts"]))
+            return "?", "", None, ""
+        args = best.get("args", {})
+        return (best["name"], json.dumps(args.get("Input Dims", ""))[:4000], (best["tid"], best["ts"]),
+                json.dumps(args.get("Input Strides", ""))[:4000])
 
     return owner, launches, kernels
 
@@ -260,8 +265,9 @@ def kernel_table(events):
     table = defaultdict(new_row)
     for k in kernels:
         args = k.get("args", {})
-        op, dims, invocation = owner(launches.get(args.get("correlation")))
+        op, dims, invocation, strides = owner(launches.get(args.get("correlation")))
         row = table[(k["name"][:120], op, dims)]
+        row["strides"] = row["strides"] or strides
         row["launches"] += 1
         row["us"] += k["dur"]
         if invocation is not None:
@@ -284,7 +290,7 @@ def occupancy(row):
 
 def op_gemm_rates(table, calls, peak_tflops):
     """Per GEMM operator (op, dims): invocations and kernel time per force call, FLOPs and achieved TFLOP/s."""
-    ops = defaultdict(lambda: dict(invocations=set(), us=0.0, kernels=[]))
+    ops = defaultdict(lambda: dict(invocations=set(), us=0.0, kernels=[], strides=""))
     for (name, op, dims), row in table.items():
         if gemm_flops(op, dims) is None:
             continue
@@ -292,6 +298,7 @@ def op_gemm_rates(table, calls, peak_tflops):
         entry["invocations"] |= row["ops"]
         entry["us"] += row["us"]
         entry["kernels"].append(name)
+        entry["strides"] = entry["strides"] or row["strides"]
     rates = {}
     for (op, dims), entry in ops.items():
         flops = gemm_flops(op, dims) * len(entry["invocations"])
@@ -300,7 +307,7 @@ def op_gemm_rates(table, calls, peak_tflops):
                                  us_per_call=entry["us"] / calls, gflop_per_call=flops / calls / 1e9,
                                  achieved_tflops=tflops,
                                  share_of_peak=(tflops / peak_tflops if tflops and peak_tflops else None),
-                                 kernels=sorted(set(entry["kernels"])))
+                                 kernels=sorted(set(entry["kernels"])), input_strides=entry["strides"])
     return rates
 
 
@@ -338,7 +345,7 @@ def write_sequence(events, edges, path):
     rows = []
     for index, k in enumerate(sorted(kernels, key=lambda e: e["ts"])):
         name = k["name"][:120]
-        op, dims, _ = owner(launches.get(k.get("args", {}).get("correlation")))
+        op, dims, _, _ = owner(launches.get(k.get("args", {}).get("correlation")))
         rows.append(dict(index=index, kernel=name, op=op, category=category(name, op, dims, edges),
                          input_dims=dims[:300]))
     with Path(path).open("w", newline="") as handle:
@@ -719,7 +726,7 @@ def main(argv=None):
     with (args.output / "gemms.csv").open("w", newline="") as handle:
         writer = csv.writer(handle)
         writer.writerow(["category", "op", "gflop_per_call", "us_per_call", "invocations_per_call",
-                         "achieved_tflops", "share_of_fp32_peak", "kernels", "input_dims"])
+                         "achieved_tflops", "share_of_fp32_peak", "kernels", "input_dims", "input_strides"])
         for (op, dims), rate in sorted(rates.items(), key=lambda item: -item[1]["us_per_call"]):
             group = category(rate["kernels"][0], op, dims, edges)
             categories[group]["gemm_flops"] += rate["gflop_per_call"] * 1e9
@@ -728,7 +735,7 @@ def main(argv=None):
                              rate["invocations_per_call"],
                              "" if rate["achieved_tflops"] is None else f"{rate['achieved_tflops']:.3f}",
                              "" if rate["share_of_peak"] is None else f"{rate['share_of_peak']:.3f}",
-                             " | ".join(rate["kernels"]), dims[:300]])
+                             " | ".join(rate["kernels"]), dims[:300], rate["input_strides"][:300]])
     kernel_ms = sum(c["us"] for c in categories.values()) / 1e3
     with (args.output / "categories.csv").open("w", newline="") as handle:
         writer = csv.writer(handle)
