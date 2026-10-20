@@ -34,8 +34,6 @@ ATOMS = 1944
 HIDDEN = ((0, 1, 512), (1, 3, 512), (2, 5, 512), (3, 7, 512))
 # Residual inputs (segments of the [N, W] message after the convolution): l, components, channels, N out.
 RESIDUAL = ((0, 1, 384, 2048), (2, 5, 384, 512), (3, 7, 256, 512))
-# The shared shape rule's one configuration (tile_rule.BLOCK_M, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES).
-RULE = (64, 64, 32, 4, 3)
 CONFIGS = ((64, 64, 32, 4, 3), (128, 64, 32, 4, 3), (64, 128, 32, 4, 3), (128, 128, 32, 8, 3), (32, 64, 32, 4, 3))
 
 
@@ -115,9 +113,13 @@ def main(argv=None):
                      *a_strides, b.stride(0), b.stride(1), *c_strides, SCALE=scale is not None,
                      BLOCK_M=bm, BLOCK_N=bn, BLOCK_K=bk, num_warps=warps, num_stages=stages)
 
+    from fastmace.kernels.triton import tile_rule as tr
+
+    rule = (tr.BLOCK_M, tr.BLOCK_N, tr.BLOCK_K, tr.NUM_WARPS, tr.NUM_STAGES)  # the shared shape rule's one config
+
     def best(fn):
         results = []
-        for config in (RULE,) if args.rule else CONFIGS:
+        for config in (rule,) if args.rule else CONFIGS:
             try:
                 fn(config)
             except Exception:  # noqa: BLE001  (a configuration the compiler refuses)
