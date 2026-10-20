@@ -113,7 +113,10 @@ Kept out:
    which §16 also accepts.
 7. **GPU CI on two architectures** (D2): the fast tier on every push to
    `main` and the full tier nightly, on an Ada (sm_89) and a Blackwell
-   (sm_120) runner, never sharing a GPU with another user.
+   (sm_120) runner, never sharing a GPU with another user. **Deferred by
+   the owner on 20 October 2026** (SPEC, eleventh amendment of draft 0.12).
+   The workflow stays, run by hand only, until the runners are registered.
+   Not part of phase 2's acceptance.
 8. **No regression.** Default plans and steady-state step times equal phase
    1b's (FastMACE tag `fastmace-1b`, which the conductor sets on `main` once
    1b-T27 is merged): MH-1 NaCl and

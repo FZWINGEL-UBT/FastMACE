@@ -52,9 +52,10 @@ Open owner decisions that phases wait on (SPEC §18): none open. Decided on
 19 October 2026: minimum MACE version (2), gate default (3), CI GPU runners
 (5), and 22–30.
 
-Owner action pending: register the two GPU CI runners, murphy and the local
-PC (`docs/development.md`, "Registering the runners"; 2-T18 is merged). 2-T18's
-done-when, both runners green from a push, waits for it.
+GPU CI is deferred (owner, 20 October 2026; SPEC draft 0.12, eleventh
+amendment). It is not part of phase 2's acceptance. `gpu.yml` runs by hand
+only until the runners are registered (`docs/development.md`, "Registering
+the runners").
 
 2-T14's scratch folders were deleted on the owner's word (20 October 2026).
 
