@@ -31,6 +31,8 @@ from fastmace.rewrites.registry import Rewrite, Support, check_tensors
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
 GATE_FORWARD = "mace.modules.gate:GatedEquivariantBlock.forward"
 GATE_FORWARD_SHA256 = "a4343a8ad2ae966f97d49a0bad4577f677dcbb4bca77dd54f89b3f5cbee48d27"
+RESHAPE_FORWARD = "mace.modules.irreps_tools:reshape_irreps.forward"
+RESHAPE_FORWARD_SHA256 = "abe2111a66a143e905fbe9a382120623c95c959c36967dd7e76fc0352301b010"
 # Set by a forward function that reads interaction.gated_rows (the folded MH-1 forward).
 READS_GATED_ROWS = "fastmace_gated_rows"
 _PROBE_ROWS = 7
@@ -109,12 +111,19 @@ def _selfcheck(original, rewritten, context):
 
 
 def join_in_place(model):
-    """Let every ``gated_rows`` chain's ``linear_2`` write into its joined output; returns their names."""
+    """Let every ``gated_rows`` chain's ``linear_2`` write into its joined output, and make the interaction's
+    ``reshape`` a view where it is one (without it the reshape copies the joined output again); returns the
+    names of the interactions."""
+    m = _modules()
     names = []
     for index, interaction in enumerate(getattr(model, "interactions", ())):
         chain = getattr(interaction, "gated_rows", None)
-        if chain is not None and chain.join_in_place()[0]:
-            names.append(f"interactions.{index}")
+        if chain is None or not chain.join_in_place()[0]:
+            continue
+        view, _ = m.irreps_view(getattr(interaction, "reshape", None))
+        if view is not None:
+            interaction.reshape = view
+        names.append(f"interactions.{index}")
     return names
 
 
@@ -134,6 +143,14 @@ def _segment_selfcheck(original, rewritten, context):
 
     cases, dtype = _chain_cases(original, rewritten, context)
     generator = torch.Generator().manual_seed(context.seed + 1)
+    for index, interaction in enumerate(getattr(rewritten, "interactions", ())):
+        view = getattr(interaction, "reshape", None)
+        if type(view).__name__ != "IrrepsView":
+            continue
+        stock = original.get_submodule(f"interactions.{index}").reshape
+        probe = torch.randn((5, view.components * view.mul), generator=generator, dtype=torch.float64)
+        probe = probe.to(device=interaction.linear_2.weight_0.device, dtype=interaction.linear_2.weight_0.dtype)
+        cases.append((f"interactions.{index}.reshape", stock(probe), view(probe)))
     for index, interaction in enumerate(getattr(rewritten, "interactions", ())):
         chain = getattr(interaction, "gated_rows", None)
         if chain is None or chain.joined is None:
@@ -183,7 +200,7 @@ RECORDS = {
         default="off", deterministic=True, workload_constraints=(), apply=_apply, selfcheck=_selfcheck),
     "segment_gemm": Rewrite(
         name="segment_gemm", applies_to=_segment_support, requires=("gated_rows",), conflicts=(),
-        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
+        mace_versions=MACE_VERSIONS, source_hashes={RESHAPE_FORWARD: RESHAPE_FORWARD_SHA256}, exactness="rounding", default="off", deterministic=True,
         workload_constraints=(), apply=_apply_segment, selfcheck=_segment_selfcheck),
 }
 

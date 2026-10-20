@@ -155,6 +155,8 @@ def test_segment_record_is_opt_in_rounding_deterministic():
     record = fusion.RECORDS["segment_gemm"]
     assert record.default == "off" and record.exactness == "rounding" and record.deterministic
     assert record.requires == ("gated_rows",)
+    assert record.source_hashes == {fusion.RESHAPE_FORWARD: fusion.RESHAPE_FORWARD_SHA256}
+    assert reg.source_sha256(fusion.RESHAPE_FORWARD) == fusion.RESHAPE_FORWARD_SHA256
     names = reg.default_registry().names()
     assert names.index("segment_gemm") > names.index("gated_rows")
 
@@ -189,6 +191,7 @@ def test_segment_record_applies_selfchecks_and_keeps_the_model_bitwise_on_the_cp
     entry = next(entry for entry in applied if entry.name == "segment_gemm")
     assert entry.result.passed and entry.result.max_relative_error <= 1e-12
     assert all(i.gated_rows.joined is not None for i in model.interactions)
+    assert all(type(i.reshape).__name__ == "IrrepsView" for i in model.interactions)  # no copy before the product
     _, without, _, _, _ = rewritten("on")
     energy_and_forces(without, batch)
     energy, forces = energy_and_forces(without, batch)

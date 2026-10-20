@@ -105,6 +105,33 @@ class GatedRows(torch.nn.Module):
         return second.transpose_out(join_rows(second.segments_out, second.products(rows), n, like))
 
 
+class IrrepsView(torch.nn.Module):
+    """MACE's ``reshape_irreps`` for an ir_mul tensor whose segments all have the same multiplicity: the
+    ``[atoms, sum (2l+1) mul]`` tensor is already laid out as ``[atoms, sum (2l+1), mul]``, so the slices,
+    reshapes and concatenation along the component axis are a view (``segment_gemm``: the joined output
+    of ``linear_2`` goes to the symmetric contraction without a copy)."""
+
+    def __init__(self, components, mul):
+        super().__init__()
+        self.components, self.mul = int(components), int(mul)
+
+    def forward(self, tensor):
+        return tensor.reshape(tensor.shape[0], self.components, self.mul)
+
+
+def irreps_view(reshape):
+    """The ``IrrepsView`` equivalent to a ``reshape_irreps`` module, or (None, reason)."""
+    if type(reshape).__name__ != "reshape_irreps":
+        return None, f"the interaction's reshape is a {type(reshape).__name__}"
+    config = getattr(reshape, "cueq_config", None)
+    if config is None or getattr(config, "layout_str", "mul_ir") != "ir_mul":
+        return None, "the reshape is not in the ir_mul layout"
+    muls = set(int(m) for m in reshape.muls)
+    if len(muls) != 1:
+        return None, f"the reshaped irreps have different multiplicities {sorted(muls)}"
+    return IrrepsView(sum(int(d) for d in reshape.dims), muls.pop()), "ok"
+
+
 def gated_rows(first, gate, second):
     """The ``GatedRows`` of one interaction's merged residual products, gate and ``linear_2``, or
     (None, reason) when the chain does not have that structure."""
