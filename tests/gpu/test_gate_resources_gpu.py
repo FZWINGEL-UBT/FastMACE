@@ -105,7 +105,8 @@ def test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell(label):
     if steps[0]["outcome"] == "ran":  # a card large enough for the reference: nothing to walk
         assert out["gpu_bytes"] > 1.05 * CASES[label], f"the reference ran on a {out['gpu_bytes'] / 1e9:.1f} GB card"
         return
-    assert steps[0]["outcome"] == "out of memory", steps[0]
+    # A GPU out-of-memory can surface as another CUDA error in the child ("device not ready" on WSL).
+    assert steps[0]["outcome"] in ("out of memory", "device failure"), steps[0]
     assert gate["status"] in ("passed", "passed-reduced"), gate
     if gate["status"] == "passed":
         assert gate["device"] == "cpu" and gate["reduced_cell"] is None

@@ -560,6 +560,28 @@ def test_a_replay_that_differs_from_direct_evaluation_fails(pristine, no_engines
     record = raised.value.gate_record
     assert record.status == "failed" and "replay" in record.reason
     assert not record.to_metadata()["replay"]["passed"]
+    force = record.to_metadata()["replay"]["quantities"]["force_eV_per_A"]
+    assert force["limit"] == record.to_metadata()["quantities"]["force_eV_per_A"]["limit"]  # the gate's own limit
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_a_replay_within_the_gates_limit_passes(pristine, no_engines_yet, monkeypatch):
+    planner, plan, ff, atoms = setup(pristine)
+    _production_cell_out_of_memory(monkeypatch)
+    refs = selfcheck.references(plan, ff, atoms, NVT, check="gate", seed=3)
+    engine = planner.build(plan, ff, atoms)
+    original = selfcheck._read_outputs
+
+    def rounded(engine_, stress):  # a replay off by float32-like rounding, below the gate's limit
+        energy, forces, values = original(engine_, stress)
+        return energy, forces + 4e-6, values
+
+    monkeypatch.setattr(selfcheck, "_read_outputs", rounded)
+    record = selfcheck.production(engine, refs, check="gate")
+    replay = record.to_metadata()["replay"]
+    assert record.status == "passed-reduced" and replay["passed"]
+    assert replay["quantities"]["force_eV_per_A"]["difference"] == pytest.approx(4e-6, rel=1e-6)
+    assert "max(2 x float32 yardstick, floor)" in replay["bound"]
 
 
 # --------------------------------------------------------------------------- the CPU step itself

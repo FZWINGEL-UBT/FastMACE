@@ -1309,23 +1309,36 @@ def _replay(engine, copies, *, direct: bool = False):
     return outputs, notes
 
 
-def _replay_check(replayed, directs, natoms, quantities):
-    """The captured replay against the direct evaluation of the same force field: each quantity within its floor."""
+def _replay_check(replayed, directs, natoms, quantities, limits):
+    """The captured replay against a direct evaluation of the same force field, per quantity within ``limits``.
+
+    The direct evaluation is ``MACEForceField.evaluate``: the same (compiled) model function,
+    uncaptured, on a freshly built unpadded neighbour list. ``limits`` are the gate's own limits from
+    the reduced cell's comparison, max(2 x the float32 yardstick's error, floor): a float32 plan's
+    replay differs from a direct evaluation by float32 rounding (padded edges, OEq's atomic sums;
+    4.8e-5 and 6.0e-5 eV/Å on 1944-atom POLAR-1-L and OMOL-0 XL, 2-T05), which the floors alone
+    (made for float64-sized errors) do not admit; the full gate absorbs the same rounding in its
+    production error. A broken capture (forces off by 1e-3 and more) still fails.
+    """
     rows = [copy_errors(direct, replay, natoms) for replay, direct in zip(replayed, directs, strict=True)]
     result = {"cell": "production", "copies": len(rows),
-              "compared": "captured replay against a direct evaluation of the same force field", "quantities": {}}
+              "compared": "captured replay against a direct evaluation of the same force field (the model function "
+                          "uncaptured, on a fresh unpadded neighbour list)",
+              "bound": "the gate's limit per quantity from the reduced cell: max(2 x float32 yardstick, floor)",
+              "quantities": {}}
     passed = True
     for quantity in quantities:
         values = [row[quantity] for row in rows if row[quantity] is not None]
         if not values:
             continue
+        limit = limits.get(quantity, FLOORS[quantity])
         if not all(math.isfinite(value) for value in values):
-            result["quantities"][quantity] = {"difference": None, "floor": FLOORS[quantity], "passed": False}
+            result["quantities"][quantity] = {"difference": None, "limit": limit, "passed": False}
             passed = False
             continue
         worst = max(values)
-        ok = bool(worst <= FLOORS[quantity])
-        result["quantities"][quantity] = {"difference": worst, "floor": FLOORS[quantity], "passed": ok}
+        ok = bool(worst <= limit)
+        result["quantities"][quantity] = {"difference": worst, "limit": limit, "passed": ok}
         passed = passed and ok
     result["passed"] = passed
     return result
@@ -1376,7 +1389,7 @@ def production(engine, references: References, *, check: str, quantities=None) -
         outputs, notes = _replay(engine, references.copies)
     else:
         replayed, directs, notes = _replay(engine, references.copies, direct=True)
-        replay = _replay_check(replayed, directs, len(references.copies[0].atoms), quantities)
+        replay = (replayed, directs)
         outputs = _reduced_outputs(references, engine, stress)
     natoms = len(references.reference_copies[0].atoms)
     rows = []
@@ -1387,6 +1400,9 @@ def production(engine, references: References, *, check: str, quantities=None) -
         rows.append({"production": copy_errors(reference, output, natoms),
                      "yardstick": copy_errors(reference, yardstick, natoms)})
     result = verdict(rows, quantities=quantities)
+    if replay is not None:
+        limits = {quantity: q["limit"] for quantity, q in result["quantities"].items() if "limit" in q}
+        replay = _replay_check(*replay, len(references.copies[0].atoms), quantities, limits)
     worst = {quantity: result["quantities"].get(quantity, {}).get("production") for quantity in QUANTITIES}
     if result["nonfinite"]:
         reasons = ["non-finite values: " + ", ".join(result["nonfinite"])]
@@ -1397,7 +1413,7 @@ def production(engine, references: References, *, check: str, quantities=None) -
                    for quantity, q in failed]
     if replay is not None and not replay["passed"]:
         reasons.append("replay on the production cell differs from a direct evaluation: " + ", ".join(
-            f"{_NAMES[quantity]} {q['difference']:.3g} {_UNITS[quantity]} above the floor {q['floor']:g}"
+            f"{_NAMES[quantity]} {q['difference']:.3g} {_UNITS[quantity]} above the limit {q['limit']:.3g}"
             if q["difference"] is not None else f"{_NAMES[quantity]} non-finite"
             for quantity, q in replay["quantities"].items() if not q["passed"]))
     passed = result["passed"] and (replay is None or replay["passed"])
