@@ -1,0 +1,343 @@
+"""The local GPU reservation on the PC (plan task 2-T18; docs/development.md, "The local GPU reservation").
+
+    python3 tools/ci/local_gpu.py run --purpose TEXT [--wait-minutes 60] -- COMMAND ...
+    python3 tools/ci/local_gpu.py reserve --purpose TEXT --pid PID [--wait-minutes 60]
+    python3 tools/ci/local_gpu.py release --pid PID
+    python3 tools/ci/local_gpu.py check [--min-available-gib 6]
+    python3 tools/ci/local_gpu.py status
+
+WSL has 15 GB of RAM for every session on the PC. A GPU suite started while sibling CPU suites ran has
+crashed WSL (19 October 2026), and WSL's nvidia-smi does not show who is on the GPU. So every local GPU run
+(the GPU CI runner, a worker's GPU suite, a timing run) holds this reservation, and every local CPU suite
+checks it first:
+
+- **reserve** creates the marker directory atomically (``mkdir``; default ``~/.fastmace-local-gpu``, or
+  ``$FASTMACE_LOCAL_GPU_MARKER``) with ``holder.json``: owner, purpose, pid, the pid's start time and the
+  start of the reservation. While another live holder has it, reserve waits, up to ``--wait-minutes``.
+- Holding it, reserve **waits for the machine**: until no other ``pytest`` process runs and at least
+  ``--min-available-gib`` (default 10) GiB of RAM are available. If that does not happen in time, it
+  releases the marker again and fails with status 75 (busy).
+- **release** removes the marker, only for its own pid.
+- A marker whose holder process is gone (or whose pid now belongs to another process) is **stale**: it is
+  reported and removed by the next reserve or check.
+- **check** exits 1 while a live marker exists, or with ``--min-available-gib`` while less RAM is
+  available. Workers run it before every local CPU suite.
+- **run** reserves for itself, runs the command, releases on any exit and returns the command's status
+  (75 if it could not reserve in time).
+
+Standard library only.
+"""
+
+from __future__ import annotations
+
+import argparse
+import getpass
+import json
+import os
+import shutil
+import signal
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+BUSY = 75  # EX_TEMPFAIL: not reserved in time
+DEFAULT_MARKER = "~/.fastmace-local-gpu"
+HOLDER = "holder.json"
+UNWRITTEN_GRACE_S = 60.0  # a marker without holder.json is a reserver between mkdir and write, this long
+
+
+def default_marker():
+    return Path(os.path.expanduser(os.environ.get("FASTMACE_LOCAL_GPU_MARKER", DEFAULT_MARKER)))
+
+
+def _now():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _stat_fields(pid, proc_root):
+    """The fields of /proc/<pid>/stat after ``(comm)``, or None."""
+    try:
+        text = (Path(proc_root) / str(pid) / "stat").read_text()
+    except OSError:
+        return None
+    return text[text.rfind(")") + 2:].split()
+
+
+def start_ticks(pid, proc_root="/proc"):
+    """The process's start time in clock ticks since boot (field 22 of /proc/<pid>/stat), or None."""
+    fields = _stat_fields(pid, proc_root)
+    try:
+        return int(fields[19])
+    except (TypeError, IndexError, ValueError):
+        return None
+
+
+def parent_pid(pid, proc_root="/proc"):
+    fields = _stat_fields(pid, proc_root)
+    try:
+        return int(fields[1])
+    except (TypeError, IndexError, ValueError):
+        return None
+
+
+def available_gib(proc_root="/proc"):
+    """MemAvailable in GiB, or None."""
+    try:
+        for line in (Path(proc_root) / "meminfo").read_text().splitlines():
+            if line.startswith("MemAvailable:"):
+                return float(line.split()[1]) / 1024**2
+    except (OSError, ValueError, IndexError):
+        pass
+    return None
+
+
+def _ancestors(pid, proc_root):
+    seen = set()
+    while pid and pid not in seen:
+        seen.add(pid)
+        pid = parent_pid(pid, proc_root)
+    return seen
+
+
+def _is_pytest(argv):
+    """``pytest ...``, ``.../pytest ...`` or ``python -m pytest ...`` (not a shell whose script mentions it)."""
+    if not argv:
+        return False
+    if Path(argv[0]).name == "pytest":
+        return True
+    return any(argv[i] == "-m" and argv[i + 1] == "pytest" for i in range(len(argv) - 1))
+
+
+def pytest_processes(proc_root="/proc", own_pid=None):
+    """Pids of pytest processes other than this one and its ancestors."""
+    own = _ancestors(own_pid if own_pid is not None else os.getpid(), proc_root)
+    pids = []
+    try:
+        entries = list(Path(proc_root).iterdir())
+    except OSError:
+        return pids
+    for entry in entries:
+        if not entry.name.isdigit() or int(entry.name) in own:
+            continue
+        try:
+            argv = [arg for arg in entry.joinpath("cmdline").read_bytes().decode(errors="replace").split("\0") if arg]
+        except OSError:
+            continue
+        if _is_pytest(argv):
+            pids.append(int(entry.name))
+    return sorted(pids)
+
+
+def read_holder(marker):
+    try:
+        return json.loads((Path(marker) / HOLDER).read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def live_holder(marker, proc_root="/proc", now=None):
+    """The holder of a live marker, or None when there is none or it is stale."""
+    marker = Path(marker)
+    if not marker.is_dir():
+        return None
+    holder = read_holder(marker)
+    if holder is None:
+        try:
+            age = (time.time() if now is None else now) - marker.stat().st_mtime
+        except OSError:
+            return None
+        return dict(owner=None, purpose="being reserved", pid=None) if age < UNWRITTEN_GRACE_S else None
+    ticks = start_ticks(holder.get("pid"), proc_root)
+    if ticks is None:
+        return None
+    if holder.get("start_ticks") is not None and ticks != holder["start_ticks"]:
+        return None  # the pid now belongs to another process
+    return holder
+
+
+def describe(holder):
+    return (f"local GPU reserved by {holder.get('owner')} for {holder.get('purpose')!r} "
+            f"(pid {holder.get('pid')}, since {holder.get('started')})")
+
+
+def remove_stale(marker, proc_root="/proc"):
+    """Remove the marker if it exists and is stale; report it on stderr."""
+    marker = Path(marker)
+    if marker.is_dir() and live_holder(marker, proc_root) is None:
+        holder = read_holder(marker) or {}
+        print(f"local_gpu: removing a stale reservation ({describe(holder)}; holder process gone)", file=sys.stderr)
+        shutil.rmtree(marker, ignore_errors=True)
+
+
+def reserve(marker, purpose, pid, proc_root="/proc", user=None, now=None):
+    """(True, holder) if this call created the marker; (False, live holder) if someone else holds it."""
+    marker = Path(marker)
+    for _ in range(2):
+        try:
+            marker.mkdir()
+        except FileExistsError:
+            holder = live_holder(marker, proc_root)
+            if holder is not None:
+                return False, holder
+            remove_stale(marker, proc_root)
+            continue
+        holder = dict(owner=user or getpass.getuser(), purpose=purpose, pid=pid,
+                      start_ticks=start_ticks(pid, proc_root), started=now or _now())
+        partial = marker / (HOLDER + ".partial")
+        partial.write_text(json.dumps(holder) + "\n")
+        partial.replace(marker / HOLDER)
+        return True, holder
+    return False, live_holder(marker, proc_root) or dict(purpose="unknown (raced)")
+
+
+def release(marker, pid):
+    """Remove the marker if ``pid`` holds it. True if it was removed."""
+    marker = Path(marker)
+    holder = read_holder(marker)
+    if holder is None or holder.get("pid") != pid:
+        return False
+    shutil.rmtree(marker, ignore_errors=True)
+    return True
+
+
+def machine_reasons(proc_root="/proc", own_pid=None, min_available_gib=None):
+    reasons = []
+    others = pytest_processes(proc_root, own_pid)
+    if others:
+        reasons.append(f"{len(others)} other pytest process(es) run: pids {others}")
+    if min_available_gib is not None:
+        available = available_gib(proc_root)
+        if available is None or available < min_available_gib:
+            shown = "unknown" if available is None else f"{available:.1f}"
+            reasons.append(f"RAM available {shown} GiB < {min_available_gib:g} GiB")
+    return reasons
+
+
+def wait_for_machine(proc_root="/proc", own_pid=None, min_available_gib=10.0, wait_s=3600.0, interval_s=30.0,
+                     clock=time.monotonic, sleep=time.sleep):
+    """Wait until no other pytest runs and enough RAM is available. (ok, the last reasons)."""
+    start = clock()
+    while True:
+        reasons = machine_reasons(proc_root, own_pid, min_available_gib)
+        waited = clock() - start
+        if not reasons or waited >= wait_s:
+            return not reasons, reasons
+        sleep(min(interval_s, wait_s - waited))
+
+
+def acquire(marker, purpose, pid, proc_root="/proc", wait_s=3600.0, interval_s=30.0, min_available_gib=10.0,
+            clock=time.monotonic, sleep=time.sleep):
+    """Reserve (waiting for another holder), then wait for the machine; release again on failure."""
+    start = clock()
+    while True:
+        ok, holder = reserve(marker, purpose, pid, proc_root)
+        if ok:
+            break
+        waited = clock() - start
+        if waited >= wait_s:
+            return False, [describe(holder)]
+        sleep(min(interval_s, wait_s - waited))
+    left = max(0.0, wait_s - (clock() - start))
+    ok, reasons = wait_for_machine(proc_root, pid, min_available_gib, left, interval_s, clock, sleep)
+    if not ok:
+        release(marker, pid)
+    return ok, reasons
+
+
+def check(marker, proc_root="/proc", min_available_gib=None):
+    """(free, reasons): no live reservation (a stale one is removed), and enough RAM if asked."""
+    remove_stale(marker, proc_root)
+    reasons = []
+    holder = live_holder(marker, proc_root)
+    if holder is not None:
+        reasons.append(describe(holder))
+    if min_available_gib is not None:
+        available = available_gib(proc_root)
+        if available is None or available < min_available_gib:
+            shown = "unknown" if available is None else f"{available:.1f}"
+            reasons.append(f"RAM available {shown} GiB < {min_available_gib:g} GiB")
+    return not reasons, reasons
+
+
+def _run_command(marker, argv, pid):
+    """Run ``argv``; release the marker on any exit, including SIGTERM from a cancelled CI job."""
+    child = None
+
+    def stop(signum, _frame):
+        if child is not None and child.poll() is None:
+            child.send_signal(signum)
+            try:
+                child.wait(timeout=60)
+            except subprocess.TimeoutExpired:
+                child.kill()
+        release(marker, pid)
+        sys.exit(128 + signum)
+
+    previous = {s: signal.signal(s, stop) for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)}
+    try:
+        child = subprocess.Popen(argv)
+        return child.wait()
+    finally:
+        release(marker, pid)
+        for s, handler in previous.items():
+            signal.signal(s, handler)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--marker", type=Path, default=None,
+                        help=f"the marker directory (default $FASTMACE_LOCAL_GPU_MARKER, else {DEFAULT_MARKER})")
+    commands = parser.add_subparsers(dest="command", required=True)
+    run = commands.add_parser("run", help="reserve, run COMMAND, release")
+    reserve_cmd = commands.add_parser("reserve", help="reserve for PID (release it yourself, e.g. trap EXIT)")
+    for sub in (run, reserve_cmd):
+        sub.add_argument("--purpose", required=True)
+        sub.add_argument("--wait-minutes", type=float, default=60.0)
+        sub.add_argument("--min-available-gib", type=float, default=10.0)
+        sub.add_argument("--interval-seconds", type=float, default=30.0)
+    reserve_cmd.add_argument("--pid", type=int, required=True, help="the holder, usually the calling shell ($$)")
+    run.add_argument("cmd", nargs=argparse.REMAINDER, help="-- COMMAND ...")
+    release_cmd = commands.add_parser("release", help="remove the marker held by PID")
+    release_cmd.add_argument("--pid", type=int, required=True)
+    check_cmd = commands.add_parser("check", help="exit 1 while the local GPU is reserved (or RAM is short)")
+    check_cmd.add_argument("--min-available-gib", type=float, default=None)
+    commands.add_parser("status", help="print the holder, if any")
+    # Accept --marker after the subcommand as well.
+    for sub in (run, reserve_cmd, release_cmd, check_cmd):
+        sub.add_argument("--marker", type=Path, default=None, dest="sub_marker", help=argparse.SUPPRESS)
+    args = parser.parse_args(argv)
+    marker = getattr(args, "sub_marker", None) or args.marker or default_marker()
+
+    if args.command == "status":
+        holder = live_holder(marker)
+        print(describe(holder) if holder else "local GPU free")
+        return 0
+    if args.command == "check":
+        free, reasons = check(marker, min_available_gib=args.min_available_gib)
+        for reason in reasons:
+            print(f"local_gpu: {reason}", file=sys.stderr)
+        return 0 if free else 1
+    if args.command == "release":
+        if not release(marker, args.pid):
+            print(f"local_gpu: pid {args.pid} holds no reservation at {marker}", file=sys.stderr)
+        return 0
+    pid = os.getpid() if args.command == "run" else args.pid
+    ok, reasons = acquire(marker, args.purpose, pid, wait_s=args.wait_minutes * 60.0,
+                          interval_s=args.interval_seconds, min_available_gib=args.min_available_gib)
+    if not ok:
+        print("local_gpu: not reserved in time: " + "; ".join(reasons), file=sys.stderr)
+        return BUSY
+    print(f"local_gpu: reserved {marker} for {args.purpose!r} (pid {pid})", file=sys.stderr)
+    if args.command == "reserve":
+        return 0
+    command = args.cmd[1:] if args.cmd[:1] == ["--"] else args.cmd
+    if not command:
+        release(marker, pid)
+        parser.error("run needs -- COMMAND ...")
+    return _run_command(marker, command, pid)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
