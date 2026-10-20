@@ -32,7 +32,7 @@ OUTPUTS = ("run/trajectory.000.traj", "run/thermo.csv", "run/metadata.json")
 GATE_PASSED = {"status": "passed", "copies": "2 rattled", "energy_meV_per_atom": 0.04, "force_eV_per_A": 2e-6}
 
 
-def _rewrites(off=("streaming_conv", "single_graph_strain")):
+def _rewrites(off=("streaming_conv", "single_graph_strain", "grouped_launch")):
     return tuple((f"RewriteConfig.{name}", "off" if name in off else "on", "auto") for name in REWRITE_FIELDS)
 
 
@@ -59,7 +59,7 @@ def make_report(plan="default", **changes):
 GOLDEN_SETUP = """\
 FastMACE {version}  |  mh1 (head matpes_r2scan)  |  NaCl, 216 atoms (3×3×3), 3D PBC, NVT Langevin 0.5 fs
 physics: no dispersion; charge/spin not used by this model
-plan:    graph, hybrid cuEq/OEq, float32, 14 rewrites on, 2 off (reasons in run.plan)
+plan:    graph, hybrid cuEq/OEq, float32, 14 rewrites on, 3 off (reasons in run.plan)
 gate:    passed (2 rattled; 0.04 meV/atom, 2e-06 eV/Å; floors §12.3)
 setup:   42 s (load 6 s, rewrites 9 s, compilation 17 s, capture 4 s, gate 6 s)
 speed:   pending (measured over steps 1,000–2,000 of this run)
