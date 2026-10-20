@@ -206,3 +206,16 @@ commands. Never print the token.
       group.
     - 2-T18 adds a local GPU reservation (`~/.fastmace-local-gpu`) that every
       local GPU run takes and every local CPU suite checks first.
+- **The local GPU reservation (since 2-T18's merge, 20 October 2026)** replaces
+  the conductor's "local machine free" and "local GPU run done" messages.
+  Commands from the checkout, with WSL's `python3`
+  (`docs/development.md`, "The local GPU reservation"):
+  - every local GPU run (a GPU suite, a timing run, the CI runner) runs under
+    `python3 tools/ci/local_gpu.py run --purpose "2-Tnn ..." -- <command>`.
+    It waits for the marker, then for no other `pytest` and at least 10 GiB
+    available, and releases on any exit;
+  - every local CPU suite starts with
+    `python3 tools/ci/local_gpu.py check --min-available-gib 6 && <suite>`;
+  - `python3 tools/ci/local_gpu.py status` shows who holds it.
+  The conductor still assigns the local GPU to one task at a time, and still
+  orders timing runs. The reservation only makes the order safe.

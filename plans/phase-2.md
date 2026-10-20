@@ -348,6 +348,35 @@ Tests first:
 
 Done when acceptance 1 holds on the local machine.
 
+#### 2-T04b Planner decisions for an unknown MACE (S, 2-T04's worker) — after T02
+
+Added on 20 October 2026, after 2-T04's GPU check on MACE 0.3.15. The
+other-MACE environment installs, but an MH-1 run on the GPU fails there for
+two reasons outside the hash rules:
+- 0.3.15 has no `mace.tools.compile.configure_autograd_for_compile`, so
+  compilation raises `ImportError`;
+- uncompiled, capture fails, because 0.3.15's unhashed MH-1 interaction
+  block calls `torch.nonzero` (`cudaErrorStreamCaptureUnsupported`).
+
+Three planner decisions, each with its Reason and code (they were 2-T02's
+for a few minutes, then given back to the worker that has the context):
+- `capture_support`: a multi-head model whose capture-safe mask does not
+  hash runs on the eager tier from revision 0;
+- `cueq_conv_fusion` on an unhashed converter: MACE's own conversion rule,
+  with no raise;
+- `compile_support()` in `rewrites/versions.py`, a capability check on
+  `mace.tools.compile`: without it the plan does not compile
+  (`compile_mode="none"`, recorded).
+
+A capture failure the planner cannot foresee (`torch.nonzero` in an unhashed
+block) stays 2-T15's: the fallback takes it to eager.
+
+Files: `rewrites/versions.py`, plus `planner/fixed.py` and `planner/minimal.py`
+as second editor after T02. Tests first, with 2-T04's fake-hash helpers.
+
+The MH-1 NaCl GPU re-check on 0.3.15, which is acceptance 1, runs after
+2-T04b and 2-T15 merge (local GPU).
+
 #### 2-T05 Gate resource policy and statuses (L, GPU: local RTX 5060 Ti for the out-of-memory cases) — after T01
 
 Spec: §12.3 "Status" and "Resources". Source: `planner/selfcheck.py`
@@ -963,8 +992,8 @@ notes folder of the conductor's session (`2-T0x-…md`).
   | File | Editors, in merge order |
   | --- | --- |
   | `simulation.py` | T01 (options), T09 (resume), T10 (`_write_json` only), T07 (runner), T15 (fallback call) |
-  | `planner/minimal.py` | T02, T03, T07 (`_claim_family` only), T13, T16, then T15 (owner) |
-  | `planner/fixed.py` | T02 (a `capture=` keyword on `build`), T16 (reproducible overrides) |
+  | `planner/minimal.py` | T04 (`_common` precision, one `build` line), T02, T04b, T03, T07 (`_claim_family` only), T13, T16, then T15 (owner) |
+  | `planner/fixed.py` | T02 (a `capture=` keyword on `build`), T04b (capture, conv-fusion and compile decisions), T16 (reproducible overrides) |
   | `model/forces.py` | T04 (call sites of `registry.apply` and the float64 energy), T13 (`dynamic_edges` and the cache key), T08 (`rebind`, only if a lease is needed) |
   | `rewrites/registry.py` | T01 (field), T04 (owner), T19 (cache lookup), T20 (screen records) |
   | `config.py` | T01 (owner), then T20 for its screens' fields only |
@@ -1317,6 +1346,33 @@ notes folder of the conductor's session (`2-T0x-…md`).
   restart point on murphy's NFS and 25 ms on WSL ext4, so at most 2.5 µs per
   step. T21's dependencies (T01, T09 and T10) are now all merged, but T21
   starts after T02, T03 and T06, which T15 needs (critical path).
+- **2-T05's first local GPU run** (the out-of-memory cases) failed for code
+  reasons.
+  - On the RTX 5060 Ti in WSL, a GPU out-of-memory in a process leaves its
+    CUDA context unusable: a "sticky" error. The POLAR-1-L float64
+    reference failed at 13.5 GB with "CUDA driver error: device not ready".
+    After OMOL-0 XL's reference failed, building the engine hit
+    `CUDA_ERROR_OUT_OF_MEMORY` from `cuStreamIsCapturing`.
+  - Conductor decision: on a CUDA plan, every GPU reference step of the
+    gate, the in-library gate and 2-T15's reduced gate alike, runs in a
+    child process, references first (§12.3). Any CUDA error, non-zero exit
+    or kill of that child counts as a device failure, and the ladder goes on
+    with the real error text recorded. CPU plans stay in-process, so the
+    default path is unchanged.
+  - The conductor amends SPEC §12.3 by one sentence when 2-T05 merges.
+- **2-T04's GPU check on MACE 0.3.15** did not complete, for two reasons
+  outside the hash rules: no compile API (`ImportError`), and `torch.nonzero`
+  during capture in the unhashed MH-1 block. This gives the new task 2-T04b
+  (above). The GPU re-check (acceptance 1) runs after 2-T04b and 2-T15.
+- **2-T18 merged** (trial on murphy: 2327 passed, 260 skipped). The local GPU
+  reservation (`tools/ci/local_gpu.py`) is now the rule for every local
+  run (`CONDUCTOR.md`).
+  - The runners are not registered yet. The owner registers them
+    (`docs/development.md`, "Registering the runners"). The fast-tier run
+    queued by the merge push starts once they are online, or fails after
+    24 hours.
+  - One attribution was fixed at the merge: automatic runner updates were a
+    conductor answer (Q8), not an owner decision.
 
 ## Phase 1b items carried into phase 2
 

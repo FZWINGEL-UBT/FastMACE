@@ -24,8 +24,8 @@ workers"). 2-T21 works in the ResearchModule worktree
 `D:/Margraf/ResearchModule-wt/2-T21` (branch `fastmace/2-T21`).
 
 - Phase 1b: done, tagged `fastmace-1b` (673a8a1, with 1b-T27).
-- Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12, 2-T10 (20 October 2026).
-- Working in phase 2: 2-T02, 2-T05 (local GPU), 2-T07 (murphy GPU), 2-T18; 2-T04 in
+- Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12, 2-T10, 2-T18 (20 October 2026).
+- Working in phase 2: 2-T02, 2-T05, 2-T07 (murphy GPU); 2-T04 in
   trial (CPU green, full GPU tier running on murphy).
 - Next go messages: 2-T03 and 2-T06 as slots free up, then 2-T21.
 - Waiting for go: the rest. Answers to all prestart reports are in
@@ -36,6 +36,10 @@ workers"). 2-T21 works in the ResearchModule worktree
 Open owner decisions that phases wait on (SPEC §18): none open. Decided on
 19 October 2026: minimum MACE version (2), gate default (3), CI GPU runners
 (5), and 22–30.
+
+Owner action pending: register the two GPU CI runners, murphy and the local
+PC (`docs/development.md`, "Registering the runners"; 2-T18 is merged). 2-T18's
+done-when, both runners green from a push, waits for it.
 
 Task IDs are `<phase>-T<nn>`. Worker branches are `fastmace/<phase>-T<nn>`.
 

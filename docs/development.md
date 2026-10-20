@@ -319,7 +319,7 @@ GitHub's `svc.sh install` needs `sudo`, and murphy has no linger for systemd use
   `wsl.exe`, minimized. The open `wsl.exe` keeps the WSL VM running. Closing that window stops the
   runner.
 
-The runner updates itself (owner, 20 October 2026). It was installed at v2.338.0.
+The runner updates itself (conductor answer to 2-T18, Q8, 20 October 2026). It was installed at v2.338.0.
 
 ### Registering the runners (the owner)
 
