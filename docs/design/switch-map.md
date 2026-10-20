@@ -202,6 +202,7 @@ reach the planner through `Simulation(fallback=, gate=, runner=)` and `fm.md`
 | none (new, SPEC §8.7) | `RunnerConfig.inherit_environment` | `True` | — | subprocess runner |
 | none (new, SPEC §8.7) | `RunnerConfig.timeout_s` | `None` | — | subprocess runner |
 | none (new, SPEC §8.7) | `RunnerConfig.stall_timeout_s` | `1800.0` | — | subprocess runner |
+| none (new, OPT-T07) | `RunnerConfig.persistent` | `True` | — | subprocess runner: one worker child per `Simulation` (`False`: a fresh child per `run()`) |
 
 ## Auto resolution rules
 
@@ -269,7 +270,7 @@ model is an error with a reason, never a silent downgrade.
 - Phase 2 (plan task 2-T01) added two fields to existing records,
   `EngineConfig.dynamic_edges` and `RewriteConfig.selfcheck_cache`, and three
   records with 11 fields (section 10: `FallbackConfig` 3, `GateConfig` 3,
-  `RunnerConfig` 5), 70 in all. Two admit `"auto"` (`FallbackConfig.fallback`,
+  `RunnerConfig` 5), 70 in all. OPT-T07 added `RunnerConfig.persistent` (71). Two admit `"auto"` (`FallbackConfig.fallback`,
   `GateConfig.reduced_cell`).
   None comes from the research engine.
 

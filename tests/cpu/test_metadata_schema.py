@@ -314,7 +314,7 @@ REDUCED_GATE = GateRecord(status="passed-reduced", check="gate", reason="CPU flo
                           steps=({"device": "cuda", "cell": "production", "outcome": "out of memory"},
                                  {"device": "cpu", "cell": "reduced", "repeat": [2, 2, 2], "outcome": "passed"}))
 CHILDREN = {"python": "/env/bin/python", "reason": "a second backend family after a compiled model",
-            "directory": None, "children": 3, "seconds": 41.5, "failed": None,
+            "directory": None, "children": 1, "calls": 3, "persistent": True, "seconds": 41.5, "failed": None,
             "last": {"action": "run", "stage": "0003", "pid": 4242, "exit_code": 0, "seconds": 20.1, "steps": 100}}
 
 

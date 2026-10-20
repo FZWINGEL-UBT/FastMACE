@@ -6,7 +6,9 @@ Tests: `tests/cpu/test_metadata_schema.py`. Phase 2 additions: plan task 2-T17, 
 (tests also in `tests/cpu/test_metadata_simulation.py`).
 
 Phase 1b writes version 1. Phase 2 adds keys and changes none, so the schema stays
-`fastmace.metadata/1`. See "What phase 2 adds" below.
+`fastmace.metadata/1`. See "What phase 2 adds" below. OPT-T07 (20 October 2026) adds
+`subprocess.calls` and `subprocess.persistent` by the same rule. `subprocess.children` still
+counts child processes; before OPT-T07 there was one child per call, so it equalled the calls.
 
 ## How a run writes it
 
@@ -78,7 +80,7 @@ Top-level keys, in order. "Source" is the input of `metadata_record`.
 | `timing` | `setup_s` (`{stage: seconds}`), `setup_total_s`, then the timing summary | `setup`, `timing` |
 | `report` | the run report | `report`: T15's `to_metadata()` or a mapping |
 | `force_field` | the engine's force field record: backend, dtype, rewrites applied, their decisions and self-check errors, `energy_treatment`, `strain_path` (`"one_graph"`, `"mace"`, or `null` if not bound; 2-T08b), … | `force_field`: the engine's force field (`info()`) or a mapping |
-| `subprocess` | `null` in-process; for a plan in a child (2-T07): `python`, `reason`, `directory`, `children`, `seconds`, `failed`, `last` (`action`, `stage`, `pid`, `exit_code`, `seconds`, `steps`, or `null`) | `subprocess`: a `SubprocessRunner` or its `record()`, checked by `provenance.subprocess_block` |
+| `subprocess` | `null` in-process; for a plan in a child (2-T07): `python`, `reason`, `directory`, `children` (child processes started), `calls` (setup and `run()` calls they served; OPT-T07), `persistent` (`RunnerConfig.persistent`; OPT-T07), `seconds`, `failed`, `last` (the last call: `action`, `stage`, `pid`, `exit_code` (`null` while a persistent worker is still running), `seconds`, `steps`; or `null`) | `subprocess`: a `SubprocessRunner` or its `record()`, checked by `provenance.subprocess_block` |
 
 Setup stages use §12.5's names: load, rewrites, compilation, capture, gate. 1b-T11 split them
 further: load, plan, rewrites, self-checks, model copy, first compiled call, captures. The
@@ -133,6 +135,7 @@ What 1b-T10 adds:
 | always-on treatments | `software.treatments` | 2-T04 |
 | gate reference device, reduced cell, resource steps | `gate.device`, `gate.reduced_cell`, `gate.steps` | 2-T05 |
 | the subprocess runner and its children | `subprocess` | 2-T07 |
+| a persistent worker: calls served, and whether the runner keeps its child | `subprocess.calls`, `subprocess.persistent` | OPT-T07 |
 | strain path bound by the force field | `force_field.strain_path` | 2-T08b |
 | compiled with dynamic edges | `plan.engine.dynamic_edges` (and its decision) | 2-T13 |
 | reproducible mode | `plan.workload.reproducible`; the verdict and its environment are the `reproducible` decisions | 2-T16 |

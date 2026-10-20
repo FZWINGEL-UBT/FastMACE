@@ -26,6 +26,7 @@ bitwise unchanged.
 | `RunnerConfig.inherit_environment` | `True` | the child starts from the parent's environment | T07 |
 | `RunnerConfig.timeout_s` | `None` | total limit of one child run | T07 |
 | `RunnerConfig.stall_timeout_s` | `1800.0` | a child without a committed step for this long is killed | T07 |
+| `RunnerConfig.persistent` | `True` | one worker child serves every `run()` of a `Simulation`; `False`: a fresh child per call (added by OPT-T07) | OPT-T07 |
 | `EngineConfig.dynamic_edges` | `False` | evaluation plans compile with a dynamic edge dimension | T13 |
 | `RewriteConfig.selfcheck_cache` | `"use"` | the qualification cache: `"use"`, `"off"`, `"refresh"` (inert until T19) | T19 |
 
