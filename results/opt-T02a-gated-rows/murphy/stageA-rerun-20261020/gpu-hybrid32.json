@@ -1,0 +1,90 @@
+{
+  "model": "mh1-r2scan",
+  "backend": "hybrid",
+  "precision": "float32",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "570dbb0ee9ec19de6663bb4fe12064a19ba35b78",
+  "stress": false,
+  "package": "planner defaults",
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.gated_rows = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))"
+        ],
+        "on": [
+          "  RewriteConfig.gated_rows = on  (requested 'on': stage 1: on (with merged_residual); stage 2: supported (ok))",
+          "  requested: RewriteConfig.gated_rows=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ],
+        "off2": [
+          "  RewriteConfig.gated_rows = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 1.1920928955078125e-06,
+          "max_abs": 1485.2001543045044
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 2.980232238769531e-07,
+          "max_abs": 0.6402362585067749
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 2.384185791015625e-07,
+          "max_abs": 1485.2001543045044
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 3.725290298461914e-07,
+          "max_abs": 0.6402362585067749
+        }
+      }
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.gated_rows = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))"
+        ],
+        "on": [
+          "  RewriteConfig.gated_rows = on  (requested 'on': stage 1: on (with merged_residual); stage 2: supported (ok))",
+          "  requested: RewriteConfig.gated_rows=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ],
+        "off2": [
+          "  RewriteConfig.gated_rows = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 5.245208740234375e-06,
+          "max_abs": 20591.06579399109
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 1.9073486328125e-06,
+          "max_abs": 4.583948612213135
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 4.76837158203125e-07,
+          "max_abs": 20591.06579399109
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 1.5497207641601562e-06,
+          "max_abs": 4.583948612213135
+        }
+      }
+    }
+  }
+}
