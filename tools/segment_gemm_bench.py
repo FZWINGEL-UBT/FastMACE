@@ -125,71 +125,71 @@ def main(argv=None):
 
     cases = {}
     width = sum(dim * mul for _, dim, mul in HIDDEN)  # 8192
-    weights = {l: torch.randn(mul, mul, generator=g, device="cuda") / mul ** 0.5 for l, _, mul in HIDDEN}
-    weights_t = {l: w.t().contiguous() for l, w in weights.items()}
+    weights = {deg: torch.randn(mul, mul, generator=g, device="cuda") / mul ** 0.5 for deg, _, mul in HIDDEN}
+    weights_t = {deg: w.t().contiguous() for deg, w in weights.items()}
     # linear_2 forward: rows -> [N, 16, 512]
-    rows_in = {l: torch.randn(n * dim, mul, generator=g, device="cuda") for l, dim, mul in HIDDEN}
+    rows_in = {deg: torch.randn(n * dim, mul, generator=g, device="cuda") for deg, dim, mul in HIDDEN}
     out_buf = torch.empty(n, width, device="cuda")
     entry = {}
     offsets, offset = {}, 0
-    for l, dim, mul in HIDDEN:
-        offsets[l] = offset
+    for deg, dim, mul in HIDDEN:
+        offsets[deg] = offset
         offset += dim * mul
-    outs = {l: torch.empty(n * dim, mul, device="cuda") for l, dim, mul in HIDDEN}
+    outs = {deg: torch.empty(n * dim, mul, device="cuda") for deg, dim, mul in HIDDEN}
 
     def base_forward():
-        for l, dim, mul in HIDDEN:
-            torch.mm(rows_in[l], weights[l], out=outs[l])
-        torch.cat([outs[l].view(n, dim * mul) for l, dim, mul in HIDDEN], dim=1, out=out_buf)
+        for deg, dim, mul in HIDDEN:
+            torch.mm(rows_in[deg], weights[deg], out=outs[deg])
+        torch.cat([outs[deg].view(n, dim * mul) for deg, dim, mul in HIDDEN], dim=1, out=out_buf)
 
     def gemms_only():
-        for l, dim, mul in HIDDEN:
-            torch.mm(rows_in[l], weights[l], out=outs[l])
+        for deg, dim, mul in HIDDEN:
+            torch.mm(rows_in[deg], weights[deg], out=outs[deg])
 
     base_us, gemm_us = time_us(torch, base_forward, args.repeats), time_us(torch, gemms_only, args.repeats)
     seg_us, seg_cfg = 0.0, {}
-    for l, dim, mul in HIDDEN:
-        def f(config, l=l, dim=dim, mul=mul):
-            run(rows_in[l], (dim * mul, mul, 1), 0, weights[l], out_buf, (width, mul, 1), offsets[l], n * dim, dim,
+    for deg, dim, mul in HIDDEN:
+        def f(config, deg=deg, dim=dim, mul=mul):
+            run(rows_in[deg], (dim * mul, mul, 1), 0, weights[deg], out_buf, (width, mul, 1), offsets[deg], n * dim, dim,
                 mul, mul, config)
         us, cfg = best(f)
         seg_us += us
-        seg_cfg[l] = list(cfg)
+        seg_cfg[deg] = list(cfg)
         f(cfg)
     torch.cuda.synchronize()
-    ref = torch.cat([(rows_in[l].double() @ weights[l].double()).view(n, dim * mul) for l, dim, mul in HIDDEN], 1)
+    ref = torch.cat([(rows_in[deg].double() @ weights[deg].double()).view(n, dim * mul) for deg, dim, mul in HIDDEN], 1)
     entry.update(cublas_plus_copy_us=base_us, cublas_only_us=gemm_us, segment_us=seg_us, configs=seg_cfg,
                  max_rel_error=rel(out_buf, ref))
     cases["linear2_forward"] = entry
 
     # linear_2 input gradient: [N, 16, 512] slices -> rows
     grad = torch.randn(n, width, generator=g, device="cuda")
-    grad_rows = {l: torch.empty(n * dim, mul, device="cuda") for l, dim, mul in HIDDEN}
+    grad_rows = {deg: torch.empty(n * dim, mul, device="cuda") for deg, dim, mul in HIDDEN}
 
     def base_grad():
-        for l, dim, mul in HIDDEN:
-            left = grad[:, offsets[l]:offsets[l] + dim * mul].reshape(n * dim, mul)  # a copy (not contiguous)
-            torch.mm(left, weights_t[l], out=grad_rows[l])
+        for deg, dim, mul in HIDDEN:
+            left = grad[:, offsets[deg]:offsets[deg] + dim * mul].reshape(n * dim, mul)  # a copy (not contiguous)
+            torch.mm(left, weights_t[deg], out=grad_rows[deg])
 
-    contiguous = {l: grad[:, offsets[l]:offsets[l] + dim * mul].reshape(n * dim, mul).contiguous()
-                  for l, dim, mul in HIDDEN}
+    contiguous = {deg: grad[:, offsets[deg]:offsets[deg] + dim * mul].reshape(n * dim, mul).contiguous()
+                  for deg, dim, mul in HIDDEN}
 
     def grad_gemms_only():
-        for l, dim, mul in HIDDEN:
-            torch.mm(contiguous[l], weights_t[l], out=grad_rows[l])
+        for deg, dim, mul in HIDDEN:
+            torch.mm(contiguous[deg], weights_t[deg], out=grad_rows[deg])
 
     base_us, gemm_us = time_us(torch, base_grad, args.repeats), time_us(torch, grad_gemms_only, args.repeats)
     seg_us, seg_cfg, errors = 0.0, {}, []
-    for l, dim, mul in HIDDEN:
-        def f(config, l=l, dim=dim, mul=mul):
-            run(grad, (width, mul, 1), offsets[l], weights_t[l], grad_rows[l], (dim * mul, mul, 1), 0, n * dim, dim,
+    for deg, dim, mul in HIDDEN:
+        def f(config, deg=deg, dim=dim, mul=mul):
+            run(grad, (width, mul, 1), offsets[deg], weights_t[deg], grad_rows[deg], (dim * mul, mul, 1), 0, n * dim, dim,
                 mul, mul, config)
         us, cfg = best(f)
         seg_us += us
-        seg_cfg[l] = list(cfg)
+        seg_cfg[deg] = list(cfg)
         f(cfg)
         torch.cuda.synchronize()
-        errors.append(rel(grad_rows[l], contiguous[l].double() @ weights_t[l].double()))
+        errors.append(rel(grad_rows[deg], contiguous[deg].double() @ weights_t[deg].double()))
     cases["linear2_input_grad"] = dict(cublas_plus_copy_us=base_us, cublas_only_us=gemm_us, segment_us=seg_us,
                                        configs=seg_cfg, max_rel_error=max(errors))
 
@@ -198,38 +198,38 @@ def main(argv=None):
     message = torch.randn(n, msg_width, generator=g, device="cuda")
     density = torch.rand(n, generator=g, device="cuda") + 1.0
     inverse = (1.0 / density).contiguous()
-    res_w = {l: torch.randn(mul, out, generator=g, device="cuda") / mul ** 0.5 for l, _, mul, out in RESIDUAL}
-    res_out = {l: torch.empty(n * dim, out, device="cuda") for l, dim, _, out in RESIDUAL}
+    res_w = {deg: torch.randn(mul, out, generator=g, device="cuda") / mul ** 0.5 for deg, _, mul, out in RESIDUAL}
+    res_out = {deg: torch.empty(n * dim, out, device="cuda") for deg, dim, _, out in RESIDUAL}
     res_off, offset = {}, 0
-    for l, dim, mul, _ in RESIDUAL:
-        res_off[l] = offset
+    for deg, dim, mul, _ in RESIDUAL:
+        res_off[deg] = offset
         offset += dim * mul
 
     def base_res():
-        for l, dim, mul, _ in RESIDUAL:
-            left = (message[:, res_off[l]:res_off[l] + dim * mul] / density[:, None]).reshape(n * dim, mul)
-            torch.mm(left, res_w[l], out=res_out[l])
+        for deg, dim, mul, _ in RESIDUAL:
+            left = (message[:, res_off[deg]:res_off[deg] + dim * mul] / density[:, None]).reshape(n * dim, mul)
+            torch.mm(left, res_w[deg], out=res_out[deg])
 
-    lefts = {l: (message[:, res_off[l]:res_off[l] + dim * mul] / density[:, None]).reshape(n * dim, mul)
-             for l, dim, mul, _ in RESIDUAL}
+    lefts = {deg: (message[:, res_off[deg]:res_off[deg] + dim * mul] / density[:, None]).reshape(n * dim, mul)
+             for deg, dim, mul, _ in RESIDUAL}
 
     def res_gemms_only():
-        for l, dim, mul, _ in RESIDUAL:
-            torch.mm(lefts[l], res_w[l], out=res_out[l])
+        for deg, dim, mul, _ in RESIDUAL:
+            torch.mm(lefts[deg], res_w[deg], out=res_out[deg])
 
     base_us, gemm_us = time_us(torch, base_res, args.repeats), time_us(torch, res_gemms_only, args.repeats)
     seg_us, seg_cfg, errors = 0.0, {}, []
-    for l, dim, mul, out in RESIDUAL:
-        def f(config, l=l, dim=dim, mul=mul, out=out):
+    for deg, dim, mul, out in RESIDUAL:
+        def f(config, deg=deg, dim=dim, mul=mul, out=out):
             # The scale goes after the product: (x / s) W = (x W) / s per row of one atom (rounding differs).
-            run(message, (msg_width, mul, 1), res_off[l], res_w[l], res_out[l], (dim * out, out, 1), 0, n * dim, dim,
+            run(message, (msg_width, mul, 1), res_off[deg], res_w[deg], res_out[deg], (dim * out, out, 1), 0, n * dim, dim,
                 mul, out, config, scale=inverse)
         us, cfg = best(f)
         seg_us += us
-        seg_cfg[l] = list(cfg)
+        seg_cfg[deg] = list(cfg)
         f(cfg)
         torch.cuda.synchronize()
-        errors.append(rel(res_out[l], lefts[l].double() @ res_w[l].double()))
+        errors.append(rel(res_out[deg], lefts[deg].double() @ res_w[deg].double()))
     cases["residual_forward"] = dict(cublas_plus_copy_us=base_us, cublas_only_us=gemm_us, segment_us=seg_us,
                                      configs=seg_cfg, max_rel_error=max(errors))
 
