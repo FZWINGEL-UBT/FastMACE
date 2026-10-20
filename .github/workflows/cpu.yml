@@ -4,9 +4,10 @@
 name: cpu
 
 on:
-  # Every branch push; pull requests come from branches of this repository, so a separate
-  # pull_request trigger would only run the same commit twice (private repository: minutes count).
-  push:
+  # Off for now (owner, 20 October 2026): Actions minutes count on this private repository, and the
+  # conductor's trial merges run the CPU suite on murphy. To turn it back on, add `push:` here
+  # (every branch push; pull requests come from branches of this repository, so a separate
+  # pull_request trigger would only run the same commit twice).
   workflow_dispatch:
 
 concurrency:
