@@ -94,6 +94,8 @@ def main():
     repository = Path(__file__).resolve().parents[1]
     commit = subprocess.run(["git", "-c", "safe.directory=*", "-C", str(repository), "rev-parse", "HEAD"],
                             capture_output=True, text=True).stdout.strip()
+    if not commit and (repository / ".source_commit").is_file():  # a git archive copy on a workstation
+        commit = (repository / ".source_commit").read_text().strip()
     filesystem = subprocess.run(["stat", "-f", "-c", "%T", str(args.directory)], capture_output=True,
                                 text=True).stdout.strip() if os.name == "posix" else None
     result = dict(machine=platform.node(), filesystem=filesystem, directory=str(args.directory),
