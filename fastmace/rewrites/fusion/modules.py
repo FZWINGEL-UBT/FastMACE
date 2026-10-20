@@ -51,6 +51,40 @@ class GatedRows(torch.nn.Module):
         self.gated = tuple(gated)  # per gated segment: (segment of first's outputs, gate offset, mul, dim)
         self.act_scalar, self.scalar_cst = act_scalar, scalar_cst
         self.act_gate, self.gate_cst = act_gate, gate_cst
+        self.joined = None  # segment_gemm: (input index, output offset, dim) per product of ``second``
+        self.sms = None  # segment_gemm: the device's SM count for the shape rule (None: not float32 on CUDA)
+
+    def join_in_place(self):
+        """Let ``second``'s products write straight into its joined output (``segment_gemm``); returns
+        (True, "ok") or (False, reason). Needs one single-input product per output segment."""
+        second = self.second
+        plan, seen = [], set()
+        for index, (i, j) in enumerate(second.block_ends):
+            if isinstance(i, tuple):
+                if len(i) != 1:
+                    return False, f"output segment {j} of linear_2 sums {len(i)} grouped inputs"
+                i = i[0]
+            if j in seen:
+                return False, f"output segment {j} of linear_2 has several products"
+            seen.add(j)
+            offset, mul, dim = second.segments_out[j]
+            if second.segments_in[i][2] != dim:
+                return False, f"product {index} of linear_2 changes the irrep dimension"
+            plan.append((i, offset, dim, index))
+        from fastmace.kernels.triton import tile_rule
+
+        weight = second.weight_0
+        # Read once at setup: the forward evaluates the rule while torch.compile traces it.
+        self.sms = tile_rule.device_sms(weight.device) if weight.dtype == torch.float32 else None
+        self.joined = tuple(plan)
+        return True, "ok"
+
+    def _any_triton(self, rows, n):
+        """Whether the shape rule picks the Triton GEMM for any of ``second``'s products at ``n`` atoms; if
+        not, the joined op would only add launches, so the stock products and join run (NaCl-sized cells)."""
+        from fastmace.kernels.triton import tile_rule
+
+        return any(tile_rule.uses_triton(n * dim, self.sms) for _, _, dim, _ in self.joined)
 
     def forward(self, x, y):
         outputs, n, like = self.first.output_rows(x, y)
@@ -71,7 +105,44 @@ class GatedRows(torch.nn.Module):
         from fastmace.rewrites.linear.modules import join_rows
 
         second = self.second
+        if self.joined is not None and self._any_triton(rows, n):  # segment_gemm: products write into the output
+            from fastmace.kernels.triton.segment_gemm import joined_products
+
+            width = sum(mul * dim for _, mul, dim in second.segments_out)
+            out = joined_products([rows[i] for i, _, _, _ in self.joined],
+                                  [getattr(second, f"weight_{k}") for _, _, _, k in self.joined],
+                                  [getattr(second, f"weight_t_{k}") for _, _, _, k in self.joined],
+                                  [offset for _, offset, _, _ in self.joined], [dim for _, _, dim, _ in self.joined],
+                                  width)
+            return second.transpose_out(out)
         return second.transpose_out(join_rows(second.segments_out, second.products(rows), n, like))
+
+
+class IrrepsView(torch.nn.Module):
+    """MACE's ``reshape_irreps`` for an ir_mul tensor whose segments all have the same multiplicity: the
+    ``[atoms, sum (2l+1) mul]`` tensor is already laid out as ``[atoms, sum (2l+1), mul]``, so the slices,
+    reshapes and concatenation along the component axis are a view (``segment_gemm``: the joined output
+    of ``linear_2`` goes to the symmetric contraction without a copy)."""
+
+    def __init__(self, components, mul):
+        super().__init__()
+        self.components, self.mul = int(components), int(mul)
+
+    def forward(self, tensor):
+        return tensor.reshape(tensor.shape[0], self.components, self.mul)
+
+
+def irreps_view(reshape):
+    """The ``IrrepsView`` equivalent to a ``reshape_irreps`` module, or (None, reason)."""
+    if type(reshape).__name__ != "reshape_irreps":
+        return None, f"the interaction's reshape is a {type(reshape).__name__}"
+    config = getattr(reshape, "cueq_config", None)
+    if config is None or getattr(config, "layout_str", "mul_ir") != "ir_mul":
+        return None, "the reshape is not in the ir_mul layout"
+    muls = set(int(m) for m in reshape.muls)
+    if len(muls) != 1:
+        return None, f"the reshaped irreps have different multiplicities {sorted(muls)}"
+    return IrrepsView(sum(int(d) for d in reshape.dims), muls.pop()), "ok"
 
 
 def gated_rows(first, gate, second):
