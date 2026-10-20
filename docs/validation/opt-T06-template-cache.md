@@ -1,6 +1,6 @@
 # OPT-T06: converted-model template cache
 
-**Status: implemented, 21 October 2026.** Plan `plans/opt-1.md`, OPT-T06, branch `fastmace/opt-T06`. Design:
+**Status: implemented and merged, 21 October 2026; engine-level check on murphy done (run `20261021c`).** Plan `plans/opt-1.md`, OPT-T06, branch `fastmace/opt-T06`. Design:
 [docs/design/opt-T06-template-cache.md](../design/opt-T06-template-cache.md) (approved by the conductor, option B).
 
 ## What changed
@@ -69,9 +69,23 @@ The engine-level columns of run `20261021b` compare two reloads (the miss above)
 
 ### Engine level after the key fix
 
-PENDING: murphy's GPU had other processes after run `20261021b`. Run `opt-T06-murphy-20261021c` (the same script
-at 7e5a58d) fills this section: second `Simulation` from a template copy against one from a reload, initial
-forces and 10 steps, with one template kept; plus the GPU test file.
+Run `opt-T06-murphy-20261021c` (murphy, 21 October 2026, 22:11–22:20 UTC, GPU empty, source 615464b, the merged
+code; data in `results/opt-T06-murphy-20261021c/`). Two `Simulation` objects in a row per force field: with the
+cache on (the second one is built from a template copy), and with it off (the second one from a reload). The table
+gives each column's largest difference. Initial forces are in eV/Å, positions after 10 steps in Å.
+
+| Backend, dtype | templates kept (on, off) | first plans, both loads: forces, positions | second plans, copy vs reload: forces, positions |
+| --- | --- | --- | --- |
+| hybrid float32 | 1, 0 | 2.5e-7, 4.1e-10 | 2.4e-7, 5.5e-10 |
+| hybrid float64 | 1, 0 | 5.0e-16, 1.4e-17 | 6.8e-16, 0 (bitwise) |
+| plain cuEq float32 | 1, 0 | 2.7e-7, 4.8e-10 | 2.1e-7, 5.0e-10 |
+| plain cuEq float64 | 1, 0 | 7.4e-16, 2.1e-17 | 6.4e-16, 1.2e-17 |
+
+- After the key fix, the second `Simulation` hits the cache: one template is kept.
+- A plan built from a template copy differs from one built from a reload by no more than two plans built from
+  two loads differ from each other, after 10 MD steps as well. That difference is the run-to-run noise of the GPU
+  kernels.
+- The execution-model times of this run agree with run `20261021b`: copy 0.32–0.83 s, reload 2.52–3.79 s.
 
 ## Tests
 
@@ -88,7 +102,8 @@ forces and 10 steps, with one template kept; plus the GPU test file.
   - fast tier: copy against reload on the model level for hybrid and plain cuEq in float32 and float64, and the
     memory release. 4 passed on murphy (run `20261021b`);
   - slow tier: a second `Simulation`, 10 steps, hybrid and plain cuEq float32. Failed in run `20261021b` on the
-    template count (the miss, fixed); rerun pending.
+    template count (the miss, fixed).
+  - run `20261021c`: **6 passed** (fast and slow tier, 152 s).
 - CPU suite subset: config, contracts, research surface, planners, fallback (4 files), isolation, selfcheck,
   simulation, metadata and provenance. 471 + 198 passed, one switch-map row added for the new field.
 
