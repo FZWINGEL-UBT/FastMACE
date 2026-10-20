@@ -303,6 +303,23 @@ def compile_model(model, mode, *, accelerated, oeq=False, prepare: Callable[[Any
     return torch.compile(private, mode=mode, fullgraph=False)
 
 
+def mark_edges_dynamic(data):
+    """Mark the edge dimension of a model input dict dynamic for torch.compile (plan task 2-T13).
+
+    Evaluation plans (``EngineConfig.dynamic_edges``) read exact edge counts. Without the mark the
+    first call compiles for its edge count, and the first call with another count compiles again,
+    when dynamo's automatic dynamic shapes make the dimension symbolic. Marked from the first call,
+    one compile serves every edge count. ``maybe_mark_dynamic``: a dimension that the model
+    specialises recompiles as before instead of raising. Marks the tensors in place; call it
+    whenever the dict gets new edge views.
+    """
+    import torch
+
+    torch._dynamo.maybe_mark_dynamic(data["edge_index"], 1)
+    torch._dynamo.maybe_mark_dynamic(data["shifts"], 0)
+    torch._dynamo.maybe_mark_dynamic(data["unit_shifts"], 0)
+
+
 # --------------------------------------------------------------------------- the cache
 
 
@@ -367,6 +384,6 @@ def configure_allocator(enabled=True, environ=None, torch_version=None):
 
 __all__ = [
     "ALLOCATOR_MIN_TORCH", "ALLOCATOR_SETTINGS", "CompiledEntry", "CompiledModelCache", "compile_model",
-    "configure_allocator", "cpu_cueq_problems", "install_engine_patches", "naive_cueq", "private_copy",
-    "restore_cueq_conv_fusion", "restore_oeq_wrappers", "simplify_traceable",
+    "configure_allocator", "cpu_cueq_problems", "install_engine_patches", "mark_edges_dynamic", "naive_cueq",
+    "private_copy", "restore_cueq_conv_fusion", "restore_oeq_wrappers", "simplify_traceable",
 ]

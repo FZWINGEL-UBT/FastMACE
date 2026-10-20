@@ -518,10 +518,15 @@ class MinimalPlanner:
         backend = self._backend(book, software)
         superset, precision, requested = self._common(book, traits, atoms, species, precision, software, backend[0],
                                                       allow_naive_cueq, loaded)
+        dynamic_edges = self.engine.compile_mode != "none"
+        book.decide("EngineConfig.dynamic_edges", "on" if dynamic_edges else "off",
+                    "exact edge counts: the edge dimension is dynamic from the first call, so a new edge count "
+                    "does not compile again (2-T13)" if dynamic_edges else "nothing is compiled")
         parts = self._fixed(rewrites, precision)._resolve(book, traits, atoms, None, hardware, backend_choice=backend,
                                                           evaluation=True, texts=TEXTS)
         book.raise_refusals()
         parts["requested"] = parts["requested"] + requested
+        parts["engine"] = dataclasses.replace(parts["engine"], dynamic_edges=dynamic_edges)
         plan = Plan(**parts, superset=superset, software=software,
                     allowances=("allow_naive_cueq",) if allow_naive_cueq else (),
                     reason="one-off evaluation (phase 1b)")
