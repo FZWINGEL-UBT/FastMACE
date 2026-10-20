@@ -81,7 +81,18 @@ in `Registry.resolve` (11 s in 1b, 2.6 s in 1a under the extra timers). A CPU pr
   `sys.path` entry: 0.6 s on 9p, 0.012 s on ext4.
 
 On ext4 the two versions are equal, so this is a file-system effect of the checkout's location, not 1b's code
-path. The same stats would cost time on a slow NFS checkout. On murphy, 1b-T23 ran both sides from NFS, and its load
+path.
+
+**Does an installed FastMACE avoid it?** The cost follows where the files that get stat'ed live, not how the
+package is imported. So the ext4 copy on `PYTHONPATH` stands for an install in site-packages on ext4. One more CPU
+profile put the package on ext4 but the script and working directory on `/mnt/d` (a user script there puts a 9p
+entry first on `sys.path`). The first resolve took 0.25–0.36 s, against 0.16 s all on ext4 and 1.6–6.8 s with the
+package on 9p. The remainder is `installed_mace_version()` scanning that one 9p `sys.path` entry 19 times. An
+installed FastMACE therefore avoids nearly all of it. The effect matters for our checkout-on-`/mnt/d` runs (and
+ResearchModule's local `main.py` with `PYTHONPATH` on `/mnt/d` or `G:`), not for users with an installed package.
+
+The other `/mnt/d` excesses are in the same direction: plan +0.4 s, rewrite apply +0.6 s, first compiled call
++1.4 s. Dynamo and Inductor read sources and stat files too. On ext4 all three are equal to 1a (table above). The same stats would cost time on a slow NFS checkout. On murphy, 1b-T23 ran both sides from NFS, and its load
 + setup agree (below).
 
 ### Cold, 1b from `/mnt/d` (`cold-*`, n = 2)
@@ -140,6 +151,15 @@ Not built, under the conductor's rule. The numbers for checkpoint 2:
 - The safety trade-off is unchanged: the checks are a function of the key only when everything that determines them
   is in the key. The structure-dependent checks (generic, `reassociate_first`) would stay uncached unless shown to be
   species-set invariant, and only passes with a margin of threshold/10 would be cached.
+
+## Recommendations
+
+1. **No self-check cache.** It addresses no part of the gap. It would save at most about 1.4 s per process warm,
+   and its safety trade-off stays. The owner decides at checkpoint 2.
+2. **Run every timed setup comparison from ext4,** with both sides in the same cache state, and record the load
+   average. For WSL that means an ext4 copy of the checkout (`git archive`), not `/mnt/d`.
+3. No fresh murphy timing (conductor: its GPU is busy for hours). 1b-T23's murphy JSON, with the accounting
+   corrected, already shows equal load + setup.
 
 ## Found elsewhere, reported, not fixed (conductor's Q4)
 
