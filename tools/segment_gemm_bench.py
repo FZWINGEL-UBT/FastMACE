@@ -150,7 +150,8 @@ def main(argv=None):
     seg_us, seg_cfg = 0.0, {}
     for deg, dim, mul in HIDDEN:
         def f(config, deg=deg, dim=dim, mul=mul):
-            run(rows_in[deg], (dim * mul, mul, 1), 0, weights[deg], out_buf, (width, mul, 1), offsets[deg], n * dim, dim,
+            run(rows_in[deg], (dim * mul, mul, 1), 0, weights[deg], out_buf, (width, mul, 1), offsets[deg],
+                n * dim, dim,
                 mul, mul, config)
         us, cfg = best(f)
         seg_us += us
@@ -182,7 +183,8 @@ def main(argv=None):
     seg_us, seg_cfg, errors = 0.0, {}, []
     for deg, dim, mul in HIDDEN:
         def f(config, deg=deg, dim=dim, mul=mul):
-            run(grad, (width, mul, 1), offsets[deg], weights_t[deg], grad_rows[deg], (dim * mul, mul, 1), 0, n * dim, dim,
+            run(grad, (width, mul, 1), offsets[deg], weights_t[deg], grad_rows[deg], (dim * mul, mul, 1), 0,
+                n * dim, dim,
                 mul, mul, config)
         us, cfg = best(f)
         seg_us += us
@@ -222,7 +224,8 @@ def main(argv=None):
     for deg, dim, mul, out in RESIDUAL:
         def f(config, deg=deg, dim=dim, mul=mul, out=out):
             # The scale goes after the product: (x / s) W = (x W) / s per row of one atom (rounding differs).
-            run(message, (msg_width, mul, 1), res_off[deg], res_w[deg], res_out[deg], (dim * out, out, 1), 0, n * dim, dim,
+            run(message, (msg_width, mul, 1), res_off[deg], res_w[deg], res_out[deg], (dim * out, out, 1), 0,
+                n * dim, dim,
                 mul, out, config, scale=inverse)
         us, cfg = best(f)
         seg_us += us
