@@ -84,3 +84,40 @@ depends on the Triton IEEE kernel at small M.
    stream must be fixed (`CUBLAS_WORKSPACE_CONFIG` is already set there).
 2. Should B and T03 converge on one "grouped segment GEMM" kernel (candidate 2), or is (b) + B the end state?
    I would decide after the bench.
+
+## 6. Result of the micro-bench (murphy, 20 October 2026)
+
+`tools/block_linear_concurrency_bench.py` on murphy (RTX 4000 Ada, 48 SMs), 19:49 UTC, GPU empty, load
+0.27. Commit `fe20449`. Raw data: `results/opt-T03-concurrency/murphy/`.
+
+Setup:
+- one MH-1 block linear's four products (l = 0–3, 512 → 512), each variant captured in a CUDA graph;
+- the median of 100 replays, in µs;
+- each speed-up is relative to the sequential variant.
+
+| Case | Sequential (TFLOPS) | 2 streams | 4 streams | Grouped Triton launch |
+| --- | ---: | ---: | ---: | ---: |
+| NaCl forward | 162.6 (11.1) | 173.1 (0.94×) | 191.4 (0.85×) | 162.6 (1.00×) |
+| NaCl input gradient | 188.4 (9.6) | 169.7 (1.11×) | 186.4 (1.01×) | 162.8 (1.16×) |
+| NbCl5 forward | 1,325.9 (12.3) | 1,396.7 (0.95×) | 1,391.4 (0.95×) | 1,369.1 (0.97×) |
+| NbCl5 input gradient | 1,413.6 (11.5) | 1,390.5 (1.02×) | 1,384.5 (1.02×) | 1,369.1 (1.03×) |
+
+- The cuBLAS variants equal the sequential result bitwise.
+- The grouped variant is within 1.2e-6.
+
+**Reading:**
+- Measured together, a block linear's four products already reach 11.1 TFLOPS forward on NaCl, only
+  part of the way to the 5.8 TFLOPS that the l = 0 product alone shows in the model trace. Run as one
+  launch sequence, the products fill the GPU better than their separate figures suggest.
+- **Streams:** the graph branches cost more than they overlap in the forward (0.85–0.95×) and give at
+  most 1.11× in one direction.
+- **Grouped launch:** saves 7 % of NaCl's forward + input gradient time (351 → 325 µs). It is neutral to
+  −3 % on NbCl5.
+
+**Decision (rule of §4): not met on sm_89.** The best candidate, the grouped launch, saves 7 % of these
+products on NaCl. The rule needs ≥ 10 % of the atom-level GEMM time and no loss on NbCl5.
+- Candidates 1 and 2 are **not built** on this evidence.
+- The sm_120 half of the bench runs when the PC is free. Its l = 0 product was the slowest one there
+  (5.8 TFLOPS).
+- Split-K (candidate 3) was not measured. Its ceiling is l = 0's share, about 0.1 ms on NaCl, below the
+  bar.
