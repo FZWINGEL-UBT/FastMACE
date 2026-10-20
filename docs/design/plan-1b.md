@@ -51,7 +51,7 @@ A reason that reports or tests match on is a `fastmace.errors.Reason` (a `str` w
 | `species-not-in-superset` | 2 | minimal, `build` → `SpeciesNotInSuperset` |
 | `polar-plain-compiled-cueq` | 3 | both |
 | `inexact-padding` | 4 | both (minimal text: "compiled MD tier: phase 3", D6) |
-| `reproducible-backend`, `reproducible-conv-fusion`, `reproducible-family-not-qualified`, `reproducible-cueq-version`, `reproducible-kernel-not-deterministic` | 5 | minimal (2-T16; `planner/reproducible.py`) |
+| `reproducible-backend`, `reproducible-conv-fusion`, `reproducible-family-not-qualified`, `reproducible-cueq-version`, `reproducible-kernel-not-deterministic`, `reproducible-tier` | 5 | minimal (2-T16; `planner/reproducible.py`) |
 | `naive-cueq` | 6 | minimal (plan, or `build` after conversion) |
 | `atom-count-changes` | 7 | minimal |
 | `superset-beyond-structure` | 8 | minimal (D3: phase 3) |

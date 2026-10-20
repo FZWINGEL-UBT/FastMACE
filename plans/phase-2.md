@@ -1476,6 +1476,13 @@ notes folder of the conductor's session (`2-T0x-…md`).
   `acceptance`. The numerical parts stay in the full tier.
 - **2-T15 started.** It builds against 2-T03's interface until 2-T03
   merges.
+- **2-T14d merged** (326e7fa): the planner's two step-time assertions are
+  now acceptance tests of their own, sharing one three-engine run per
+  process. Fast- and full-tier tests make no step-time assertions
+  (`docs/development.md`). The new tests still need one run on an idle GPU,
+  in the next acceptance window.
+- **2-T16** synced with main 14a5e20 (7b9980e; murphy CPU 2348 passed). Its
+  trial follows 2-T03's.
 
 ## Phase 1b items carried into phase 2
 

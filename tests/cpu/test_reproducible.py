@@ -148,6 +148,13 @@ def test_a_record_switched_off_does_not_block():
     assert got.decision("reproducible")[2].code == "reproducible-qualified"
 
 
+def test_the_reference_tier_is_not_qualified():
+    """2-T03's reference tier runs MACE's own calculator, which the allow-list does not cover."""
+    error = refusal(mode="reference", allow_reference=True)
+    reason = next(reason for reason in error.reasons if reason.code == "reproducible-tier")
+    assert reason.rule == 5 and "reference" in reason
+
+
 def test_an_explicit_nondeterministic_rewrite_refuses():
     error = refusal(rewrites=RewriteConfig(streaming_conv="on"))
     assert {"reproducible-backend", "rewrite-requirement-missing"} & set(tmp.codes(error))

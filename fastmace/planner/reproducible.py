@@ -49,6 +49,8 @@ TASK = "plan task 2-T16"
 KINDS = ("cueq-kernel", "torch-op", "fastmace-kernel")
 
 FAMILY = "mh1"
+# FastMACE's own tiers run the qualified kernels; the reference tier is MACE's calculator (2-T03).
+QUALIFIED_TIERS = ("graph", "eager")
 BACKEND = "cueq"
 # The architecture qualified: MH-1's model class and interaction class, no joint embeddings.
 FAMILY_MODEL_CLASS = "ScaleShiftMACE"
@@ -239,6 +241,10 @@ def qualify(plan: Any, traits: Any = None, *, versions: Mapping[str, str | None]
         blocking.append(component)
         reasons.append(Reason(f"reproducible=True: {text} (SPEC §9.3 rule 5)", rule=5, code=code))
 
+    tier = getattr(plan, "tier", "graph")
+    if tier not in QUALIFIED_TIERS:
+        block(f"the {tier} tier", f"the {tier} tier runs MACE's own calculator, which is not qualified; "
+              f"reproducible plans run on the {' or '.join(QUALIFIED_TIERS)} tier", "reproducible-tier")
     if family != FAMILY:
         block(f"model family {family}", f"only the MH-1 family is qualified with plain cuEq; this model is {family}",
               "reproducible-family-not-qualified")
@@ -336,7 +342,7 @@ def _bytes(value):
 
 __all__ = [
     "ALLOW_LIST", "AllowListEntry", "BACKEND", "CUEQ_OPS", "FAMILY", "FUSED_CONVOLUTION", "KINDS", "OEQ_STREAMING",
-    "PINNED_CUEQ_OPS", "PROCESS_ENVIRONMENT", "Qualification", "U1D_ALGOS", "UNDOCUMENTED", "check_repeatable",
+    "PINNED_CUEQ_OPS", "PROCESS_ENVIRONMENT", "QUALIFIED_TIERS", "Qualification", "U1D_ALGOS", "UNDOCUMENTED", "check_repeatable",
     "decisions", "explicit_conflicts", "family_of", "installed_versions", "prepare_process", "qualify",
     "record_determinism", "records_in_use",
 ]

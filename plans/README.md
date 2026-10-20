@@ -47,6 +47,8 @@ Owner action pending: register the two GPU CI runners, murphy and the local
 PC (`docs/development.md`, "Registering the runners"; 2-T18 is merged). 2-T18's
 done-when, both runners green from a push, waits for it.
 
+2-T14's scratch folders were deleted on the owner's word (20 October 2026).
+
 Task IDs are `<phase>-T<nn>`. Worker branches are `fastmace/<phase>-T<nn>`.
 
 Conductor sessions start with [CONDUCTOR.md](CONDUCTOR.md).

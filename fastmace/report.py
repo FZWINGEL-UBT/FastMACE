@@ -56,6 +56,8 @@ REFUSALS = {
                                          "drop reproducible=True for statistical reproducibility",
     "reproducible-cueq-version": "reproducible=True: cuEquivariance's run-time kernel choice is pinned for "
                                  "cuequivariance_ops 0.12.0 only (rule 5); install it, or drop reproducible=True",
+    "reproducible-tier": "reproducible=True runs on the graph or eager tier, not the reference tier (rule 5); "
+                         "drop mode='reference' or reproducible=True",
     "reproducible-kernel-not-deterministic": "reproducible=True: a rewrite in use is not declared deterministic "
                                              "(rule 5); switch it off, or drop reproducible=True",
     "naive-cueq": "cuEquivariance's fused kernels do not load (rule 6); install cuequivariance-ops-torch "

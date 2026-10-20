@@ -80,9 +80,9 @@ def test_engine_and_neighbours_reach_the_planner(loaded, cpu_planner):
     assert cpu_planner.engine == CPU and cpu_planner.neighbours == NeighbourConfig()  # not changed in place
 
 
-@pytest.mark.parametrize("mode", ["reference", "compiled"])
+@pytest.mark.parametrize("mode", ["compiled"])
 def test_modes_other_than_graph_reach_the_planner(loaded, mode):
-    with pytest.raises(PlanRefused) as refused:  # until 2-T03 lifts the reference refusal
+    with pytest.raises(PlanRefused) as refused:  # the compiled MD tier: phase 3
         _simulation(loaded, mode=mode)
     assert f"mode-{mode}" in refused.value.codes
 
@@ -91,10 +91,12 @@ def test_eager_mode_reaches_the_planner(loaded):  # 2-T02
     assert _simulation(loaded, mode="eager").plan.tier == "eager"
 
 
+def test_mode_reference_reaches_the_planner(loaded):
+    assert _simulation(loaded, mode="reference").plan.tier == "reference"  # 2-T03
+
+
 def test_allow_reference_reaches_the_planner(loaded):
-    with pytest.raises(PlanRefused) as refused:  # until 2-T03
-        _simulation(loaded, allow_reference=True)
-    assert "reference-tier-not-in-1b" in refused.value.codes
+    assert "allow_reference" in _simulation(loaded, allow_reference=True).plan.allowances  # 2-T03
 
 
 def test_options_are_recorded_and_resume_replans_with_them(loaded, tmp_path):
