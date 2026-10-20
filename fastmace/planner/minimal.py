@@ -100,6 +100,19 @@ def default_planner(force_field) -> MinimalPlanner:
     return MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"))
 
 
+def _cuda_initialised() -> bool:
+    """Whether this process has initialised CUDA (without importing torch to find out)."""
+    import sys
+
+    torch = sys.modules.get("torch")
+    return torch is not None and bool(torch.cuda.is_initialized())
+
+
+def _in_child(plan, reason):
+    """``plan`` marked to run in a child through the subprocess runner (SPEC §8.7, 2-T07)."""
+    return dataclasses.replace(plan, runner="subprocess", decisions=(*plan.decisions, ("runner", "subprocess", reason)))
+
+
 def _symbols(numbers):
     from ase.data import chemical_symbols
 
@@ -267,14 +280,37 @@ class MinimalPlanner:
             code="allow-naive-cueq" if problems else "fused-cueq"))
         return superset
 
-    def _claim_family(self, plan, owner):
-        """The process's compile family (§8.7): the first compiled plan fixes it."""
-        from fastmace.engine import constraints
+    def _claim_family(self, plan, owner, *, offer_runner=False):
+        """The process's compile family (§8.7): the first compiled plan fixes it; returns the plan.
 
+        With ``offer_runner`` (MD plans), a plan that a process constraint forbids here is returned with
+        ``runner="subprocess"`` and a ``runner`` decision instead of raising ``ProcessConstraintError``
+        (2-T07): a compiled plan of the other family, or ``reproducible=True`` after CUDA was
+        initialised. Such a plan claims nothing in this process; the child plans for itself.
+        """
+        from fastmace.engine import constraints
+        from fastmace.errors import ProcessConstraintError
+
+        workload = plan.workload
+        if (offer_runner and workload is not None and workload.reproducible
+                and str(plan.engine.device).startswith("cuda") and _cuda_initialised()):
+            return _in_child(plan, Reason(
+                "reproducible=True after CUDA was initialised in this process: CUBLAS_WORKSPACE_CONFIG and "
+                "deterministic algorithms must be set before (SPEC §8.7, owner decision 14), so the plan runs in a "
+                "child process", code="runner-subprocess-reproducible"))
         if plan.engine.compile_mode == "none":
-            return
+            return plan
         family = constraints.OEQ_FAMILY if plan.engine.backend == "hybrid" else constraints.AUTOGRAD_FAMILY
-        self.process.claim_family(family, owner)
+        try:
+            self.process.claim_family(family, owner)
+        except ProcessConstraintError:
+            if not offer_runner:
+                raise
+            return _in_child(plan, Reason(
+                f"this process already compiled a {self.process.family} model ({self.process.family_owner}); one "
+                f"compile family per process, so this {family} plan runs in a child process (SPEC §8.7)",
+                code="runner-subprocess-family"))
+        return plan
 
     # ------------------------------------------------------------------ plans
 
@@ -336,7 +372,7 @@ class MinimalPlanner:
         book.raise_refusals()
         plan = Plan(**parts, superset=superset, workload=workload, software=software,
                     allowances=("allow_naive_cueq",) if allow_naive_cueq else (), reason="minimal plan (phase 1b)")
-        self._claim_family(plan, f"a {plan.engine.backend} MD plan")
+        plan = self._claim_family(plan, f"a {plan.engine.backend} MD plan", offer_runner=True)
         return plan
 
     def _workload_decisions(self, book, workload):

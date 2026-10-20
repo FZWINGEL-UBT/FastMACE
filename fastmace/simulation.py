@@ -12,7 +12,10 @@ What the constructor does, in this order (``docs/design/contracts-1b.md``):
    decision D7), recorded in the plan;
 3. plan through the minimal planner, with the caller's planner inputs (``PlannerOptions``: mode,
    ``allow_reference``, fallback, gate, runner, engine and neighbour options; plan task 2-T01);
-   ``PlanRefused`` here carries every reason;
+   ``PlanRefused`` here carries every reason. A plan that a process constraint forbids here
+   (``Plan.runner == "subprocess"``, §8.7) stops at this point: the subprocess runner
+   (``engine/subprocess.py``, plan task 2-T07) does the rest in a child, and each ``run()`` in
+   another, handed over through restart writes;
 4. with ``check="gate"`` or ``"allow_unavailable"``: the gate's references (§12.3, 1b-T16),
    before any production engine exists in the process;
 5. build the engine through the planner;
@@ -290,6 +293,7 @@ class Simulation:
         self._restart_points = []
         self._host_writes = 0
         self._sinks = []  # (interval, sink): add_sink
+        self._runner = None  # the subprocess runner of a plan that runs in a child (2-T07)
         setup = {}
 
         planner = _planner(minimal.default_planner(ff), options)
@@ -297,6 +301,9 @@ class Simulation:
         self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq,
                                   allow_reference=options.allow_reference, mode=options.mode)
         setup["plan"] = time.perf_counter() - started
+        if self._plan.runner == "subprocess":
+            self._start_runner(setup)
+            return
 
         # The gate's references before any production engine exists (§12.3); under check="gate" an
         # unavailable reference raises GateUnavailable here, before the build. "skip" computes nothing.
@@ -332,6 +339,23 @@ class Simulation:
         if output is not None:
             self._open_output()
         self._write_metadata()
+
+    def _start_runner(self, setup):
+        """The plan runs in a child (``Plan.runner == "subprocess"``, SPEC §8.7; 2-T07): no gate and no
+        engine in this process. The setup child plans, gates and builds there, and its restart at step 0
+        is the first hand-off; ``Simulation.resume`` hands over its restart instead."""
+        from fastmace.engine.subprocess import RUNNER_WARNING, SubprocessRunner
+        from fastmace.planner import selfcheck
+
+        self._engine = None
+        self._fill = None
+        self._gate = selfcheck.skipped_record()
+        self._setup_s = setup
+        self._runner = SubprocessRunner(self.options.runner)
+        self._report = self._new_report(start_step=0)
+        self._report.add_warning(RUNNER_WARNING)
+        if not getattr(self, "_resuming", False):
+            self._runner.setup(self)
 
     # ------------------------------------------------------------------ public state
 
@@ -373,6 +397,8 @@ class Simulation:
 
     def committed(self) -> Committed:
         """The committed step as read-only host arrays (flushes any step in flight)."""
+        if self._runner is not None:
+            return self._runner.committed(self)
         engine = self._engine
         values = engine.sync()
         cell = values["cell"] if "cell" in values else engine.state.cell.detach().cpu().numpy()
@@ -385,6 +411,9 @@ class Simulation:
         """Queue the committed step's output values for ``sink(step, values)`` (host arrays: positions,
         momenta, forces, energy, kinetic; cell and stress for NPT). The copies run behind the GPU;
         ``sink`` is called after the next step has been launched, or by ``flush_output``."""
+        if self._runner is not None:
+            self._runner.submit_frame(self, sink)
+            return
         self._queue.submit(self._engine.snapshot(), sink)
 
     def add_sink(self, sink: Callable[[int, Mapping[str, Any]], Any], interval: int) -> None:
@@ -419,6 +448,8 @@ class Simulation:
         if self._status != "non-finite":
             self._status = "complete"
         self._write_metadata()
+        if self._runner is not None:
+            self._runner.close()  # the hand-off directory, unless a child failed
 
     def __enter__(self) -> Simulation:
         return self
@@ -467,6 +498,9 @@ class Simulation:
         if mc is not ... and mc is not None:
             self._refuse_mc(mc, position, count)  # raises: nothing is attached before phase 3
 
+        if self._runner is not None:  # the plan runs in a child (SPEC §8.7)
+            self._runner.run(self, steps=count, schedule=position if schedule is not None else None)
+            return
         self._schedule = position
         self._engine.state.protocol = position
         self._advance(count)
@@ -497,7 +531,8 @@ class Simulation:
                 "the gate never covered it (SPEC §7.6)", code="mc-move-not-declared"))
         if workload.min_mc_temperature_K is not None:
             lowest = (position.min_target(count) if position is not None
-                      else float(self._engine.integrator.temperature_K))
+                      else float(self._engine.integrator.temperature_K) if self._engine is not None
+                      else float(self.integrator.temperature_K))
             if lowest < workload.min_mc_temperature_K:
                 reasons.append(Reason(
                     f"the MC block's target temperature reaches {lowest:g} K in the steps this run would take, below "
@@ -624,7 +659,7 @@ class Simulation:
 
     # ------------------------------------------------------------------ report and metadata
 
-    def _new_report(self):
+    def _new_report(self, start_step=None):
         import numpy as np
 
         from fastmace import report as reports
@@ -643,11 +678,13 @@ class Simulation:
             outputs=outputs, charge_spin=(model.charge, model.spin_multiplicity) if reads_charge else None,
             cell_heights_A=tuple(float(h) for h in heights), cutoff_A=self.force_field.traits.r_max,
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,
-            start_step=int(self._engine.state.step))
+            start_step=int(self._engine.state.step) if start_step is None else start_step)
 
     def _metadata_record(self):
         from fastmace import provenance
 
+        if self._runner is not None:
+            return self._runner.metadata(self)
         state = self._engine.state
         timing = {"status": self._status, "steps": self._steps_run, "loop_s": self._loop_s}
         return provenance.metadata_record(
@@ -674,16 +711,20 @@ class Simulation:
         engine is canonicalised and written by ``io.restart.write_engine_restart`` (T05's format),
         and ``simulation.json`` next to it holds what that format does not: the model source, the
         integrator record, workload, ``Output``, seed, ``allow_naive_cueq``, the planner options,
-        species, masses and PBC.
+        species, masses and PBC. A plan that runs in a child copies the child's last hand-off, a
+        canonical restart point at the committed step (2-T07).
         """
-        from fastmace.io import restart
-
         path = Path(path)
         if path.suffix != ".npz":
             path = path / RESTART_NAME
         if path.name != RESTART_NAME:
             raise ValueError(f"save_restart writes {RESTART_NAME!r} (Simulation.resume reads <directory>/"
                              f"{RESTART_NAME}), got {path.name!r}")
+        if self._runner is not None:
+            self._runner.save_restart(self, path)
+            return
+        from fastmace.io import restart
+
         path.parent.mkdir(parents=True, exist_ok=True)
         self._queue.drain()
         outputs = self._writer.restart_point() if self._writer is not None else None
@@ -747,7 +788,6 @@ class Simulation:
         import json
 
         from fastmace.io import restart
-        from fastmace.model.forcefield import ForceField
 
         check_mode(check)
         directory = Path(directory)
@@ -764,14 +804,7 @@ class Simulation:
                              f"1 or {SIMULATION_RECORD_VERSION}")
         options = PlannerOptions.from_record(record.get("planner_options"))
         stored = restart.read_restart(file, engine=ENGINE_NAME)
-        loaded = _load_model(record["model"])
-        rewrites = record["force_field"]["rewrites"]
-        if rewrites != "auto":
-            from fastmace.config import RewriteConfig
-
-            rewrites = RewriteConfig(**rewrites)
-        ff = ForceField(loaded, precision=record["force_field"]["precision"], rewrites=rewrites,
-                        species=record["force_field"]["species"])
+        ff = _record_force_field(record)
         versions = _resume_identity(stored, ff.identity)
         if versions:
             import warnings
@@ -784,40 +817,31 @@ class Simulation:
             if output["directory"] == ".":
                 output["directory"] = str(directory)
             output = Output(**output)
-        sim = cls(_restart_atoms(record["structure"], stored), ff, integrator=_integrator(record["integrator"]),
-                  workload=_workload(record["workload"]), output=None, seed=record["seed"], check=check,
-                  allow_naive_cueq=record["allow_naive_cueq"], mode=options.mode,
-                  allow_reference=options.allow_reference, fallback=options.fallback, gate=options.gate,
-                  runner=options.runner, engine=options.engine, neighbours=options.neighbours)
-        sim._resume(stored, record, output, allow_plan_change, versions)
+        sim = cls.__new__(cls)
+        sim._resuming = True  # a plan that runs in a child takes this restart as its first hand-off (2-T07)
+        sim.__init__(_restart_atoms(record["structure"], stored), ff, integrator=_integrator(record["integrator"]),
+                     workload=_workload(record["workload"]), output=None, seed=record["seed"], check=check,
+                     allow_naive_cueq=record["allow_naive_cueq"], mode=options.mode,
+                     allow_reference=options.allow_reference, fallback=options.fallback, gate=options.gate,
+                     runner=options.runner, engine=options.engine, neighbours=options.neighbours)
+        del sim._resuming
+        sim._resume(stored, record, output, allow_plan_change, versions, source=directory)
         return sim
 
-    def _resume(self, stored, record, output, allow_plan_change, versions=None):
-        from fastmace.errors import RestartMismatch
+    def _resume(self, stored, record, output, allow_plan_change, versions=None, source=None):
         from fastmace.io import restart
-        from fastmace.planner.plan import Plan
         from fastmace.protocols import ScheduleState
 
         engine = self._engine
+        if engine is None:  # the plan runs in a child: it resumes this restart (2-T07)
+            self._plan = self._resumed_plan(stored, int(stored["step"]), allow_plan_change, versions)
+            self._runner.resume(self, source, record, output)
+            if versions:
+                self._report.add_warning(_versions_text(versions))
+            return
         restart.resume_engine(stored, engine)
         step = int(engine.state.step)
-        previous = Plan.from_restart(restart.plan_record(stored))
-        changed = [name for name in _PLAN_FIELDS if getattr(previous, name) != getattr(self._plan, name)]
-        if changed:
-            if not allow_plan_change:
-                raise RestartMismatch(
-                    f"the plan differs from the restart's in {', '.join(changed)}",
-                    why="a different plan (another GPU, software or rewrite set) is the same physics but no "
-                        "bitwise continuation, so it is never taken silently (SPEC §10.6)",
-                    next_step="pass allow_plan_change=True to resume on the new plan, recorded as a new revision")
-            fresh = self._plan
-            self._plan = previous.revise(
-                f"resumed with a different plan ({', '.join(changed)}; allow_plan_change=True)", step,
-                **{name: getattr(fresh, name) for name in (*_PLAN_FIELDS, *_PLAN_RECORDS)})
-        else:
-            self._plan = previous
-        if versions:  # recorded as a revision of the same plan (owner decision 23)
-            self._plan = self._plan.revise(_versions_text(versions), step)
+        self._plan = self._resumed_plan(stored, step, allow_plan_change, versions)
         engine.state.plan_revision = self._plan.revision
         protocol = restart.protocol_record(stored)
         self._schedule = None if protocol is None else ScheduleState.from_restart(protocol)
@@ -835,6 +859,31 @@ class Simulation:
             self.output = output
             self._open_output(resume_from=restart.output_indices(stored))
         self._write_metadata()
+
+    def _resumed_plan(self, stored, step, allow_plan_change, versions):
+        """The plan a resume continues on: the restart's, or a revision to this one (§9.5, §10.6)."""
+        from fastmace.errors import RestartMismatch
+        from fastmace.io import restart
+        from fastmace.planner.plan import Plan
+
+        previous = Plan.from_restart(restart.plan_record(stored))
+        changed = [name for name in _PLAN_FIELDS if getattr(previous, name) != getattr(self._plan, name)]
+        if changed:
+            if not allow_plan_change:
+                raise RestartMismatch(
+                    f"the plan differs from the restart's in {', '.join(changed)}",
+                    why="a different plan (another GPU, software or rewrite set) is the same physics but no "
+                        "bitwise continuation, so it is never taken silently (SPEC §10.6)",
+                    next_step="pass allow_plan_change=True to resume on the new plan, recorded as a new revision")
+            fresh = self._plan
+            plan = previous.revise(
+                f"resumed with a different plan ({', '.join(changed)}; allow_plan_change=True)", step,
+                **{name: getattr(fresh, name) for name in (*_PLAN_FIELDS, *_PLAN_RECORDS)})
+        else:
+            plan = previous
+        if versions:  # recorded as a revision of the same plan (owner decision 23)
+            plan = plan.revise(_versions_text(versions), step)
+        return plan
 
     # ------------------------------------------------------------------ host writes (owner decision D4)
 
@@ -868,6 +917,9 @@ class Simulation:
         import torch
 
         array = self._host_values(positions, "positions")
+        if self._runner is not None:  # applied by the next child, after its resume
+            self._runner.host_write(self, "positions", array)
+            return
 
         def write(state):
             state.positions.copy_(torch.as_tensor(array, dtype=state.positions.dtype))
@@ -880,6 +932,9 @@ class Simulation:
         import torch
 
         array = self._host_values(momenta, "momenta")
+        if self._runner is not None:
+            self._runner.host_write(self, "momenta", array)
+            return
 
         def write(state):
             momenta = torch.as_tensor(array, dtype=state.velocities.dtype, device=state.velocities.device)
@@ -999,6 +1054,20 @@ def _same_reference(first, second):
     """Whether two reference record ids name the same content (they may differ in the MACE version)."""
     records = [_known_reference_record(record_id) for record_id in (first, second)]
     return None not in records and _reference_content_digest(records[0]) == _reference_content_digest(records[1])
+
+
+def _record_force_field(record):
+    """The ``ForceField`` of a ``simulation.json`` record: its model loaded again (by SHA-256), precision,
+    rewrites and species."""
+    from fastmace.model.forcefield import ForceField
+
+    rewrites = record["force_field"]["rewrites"]
+    if rewrites != "auto":
+        from fastmace.config import RewriteConfig
+
+        rewrites = RewriteConfig(**rewrites)
+    return ForceField(_load_model(record["model"]), precision=record["force_field"]["precision"], rewrites=rewrites,
+                      species=record["force_field"]["species"])
 
 
 def _restart_atoms(structure, stored):
