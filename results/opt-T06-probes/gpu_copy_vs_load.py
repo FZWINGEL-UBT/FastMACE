@@ -65,9 +65,11 @@ def main(argv=None):
     p.add_argument("--json")
     args = p.parse_args(argv)
     from fastmace.config import EngineConfig
+    from fastmace.model import compile as compiling
     from fastmace.model import loading
     from fastmace.model.forcefield import ForceField
 
+    compiling.configure_allocator()  # before anything touches CUDA, as a planner's construction does
     if args.label:
         pristine = loading.load_pristine(args.label, checkpoint=args.checkpoint,
                                          sha256=loading.sha256_of(args.checkpoint))
