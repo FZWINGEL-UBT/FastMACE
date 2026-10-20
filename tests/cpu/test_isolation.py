@@ -12,8 +12,9 @@ docs/design/isolation.md.
   shared as it is, private rewritten copies, and one compiled model shared through the cache;
 - a module buffer swapped between calls (the streaming edge counter) is read as an input by
   dynamo: the right count every call, and no recompilation after the first A -> B round;
-- the one shared state left open (finding 1, plan task 2-T08b): a failing ``single_graph_strain``
-  self-check undoes the process-wide patch that earlier force fields were built with (pinned);
+- the strain path is per model (2-T08b, finding 1 closed): a failing ``single_graph_strain``
+  self-check leaves earlier force fields bitwise unchanged, a bound path (on or off) ignores the
+  process patch the reference calculators toggle, and on and off interleave;
 - PolarMACE: each force field enables its own copy, and A -> B -> A on two cells equals fresh;
 - two engines stepped in turn equal each engine run alone, across neighbour rebuilds.
 """
@@ -227,21 +228,12 @@ def test_swapped_count_buffer_is_an_input_to_compiled_code():
     torch._dynamo.reset()
 
 
-# --------------------------------------------------------------------------- the one open shared state
+# --------------------------------------------------------------------------- the strain path per model (2-T08b)
 
 
-def test_failing_strain_selfcheck_undoes_the_patch_of_earlier_force_fields():
-    """Pins today's behaviour (docs/design/isolation.md, finding 1), which 2-T08b changes.
-
-    ``single_graph_strain`` is a process-wide patch. B's failing self-check restores MACE's
-    function (``Registry._selfcheck_failure``), and A, built with the record, then runs MACE's
-    function: energy and forces unchanged, stress at rounding level, ``A.applied`` stale.
-    2-T08b makes the strain path per model; then the patch is not undone and this test changes.
-    """
+def _broken_strain_registry():
+    """The default registry with a single_graph_strain whose self-check always fails (fault injection)."""
     import dataclasses
-
-    from fastmace import _patches
-    from fastmace.errors import SelfCheckError
 
     def failing(original, rewritten, context):
         return reg.CheckResult(False, 1.0, 1e-10, 1, "injected failure (test)", "float64")
@@ -253,27 +245,83 @@ def test_failing_strain_selfcheck_undoes_the_patch_of_earlier_force_fields():
         if name == "single_graph_strain":
             record = dataclasses.replace(record, selfcheck=failing)
         broken.register(record, registry.config_field(name))
+    return broken
+
+
+@pytest.fixture
+def _strain_patch_restored():
+    from fastmace import _patches
+
+    installed_before = _patches.record_of("single_graph_strain") is not None
+    yield
+    if installed_before:
+        _patches.set_single_graph_strain(True)
+    else:
+        _patches.restore("single_graph_strain")
+
+
+def test_failing_strain_selfcheck_leaves_earlier_force_fields_unchanged(_strain_patch_restored):
+    """Finding 1 of docs/design/isolation.md, closed by 2-T08b (before it, this test pinned the opposite).
+
+    A binds the one-graph path into its own forward. B's failing self-check restores nothing, and A
+    evaluates bitwise as before, its ``applied`` list and bound path still true.
+    """
+    from fastmace import _patches
+    from fastmace.errors import SelfCheckError
+
     calc, atoms = calculator(), crystals()
     request = only("single_graph_strain")
-    installed_before = _patches.record_of("single_graph_strain") is not None
-    try:
-        first = MACEForceField(calc, atoms["A"], rewrites=request, neighbours=NEIGHBOURS, compute_stress=True)
-        assert [entry.name for entry in first.applied] == ["single_graph_strain"]
-        assert _patches.record_of("single_graph_strain") is not None
-        before = first.evaluate(atoms["A"], stress=True)
-        with pytest.raises(SelfCheckError, match="single_graph_strain"):
-            MACEForceField(calc, atoms["B"], rewrites=request, neighbours=NEIGHBOURS, compute_stress=True,
-                           registry=broken)
-        assert _patches.record_of("single_graph_strain") is None  # undone for the whole process
-        assert [entry.name for entry in first.applied] == ["single_graph_strain"]  # A's record is stale
-        after = first.evaluate(atoms["A"], stress=True)
-        assert after[0] == before[0] and np.array_equal(after[1], before[1])
-        np.testing.assert_allclose(after[2], before[2], rtol=1e-12, atol=1e-16)
-    finally:
-        if installed_before:
+    first = MACEForceField(calc, atoms["A"], rewrites=request, neighbours=NEIGHBOURS, compute_stress=True)
+    assert [entry.name for entry in first.applied] == ["single_graph_strain"]
+    assert first.info()["strain_path"] == "one_graph"
+    assert _patches.record_of("single_graph_strain") is None  # nothing process-wide
+    before = first.evaluate(atoms["A"], stress=True)
+    with pytest.raises(SelfCheckError, match="single_graph_strain"):
+        MACEForceField(calc, atoms["B"], rewrites=request, neighbours=NEIGHBOURS, compute_stress=True,
+                       registry=_broken_strain_registry())
+    after = first.evaluate(atoms["A"], stress=True)
+    assert after[0] == before[0] and np.array_equal(after[1], before[1]) and np.array_equal(after[2], before[2])
+    assert first.info()["strain_path"] == "one_graph"
+
+
+@pytest.mark.parametrize("rewrites", [None, ("single_graph_strain",), MH1_PACKAGE + ("single_graph_strain",)],
+                         ids=["off-source", "on-source", "on-copy"])
+def test_bound_strain_path_ignores_the_process_patch(rewrites, _strain_patch_restored):
+    """A reference calculator toggles the process patch; no force field follows it, on or off."""
+    from fastmace import _patches
+
+    calc, atoms = calculator(), crystals()
+    request = None if rewrites is None else only(*rewrites)
+    field = MACEForceField(calc, atoms["A"], neighbours=NEIGHBOURS, rewrites=request, compute_stress=True)
+    assert field.info()["strain_path"] == ("mace" if rewrites is None else "one_graph")
+    expected = field.evaluate(atoms["A"], stress=True)
+    for installed in (True, False, True):
+        if installed:
             _patches.set_single_graph_strain(True)
         else:
             _patches.restore("single_graph_strain")
+        got = field.evaluate(atoms["A"], stress=True)
+        assert got[0] == expected[0] and np.array_equal(got[1], expected[1]) and np.array_equal(got[2], expected[2])
+
+
+def test_strain_on_and_off_interleaved_equal_fresh_force_fields():
+    """A with the one-graph path, B (another crystal) with MACE's, on one source model: A -> B -> A."""
+    calc, atoms = calculator(), crystals()
+    positions = schedule(atoms)
+    requests = {"A": only("single_graph_strain"), "B": None}
+    builds = {name: (lambda structure, name=name: MACEForceField(calc, structure, neighbours=NEIGHBOURS,
+                                                                 rewrites=requests[name], compute_stress=True))
+              for name in atoms}
+    expected = {name: fresh_values(builds[name], {name: atoms[name]}, positions)[name] for name in atoms}
+    fields = {name: builds[name](atoms[name]) for name in atoms}
+    got = {name: [] for name in atoms}
+    for index in range(2):
+        for name in ("A", "B"):
+            got[name].append(graph_level(fields[name], positions[name][index]))
+    got["A"].append(graph_level(fields["A"], positions["A"][0]))
+    assert fields["A"].info()["strain_path"] == "one_graph" and fields["B"].info()["strain_path"] == "mace"
+    assert_equal(got["A"], expected["A"] + expected["A"][:1], "A")
+    assert_equal(got["B"], expected["B"], "B")
 
 
 # --------------------------------------------------------------------------- PolarMACE
