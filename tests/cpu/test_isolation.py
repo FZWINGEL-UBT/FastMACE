@@ -12,6 +12,8 @@ docs/design/isolation.md.
   shared as it is, private rewritten copies, and one compiled model shared through the cache;
 - a module buffer swapped between calls (the streaming edge counter) is read as an input by
   dynamo: the right count every call, and no recompilation after the first A -> B round;
+- the one shared state left open (finding 1, plan task 2-T08b): a failing ``single_graph_strain``
+  self-check undoes the process-wide patch that earlier force fields were built with (pinned);
 - PolarMACE: each force field enables its own copy, and A -> B -> A on two cells equals fresh;
 - two engines stepped in turn equal each engine run alone, across neighbour rebuilds.
 """
@@ -223,6 +225,55 @@ def test_swapped_count_buffer_is_an_input_to_compiled_code():
     assert torch.equal(compiled(x), x[:9].sum(dim=0))
     assert frames[1:] == [frames[1]] * 4 and counter.frame_count == frames[1]
     torch._dynamo.reset()
+
+
+# --------------------------------------------------------------------------- the one open shared state
+
+
+def test_failing_strain_selfcheck_undoes_the_patch_of_earlier_force_fields():
+    """Pins today's behaviour (docs/design/isolation.md, finding 1), which 2-T08b changes.
+
+    ``single_graph_strain`` is a process-wide patch. B's failing self-check restores MACE's
+    function (``Registry._selfcheck_failure``), and A, built with the record, then runs MACE's
+    function: energy and forces unchanged, stress at rounding level, ``A.applied`` stale.
+    2-T08b makes the strain path per model; then the patch is not undone and this test changes.
+    """
+    import dataclasses
+
+    from fastmace import _patches
+    from fastmace.errors import SelfCheckError
+
+    def failing(original, rewritten, context):
+        return reg.CheckResult(False, 1.0, 1e-10, 1, "injected failure (test)", "float64")
+
+    registry = reg.default_registry()
+    broken = reg.Registry()
+    for name in registry.names():
+        record = registry[name]
+        if name == "single_graph_strain":
+            record = dataclasses.replace(record, selfcheck=failing)
+        broken.register(record, registry.config_field(name))
+    calc, atoms = calculator(), crystals()
+    request = only("single_graph_strain")
+    installed_before = _patches.record_of("single_graph_strain") is not None
+    try:
+        first = MACEForceField(calc, atoms["A"], rewrites=request, neighbours=NEIGHBOURS, compute_stress=True)
+        assert [entry.name for entry in first.applied] == ["single_graph_strain"]
+        assert _patches.record_of("single_graph_strain") is not None
+        before = first.evaluate(atoms["A"], stress=True)
+        with pytest.raises(SelfCheckError, match="single_graph_strain"):
+            MACEForceField(calc, atoms["B"], rewrites=request, neighbours=NEIGHBOURS, compute_stress=True,
+                           registry=broken)
+        assert _patches.record_of("single_graph_strain") is None  # undone for the whole process
+        assert [entry.name for entry in first.applied] == ["single_graph_strain"]  # A's record is stale
+        after = first.evaluate(atoms["A"], stress=True)
+        assert after[0] == before[0] and np.array_equal(after[1], before[1])
+        np.testing.assert_allclose(after[2], before[2], rtol=1e-12, atol=1e-16)
+    finally:
+        if installed_before:
+            _patches.set_single_graph_strain(True)
+        else:
+            _patches.restore("single_graph_strain")
 
 
 # --------------------------------------------------------------------------- PolarMACE
