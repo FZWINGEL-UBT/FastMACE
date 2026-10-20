@@ -1,0 +1,68 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for '2-T04 acceptance 1 (0.3.15)' (pid 39189)
+  import pynvml  # type: ignore[import]
+  value = original(*args, **kwargs)
+  value = original(*args, **kwargs)
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+  value = original(*args, **kwargs)
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+  return visitor(node)
+  return visitor(node)
+  return visitor(node)
+  return visitor(node)
+Traceback (most recent call last):
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/engine/graph.py", line 619, in _capture
+    stage()
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/engine/graph.py", line 514, in _stage_b
+    self._force_stage()
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/engine/graph.py", line 483, in _force_stage
+    out = self.force_field(self.state.positions)
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/model/forces.py", line 492, in __call__
+    out = self._outputs(positions)
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/model/forces.py", line 504, in _outputs
+    return self._model_call(self.data, training=self.training, compute_force=True, compute_stress=False)
+  File "<fastmace float64-energy ScaleShiftMACE.forward>", line 110, in forward
+  File "/home/fzwin/environments/fastmace_mace_other/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1783, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/fzwin/environments/fastmace_mace_other/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1794, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/fzwin/environments/fastmace_mace_other/lib/python3.10/site-packages/mace/modules/blocks.py", line 444, in forward
+    index_attrs = torch.nonzero(node_attrs)[:, 1].int()
+torch.AcceleratorError: CUDA error: operation not permitted when stream is capturing
+Search for `cudaErrorStreamCaptureUnsupported' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.
+The CUDA driver logged these messages, which may provide useful details:
+Returning 900 (CUDA_ERROR_STREAM_CAPTURE_UNSUPPORTED) from cuStreamSynchronize
+
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/mnt/c/Users/fzwin/AppData/Local/Temp/claude/D--Margraf-FastMACE--claude-worktrees-2-t04-fbd608/9eb19db2-291c-4145-bf8a-a567ad346939/scratchpad/acc1.py", line 26, in <module>
+    run = fm.md(atoms, model="mh-1", head="matpes_r2scan", temperature_K=300.0, steps=200, seed=7,
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/quick.py", line 235, in md
+    sim = Simulation(atoms, model, integrator=integrator, workload=workload, output=output, seed=seed, check=check,
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/simulation.py", line 344, in __init__
+    failure = self._failure("gate", error, stored)
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/simulation.py", line 400, in _failure
+    raise error
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/simulation.py", line 342, in __init__
+    self._gate = selfcheck.production(self._engine, references, check=check)
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/planner/selfcheck.py", line 1390, in production
+    outputs, notes = _replay(engine, references.copies)
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/planner/selfcheck.py", line 1276, in _replay
+    engine._run(("B", edges))
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/engine/graph.py", line 546, in _run
+    self._capture(key)
+  File "/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t04-fbd608/fastmace/engine/graph.py", line 618, in _capture
+    with torch.cuda.graph(graph, pool=self._pool, stream=side):
+  File "/home/fzwin/environments/fastmace_mace_other/lib/python3.10/site-packages/torch/cuda/graphs.py", line 1210, in __exit__
+    self.cuda_graph.capture_end()
+  File "/home/fzwin/environments/fastmace_mace_other/lib/python3.10/site-packages/torch/cuda/graphs.py", line 649, in capture_end
+    self.capture_end_pre()
+  File "/home/fzwin/environments/fastmace_mace_other/lib/python3.10/site-packages/torch/cuda/graphs.py", line 630, in capture_end_pre
+    super().capture_end_pre()
+torch.AcceleratorError: CUDA error: operation failed due to a previous error during capture
+Search for `cudaErrorStreamCaptureInvalidated' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.
+
+EXIT 1

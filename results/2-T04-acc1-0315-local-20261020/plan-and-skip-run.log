@@ -1,0 +1,20 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for '2-T04 acceptance 1 diagnosis (0.3.15)' (pid 40002)
+PLAN mode = graph  [mode-graph] molecular dynamics on the graph tier (SPEC §8.1)
+PLAN capture = on  [None] CUDA graphs
+PLAN EngineConfig.backend = cueq  [backend-cueq-oeq-unavailable] auto: OpenEquivariance cannot build: openequivariance is not installed
+PLAN EngineConfig.compile_mode = none  [compile-unavailable] this MACE lacks the compile API FastMACE uses (mace.tools.compile.configure_autograd_for_compile): no compilation, the model runs uncompiled (SPEC §18 decision 
+PLAN EngineConfig.cueq_conv_fusion = off  [conv-fusion-mace-rule] MACE's own conversion rule (off on 'cuda:0'): FastMACE's fusion patch is not qualified on this MACE (SPEC §6.3, §18 decision 2)
+PLAN force_precision = float32  [None] the ForceField's precision (SPEC §7.1, §9.2)
+PLAN tier graph revision 0
+SKIP-RUN FAILED AcceleratorError CUDA error: operation failed due to a previous error during capture
+  at quick.py 238 md
+  at simulation.py 570 run
+  at simulation.py 645 _advance
+  at engine/graph.py 194 step
+  at engine/graph.py 387 _step_pipelined
+  at engine/graph.py 546 _run
+  at engine/graph.py 618 _capture
+  at /home/fzwin/environments/fastmace_mace_other/lib/python3.10/site-packages/torch/cuda/graphs.py 1210 __exit__
+  at /home/fzwin/environments/fastmace_mace_other/lib/python3.10/site-packages/torch/cuda/graphs.py 649 capture_end
+  at /home/fzwin/environments/fastmace_mace_other/lib/python3.10/site-packages/torch/cuda/graphs.py 630 capture_end_pre
+EXIT 0
