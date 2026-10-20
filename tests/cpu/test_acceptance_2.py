@@ -316,3 +316,66 @@ def test_runner_statistics_suite():
     jobs = suites.runner_statistics_jobs(suites.MACHINES["murphy"], Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
     assert [job.name for job in jobs] == ["runner-statistics-fresh", "runner-statistics-runner"]
     assert all("mace_cueq_oeq" in job.argv[0] and not job.timing for job in jobs)
+
+
+def test_runner_statistics_four_seeds_use_the_median_pair(tmp_path, monkeypatch):
+    temperatures = {"f": {"1": 300.0, "2": 301.0, "3": 302.0, "4": 310.0}, "r": {"1": 300.5, "2": 301.0, "3": 302.0,
+                                                                              "4": 310.0}}
+
+    def fake_rows(directory):
+        kind = "f" if directory.parent.name == "fresh" else "r"
+        temperature = temperatures[kind][directory.name.split("-")[1]]
+        return [{"step": s, "target": 300.0 + s, "temperature": temperature, "energy": -1.0}
+                for s in range(20, 301, 20)]
+
+    monkeypatch.setattr(runner_statistics, "thermo_rows", fake_rows)
+    seeds = {1: None, 2: None, 3: None, 4: None}
+    fresh = _runner_case(tmp_path / "fresh", "in-process", seeds)
+    runner = _runner_case(tmp_path / "runner", "subprocess", seeds)
+    result = runner_statistics.compare(fresh, runner)
+    # fresh pairs: 1, 2, 10, 1, 9, 8 K -> median 5 K -> limit 10 K
+    assert result["between_seeds"]["temperature_K"] == pytest.approx(5.0)
+    assert result["limits"]["temperature_K"] == pytest.approx(10.0) and result["passed"]
+
+
+def test_runner_statistics_refuses_different_start_states(tmp_path):
+    fresh = _runner_case(tmp_path / "fresh", "in-process", {1: None, 2: None})
+    runner = _runner_case(tmp_path / "runner", "subprocess", {1: None, 2: None})
+    meta = json.loads((runner / "statistics.json").read_text())
+    meta["start"] = "/elsewhere/start.extxyz"
+    (runner / "statistics.json").write_text(json.dumps(meta))
+    with pytest.raises(ValueError, match="start"):
+        runner_statistics.compare(fresh, runner)
+
+
+def test_runner_statistics_equilibrate_arguments(tmp_path, capsys):
+    args = runner_statistics.parse_args(["equilibrate", "--output", str(tmp_path / "e")])
+    assert args.stages == [0.5, 4000, 2.0, 5000] and args.temperature_K == 300.0
+    with pytest.raises(SystemExit):
+        runner_statistics.parse_args(["equilibrate", "--output", str(tmp_path / "e"), "--stages", "0.5"])
+    capsys.readouterr()
+
+
+def test_runner_statistics_reads_a_start_with_momenta(tmp_path):
+    from ase.build import bulk
+    from ase.io import write
+    atoms = bulk("NaCl", "rocksalt", a=5.64)
+    path = tmp_path / "start.extxyz"
+    write(path, atoms)
+    with pytest.raises(ValueError, match="momenta"):
+        runner_statistics.read_start(path)
+    atoms.set_momenta([[0.1, 0.0, 0.0], [0.0, -0.1, 0.0]])
+    write(path, atoms)
+    assert runner_statistics.read_start(path).get_momenta()[0, 0] == pytest.approx(0.1)
+
+
+def test_runner_repeat_suite():
+    root = Path("/mnt/homes/zwingel/fastmace-acceptance/r")
+    jobs = suites.runner_statistics_repeat_jobs(suites.MACHINES["murphy"], root)
+    assert [job.name for job in jobs] == ["runner-repeat-equilibrate", "runner-repeat-fresh", "runner-repeat-runner"]
+    start = "/mnt/homes/zwingel/fastmace-acceptance/r/runner-repeat-equilibrate/start.extxyz"
+    for job in jobs[1:]:
+        argv = list(job.argv)
+        assert argv[argv.index("--start") + 1] == start
+        assert argv[argv.index("--seeds") + 1:] == ["20261001", "20261101", "20261201", "20261301"]
+    assert not any(job.timing for job in jobs)

@@ -607,6 +607,28 @@ def runner_statistics_jobs(machine: Machine, run_root: Path) -> list:
     return jobs
 
 
+REPEAT_SEEDS = (20261001, 20261101, 20261201, 20261301)
+
+
+def runner_statistics_repeat_jobs(machine: Machine, run_root: Path) -> list:
+    """Item 4's repeat (owner, 20 October 2026, after the first comparison was dominated by the heating transient
+    from 0 K): one equilibrated start (300 K: 2 ps at 0.5 fs, then 10 ps at 2 fs), then fresh and runner from it,
+    four seeds. Untimed."""
+    run_root = Path(run_root)
+    equilibrated = check_location(machine, run_root / "runner-repeat-equilibrate")
+    jobs = [Job(name="runner-repeat-equilibrate", output=str(equilibrated), note="the shared start state",
+                argv=(machine.python("mace_cueq_oeq"), _tool(machine, "runner_statistics.py"), "equilibrate",
+                      "--output", str(equilibrated), "--model", PRIMARY_MODEL))]
+    for case in ("fresh", "runner"):
+        name = f"runner-repeat-{case}"
+        output = check_location(machine, run_root / name)
+        argv = [machine.python("mace_cueq_oeq"), _tool(machine, "runner_statistics.py"), "run", "--case", case,
+                "--output", str(output), "--model", PRIMARY_MODEL, "--start", str(equilibrated / "start.extxyz"),
+                "--seeds", *(str(seed) for seed in REPEAT_SEEDS)]
+        jobs.append(Job(name=name, argv=tuple(argv), output=str(output), note="hybrid, equilibrated start, 4 seeds"))
+    return jobs
+
+
 def _tier_job(machine, run_root, name, marker, *, timing, note):
     output = check_location(machine, run_root / name)
     basetemp = check_location(machine, run_root / f"{name}-pytest")
@@ -640,4 +662,5 @@ SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun
           "regression": regression_jobs, "frontends": frontends_jobs, "gpu-suite": gpu_suite_jobs,
           "adapter-tests": adapter_jobs, "compile-checks": compile_checks_jobs,
           "regression2": regression2_jobs, "trajectory2": trajectory2_jobs, "runner-statistics": runner_statistics_jobs,
+          "runner-repeat": runner_statistics_repeat_jobs,
           "acceptance-tier": acceptance_tier_jobs, "full-tier": full_tier_jobs}
