@@ -66,16 +66,70 @@ def _current(target):
 # --------------------------------------------------------------------------- hash gates on every patch
 
 
+def _applies(name):
+    """Whether patch ``name`` has anything to do on this torch (unfuse_full_addmm: not on torch 2.13)."""
+    return _patches.patch_applicable(name)[0]
+
+
 def test_every_patch_is_pinned_and_qualified_here():
     assert set(_patches.SOURCE_PINS) == set(SETTERS)
     for name in SETTERS:
-        assert _patches.patch_problems(name) == [], name
+        if _applies(name):
+            assert _patches.patch_problems(name) == [], name
+
+
+def test_only_the_addmm_patch_can_be_inapplicable():
+    for name in SETTERS:
+        if name != "unfuse_full_addmm":
+            assert _applies(name), name
+    assert _applies("unfuse_full_addmm") == (_patches._torch_release() >= _patches.ADDMM_TEST_SINCE)
+
+
+def test_a_missing_addmm_test_on_torch_2_14_is_a_problem_not_not_needed(monkeypatch):
+    """On torch >= 2.14 a moved or renamed bias-like test is an unqualified source, never "not needed"."""
+    from torch._inductor.fx_passes import post_grad
+
+    monkeypatch.setattr(_patches, "_torch_release", lambda: (2, 15))
+    monkeypatch.delattr(post_grad, "_is_bias_like_addmm_input", raising=False)
+    assert _applies("unfuse_full_addmm")
+    problems = _patches.patch_problems("unfuse_full_addmm")
+    assert any("_is_bias_like_addmm_input" in problem and "AttributeError" in problem for problem in problems)
+    with pytest.raises(_patches.UnqualifiedPatchError):
+        _patches.set_unfuse_full_addmm(True)
+    assert _patches.record_of("unfuse_full_addmm") is None
+    assert _patches.install_if_qualified("unfuse_full_addmm") is None  # skipped with its reason logged
+    treatment = versions.treatment("unfuse_full_addmm")
+    assert not treatment.qualified and treatment.decision == "not installed"
+
+
+def test_an_older_torch_does_not_need_the_addmm_patch(monkeypatch):
+    monkeypatch.setattr(_patches, "_torch_release", lambda: (2, 13))
+    applicable, reason = _patches.patch_applicable("unfuse_full_addmm")
+    assert not applicable and "before 2.14" in reason
+    assert _patches.set_unfuse_full_addmm(True) is None and _patches.record_of("unfuse_full_addmm") is None
+    assert versions.treatment("unfuse_full_addmm").decision == "not needed"
+
+
+def test_without_inductor_the_addmm_patch_is_not_needed(monkeypatch):
+    import sys
+
+    from torch._inductor import fx_passes
+
+    monkeypatch.delattr(fx_passes, "post_grad", raising=False)
+    monkeypatch.setitem(sys.modules, "torch._inductor.fx_passes.post_grad", None)  # the import raises ImportError
+    applicable, reason = _patches.patch_applicable("unfuse_full_addmm")
+    assert not applicable and "Inductor is not importable" in reason
 
 
 @pytest.mark.parametrize("name", sorted(SETTERS))
 def test_an_unhashed_source_is_never_patched(monkeypatch, name):
     _unpin(monkeypatch, name)
     before = {target: _current(target) for target in _patches.SOURCE_PINS[name]}
+    if not _applies(name):  # torch 2.13: the setter has nothing to do and patches nothing
+        assert SETTERS[name](True) is None and _patches.install_if_qualified(name) is None
+        assert {target: _current(target) for target in before} == before
+        assert _patches.record_of(name) is None
+        return
     with pytest.raises(_patches.UnqualifiedPatchError) as caught:
         SETTERS[name](True)
     assert caught.value.patch == name and caught.value.problems
@@ -112,6 +166,7 @@ def test_treatments_on_the_qualified_version():
     assert all(t.qualified for t in found.values())
     assert found["float64_energy"].decision == "patched"
     assert found["capture_safe_mask_head"].decision == "installed"
+    assert found["unfuse_full_addmm"].decision == ("installed" if _applies("unfuse_full_addmm") else "not needed")
 
 
 def test_treatments_on_unhashed_sources(monkeypatch):
@@ -122,11 +177,15 @@ def test_treatments_on_unhashed_sources(monkeypatch):
 
     monkeypatch.setattr(polar, "SOURCE_HASHES", {key: WRONG for key in polar.SOURCE_HASHES})
     found = {t.name: t for t in versions.treatments()}
+    # torch 2.13: the addmm patch has nothing to do, so it is "not needed" whatever its pins say.
+    inapplicable = {name for name in _patches.SOURCE_PINS if not _applies(name)}
+    for name in inapplicable:
+        assert found.pop(name).decision == "not needed"
     assert not any(t.qualified for t in found.values())
     assert found["float64_energy"].decision == "native float64"
     assert found["polar_forward"].decision == "refuse PolarMACE"
     assert found["capture_safe_mask_head"].decision == "no capture for multi-head models"
-    for name in ("first_derivative_only", "single_graph_strain", "unfuse_full_addmm"):
+    for name in {"first_derivative_only", "single_graph_strain", "unfuse_full_addmm"} - inapplicable:
         assert found[name].decision == "not installed"
     assert found["cueq_conv_fusion"].decision == "MACE's own rule"
     assert all(t.reason and "sha256" in t.reason for t in found.values())
