@@ -48,7 +48,8 @@ def gate_rows(model):
         if not _reads_gated_rows(interaction):
             continue
         chain, _ = m.gated_rows(getattr(interaction, "residual_linear", None),
-                                getattr(interaction, "equivariant_nonlin", None), getattr(interaction, "linear_2", None))
+                                getattr(interaction, "equivariant_nonlin", None),
+                                getattr(interaction, "linear_2", None))
         if chain is not None:
             interaction.gated_rows = chain
             names.append(f"interactions.{index}")

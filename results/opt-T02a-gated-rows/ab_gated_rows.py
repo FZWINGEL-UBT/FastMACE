@@ -83,7 +83,8 @@ def main(argv=None):
         blocks = {side: result.statistics[side].block_ms for side in sides}
         entry = dict(natoms=len(base), ab=result.as_dict(), ratio_on_over_off=medians["on"] / medians["off"],
                      pair_ratios=[on / off for on, off in zip(blocks["on"], blocks["off"])],
-                     setup_s=setup, plan_lines=lines, compile_during_timing=dict(changes=changes, recompiled=recompiled),
+                     setup_s=setup, plan_lines=lines,
+                     compile_during_timing=dict(changes=changes, recompiled=recompiled),
                      observables={side: sides[side].observables() for side in sides},
                      load_after=list(os.getloadavg()),
                      other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()])

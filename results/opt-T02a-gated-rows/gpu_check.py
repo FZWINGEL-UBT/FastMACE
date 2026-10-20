@@ -1,8 +1,8 @@
 """OPT-T02 stage A on the GPU: ``gated_rows`` off against on, same process, same structure (one backend family).
 
-For each structure (3x3x3, rattled 0.05 A, seed 20261020) it builds two engines through the minimal planner,
-one with ``RewriteConfig(gated_rows="on")``, and a third with it off again as a control, and compares their first force evaluation (the compiled force
-call the engine starts with): energy, forces and, with ``--stress``, stress. Plain cuEq float64
+For each structure (3x3x3, rattled 0.05 A, seed 20261020) it builds three engines through the minimal
+planner: off, on (``RewriteConfig(gated_rows="on")``) and off again as a control. It compares their first
+force evaluation (the compiled force call the engine starts with): energy, forces and, with ``--stress``, stress. Plain cuEq float64
 (``--backend cueq``) is expected to be bitwise equal; the hybrid float32 result is recorded the same way.
 Plain cuEq plans leave the MH-1 package and the block linears off (they are ``auto`` for the hybrid only),
 so there both sides request them explicitly (``CUEQ_PACKAGE``); ``reassociate_first`` stays off, as the
