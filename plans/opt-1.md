@@ -190,6 +190,25 @@ and runs in parallel with B/C, with its own worker.
   - **Checks:** repeated short calls, observer mutations, reproducible
     restart equivalence, child termination, GPU-memory release.
 
+**Overnight queue, 20–21 October 2026** (owner asleep from about 21:30 UTC,
+asked for about 10 hours of queued work):
+
+| Who | Until about 03:00 UTC (code freeze for the acceptance) |
+| --- | --- |
+| 2-T20 | Push the A+B default change (conductor trials and merges it). Then: the stage B report; the local OPT-T03 sm_120 and OPT-T01 reruns; stage C (design note, then build, gate and A/B on both GPUs if it's a go); then an OPT-T04 checkpoint scan, CPU only, report only |
+| 2-T19 | OPT-T06: build, tests, murphy bitwise check |
+| 2-T07 | OPT-T07: build, tests, murphy checks |
+| 2-T23 | Write the combined-acceptance runbook (phase 2 items plus the round's), CPU only |
+| 2-T22 | Coraline soft-lock check, only if coraline's GPU has no process of any user |
+
+**Code freeze at about 03:00 UTC:** whatever is merged by then is in the
+combined acceptance. Anything later waits for the next round.
+
+**Combined acceptance from about 03:00 UTC (2-T23):** both GPUs, the
+runbook's order, including the 19-label gate, the item 4 repeat and item 8
+against `fastmace-1b`. The phase 2 report and a round-1 summary are ready
+for the owner in the morning.
+
 Not in this round:
 - a complete force megakernel. Our fit gives a ceiling of 8–16 % on NaCl, and
   the report budgets 0–15 % with regression possible. Months of work.
