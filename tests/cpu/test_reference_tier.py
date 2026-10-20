@@ -250,6 +250,26 @@ def test_gate_passes_in_reference_mode(loaded, tmp_path):
     sim.run(steps=2)
 
 
+def test_fallback_reference_candidate_builds_and_validates_on_the_reference_tier(loaded, cpu_planner):
+    """The last candidate of the terminal sequence (2-T06's ``candidate``/``activate``, §9.4 step 2)."""
+    from fastmace.model.forcefield import ForceField
+    from fastmace.planner import fallback, selfcheck
+    from fastmace.planner.workload import Workload
+
+    atoms = _atoms()
+    ff = ForceField(loaded, atoms, precision="float64")
+    config = LANGEVIN.to_config(seed=1)
+    plan = cpu_planner.plan(ff, atoms, config, Workload(max_temperature_K=300.0))
+    cand = fallback.candidate(plan, {"mode": "reference", "reason": "terminal sequence"}, ff, atoms,
+                              planner=cpu_planner)
+    assert cand.tier == "reference" and "allow_reference" in cand.allowances
+    references = selfcheck.references(cand, ff, atoms, config, check="gate", seed=1)
+    activation = fallback.activate(cand, cpu_planner, ff, atoms, references=references)
+    assert activation.activated, activation.error
+    assert type(activation.engine.force_field).__name__ == "ReferenceForceField"
+    assert activation.gate.status == "passed"
+
+
 # --------------------------------------------------------------------------- fits (§9.4 step 5)
 
 
