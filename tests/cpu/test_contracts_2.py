@@ -320,10 +320,9 @@ def test_reference_force_field_stub():
 def test_fallback_stubs():
     from fastmace.planner import fallback
 
-    assert list(inspect.signature(fallback.candidate).parameters) == ["plan", "changes", "force_field", "atoms"]
+    # 2-T06 filled candidate and activate (tests/cpu/test_fallback_candidates.py); planner= is keyword-only.
+    assert list(inspect.signature(fallback.candidate).parameters)[:4] == ["plan", "changes", "force_field", "atoms"]
     assert list(inspect.signature(fallback.activate).parameters)[:1] == ["candidate"]
-    _raises_naming("2-T06", lambda: fallback.candidate(None, {}, None, None))
-    _raises_naming("2-T06", lambda: fallback.activate(None))
     ddmin = inspect.signature(fallback.ddmin)
     assert list(ddmin.parameters) == ["rewrites", "test", "requires", "budget"]
     _raises_naming("2-T15", lambda: fallback.ddmin(("a",), lambda subset: True, requires={}, budget=None))
