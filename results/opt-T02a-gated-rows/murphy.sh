@@ -7,6 +7,7 @@
 # 4. ab-off-first, ab-on-first: same-process A/B, 12 blocks of 300 steps, ABAB and ABBA
 # Before every job: no compute process on the GPU and the 1-minute load below LOAD_MAX (waits up to 30
 # minutes, then stops); the idle record goes into the run log. Files only under /mnt/homes/zwingel.
+# ONLY="gpu-cueq64 gpu-cueq64-npt" (environment) runs only the named jobs.
 set -uo pipefail
 src=$1; id=$2
 work=/mnt/homes/zwingel/fastmace-work/opt-T02a
@@ -42,8 +43,9 @@ idle() {
   note "$name idle (waited ${waited}s) load=$(cut -d' ' -f1-3 /proc/loadavg) gpu=$(nvidia-smi --query-gpu=name,driver_version,utilization.gpu,memory.used --format=csv,noheader) top=[$(ps -eo pcpu,user,comm --sort=-pcpu | sed -n 2,4p | tr -s ' ' | paste -sd';' -)]"
 }
 
-job() {  # name env_dir command...
+job() {  # name env_dir command...; ONLY="name ..." runs only those jobs
   local name=$1 env=$2; shift 2
+  if [ -n "${ONLY:-}" ] && [[ " $ONLY " != *" $name "* ]]; then return 0; fi
   idle "$name" || exit 3
   note "start $name"
   LD_LIBRARY_PATH=$(libs "$env") "$@" > "$run/$name.log" 2>&1 < /dev/null

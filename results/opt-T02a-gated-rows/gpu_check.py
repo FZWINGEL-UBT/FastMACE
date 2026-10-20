@@ -4,6 +4,9 @@ For each structure (3x3x3, rattled 0.05 A, seed 20261020) it builds two engines 
 one with ``RewriteConfig(gated_rows="on")``, and compares their first force evaluation (the compiled force
 call the engine starts with): energy, forces and, with ``--stress``, stress. Plain cuEq float64
 (``--backend cueq``) is expected to be bitwise equal; the hybrid float32 result is recorded the same way.
+Plain cuEq plans leave the MH-1 package and the block linears off (they are ``auto`` for the hybrid only),
+so there both sides request them explicitly (``CUEQ_PACKAGE``); ``reassociate_first`` stays off, as the
+planner refuses it on plain cuEq.
 Writes ``<output>.json``. Run in a fresh process per backend (SPEC §8.7) on an idle GPU.
 """
 
@@ -19,6 +22,10 @@ import fastmace  # noqa: F401  (before torch: soft file locks)
 
 sys.path.insert(0, str(Path(fastmace.__file__).resolve().parents[1] / "tools"))
 import ab_step_time  # noqa: E402
+
+
+CUEQ_PACKAGE = dict(factor_species="on", fold_cutoff="on", density_first="on", joint_radial_input="on",
+                    block_linear="on", grouped_linear="on", merged_residual="on")
 
 
 def main(argv=None):
@@ -50,6 +57,7 @@ def main(argv=None):
     precision = "float32" if args.backend == "hybrid" else "float64"
     out = dict(model=args.model, backend=args.backend, precision=precision, gpu=torch.cuda.get_device_name(),
                torch=torch.__version__, fastmace_commit=ab_step_time.fastmace_commit(), stress=args.stress,
+               package=CUEQ_PACKAGE if args.backend == "cueq" else "planner defaults",
                structures={})
     integrator = IntegratorConfig(ensemble="npt" if args.stress else "nvt", temperature_K=300.0)
     for spec in args.structures:
@@ -58,7 +66,8 @@ def main(argv=None):
         atoms.positions += rng.normal(scale=0.05, size=atoms.positions.shape)
         results = {}
         for setting in ("off", "on"):
-            rewrites = RewriteConfig(gated_rows=setting) if setting == "on" else "auto"
+            base = CUEQ_PACKAGE if args.backend == "cueq" else {}
+            rewrites = (RewriteConfig(**base, gated_rows=setting) if setting == "on" or base else "auto")
             field = ForceField(loaded, atoms, precision=precision, rewrites=rewrites)
             plan = planner.plan(field, atoms, integrator, Workload(max_temperature_K=300.0), hardware)
             engine = planner.build(plan, field, atoms.copy(), temperature_K=0.0)
