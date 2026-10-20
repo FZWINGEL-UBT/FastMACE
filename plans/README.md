@@ -10,7 +10,8 @@ phase before it is under way, not all in advance. Worker rules are in
 | 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phase-1a.md`); owner checkpoint 3 decided (19 October: `main.py` defaults to FastMACE) |
 | 1b. Contracts | [phase-1b.md](phase-1b.md) | **done** (19–20 October 2026), tag `fastmace-1b`; acceptance report `docs/validation/phase-1b.md` |
 | 2. Safety | [phase-2.md](phase-2.md) | planned (19 October 2026); D1–D4 decided; all workers prestarted |
-| 3. Dynamic topology and MC | — | |
+| Optimisation round 1 | [opt-1.md](opt-1.md) | owner decision 20 October 2026: before phase 3, starting with FP32-accurate tensor-core GEMMs (OPT-T01) |
+| 3. Dynamic topology and MC | — | after optimisation round 1 |
 | 3b. NPT for the chlorides | — | |
 | 4. Physics | — | |
 | 5. Planner completion | — | |
