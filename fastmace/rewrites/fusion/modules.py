@@ -52,6 +52,7 @@ class GatedRows(torch.nn.Module):
         self.act_scalar, self.scalar_cst = act_scalar, scalar_cst
         self.act_gate, self.gate_cst = act_gate, gate_cst
         self.joined = None  # segment_gemm: (input index, output offset, dim) per product of ``second``
+        self.sms = None  # segment_gemm: the device's SM count for the shape rule (None: not float32 on CUDA)
 
     def join_in_place(self):
         """Let ``second``'s products write straight into its joined output (``segment_gemm``); returns
@@ -70,6 +71,11 @@ class GatedRows(torch.nn.Module):
             if second.segments_in[i][2] != dim:
                 return False, f"product {index} of linear_2 changes the irrep dimension"
             plan.append((i, offset, dim, index))
+        from fastmace.kernels.triton import tile_rule
+
+        weight = second.weight_0
+        # Read once at setup: the forward evaluates the rule while torch.compile traces it.
+        self.sms = tile_rule.device_sms(weight.device) if weight.dtype == torch.float32 else None
         self.joined = tuple(plan)
         return True, "ok"
 
@@ -78,13 +84,7 @@ class GatedRows(torch.nn.Module):
         not, the joined op would only add launches, so the stock products and join run (NaCl-sized cells)."""
         from fastmace.kernels.triton import tile_rule
 
-        like = rows[0]
-        sms = tile_rule.device_sms(like.device) if like.dtype == torch.float32 else None
-        second = self.second
-        n = int(n)  # the atom count is fixed per engine; under torch.compile this specialises on it
-        return any(tile_rule.segment_gemm_choice(n * dim, int(getattr(second, f"weight_{k}").shape[1]),
-                                                 int(getattr(second, f"weight_{k}").shape[0]), sms).backend == "triton"
-                   for _, _, dim, k in self.joined)
+        return any(tile_rule.uses_triton(n * dim, self.sms) for _, _, dim, _ in self.joined)
 
     def forward(self, x, y):
         outputs, n, like = self.first.output_rows(x, y)

@@ -41,6 +41,14 @@ def row_waves(m: int, sms: int, block_m: int = BLOCK_M) -> float:
     return math.ceil(m / block_m) / max(sms, 1)
 
 
+def uses_triton(m, sms) -> bool:
+    """Whether ``segment_gemm_choice`` picks Triton for ``m`` rows on ``sms`` SMs, in integer arithmetic only
+    (it is evaluated while torch.compile traces a forward, where ``m`` may be symbolic)."""
+    if not sms:
+        return False
+    return (m + BLOCK_M - 1) // BLOCK_M >= MIN_TRITON_WAVES * sms
+
+
 def segment_gemm_choice(m: int, n: int, k: int, sms: int | None) -> GemmChoice:
     """The backend and tiles of a gathered-row product ``[m, k] @ [k, n]`` on a device with ``sms`` SMs
     (None: not a CUDA device, so cuBLAS/PyTorch)."""
