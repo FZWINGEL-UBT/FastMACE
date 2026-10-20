@@ -5,6 +5,10 @@ written on 17 October 2026 by the conductor that ran phases 0 and 1a waves
 0–1 from a ResearchModule session. From here on, the conductor runs in a
 session opened in this repository (`D:\Margraf\FastMACE`).
 
+**Workstations unavailable from Thursday 22 October 2026, evening, until the
+owner says so** (power outage on Friday 23 October). See `plans/README.md`,
+"Workstation availability".
+
 ## Your job
 
 You own `plans/`, the phase status and `main`. You start one worker per

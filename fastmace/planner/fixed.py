@@ -82,6 +82,8 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.block_linear": "on_for_hybrid_graph_engine",
     "RewriteConfig.grouped_linear": "on_with_block_linear",
     "RewriteConfig.merged_residual": "on_with_block_linear",
+    "RewriteConfig.gated_rows": "never_automatic",
+    "RewriteConfig.segment_gemm": "never_automatic",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
 })
@@ -89,6 +91,7 @@ AUTO_RULES = MappingProxyType({
 # adapt_options_to_model's ``requires``: option -> rewrite_support key, in its order.
 STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
+    ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
     ("streaming_conv", "streaming_conv"), ("fold_cutoff", "fold_cutoff"), ("factor_species", "factor_species"),
     ("reassociate_first", "reassociate_first"), ("segmented_first_sum", "reassociate_first"),
@@ -96,7 +99,8 @@ STAGE2_SUPPORT = (
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "segmented_first_sum", "fused_radial_hidden", "streaming_conv",
-                  "block_linear", "grouped_linear", "merged_residual", "species_skip", "single_graph_strain")
+                  "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "species_skip",
+                  "single_graph_strain")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
 SINGLE_GRAPH = "single_graph"  # one structure per evaluation: always, production is one structure
@@ -547,6 +551,12 @@ class FixedPlanner:
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")
         needs("merged_residual", r.merged_residual != "off", v["block_linear"], "block_linear")
+        needs("gated_rows", r.gated_rows == "on", v["merged_residual"], "merged_residual")
+        if r.gated_rows == "auto":
+            v["_why"]["gated_rows"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
+        needs("segment_gemm", r.segment_gemm == "on", v["gated_rows"], "gated_rows")
+        if r.segment_gemm == "auto":
+            v["_why"]["segment_gemm"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
         note("single_graph_strain", r.single_graph_strain != "off",
              "acts where stress is computed (NPT)" if npt else "process-wide; acts only where stress is computed")

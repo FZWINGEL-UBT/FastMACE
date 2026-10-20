@@ -380,3 +380,68 @@ def test_progress_resets_the_stall_clock(tmp_path):
     process = subprocess.Popen([sys.executable, "-c", code, str(heartbeat)])
     code, reason = runner_module._wait(process, heartbeat, timeout_s=None, stall_timeout_s=0.6, poll_s=0.05)
     assert (code, reason) == (0, None)  # 1.2 s in all, never 0.6 s without progress
+
+
+# --------------------------------------------------------------------------- durable copies (2-T07b)
+
+
+class _Queue:
+    def drain(self):
+        pass
+
+
+class _Parent:
+    """What ``SubprocessRunner.save_restart`` reads from its ``Simulation``."""
+
+    _queue = _Queue()
+
+    def _write_metadata(self):
+        pass
+
+
+def _hand_off(tmp_path, marker):
+    """A runner whose current hand-off holds a restart and record marked ``marker``."""
+    stage = tmp_path / "stage"
+    stage.mkdir(exist_ok=True)
+    np.savez(stage / "restart.npz", marker=np.array([marker]))
+    (stage / "simulation.json").write_text(json.dumps({"marker": marker, "output": None}))
+    runner = runner_module.SubprocessRunner()
+    runner.current = stage
+    return runner
+
+
+def test_an_interrupted_save_restart_keeps_the_previous_checkpoint(tmp_path, monkeypatch):
+    target = tmp_path / "run"
+    _hand_off(tmp_path, 1).save_restart(_Parent(), target / "restart.npz")
+    before = (target / "restart.npz").read_bytes()
+    runner = _hand_off(tmp_path, 2)
+
+    def interrupted(source, destination, *args, **kwargs):
+        destination.write(b"NEW_")
+        raise OSError("injected: the copy was interrupted")
+
+    monkeypatch.setattr(runner_module.shutil, "copyfileobj", interrupted)
+    with pytest.raises(OSError, match="injected"):
+        runner.save_restart(_Parent(), target / "restart.npz")
+    assert (target / "restart.npz").read_bytes() == before
+    with np.load(target / "restart.npz") as stored:
+        assert stored["marker"].tolist() == [1]
+    assert json.loads((target / "simulation.json").read_text())["marker"] == 1
+    assert sorted(path.name for path in target.iterdir()) == ["restart.npz", "simulation.json"]  # no temporary
+
+
+def test_save_restart_fsyncs_replaces_then_fsyncs_the_directory(tmp_path, monkeypatch):
+    from test_durable import Recorder, directory_fsync
+
+    target = tmp_path / "run"
+    target.mkdir()
+    runner = _hand_off(tmp_path, 1)
+    recorder = Recorder(monkeypatch, target)
+    runner.save_restart(_Parent(), target / "restart.npz")
+    events = []
+    for name in ("restart.npz", "simulation.json"):
+        temporary = f".{name}.{os.getpid()}.tmp"
+        events += [("fsync", temporary), ("replace", temporary, name), *directory_fsync()]
+    assert recorder.events == events
+    with np.load(target / "restart.npz") as stored:
+        assert stored["marker"].tolist() == [1]

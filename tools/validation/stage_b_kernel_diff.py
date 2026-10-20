@@ -1,0 +1,137 @@
+"""2-T08c: which kernels of stage B differ between FastMACE and the research engine (MH-1 plain cuEq float64).
+
+``test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine`` compares the captured
+graphs' kernel sequences (``kernel_sequence``). This runs both of its children once, in the
+"checked" mode only, and prints for every captured graph the node counts, whether the sequences
+match, and a diff of the two sequences (``difflib``: ``-`` FastMACE only, ``+`` research engine only).
+
+Variants (``--variant``), each a FastMACE child with one change, to bisect a difference:
+
+- ``main``: the test's own child;
+- ``no-fresh-basis``: ``fastmace.model.loading._fresh_cueq_basis_cache`` replaced by a no-op (2-T14).
+
+Run from a checkout with the environment of the test (``FASTMACE_MODELS``, ``FASTMACE_BASELINE``):
+
+    python tools/validation/stage_b_kernel_diff.py --steps 100 --variant main --variant no-fresh-basis
+
+``--load-gib N`` runs the comparison beside a GPU load of our own (continuous matmuls holding N GiB),
+to test whether a shared GPU changes run-time kernel choices (2-T08c: the failures were on a shared
+GPU, the passes on an idle one).
+"""
+
+from __future__ import annotations
+
+import argparse
+import contextlib
+import difflib
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path[:0] = [str(ROOT), str(ROOT / "tests" / "gpu"), str(ROOT / "tests")]
+import test_engine_gpu as t  # noqa: E402
+
+VARIANTS = {
+    "main": "",
+    "no-fresh-basis": ("import contextlib\nfrom fastmace.model import loading as _loading\n"
+                       "_loading._fresh_cueq_basis_cache = contextlib.nullcontext\n"),
+}
+
+
+def fastmace(spec, variant):
+    child = t.FASTMACE_CHILD.format()
+    child = child.replace("import fastmace\n", "import fastmace\n" + VARIANTS[variant], 1)
+    return t.run_fresh(t.COMMON.format(spec=spec) + child)["modes"]["checked"]
+
+
+def compare(ours, theirs):
+    out = {}
+    for key in sorted(set(ours["kinds"]) | set(theirs["kinds"])):
+        a, b = ours["kinds"].get(key) or [], theirs["kinds"].get(key) or []
+        sa, sb = t.kernel_sequence(a), t.kernel_sequence(b)
+        diff = [line for line in difflib.ndiff(sa, sb) if line[:1] in "+-"]
+        out[key] = {"nodes": [len(a), len(b)], "sequence": [len(sa), len(sb)], "equal": sa == sb, "diff": diff}
+    return out
+
+
+ENVIRONMENT = """
+import json, importlib.metadata as md
+import fastmace
+from fastmace import _patches
+out = {"versions": {},
+       "patch_problems": {name: _patches.patch_problems(name) for name in getattr(_patches, "SOURCE_PINS", {})}}
+for name in ("mace-torch", "cuequivariance", "cuequivariance-torch", "cuequivariance-ops-torch-cu12",
+             "cuequivariance-ops-torch-cu13", "torch"):
+    try:
+        out["versions"][name] = md.version(name)
+    except md.PackageNotFoundError:
+        pass
+import mace
+out["mace_file"] = mace.__file__
+print(json.dumps(out))
+"""
+
+
+LOAD = """
+import sys, torch
+held = torch.empty(int(float(sys.argv[1]) * 2**30), dtype=torch.uint8, device="cuda")
+a = torch.randn(4096, 4096, device="cuda")
+print("load running", flush=True)
+while True:
+    a = (a @ a).tanh_()
+"""
+
+
+@contextlib.contextmanager
+def gpu_load(gib):
+    """A second process of ours on the GPU for the block: continuous matmuls holding ``gib`` GiB (0: none)."""
+    if not gib:
+        yield None
+        return
+    child = subprocess.Popen([sys.executable, "-c", LOAD, str(gib)], stdout=subprocess.PIPE, text=True)
+    try:
+        assert child.stdout.readline().strip() == "load running"
+        yield child.pid
+    finally:
+        child.kill()
+        child.wait()
+
+
+def environment():
+    """Package versions and, where the checkout has hash gates (2-T04), every patch whose source does not hash."""
+    return t.run_fresh(ENVIRONMENT)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--steps", type=int, default=100)
+    parser.add_argument("--variant", action="append", choices=sorted(VARIANTS))
+    parser.add_argument("--out", type=Path)
+    parser.add_argument("--environment-only", action="store_true", help="versions and hash gates only (no GPU)")
+    parser.add_argument("--load-gib", type=float, default=0.0,
+                        help="run the comparison beside a GPU load of ours holding this many GiB (0: idle GPU)")
+    args = parser.parse_args(argv)
+    result = {"environment": environment()}
+    print("== environment")
+    print(json.dumps(result["environment"], indent=1))
+    if args.environment_only:
+        return
+    spec = t.spec("cueq", modes=[("checked", args.steps)])
+    result["load_gib"] = args.load_gib
+    with gpu_load(args.load_gib):
+        theirs = t.baseline_run(spec)["modes"]["checked"]
+        result["baseline"] = {"kinds": theirs["kinds"], "edge_sizes_used": theirs["edge_sizes_used"]}
+        for variant in args.variant or ["main"]:
+            ours = fastmace(spec, variant)
+            result[variant] = {"kinds": ours["kinds"], "edge_sizes_used": ours["info"]["edge_sizes_used"],
+                               "compare": compare(ours, theirs)}
+            print(f"== {variant}")
+            print(json.dumps(result[variant]["compare"], indent=1))
+    if args.out:
+        args.out.write_text(json.dumps(result, indent=1) + "\n")
+
+
+if __name__ == "__main__":
+    main()

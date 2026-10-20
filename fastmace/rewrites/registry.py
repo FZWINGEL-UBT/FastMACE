@@ -75,6 +75,8 @@ RECORD_SOURCES = (
     "fastmace.rewrites.mh1",
     "fastmace.rewrites.generic",
     "fastmace.rewrites.linear",
+    # Optimisation round 1 (plans/opt-1.md): after the linear family, whose modules it chains.
+    "fastmace.rewrites.fusion",
     "fastmace.rewrites.polar",
     # Process-wide stress-path patch (MACE PR 1498), as a record so the planner gets a decision and reason.
     "fastmace.rewrites.engine",

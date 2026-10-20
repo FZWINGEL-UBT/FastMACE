@@ -8,17 +8,16 @@
 # - by hand: any tier on either or both runners.
 name: gpu
 
+# Deferred (owner, 20 October 2026; SPEC draft 0.12, eleventh amendment): no runner is registered, so
+# the push and nightly triggers are off and the workflow runs only by hand. To enable it after the
+# runners are registered, put these back under `on:`:
+#   push:
+#     branches: [main]
+#     # Plan, docs and result updates start no GPU run; a push that also touches code still does.
+#     paths-ignore: ["plans/**", "docs/**", "results/**", "**/*.md"]
+#   schedule:
+#     - cron: "30 0 * * *"  # 01:30 CET / 02:30 CEST
 on:
-  push:
-    branches: [main]
-    # Plan, docs and result updates start no GPU run; a push that also touches code still does.
-    paths-ignore:
-      - "plans/**"
-      - "docs/**"
-      - "results/**"
-      - "**/*.md"
-  schedule:
-    - cron: "30 0 * * *"  # 01:30 CET / 02:30 CEST
   workflow_dispatch:
     inputs:
       tier:

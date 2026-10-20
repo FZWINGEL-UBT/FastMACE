@@ -95,6 +95,26 @@ elif CASE == "capture_error":
 
     graph.GraphEngine._stage = _stage
 
+memory = []  # CUDA memory allocated when each build starts and ends (2-T15c)
+if SPEC.get("probe_memory"):
+    from fastmace.planner import fallback as fallback_module, minimal
+
+    if not SPEC.get("detach", True):  # the control: failures keep their frames, as before 2-T15c
+        fallback_module.detach = lambda error: error
+    original_build = minimal.MinimalPlanner.build
+
+    def build(planner, plan, *args, **kwargs):
+        gc.collect()
+        torch.cuda.synchronize()
+        entry = {"tier": plan.tier, "before_MiB": torch.cuda.memory_allocated() / 2**20}
+        memory.append(entry)
+        engine = original_build(planner, plan, *args, **kwargs)
+        torch.cuda.synchronize()
+        entry["after_MiB"] = torch.cuda.memory_allocated() / 2**20
+        return engine
+
+    minimal.MinimalPlanner.build = build
+
 model = fm.load(SPEC["label"])
 integrator = fm.integrators.Langevin(timestep_fs=2.0, temperature_K=300.0, friction_per_fs=0.02 * units.fs)
 started = time.perf_counter()
@@ -116,7 +136,7 @@ out = {
     "reduced_gate_runs": sum(t.reduced_gate_runs for t in plan.fallbacks),
     "full_gate_runs": sum(t.full_gate_runs for t in plan.fallbacks),
     "finite": bool(np.isfinite(committed.forces).all() and np.isfinite(committed.positions).all()),
-    "report": sim.report.text(), "check": SPEC.get("check", "gate"),
+    "report": sim.report.text(), "check": SPEC.get("check", "gate"), "memory": memory,
 }
 sim.close()
 print(json.dumps(out, default=str))
@@ -248,3 +268,26 @@ def test_prepare_leaves_the_default_trajectory_unchanged():
         assert summary["prepare_vs_lazy_A"] == 0.0 and summary["prepare_vs_lazy_momenta"] == 0.0, summary
     else:  # the backend is not bitwise even between two lazy runs: no worse than that
         assert summary["prepare_vs_lazy_A"] <= summary["lazy_again_vs_lazy_A"] * 10, summary
+
+
+@pytest.mark.slow
+def test_a_failed_candidates_memory_is_freed_before_the_next_build():
+    """2-T15c: the broken-rewrite case, with ``torch.cuda.memory_allocated`` at every build. With
+    ``detach`` each build starts at the first build's level (the failed engines are gone); the control
+    without it (failures keep their frames, as before) starts every later build with the first,
+    failed engine still allocated."""
+    fixed = _run("rewrite", probe_memory=True)
+    control = _run("rewrite", probe_memory=True, detach=False)
+    for out in (fixed, control):
+        _common(out)
+        assert len(out["memory"]) >= 3, out["memory"]
+    first = fixed["memory"][0]
+    engine_MiB = first["after_MiB"] - first["before_MiB"]
+    later = [entry["before_MiB"] - first["before_MiB"] for entry in fixed["memory"][1:]]
+    held = [entry["before_MiB"] - control["memory"][0]["before_MiB"] for entry in control["memory"][1:]]
+    summary = {"engine_MiB": engine_MiB, "fixed_extra_at_build_MiB": later, "control_extra_at_build_MiB": held,
+               "fixed": fixed["memory"], "control": control["memory"], "gpu": fixed["gpu"]}
+    ENGINE.report("2-T15c-fallback-memory-mh1-nacl", summary)
+    assert engine_MiB > 50, summary
+    assert max(later) <= 0.1 * engine_MiB + 64, summary  # library workspaces may stay; no engine does
+    assert min(held) >= 0.75 * engine_MiB, summary  # the claim, reproduced on the GPU

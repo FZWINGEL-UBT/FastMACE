@@ -1,0 +1,122 @@
+{
+  "model": "mh1-r2scan",
+  "backend": "cueq",
+  "precision": "float64",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "570dbb0ee9ec19de6663bb4fe12064a19ba35b78",
+  "stress": true,
+  "package": {
+    "factor_species": "on",
+    "fold_cutoff": "on",
+    "density_first": "on",
+    "joint_radial_input": "on",
+    "block_linear": "on",
+    "grouped_linear": "on",
+    "merged_residual": "on"
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.gated_rows = off  (requested 'off': stage 1: off)",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.gated_rows=off, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ],
+        "on": [
+          "  RewriteConfig.gated_rows = on  (requested 'on': stage 1: on (with merged_residual); stage 2: supported (ok))",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.gated_rows=on, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ],
+        "off2": [
+          "  RewriteConfig.gated_rows = off  (requested 'off': stage 1: off)",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.gated_rows=off, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 1.1368683772161603e-12,
+          "max_abs": 1485.2001226731854
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 7.216449660063518e-16,
+          "max_abs": 0.6402363947270044
+        },
+        "stress": {
+          "bitwise_equal": false,
+          "max_abs_diff": 3.0357660829594124e-18,
+          "max_abs": 0.003848654769885569
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 2.2737367544323206e-13,
+          "max_abs": 1485.2001226731854
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 6.938893903907228e-16,
+          "max_abs": 0.6402363947270044
+        },
+        "stress": {
+          "bitwise_equal": false,
+          "max_abs_diff": 6.071532165918825e-18,
+          "max_abs": 0.003848654769885569
+        }
+      }
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.gated_rows = off  (requested 'off': stage 1: off)",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.gated_rows=off, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ],
+        "on": [
+          "  RewriteConfig.gated_rows = on  (requested 'on': stage 1: on (with merged_residual); stage 2: supported (ok))",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.gated_rows=on, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ],
+        "off2": [
+          "  RewriteConfig.gated_rows = off  (requested 'off': stage 1: off)",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.gated_rows=off, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 2.546585164964199e-11,
+          "max_abs": 20591.06611744947
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 3.552713678800501e-15,
+          "max_abs": 4.583933093895755
+        },
+        "stress": {
+          "bitwise_equal": false,
+          "max_abs_diff": 1.1817803680091998e-17,
+          "max_abs": 0.0038719633915889526
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 7.275957614183426e-12,
+          "max_abs": 20591.06611744947
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 2.9976021664879227e-15,
+          "max_abs": 4.583933093895755
+        },
+        "stress": {
+          "bitwise_equal": false,
+          "max_abs_diff": 2.211772431870429e-17,
+          "max_abs": 0.0038719633915889526
+        }
+      }
+    }
+  }
+}

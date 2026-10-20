@@ -163,7 +163,7 @@ class SubprocessRunner:
         sim = simulation
         self._start(sim, output)
         stage = self._stage()
-        shutil.copyfile(Path(source) / "restart.npz", stage / "restart.npz")
+        _copy(Path(source) / "restart.npz", stage / "restart.npz")
         record = json.loads(json.dumps(record))
         if record.get("output") is not None:
             record["output"]["directory"] = str(Path(record["output"]["directory"]).resolve())
@@ -203,17 +203,23 @@ class SubprocessRunner:
         simulation._queue.submit(_HostSnapshot(self._step, self._values), sink)
 
     def save_restart(self, simulation: Any, path: Path) -> None:
-        """Copy the last hand-off (a canonical restart point at the committed step) to ``path``."""
+        """Copy the last hand-off (a canonical restart point at the committed step) to ``path``.
+
+        Both files are written durably (``io.durable``: temporary file, fsync, rename, directory
+        fsync; SPEC §10.6), so an interrupted copy leaves the previous restart as it was (2-T07b).
+        """
+        from fastmace.simulation import _write_json as write_record
+
         self._apply_host_writes(simulation)
         simulation._queue.drain()
         directory = path.parent
         directory.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(self.current / "restart.npz", path)
+        _copy(self.current / "restart.npz", path)
         record = json.loads((self.current / "simulation.json").read_text(encoding="utf-8"))
         output = record.get("output")
         if output is not None and Path(output["directory"]).resolve() == directory.resolve():
             output["directory"] = "."
-        _write_json(directory / "simulation.json", record)
+        write_record(directory / "simulation.json", record)  # canonical JSON, as Simulation.save_restart
         simulation._write_metadata()
 
     def metadata(self, simulation: Any) -> dict[str, Any]:
@@ -484,13 +490,23 @@ def _tail(path, lines=LOG_TAIL_LINES):
 
 
 def _write_json(path, record):
-    """JSON written atomically: temporary file, then rename (the heartbeat and records are read while
-    they change)."""
-    path = Path(path)
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(json.dumps(record, indent=1, allow_nan=False) + "\n")
-    os.replace(temporary, path)
+    """JSON written durably and atomically (``io.durable.atomic_write``): the records are read while
+    they change, and a hand-off's records must survive a crash as its restart does."""
+    from fastmace.io import durable
+
+    durable.atomic_write(path, json.dumps(record, indent=1, allow_nan=False) + "\n")
+
+
+def _copy(source, target):
+    """Copy ``source`` to ``target`` durably and atomically: an interrupted copy leaves ``target`` as it
+    was (``io.durable.write_atomically``)."""
+    from fastmace.io import durable
+
+    def write(handle):
+        with open(source, "rb") as original:
+            shutil.copyfileobj(original, handle)
+
+    durable.write_atomically(target, write)
 
 
 # --------------------------------------------------------------------------- child
@@ -520,6 +536,8 @@ class _Heartbeat:
         return f"{self.phase} {step}" if step is not None else self.phase
 
     def write(self):
+        # An atomic rename without fsync: the heartbeat only shows liveness to the waiting parent,
+        # is rewritten every few seconds, and means nothing after a crash of the machine.
         text = self.text()
         if text != self._written:
             temporary = self.path.with_name(f".{self.path.name}.tmp")

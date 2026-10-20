@@ -108,6 +108,28 @@ FLAG_NAMES = (
     "speculative_graph", "pipelined")
 
 
+def rewrite_overrides(items):
+    """{field: value} of ``FIELD=VALUE`` items, each a RewriteConfig field; "on"/"off"/"auto" or true/false."""
+    import dataclasses
+
+    from fastmace.config import RewriteConfig
+
+    fields = {f.name: f for f in dataclasses.fields(RewriteConfig)}
+    out = {}
+    for item in items:
+        name, _, value = item.partition("=")
+        if name not in fields or not value:
+            raise ValueError(f"--rewrites {item!r}: expected FIELD=VALUE with a RewriteConfig field")
+        default = fields[name].default
+        if isinstance(default, bool):
+            if value.lower() not in ("true", "false"):
+                raise ValueError(f"--rewrites {item!r}: {name} takes true or false")
+            out[name] = value.lower() == "true"
+        else:
+            out[name] = value
+    return out
+
+
 class GateJobError(RuntimeError):
     """A child process of the gate failed or left no result."""
 
@@ -395,6 +417,8 @@ def parse_args(argv=None):
     p.add_argument("--reference-scope", choices=REFERENCE_SCOPES, default="calculator",
                    help="calculator: one reference process per structure and calculator; configuration: one "
                         "per configuration and calculator")
+    p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="RewriteConfig fields for FastMACE's minimal planner (e.g. gated_rows=on); others stay auto")
     p.add_argument("--reference-command", default=sys.executable,
                    help="Interpreter (with an optional launcher prefix) of the reference processes")
     p.add_argument("--production-command", default=sys.executable,
@@ -404,6 +428,12 @@ def parse_args(argv=None):
         p.error("configs and rattle amplitude must be positive, strain nonnegative")
     if args.engine == "fastmace" and args.main_args.strip():
         p.error("--main-args are main.py options for the baseline engine; FastMACE plans its own options")
+    try:
+        args.rewrites = rewrite_overrides(args.rewrites)
+    except ValueError as exc:
+        p.error(str(exc))
+    if args.rewrites and (args.engine != "fastmace" or args.planner != "minimal"):
+        p.error("--rewrites are RewriteConfig fields of FastMACE's minimal planner (--engine fastmace)")
     if args.engine == "baseline" and args.baseline is None:
         p.error("--engine baseline builds the research engine from its export: give --baseline DIR")
     if args.baseline is None and args.structures_root is None:
@@ -498,7 +528,7 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
         # md_dtype is the production path's --dtype; a reference job's own dtype is its calculator's.
         common = dict(model=args.model, label=args.model, checkpoint=str(checkpoint),
                       checkpoint_sha256=checkpoint_sha256, baseline=str(export.root) if export else None,
-                      backend=args.backend, md_dtype=args.dtype, main_args=args.main_args)
+                      backend=args.backend, md_dtype=args.dtype, main_args=args.main_args, rewrites=args.rewrites)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
         # One finite-difference self-test, by the first float64 reference (it acts for polar models only), on
         # the gate's first NaCl 3x3x3 configuration (the same draw as a NaCl run's own hydrostatic-0).
@@ -810,7 +840,8 @@ def _fastmace_build(job, result):
 
         def build(structure, base, cell_mode):
             # One ForceField per structure: its species superset is the structure's (owner decision D3).
-            force_field = ForceField(loaded, base, precision=precision)
+            rewrites = config.RewriteConfig(**job["rewrites"]) if job.get("rewrites") else "auto"
+            force_field = ForceField(loaded, base, precision=precision, rewrites=rewrites)
             plan = planner.plan(force_field, base, config.IntegratorConfig(ensemble="npt", cell_mode=cell_mode,
                                                                            seed=0, temperature_K=300.0),
                                 Workload(max_temperature_K=300.0), hardware)
