@@ -106,9 +106,9 @@ Setup:
 - The grouped variant is within 1.2e-6.
 
 **Reading:**
-- Measured together, a block linear's four products already reach 11.1 TFLOPS forward on NaCl, only
-  part of the way to the 5.8 TFLOPS that the l = 0 product alone shows in the model trace. Run as one
-  launch sequence, the products fill the GPU better than their separate figures suggest.
+- Measured together, a block linear's four products already reach 11.1 TFLOPS forward on NaCl. The
+  slow l = 0 product (6.6 TFLOPS on murphy, 5.8 locally in the model trace) carries only a small share
+  of the work, so the four products together are already close to the rate of the large ones.
 - **Streams:** the graph branches cost more than they overlap in the forward (0.85–0.95×) and give at
   most 1.11× in one direction.
 - **Grouped launch:** saves 7 % of NaCl's forward + input gradient time (351 → 325 µs). It is neutral to
