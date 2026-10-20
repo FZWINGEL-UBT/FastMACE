@@ -200,8 +200,9 @@ RECORDS = {
         default="off", deterministic=True, workload_constraints=(), apply=_apply, selfcheck=_selfcheck),
     "segment_gemm": Rewrite(
         name="segment_gemm", applies_to=_segment_support, requires=("gated_rows",), conflicts=(),
-        mace_versions=MACE_VERSIONS, source_hashes={RESHAPE_FORWARD: RESHAPE_FORWARD_SHA256}, exactness="rounding", default="off", deterministic=True,
-        workload_constraints=(), apply=_apply_segment, selfcheck=_segment_selfcheck),
+        mace_versions=MACE_VERSIONS, source_hashes={RESHAPE_FORWARD: RESHAPE_FORWARD_SHA256}, exactness="rounding",
+        default="off", deterministic=True, workload_constraints=(), apply=_apply_segment,
+        selfcheck=_segment_selfcheck),
 }
 
 __all__ = ["GATE_FORWARD", "GATE_FORWARD_SHA256", "READS_GATED_ROWS", "RECORDS", "gate_rows", "join_in_place"]
