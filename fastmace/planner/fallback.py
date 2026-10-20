@@ -55,7 +55,8 @@ TASK_CANDIDATES = "plan task 2-T06"
 TASK_SEARCH = "plan task 2-T15"
 # The dimensions a phase 2 fallback changes (SPEC §9.3): precision is not one (conductor answers).
 DIMENSIONS = ("mode", "rewrites", "backend")
-OUTCOMES = ("activated", "failed", "skipped")
+# "passed": a diagnosis run that passed the reduced gate (never activated; 2-T15).
+OUTCOMES = ("activated", "passed", "failed", "skipped")
 # Where a failure was raised; the fallback classifies by stage, never by exception type alone.
 STAGES = ("build", "compile", "capture", "self-check", "gate")
 
@@ -66,7 +67,8 @@ class TriedCandidate:
 
     - ``dimension``: one of ``DIMENSIONS``; ``change``: what changed, readable ("eager",
       "rewrites fold_cutoff, density_first off");
-    - ``outcome``: ``"activated"``, ``"failed"`` or ``"skipped"`` (a duplicate of an earlier one);
+    - ``outcome``: ``"activated"``, ``"passed"`` (a diagnosis run that passed the reduced gate, never
+      activated), ``"failed"`` or ``"skipped"`` (a duplicate of an earlier one, or not planned);
     - ``reason``: why it was tried, or why it failed; ``stage``: where it failed (``STAGES``);
     - ``revision``: the plan revision it became, ``None`` until activated;
     - ``reduced_gate_runs``, ``full_gate_runs``: what validating it cost.
@@ -335,7 +337,7 @@ def _text(error) -> str:
     first = str(error).splitlines()[0] if str(error) else ""
     text = f"{type(error).__name__}: {first}" if first else type(error).__name__
     record = getattr(error, "gate_record", None)
-    if record is not None and getattr(record, "reason", None):
+    if record is not None and getattr(record, "reason", None) and record.reason not in text:
         text += f" ({record.reason})"
     return text
 
@@ -416,13 +418,256 @@ def activate(candidate: Any, planner: Any, force_field: Any, atoms: Any, *, refe
 
 # --------------------------------------------------------------------------- 2-T15
 
+FAILED_CODE = "fallback-exhausted"
+# The reasons of the search's candidates start with these (the report and tests read them).
+MODE_WHY = "eager passes the reduced gate: the fault is in capture or compilation"
+DDMIN_WHY = "ddmin: minimal failing set"
+TERMINAL_WHY = "terminal sequence"
+RULE_13_WHY = "rule 13"
+
+
+class DiagnosisBudgetSpent(Exception):
+    """The reduced-gate budget of one fallback is spent (§9.4 step 2): the terminal sequence runs next."""
+
+
+@dataclass(frozen=True)
+class Failure:
+    """What failed before the first step: the ``plan``, the ``stage`` that raised (``STAGES``), the
+    original ``error`` and, for a gate failure, its ``gate`` record."""
+
+    plan: Any
+    stage: str
+    error: BaseException
+    gate: Any = None
+
+    def __post_init__(self):
+        if self.stage not in STAGES:
+            raise ValueError(f"Failure.stage {self.stage!r} is not one of {STAGES}")
+
+    def quantities(self) -> tuple[str, ...]:
+        """The quantities the reduced gate judges: the gate's failing ones, else all (§9.4 step 2)."""
+        from fastmace.planner import selfcheck
+
+        record = self.gate
+        if record is None or getattr(record, "nonfinite", ()):
+            return selfcheck.QUANTITIES
+        failing = tuple(q for q in selfcheck.QUANTITIES
+                        if not (getattr(record, "quantities", None) or {}).get(q, {}).get("passed", True))
+        return failing or selfcheck.QUANTITIES
+
+
+@dataclass(frozen=True)
+class Result:
+    """The fallback's outcome: the active ``plan`` revision (every tried candidate in its
+    ``fallbacks``), its ``engine`` and validating ``gate`` record, the ``budget`` and, when the
+    candidate runs in a child (§9.4 step 3), ``runner=True`` with no engine here."""
+
+    plan: Any
+    engine: Any
+    gate: Any
+    budget: Budget
+    tried: tuple[TriedCandidate, ...]
+    runner: bool = False
+
+
+def replay_off(stored: Any, planned: Any) -> Any:
+    """``planned`` (a fresh plan in ``stored``'s mode) with every rewrite ``stored`` had off still off,
+    with ``stored``'s decisions: how a resume rebuilds a fallback revision (conductor answers, T15 Q9)."""
+    return _keep_off(stored, planned)
+
+
+def stored_fallback_plan(record: Mapping[str, Any] | None) -> Any:
+    """The plan of a restart's plan record when it, or a revision before it, is a fallback; else ``None``."""
+    from fastmace.planner.plan import Plan
+
+    if not record:
+        return None
+    plan = Plan.from_restart(record)
+    reasons = [str(plan.reason), *(str(p.reason) for p in plan.chain())]
+    return plan if any(reason.startswith(PREFIX) for reason in reasons) else None
+
+
+def enabled_rewrites(plan: Any) -> tuple[str, ...]:
+    """The ``RewriteConfig`` switches that are on in ``plan``, in the registry's application order."""
+    if plan is None or plan.rewrites is None:
+        return ()
+    on = [name for name in _switches(plan.rewrites) if not _off(getattr(plan.rewrites, name))
+          and getattr(plan.rewrites, name) in ("on", True)]
+    order = {name: index for index, name in enumerate(_field_order())}
+    return tuple(sorted(on, key=lambda name: (order.get(name, len(order)), name)))
+
+
+def _field_order(registry=None):
+    from fastmace.rewrites import registry as reg
+
+    registry = registry or reg.default_registry()
+    return tuple(dict.fromkeys(registry.config_field(name) for name in registry.order()))
+
+
+def field_requires(units: Sequence[str], registry: Any = None) -> dict[str, tuple[str, ...]]:
+    """``requires`` between the switches in ``units``: a switch requires another when one of its
+    records requires one of the other's (the registry's records, §6.1)."""
+    from fastmace.rewrites import registry as reg
+
+    registry = registry or reg.default_registry()
+    units = set(units)
+    out: dict[str, list[str]] = {}
+    for name in registry.order():
+        field = registry.config_field(name)
+        if field not in units:
+            continue
+        for required in registry[name].requires:
+            other = registry.config_field(required) if required in registry.names() else required
+            if other != field and other in units and other not in out.setdefault(field, []):
+                out[field].append(other)
+    return {field: tuple(required) for field, required in out.items() if required}
+
+
+def _closure(subset, requires, universe):
+    found, todo = set(subset), list(subset)
+    while todo:
+        for required in requires.get(todo.pop(), ()):
+            if required in universe and required not in found:
+                found.add(required)
+                todo.append(required)
+    return frozenset(found)
+
+
+def dependants(culprits: Sequence[str] | frozenset[str], requires: Mapping[str, Sequence[str]],
+               universe: Sequence[str]) -> tuple[str, ...]:
+    """The members of ``universe`` that require one of ``culprits``, directly or through others, in order."""
+    found = set(culprits)
+    changed = True
+    while changed:
+        changed = False
+        for unit in universe:
+            if unit not in found and found & set(requires.get(unit, ())):
+                found.add(unit)
+                changed = True
+    return tuple(unit for unit in universe if unit in found and unit not in culprits)
+
+
+def _split(items, n):
+    size, rest = divmod(len(items), n)
+    parts, start = [], 0
+    for index in range(n):
+        end = start + size + (1 if index < rest else 0)
+        parts.append(items[start:end])
+        start = end
+    return [part for part in parts if part]
+
+
+def ddmin(rewrites: Sequence[str], test: Callable[[frozenset[str]], bool], *,
+          requires: Mapping[str, Sequence[str]], budget: Budget | None) -> frozenset[str]:
+    """A 1-minimal failing subset of ``rewrites`` under the ``requires`` closure (delta debugging).
+
+    ``test(subset)`` is True when the reduced gate fails with ``subset`` enabled; ``subset`` always
+    holds what its members require (the closure), so a culprit that requires another is tested with
+    it and blamed alone. The caller knows that the whole set fails and the empty set passes. Each
+    call counts against ``budget`` (``None``: the caller counts); a closed subset is never tested
+    twice. Raises ``DiagnosisBudgetSpent`` when the budget is spent.
+    """
+    universe = tuple(rewrites)
+    known: dict[frozenset[str], bool] = {frozenset(universe): True, frozenset(): False}
+
+    def fails(part):
+        closed = _closure(part, requires, universe)
+        if closed not in known:
+            if budget is not None:
+                if budget.spent:
+                    raise DiagnosisBudgetSpent(f"the diagnosis budget of {budget.limit} reduced-gate runs is spent")
+                budget.reduced_gate_runs += 1
+            known[closed] = bool(test(closed))
+        return known[closed]
+
+    current, n = list(universe), 2
+    while len(current) >= 2:
+        parts = _split(current, n)
+        reduced = next((part for part in parts if fails(part)), None)
+        if reduced is not None:
+            current, n = reduced, 2
+            continue
+        complement = None
+        if n > 2:
+            for part in parts:
+                rest = [unit for unit in current if unit not in part]
+                if fails(rest):
+                    complement = rest
+                    break
+        if complement is not None:
+            current, n = complement, max(n - 1, 2)
+        elif n < len(current):
+            n = min(2 * n, len(current))
+        else:
+            break
+    return frozenset(current)
+
+
+def diagnose(plan: Any, failure: BaseException | Failure | None, *, test: Callable[[str, frozenset[str]], bool]
+             ) -> str | None:
+    """The failing dimension (§9.4 step 2): ``"mode"`` if eager passes, else ``"rewrites"``.
+
+    ``test(mode, enabled)`` is True when the reduced gate fails in ``mode`` with the switches
+    ``enabled`` on. Eager on the full rewrite set passes: ``"mode"`` (a graph plan; for an eager plan
+    the reduced gate cannot see the fault: ``None``). Eager fails and the empty set passes:
+    ``"rewrites"``. The empty set fails too: ``None``, the fault is not in the rewrites.
+    """
+    units = frozenset(enabled_rewrites(plan))
+    if not test("eager", units):
+        return "mode" if plan.tier not in ("eager", "reference") else None
+    if not units or test("eager", frozenset()):
+        return None
+    return "rewrites"
+
+
+def terminal_sequence(plan: Any, *, reference: bool = True) -> tuple[tuple[str, str], ...]:
+    """The fixed candidates after the budget is spent (§9.4 step 2), as ``(mode, label)``: the same mode
+    with every rewrite off, eager with every rewrite off, the reference tier if it fits (``reference``:
+    ``FallbackConfig.reference_last``). Duplicates are left out."""
+    steps = [(plan.tier, f"{plan.tier} with every rewrite off"), ("eager", "eager with every rewrite off")]
+    if reference:
+        steps.append(("reference", "the reference tier"))
+    out, seen = [], set()
+    for mode, label in steps:
+        if mode not in seen:
+            seen.add(mode)
+            out.append((mode, label))
+    return tuple(out)
+
+
+def _release(*objects):
+    """Drop engines built for a test before the next one is built (one engine at a time)."""
+    import gc
+
+    del objects
+    gc.collect()
+    try:
+        import torch
+    except ImportError:  # pragma: no cover - torch is a dependency
+        return
+    if torch.cuda.is_available() and torch.cuda.is_initialized():
+        torch.cuda.empty_cache()
+
 
 class Fallback:
     """The §9.4 search for one failure: ``Fallback(planner, force_field, atoms, integrator, references,
-    config).run(failure)`` returns the activated plan revision or raises ``FallbackExhausted``."""
+    config).run(failure)`` returns a ``Result`` with the activated plan revision, or raises
+    ``FallbackExhausted``.
+
+    - ``references``: the gate's (``selfcheck.references``); the reduced gate takes their first copy
+      and the failing quantity. Under ``check="skip"`` they are skipped, and the search computes one
+      rattled copy's references once, at the first run that needs them (``seed``, ``gate``);
+    - ``failure``: a ``Failure``.
+
+    The loop keeps (mode, rewrites off) and, per round, reacts to the last failure: rule 13 for a
+    self-check failure; otherwise ``diagnose``: the mode (eager), or ddmin over the eager rewrite set,
+    whose minimal failing set and its dependants go off; then the candidate is validated
+    (``activate``). Every round changes the mode or switches rewrites off, so the loop ends. When the
+    diagnosis cannot locate the fault or its budget is spent, the terminal sequence runs.
+    """
 
     def __init__(self, planner: Any, force_field: Any, atoms: Any, integrator: Any, references: Any,
-                 config: Any = None):
+                 config: Any = None, *, seed: int = 0, gate: Any = None):
         from fastmace.config import FallbackConfig
 
         self.planner = planner
@@ -431,26 +676,300 @@ class Fallback:
         self.integrator = integrator
         self.references = references
         self.config = FallbackConfig() if config is None else config
+        self.seed = seed
+        self.gate = gate
+        self.budget = Budget(limit=self.config.diagnosis_budget)
+        self.tried: list[TriedCandidate] = []
+        self.revisions: list[Any] = []
+        self._cache: dict[tuple, bool] = {}
+        self._bases: dict[str, Any] = {}
+        self._one_copy = None
 
-    def run(self, failure: BaseException) -> Any:
-        raise NotImplementedError(f"the fallback search is {TASK_SEARCH}")
+    # ---- references
 
+    def _full_references(self):
+        refs = self.references
+        if refs is None or refs.skipped or refs.unavailable is not None:
+            return None
+        return refs
 
-def diagnose(plan: Any, failure: BaseException, *args: Any, **kwargs: Any) -> str:
-    """The failing dimension (§9.4 step 2): ``"mode"`` if eager passes, else ``"rewrites"``."""
-    raise NotImplementedError(f"the fallback diagnosis is {TASK_SEARCH}")
+    def _single(self):
+        """One rattled copy's references (all quantities), computed once (``check="skip"``)."""
+        from fastmace.planner import selfcheck
 
+        if self._one_copy is None:
+            self._one_copy = selfcheck.references(self.failed, self.force_field, self.atoms, self.integrator,
+                                                  check="gate", seed=self.seed, gate=self.gate, count=1)
+        return self._one_copy
 
-def ddmin(rewrites: Sequence[str], test: Callable[[frozenset[str]], bool], *,
-          requires: Mapping[str, Sequence[str]], budget: Budget | None) -> frozenset[str]:
-    """A 1-minimal failing subset of ``rewrites`` under the ``requires`` closure (delta debugging).
+    def _reduced_references(self):
+        full = self._full_references()
+        if full is None:
+            return dataclasses.replace(self._single(), quantities=tuple(self.quantities))
+        return dataclasses.replace(full, copies=list(full.copies[:1]), values=list(full.values[:1]),
+                                   reference_copies=list(full.reference_copies[:1]),
+                                   quantities=tuple(self.quantities))
 
-    ``test(subset)`` is True when the reduced gate fails with ``subset`` enabled; each call counts
-    against ``budget``."""
-    raise NotImplementedError(f"ddmin over the rewrite set is {TASK_SEARCH}")
+    def _validation_references(self):
+        """The full gate's references, or under ``check="skip"`` the one-copy reduced gate (conductor answers)."""
+        return self._full_references() or self._single()
 
+    # ---- plans
 
-def terminal_sequence(plan: Any, *args: Any, **kwargs: Any) -> tuple[Any, ...]:
-    """The fixed candidates after the budget is spent (§9.4 step 2): the same mode with every rewrite
-    off, eager with every rewrite off, the reference tier if it fits."""
-    raise NotImplementedError(f"the terminal sequence is {TASK_SEARCH}")
+    def _base(self, mode):
+        """The failed plan re-planned in ``mode`` (cached); ``None`` when that mode is refused."""
+        from fastmace.errors import PlanRefused, ProcessConstraintError
+
+        if mode == self.failed.tier:
+            return self.failed
+        if mode not in self._bases:
+            try:
+                self._bases[mode] = candidate(self.failed, {"mode": mode, "reason": "diagnosis"}, self.force_field,
+                                              self.atoms, planner=self.planner)
+            except (PlanRefused, ProcessConstraintError, ValueError):
+                self._bases[mode] = None
+        return self._bases[mode]
+
+    def _units(self, mode):
+        base = self._base(mode)
+        return enabled_rewrites(base) if base is not None else ()
+
+    def _variant(self, mode, enabled):
+        base = self._base(mode)
+        values = {}
+        for name in enabled_rewrites(base):
+            if name not in enabled:
+                values[name] = False if isinstance(getattr(base.rewrites, name), bool) else "off"
+        return dataclasses.replace(base, rewrites=dataclasses.replace(base.rewrites, **values)) if values else base
+
+    # ---- runs
+
+    def _evaluate(self, plan, references, quantities=None):
+        """Build ``plan`` and gate it once: ``(passed, stage, error)``; the engine is dropped."""
+        from fastmace.errors import GateFailed
+        from fastmace.planner import selfcheck
+
+        try:
+            engine = self.planner.build(plan, self.force_field, self.atoms)
+        except Exception as error:
+            if _propagates(error):
+                raise
+            return False, _build_stage(error), error
+        extra = {} if quantities is None else {"quantities": tuple(quantities)}
+        try:
+            record = selfcheck.production(engine, references, check=references.check, **extra)
+        except GateFailed as error:
+            _release(engine)
+            return False, "gate", error
+        except Exception as error:
+            if _propagates(error):
+                raise
+            _release(engine)
+            return False, "gate", error
+        _release(engine)
+        if not record.passed:
+            return False, "gate", RuntimeError(f"gate {record.status}: {record.reason}")
+        return True, None, None
+
+    def _test(self, mode, enabled):
+        """One reduced-gate run (counted): True when it fails in ``mode`` with ``enabled`` on (cached)."""
+        base = self._base(mode)
+        if base is None:
+            return True
+        units = enabled_rewrites(base)
+        enabled = frozenset(enabled) & frozenset(units)
+        key = (mode, enabled, tuple(self.quantities))
+        if key in self._cache:
+            return self._cache[key]
+        if self.budget.spent:
+            raise DiagnosisBudgetSpent(f"the diagnosis budget of {self.budget.limit} reduced-gate runs is spent")
+        self.budget.reduced_gate_runs += 1
+        plan = self._variant(mode, enabled)
+        passed, stage, error = self._evaluate(plan, self._reduced_references())
+        off = [name for name in units if name not in enabled]
+        whole = not off
+        change = f"mode {mode}" + ("" if whole else ", every rewrite off" if not enabled
+                                   else f", rewrites {', '.join(off)} off")
+        dimension = "mode" if whole and mode != self.failed.tier else "rewrites"
+        what = "reduced gate (one rattled copy, " + ", ".join(self.quantities) + ")"
+        reason = f"diagnosis: {what} " + ("passed" if passed else f"failed at {stage}: {_text(error)}")
+        self.tried.append(TriedCandidate(dimension=dimension, change=change, outcome="passed" if passed else "failed",
+                                         reason=reason, stage=None if passed else stage, reduced_gate_runs=1))
+        self._cache[key] = not passed
+        return not passed
+
+    def _skipped(self, dimension, change, reason):
+        self.tried.append(TriedCandidate(dimension=dimension, change=change, outcome="skipped", reason=reason))
+
+    def _candidate(self, mode, off, why, rule13=None):
+        """The candidate chain from the failed plan: rewrites ``off`` (rule 13's decisions for a self-check
+        failure), then the mode. ``None`` (recorded) when it changes nothing or is refused."""
+        from fastmace.errors import PlanRefused, ProcessConstraintError
+        from fastmace.planner import reactions
+
+        plan = self.failed
+        change = f"mode {mode}" if mode != plan.tier else "rewrites"
+        try:
+            here = [name for name in enabled_rewrites(plan) if name in off]
+            if here:
+                plan = candidate(plan, {"rewrites": {name: "off" for name in here}, "reason": why},
+                                 self.force_field, self.atoms)
+                if rule13 is not None:
+                    plan = dataclasses.replace(plan, decisions=reactions.selfcheck_revision(
+                        self.failed, rule13).decisions)
+            if mode != plan.tier:
+                plan = candidate(plan, {"mode": mode, "reason": why}, self.force_field, self.atoms,
+                                 planner=self.planner)
+                left = [name for name in enabled_rewrites(plan) if name in off]
+                if left:
+                    plan = candidate(plan, {"rewrites": {name: "off" for name in left}, "reason": why},
+                                     self.force_field, self.atoms)
+        except (PlanRefused, ProcessConstraintError, ValueError) as error:
+            self._skipped("mode" if mode != self.failed.tier else "rewrites", change,
+                          f"{why}; not planned: {_text(error)}")
+            return None
+        if plan is self.failed:
+            self._skipped("rewrites", change, f"{why}; the candidate would be the failed plan")
+            return None
+        return plan
+
+    def _validate(self, mode, off, why, rule13=None):
+        """Build, self-check and gate the candidate (``activate``); the ``Activation``, a ``Result`` for a
+        child, or ``None`` when there was nothing to try."""
+        from fastmace.errors import ProcessConstraintError
+        from fastmace.planner import selfcheck
+
+        plan = self._candidate(mode, off, why, rule13)
+        if plan is None:
+            return None
+        if mode == "reference":  # the last candidate only if it fits (§9.4 step 5; 2-T03)
+            fits, reason = self.planner.reference_fits(plan, self.force_field, self.atoms, self._full_references())
+            if not fits:
+                self._skipped("mode", "mode reference", f"{why}; does not fit: {reason}")
+                return None
+        self.revisions.append(plan)
+        try:
+            activation = activate(plan, self.planner, self.force_field, self.atoms,
+                                  references=self._validation_references(), budget=self.budget)
+        except ProcessConstraintError:
+            if plan.runner != "subprocess":
+                raise
+            tried = TriedCandidate(dimension=_parse(plan)[0], change=_parse(plan)[1], outcome="activated",
+                                   reason=f"{why}; validated in its child process (SPEC §9.4 step 3)",
+                                   revision=plan.revision)
+            self.tried.append(tried)
+            return Result(plan=dataclasses.replace(plan, fallbacks=tuple(self.tried)), engine=None, gate=None,
+                          budget=self.budget, tried=tuple(self.tried), runner=True)
+        except Exception as error:
+            if mode == "reference" and selfcheck.is_out_of_memory(error):
+                self._skipped("mode", "mode reference", f"{why}; does not fit: {_text(error)}")
+                return None
+            raise
+        self.tried.append(activation.tried)
+        return activation
+
+    def _result(self, activation):
+        plan = dataclasses.replace(activation.plan, fallbacks=tuple(self.tried))
+        activation.engine.plan = plan
+        return Result(plan=plan, engine=activation.engine, gate=activation.gate, budget=self.budget,
+                      tried=tuple(self.tried))
+
+    # ---- the search
+
+    def run(self, failure: Failure) -> Result:
+        if self.config.fallback == "refuse":
+            raise failure.error
+        if not isinstance(failure, Failure):
+            raise TypeError(f"Fallback.run takes a fallback.Failure, got {type(failure).__name__}")
+        self.failed = failure.plan
+        self.first = failure
+        self.quantities = failure.quantities()
+        mode, off, last = self.failed.tier, set(), failure
+        rounds = len(_switches(self.failed.rewrites)) + 4 if self.failed.rewrites is not None else 4
+        try:
+            for _ in range(rounds):
+                outcome = self._round(mode, off, last)
+                if outcome is None:
+                    break
+                mode, off, result = outcome
+                if isinstance(result, Result):
+                    return result
+                if result is None:
+                    break
+                if result.activated:
+                    return self._result(result)
+                last = Failure(plan=result.candidate, stage=result.tried.stage or "gate", error=result.error,
+                               gate=result.gate)
+                if last.stage == "gate" and last.gate is not None:
+                    self.quantities = last.quantities()
+        except DiagnosisBudgetSpent:
+            pass
+        return self._terminal()
+
+    def _round(self, mode, off, last):
+        """One reaction to ``last``: ``(mode, off, activation)``, or ``None`` when the diagnosis is done."""
+        reaction = getattr(last.error, "reaction", None) if last.stage == "self-check" else None
+        if reaction is not None and not set(reaction.fields) <= off:
+            off = off | set(reaction.fields)
+            why = (f"{RULE_13_WHY}: rewrite {reaction.rewrite} failed its self-check ({reaction.reason}); "
+                   f"{', '.join(reaction.disabled)} off")
+            return mode, off, self._validate(mode, off, why, rule13=last.error)
+        current = self._variant(mode, frozenset(self._units(mode)) - off) if self._base(mode) else None
+        if current is None:
+            return None
+        dimension = diagnose(current, last, test=self._test)
+        if dimension == "mode":
+            return "eager", off, self._validate("eager", off, f"{MODE_WHY} ({_text(last.error)})")
+        if dimension != "rewrites":
+            return None
+        # The set the diagnosis just saw failing in eager: ddmin's whole set (its precondition).
+        seen = set(enabled_rewrites(current))
+        units = tuple(name for name in self._units("eager") if name not in off and name in seen)
+        requires = field_requires(units, self._registry())
+        culprits = ddmin(units, lambda subset: self._test("eager", subset), requires=requires, budget=None)
+        ordered = tuple(name for name in units if name in culprits)
+        everything = tuple(dict.fromkeys((*self._units("eager"), *self._units(mode))))
+        along = dependants(culprits, field_requires(everything, self._registry()), everything)
+        along = tuple(name for name in along if name not in off)
+        off = off | set(ordered) | set(along)
+        why = f"{DDMIN_WHY} {', '.join(ordered)}" + (f" (and {', '.join(along)}, which require it)" if along else "")
+        return mode, off, self._validate(mode, off, f"{why} ({_text(self.first.error)})")
+
+    def _registry(self):
+        from fastmace.rewrites import registry as reg
+
+        return getattr(self.planner, "registry", None) or reg.default_registry()
+
+    def _terminal(self):
+        """The terminal sequence (§9.4 step 2), each step validated; ``FallbackExhausted`` when none passes."""
+        spent = (f"the diagnosis budget of {self.budget.limit} reduced-gate runs is spent" if self.budget.spent
+                 else "the reduced gate cannot locate the fault")
+        everything = set(_switches(self.failed.rewrites)) if self.failed.rewrites is not None else set()
+        for mode, label in terminal_sequence(self.failed, reference=self.config.reference_last):
+            key = (mode, frozenset(), tuple(self.quantities))
+            if self._cache.get(key):
+                self._skipped("mode" if mode != self.failed.tier else "rewrites", f"mode {mode}, every rewrite off",
+                              f"{TERMINAL_WHY}: {label}: it failed the reduced gate in the diagnosis")
+                continue
+            result = self._validate(mode, everything, f"{TERMINAL_WHY}: {label} ({spent}; "
+                                                      f"{_text(self.first.error)})")
+            if isinstance(result, Result):
+                return result
+            if result is not None and result.activated:
+                return self._result(result)
+        raise self._exhausted()
+
+    def _exhausted(self):
+        from fastmace.errors import FallbackExhausted, Reason
+
+        error = FallbackExhausted(
+            [Reason(f"no fallback candidate passed its validation (SPEC §9.4 step 5): {len(self.tried)} tried, "
+                    f"{self.budget.reduced_gate_runs} reduced-gate and {self.budget.full_gate_runs} full gate runs; "
+                    f"the first failure: {_text(self.first.error)}", rule=14, code=FAILED_CODE)],
+            why="every candidate (diagnosis, ddmin and the terminal sequence) failed its self-checks or gate, so the "
+                "planner refuses rather than run a plan it could not validate",
+            revisions=(self.failed, *self.revisions))
+        error.tried = tuple(self.tried)
+        error.budget = self.budget
+        error.failure = self.first
+        return error

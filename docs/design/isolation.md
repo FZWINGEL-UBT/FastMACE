@@ -54,38 +54,37 @@ change what another instance computes.
 | `dynamo.config.cache_size_limit` | raised to 64, never lowered | no isolation issue |
 | `capture_safe_mask_head` patch (`_patches`) | the same replacement for every instance; reinstalled before every capture (1a-T13b) | idempotent inside FastMACE; only foreign code (the research engine in an A/B process) replaces it |
 | `first_derivative_only`, `unfuse_full_addmm` patches | the same for every instance; never undone by the library | idempotent |
-| `single_graph_strain` patch | undone for every instance by a failing self-check (finding 1) | open: 2-T08b |
+| `single_graph_strain` patch | since 2-T08b read by the reference calculators only; no force field reads it | closed (finding 1): each force field binds its strain path per model |
 | Compile family and reproducibility of the process (`engine.constraints.PROCESS`) | refused, not shared state | 2-T07 (subprocess runner), 2-T16 |
 
 ## Findings
 
-1. **A failing `single_graph_strain` self-check undoes the patch for every
-   earlier force field. This is the one shared state left open; plan task
-   2-T08b closes it.**
-   - Who undoes it: `Registry._selfcheck_failure` (`rewrites/registry.py`)
-     calls `_patches.restore(name)` when a process-wide record fails its
-     self-check. The only process-wide record the registry switches is
-     `single_graph_strain` (rounding class), so only a failing
-     `single_graph_strain` self-check reaches this: in practice fault
-     injection, or a MACE whose function the patch no longer matches.
-   - What a force field A built earlier with the record then does: it keeps
-     running, on MACE's function. Energy and forces are unchanged; the stress
-     changes at rounding level (8.7e-19 eV/Å³ on the tiny CPU model). A
-     compiled model fails dynamo's guard on the replaced global and
-     recompiles at its next call that is not a replay; captured graphs are
-     unaffected. `A.applied` and A's provenance still list the record.
-   - Pinned by
-     `tests/cpu/test_isolation.py::test_failing_strain_selfcheck_undoes_the_patch_of_earlier_force_fields`,
-     so 2-T08b's change shows there.
-   - The fix (conductor decision, 20 October 2026): 2-T08b makes the strain
-     path per model, as SPEC §8.7 ("MACE patches") says. Then no self-check
-     failure undoes anything process-wide. A lease on the patch set was
-     considered and not taken: it would add a check to every host-side call
-     for a case that only a failing self-check reaches.
+1. **A failing `single_graph_strain` self-check undid the patch for every
+   earlier force field. Closed by 2-T08b.**
+   - What happened before 2-T08b: `Registry._selfcheck_failure` called
+     `_patches.restore(name)` when the process-wide `single_graph_strain`
+     record failed its self-check (and a reference calculator whose record
+     has the stock strain off removed it too). A force field A built earlier
+     with the record kept running on MACE's function: energy and forces
+     unchanged, stress at rounding level (8.7e-19 eV/Å³ on the tiny CPU
+     model), a recompile at its next non-replayed call, captured graphs
+     unaffected, `A.applied` stale.
+   - The fix (conductor decision, 20 October 2026; SPEC §8.7 "MACE
+     patches"): each force field binds its strain path into its own
+     forward, on or off ([strain-per-model.md](strain-per-model.md)). The
+     record installs nothing, so a failing self-check restores nothing, and
+     the reference calculators' process patch reaches no force field. The
+     bound path is in the force field's provenance (`info()["strain_path"]`).
+   - Tests: `tests/cpu/test_isolation.py`
+     (`test_failing_strain_selfcheck_leaves_earlier_force_fields_unchanged`,
+     which pinned the old behaviour before, and
+     `test_bound_strain_path_ignores_the_process_patch`) and
+     `tests/cpu/test_strain_per_model.py`.
 
 ## Leases
 
 None needed: every per-instance state is owned or passed as data, and the
 dynamo reset leaves results correct. `rebind()` and `IsolationError` are
 therefore not used (conductor answer Q1: only where a lease is needed).
-Finding 1 is closed by making the strain path per model, not by a lease.
+Finding 1 was closed by making the strain path per model, not by a lease.
+No shared state is left open.

@@ -1,0 +1,268 @@
+{
+ "schema": 1,
+ "tool": "2-T19 setup_stages",
+ "created_utc": "2026-10-20T07:31:10.708411+00:00",
+ "host": "Fabi-PC",
+ "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+ "fastmace_commit": null,
+ "fastmace_1a": null,
+ "mace_first": true,
+ "path": "simulation",
+ "side": "1b",
+ "check": "gate",
+ "model": "mh1-r2scan",
+ "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+ "oeq_runtime": null,
+ "wrapped": {
+  "load: sha256_of": true,
+  "load: check_oeq": true,
+  "load: check_cueq": true,
+  "load: require_fused_cueq": true,
+  "load: MACECalculator": true,
+  "load: loading.load": true,
+  "load: load_pristine": true,
+  "plan: fixed": true,
+  "build: fixed": true,
+  "plan: minimal": true,
+  "build: minimal": true,
+  "build: execution model": true,
+  "ForceField": true,
+  "MACEForceField": true,
+  "rewrites: apply": true,
+  "rewrites: selfcheck": true,
+  "compile: private_copy": true,
+  "compile: simplify_traceable": true,
+  "first compiled call": true,
+  "capture": true,
+  "eager warm-up": true,
+  "gate: references": true,
+  "gate: production": true
+ },
+ "environment": {
+  "TORCHINDUCTOR_CACHE_DIR": "/home/fzwin/fastmace-t19/2-T19-local-20261020/cache-warm/inductor",
+  "TRITON_CACHE_DIR": "/home/fzwin/fastmace-t19/2-T19-local-20261020/cache-warm/triton",
+  "FASTMACE_CACHE": "/home/fzwin/fastmace-t19/2-T19-local-20261020/cache-warm",
+  "MACE_COMPILE_CACHE": "/home/fzwin/fastmace-t19/2-T19-local-20261020/cache-warm/compile",
+  "TORCHINDUCTOR_COMPILE_THREADS": "4",
+  "CUDA_VISIBLE_DEVICES": null
+ },
+ "structures": {
+  "NaCl": {
+   "natoms": 216,
+   "setup_s": 104.31442416500067,
+   "since_process_start_s": 115.70000000000073,
+   "simulation_setup": {
+    "plan": 0.3819496620017162,
+    "build": 41.39751929900012,
+    "gate": 61.05939462300012,
+    "provenance": 0.5656957249993866
+   },
+   "plan": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = Na Cl  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = mace, openequivariance, torch.utils.cpp_extension  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 300 K  (recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3)\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = cueq  (auto: mace, openequivariance, torch.utils.cpp_extension was imported before FastMACE could prepare the OpenEquivariance runtime (SPEC \u00a79.4, 1a-T00); import fastmace and plan before importing MACE)\n  PrecisionConfig.dtype = float32  (requested 'float32': cueq backend)\n  EngineConfig.cueq_conv_fusion = on  (auto (on_for_plain_cueq_unless_reproducible): plain cuEq: cuEquivariance's fused convolution (MACE PR 1641))\n  RewriteConfig.factor_species = off  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: plain cuEq backend)\n  RewriteConfig.fold_cutoff = off  (auto (on_with_factor_species_if_model_supports): stage 1: off (without factor_species))\n  RewriteConfig.density_first = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.reassociate_first = off  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.joint_radial_input = off  (auto (on_with_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.fused_folded_backward = off  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: off (without fold_cutoff))\n  RewriteConfig.segmented_first_sum = off  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: off (without reassociate_first and sort_receivers))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = off  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: off (without the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)))\n  RewriteConfig.block_linear = off  (auto (on_for_hybrid_graph_engine): stage 1: plain cuEq backend)\n  RewriteConfig.grouped_linear = off  (auto (on_with_block_linear): stage 1: off (without block_linear))\n  RewriteConfig.merged_residual = off  (auto (on_with_block_linear): stage 1: off (without block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = off  (auto (on_for_hybrid_graph_engine): plain cuEq backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: PrecisionConfig.dtype=float32",
+   "setup_stages": {
+    "force field: ForceField.__init__": {
+     "total_s": 0.0010092029988300055,
+     "calls": 1,
+     "each_s": [
+      0.0010092029988300055
+     ]
+    },
+    "plan: MinimalPlanner.plan (total)": {
+     "total_s": 0.3818914069997845,
+     "calls": 1,
+     "each_s": [
+      0.3818914069997845
+     ]
+    },
+    "gate: references": {
+     "total_s": 25.48639612900297,
+     "calls": 1,
+     "each_s": [
+      25.48639612900297
+     ]
+    },
+    "load: sha256_of": {
+     "total_s": 0.016547735998756252,
+     "calls": 1,
+     "each_s": [
+      0.016547735998756252
+     ]
+    },
+    "load: check_cueq": {
+     "total_s": 0.0002227219993073959,
+     "calls": 1,
+     "each_s": [
+      0.0002227219993073959
+     ]
+    },
+    "load: MACECalculator (torch.load + conversion)": {
+     "total_s": 3.201254092000454,
+     "calls": 1,
+     "each_s": [
+      3.201254092000454
+     ]
+    },
+    "load: require_fused_cueq": {
+     "total_s": 0.0003760470026463736,
+     "calls": 1,
+     "each_s": [
+      0.0003760470026463736
+     ]
+    },
+    "load: loading.load (total)": {
+     "total_s": 3.225601600999653,
+     "calls": 1,
+     "each_s": [
+      3.225601600999653
+     ]
+    },
+    "build: execution model (reload, hash, conversion)": {
+     "total_s": 3.225646989998495,
+     "calls": 1,
+     "each_s": [
+      3.225646989998495
+     ]
+    },
+    "compile: private_copy": {
+     "total_s": 0.4889447929999733,
+     "calls": 1,
+     "each_s": [
+      0.4889447929999733
+     ]
+    },
+    "apply: single_graph_strain": {
+     "total_s": 0.0008665890018164646,
+     "calls": 1,
+     "each_s": [
+      0.0008665890018164646
+     ]
+    },
+    "self-check: single_graph_strain": {
+     "total_s": 0.002301302996784216,
+     "calls": 1,
+     "each_s": [
+      0.002301302996784216
+     ]
+    },
+    "rewrites: Registry.apply (total)": {
+     "total_s": 0.0031972520009730943,
+     "calls": 1,
+     "each_s": [
+      0.0031972520009730943
+     ]
+    },
+    "compile: simplify_traceable": {
+     "total_s": 0.001817311997001525,
+     "calls": 1,
+     "each_s": [
+      0.001817311997001525
+     ]
+    },
+    "build: MACEForceField.__init__ (total)": {
+     "total_s": 1.0539960660025827,
+     "calls": 1,
+     "each_s": [
+      1.0539960660025827
+     ]
+    },
+    "build: initial forces (first compiled call)": {
+     "total_s": 30.890446733999852,
+     "calls": 1,
+     "each_s": [
+      30.890446733999852
+     ]
+    },
+    "build: FixedPlanner.build (total)": {
+     "total_s": 38.17146558499735,
+     "calls": 1,
+     "each_s": [
+      38.17146558499735
+     ]
+    },
+    "build: MinimalPlanner.build (total)": {
+     "total_s": 41.39750446099788,
+     "calls": 1,
+     "each_s": [
+      41.39750446099788
+     ]
+    },
+    "warm-up: capture C": {
+     "total_s": 0.023594385998876533,
+     "calls": 1,
+     "each_s": [
+      0.023594385998876533
+     ]
+    },
+    "warm-up: capture B": {
+     "total_s": 35.52678786099932,
+     "calls": 1,
+     "each_s": [
+      35.52678786099932
+     ]
+    },
+    "gate: production": {
+     "total_s": 35.572862826000346,
+     "calls": 1,
+     "each_s": [
+      35.572862826000346
+     ]
+    }
+   },
+   "warmup_s": 1.9712587200010603,
+   "warmup_stages": {
+    "warm-up: capture ACP": {
+     "total_s": 0.06997193000279367,
+     "calls": 1,
+     "each_s": [
+      0.06997193000279367
+     ]
+    }
+   }
+  }
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "process": {
+  "stages": {
+   "prepare_hybrid": 1.2300006346777081e-07,
+   "load": 0.2391383299982408
+  },
+  "load_stages": {
+   "load: sha256_of": {
+    "total_s": 0.016215355000895215,
+    "calls": 1,
+    "each_s": [
+     0.016215355000895215
+    ]
+   },
+   "load: MACECalculator (torch.load + conversion)": {
+    "total_s": 0.10701768600119976,
+    "calls": 1,
+    "each_s": [
+     0.10701768600119976
+    ]
+   },
+   "load: require_fused_cueq": {
+    "total_s": 0.00022168199939187616,
+    "calls": 1,
+    "each_s": [
+     0.00022168199939187616
+    ]
+   },
+   "load: loading.load (total)": {
+    "total_s": 0.19935389999955078,
+    "calls": 1,
+    "each_s": [
+     0.19935389999955078
+    ]
+   },
+   "load: load_pristine (total)": {
+    "total_s": 0.19941879799807793,
+    "calls": 1,
+    "each_s": [
+     0.19941879799807793
+    ]
+   }
+  }
+ },
+ "process_wall_s": 109.91731710300155
+}

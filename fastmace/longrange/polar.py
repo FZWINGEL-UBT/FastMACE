@@ -285,6 +285,9 @@ class PolarHolder:
     state: PolarState | None = None
     config: PolarConfig = PolarConfig()
     float64_energy: bool = False
+    # The strain path bound by the force field (2-T08b, fastmace.rewrites.engine.bind_strain_path):
+    # True one-graph, False MACE's own, None not bound (whatever mace.modules.utils holds).
+    single_graph_strain: bool | None = None
 
 
 class _Call:
@@ -817,14 +820,20 @@ def install():
     original_internal = gto_utils.GTOInternalFieldtoFeaturesBlock.forward
     original_radial = gto_utils.RadialIntegralDirect.forward
     original_moduli = gto_utils.GTOBasis._prepare_k_moduli
-    rewritten = {}  # (PR 1762, float64 energy) -> forward, built on first use
+    rewritten = {}  # (PR 1762, float64 energy, strain path) -> forward, built on first use
 
     def model_forward(holder):
-        key = (stabilised(holder.config), bool(holder.float64_energy))
-        if key == (False, False):
+        key = (stabilised(holder.config), bool(holder.float64_energy), holder.single_graph_strain)
+        if key == (False, False, None):
             return original_forward
         if key not in rewritten:
-            rewritten[key] = polar_forward(original_forward, *key)
+            function = polar_forward(original_forward, *key[:2])
+            if key[2] is not None:
+                # After install(): the module functions it replaced are in the copied globals.
+                from fastmace.rewrites import engine as engine_rewrites
+
+                function = engine_rewrites.strain_forward(function, key[2])
+            rewritten[key] = function
         return rewritten[key]
 
     def forward(self, data, *args, **kwargs):
@@ -978,6 +987,18 @@ def set_float64_energy(model, enabled=True):
     _holder(model, create=True).float64_energy = bool(enabled)
 
 
+def set_single_graph_strain(model, one_graph):
+    """Bind this PolarMACE instance's strain path (2-T08b): one-graph (True) or MACE's own (False).
+
+    Called by ``fastmace.rewrites.engine.bind_strain_path``; installs the wrappers, whose
+    dispatcher builds the forward with ``strain_forward``.
+    """
+    if not is_polar(model):
+        raise TypeError(f"{type(model).__name__} is not PolarMACE")
+    install()
+    _holder(model, create=True).single_graph_strain = bool(one_graph)
+
+
 def get_config(model):
     """The instance's ``PolarConfig`` (the default when none was set)."""
     return _instance_config(model)
@@ -1015,6 +1036,7 @@ __all__ = [
     "compute_k_vectors_fixed", "configure", "coulomb_energy_float64", "coulomb_energy_pbc", "disable", "enable",
     "get_config", "get_state", "install", "installed", "is_polar", "no_sync_check", "normalise_fukui",
     "overflowed", "polar_forward", "pr1762_forward", "require_route", "reset_overflow", "resolve_kspace_headroom",
-    "route_support", "set_float64_energy", "set_state", "source_digest", "source_problems", "stabilised",
+    "route_support", "set_float64_energy", "set_single_graph_strain", "set_state", "source_digest",
+    "source_problems", "stabilised",
     "validate_charge_spin",
 ]

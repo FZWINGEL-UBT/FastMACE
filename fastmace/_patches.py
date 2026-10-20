@@ -23,7 +23,10 @@ The installed package files are never modified. Entries so far:
 - ``capture_safe_mask_head``, ``first_derivative_only``, ``unfuse_full_addmm`` and
   ``single_graph_strain`` (1a-T08): the engine-level rewrites of ``fastmace.rewrites.engine``
   (MACE's readout mask, its force functions, Inductor's addmm rule with its cache key, and MACE
-  PR 1498's one-graph strain). Each can be undone with ``restore``.
+  PR 1498's one-graph strain). Each can be undone with ``restore``. Since 2-T08b no force field
+  reads ``single_graph_strain``'s patch: each binds its strain path per model
+  (``rewrites.engine.bind_strain_path``), and the patch remains for the reference calculators,
+  which describe MACE's own calculator with or without it.
 
 **Hash gates** (SPEC §6.3, plan task 2-T04). Every patch that replaces a function first checks
 that the function it replaces is the one it was written for: the sha256 of its
@@ -134,6 +137,7 @@ def original_if_patched(target, current):
 # convert_e3nn_cueq.run as run_e3nn_to_cueq: the same source, so the same pin.
 _MASK_HEAD = "bcb74869e70f9cd7ddfdfb7e133f4aacec058e8dd996b3c6eeb916e6e1b49e8e"
 _STRAIN = "d75106300f967df0872e253c6d9c4607c0783a6dd8fe35045204e958a0b36437"
+_PREPARE_GRAPH = "a369db1b449ebb4f4105cf7e42ad4cebea28950cd9d51a07f7b6cc8ec425c557"
 _CUEQ_RUN = "5dde1426a0701a9bd9a4ced74fb810e3f82a849cff42b3778d96f8d7c4a4487c"
 SOURCE_PINS = {
     "capture_safe_mask_head": {"mace.modules.blocks:mask_head": _MASK_HEAD},
@@ -143,7 +147,9 @@ SOURCE_PINS = {
             "8c1d2ab9d98ce99f3b8791c9c78f5f10d0d32ff5508ff48e0a641c174fed5ba0",
     },
     "single_graph_strain": {"mace.modules.utils:get_symmetric_displacement": _STRAIN,
-                            "mace.modules.models:get_symmetric_displacement": _STRAIN},
+                            "mace.modules.models:get_symmetric_displacement": _STRAIN,
+                            # Not replaced: the per-model path reuses its code with other globals (2-T08b).
+                            "mace.modules.utils:prepare_graph": _PREPARE_GRAPH},
     "cueq_conv_fusion": {"mace.cli.convert_e3nn_cueq:run": _CUEQ_RUN,
                          "mace.calculators.mace:run_e3nn_to_cueq": _CUEQ_RUN},
     # The addmm rule wraps torch's decision and reads its bias-like test: both are pinned.
@@ -504,6 +510,10 @@ def set_unfuse_full_addmm(enabled=True):
 
 def set_single_graph_strain(enabled=True):
     """Put MACE PR 1498's one-graph get_symmetric_displacement into MACE (True), or MACE's own back (False).
+
+    For the reference calculators only (``fastmace.reference.calculators``), which describe MACE's
+    own calculator with or without this patch. No ``MACEForceField`` reads it: each binds its
+    strain path per model (``fastmace.rewrites.engine.bind_strain_path``, 2-T08b).
 
     Replaces the function in mace.modules.utils, which prepare_graph calls (MACE, ScaleShiftMACE,
     PolarMACE), and in mace.modules.models, which imports it by name (EnergyDipolesMACE).

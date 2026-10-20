@@ -219,6 +219,12 @@ commands. Never print the token.
   - `python3 tools/ci/local_gpu.py status` shows who holds it.
   The conductor still assigns the local GPU to one task at a time, and still
   orders timing runs. The reservation only makes the order safe.
+- **The NAS checkout `/mnt/homes/zwingel/FastMACE` moves at every merge**,
+  because the conductor syncs it to main. A/B comparisons and long runs
+  that load FastMACE more than once (fresh processes, children, resumes)
+  use a pinned copy, a `git archive` of one commit under the worker's own
+  directory. The commit is recorded in the report. 2-T21 restarted its A/B
+  on such a copy (20 October 2026).
 - **WSL crashed again on 20 October 2026 (about 02:51)**, with
   `HCS_E_CONNECTION_TIMEOUT` and the Ubuntu distribution stopped. Recovered
   with `wsl --shutdown`.

@@ -257,15 +257,17 @@ def test_a_failing_selfcheck_raises_with_the_reaction():
     assert "broken on purpose" in str(error)
 
 
-def test_a_failing_process_record_restores_its_patch(monkeypatch):
+def test_a_failing_strain_record_leaves_the_process_patch(monkeypatch):
+    """Since 2-T08b no registry record installs a process-wide patch, so a failure restores none."""
     registry = reg.default_registry()
     rewrite = registry["single_graph_strain"]
     broken = dataclasses.replace(rewrite, selfcheck=lambda o, r, c: CheckResult(False, 1.0, 1e-10, 1, "no", "float64"))
     monkeypatch.setitem(registry._records, "single_graph_strain", broken)
     resolution = reg.Resolution((reg.Decision("single_graph_strain", "on", True, "on"),))
+    _patches.set_single_graph_strain(True)  # the reference calculators' patch, say
     with pytest.raises(SelfCheckError):
         registry.apply(types.SimpleNamespace(), resolution, original=types.SimpleNamespace())
-    assert _patches.record_of("single_graph_strain") is None
+    assert _patches.record_of("single_graph_strain") is not None
 
 
 def _plan(registry, resolution):

@@ -51,6 +51,7 @@ from typing import Any
 
 from fastmace.config import EngineConfig, IntegratorConfig, NeighbourConfig, PolarConfig, PrecisionConfig, RewriteConfig
 from fastmace.errors import ModelElementError, PlanRefused, Reason, SpeciesNotInSuperset
+from fastmace.rewrites import versions
 
 from . import fixed
 from . import reproducible as reproducible_mode
@@ -289,7 +290,6 @@ class MinimalPlanner:
         PolarMACE without its hashed forward is refused (rule 1).
         """
         from fastmace.model import loading
-        from fastmace.rewrites import versions
 
         if precision not in ("float32", "float64"):
             raise ValueError(f"force precision must be 'float32' or 'float64', got {precision!r}")
@@ -445,7 +445,12 @@ class MinimalPlanner:
         software = self.software or detect_software(self.engine.device)
         book = fixed._Book()
         reference = mode == REFERENCE_TIER
-        book.decide("mode", mode, MODE_TIERS.get(mode) or Reason(MODE_REFUSALS[mode], code=f"mode-{mode}"))
+        mode_reason = MODE_TIERS.get(mode) or Reason(MODE_REFUSALS[mode], code=f"mode-{mode}")
+        capture = versions.capture_support(traits)
+        if mode == "graph" and not capture.supported:
+            # 2-T04b: no capture-safe readout mask on this MACE, so a multi-head model runs eager from revision 0.
+            mode, mode_reason = "eager", Reason(capture.reason, code=versions.CAPTURE_CODE)
+        book.decide("mode", mode, mode_reason)
         if mode not in MODE_TIERS:
             book.refuse(MODE_REFUSALS[mode], f"mode-{mode}")
         engine = self._mode_engine(mode)

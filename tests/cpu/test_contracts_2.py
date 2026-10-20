@@ -326,10 +326,14 @@ def test_fallback_stubs():
     assert list(inspect.signature(fallback.activate).parameters)[:1] == ["candidate"]
     ddmin = inspect.signature(fallback.ddmin)
     assert list(ddmin.parameters) == ["rewrites", "test", "requires", "budget"]
-    _raises_naming("2-T15", lambda: fallback.ddmin(("a",), lambda subset: True, requires={}, budget=None))
-    _raises_naming("2-T15", lambda: fallback.diagnose(None, None))
-    _raises_naming("2-T15", lambda: fallback.terminal_sequence(None))
-    _raises_naming("2-T15", lambda: fallback.Fallback(None, None, None, None, None, config.FallbackConfig()).run(None))
+    # 2-T15 filled the search (tests/cpu/test_fallback_search.py).
+    assert fallback.ddmin(("a",), lambda subset: True, requires={}, budget=None) == {"a"}
+    assert list(inspect.signature(fallback.diagnose).parameters)[:2] == ["plan", "failure"]
+    assert list(inspect.signature(fallback.terminal_sequence).parameters)[:1] == ["plan"]
+    assert list(inspect.signature(fallback.Fallback).parameters)[:6] == [
+        "planner", "force_field", "atoms", "integrator", "references", "config"]
+    with pytest.raises(TypeError, match="Failure"):
+        fallback.Fallback(None, None, None, None, None, config.FallbackConfig()).run(None)
 
 
 def test_fallback_records():
