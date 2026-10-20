@@ -480,7 +480,9 @@ GATE_SKIPPED = {"status": "skipped", "reason": 'opt-in: check="gate"', "selfchec
 GATE_RECORD_KEYS = ("selfchecks", "device", "reduced_cell", "steps")
 CHECKPOINT_KEYS = ("path", "sha256", "head", "licence", "label", "trust")
 # The subprocess runner's block (2-T07, ``engine.subprocess.SubprocessRunner.record``) and its last child.
-SUBPROCESS_KEYS = ("python", "reason", "directory", "children", "seconds", "failed", "last")
+# ``children`` counts child processes, ``calls`` the setup and run() calls they served (OPT-T07: one
+# persistent worker serves many calls), ``persistent`` is ``RunnerConfig.persistent``.
+SUBPROCESS_KEYS = ("python", "reason", "directory", "children", "calls", "persistent", "seconds", "failed", "last")
 SUBPROCESS_CHILD_KEYS = ("action", "stage", "pid", "exit_code", "seconds", "steps")
 # Counters the caller fills, and those a later phase fills (tier switches: phase 5, §9.6; MC: phase 3).
 COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone")
