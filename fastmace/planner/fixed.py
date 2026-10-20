@@ -84,6 +84,8 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
+    "RewriteConfig.species_tables": "never_automatic",
+    "RewriteConfig.fold_readout_tail": "never_automatic",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
 })
@@ -100,7 +102,7 @@ STAGE2_SUPPORT = (
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "segmented_first_sum", "fused_radial_hidden", "streaming_conv",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "species_skip",
-                  "single_graph_strain")
+                  "single_graph_strain", "species_tables", "fold_readout_tail")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
 SINGLE_GRAPH = "single_graph"  # one structure per evaluation: always, production is one structure
@@ -554,6 +556,12 @@ class FixedPlanner:
         needs("gated_rows", r.gated_rows != "off", v["merged_residual"], "merged_residual")
         needs("segment_gemm", r.segment_gemm != "off", v["gated_rows"], "gated_rows")
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
+        # OPT-T08 (opt-in): only an explicit "on" enables them; the registry checks the model.
+        note("species_tables", r.species_tables == "on",
+             "opt-in (OPT-T08)" if r.species_tables != "auto" else "off: only an explicit 'on' enables it")
+        needs("fold_readout_tail", r.fold_readout_tail == "on", v["block_linear"], "block_linear")
+        if r.fold_readout_tail == "auto":
+            v["_why"]["fold_readout_tail"] = "off: only an explicit 'on' enables it"
         note("single_graph_strain", r.single_graph_strain != "off",
              "acts where stress is computed (NPT)" if npt else "process-wide; acts only where stress is computed")
         return v

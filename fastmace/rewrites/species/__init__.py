@@ -1,0 +1,239 @@
+"""The species family of optimisation round 1 (OPT-T08; ``docs/design/opt-T08-linear-audit.md``).
+
+``RECORDS`` holds two opt-in records (default off). Both are rounding class and deterministic.
+
+- ``species_tables`` (candidate C1). In MD the one-hot ``node_attrs`` never change, so every
+  atom-level product that reads only them is a function of the atom's species. These products
+  become per-species tables, computed once by the replaced modules on the identity rows and
+  gathered by species at each step (``modules.SpeciesTable``):
+  - the node embedding (it then hands the one-hot on, ``modules.OneHotPassthrough``);
+  - each interaction's source and target embeddings (``ProjectedEmbedding`` after
+    ``factor_species``);
+  - the first interaction's ``skip_tp`` and ``linear_up``, whose input is the embedding.
+
+  The step loses their products and backward: 4.1 % of NaCl's B stage, 2.1 % of NbCl5's (2-T20a
+  profiles). Pinned sources:
+  - ``ScaleShiftMACE.forward``: the embedding is read only by the first interaction;
+  - the MH-1-class interaction forward: the first interaction reads it only through ``skip_tp`` and
+    ``linear_up``.
+
+  Refused for a joint charge/spin embedding (OMOL-0): there the first input is not species-only.
+  Species swaps (phase 3) change only the gathered index.
+- ``fold_readout_tail`` (candidate C2). The last product's ``linear`` and the last interaction's
+  ``skip_tp`` feed only the last readout, whose first layer is linear. That layer is folded into
+  both (``modules.compose``) and replaced by the identity. Products of 512 columns become
+  products of the readout's width (96 on MH-1, all heads kept): 2.0 % of NaCl's B stage, 1.2 % of
+  NbCl5's. MACE's ``node_feats`` descriptor output changes meaning; FastMACE never reads it.
+  Needs ``block_linear``.
+
+Each self-check compares the rewritten modules with what they replaced, values and input gradients,
+in the model's dtype (SPEC §6.4).
+"""
+
+from __future__ import annotations
+
+from fastmace.model.capabilities import FACTORED_INTERACTIONS
+from fastmace.rewrites.registry import Rewrite, Support, check_tensors
+
+MACE_VERSIONS = ">=0.3.16,<0.3.17"
+MODEL_FORWARD = "mace.modules.models:ScaleShiftMACE.forward"
+MODEL_FORWARD_SHA256 = "7f4daea32cb9b55c59db5ee623f8310ef65e41cf0f717278f743ae8bd2782e1d"
+INTERACTION_FORWARD = "mace.modules.blocks:RealAgnosticResidualNonLinearInteractionBlock.forward"
+INTERACTION_FORWARD_SHA256 = "727c37b796de7d3b33793ae6317a6d09c1f4c8677b28c04963ffbb34899b0b44"
+_PROBE_ROWS = 7
+
+
+def _modules():
+    from fastmace.rewrites.species import modules
+
+    return modules
+
+
+def _one_hot_rows(model):
+    """The identity rows [n_elements, n_elements] in the model's dtype and device."""
+    import torch
+
+    tensor = next(iter(model.buffers()), None)
+    tensor = next(iter(model.parameters()), tensor)
+    width = len(model.atomic_numbers)
+    return torch.eye(width, dtype=tensor.dtype, device=tensor.device)
+
+
+# --------------------------------------------------------------------------- species_tables
+
+
+def _tables_support(model):
+    if type(model).__name__ != "ScaleShiftMACE":
+        return Support(False, f"{type(model).__name__}: only ScaleShiftMACE's forward is pinned")
+    if hasattr(model, "joint_embedding"):
+        return Support(False, "a joint (charge/spin) embedding is added to the first input, which is then not "
+                              "species-only")
+    if getattr(getattr(model, "node_embedding", None), "linear", None) is None:
+        return Support(False, "no linear node embedding")
+    interactions = getattr(model, "interactions", ())
+    if not interactions or type(interactions[0]).__name__ not in FACTORED_INTERACTIONS:
+        return Support(False, f"the first interaction is not of {FACTORED_INTERACTIONS}")
+    first = interactions[0]
+    if not hasattr(first, "skip_tp") or not hasattr(first, "linear_up"):
+        return Support(False, "the first interaction has no skip_tp and linear_up")
+    return Support(True, "ok")
+
+
+def tabulate(model):
+    """Replace the species-only modules of ``model`` by species tables; returns the replaced names."""
+    import torch
+
+    m = _modules()
+    onehot = _one_hot_rows(model)
+    names = []
+    with torch.no_grad():
+        embedding = model.node_embedding
+        embedded = embedding(onehot)
+        first = model.interactions[0]
+        for attribute in ("skip_tp", "linear_up"):
+            module = getattr(first, attribute)
+            setattr(first, attribute, m.SpeciesTable(module(embedded), m.Chain(embedding, module)))
+            names.append(f"interactions.0.{attribute}")
+        for index, interaction in enumerate(model.interactions):
+            for attribute in ("source_embedding", "target_embedding"):
+                module = getattr(interaction, attribute, None)
+                if module is None:
+                    continue
+                setattr(interaction, attribute, m.SpeciesTable(module(onehot), module))
+                names.append(f"interactions.{index}.{attribute}")
+        model.node_embedding = m.OneHotPassthrough()
+        names.append("node_embedding")
+    return names
+
+
+def _probe_attrs(model, context, generator):
+    """One-hot rows: the structure's (context) or random ones."""
+    import torch
+
+    attrs = (context.inputs or {}).get("node_attrs")
+    width = len(model.atomic_numbers)
+    if attrs is None:
+        species = torch.randint(0, width, (_PROBE_ROWS,), generator=generator)
+        attrs = torch.nn.functional.one_hot(species, width)
+    rows = _one_hot_rows(model)
+    return attrs.to(dtype=rows.dtype, device=rows.device)
+
+
+def _tables_selfcheck(original, rewritten, context):
+    import torch
+
+    m = _modules()
+    generator = torch.Generator().manual_seed(context.seed)
+    attrs = _probe_attrs(rewritten, context, generator)
+    cases, dtype = [], None
+    with torch.no_grad():
+        for name, module in rewritten.named_modules():
+            if isinstance(module, m.SpeciesTable):
+                cases.append((name, module.reference(attrs), module(attrs)))
+                dtype = dtype or module.table.dtype
+    return check_tensors(cases, dtype)
+
+
+# --------------------------------------------------------------------------- fold_readout_tail
+
+
+def _readout_first(readout):
+    """(attribute, module) of the readout's first linear layer, or (None, None)."""
+    for attribute in ("linear_1", "linear"):
+        module = getattr(readout, attribute, None)
+        if module is not None:
+            return attribute, module
+    return None, None
+
+
+def _tail_support(model):
+    if type(model).__name__ != "ScaleShiftMACE":
+        return Support(False, f"{type(model).__name__}: only ScaleShiftMACE's forward is pinned")
+    interactions, products, readouts = (getattr(model, n, ()) for n in ("interactions", "products", "readouts"))
+    if not interactions or not readouts or len(readouts) not in (1, len(interactions)):
+        return Support(False, "the last readout does not read the last layer's features")
+    kind = type(readouts[-1]).__name__
+    if kind not in ("NonLinearReadoutBlock", "LinearReadoutBlock"):
+        return Support(False, f"last readout {kind} is not MACE's linear or nonlinear readout")
+    if not getattr(products[-1], "use_sc", True):
+        return Support(False, "the last product has no skip connection")
+    return Support(True, "ok")
+
+
+def fold_tail(model):
+    """Fold the last readout's first linear layer into the last product's linear and the last skip_tp."""
+    import torch
+
+    from fastmace.rewrites.linear.modules import BlockLinear
+
+    m = _modules()
+    readout = model.readouts[-1]
+    attribute, layer = _readout_first(readout)
+    product, last = model.products[-1], model.interactions[-1]
+    if not isinstance(layer, BlockLinear) or not isinstance(product.linear, BlockLinear):
+        raise ValueError("fold_readout_tail needs block linears (block_linear)")
+    with torch.no_grad():
+        product.linear = m.compose(product.linear, layer)
+        skip = last.skip_tp
+        if isinstance(skip, m.SpeciesTable):  # a one-interaction model under species_tables
+            last.skip_tp = m.SpeciesTable(layer(skip.table), m.Chain(skip, layer))
+        elif isinstance(skip, BlockLinear):
+            last.skip_tp = m.compose(skip, layer)
+        else:
+            raise ValueError("fold_readout_tail: the last skip_tp is neither a block linear nor a species table")
+        setattr(readout, attribute, torch.nn.Identity())
+    index = len(model.interactions) - 1
+    return [f"products.{index}.linear", f"interactions.{index}.skip_tp",
+            f"readouts.{len(model.readouts) - 1}.{attribute}"]
+
+
+def _tail_selfcheck(original, rewritten, context):
+    import torch
+
+    from fastmace.rewrites.linear import _compare, _probe, _values_and_gradients, _width
+    from fastmace.rewrites.linear.modules import BlockLinear
+
+    m = _modules()
+    generator = torch.Generator().manual_seed(context.seed)
+    cases, dtype = [], None
+    index = len(rewritten.interactions) - 1
+    for name in (f"products.{index}.linear", f"interactions.{index}.skip_tp"):
+        module = rewritten.get_submodule(name)
+        if not isinstance(module, BlockLinear):
+            continue
+        reference = m.reference_of(module)
+        x = _probe(module, generator, _width(module.segments_in))
+        grad = torch.randn((_PROBE_ROWS, _width(module.segments_out)), generator=generator,
+                           dtype=torch.float64).to(x)
+        cases += _compare(name, _values_and_gradients(reference, (x,), grad),
+                          _values_and_gradients(module, (x,), grad))
+        dtype = dtype or module.weight_0.dtype
+    return check_tensors(cases, dtype)
+
+
+# --------------------------------------------------------------------------- records
+
+
+def _apply_tables(model, context):
+    return tabulate(model)
+
+
+def _apply_tail(model, context):
+    return fold_tail(model)
+
+
+RECORDS = {
+    "species_tables": Rewrite(
+        name="species_tables", applies_to=_tables_support, requires=(), conflicts=(),
+        mace_versions=MACE_VERSIONS,
+        source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256, INTERACTION_FORWARD: INTERACTION_FORWARD_SHA256},
+        exactness="rounding", default="off", workload_constraints=("fixed_species_superset",),
+        apply=_apply_tables, selfcheck=_tables_selfcheck, deterministic=True),
+    "fold_readout_tail": Rewrite(
+        name="fold_readout_tail", applies_to=_tail_support, requires=("block_linear",), conflicts=(),
+        mace_versions=MACE_VERSIONS, source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256},
+        exactness="rounding", default="off", workload_constraints=(),
+        apply=_apply_tail, selfcheck=_tail_selfcheck, deterministic=True),
+}
+
+__all__ = ["RECORDS", "fold_tail", "tabulate"]
