@@ -23,3 +23,9 @@ def test_one_fixed_configuration_and_a_reason():
     assert "waves" in choice.reason
     assert tr.segment_gemm_choice(13608, 512, 512, 48) == choice  # deterministic
     assert tr.row_waves(6144, 48) == 2.0
+
+
+def test_uses_triton_agrees_with_the_choice():
+    for sms in (None, 0, 36, 48):
+        for m in (1, 216, 1944, 4544, 4545, 5832, 6143, 6144, 13608):
+            assert tr.uses_triton(m, sms) == (tr.segment_gemm_choice(m, 512, 512, sms).backend == "triton")
