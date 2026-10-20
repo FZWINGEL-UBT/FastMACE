@@ -308,13 +308,14 @@ def test_subprocess_runner_stub():
     # Implemented by 2-T07 (tests/cpu/test_subprocess_runner.py).
 
 
-def test_reference_force_field_stub():
+def test_reference_force_field_contract():
     from fastmace.engine import reference
 
     signature = inspect.signature(reference.ReferenceForceField)
     assert list(signature.parameters)[:2] == ["force_field", "atoms"]
-    assert _keyword_only(signature) == ["device", "dtype"]
-    _raises_naming("2-T03", lambda: reference.ReferenceForceField(None, None))
+    # 2-T03 adds the plan's PolarConfig and the stress switch of a variable-cell run.
+    assert _keyword_only(signature) == ["device", "dtype", "polar", "compute_stress"]
+    assert signature.parameters["dtype"].default == "float64"
 
 
 def test_fallback_stubs():
