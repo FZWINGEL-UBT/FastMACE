@@ -60,7 +60,9 @@ def _problems(name):
     if name == "polar_forward":
         from fastmace.longrange import polar
 
-        return polar.source_problems()
+        # Without graph_longrange PolarMACE is refused at build ("not installed", polar.install), as
+        # before; only sources that exist and differ are this rule's business.
+        return [problem for problem in polar.source_problems() if "No module named 'graph_longrange" not in problem]
     from fastmace import _patches
 
     return _patches.patch_problems(name)
