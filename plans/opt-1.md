@@ -157,6 +157,34 @@ recommendation.
     block, and needs ≥ 10 % whole-step gain on both GPUs before it grows
     beyond one interaction.
 
+**Added 20 October 2026, from an outside review** (owner: "assess and
+implement how you like"). These two target setup and the subprocess
+lifecycle, not the steady-state step. Each starts with a short design note
+and runs in parallel with B/C, with its own worker.
+
+- **OPT-T06 Converted-model template cache (2-T19 worker).**
+  - **Why:** every plan reloads, hashes and converts the checkpoint, 3.1–3.5 s
+    for each plan after the first (2-T19 report). Fallback re-plans pay it
+    too.
+  - **What:** a bounded per-process cache of the pristine converted model,
+    keyed by checkpoint hash, backend and dtype, with a private deep copy for
+    every plan. All self-checks stay, since checkpoint 2 kept the self-check
+    cache out.
+  - **Checks:** benchmark clone against reload first. Then A → B → A isolation
+    (§8.7), precision and backend changes, fallback attempts, memory
+    retention.
+  - **Small fix alongside:** call `installed_mace_version()` once per process,
+    not once per record.
+- **OPT-T07 Persistent subprocess worker (2-T07 worker).**
+  - **Why:** every subprocess `run()` starts a fresh child and recompiles,
+    68–90 s per `run(100)` (2-T07 report), and ASE observers split runs at
+    each callback.
+  - **What:** keep one child and its compiled engine for the simulation's
+    lifetime. Checkpoint boundaries, host writes, failure recovery and the
+    restart semantics stay unchanged.
+  - **Checks:** repeated short calls, observer mutations, reproducible
+    restart equivalence, child termination, GPU-memory release.
+
 Not in this round:
 - a complete force megakernel. Our fit gives a ceiling of 8–16 % on NaCl, and
   the report budgets 0–15 % with regression possible. Months of work.
