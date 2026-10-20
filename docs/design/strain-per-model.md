@@ -60,6 +60,27 @@ modules.
    reference calculators, whose records describe MACE's own calculator with
    or without the stock patch. It no longer reaches any `MACEForceField`.
 
+## Snapshots of module globals (conductor's caveat)
+
+Both copies are taken at bind time, so a process-wide patch applied later to
+a global they read would not reach them. Three rules keep that from
+mattering:
+- **The copies are built from the module's current globals when binding.**
+  Nothing is cached across force fields, except the PolarMACE dispatcher's
+  per-key forward. That forward is built on first use, after
+  `polar.install()` has put in the module functions it replaces, and those
+  are never undone.
+- **Only one name differs in each copy:** `get_symmetric_displacement` in
+  the `prepare_graph` variant, and `prepare_graph` in the forward. Tests
+  check both. The rebound forward still calls MACE's own `get_outputs`,
+  which looks `compute_forces` up in `mace.modules.utils` at call time, so
+  `first_derivative_only` installed after binding still reaches it. A test
+  checks that too.
+- **`strain_problems` refuses a forward (or `prepare_graph`) that reads a
+  global named in `_patches.SOURCE_PINS`,** other than the strain function
+  itself, because the copy would freeze it. MACE 0.3.16's forwards read
+  none.
+
 ## Dynamo, capture, compile cache
 
 - A forward function bound to the instance is what the float64 energy

@@ -183,7 +183,7 @@ def test_bind_on_a_private_copy_and_on_the_float64_forward():
     """bind_strain_path binds the instance's current forward (the float64 one included), never the class."""
     from fastmace.model import energy as energy64
 
-    calc, atoms = tiny_mace_calculator([11, 17]), structure()
+    calc = tiny_mace_calculator([11, 17])
     source = calc.models[0]
     private = copy.deepcopy(source)
     energy64.install(private)
