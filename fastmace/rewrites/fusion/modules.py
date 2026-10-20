@@ -73,6 +73,18 @@ class GatedRows(torch.nn.Module):
         self.joined = tuple(plan)
         return True, "ok"
 
+    def _any_triton(self, rows, n):
+        """Whether the shape rule picks the Triton GEMM for any of ``second``'s products at ``n`` atoms; if
+        not, the joined op would only add launches, so the stock products and join run (NaCl-sized cells)."""
+        from fastmace.kernels.triton import tile_rule
+
+        like = rows[0]
+        sms = tile_rule.device_sms(like.device) if like.dtype == torch.float32 else None
+        second = self.second
+        return any(tile_rule.segment_gemm_choice(n * dim, int(getattr(second, f"weight_{k}").shape[1]),
+                                                 int(getattr(second, f"weight_{k}").shape[0]), sms).backend == "triton"
+                   for _, _, dim, k in self.joined)
+
     def forward(self, x, y):
         outputs, n, like = self.first.output_rows(x, y)
         index, start, length = self.scalars
@@ -92,7 +104,7 @@ class GatedRows(torch.nn.Module):
         from fastmace.rewrites.linear.modules import join_rows
 
         second = self.second
-        if self.joined is not None:  # segment_gemm: the products write into the joined output
+        if self.joined is not None and self._any_triton(rows, n):  # segment_gemm: products write into the output
             from fastmace.kernels.triton.segment_gemm import joined_products
 
             width = sum(mul * dim for _, mul, dim in second.segments_out)

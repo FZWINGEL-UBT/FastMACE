@@ -14,6 +14,7 @@ measured at run time (SPEC §9.1). The thresholds are in waves, tiles over SMs, 
 
 from __future__ import annotations
 
+import functools
 import math
 from dataclasses import dataclass
 
@@ -53,13 +54,20 @@ def segment_gemm_choice(m: int, n: int, k: int, sms: int | None) -> GemmChoice:
 
 
 def device_sms(device) -> int | None:
-    """The SM count of a CUDA ``device``, else None."""
+    """The SM count of a CUDA ``device``, else None (cached per device: forwards ask it while tracing)."""
     import torch
 
     device = torch.device(device)
     if device.type != "cuda":
         return None
-    return torch.cuda.get_device_properties(device).multi_processor_count
+    return _sms(device.index if device.index is not None else torch.cuda.current_device())
+
+
+@functools.lru_cache(maxsize=None)
+def _sms(index: int) -> int:
+    import torch
+
+    return torch.cuda.get_device_properties(index).multi_processor_count
 
 
 __all__ = ["BLOCK_K", "BLOCK_M", "BLOCK_N", "GemmChoice", "MIN_TRITON_WAVES", "NUM_STAGES", "NUM_WARPS",

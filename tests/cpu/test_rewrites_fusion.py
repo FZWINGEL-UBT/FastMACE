@@ -204,3 +204,10 @@ def test_segment_record_needs_gated_rows():
     regs = registry()
     asked = requests("off") | {"segment_gemm": "on"}
     assert not regs.resolve(copy.deepcopy(model), asked, strict=False).decision("segment_gemm").enabled
+
+
+def test_without_a_triton_product_the_stock_join_runs():
+    _, model, _, _, _ = _rewritten_segment("on")
+    chain = model.interactions[0].gated_rows
+    rows = [torch.zeros((4 * d, 1)) for _ in range(2) for d in (1,)]
+    assert not chain._any_triton(rows, 4)  # CPU: no SMs, so the shape rule never picks Triton
