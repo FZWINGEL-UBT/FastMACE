@@ -16,6 +16,27 @@ partway (2-T23). It runs once, as a combined acceptance of phase 2 and this
 round, on the optimised main. Short non-accuracy jobs (CPU trials, short
 speed runs) may still use murphy.
 
+**Owner decision, 20 October 2026, night:** OPT-T02 stage A (`gated_rows`)
+becomes the default, with auto = on wherever block linear applies. The
+evidence:
+- bitwise exact on the CPU and in the reproducible GPU mode;
+- the force gate passes;
+- the speed gains below.
+
+| | murphy (sm_89) | local (sm_120) |
+| --- | --- | --- |
+| NaCl | −4.4 % | −3.7 % |
+| NbCl5 | −9.0 % | −10.6 % |
+
+The 19-label gate runs in the combined acceptance. Any model that fails there
+gets the rewrite switched off.
+
+Results so far in this round:
+- **OPT-T01 (tensor cores) and OPT-T01b (overlap):** rejected on sm_89.
+- **OPT-T03 candidates 1–2:** missed their rule on sm_89.
+- **Stage B (`segment_gemm`):** NbCl5 −5.1 % on top of A on murphy; still
+  opt-in.
+
 ## Starting point
 
 - **NaCl 3×3×3 (216 atoms):** 3.81 ms per step on the RTX 5060 Ti. The force
