@@ -131,12 +131,14 @@ def _slab():
     (1, "constraints", dict(atoms=_with_constraint(nacl()))),
     (1, "variable-cell-without-barostat", dict(variable_cell=True)),
     (2, "species-not-in-superset", dict(species=["Na"])),
-    (5, "reproducible-no-family-qualified", dict(workload=Workload(max_temperature_K=300.0, reproducible=True))),
+    (5, "reproducible-family-not-qualified", dict(label="mp0-medium",
+                                                  workload=Workload(max_temperature_K=300.0, reproducible=True),
+                                                  planner=minimal(versions={"cuequivariance_ops": "0.12.0"}))),
     (7, "atom-count-changes", dict(workload=Workload(max_temperature_K=300.0, atom_count_changes=True))),
 ])
 def test_each_hard_rule_refuses_with_its_reason(rule, code, kwargs):
     with pytest.raises(PlanRefused) as caught:
-        plan_label("mh1-r2scan", **kwargs)
+        plan_label(kwargs.pop("label", "mh1-r2scan"), **kwargs)
     assert codes(caught.value) == [code]
     assert caught.value.reasons[0].rule == rule
     assert isinstance(caught.value, SpeciesNotInSuperset) == (rule == 2)
@@ -178,8 +180,9 @@ def test_rule_6_naive_cueq_refused_unless_allowed():
 def test_three_violated_rules_give_one_refusal_with_three_reasons():
     with pytest.raises(PlanRefused) as caught:
         plan_label("mh1-r2scan", atoms=_with_constraint(_slab()),
-                   workload=Workload(max_temperature_K=300.0, reproducible=True))
-    assert sorted(codes(caught.value)) == ["constraints", "non-3d-pbc", "reproducible-no-family-qualified"]
+                   workload=Workload(max_temperature_K=300.0, reproducible=True),
+                   planner=minimal(engine=EngineConfig(backend="hybrid")))
+    assert sorted(codes(caught.value)) == ["constraints", "non-3d-pbc", "reproducible-backend"]
     assert not isinstance(caught.value, SpeciesNotInSuperset)
 
 

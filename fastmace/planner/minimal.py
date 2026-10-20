@@ -10,8 +10,10 @@ What 1b decides (the rules of §9.3 that have their tiers in 1b):
   is among them): non-3D-PBC, constraints, a variable cell without a barostat integrator,
   a structure species outside the
   superset; PolarMACE on plain compiled cuEq; inexact padding for the graph tier ("compiled MD
-  tier: phase 3", D6); ``reproducible=True`` (no family qualified, phase 2); naive cuEq kernels
-  unless ``allow_naive_cueq``; ``atom_count_changes``;
+  tier: phase 3", D6); ``reproducible=True`` outside plain cuEq MH-1 with the unfused convolution
+  and deterministic kernels (2-T16, ``planner.reproducible``; a qualified plan prepares the
+  process at ``build`` and checks two evaluations there); naive cuEq kernels unless
+  ``allow_naive_cueq``; ``atom_count_changes``;
 - **owner decision D3**: the superset must equal the structure's species (compared as sets);
   a larger one is phase 3 (§8.5);
 - **mode**: graph; eager (2-T02, SPEC §8.3): the graph plan's backend, rewrites and precision
@@ -52,6 +54,7 @@ from fastmace.errors import ModelElementError, PlanRefused, Reason, SpeciesNotIn
 from fastmace.rewrites import versions
 
 from . import fixed
+from . import reproducible as reproducible_mode
 from .plan import Hardware, Plan, SelfCheck, SoftwareTraits
 
 MODES = ("graph", "compiled", "eager", "reference")
@@ -187,13 +190,15 @@ class MinimalPlanner:
     precision itself belongs to the ``ForceField`` (``precision.dtype`` must stay ``"auto"``).
     ``software`` (default: ``detect_software`` at each plan) and ``process`` (default: the process
     record of ``fastmace.engine.constraints``) can be given for tests; ``environ`` and
-    ``torch_version`` as in ``FixedPlanner``.
+    ``torch_version`` as in ``FixedPlanner``; ``versions`` (default: the installed ones) the package
+    versions rule 5 checks (``planner.reproducible.installed_versions``).
     """
 
     def __init__(self, engine: EngineConfig | None = None, neighbours: NeighbourConfig | None = None,
                  polar: PolarConfig | None = None, precision: PrecisionConfig | None = None, *, registry=None,
                  environ: Mapping[str, str] | None = None, torch_version: str | None = None,
-                 software: SoftwareTraits | None = None, process=None):
+                 software: SoftwareTraits | None = None, process=None,
+                 versions: Mapping[str, str | None] | None = None):
         self.engine = engine or EngineConfig()
         self.neighbours = neighbours or NeighbourConfig()
         self.polar = polar or PolarConfig()
@@ -205,6 +210,7 @@ class MinimalPlanner:
         self.environ = environ
         self.torch_version = torch_version
         self.software = software
+        self.versions = versions
         if process is None:
             from fastmace.engine import constraints
 
@@ -234,12 +240,20 @@ class MinimalPlanner:
         """The engine device's ``Hardware``, after the process's allocator settings (as ``FixedPlanner``)."""
         return self._fixed("auto", "float32").hardware()
 
-    def _backend(self, book, software, engine=None):
-        """(backend, Reason) of the backend rule (§9.4, 1a-T00, §8.7), with refusals in ``book``."""
+    def _backend(self, book, software, engine=None, reproducible=False):
+        """(backend, Reason) of the backend rule (§9.4, 1a-T00, §8.7), with refusals in ``book``.
+
+        ``reproducible``: plain cuEq (rule 5, 2-T16); an explicit hybrid is refused by rule 5.
+        """
         from fastmace.engine import constraints
 
         engine = engine or self.engine
         request = engine.backend
+        if reproducible:
+            if request == "hybrid":
+                return "hybrid", Reason("requested 'hybrid'", code="backend-hybrid")  # refused by rule 5
+            return "cueq", Reason("reproducible=True: plain cuEq, the only qualified backend (SPEC §9.3 rule 5)",
+                                  code="backend-cueq-reproducible")
         compiled = engine.compile_mode != "none"
         family = self.process.family
         if self._device_type() != "cuda":
@@ -332,6 +346,16 @@ class MinimalPlanner:
             code="allow-naive-cueq" if problems else "fused-cueq"))
         return superset, effective, requested
 
+    def _qualify(self, plan, traits):
+        """Rule 5 (2-T16): the reproducible ``plan`` with its qualification records, or ``PlanRefused``
+        naming every blocking component."""
+        versions = self.versions if self.versions is not None else reproducible_mode.installed_versions()
+        qualification = reproducible_mode.qualify(plan, traits, versions=versions, registry=self.registry)
+        if not qualification.qualified:
+            raise PlanRefused.from_reasons(list(qualification.reasons))
+        return dataclasses.replace(plan, decisions=(*plan.decisions,
+                                                    *reproducible_mode.decisions(qualification, versions)))
+
     def _claim_family(self, plan, owner, *, offer_runner=False):
         """The process's compile family (§8.7): the first compiled plan fixes it; returns the plan.
 
@@ -345,11 +369,24 @@ class MinimalPlanner:
 
         workload = plan.workload
         if (offer_runner and workload is not None and workload.reproducible
+                and getattr(self.process, "reproducible", None) is not True
                 and str(plan.engine.device).startswith("cuda") and _cuda_initialised()):
             return _in_child(plan, Reason(
                 "reproducible=True after CUDA was initialised in this process: CUBLAS_WORKSPACE_CONFIG and "
                 "deterministic algorithms must be set before (SPEC §8.7, owner decision 14), so the plan runs in a "
                 "child process", code="runner-subprocess-reproducible"))
+        # A process is reproducible or not (owner decision 14, 2-T16): the other kind runs in a child.
+        kind = getattr(self.process, "reproducible", None)
+        if offer_runner and workload is not None and kind is not None and kind != workload.reproducible:
+            if workload.reproducible:
+                return _in_child(plan, Reason(
+                    f"reproducible=True in a process that is not reproducible ({self.process.reproducible_owner}): a "
+                    "process is reproducible or not (SPEC §8.7, owner decision 14), so the plan runs in a child "
+                    "process", code="runner-subprocess-reproducible"))
+            return _in_child(plan, Reason(
+                f"this process is reproducible ({self.process.reproducible_owner}): a process is reproducible or not "
+                "(SPEC §8.7, owner decision 14), so this plan runs in a child process",
+                code="runner-subprocess-not-reproducible"))
         if plan.engine.compile_mode == "none":
             return plan
         family = constraints.OEQ_FAMILY if plan.engine.backend == "hybrid" else constraints.AUTOGRAD_FAMILY
@@ -373,13 +410,22 @@ class MinimalPlanner:
 
         ``variable_cell`` (default: the integrator's) says whether the run changes the cell. Raises
         ``PlanRefused`` (``SpeciesNotInSuperset``) with every reason, ``ModelElementError``, or
-        ``ProcessConstraintError``; nothing is loaded onto the GPU or compiled.
+        ``ProcessConstraintError``; nothing is loaded onto the GPU or compiled. A reproducible plan that
+        runs here prepares the process (``planner.reproducible.prepare_process``).
         """
         superset = force_field.superset_for(atoms)
-        return self.plan_traits(force_field.traits, atoms, integrator, workload, hardware or self.hardware(),
+        if (workload.reproducible and str(self.engine.device).startswith("cuda") and not _cuda_initialised()
+                and getattr(self.process, "reproducible", None) is not False):
+            # The first reproducible plan makes the process reproducible before anything starts CUDA:
+            # the hardware detection below does, and so may the gate's references (SPEC §8.7, decision 14).
+            reproducible_mode.prepare_process(self.process, owner="a reproducible MD plan")
+        plan = self.plan_traits(force_field.traits, atoms, integrator, workload, hardware or self.hardware(),
                                 precision=force_field.precision, rewrites=force_field.rewrites, species=superset,
                                 loaded=force_field.model, variable_cell=variable_cell,
                                 allow_naive_cueq=allow_naive_cueq, allow_reference=allow_reference, mode=mode)
+        if workload.reproducible and plan.runner == "in-process":  # the CPU device, or already done above
+            reproducible_mode.prepare_process(self.process, owner=f"a reproducible {plan.engine.backend} MD plan")
+        return plan
 
     def plan_traits(self, traits, atoms, integrator: IntegratorConfig, workload, hardware: Hardware, *,
                     precision: str, rewrites: Any = "auto", species=None, loaded=None,
@@ -417,15 +463,15 @@ class MinimalPlanner:
             book.refuse(f"a variable cell needs a barostat integrator, got ensemble={integrator.ensemble!r} "
                         "(SPEC §4.4, §9.3 rule 1)", "variable-cell-without-barostat", 1)
         if workload.reproducible:
-            book.refuse("reproducible=True: no (backend, model family) is qualified for bitwise reproducibility yet; "
-                        "phase 2 qualifies the first (SPEC §9.3 rule 5, §16)", "reproducible-no-family-qualified", 5)
+            for reason in reproducible_mode.explicit_conflicts(engine):
+                book.refuse(reason, reason.code)
         if workload.atom_count_changes:
             book.refuse("atom_count_changes=True: changing atom counts is not in 1.0 (SPEC §8.6, §9.3 rule 7)",
                         "atom-count-changes", 7)
         if reference:
             backend = ("cueq", Reason(REFERENCE_REASONS["backend"], code="backend-reference-stock"))
         else:
-            backend = self._backend(book, software, engine)
+            backend = self._backend(book, software, engine, workload.reproducible)
         superset, precision, requested = self._common(book, traits, atoms, species, precision, software, backend[0],
                                                       allow_naive_cueq, loaded)
         self._workload_decisions(book, workload)
@@ -433,7 +479,8 @@ class MinimalPlanner:
             parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend)
         else:
             parts = self._fixed(rewrites, precision, engine)._resolve(book, traits, atoms, integrator, hardware,
-                                                                      backend_choice=backend, texts=TEXTS)
+                                                                      backend_choice=backend, texts=TEXTS,
+                                                                      reproducible=workload.reproducible)
         if mode == "eager":
             self._eager(book, parts, traits)
         book.raise_refusals()
@@ -442,6 +489,8 @@ class MinimalPlanner:
                                                    ("allow_reference", allow_reference)) if used)
         plan = Plan(**parts, superset=superset, workload=workload, software=software, allowances=allowances,
                     reason="reference tier (phase 2)" if reference else "minimal plan (phase 1b)")
+        if workload.reproducible:
+            plan = self._qualify(plan, traits)
         plan = self._claim_family(plan, f"a {plan.engine.backend} MD plan", offer_runner=True)
         return plan
 
@@ -593,16 +642,46 @@ class MinimalPlanner:
                              f"not {plan.tier!r}; "
                              "use build_evaluation for an evaluation plan")
         self._check_atoms(plan, atoms)
+        reproducible = plan.workload is not None and plan.workload.reproducible
+        if plan.workload is not None:  # before the model goes to the GPU (SPEC §8.7, owner decision 14)
+            if reproducible:
+                reproducible_mode.prepare_process(self.process, owner=f"a reproducible {plan.engine.backend} MD plan")
+            else:
+                self.process.claim_reproducible(False, f"a {plan.engine.backend} MD plan")
         model = self._execution_model(plan, force_field)
         if temperature_K is None:
             temperature_K = plan.integrator.temperature_K or 0.0
         engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
             plan, model, atoms, temperature_K=temperature_K, compile_cache=compile_cache, constraints=self.process,
             check=check, capture=False if plan.tier == fixed.EAGER_TIER else None)
+        if reproducible:
+            self._check_reproducible(engine)
         # The built plan with its per-record self-checks (SPEC §6.4, 2-T04); the caller records it.
         engine.plan = dataclasses.replace(plan, selfchecks=tuple(
             SelfCheck.from_mapping(record) for record in engine.force_field.selfcheck_records()))
         return engine
+
+    @staticmethod
+    def _check_reproducible(engine):
+        """Rule 5 at build (2-T16): the records applied are deterministic, and two evaluations of the
+        start positions are bitwise equal (the check of the pinned cuEq variable)."""
+        from fastmace.errors import ReproducibilityError
+
+        declared = reproducible_mode.record_determinism()
+        applied = [getattr(entry, "name", entry) for entry in getattr(engine.force_field, "applied", ())]
+        blocking = tuple(f"rewrite {name}" for name in applied if declared.get(name) is not True)
+        if blocking:
+            raise ReproducibilityError(f"reproducible=True: applied rewrites are not declared deterministic: "
+                                       f"{', '.join(blocking)}", blocking=blocking)
+        field, positions = engine.force_field, engine.state.positions.detach().clone()
+
+        def evaluate():
+            out = field(positions)
+            return out.energy, out.forces
+
+        kernels = ("cuEquivariance uniform_1d",) if str(engine.state.positions.device).startswith("cuda") else (
+            "torch CPU kernels",)
+        reproducible_mode.check_repeatable(evaluate, kernels=kernels)
 
     def build_reference(self, plan: Plan, force_field, atoms, *, temperature_K: float | None = None):
         """The reference tier's engine (plan task 2-T03, SPEC §8.4): the reference calculator as the force

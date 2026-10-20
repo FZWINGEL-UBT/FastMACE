@@ -61,6 +61,20 @@ class ProcessRecord:
     family_owner: str | None = None
     engines: int = 0
     notes: list[str] = field(default_factory=list)
+    # Reproducible or not (SPEC §8.7, owner decision 14): None until the first engine is built.
+    reproducible: bool | None = None
+    reproducible_owner: str | None = None
+
+    def claim_reproducible(self, reproducible: bool, owner: str) -> None:
+        """Record whether this process is reproducible; refuse the other kind once one is recorded."""
+        if self.reproducible is None:
+            self.reproducible, self.reproducible_owner = bool(reproducible), owner
+            return
+        if bool(reproducible) != self.reproducible:
+            kind = "reproducible" if self.reproducible else "not reproducible"
+            raise ProcessConstraintError(
+                f"this process is {kind} ({self.reproducible_owner}); a process is reproducible or not (SPEC §8.7, "
+                f"owner decision 14), so {owner} runs in a child through the subprocess runner")
 
     def claim_family(self, family: str | None, owner: str) -> None:
         """Record ``family`` (None: nothing compiled, always allowed); refuse a second family."""

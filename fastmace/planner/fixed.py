@@ -237,11 +237,12 @@ class FixedPlanner:
 
     # ------------------------------------------------------------------ stage 1: what loading needs
 
-    def _backend(self, book, choice=None):
+    def _backend(self, book, choice=None, reproducible=False):
         """(backend, dtype, cueq_conv_fusion) of stage 1, with their decisions and refusals.
 
         ``choice``: ``(backend, reason)`` decided by another planner (the minimal planner's backend
-        rule, SPEC §9.3); default the research engine's rule.
+        rule, SPEC §9.3); default the research engine's rule. ``reproducible``: the unfused
+        convolution under "auto" (owner decision 13; the minimal planner refuses an explicit "on").
         """
         engine, precision = self.engine, self.precision
         if choice is None:
@@ -270,10 +271,12 @@ class FixedPlanner:
                 f"MACE's own conversion rule ({_toggle(fusion)} on {engine.device!r}): FastMACE's fusion patch is "
                 "not qualified on this MACE (SPEC §6.3, §18 decision 2)", code=versions.CONV_FUSION_CODE))
         elif backend == "cueq":
-            fusion = engine.cueq_conv_fusion != "off"
+            fusion = engine.cueq_conv_fusion == "on" if reproducible else engine.cueq_conv_fusion != "off"
             book.decide("EngineConfig.cueq_conv_fusion", _toggle(fusion), _why(
                 engine.cueq_conv_fusion, rule, "plain cuEq: cuEquivariance's fused convolution (MACE PR 1641)"
-                if fusion else "plain cuEq, unfused convolution"))
+                if fusion else "reproducible=True: the unfused convolution, whose messages MACE's scatter_add_ sums "
+                "under the deterministic flag (owner decision 13)" if reproducible
+                else "plain cuEq, unfused convolution"))
         else:
             if engine.cueq_conv_fusion == "on":
                 book.refuse("EngineConfig.cueq_conv_fusion='on' requires backend 'cueq' (the hybrid fuses its OEq "
@@ -355,13 +358,13 @@ class FixedPlanner:
         return Plan(**parts, reason="fixed plan of phase 1a (main.py)")
 
     def _resolve(self, book, traits, atoms, integrator, hardware, *, backend_choice=None, evaluation=False,
-                 texts=None):
+                 texts=None, reproducible=False):
         """The plan's parts (``Plan`` keywords except the reason), decisions and refusals in ``book``.
 
         Shared with the minimal planner (1b-T12): ``backend_choice`` is its backend rule;
         ``evaluation`` plans a one-off compiled evaluation with stress (no integrator, no graph
         tier, so exact padding is not required); ``texts`` maps a refusal code to a function that
-        rewrites its text.
+        rewrites its text; ``reproducible`` (minimal planner, rule 5) takes the unfused convolution.
         """
         from fastmace.longrange import polar as longrange
         from fastmace.model.capabilities import ModelTraits, model_traits
@@ -399,7 +402,7 @@ class FixedPlanner:
         book.decide("hardware", hardware.name, f"compute capability {hardware.compute_capability[0]}."
                     f"{hardware.compute_capability[1]}, {hardware.memory_bytes / 2**30:.1f} GiB (recorded only)")
 
-        backend, dtype, fusion = self._backend(book, backend_choice)
+        backend, dtype, fusion = self._backend(book, backend_choice, reproducible)
         hybrid = backend == "hybrid"
         values = self._stage1(book, hybrid, npt)
         self._stage2(book, values, traits, explicit)

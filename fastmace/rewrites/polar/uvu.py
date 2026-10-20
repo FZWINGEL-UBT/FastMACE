@@ -166,6 +166,7 @@ RECORD = {
     "exactness": "rounding",
     "default": "on",  # RewriteConfig.polar_uvu = True
     "workload_constraints": (),
+    "deterministic": True,  # a GEMM (cuBLAS with its fixed workspace), no atomics (2-T16)
     "apply": apply,
     "selfcheck": selfcheck,
     "config_field": "RewriteConfig.polar_uvu",

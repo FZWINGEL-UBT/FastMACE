@@ -51,7 +51,7 @@ A reason that reports or tests match on is a `fastmace.errors.Reason` (a `str` w
 | `species-not-in-superset` | 2 | minimal, `build` → `SpeciesNotInSuperset` |
 | `polar-plain-compiled-cueq` | 3 | both |
 | `inexact-padding` | 4 | both (minimal text: "compiled MD tier: phase 3", D6) |
-| `reproducible-no-family-qualified` | 5 | minimal |
+| `reproducible-backend`, `reproducible-conv-fusion`, `reproducible-family-not-qualified`, `reproducible-cueq-version`, `reproducible-kernel-not-deterministic`, `reproducible-tier` | 5 | minimal (2-T16; `planner/reproducible.py`) |
 | `naive-cueq` | 6 | minimal (plan, or `build` after conversion) |
 | `atom-count-changes` | 7 | minimal |
 | `superset-beyond-structure` | 8 | minimal (D3: phase 3) |
@@ -64,7 +64,9 @@ A reason that reports or tests match on is a `fastmace.errors.Reason` (a `str` w
 | Key | Codes |
 | --- | --- |
 | `mode` | `mode-graph`, `mode-evaluation` |
-| `EngineConfig.backend` | `backend-hybrid`, `backend-cueq-cpu`, `backend-cueq-oeq-unavailable`, `backend-cueq-mace-imported-first`, `backend-cueq-process-family`, `backend-cueq-requested` |
+| `EngineConfig.backend` | `backend-hybrid`, `backend-cueq-cpu`, `backend-cueq-oeq-unavailable`, `backend-cueq-mace-imported-first`, `backend-cueq-process-family`, `backend-cueq-requested`, `backend-cueq-reproducible` (2-T16) |
+| `reproducible`, `reproducible.environment` | `reproducible-qualified` (the report names the undocumented cuEq internal), `reproducible-environment` (2-T16) |
+| `runner` | `runner-subprocess-reproducible`, `runner-subprocess-family`, `runner-subprocess-not-reproducible` (2-T07, 2-T16) |
 | `workload.host_callbacks_every` | `no-host-callbacks`, `host-callbacks-graph-sync` (rule 9, D6: the report says so) |
 | `workload.max_temperature_K` | `max-temperature-recorded` (rule 11: 1a's skin and buckets) |
 | `workload.mc_moves` | `no-mc`, `mc-phase-3` |

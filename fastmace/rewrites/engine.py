@@ -465,9 +465,10 @@ def _always(model):
 
 
 def _record(name, apply, selfcheck, exactness, default, sources, constraints=()):
+    # Each switches how MACE's own torch code runs; nothing sums atomically (SPEC §9.3, 2-T16).
     return Rewrite(name=name, applies_to=_always, requires=(), conflicts=(), mace_versions=MACE_VERSIONS,
                    source_hashes=sources, exactness=exactness, default=default,
-                   workload_constraints=constraints, apply=apply, selfcheck=selfcheck)
+                   workload_constraints=constraints, apply=apply, selfcheck=selfcheck, deterministic=True)
 
 
 def _apply_mask_head(model, context):
