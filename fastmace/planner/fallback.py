@@ -917,7 +917,9 @@ class Fallback:
             return "eager", off, self._validate("eager", off, f"{MODE_WHY} ({_text(last.error)})")
         if dimension != "rewrites":
             return None
-        units = tuple(name for name in self._units("eager") if name not in off)
+        # The set the diagnosis just saw failing in eager: ddmin's whole set (its precondition).
+        seen = set(enabled_rewrites(current))
+        units = tuple(name for name in self._units("eager") if name not in off and name in seen)
         requires = field_requires(units, self._registry())
         culprits = ddmin(units, lambda subset: self._test("eager", subset), requires=requires, budget=None)
         ordered = tuple(name for name in units if name in culprits)
