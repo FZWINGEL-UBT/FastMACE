@@ -14,7 +14,7 @@ neighbour-list rebuild, what an ASE optimiser pays) and ``model`` (the force fie
 Measurement only: nothing here is a library option.
 """
 
-import json
+import json  # noqa: I001 - fastmace is imported before torch on purpose (SPEC §14)
 import statistics
 import sys
 import time
