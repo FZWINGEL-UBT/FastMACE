@@ -542,7 +542,8 @@ def test_conv_fusion_patch_refuses_another_signature(clean_patches, monkeypatch)
 
     monkeypatch.setattr(convert, "run", other)
     monkeypatch.setattr(_patches, "_ORIGINALS", {})
-    with pytest.raises(RuntimeError, match="0.3.16 parameters"):
+    # The hash gate (2-T04) refuses it before the signature check.
+    with pytest.raises(_patches.UnqualifiedPatchError, match="convert_e3nn_cueq:run"):
         _patches.set_cueq_conv_fusion(True)
     assert _patches.applied() == ()
 
