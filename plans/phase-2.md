@@ -196,6 +196,14 @@ These are 1b's principles, unchanged where they still apply:
   plus the local `fastmace_cpu` suite when the machine is free. The `fast`
   GPU tier runs on engine merges, `full` on merges that touch `engine/` or
   `planner/`, and `acceptance` on merges that change numerics.
+  - One trial's GPU tier at a time on a GPU (20 October 2026).
+  - The full tier keeps one step-time assertion,
+    `test_planner_gpu.py::test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal`
+    (planned < 1.25 × hand-built). It failed for 2-T02 at 4.90 against
+    3.52 ms/step while a second tier and two workers' tests shared murphy's
+    GPU. With the same code, the combined 2-T02 + 2-T06 tier passed it.
+  - A step-time failure in a shared run is re-checked on an idle GPU, never
+    read as a regression.
 - **NFS and git.** Tests that run git in a temporary directory on the NAS
   pass `safe.directory` in the tests only. The library never overrides it
   (1b-T28).
@@ -492,6 +500,32 @@ Files: tests, the audit in `docs/design/isolation.md`, and narrow fixes in
 named to the conductor first, because the files are shared.
 
 Done when acceptance 5 holds and the audit lists no unhandled shared state.
+
+#### 2-T08b The strain path per model (M, 2-T08's worker) — after T08, T13
+
+Added on 20 October 2026, from 2-T08's audit. A failing self-check of
+`single_graph_strain` undoes its process-wide patch
+(`Registry._selfcheck_failure` calls `_patches.restore`), and that changes
+force fields built earlier in the process:
+- energy and forces stay the same, but stress moves at rounding level
+  (8.7e-19);
+- a compiled force field recompiles with MACE's function at its next
+  non-replayed call, while captured graphs are unaffected;
+- its `applied` list goes stale.
+
+SPEC §8.7 ("MACE patches") says the strain path is per model.
+
+2-T08 records the finding in `docs/design/isolation.md` and pins the
+current behaviour with a test (option a). 2-T08b makes the strain path per
+model (option c), so that no self-check failure undoes anything
+process-wide. Option b, a lease on every host-side call, was rejected.
+- Start with a short design note. One idea: bind the one-graph
+  `get_symmetric_displacement` into the private model copy's forward, as the
+  float64 energy forward already is per instance.
+- Files: `rewrites/engine.py`, `rewrites/registry.py`, `_patches.py`, and
+  `model/forces.py` after T13.
+
+Acceptance 5's audit is complete when 2-T08b is merged.
 
 #### 2-T09 Resume warns on a version change (S) — after T01
 
@@ -1397,8 +1431,41 @@ notes folder of the conductor's session (`2-T0x-…md`).
 - **2-T14c started** (2-T14's worker): the float32 noise bound of that test
   gets a robust noise estimate, and the test must still fail for a real
   force change. Verified over 20 runs on murphy and 10 on the local card.
-- **2-T07 in trial:** CPU on murphy 2380 passed; the full GPU tier is
-  running (it touches `engine/`).
+- **2-T07 merged** (4d657e8). CPU 2380 passed; the full GPU tier gave
+  241 passed, 3 skipped.
+- **2-T14c merged** (8c6e22e). Murphy 21/21 and RTX 5060 Ti 11/11, with
+  cross/noise at most 1.07. The owner rejected the deletion of its scratch
+  folders (`/mnt/homes/zwingel/fastmace-2-T14c`, 197 MB, and WSL
+  `~/fastmace-2-T14c`, 68 KB), so they stay until the owner decides.
+- **2-T05's GPU cases pass** (attempt-5, d9f0458). Both end
+  `passed-reduced` after GPU out-of-memory and a capped or declined CPU
+  step: POLAR-1-L on a 1080-atom cell, OMOL-0 XL on a 1620-atom cell.
+  - The replay check uses the gate's own limit, max(2 × float32 yardstick,
+    floor), from the comparison that was run.
+  - The GPU test accepts "out of memory" or "device failure" for the first
+    step.
+  - 2-T05 rebases after 2-T02 (a one-line conflict in report.py's
+    `DOWNGRADES`).
+- **2-T08's audit, decision:** see 2-T08b above. Option a now, the per-model
+  strain path (option c) as 2-T08b.
+- **Started:** 2-T06 (pushed 737527d; in trial with 2-T02), 2-T08, 2-T13 and 2-T16.
+- **2-T02 and 2-T06 merged** (28c4978, 875f8a2), trial-merged together.
+  - CPU: 2425 passed.
+  - The combined full GPU tier was killed externally by SIGKILL at 98 %
+    (05:04 CEST). Murphy shows no limit, and no worker kill was found. The
+    last 4 tests then passed on a rerun.
+  - 2-T02's own tier failed only the step-time assertion under GPU sharing.
+- **2-T08 merged** (ba782a5): tests and docs, CPU 2435 passed. A → B → A
+  passes on all three GPU paths, and no lease was needed. 2-T08b started.
+- **2-T13 pushed** (5db9daf). `fm.calc`'s LBFGS compiles once on both
+  backends: call 2 drops from 33.3 s to 0.016 s (plain cuEq) and from
+  23.1 s to 0.024 s (hybrid). The steady-state per-call time is unchanged
+  within the local A/B's resolution (about 2 %). It is in trial now.
+- **2-T16:** acceptance 6 passes bitwise on murphy with
+  `CUEQUIVARIANCE_OPS_U1D_ALGOS=1,1`. Unpinned, 1 of 3 fresh runs differed.
+  The second machine (the local card) is running now.
+- **Order change:** 2-T03 merges before 2-T04b (2-T15 needs 2-T03, and
+  2-T04b is small), and 2-T04b rebases.
 
 ## Phase 1b items carried into phase 2
 

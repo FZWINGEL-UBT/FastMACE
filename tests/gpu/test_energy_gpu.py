@@ -64,7 +64,8 @@ def evaluate(field, positions):
     return [value.detach().clone() for value in out if value is not None]
 
 
-def captured(field, positions):
+def captured(field, positions, replays=1):
+    """The outputs of ``replays`` replays of one captured graph of ``field`` (a list of output lists)."""
     stream = torch.cuda.Stream()
     stream.wait_stream(torch.cuda.current_stream())
     with torch.cuda.stream(stream):
@@ -74,9 +75,32 @@ def captured(field, positions):
     graph = torch.cuda.CUDAGraph()
     with torch.cuda.graph(graph):
         out = field(positions)
-    graph.replay()
-    torch.cuda.synchronize()
-    return [value.detach().clone() for value in out]
+    results = []
+    for _ in range(replays):
+        graph.replay()
+        torch.cuda.synchronize()
+        results.append([value.detach().clone() for value in out])
+    return results
+
+
+# Samples per force field for the noise of its atomic scatters: replays of its graph and eager calls.
+REPLAYS, EAGER_CALLS = 8, 4
+# The largest difference between the two fields may exceed the largest spread within one field by
+# this factor (both are maxima over samples of the same atomic-order noise). 2-T14c on an RTX 4000
+# Ada, float32 compiled, 20 runs: the ratio was at most 1.00 for forces and 1.07 for stress; the
+# noise was 1.7e-7 to 3.4e-7 eV/Å, so the 1e-6 shift below exceeded the bound at least 1.5 times.
+NOISE_FACTOR = 2.0
+
+
+def spread(samples, index):
+    """The largest max-abs difference between any two of ``samples`` (output lists) in output ``index``."""
+    values = [sample[index] for sample in samples]
+    return max(float((x - y).abs().max()) for i, x in enumerate(values) for y in values[i + 1:])
+
+
+def within_noise(cross, noise, scale):
+    """True when every cross-field difference is within the noise bound (plus 1e-12 relative)."""
+    return max(cross) <= NOISE_FACTOR * noise + 1e-12 * scale
 
 
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
@@ -92,8 +116,10 @@ def test_float64_energy_replays_and_keeps_forces(dtype, compile_mode):
                                    atomic_energies=exact if flag else None)
               for flag in (True, False)}
     positions = torch.tensor(atoms.positions + 0.03, device="cuda")
-    eager = {flag: evaluate(field, positions) for flag, field in fields.items()}
-    replayed = {flag: captured(field, positions) for flag, field in fields.items()}
+    eager_calls = {flag: [evaluate(field, positions) for _ in range(EAGER_CALLS)] for flag, field in fields.items()}
+    replays = {flag: captured(field, positions, REPLAYS) for flag, field in fields.items()}
+    eager = {flag: calls[0] for flag, calls in eager_calls.items()}
+    replayed = {flag: runs[0] for flag, runs in replays.items()}
     assert eager[True][0].dtype == torch.float64
     # The float64 sums use atomic adds on the GPU: the same value up to their summation order. In
     # float32 the per-atom terms themselves come from atomic float32 scatters (4e-7 eV on 64 atoms).
@@ -102,11 +128,24 @@ def test_float64_energy_replays_and_keeps_forces(dtype, compile_mode):
                                atol=0 if dtype == torch.float64 else 1e-5)
     # Forces and stress: MACE's autograd of its own scalar either way (design A). Bitwise on the CPU
     # (tests/cpu/test_energy.py); here two graphs with atomic scatters, so to rounding.
-    # The noise of one force field (its replay against its eager call) bounds the difference.
+    # The noise of the atomic scatters bounds the difference: the largest spread within one field
+    # (its replays and eager calls) over both fields. A single replay against a single eager call
+    # was too small an estimate: in float32 on an RTX 4000 Ada about 1 run in 9 failed at 4x (2-T14c).
     for index in (1, 2):
-        a, b = replayed[True][index], replayed[False][index]
-        noise = float((replayed[False][index] - eager[False][index]).abs().max())
-        assert float((a - b).abs().max()) <= 4 * noise + 1e-12 * float(b.abs().max())
+        noise = max(spread(replays[flag] + eager_calls[flag], index) for flag in (True, False))
+        cross = [float((a[index] - b[index]).abs().max()) for a, b in zip(replays[True], replays[False])]
+        scale = float(replayed[False][index].abs().max())
+        print({"output": index, "noise": noise, "cross": max(cross)})
+        assert within_noise(cross, noise, scale), (max(cross), noise)
+    # The bound still catches a real change: 1e-6 eV/Å on the force component where the two fields
+    # agree best (so the shift is not helped by the noise).
+    difference = (replays[True][0][1] - replays[False][0][1]).abs()
+    shift = torch.zeros_like(difference)
+    shift.view(-1)[int(difference.argmin())] = 1e-6
+    shifted = [float((a[1] + shift - b[1]).abs().max()) for a, b in zip(replays[True], replays[False])]
+    noise = max(spread(replays[flag] + eager_calls[flag], 1) for flag in (True, False))
+    print({"shifted": max(shifted), "bound": NOISE_FACTOR * noise})
+    assert not within_noise(shifted, noise, float(replayed[False][1].abs().max())), (max(shifted), noise)
     reference = MACEForceField(cueq_calculator(model, torch.float64), atoms, neighbours=NEIGHBOURS)
     expected = float(evaluate(reference, positions)[0][0])
     error, stock_error = abs(float(eager[True][0][0]) - expected), abs(float(eager[False][0][0]) - expected)

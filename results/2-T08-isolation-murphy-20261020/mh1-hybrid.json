@@ -1,0 +1,64 @@
+{
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "dtype": "float32",
+ "backend": "hybrid",
+ "polar": false,
+ "shared_A_A2": true,
+ "shared_A_B": false,
+ "species_dependent": true,
+ "streaming": {
+  "A": 2,
+  "B": 2,
+  "A2": 2
+ },
+ "cache_entries": 2,
+ "evaluation_errors": {
+  "A": [
+   5.506855683824935e-07,
+   6.098297087606366e-07,
+   5.682606397138497e-07
+  ],
+  "B": [
+   3.62736951868192e-07,
+   3.619472152107014e-07
+  ],
+  "A2": [
+   6.721220573656176e-07,
+   4.868264755710474e-07
+  ]
+ },
+ "compiled_in_last_round": 0,
+ "engines": {
+  "A": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 12,
+   "edge_sizes": 1,
+   "captured": 2,
+   "force_error": 4.946557743465155e-07,
+   "position_deviation": 3.472491627576346e-07
+  },
+  "B": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 13,
+   "edge_sizes": 1,
+   "captured": 2,
+   "force_error": 5.423571274645311e-07,
+   "position_deviation": 6.566598322876871e-07
+  },
+  "A2": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 11,
+   "edge_sizes": 2,
+   "captured": 3,
+   "force_error": 3.8778127068166776e-07,
+   "position_deviation": 1.9124956374128033e-07
+  }
+ },
+ "path": "mh1-hybrid",
+ "fastmace_commit": "d70307e",
+ "machine": "murphy"
+}

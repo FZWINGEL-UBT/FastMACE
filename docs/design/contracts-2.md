@@ -120,7 +120,7 @@ All four have the §7.7 message shape (what, why, next, record, environment).
 | --- | --- | --- |
 | `engine/subprocess.py` | `SubprocessRunner(config=None)`; `.run(simulation, *, steps=None, schedule=None)`; `main(argv=None)` for `python -m fastmace.engine.subprocess <directory>`; `HANDOFF_NAME = ".fastmace-handoff"` | T07 |
 | `engine/reference.py` | `ReferenceForceField(force_field, atoms, *, device=None, dtype="float64")`, implementing `model.forces.ForceField` | T03 |
-| `planner/fallback.py` | `candidate(plan, changes, force_field, atoms)`, `activate(candidate, ...)` | T06 |
+| `planner/fallback.py` | `candidate(plan, changes, force_field, atoms, *, planner=None)`, `activate(candidate, planner, force_field, atoms, *, references, reduced=False, quantities=None, budget=None, ...)` | T06 (merged) |
 | `planner/fallback.py` | `Fallback(planner, force_field, atoms, integrator, references, config=None).run(failure)`; `diagnose(plan, failure, ...)`; `ddmin(rewrites, test, *, requires, budget)`; `terminal_sequence(plan, ...)` | T15 |
 | `planner/fallback.py` | records `TriedCandidate`, `Budget(limit, reduced_gate_runs=0, full_gate_runs=0)` with `.spent`; `DIMENSIONS`, `OUTCOMES`, `STAGES` | complete |
 | `planner/reproducible.py` | `AllowListEntry(component, kind, deterministic, reason, condition="")` (kind: `cueq-kernel`, `torch-op`, `fastmace-kernel`); `Qualification(backend, family, qualified, blocking=(), entries=())`; `ALLOW_LIST = ()`; `qualify(plan, ...)` | T16 |

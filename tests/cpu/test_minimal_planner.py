@@ -204,7 +204,7 @@ def test_d3_superset_beyond_the_structure_is_phase_3():
     assert plan_label("mh1-r2scan", species=[17, 11]).superset == NA_CL
 
 
-@pytest.mark.parametrize(("mode", "phase"), [("compiled", "phase 3"), ("eager", "phase 2"), ("reference", "1b")])
+@pytest.mark.parametrize(("mode", "phase"), [("compiled", "phase 3"), ("reference", "1b")])  # eager: 2-T02
 def test_other_modes_are_refused_with_their_phase(mode, phase):
     with pytest.raises(PlanRefused) as caught:
         plan_label("mh1-r2scan", mode=mode)
