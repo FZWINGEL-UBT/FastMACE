@@ -222,7 +222,9 @@ class SubprocessRunner:
         if isinstance(timing, dict):
             timing["status"] = simulation._status
         record["report"] = simulation._report.to_metadata()
-        record["subprocess"] = self.record()
+        from fastmace import provenance
+
+        record["subprocess"] = provenance.subprocess_block(self)
         return record
 
     def record(self) -> dict[str, Any]:

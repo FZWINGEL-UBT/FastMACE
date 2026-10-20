@@ -9,6 +9,12 @@
 - The record round-trips through ``json``; ``write_metadata`` writes it atomically.
 - The 1a blocks (``model_block``, ``fastmace_block``, ``run_record``) keep their output; the 1a model
   block nests under ``"model"`` unchanged, and gains only ``trust``.
+
+Plan task 2-T17 (phase 2) extends the map: the fallbacks tried and the revision each became
+(2-T06, 2-T15), the per-record self-checks (2-T04), the always-on treatments (2-T04), the gate's
+device, reduced cell and resource steps (2-T05), the runner and its child records (2-T07), the
+strain path the force field bound (2-T08b), dynamic edges (2-T13) and the reproducible flag
+(2-T16). A run that takes those paths leaves none of them null.
 """
 
 import fastmace  # noqa: F401  (before torch: it switches PyTorch's file locks, SPEC §14)
@@ -24,6 +30,9 @@ import torch
 from test_minimal_planner import plan_label
 
 from fastmace import provenance
+from fastmace.planner.fallback import TriedCandidate
+from fastmace.planner.plan import SelfCheck
+from fastmace.planner.selfcheck import GateRecord
 from fastmace.state import ForceFieldIdentity
 
 HEX64 = re.compile(r"[0-9a-f]{64}")
@@ -93,7 +102,20 @@ PLAN_1B = (
     ("checkpoint trust (1b-T08)", "checkpoint.trust"),
     ("float64 energy accumulation (1b-T03)", "precision.float64_energy"),
 )
-# Filled by a later phase: an explicit null in 1b.
+# What phase 2 adds (plan task 2-T17): filled whenever the run takes the path that produces it.
+PHASE_2 = (
+    ("plan runner (2-T07)", "plan.runner"),
+    ("per-record self-checks (2-T04)", "gate.selfchecks"),
+    ("always-on treatments (2-T04)", "software.treatments"),
+    ("gate reference device (2-T05)", "gate.device"),
+    ("gate reduced cell (2-T05)", "gate.reduced_cell"),
+    ("gate resource steps (2-T05)", "gate.steps"),
+    ("subprocess runner and its children (2-T07)", "subprocess"),
+    ("strain path bound by the force field (2-T08b)", "force_field.strain_path"),
+    ("compiled with dynamic edges (2-T13)", "plan.engine.dynamic_edges"),
+    ("reproducible mode (2-T16)", "plan.workload.reproducible"),
+)
+# Filled by a later phase: an explicit null in phase 2 (tier switches: phase 5, §9.6; MC: phase 3).
 LATER_PHASES = ("counters.tier_switches", "counters.mc")
 
 IDENTITY = ForceFieldIdentity(checkpoint_sha256="b" * 64, head="matpes_r2scan", species=(11, 17),
@@ -152,10 +174,10 @@ def _full_record(**changes):
 
 
 def test_every_spec_13_item_maps_to_a_key():
-    assert dict(provenance.SPEC_13_KEYS) == dict(SPEC_13 + PLAN_1B)
+    assert dict(provenance.SPEC_13_KEYS) == dict(SPEC_13 + PLAN_1B + PHASE_2)
     full, empty = _full_record(), provenance.metadata_record()
-    for item, path in SPEC_13 + PLAN_1B:
-        _get(full, path)  # present, null or not
+    for item, path in SPEC_13 + PLAN_1B + PHASE_2:
+        _get(full, path, null_parent=(item, path) in PHASE_2)  # present, null or not; no force_field= here
         _get(empty, path, null_parent=True)  # without a plan, "plan" is null
 
 
@@ -178,7 +200,10 @@ def test_an_empty_record_records_what_the_process_knows():
     assert record["code"]["version"] == fastmace.__version__
     assert record["software"]["versions"]["python"]
     # D1: the gate is opt-in; without a gate record the run says why it did not run.
-    assert record["gate"] == {"status": "skipped", "reason": 'opt-in: check="gate"', "selfchecks": None}
+    assert record["gate"] == {"status": "skipped", "reason": 'opt-in: check="gate"', "selfchecks": None,
+                              "device": None, "reduced_cell": None, "steps": []}
+    assert record["subprocess"] is None and record["force_field"] is None
+    assert record["software"]["treatments"] is None  # no plan: MACE is never imported for it
     assert record["plan"] is None and record["plan_revisions"] == []
     assert record["restart_points"] == []
 
@@ -257,21 +282,148 @@ def test_setup_stages_and_timing():
 
 def test_gate_report_counters_and_engine_info():
     record = _full_record()
-    assert record["gate"] == {"status": "passed", "selfchecks": {"factor_species": 1e-7}}
+    assert record["gate"] == {"status": "passed", "selfchecks": {"factor_species": 1e-7}, "device": None,
+                              "reduced_cell": None, "steps": []}
     assert record["report"] == _Report().to_metadata()
     counters = record["counters"]
     assert counters["recaptures"] == 2 and counters["overflows_redone"] == 1
     assert counters["neighbour_lists"]["mace"]["rebuilds"] == 12
     assert counters["engine"]["edge_bucket"] == 4096
     gate = _full_record(gate={"status": "unavailable", "reason": "no reference"})["gate"]
-    assert gate["selfchecks"] is None  # until 1b-T16, the self-checks are part of the gate record
+    assert gate["selfchecks"] == []  # the plan's (2-T04): this plan was never built
 
 
 def test_unknown_counter_and_gate_without_status_are_refused():
     with pytest.raises(ValueError, match="tier_switches"):
-        _full_record(counters={"tier_switches": 1})  # phase 2: not settable in 1b
+        _full_record(counters={"tier_switches": 1})  # phase 5 (§9.6): not settable in phase 2
     with pytest.raises(ValueError, match="status"):
         _full_record(gate={"selfchecks": {}})
+
+
+# ------------------------------------------------------------------------ phase 2 (plan task 2-T17)
+
+FAILED_EAGER = TriedCandidate(dimension="mode", change="eager", outcome="failed",
+                              reason="eager fails too: the fault is in the rewrites", stage="self-check",
+                              reduced_gate_runs=1)
+ACTIVATED = TriedCandidate(dimension="rewrites", change="rewrites fold_cutoff off", outcome="activated",
+                           reason="ddmin: fold_cutoff", revision=1, reduced_gate_runs=5, full_gate_runs=1)
+SELFCHECK = SelfCheck(name="factor_species", passed=True, max_relative_error=1e-7, threshold=1e-5, modules=2,
+                      dtype="float64", detail="max relative error 1e-07")
+REDUCED_GATE = GateRecord(status="passed-reduced", check="gate", reason="CPU float64 over the time limit",
+                          device="cpu", reduced_cell=(2, 2, 2),
+                          steps=({"device": "cuda", "cell": "production", "outcome": "out of memory"},
+                                 {"device": "cpu", "cell": "reduced", "repeat": [2, 2, 2], "outcome": "passed"}))
+CHILDREN = {"python": "/env/bin/python", "reason": "a second backend family after a compiled model",
+            "directory": None, "children": 3, "seconds": 41.5, "failed": None,
+            "last": {"action": "run", "stage": "0003", "pid": 4242, "exit_code": 0, "seconds": 20.1, "steps": 100}}
+
+
+class _ForceField:
+    """A force field as the engine holds it: ``info()`` with the strain path it bound (2-T08b)."""
+
+    def info(self):
+        from fastmace.errors import Reason
+
+        return {"backend": "cueq", "strain_path": "one_graph", "energy_treatment": "patched",
+                "decisions": {"fold_cutoff": Reason("off by the fallback", code="fallback")}}
+
+
+def _phase_2_plan(runner="subprocess"):
+    import dataclasses
+
+    plan = plan_label("mh1-r2scan", precision="float64")
+    revised = plan.revise("plan revision 1 (fallback): rewrites fold_cutoff off, self-check failed", 0)
+    return dataclasses.replace(revised, fallbacks=(FAILED_EAGER, ACTIVATED), selfchecks=(SELFCHECK,), runner=runner)
+
+
+def _phase_2_record(**changes):
+    arguments = dict(plan=_phase_2_plan(), gate=REDUCED_GATE, force_field=_ForceField(),
+                     subprocess=SimpleNamespace(record=lambda: dict(CHILDREN)))
+    arguments.update(changes)
+    return _full_record(**arguments)
+
+
+def test_no_phase_2_key_is_null_on_the_paths_that_fill_it():
+    record = _phase_2_record()
+    for item, path in PHASE_2:
+        assert _get(record, path) is not None, item
+    assert record["plan"]["fallbacks_tried"] and record["gate"]["selfchecks"] and record["gate"]["steps"]
+
+
+def test_fallbacks_tried_and_the_revision_they_became():
+    import dataclasses
+
+    record = _phase_2_record()
+    assert record["plan"]["fallbacks_tried"] == [dataclasses.asdict(FAILED_EAGER), dataclasses.asdict(ACTIVATED)]
+    revisions = record["plan_revisions"]
+    assert [entry["revision"] for entry in revisions] == [0, 1]
+    assert revisions[0]["fallback"] is None  # the initial plan
+    assert revisions[1]["fallback"] == dataclasses.asdict(ACTIVATED)
+    assert revisions[1]["reason"].startswith("plan revision 1 (fallback): rewrites fold_cutoff off")
+    assert [entry["runner"] for entry in revisions] == ["in-process", "subprocess"]
+    assert record["plan"]["runner"] == "subprocess"
+
+
+def test_the_default_path_records_no_fallback():
+    record = _full_record()
+    assert record["plan"]["fallbacks_tried"] == [] and record["plan"]["runner"] == "in-process"
+    assert all(entry["fallback"] is None for entry in record["plan_revisions"])
+    assert record["subprocess"] is None and record["force_field"] is None
+
+
+def test_selfchecks_come_from_the_plan_per_record():
+    import dataclasses
+
+    record = _phase_2_record()
+    assert record["gate"]["selfchecks"] == [dataclasses.asdict(SELFCHECK)]
+    unchecked = SelfCheck(name="fold_cutoff", passed=None, max_relative_error=None, threshold=None, modules=1,
+                          dtype=None, detail="check=False")
+    plan = dataclasses.replace(_phase_2_plan(), selfchecks=(unchecked,))
+    assert _phase_2_record(plan=plan)["gate"]["selfchecks"][0]["passed"] is None
+    # A gate record that carries its own self-check results keeps them.
+    assert _phase_2_record(gate={"status": "passed", "selfchecks": {"x": 1.0}})["gate"]["selfchecks"] == {"x": 1.0}
+
+
+def test_the_gate_records_its_device_reduced_cell_and_steps():
+    gate = _phase_2_record()["gate"]
+    assert gate["status"] == "passed-reduced" and gate["device"] == "cpu" and gate["reduced_cell"] == [2, 2, 2]
+    assert [step["outcome"] for step in gate["steps"]] == ["out of memory", "passed"]
+    assert gate["selfchecks"]  # the plan's, beside the gate's own fields
+
+
+def test_the_always_on_treatments_are_recorded_with_a_plan():
+    from fastmace.rewrites import versions
+
+    treatments = _phase_2_record()["software"]["treatments"]
+    assert treatments == [{"name": item.name, "qualified": item.qualified, "decision": item.decision,
+                           "reason": item.reason} for item in versions.treatments()]
+    assert {entry["name"] for entry in treatments} == set(versions.TREATMENTS)
+
+
+def test_the_force_field_records_its_strain_path():
+    record = _phase_2_record()
+    assert record["force_field"]["strain_path"] == "one_graph"
+    assert record["force_field"]["decisions"] == {"fold_cutoff": "off by the fallback"}  # a Reason as text
+    assert _phase_2_record(force_field={"strain_path": "mace"})["force_field"] == {"strain_path": "mace"}
+
+
+def test_the_subprocess_block_is_checked():
+    assert _phase_2_record()["subprocess"] == CHILDREN
+    assert _phase_2_record(subprocess=dict(CHILDREN))["subprocess"] == CHILDREN
+    assert provenance.subprocess_block(SimpleNamespace(record=lambda: dict(CHILDREN))) == CHILDREN
+    with pytest.raises(ValueError, match="children"):
+        _phase_2_record(subprocess={key: value for key, value in CHILDREN.items() if key != "children"})
+    with pytest.raises(ValueError, match="pid"):
+        _phase_2_record(subprocess=dict(CHILDREN, pid=1))
+    with pytest.raises(ValueError, match="last"):
+        _phase_2_record(subprocess=dict(CHILDREN, last={"action": "run"}))
+
+
+def test_a_phase_2_record_round_trips_and_writes(tmp_path):
+    record = _phase_2_record()
+    assert json.loads(json.dumps(record, allow_nan=False)) == record
+    provenance.write_metadata(tmp_path / "metadata.json", record)
+    assert json.loads((tmp_path / "metadata.json").read_text()) == record
 
 
 # ------------------------------------------------------------------------ random state

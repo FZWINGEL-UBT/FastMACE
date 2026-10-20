@@ -751,12 +751,15 @@ class Simulation:
             return self._runner.metadata(self)
         state = self._engine.state
         timing = {"status": self._status, "steps": self._steps_run, "loop_s": self._loop_s}
+        plan, built = self._plan, getattr(self._engine, "plan", None)
+        if built is not None and built.revision == plan.revision:
+            plan = built  # the built plan carries the per-record self-checks (2-T04)
         return provenance.metadata_record(
-            checkpoint=self.force_field.model, identity=self.force_field.identity, plan=self._plan, seed=self.seed,
+            checkpoint=self.force_field.model, identity=self.force_field.identity, plan=plan, seed=self.seed,
             generators={"integrator": state.rng.generator}, cursors={"integrator": int(state.rng.cursor)},
             schedule=self._schedule, gate=self._gate, engine_info=self._engine.info(),
             restart_points=self._restart_points, setup=self._setup_s, timing=timing, report=self._report,
-            device=str(self._engine.device))
+            device=str(self._engine.device), force_field=self._engine.force_field)
 
     def _write_metadata(self):
         if self.output is None:
