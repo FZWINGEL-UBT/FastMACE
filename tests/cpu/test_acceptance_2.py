@@ -260,3 +260,11 @@ def test_junit_totals(tmp_path):
     totals = summarize2.junit_totals(path)
     assert (totals["passed"], totals["failures"], totals["skipped"]) == (2, 1, 1)
     assert totals["failed_ids"] == ["tests.gpu.test_a::test_y"]
+
+
+def test_run_takes_the_versions_directory(tmp_path, capsys):
+    run = _load(TOOLS / "acceptance" / "run.py", "_tool_run_2t23")
+    run.main(["regression2", "--machine", "murphy", "--run-id", "x", "--fastmace", "/mnt/homes/zwingel/f-2-T23/src",
+              "--versions", "/mnt/homes/zwingel/f-2-T23/versions", "--dry-run"])
+    out = capsys.readouterr().out
+    assert "--renamed /mnt/homes/zwingel/f-2-T23/versions" in out and "/mnt/homes/zwingel/f-2-T23/src/tools" in out
