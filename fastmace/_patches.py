@@ -216,21 +216,40 @@ def patch_problems(name):
 def patch_applicable(name):
     """``(applicable, reason)``: whether patch ``name`` has anything to do on this torch and MACE.
 
-    Only ``unfuse_full_addmm`` can be inapplicable: a torch without Inductor's bias-like addmm test
-    (torch 2.13 and older) already keeps a full-matrix add unfused, so ``set_unfuse_full_addmm``
-    changes nothing there. An inapplicable patch is not needed, which is not an unqualified source;
-    its pins are not checked.
+    Only ``unfuse_full_addmm`` can be inapplicable, in two bounded cases:
+    - torch older than 2.14 (``ADDMM_TEST_SINCE``), which has no bias-like addmm test in Inductor
+      and already keeps a full-matrix add unfused, so ``set_unfuse_full_addmm`` changes nothing;
+    - a torch whose Inductor does not import, where nothing is compiled.
+    On torch 2.14 and newer a missing test is not "not needed": the source moved or changed, and
+    ``patch_problems`` reports it as unqualified (the fusion it prevents would otherwise return
+    unnoticed). An inapplicable patch's pins are not checked.
     """
     if name != "unfuse_full_addmm":
         return True, "applies"
     try:
-        from torch._inductor.fx_passes import post_grad
+        from torch._inductor.fx_passes import post_grad  # noqa: F401
     except ImportError as error:
-        return False, f"not needed: Inductor is not importable ({error})"
-    if not hasattr(post_grad, "_is_bias_like_addmm_input"):
-        return False, ("not needed: this torch has no bias-like addmm test, so a full-matrix add already stays "
-                       "unfused (torch 2.13 and older)")
+        return False, f"not needed: Inductor is not importable, nothing is compiled ({error})"
+    if _torch_release() < ADDMM_TEST_SINCE:
+        return False, (f"not needed: torch {_torch_release_text()} has no bias-like addmm test, so a full-matrix "
+                       "add already stays unfused (torch before 2.14)")
     return True, "applies"
+
+
+# The first torch whose Inductor fuses a full-matrix add into addmm (post_grad._is_bias_like_addmm_input).
+ADDMM_TEST_SINCE = (2, 14)
+
+
+def _torch_release():
+    """torch's (major, minor) release."""
+    import torch
+
+    parts = torch.__version__.split("+")[0].split(".")
+    return tuple(int("".join(ch for ch in part if ch.isdigit()) or 0) for part in parts[:2])
+
+
+def _torch_release_text():
+    return ".".join(str(part) for part in _torch_release())
 
 
 def _require_pinned(name):
@@ -511,15 +530,13 @@ def set_unfuse_full_addmm(enabled=True):
         return None
     if name in _RECORDS:
         return _RECORDS[name]
-    try:
-        from torch._inductor import config as inductor_config
-        from torch._inductor.fx_passes import post_grad
-    except ImportError:
-        return None
-    if not hasattr(post_grad, "_is_bias_like_addmm_input"):
-        return None  # torch 2.5 behaviour already
+    if not patch_applicable(name)[0]:
+        return None  # torch before 2.14 already keeps it unfused, or no Inductor (nothing compiled)
+    from torch._inductor import config as inductor_config
+    from torch._inductor.fx_passes import post_grad
+
     from fastmace.rewrites import engine
-    _require_pinned(name)
+    _require_pinned(name)  # on torch >= 2.14 a missing or changed source raises here
     current = inductor_config.post_grad_custom_pre_pass
     if current is not None and not (hasattr(current, "uuid") and current.uuid() == engine.UNFUSED_ADDMM_UUID):
         raise RuntimeError("Inductor's post_grad_custom_pre_pass is already in use; cannot key the addmm choice")

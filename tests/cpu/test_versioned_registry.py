@@ -82,9 +82,43 @@ def test_only_the_addmm_patch_can_be_inapplicable():
     for name in SETTERS:
         if name != "unfuse_full_addmm":
             assert _applies(name), name
+    assert _applies("unfuse_full_addmm") == (_patches._torch_release() >= _patches.ADDMM_TEST_SINCE)
+
+
+def test_a_missing_addmm_test_on_torch_2_14_is_a_problem_not_not_needed(monkeypatch):
+    """On torch >= 2.14 a moved or renamed bias-like test is an unqualified source, never "not needed"."""
     from torch._inductor.fx_passes import post_grad
 
-    assert _applies("unfuse_full_addmm") == hasattr(post_grad, "_is_bias_like_addmm_input")
+    monkeypatch.setattr(_patches, "_torch_release", lambda: (2, 15))
+    monkeypatch.delattr(post_grad, "_is_bias_like_addmm_input", raising=False)
+    assert _applies("unfuse_full_addmm")
+    problems = _patches.patch_problems("unfuse_full_addmm")
+    assert any("_is_bias_like_addmm_input" in problem and "AttributeError" in problem for problem in problems)
+    with pytest.raises(_patches.UnqualifiedPatchError):
+        _patches.set_unfuse_full_addmm(True)
+    assert _patches.record_of("unfuse_full_addmm") is None
+    assert _patches.install_if_qualified("unfuse_full_addmm") is None  # skipped with its reason logged
+    treatment = versions.treatment("unfuse_full_addmm")
+    assert not treatment.qualified and treatment.decision == "not installed"
+
+
+def test_an_older_torch_does_not_need_the_addmm_patch(monkeypatch):
+    monkeypatch.setattr(_patches, "_torch_release", lambda: (2, 13))
+    applicable, reason = _patches.patch_applicable("unfuse_full_addmm")
+    assert not applicable and "before 2.14" in reason
+    assert _patches.set_unfuse_full_addmm(True) is None and _patches.record_of("unfuse_full_addmm") is None
+    assert versions.treatment("unfuse_full_addmm").decision == "not needed"
+
+
+def test_without_inductor_the_addmm_patch_is_not_needed(monkeypatch):
+    import sys
+
+    from torch._inductor import fx_passes
+
+    monkeypatch.delattr(fx_passes, "post_grad", raising=False)
+    monkeypatch.setitem(sys.modules, "torch._inductor.fx_passes.post_grad", None)  # the import raises ImportError
+    applicable, reason = _patches.patch_applicable("unfuse_full_addmm")
+    assert not applicable and "Inductor is not importable" in reason
 
 
 @pytest.mark.parametrize("name", sorted(SETTERS))
