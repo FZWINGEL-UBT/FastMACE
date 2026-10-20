@@ -379,3 +379,13 @@ def test_runner_repeat_suite():
         assert argv[argv.index("--start") + 1] == start
         assert argv[argv.index("--seeds") + 1:] == ["20261001", "20261101", "20261201", "20261301"]
     assert not any(job.timing for job in jobs)
+
+
+def test_regression2_nacl_suite():
+    jobs = suites.regression2_nacl_jobs(suites.MACHINES["murphy"], Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
+    orders = []
+    for job in jobs:
+        argv = list(job.argv)
+        assert job.timing and argv[argv.index("--structures") + 1:argv.index("--sides")] == ["NaCl"]
+        orders.append((argv[argv.index("--sides") + 1], argv[argv.index("--pattern") + 1]))
+    assert orders == [("1b", "abab"), ("2", "abab"), ("1b", "abba")]

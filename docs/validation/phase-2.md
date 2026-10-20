@@ -18,6 +18,21 @@ tiers, and item 8.
 
 <!-- RUNS -->
 
+## Item 8 on murphy, NaCl: the rule for three more processes (written before they ran)
+
+The first three murphy A/B processes (run `2-T23-murphy-20261020`, 15:42–16:05 UTC) gave main/1b on NaCl
+1.00096, 1.00164 and 1.00042 against the 0.16 % floor. The 1.00164 process (ABAB, 1b built first) is
+0.004 percentage points over the floor, with every pair above 1. This is the same process dependence
+that 1b's open NaCl item showed ([phase-1b.md](phase-1b.md), finding 3). On 20 October 2026 the conductor
+fixed this rule before more data was taken:
+
+- three more NaCl-only A/B processes on murphy, timed and quiet, right after the acceptance tier and
+  before item 4's repeat: ABAB with 1b built first, ABAB with main built first, ABBA with 1b built first
+  (suite `regression2-nacl`);
+- **murphy NaCl passes** if the median main/1b ratio over all six processes is ≤ 1.0016 (the floor), no
+  single process exceeds 1.0032 (twice the floor), and the one-version controls show main not slower;
+- otherwise it is reported as failing for the owner, with every number.
+
 ## Item 4, hybrid: the repeat's protocol (written before it ran)
 
 **Why there is a repeat.** The first comparison (run `2-T23-murphy-20261020-runner2`, tools `4b35b60`)

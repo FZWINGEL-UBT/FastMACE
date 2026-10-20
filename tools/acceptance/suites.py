@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import os
 import shlex
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 
 NAS_HOME = PurePosixPath("/mnt/homes/zwingel")
@@ -561,6 +561,27 @@ def regression2_jobs(machine: Machine, run_root: Path) -> list:
     return jobs
 
 
+def regression2_nacl_jobs(machine: Machine, run_root: Path) -> list:
+    """Three more NaCl-only A/B processes for item 8 on murphy (conductor, 20 October 2026, after one of the first
+    three NaCl processes ended 0.004 points over the floor): 1b built first in two of them."""
+    run_root = Path(run_root)
+    jobs = [
+        _regression2_job(machine, run_root, "regression2-nacl-abab-1b-first", ("1b", "2"), blocks=AB_BLOCKS,
+                         note="NaCl only, ABAB, 1b built first"),
+        _regression2_job(machine, run_root, "regression2-nacl-abab-2-first", ("2", "1b"), blocks=AB_BLOCKS,
+                         note="NaCl only, ABAB, 2 built first"),
+        _regression2_job(machine, run_root, "regression2-nacl-abba-1b-first", ("1b", "2"), blocks=AB_BLOCKS,
+                         pattern="abba", note="NaCl only, ABBA, 1b built first"),
+    ]
+    out = []
+    for job in jobs:
+        argv = list(job.argv)
+        start = argv.index("--structures") + 1
+        argv[start:start + len(REGRESSION_STRUCTURES)] = ["NaCl"]
+        out.append(replace(job, argv=tuple(argv)))
+    return out
+
+
 # 1b-T14's protocols: plain cuEq float64 500 steps (positions every 50), hybrid 20,000 steps (every 20), two seeds;
 # the target ramps from 300 to 600 K.
 TRAJECTORY_CASES = {"cueq": dict(environment="mace_cueq_latest", steps=500, every=50, seeds=(20261019,),
@@ -661,6 +682,7 @@ SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun
           "gate-1b": gate_1b_jobs, "gate-1b-subset": gate_1b_subset_jobs, "library-gate": library_gate_jobs,
           "regression": regression_jobs, "frontends": frontends_jobs, "gpu-suite": gpu_suite_jobs,
           "adapter-tests": adapter_jobs, "compile-checks": compile_checks_jobs,
-          "regression2": regression2_jobs, "trajectory2": trajectory2_jobs, "runner-statistics": runner_statistics_jobs,
+          "regression2": regression2_jobs, "regression2-nacl": regression2_nacl_jobs, "trajectory2": trajectory2_jobs,
+          "runner-statistics": runner_statistics_jobs,
           "runner-repeat": runner_statistics_repeat_jobs,
           "acceptance-tier": acceptance_tier_jobs, "full-tier": full_tier_jobs}
