@@ -3,10 +3,12 @@
 MH-1 (``FASTMACE_MODELS``, head ``matpes_r2scan``) on NaCl 3x3x3, plain cuEq float64. Every run is a
 fresh process, so no FastMACE patch reaches the ASE references:
 
-- **Langevin:** 0 -> 400 K in 1 ps, then 400 -> 0 K in 8 ps (18,000 steps of 0.5 fs) from the 0 K
-  lattice, as the research engine's MD checks (``studies/other_models/README.md``). The engine that
-  ``FixedPlanner`` builds and ASE's ``Langevin`` with MACE's calculator, same seed: the same
-  temperature and potential energy in every 50 K bin of heating and cooling, |ΔPE| < 0.01 meV/atom.
+- **Langevin:** 0 -> 400 K in 1 ps, then 400 -> 0 K in 1 ps (4,000 steps of 0.5 fs) from the 0 K
+  lattice. The engine that ``FixedPlanner`` builds and ASE's ``Langevin`` with MACE's calculator, same
+  seed: the same temperature and potential energy in every 50 K bin of heating and cooling, |ΔT| <
+  1e-6 K and |ΔPE| < 1e-7 meV/atom. Both runs share ASE's noise stream, so they are the same trajectory
+  to rounding; length adds no power, and the limits are what catches a difference (2-T14e, owner
+  20 October 2026; it ran 18,000 steps with 0.1 K and 0.01 meV/atom before).
 - **BAOAB, full cell:** 2,000 steps at 300 K and 1 GPa from a 300 K Maxwell-Boltzmann start. The ASE
   variant (``ase_trace_drag_all_elements=True``) against ASE's ``LangevinBAOAB``, the production
   variant against ``fastmace.reference.integrators.CorrectedLangevinBAOAB``. Plain cuEq float64 is not
@@ -34,11 +36,11 @@ ENGINE = _module("_ase_equivalence_engine_helpers", Path(__file__).parent / "tes
 needs_mh1 = pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 
 SEED = 20261019
-HEAT_STEPS, COOL_STEPS, PEAK_K = 2000, 16000, 400.0
+HEAT_STEPS, COOL_STEPS, PEAK_K = 2000, 2000, 400.0
 BAOAB_STEPS, BAOAB_K, BAOAB_GPA = 2000, 300.0, 1.0
 BIN_K = 50.0
-PE_LIMIT = 1e-5      # eV/atom: 0.01 meV/atom (SPEC §12.2)
-T_LIMIT = 0.1        # K, per bin mean
+PE_LIMIT = 1e-10     # eV/atom: 1e-7 meV/atom (SPEC §12.2)
+T_LIMIT = 1e-6       # K, per bin mean
 TIMEOUT = 4 * 3600
 
 COMMON = """
@@ -194,7 +196,8 @@ def test_langevin_reproduces_ase_in_every_50_K_bin():
     ENGINE.report("1b-T09-langevin-ase-equivalence", summary)
     assert summary["max_abs_dPE_meV_per_atom"] < 1e3 * PE_LIMIT, summary["max_abs_dPE_meV_per_atom"]
     assert summary["max_abs_dT_K"] < T_LIMIT, summary["max_abs_dT_K"]
-    assert max(last_ase[2], last_ours[2]) < 50.0  # the cooling ramp really cooled it
+    # The cooling ramp really cooled it: the thermostat lags the 1 ps ramp by about 150 K (2-T14e).
+    assert max(last_ase[2], last_ours[2]) < PEAK_K / 2
 
 
 @pytest.mark.slow

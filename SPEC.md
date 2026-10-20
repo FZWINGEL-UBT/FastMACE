@@ -1950,7 +1950,7 @@ defective behaviour.
 | Reproducibility | CI (GPU) | in reproducible mode, repeated runs and restarts bit for bit (§9.3) |
 | Isolation | CI (GPU) | A → B → A with two crystals for the plain, MH-1 and polar paths (§8.7) |
 | Fallback | CI (GPU) | deliberately broken rewrite and broken capture: eager diagnosis, bisection, pristine rebuild, validated activation (§9.4) |
-| ASE equivalence | CI (GPU) | Langevin: same seed reproduces ASE's noise stream (NaCl 9 ps: same T and E_pot in every 50 K bin, \|ΔPE\| < 0.01 meV/atom); BAOAB: the ASE variant (`ASE_TRACE_DRAG_ALL_ELEMENTS=True`) vs ASE `LangevinBAOAB` exactly, and the corrected production variant vs an independent corrected reference (§12.1); new integrators vs reference implementations |
+| ASE equivalence | CI (GPU) | Langevin: same seed reproduces ASE's noise stream (NaCl 2 ps, 0 → 400 → 0 K: same T and E_pot in every 50 K bin, \|ΔT\| < 1e-6 K, \|ΔPE\| < 1e-7 meV/atom; owner, 20 October 2026); BAOAB: the ASE variant (`ASE_TRACE_DRAG_ALL_ELEMENTS=True`) vs ASE `LangevinBAOAB` exactly, and the corrected production variant vs an independent corrected reference (§12.1); new integrators vs reference implementations |
 | Statistical | nightly | long MD: distributions of T, E, P, V vs float64 stock ASE; hybrid runs are compared statistically, not bitwise |
 | Performance | nightly | step-time suite (§12.5); regressions > 3% flagged (cross-process noise is about 3%; compare small effects with alternating A/B in one process) |
 
@@ -2672,3 +2672,13 @@ automatic default and the `fallback="refuse"` opt-out.
 - GPU reference steps run in child processes on CUDA plans;
 - CPU reference children run under a hard memory cap;
 - the replay check under `passed-reduced` uses the gate's own limit.
+
+**Draft 0.12, tenth amendment (20 October 2026, owner decisions, from 2-T14e):**
+§12.2 "ASE equivalence", Langevin: the run is 2 ps (heat and cool 1 ps each,
+4,000 steps) instead of 9 ps, and the per-bin limits are 1e-6 K and 1e-7
+meV/atom instead of 0.1 K and 0.01 meV/atom. The two runs share ASE's noise
+stream and are the same trajectory to rounding (1b-T09: 3.5e-10 K and
+3.8e-11 meV/atom), so length adds no power and the limits do the catching
+(`docs/validation/2-T14e-reference-reuse.md`). The BAOAB pairs share the
+energy limit, now 1e-7 meV/atom (1b-T09 measured 1.1e-11); their other
+criteria are unchanged.

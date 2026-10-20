@@ -1,0 +1,64 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (shared): inductor /home/fzwin/.cache/fastmace/inductor, triton /home/fzwin/.cache/fastmace/triton
+rootdir: /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t14-08a9fe
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 2 items / 1 deselected / 1 selected
+
+tests/gpu/test_ase_equivalence_gpu.py 
+1b-T09-baoab-ase-equivalence: {
+ "ase_variant_vs_ase": {
+  "positions_A": 4.725109192804666e-13,
+  "cell_A": 1.8118839761882555e-13,
+  "T_K": 5.502442945726216e-11,
+  "PE_meV_per_atom": 1.4210854715202004e-11,
+  "volume_A3": 2.4010660126805305e-10
+ },
+ "production_vs_corrected": {
+  "positions_A": 4.551914400963142e-13,
+  "cell_A": 1.4921397450962104e-13,
+  "T_K": 6.508571459562518e-11,
+  "PE_meV_per_atom": 1.5987211554602254e-11,
+  "volume_A3": 1.8826540326699615e-10
+ },
+ "variants": {
+  "positions_A": 6.130584251806681e-06,
+  "cell_A": 3.541254045558162e-08,
+  "T_K": 0.0008292308489785682,
+  "PE_meV_per_atom": 9.915784282554796e-05,
+  "volume_A3": 1.9048748072236776e-05
+ },
+ "references": {
+  "positions_A": 6.130584405905637e-06,
+  "cell_A": 3.541236992532504e-08,
+  "T_K": 0.0008292308424415751,
+  "PE_meV_per_atom": 9.915784637826164e-05,
+  "volume_A3": 1.9048664398724213e-05
+ },
+ "volume_change": -0.01969760396014908,
+ "seconds": {
+  "ase": 260.86193648000335,
+  "corrected": 257.36990078899544,
+  "fastmace": [
+   243.46180614000332,
+   215.97755438000604
+  ]
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "mode": "pipelined",
+ "records": [
+  "single_graph_strain"
+ ]
+}
+.
+
+----- generated xml file: /home/fzwin/fastmace-2-T14e/logs/baoab.junit.xml -----
+============================== slowest durations ===============================
+1108.58s call     tests/gpu/test_ase_equivalence_gpu.py::test_baoab_variants_reproduce_their_references
+0.02s setup    tests/gpu/test_ase_equivalence_gpu.py::test_baoab_variants_reproduce_their_references
+
+(1 durations < 0.005s hidden.  Use -vv to show these durations.)
+================= 1 passed, 1 deselected in 1114.77s (0:18:34) =================
