@@ -213,6 +213,26 @@ def patch_problems(name):
     return problems
 
 
+def patch_applicable(name):
+    """``(applicable, reason)``: whether patch ``name`` has anything to do on this torch and MACE.
+
+    Only ``unfuse_full_addmm`` can be inapplicable: a torch without Inductor's bias-like addmm test
+    (torch 2.13 and older) already keeps a full-matrix add unfused, so ``set_unfuse_full_addmm``
+    changes nothing there. An inapplicable patch is not needed, which is not an unqualified source;
+    its pins are not checked.
+    """
+    if name != "unfuse_full_addmm":
+        return True, "applies"
+    try:
+        from torch._inductor.fx_passes import post_grad
+    except ImportError as error:
+        return False, f"not needed: Inductor is not importable ({error})"
+    if not hasattr(post_grad, "_is_bias_like_addmm_input"):
+        return False, ("not needed: this torch has no bias-like addmm test, so a full-matrix add already stays "
+                       "unfused (torch 2.13 and older)")
+    return True, "applies"
+
+
 def _require_pinned(name):
     problems = patch_problems(name)
     if problems:
@@ -228,6 +248,8 @@ def install_if_qualified(name):
     raises ``UnqualifiedPatchError``.
     """
     if name not in _RECORDS:
+        if not patch_applicable(name)[0]:
+            return None
         problems = patch_problems(name)
         if problems:
             import logging

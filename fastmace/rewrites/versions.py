@@ -77,6 +77,10 @@ def _problems(name):
     return _patches.patch_problems(name)
 
 
+# The treatments that are patches in fastmace._patches.
+_PATCHES = ("capture_safe_mask_head", "first_derivative_only", "single_graph_strain", "unfuse_full_addmm",
+            "cueq_conv_fusion")
+
 _CONSEQUENCES = {
     "float64_energy": "the force precision is promoted to float64, whose forward sums the energy in float64 "
                       "natively; the reference tier is the last resort",
@@ -92,6 +96,12 @@ _CONSEQUENCES = {
 def treatment(name):
     """The ``Treatment`` of ``name`` (a key of ``TREATMENTS``) for the installed sources."""
     good, bad = TREATMENTS[name]
+    if name in _PATCHES:
+        from fastmace import _patches
+
+        applicable, why = _patches.patch_applicable(name)
+        if not applicable:  # nothing to patch on this torch: not needed, not unqualified
+            return Treatment(name, True, "not needed", why)
     problems = _problems(name)
     if not problems:
         return Treatment(name, True, good, "every pinned source hashes")
