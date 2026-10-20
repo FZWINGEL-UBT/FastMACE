@@ -74,11 +74,15 @@ def main(argv=None):
             sides[side] = ab_step_time.FastMACESide(engine, torch)
             setup[side] = time.perf_counter() - started
             lines[side] = [line.strip() for line in plan.describe().splitlines() if "gated_rows" in line]
+        for side in sides:  # warm up outside the compile-counter window (new edge sizes compile here)
+            step_time.warm_up(sides[side], protocol.warmup)
         counted = ab_step_time.compile_counters(counters)
-        result = ab.run_ab(sides, dataclasses.replace(protocol), pattern=args.pattern)
+        result = ab.run_ab(sides, dataclasses.replace(protocol, warmup=0), pattern=args.pattern)
         changes, recompiled = ab_step_time.compile_changes(counted, ab_step_time.compile_counters(counters))
         medians = {side: result.statistics[side].median_ms for side in sides}
+        blocks = {side: result.statistics[side].block_ms for side in sides}
         entry = dict(natoms=len(base), ab=result.as_dict(), ratio_on_over_off=medians["on"] / medians["off"],
+                     pair_ratios=[on / off for on, off in zip(blocks["on"], blocks["off"])],
                      setup_s=setup, plan_lines=lines, compile_during_timing=dict(changes=changes, recompiled=recompiled),
                      observables={side: sides[side].observables() for side in sides},
                      load_after=list(os.getloadavg()),
