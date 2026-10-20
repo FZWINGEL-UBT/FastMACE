@@ -389,3 +389,13 @@ def test_regression2_nacl_suite():
         assert job.timing and argv[argv.index("--structures") + 1:argv.index("--sides")] == ["NaCl"]
         orders.append((argv[argv.index("--sides") + 1], argv[argv.index("--pattern") + 1]))
     assert orders == [("1b", "abab"), ("2", "abab"), ("1b", "abba")]
+
+
+def test_tier_suite_sets_the_polar_references_only_where_they_exist(tmp_path):
+    import dataclasses
+    machine = dataclasses.replace(suites.MACHINES["local"], root=str(tmp_path))
+    (job,) = suites.full_tier_jobs(machine, tmp_path / "run")
+    assert "FASTMACE_1A_T19_POLAR1S" not in job.env
+    (tmp_path / "1a-T19-gate-leto-20261018" / "gate-polar1-s").mkdir(parents=True)
+    (job,) = suites.full_tier_jobs(machine, tmp_path / "run")
+    assert job.env["FASTMACE_1A_T19_POLAR1S"].endswith("gate-polar1-s")

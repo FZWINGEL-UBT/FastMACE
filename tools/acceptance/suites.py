@@ -658,8 +658,12 @@ def _tier_job(machine, run_root, name, marker, *, timing, note):
             f"--basetemp={basetemp}", "--durations=60", "-rfEs", f"--junitxml={output / 'junit.xml'}"]
     env = {"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq"),
            "FASTMACE_BASELINE": str(machine.path(machine.baseline)),
-           "FASTMACE_RESULTS": str(output / "results"),
-           "FASTMACE_1A_T19_POLAR1S": str(machine.path(machine.root) / "1a-T19-gate-leto-20261018" / "gate-polar1-s")}
+           "FASTMACE_RESULTS": str(output / "results")}
+    # 1a-T19's stored POLAR-1-S references are on the NAS only; elsewhere the test skips (run 2-T23-local-20261020:
+    # the variable pointed at a missing directory and the test failed reading it).
+    polar = machine.path(machine.root) / "1a-T19-gate-leto-20261018" / "gate-polar1-s"
+    if polar.is_dir():
+        env["FASTMACE_1A_T19_POLAR1S"] = str(polar)
     return Job(name=name, argv=tuple(argv), output=str(output), env=env, timing=timing, note=note)
 
 
