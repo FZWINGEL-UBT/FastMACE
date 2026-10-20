@@ -78,11 +78,27 @@ elif CASE == "capture":
         return wrong
 
     graph.GraphEngine._stage = _stage
+elif CASE == "capture_error":
+    original_stage = graph.GraphEngine._stage
+
+    def _stage(self, key):
+        run = original_stage(self, key)
+        if not self.capture:
+            return run
+
+        def unsupported():  # a host sync inside the capture: cudaErrorStreamCaptureUnsupported
+            run()
+            if torch.cuda.is_current_stream_capturing():
+                torch.nonzero(self.state.forces)
+
+        return unsupported
+
+    graph.GraphEngine._stage = _stage
 
 model = fm.load(SPEC["label"])
 integrator = fm.integrators.Langevin(timestep_fs=2.0, temperature_K=300.0, friction_per_fs=0.02 * units.fs)
 started = time.perf_counter()
-sim = fm.Simulation(structure(), model, integrator=integrator, seed=7, check="gate")
+sim = fm.Simulation(structure(), model, integrator=integrator, seed=7, check=SPEC.get("check", "gate"))
 setup = time.perf_counter() - started
 sim.run(steps=20)
 plan = sim.plan
@@ -100,7 +116,7 @@ out = {
     "reduced_gate_runs": sum(t.reduced_gate_runs for t in plan.fallbacks),
     "full_gate_runs": sum(t.full_gate_runs for t in plan.fallbacks),
     "finite": bool(np.isfinite(committed.forces).all() and np.isfinite(committed.positions).all()),
-    "report": sim.report.text(),
+    "report": sim.report.text(), "check": SPEC.get("check", "gate"),
 }
 sim.close()
 print(json.dumps(out, default=str))
@@ -110,21 +126,23 @@ CASES = {
     "rewrite": {"fields": ["block_linear"]},
     "pair": {"fields": ["joint_radial_input", "grouped_linear"]},
     "capture": {},
+    "capture_error": {},
 }
 DEPENDANTS = {"block_linear": {"grouped_linear", "merged_residual"}}
 
 
-def _run(case):
-    spec = {"temperature": 300.0, "label": "mh1-r2scan", "case": case, **CASES[case]}
+def _run(case, **extra):
+    spec = {"temperature": 300.0, "label": "mh1-r2scan", "case": case, **CASES[case], **extra}
     out = ENGINE.run_fresh(ENGINE.COMMON.format(spec=spec) + CHILD, python=ENGINE.HYBRID_PYTHON)
-    ENGINE.report(f"2-T15-fallback-{case}-mh1-nacl", {key: value for key, value in out.items() if key != "report"})
+    name = "-".join([case, *(f"{key}-{value}" for key, value in extra.items())])
+    ENGINE.report(f"2-T15-fallback-{name}-mh1-nacl", {key: value for key, value in out.items() if key != "report"})
     print(out["report"])
     return out
 
 
 def _common(out):
     assert out["revision"] >= 1 and out["reason"].startswith("fallback: ")
-    assert out["gate"]["status"] == "passed", out["gate"]
+    assert out["gate"]["status"] == ("skipped" if out.get("check") == "skip" else "passed"), out["gate"]
     assert out["reduced_gate_runs"] <= 64 and out["full_gate_runs"] >= 1
     assert out["tried"][-1]["outcome"] == "activated"
     assert out["finite"]
@@ -153,3 +171,80 @@ def test_a_broken_capture_drops_the_graph_mode():
     _common(out)
     assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
     assert out["gate"]["mode"] == "eager stages C, B"
+
+
+@pytest.mark.parametrize("check", ["skip", "gate"])
+def test_a_capture_error_before_the_first_step_falls_back_to_eager(check):
+    """A host sync inside the capture (``torch.nonzero``, as an unhashed MACE block does; 2-T15b): the
+    first step's graphs are captured before it, so the fallback takes the plan to eager."""
+    out = _run("capture_error", check=check)
+    _common(out)
+    assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
+    assert "captur" in out["reason"].lower()
+    assert [t["outcome"] for t in out["tried"]] == ["passed", "activated"]
+
+
+PREPARE_CHILD = """
+import fastmace
+import fastmace as fm
+import torch
+from ase import units
+from fastmace.engine import graph
+
+original_prepare = graph.GraphEngine.prepare
+
+
+def run(prepare):
+    graph.GraphEngine.prepare = original_prepare if prepare else (lambda self: None)
+    model = fm.load(SPEC["label"])
+    integrator = fm.integrators.Langevin(timestep_fs=2.0, temperature_K=300.0, friction_per_fs=0.02 * units.fs)
+    sim = fm.Simulation(structure(), model, integrator=integrator, seed=7)
+    graphs_after_setup = list(sim._engine.info()["graphs"])
+    started = time.perf_counter()
+    sim.run(steps=SPEC["steps"])
+    loop = time.perf_counter() - started
+    committed = sim.committed()
+    out = {"positions": committed.positions.tolist(), "energy": committed.energy,
+           "momenta": committed.momenta.tolist(), "graphs_after_setup": graphs_after_setup,
+           "graphs": list(sim._engine.info()["graphs"]), "setup_s": dict(sim._setup_s), "loop_s": loop,
+           "backend": sim.plan.engine.backend, "dtype": sim.plan.precision.dtype}
+    sim.close()
+    del sim
+    gc.collect()
+    torch.cuda.empty_cache()
+    return out
+
+
+out = {"lazy": run(False), "prepare": run(True), "lazy_again": run(False)}
+out.update(gpu=torch.cuda.get_device_name(), torch=torch.__version__)
+print(json.dumps(out))
+"""
+
+
+@pytest.mark.slow
+def test_prepare_leaves_the_default_trajectory_unchanged():
+    """Acceptance 8 for 2-T15b: capturing before the first step instead of at it, in one process
+    (MH-1 hybrid float32, NaCl 3x3x3, 200 steps): bitwise equal to the lazy capture when two lazy runs are."""
+    import numpy as np
+
+    spec = {"temperature": 300.0, "label": "mh1-r2scan", "steps": 200}
+    out = ENGINE.run_fresh(ENGINE.COMMON.format(spec=spec) + PREPARE_CHILD, python=ENGINE.HYBRID_PYTHON)
+
+    def diff(a, b, key):
+        return float(np.abs(np.asarray(out[a][key]) - np.asarray(out[b][key])).max())
+
+    summary = {"gpu": out["gpu"], "torch": out["torch"], "backend": out["lazy"]["backend"],
+               "dtype": out["lazy"]["dtype"],
+               "prepare_vs_lazy_A": diff("prepare", "lazy", "positions"),
+               "lazy_again_vs_lazy_A": diff("lazy_again", "lazy", "positions"),
+               "prepare_vs_lazy_momenta": diff("prepare", "lazy", "momenta"),
+               "graphs_after_setup": {name: out[name]["graphs_after_setup"] for name in ("lazy", "prepare")},
+               "setup_s": {name: out[name]["setup_s"] for name in ("lazy", "prepare", "lazy_again")},
+               "loop_s": {name: out[name]["loop_s"] for name in ("lazy", "prepare", "lazy_again")}}
+    ENGINE.report("2-T15b-prepare-vs-lazy-mh1-nacl", summary)
+    assert out["lazy"]["graphs_after_setup"] == [] and len(out["prepare"]["graphs_after_setup"]) >= 1
+    assert out["prepare"]["graphs"] == out["lazy"]["graphs"]  # the same graphs, captured earlier
+    if summary["lazy_again_vs_lazy_A"] == 0.0:
+        assert summary["prepare_vs_lazy_A"] == 0.0 and summary["prepare_vs_lazy_momenta"] == 0.0, summary
+    else:  # the backend is not bitwise even between two lazy runs: no worse than that
+        assert summary["prepare_vs_lazy_A"] <= summary["lazy_again_vs_lazy_A"] * 10, summary

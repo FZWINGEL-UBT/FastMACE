@@ -66,6 +66,8 @@ from .registry import Registry
 SPECULATIVE_SLOTS = 1
 # Eager runs of a stage before its capture (library workspaces, allocator warm-up).
 WARMUP_RUNS = 3
+# The ``fastmace_stage`` tag of an error raised while capturing (planner.fallback.stage_of; 2-T15b).
+CAPTURE_STAGE = "capture"
 
 
 def _device(name: str) -> torch.device:
@@ -194,6 +196,28 @@ class GraphEngine(Engine):
             self._step_pipelined()
         else:
             self._step_checked()
+
+    def prepare(self) -> None:
+        """Capture the stages the first step replays, before it (plan task 2-T15b; SPEC §8.1, §9.4).
+
+        Capture is otherwise lazy, at a stage's first replay; ``Simulation`` calls this after the
+        build and before the gate, so that a capture failure comes before the first step, where the
+        fallback acts. The keys are the first step's: checked AC and B at the padded initial edge
+        count, pipelined ACP and B at its first edge size, speculative ACB. A capture leaves the MD
+        state as it was (the runtime-state registry restores it), so this only moves the captures
+        earlier. A no-op without capture.
+        """
+        if not self.capture:
+            return
+        if self.speculative:
+            keys = [("ACB", self._spec_edges, 0)]
+        elif self.pipelined:
+            keys = ["ACP", ("B", self._pipe_edges)]
+        else:
+            keys = ["AC", ("B", self._padded(self.initial_edges))]
+        for key in keys:
+            if key not in self._graphs:
+                self._captured(key)
 
     def flush(self) -> None:
         """Validate every speculative or pipelined step still in flight (no-op otherwise)."""
@@ -543,8 +567,20 @@ class GraphEngine(Engine):
             self._stage(key)()
             return
         if key not in self._graphs:
-            self._capture(key)
+            self._captured(key)
         self._graphs[key].replay()
+
+    def _captured(self, key) -> None:
+        """``_capture(key)``; an error it raises is tagged with the stage ``"capture"`` (``CAPTURE_STAGE``)
+        and raised again unchanged, so the fallback can tell a capture failure from others (2-T15b)."""
+        try:
+            self._capture(key)
+        except Exception as error:
+            try:
+                error.fastmace_stage = CAPTURE_STAGE
+            except AttributeError:  # pragma: no cover - an exception type without a __dict__
+                pass
+            raise
 
     def _warm_up(self, key) -> None:
         """The warm-up runs of a capture without the capture: run ``key`` eagerly, then restore the state."""
@@ -625,4 +661,4 @@ class GraphEngine(Engine):
         self._captured_kinds.add(kind)
 
 
-__all__ = ["SPECULATIVE_SLOTS", "WARMUP_RUNS", "GraphEngine"]
+__all__ = ["CAPTURE_STAGE", "SPECULATIVE_SLOTS", "WARMUP_RUNS", "GraphEngine"]

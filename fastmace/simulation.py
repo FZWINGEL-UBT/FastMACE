@@ -23,7 +23,8 @@ What the constructor does, in this order (``docs/design/contracts-1b.md``):
    restore), then ``GateFailed`` or ``GateUnavailable`` if it says so; the record is ``sim.gate``.
    Without a requested gate its status is ``skipped`` (owner decision D1);
 7. a failure of steps 5-6 (build, compile, capture, self-check or a failed gate, classified by the
-   step that raised it) goes to the fallback (§9.4, plan task 2-T15) under
+   step that raised it; the first step's CUDA graphs are captured after the build, before the gate,
+   ``GraphEngine.prepare``, so a capture failure comes here too) goes to the fallback (§9.4, plan task 2-T15) under
    ``FallbackConfig.fallback == "auto"`` (decision 29): the active plan becomes the validated
    revision it finds, or ``FallbackExhausted`` is raised with the record. Under ``"refuse"`` the
    failure raises as in 1b. A resume never falls back: it rebuilds the restart's revision.
@@ -333,6 +334,16 @@ class Simulation:
         else:
             self._attach_engine()
         setup["build"] = time.perf_counter() - started
+        # The first step's CUDA graphs, captured now, inside the fallback window, not at the first
+        # run() (2-T15b). A resume keeps capturing at its first step: it never falls back.
+        if failure is None and stored is None and not getattr(self, "_resuming", False):
+            started = time.perf_counter()
+            try:
+                self._engine.prepare()
+            except Exception as error:
+                failure = self._failure("capture", error, stored)
+            if self._engine is not None and self._engine.capture:
+                setup["capture"] = time.perf_counter() - started
 
         # The production half through this engine; GateFailed (and the unavailable record under
         # check="allow_unavailable") come from selfcheck. The record is final: sim.gate.
@@ -395,14 +406,18 @@ class Simulation:
 
         if stored is not None or getattr(self, "_resuming", False):
             raise error
-        if step == "gate":
+        if fallback._propagates(error) or isinstance(error, (PlanRefused, ModelElementError, CheckpointTrustError)):
+            raise error
+        # A capture error is a capture failure wherever it is raised before the first step: in
+        # prepare() or in the gate's replay (2-T15b).
+        stage = fallback.stage_of(error, "capture" if step == "capture" else "build")
+        if step == "gate" and stage != "capture":
             if not isinstance(error, GateFailed):
                 raise error
             self._engine = None
             return fallback.Failure(plan=self._plan, stage="gate", error=error, gate=error.gate_record)
-        if fallback._propagates(error) or isinstance(error, (PlanRefused, ModelElementError, CheckpointTrustError)):
-            raise error
-        return fallback.Failure(plan=self._plan, stage=fallback._build_stage(error), error=error)
+        self._engine = None
+        return fallback.Failure(plan=self._plan, stage=stage, error=error)
 
     def _start_runner(self, setup):
         """The plan runs in a child (``Plan.runner == "subprocess"``, SPEC §8.7; 2-T07): no gate and no

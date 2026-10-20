@@ -322,14 +322,30 @@ def _propagates(error) -> bool:
     return type(error).__name__ == "OutOfMemoryError"  # torch.cuda.OutOfMemoryError, without importing torch
 
 
-def _build_stage(error) -> str:
+def stage_of(error, default: str = "build") -> str:
+    """The stage an error before the first step was raised in: ``"capture"`` for an error the graph
+    engine tagged while capturing (``engine.graph.CAPTURE_STAGE``, 2-T15b), ``"self-check"``,
+    ``"compile"`` (Dynamo or Inductor), else ``default``."""
     from fastmace.errors import SelfCheckError
 
+    if getattr(error, "fastmace_stage", None) == "capture":
+        return "capture"
     if isinstance(error, SelfCheckError):
         return "self-check"
     if type(error).__module__.startswith(("torch._dynamo", "torch._inductor")):
         return "compile"
-    return "build"
+    return default
+
+
+def _build_stage(error) -> str:
+    return stage_of(error)
+
+
+def _prepare(engine) -> None:
+    """The engine's captures before its first step and before the gate (``GraphEngine.prepare``, 2-T15b)."""
+    prepare = getattr(engine, "prepare", None)
+    if prepare is not None:
+        prepare()
 
 
 def _text(error) -> str:
@@ -386,6 +402,13 @@ def activate(candidate: Any, planner: Any, force_field: Any, atoms: Any, *, refe
         if _propagates(error):
             raise
         return failed(_build_stage(error), error)
+    try:
+        _prepare(engine)
+    except Exception as error:
+        if _propagates(error):
+            raise
+        del engine
+        return failed(stage_of(error, "capture"), error)
 
     if budget is not None:
         if reduced:
@@ -402,7 +425,7 @@ def activate(candidate: Any, planner: Any, force_field: Any, atoms: Any, *, refe
         if _propagates(error):
             raise
         del engine
-        return failed("gate", error, runs=1)
+        return failed(stage_of(error, "gate"), error, runs=1)
     if not gate.passed:
         del engine
         return failed("gate", RuntimeError(f"gate {gate.status}: {gate.reason}"), gate=gate, runs=1)
@@ -751,6 +774,7 @@ class Fallback:
 
         try:
             engine = self.planner.build(plan, self.force_field, self.atoms)
+            _prepare(engine)
         except Exception as error:
             if _propagates(error):
                 raise
@@ -765,7 +789,7 @@ class Fallback:
             if _propagates(error):
                 raise
             _release(engine)
-            return False, "gate", error
+            return False, stage_of(error, "gate"), error
         _release(engine)
         if not record.passed:
             return False, "gate", RuntimeError(f"gate {record.status}: {record.reason}")
