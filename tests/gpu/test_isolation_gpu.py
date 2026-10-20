@@ -152,6 +152,8 @@ cache = fc.CompiledModelCache()
 together = {name: field(name, cache) for name in ORDER}
 out["shared_A_A2"] = together["A"].model is together["A2"].model
 out["shared_A_B"] = together["A"].model is together["B"].model
+out["species_dependent"] = any("fixed_species_superset" in registry[record].workload_constraints
+                               for record in together["A"].resolution.enabled if record in registry)
 out["streaming"] = {name: together[name].info()["streaming_interactions"] for name in ORDER}
 out["cache_entries"] = len(cache)
 errors = {name: [] for name in ORDER}
@@ -227,9 +229,10 @@ def test_a_b_a_equals_fresh_instances(path):
     threshold = reg.THRESHOLDS[out["dtype"]]
     polar = out["polar"]
     assert polar is (path == "polar1-s-hybrid")
-    # Sharing as the audit says: MH-1 shares one compiled model between same-species crystals, a
-    # polar model is never shared.
-    assert out["shared_A_A2"] is not polar and out["shared_A_B"] is False
+    # Sharing as the audit says: one compiled model per cache key, the species part of the key only
+    # for species-dependent records; a polar model is never shared.
+    assert out["shared_A_A2"] is not polar
+    assert out["shared_A_B"] is (not polar and not out["species_dependent"])
     if path == "mh1-hybrid":
         assert all(count > 0 for count in out["streaming"].values())
     for name, errors in out["evaluation_errors"].items():
