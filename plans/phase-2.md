@@ -1483,6 +1483,27 @@ notes folder of the conductor's session (`2-T0x-…md`).
   in the next acceptance window.
 - **2-T16** synced with main 14a5e20 (7b9980e; murphy CPU 2348 passed). Its
   trial follows 2-T03's.
+- **2-T03, 2-T08b, 2-T19, 2-T04b and 2-T15 merged.**
+  - 2-T03: full tier 244 passed.
+  - 2-T08b: 244 passed. Acceptance 5's audit is complete.
+  - 2-T19: no setup regression like for like. The self-check cache is not
+    built, pending the owner's checkpoint 2.
+  - 2-T04b with 2-T15: combined trial, 244 passed. Acceptance 2 holds on
+    murphy.
+- **2-T15b added (20 October 2026)**, from 2-T04's acceptance 1 re-check on
+  MACE 0.3.15. `GraphEngine` captures lazily on the first `_run`, so a
+  capture failure misses the fallback:
+  - under `check="gate"`, it surfaces inside the gate's replay and is
+    re-raised as a non-`GateFailed`;
+  - under `check="skip"`, it surfaces at the first step, after the fallback
+    window.
+  The fix is 2-T15's:
+  - (b) force the first capture before the first step, inside the fallback
+    window, with the trajectory bitwise unchanged (the warm-ups leave no
+    trace) and setup and step times unchanged;
+  - (a) classify any capture error before the first step as stage
+    "capture".
+  Acceptance 1 is rerun after 2-T15b merges.
 
 ## Phase 1b items carried into phase 2
 
