@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path[:0] = [str(ROOT / "tests" / "gpu"), str(ROOT / "tests")]
+sys.path[:0] = [str(ROOT), str(ROOT / "tests" / "gpu"), str(ROOT / "tests")]
 import test_engine_gpu as t  # noqa: E402
 
 VARIANTS = {
@@ -50,15 +50,44 @@ def compare(ours, theirs):
     return out
 
 
+ENVIRONMENT = """
+import json, importlib.metadata as md
+import fastmace
+from fastmace import _patches
+out = {"versions": {},
+       "patch_problems": {name: _patches.patch_problems(name) for name in getattr(_patches, "SOURCE_PINS", {})}}
+for name in ("mace-torch", "cuequivariance", "cuequivariance-torch", "cuequivariance-ops-torch-cu12",
+             "cuequivariance-ops-torch-cu13", "torch"):
+    try:
+        out["versions"][name] = md.version(name)
+    except md.PackageNotFoundError:
+        pass
+import mace
+out["mace_file"] = mace.__file__
+print(json.dumps(out))
+"""
+
+
+def environment():
+    """Package versions and, where the checkout has hash gates (2-T04), every patch whose source does not hash."""
+    return t.run_fresh(ENVIRONMENT)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--steps", type=int, default=100)
     parser.add_argument("--variant", action="append", choices=sorted(VARIANTS))
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--environment-only", action="store_true", help="versions and hash gates only (no GPU)")
     args = parser.parse_args(argv)
+    result = {"environment": environment()}
+    print("== environment")
+    print(json.dumps(result["environment"], indent=1))
+    if args.environment_only:
+        return
     spec = t.spec("cueq", modes=[("checked", args.steps)])
     theirs = t.baseline_run(spec)["modes"]["checked"]
-    result = {"baseline": {"kinds": theirs["kinds"], "edge_sizes_used": theirs["edge_sizes_used"]}}
+    result["baseline"] = {"kinds": theirs["kinds"], "edge_sizes_used": theirs["edge_sizes_used"]}
     for variant in args.variant or ["main"]:
         ours = fastmace(spec, variant)
         result[variant] = {"kinds": ours["kinds"], "edge_sizes_used": ours["info"]["edge_sizes_used"],
