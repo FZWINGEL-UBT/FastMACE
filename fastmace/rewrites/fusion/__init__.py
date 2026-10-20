@@ -16,7 +16,8 @@
   (``fastmace.kernels.triton.segment_gemm``), where the shared shape rule
   (``fastmace.kernels.triton.tile_rule``) picks the Triton GEMM; cuBLAS otherwise. It removes the join
   before the symmetric contraction and its backward. ``rounding`` (another GEMM), deterministic (no
-  atomics). Opt-in (``RewriteConfig.segment_gemm``).
+  atomics). On by default with ``gated_rows`` in float32 plans that are not reproducible (owner decision,
+  20 October 2026); float64 and ``reproducible=True`` keep the stock products and join.
 
 The self-check compares each chain with the unrewritten interaction's ``linear_2(gate(linear_1(x)
 + linear_res(y)))``, values and both input gradients, in the model's dtype (SPEC §6.4). The gate's
@@ -201,7 +202,7 @@ RECORDS = {
     "segment_gemm": Rewrite(
         name="segment_gemm", applies_to=_segment_support, requires=("gated_rows",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={RESHAPE_FORWARD: RESHAPE_FORWARD_SHA256}, exactness="rounding",
-        default="off", deterministic=True, workload_constraints=(), apply=_apply_segment,
+        default="auto", deterministic=True, workload_constraints=(), apply=_apply_segment,
         selfcheck=_segment_selfcheck),
 }
 

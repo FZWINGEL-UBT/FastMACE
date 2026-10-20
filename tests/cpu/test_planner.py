@@ -198,6 +198,8 @@ NOT_GENERIC = "no MACE-MP-0 or density-family interaction"
 FASTMACE_ONLY_DEFAULTS = {
     # Owner decision, 20 October 2026 (plans/opt-1.md, OPT-T02 stage A): auto = on with merged_residual.
     "gated_rows": "on_with_merged_residual",
+    # Owner decision, 20 October 2026 (OPT-T02 stage B): auto = on with gated_rows, float32, not reproducible.
+    "segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
 }
 
 
@@ -231,10 +233,12 @@ def test_default_plans_equal_main_py(label, backend):
     want_on, want_off, dtype = expected(label, backend)
     got = plan_options(plan)
     assert {name for name in OPTIONS if got[name]} == want_on
-    assert {k: v for k, v in plan.auto_options_off.items() if k not in FASTMACE_ONLY_DEFAULTS} == want_off
-    # gated_rows follows merged_residual; stage 2 drops it with fold_cutoff (models without the factored interaction).
-    assert on(plan.rewrites.gated_rows) == (backend == "hybrid" and label in FACTORED_LABELS)
-    assert ("gated_rows" in plan.auto_options_off) == (backend == "hybrid" and label not in FACTORED_LABELS)
+    assert {k: v for k, v in dict(plan.auto_options_off).items() if k not in FASTMACE_ONLY_DEFAULTS} == want_off
+    # gated_rows follows merged_residual and segment_gemm gated_rows (float32 here: the hybrid); stage 2 drops
+    # both with fold_cutoff (models without the factored interaction).
+    for name in FASTMACE_ONLY_DEFAULTS:
+        assert on(getattr(plan.rewrites, name)) == (backend == "hybrid" and label in FACTORED_LABELS), name
+        assert (name in dict(plan.auto_options_off)) == (backend == "hybrid" and label not in FACTORED_LABELS), name
     assert (got["backend"], got["dtype"]) == (backend, dtype)
     assert got["cueq_conv_fusion"] == (True if backend == "cueq" else None)
     assert got["polar_uvu"] == "on" and plan.tier == "graph"
@@ -244,6 +248,19 @@ def test_default_plans_equal_main_py(label, backend):
     assert plan.integrator == IntegratorConfig()
     assert plan.polar.kspace_headroom == 0.0 if polar else plan.polar is None
 
+
+
+def test_segment_gemm_default_keeps_the_stock_path_in_float64():
+    """Owner decision, 20 October 2026: float64 plans keep the stock products and join (the Triton GEMM is
+    float32); an explicit 'on' is kept (its op then runs the PyTorch path)."""
+    plan = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"))
+    assert plan.precision.dtype == "float64" and on(plan.rewrites.gated_rows)
+    item, choice, reason = decision(plan, "RewriteConfig.segment_gemm")
+    assert choice == "off" and "float64 keeps the stock products" in reason
+    explicit = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"),
+                        rewrites=RewriteConfig(segment_gemm="on"))
+    assert on(explicit.rewrites.segment_gemm)
+    assert on(plan_for("mh1-r2scan").rewrites.segment_gemm)
 
 def test_reasons_name_the_stage_2_verdict():
     plan = plan_for("mp0-medium")

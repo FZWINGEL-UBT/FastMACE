@@ -102,7 +102,8 @@ class RewriteConfig:
     # joins and copies between them (opt-1 OPT-T02 stage A); auto = on with merged_residual (owner, 20 Oct 2026).
     gated_rows: Toggle = "auto"
     # linear_2's products in those chains written straight into its joined output by a gathered-row Triton
-    # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); opt-in until its A/B on both GPUs.
+    # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); auto = on with gated_rows in float32,
+    # not reproducible (owner, 20 Oct 2026).
     segment_gemm: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False

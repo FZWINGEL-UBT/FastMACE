@@ -152,9 +152,9 @@ def _rewritten_segment(segment):
     return model, out, batch, resolution, applied
 
 
-def test_segment_record_is_opt_in_rounding_deterministic():
+def test_segment_record_is_default_rounding_deterministic():
     record = fusion.RECORDS["segment_gemm"]
-    assert record.default == "off" and record.exactness == "rounding" and record.deterministic
+    assert record.default == "auto" and record.exactness == "rounding" and record.deterministic
     assert record.requires == ("gated_rows",)
     assert record.source_hashes == {fusion.RESHAPE_FORWARD: fusion.RESHAPE_FORWARD_SHA256}
     assert reg.source_sha256(fusion.RESHAPE_FORWARD) == fusion.RESHAPE_FORWARD_SHA256
