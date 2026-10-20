@@ -5,8 +5,9 @@ thermo rows and trajectory frames of a run as chunks, ``thermo.<n>.csv`` and
 ``trajectory.<n>.traj`` for n = 0, 1, ..., with a chunk boundary exactly at every restart point
 (SPEC §10.6 "Output files at restart points"):
 
-- ``restart_point()`` closes the current chunks and opens the next pair; it returns the indices
-  the restart file stores (``io.restart.OUTPUT_KEYS``): ``output_chunk``, the last closed chunk,
+- ``restart_point()`` closes the current chunks, fsyncs them and their directory (plan task
+  2-T10; rows and frames in between are flushed, not fsynced) and opens the next pair; it
+  returns the indices the restart file stores (``io.restart.OUTPUT_KEYS``): ``output_chunk``, the last closed chunk,
   and ``output_rows`` and ``output_frames``, the rows and frames in chunks 0 to ``output_chunk``.
   Call it after draining the output queue (``AsyncOutput.restart_point`` does both), then write
   the restart file. Every restart write is a chunk boundary, a stop request's included.
@@ -37,6 +38,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from fastmace.errors import RestartMismatch
+from fastmace.io import durable
 
 if TYPE_CHECKING:
     from ase import Atoms
@@ -229,7 +231,7 @@ class ChunkedOutput:
 
         Call it after the output queue is drained; the result is ``write_restart``'s ``outputs``.
         """
-        self._writer.close()
+        self._close_durably()
         indices = dict(output_chunk=self.chunk, output_rows=self.rows, output_frames=self.frames)
         self.chunk += 1
         self._open()
@@ -240,8 +242,15 @@ class ChunkedOutput:
 
     def close(self) -> None:
         if self._writer is not None:
-            self._writer.close()
+            self._close_durably()
             self._writer = None
+
+    def _close_durably(self) -> None:
+        """Close the current chunk, then fsync both files and the directory (``io.durable``)."""
+        self._writer.close()
+        for path in chunk_paths(self.directory, self.chunk):
+            durable.fsync_file(path)
+        durable.fsync_directory(self.directory)
 
     def __enter__(self) -> ChunkedOutput:
         return self

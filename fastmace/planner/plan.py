@@ -7,7 +7,8 @@ code that builds force fields, integrators and engines from a plan (SPEC §5).
 
 Phase 1b adds revisions (``Plan.revise``), the software traits the plan was made with, and the
 restart record (``Plan.to_restart``, ``Plan.from_restart``; the format is
-docs/design/plan-1b.md). The fallback algorithm of §9.4 comes in phase 2.
+docs/design/plan-1b.md). Phase 2 records the fallback's tried candidates in ``fallbacks``
+(``planner.fallback.TriedCandidate``, 2-T06), in restart record version 2.
 """
 
 from __future__ import annotations
@@ -26,10 +27,13 @@ if TYPE_CHECKING:
         RewriteConfig,
     )
     from fastmace.engine.base import Engine
+    from fastmace.planner.fallback import TriedCandidate
     from fastmace.planner.workload import Workload
 
-# The schema of Plan.to_restart; a change of its keys or meaning increases it.
-PLAN_RECORD_VERSION = 1
+# The schema of Plan.to_restart; a change of its keys or meaning increases it. Version 2 (2-T06) adds
+# "fallbacks"; version 1 records still read.
+PLAN_RECORD_VERSION = 2
+PLAN_RECORD_VERSIONS = (1, 2)
 # The resolved config parts of a plan, by attribute name, and their classes in fastmace.config.
 # Where a plan runs (SPEC §8.7): in this process, or in a child through the subprocess runner (2-T07).
 RUNNERS = ("in-process", "subprocess")
@@ -81,6 +85,27 @@ class SoftwareTraits:
 
 
 @dataclass(frozen=True)
+class SelfCheck:
+    """One rewrite record's self-check at build time (SPEC §6.4; plan task 2-T04).
+
+    ``passed`` and the numbers are ``None`` when the force field was built with ``check=False``.
+    """
+
+    name: str
+    passed: bool | None
+    max_relative_error: float | None
+    threshold: float | None
+    modules: int
+    dtype: str | None
+    detail: str
+
+    @classmethod
+    def from_mapping(cls, record: Any) -> SelfCheck:
+        """From one entry of ``fastmace.rewrites.registry.selfcheck_records``."""
+        return cls(**{f.name: record[f.name] for f in dataclasses.fields(cls)})
+
+
+@dataclass(frozen=True)
 class Plan:
     """A frozen execution plan (SPEC §9.5).
 
@@ -96,7 +121,8 @@ class Plan:
       ``"auto"`` (an explicit ``"on"`` is refused, never downgraded, when it cannot be honoured);
     - ``auto_options_off``: ``(option, reason)`` for every option that ``auto`` switched off because
       the model does not support it (the research engine's ``model.auto_options_off``);
-    - ``fallbacks``: the fallback candidates, in order (empty until phase 2);
+    - ``fallbacks``: every candidate the fallback tried (``planner.fallback.TriedCandidate``), in
+      order, carried from revision to revision (§9.4 step 4); empty when no fallback ran;
     - ``predicted_memory_bytes``: ``None`` until the memory model exists;
     - ``superset``: the species superset, atomic numbers sorted (minimal plans; ``()`` in 1a's);
     - ``workload``: the ``Workload`` planned for (``None`` for evaluations and 1a's fixed plans);
@@ -107,7 +133,10 @@ class Plan:
       step it takes effect at;
     - ``runner``: ``"in-process"``, or ``"subprocess"`` where a process constraint of §8.7 forbids the
       plan in this process and the subprocess runner runs it in a child (2-T07). Not in the restart
-      record: the child resumes the plan in its own process.
+      record: the child resumes the plan in its own process;
+    - ``selfchecks``: the per-record self-checks (``SelfCheck``) of the built plan, in application
+      order; ``()`` before the build (``MinimalPlanner.build`` fills them, 2-T04). Not in the
+      restart record: a resume runs them again.
     """
 
     tier: str
@@ -120,7 +149,7 @@ class Plan:
     decisions: tuple[tuple[str, str, str], ...] = ()
     requested: tuple[tuple[str, str], ...] = ()
     auto_options_off: tuple[tuple[str, str], ...] = ()
-    fallbacks: tuple[Plan, ...] = ()
+    fallbacks: tuple[TriedCandidate, ...] = ()
     predicted_memory_bytes: int | None = None
     superset: tuple[int, ...] = ()
     workload: Workload | None = None
@@ -131,6 +160,7 @@ class Plan:
     reason: str = "initial plan"
     step: int | None = None
     runner: Literal["in-process", "subprocess"] = "in-process"
+    selfchecks: tuple[SelfCheck, ...] = ()
 
     def __post_init__(self):
         if self.runner not in RUNNERS:
@@ -173,6 +203,14 @@ class Plan:
             lines.append("  allowed: " + ", ".join(self.allowances))
         if self.runner != "in-process":
             lines.append(f"  runner: {self.runner} (SPEC §8.7)")
+        if self.selfchecks:
+            failed = [check.name for check in self.selfchecks if check.passed is False]
+            lines.append(f"  self-checks: {len(self.selfchecks)} records"
+                         + (f", failed: {', '.join(failed)}" if failed else ""))
+        for tried in self.fallbacks:
+            outcome = (f"activated as revision {tried.revision}" if tried.outcome == "activated"
+                       else tried.outcome + (f" at {tried.stage}" if tried.stage else ""))
+            lines.append(f"  fallback tried: {tried.change}: {outcome} ({tried.reason})")
         if self.predecessor is not None:
             lines.append(f"  predecessor: revision {self.predecessor.revision}")
         return "\n".join(lines)
@@ -216,9 +254,8 @@ class Plan:
             "workload": None if self.workload is None else _json_safe(dataclasses.asdict(self.workload)),
             "software": None if self.software is None else self.software.to_dict(),
             "allowances": list(self.allowances),
+            "fallbacks": [dataclasses.asdict(tried) for tried in self.fallbacks],
         }
-        if self.fallbacks:
-            raise ValueError("a plan with fallback candidates has no restart record before phase 2")
         return record
 
     @classmethod
@@ -226,11 +263,12 @@ class Plan:
         """The plan of a ``to_restart`` record; the predecessors come back as summaries (tier and reason)."""
         from fastmace import config as configs
         from fastmace.errors import Reason
+        from fastmace.planner.fallback import TriedCandidate
         from fastmace.planner.workload import Workload
 
-        if record.get("plan_record_version") != PLAN_RECORD_VERSION:
-            raise ValueError(f"plan record version {record.get('plan_record_version')!r} is not "
-                             f"{PLAN_RECORD_VERSION}")
+        if record.get("plan_record_version") not in PLAN_RECORD_VERSIONS:
+            raise ValueError(f"plan record version {record.get('plan_record_version')!r} is not one of "
+                             f"{PLAN_RECORD_VERSIONS}")
 
         def part(name, class_name):
             values = record[name]
@@ -262,6 +300,7 @@ class Plan:
             workload=workload,
             software=None if record["software"] is None else SoftwareTraits.from_dict(record["software"]),
             allowances=tuple(record["allowances"]),
+            fallbacks=tuple(TriedCandidate(**tried) for tried in record.get("fallbacks", ())),
             revision=record["revision"],
             predecessor=predecessor,
             reason=record["reason"],

@@ -1,0 +1,126 @@
+{
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "eager": {
+  "tier": "eager",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "compile_mode": "none",
+  "capture": false,
+  "gate": "passed"
+ },
+ "graph": {
+  "tier": "graph",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "compile_mode": "default",
+  "capture": true
+ },
+ "gate_record": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 6.976215950594957e-05,
+  "force_eV_per_A": 2.9923442745327655e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 6.976215950594957e-05,
+    "yardstick": 5.320531373500772e-05,
+    "ratio": 1.3111878233329142,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 2.9923442745327655e-06,
+    "yardstick": 2.932739629757375e-06,
+    "ratio": 1.0203238787959918,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "eager stages C, B",
+  "references": {
+   "ran": "in-process",
+   "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+   "oeq_runtime": "prepared",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   }
+  },
+  "seconds": {
+   "references_s": 20.91798430122435,
+   "production_s": 0.0471766572445631
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ]
+ },
+ "eager_vs_graph_A": 5.397321842792735e-07,
+ "repeat_vs_graph_A": 2.524285616090083e-07,
+ "eager_vs_graph_energy_meV_per_atom": 9.602970596489513e-05,
+ "repeat_vs_graph_energy_meV_per_atom": 4.3047799103135276e-05,
+ "speed_eager": {
+  "status": "whole-run mean",
+  "seconds_per_step": 0.032079712077975275,
+  "first_step": 1,
+  "last_step": 100
+ },
+ "speed_graph": {
+  "status": "whole-run mean",
+  "seconds_per_step": 0.23724899277091027,
+  "first_step": 1,
+  "last_step": 100
+ },
+ "report_eager": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    eager, hybrid cuEq/OEq, float32, 12 rewrites on, 2 off (reasons in run.plan)\nwhy:     eager tier: no CUDA graphs, no compilation (mode='eager', SPEC \u00a78.3); correct but slower\ngate:    passed (2 rattled (0.05 \u00c5); 7e-05 meV/atom, 3e-06 eV/\u00c5; floors \u00a712.3)\nsetup:   29 s (plan 0.012 s, build 8 s, gate 21 s, provenance 0.014 s)\nspeed:   32.1 ms/step, whole-run mean over steps 1\u2013100\noutput:  none\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+}

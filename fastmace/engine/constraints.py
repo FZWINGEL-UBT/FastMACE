@@ -13,7 +13,9 @@ Some of what an engine relies on is process-wide state of torch or MACE, not of 
   compiled with ``torch.autograd.grad`` disallowed in the graph, cuEquivariance and e3nn models
   with it allowed. Dynamo recompiles for every new edge size, under the policy in force at that
   moment, so a compiled hybrid and a compiled plain-cuEq engine cannot share a process. The second
-  family is refused; SPEC §8.7's subprocess runner is the way to mix them.
+  family is refused here; the minimal planner marks such an MD plan ``runner="subprocess"`` instead,
+  and ``Simulation`` runs it in a child through SPEC §8.7's subprocess runner
+  (``fastmace.engine.subprocess``, 2-T07), which hands the state over through restart writes.
 - **PolarMACE resets dynamo per engine.** A compiled PolarMACE copy carries its structure's
   k-space state; code compiled for a previous structure kept that call's autograd graph alive and
   broke the next capture (research engine, 16 October 2026). ``MACEForceField`` resets dynamo
@@ -24,7 +26,8 @@ Some of what an engine relies on is process-wide state of torch or MACE, not of 
 
 The record of compile families is the one piece of module-level state here (``PROCESS``): what it
 protects is process-wide itself. It is a record of facts, never a switch, and tests pass their own
-``ProcessRecord``. The 1b runtime-state registry and the planner's subprocess runner build on it.
+``ProcessRecord``. The 1b runtime-state registry and the planner's offer of the subprocess runner
+build on it.
 """
 
 from __future__ import annotations
@@ -70,8 +73,9 @@ class ProcessRecord:
             raise ProcessConstraintError(
                 f"this process already compiled a {self.family} model ({self.family_owner}); MACE's "
                 f"autograd-compile policy is process-wide, so a compiled {family} model ({owner}) cannot "
-                "run in the same process. Run it in a separate process; the subprocess runner, which hands "
-                "the state over through a restart write, comes in phase 2 (SPEC §8.7)")
+                "run in the same process. Run it in a separate process: fm.Simulation runs such an MD plan in a "
+                "child through the subprocess runner, which hands the state over through restart writes (SPEC "
+                "§8.7)")
 
 
 PROCESS = ProcessRecord()

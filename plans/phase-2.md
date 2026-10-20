@@ -196,6 +196,14 @@ These are 1b's principles, unchanged where they still apply:
   plus the local `fastmace_cpu` suite when the machine is free. The `fast`
   GPU tier runs on engine merges, `full` on merges that touch `engine/` or
   `planner/`, and `acceptance` on merges that change numerics.
+  - One trial's GPU tier at a time on a GPU (20 October 2026).
+  - The full tier keeps one step-time assertion,
+    `test_planner_gpu.py::test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal`
+    (planned < 1.25 × hand-built). It failed for 2-T02 at 4.90 against
+    3.52 ms/step while a second tier and two workers' tests shared murphy's
+    GPU. With the same code, the combined 2-T02 + 2-T06 tier passed it.
+  - A step-time failure in a shared run is re-checked on an idle GPU, never
+    read as a regression.
 - **NFS and git.** Tests that run git in a temporary directory on the NAS
   pass `safe.directory` in the tests only. The library never overrides it
   (1b-T28).
@@ -348,6 +356,35 @@ Tests first:
 
 Done when acceptance 1 holds on the local machine.
 
+#### 2-T04b Planner decisions for an unknown MACE (S, 2-T04's worker) — after T02
+
+Added on 20 October 2026, after 2-T04's GPU check on MACE 0.3.15. The
+other-MACE environment installs, but an MH-1 run on the GPU fails there for
+two reasons outside the hash rules:
+- 0.3.15 has no `mace.tools.compile.configure_autograd_for_compile`, so
+  compilation raises `ImportError`;
+- uncompiled, capture fails, because 0.3.15's unhashed MH-1 interaction
+  block calls `torch.nonzero` (`cudaErrorStreamCaptureUnsupported`).
+
+Three planner decisions, each with its Reason and code (they were 2-T02's
+for a few minutes, then given back to the worker that has the context):
+- `capture_support`: a multi-head model whose capture-safe mask does not
+  hash runs on the eager tier from revision 0;
+- `cueq_conv_fusion` on an unhashed converter: MACE's own conversion rule,
+  with no raise;
+- `compile_support()` in `rewrites/versions.py`, a capability check on
+  `mace.tools.compile`: without it the plan does not compile
+  (`compile_mode="none"`, recorded).
+
+A capture failure the planner cannot foresee (`torch.nonzero` in an unhashed
+block) stays 2-T15's: the fallback takes it to eager.
+
+Files: `rewrites/versions.py`, plus `planner/fixed.py` and `planner/minimal.py`
+as second editor after T02. Tests first, with 2-T04's fake-hash helpers.
+
+The MH-1 NaCl GPU re-check on 0.3.15, which is acceptance 1, runs after
+2-T04b and 2-T15 merge (local GPU).
+
 #### 2-T05 Gate resource policy and statuses (L, GPU: local RTX 5060 Ti for the out-of-memory cases) — after T01
 
 Spec: §12.3 "Status" and "Resources". Source: `planner/selfcheck.py`
@@ -463,6 +500,32 @@ Files: tests, the audit in `docs/design/isolation.md`, and narrow fixes in
 named to the conductor first, because the files are shared.
 
 Done when acceptance 5 holds and the audit lists no unhandled shared state.
+
+#### 2-T08b The strain path per model (M, 2-T08's worker) — after T08, T13
+
+Added on 20 October 2026, from 2-T08's audit. A failing self-check of
+`single_graph_strain` undoes its process-wide patch
+(`Registry._selfcheck_failure` calls `_patches.restore`), and that changes
+force fields built earlier in the process:
+- energy and forces stay the same, but stress moves at rounding level
+  (8.7e-19);
+- a compiled force field recompiles with MACE's function at its next
+  non-replayed call, while captured graphs are unaffected;
+- its `applied` list goes stale.
+
+SPEC §8.7 ("MACE patches") says the strain path is per model.
+
+2-T08 records the finding in `docs/design/isolation.md` and pins the
+current behaviour with a test (option a). 2-T08b makes the strain path per
+model (option c), so that no self-check failure undoes anything
+process-wide. Option b, a lease on every host-side call, was rejected.
+- Start with a short design note. One idea: bind the one-graph
+  `get_symmetric_displacement` into the private model copy's forward, as the
+  float64 energy forward already is per instance.
+- Files: `rewrites/engine.py`, `rewrites/registry.py`, `_patches.py`, and
+  `model/forces.py` after T13.
+
+Acceptance 5's audit is complete when 2-T08b is merged.
 
 #### 2-T09 Resume warns on a version change (S) — after T01
 
@@ -963,8 +1026,8 @@ notes folder of the conductor's session (`2-T0x-…md`).
   | File | Editors, in merge order |
   | --- | --- |
   | `simulation.py` | T01 (options), T09 (resume), T10 (`_write_json` only), T07 (runner), T15 (fallback call) |
-  | `planner/minimal.py` | T02, T03, T07 (`_claim_family` only), T13, T16, then T15 (owner) |
-  | `planner/fixed.py` | T02 (a `capture=` keyword on `build`), T16 (reproducible overrides) |
+  | `planner/minimal.py` | T04 (`_common` precision, one `build` line), T02, T04b, T03, T07 (`_claim_family` only), T13, T16, then T15 (owner) |
+  | `planner/fixed.py` | T02 (a `capture=` keyword on `build`), T04b (capture, conv-fusion and compile decisions), T16 (reproducible overrides) |
   | `model/forces.py` | T04 (call sites of `registry.apply` and the float64 energy), T13 (`dynamic_edges` and the cache key), T08 (`rebind`, only if a lease is needed) |
   | `rewrites/registry.py` | T01 (field), T04 (owner), T19 (cache lookup), T20 (screen records) |
   | `config.py` | T01 (owner), then T20 for its screens' fields only |
@@ -1309,6 +1372,83 @@ notes folder of the conductor's session (`2-T0x-…md`).
     the conductor sends "local GPU run done".
   The conductor's first grant wrongly allowed sibling CPU suites alongside
   it and was corrected within minutes.
+- **2-T14b merged:** the raw files of the flaky-test hunt are in
+  `results/2-T14-murphy-20261020/`, and the NAS scratch copy is deleted.
+- **2-T10 merged** (trial on murphy: 2280 passed, 260 skipped, ruff clean).
+  Output chunks, the restart file, `simulation.json` and `metadata.json`
+  are now fsynced, renamed and directory-fsynced. That costs 0.005 ms per
+  restart point on murphy's NFS and 25 ms on WSL ext4, so at most 2.5 µs per
+  step. T21's dependencies (T01, T09 and T10) are now all merged, but T21
+  starts after T02, T03 and T06, which T15 needs (critical path).
+- **2-T05's first local GPU run** (the out-of-memory cases) failed for code
+  reasons.
+  - On the RTX 5060 Ti in WSL, a GPU out-of-memory in a process leaves its
+    CUDA context unusable: a "sticky" error. The POLAR-1-L float64
+    reference failed at 13.5 GB with "CUDA driver error: device not ready".
+    After OMOL-0 XL's reference failed, building the engine hit
+    `CUDA_ERROR_OUT_OF_MEMORY` from `cuStreamIsCapturing`.
+  - Conductor decision: on a CUDA plan, every GPU reference step of the
+    gate, the in-library gate and 2-T15's reduced gate alike, runs in a
+    child process, references first (§12.3). Any CUDA error, non-zero exit
+    or kill of that child counts as a device failure, and the ladder goes on
+    with the real error text recorded. CPU plans stay in-process, so the
+    default path is unchanged.
+  - The conductor amends SPEC §12.3 by one sentence when 2-T05 merges.
+- **2-T04's GPU check on MACE 0.3.15** did not complete, for two reasons
+  outside the hash rules: no compile API (`ImportError`), and `torch.nonzero`
+  during capture in the unhashed MH-1 block. This gives the new task 2-T04b
+  (above). The GPU re-check (acceptance 1) runs after 2-T04b and 2-T15.
+- **2-T18 merged** (trial on murphy: 2327 passed, 260 skipped). The local GPU
+  reservation (`tools/ci/local_gpu.py`) is now the rule for every local
+  run (`CONDUCTOR.md`).
+  - The runners are not registered yet. The owner registers them
+    (`docs/development.md`, "Registering the runners"). The fast-tier run
+    queued by the merge push starts once they are online, or fails after
+    24 hours.
+  - One attribution was fixed at the merge: automatic runner updates were a
+    conductor answer (Q8), not an owner decision.
+- **WSL crashed at about 02:51** during 2-T05's rerun, which ran under the
+  reservation with nothing else running. Its CPU float64 reference step
+  needed far more host RAM than estimated. Recovered with `wsl --shutdown`
+  (`CONDUCTOR.md`). 2-T05 now caps every CPU reference child with
+  `setrlimit` (min(estimate × safety, MemAvailable − 2 GiB)), records the
+  measured peak next to the estimate, and reruns only after the conductor
+  has reviewed this.
+- **2-T04 merged** (4b555c6).
+  - CPU trial: 2368 passed, 262 skipped.
+  - Full GPU tier on murphy: 240 passed, 1 failed. The failure,
+    `test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[default-dtype0]`,
+    is a float32 noise bound from one sample, and it fails on main too (1 of
+    9 repeat runs on main, 1 of 9 on the trial). It goes to 2-T14c (2-T14's
+    worker).
+  - The acceptance tier was not run before the merge. The docs' rule asks
+    for it on merges touching `model/` or `rewrites/`, because those change
+    numerics. On MACE 0.3.16, though, every hash gate passes and the same
+    patches are installed, so this change runs the same code. The
+    acceptance tier runs in the next free murphy window, and at T23.
+  - Follow-ups: 2-T09b (resume compares `ReferenceRecord.content_digest()`)
+    has started; 2-T04b waits for 2-T02.
+- **2-T14c started** (2-T14's worker): the float32 noise bound of that test
+  gets a robust noise estimate, and the test must still fail for a real
+  force change. Verified over 20 runs on murphy and 10 on the local card.
+- **2-T07 merged** (4d657e8). CPU 2380 passed; the full GPU tier gave
+  241 passed, 3 skipped.
+- **2-T14c merged** (8c6e22e). Murphy 21/21 and RTX 5060 Ti 11/11, with
+  cross/noise at most 1.07. The owner rejected the deletion of its scratch
+  folders (`/mnt/homes/zwingel/fastmace-2-T14c`, 197 MB, and WSL
+  `~/fastmace-2-T14c`, 68 KB), so they stay until the owner decides.
+- **2-T05's GPU cases pass** (attempt-5, d9f0458). Both end
+  `passed-reduced` after GPU out-of-memory and a capped or declined CPU
+  step: POLAR-1-L on a 1080-atom cell, OMOL-0 XL on a 1620-atom cell.
+  - The replay check uses the gate's own limit, max(2 × float32 yardstick,
+    floor), from the comparison that was run.
+  - The GPU test accepts "out of memory" or "device failure" for the first
+    step.
+  - 2-T05 rebases after 2-T02 (a one-line conflict in report.py's
+    `DOWNGRADES`).
+- **2-T08's audit, decision:** see 2-T08b above. Option a now, the per-model
+  strain path (option c) as 2-T08b.
+- **Started:** 2-T06 (pushed 737527d; in trial with 2-T02), 2-T08, 2-T13 and 2-T16.
 
 ## Phase 1b items carried into phase 2
 

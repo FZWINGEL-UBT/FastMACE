@@ -268,6 +268,19 @@ def check_trust(resolved, digest, sha256=None, trusted=False):
 # ------------------------------------------------------------------------ backend checks
 
 
+def _cueq_enabled(calculator):
+    """Whether MACE's calculator converted its model to cuEquivariance.
+
+    MACE 0.3.16 records it as ``_enable_cueq``; an older MACE does not, so its model is searched for
+    cuEquivariance modules (2-T04, unknown MACE versions).
+    """
+    flag = getattr(calculator, "_enable_cueq", None)
+    if flag is not None:
+        return bool(flag)
+    return any(type(module).__module__.startswith("cuequivariance")
+               for model in getattr(calculator, "models", ()) for module in model.modules())
+
+
 def _device_type(device):
     import torch
 
@@ -667,7 +680,7 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
     if backend == "hybrid":
         kwargs["enable_oeq"] = True
     # The fusion rule acts on this conversion only; the rule in force before is back afterwards.
-    scope = _patches.cueq_conv_fusion(cueq_conv_fusion) if backend == "cueq" else contextlib.nullcontext()
+    scope = _patches.cueq_conv_fusion(cueq_conv_fusion, device) if backend == "cueq" else contextlib.nullcontext()
     # On the CPU, cuEq must build its naive kernels: with cuequivariance_ops_torch importable it would
     # pick the CUDA-only uniform_1d kernel, and the first forward pass would fail (decision after T06).
     naive = _device_type(device) == "cpu" and backend == "cueq"
@@ -695,7 +708,7 @@ def load(source, head=None, *, checkpoint=None, backend="cueq", dtype="float64",
         raise ValueError(f"{resolved.path.name} has several heads; pass head= one of {', '.join(heads)}")
     if wanted is not None and calculator.head != wanted:  # MACE falls back to the last head with a warning only
         raise ValueError(f"{resolved.path.name} has no head {wanted!r}; its heads are {', '.join(heads)}")
-    if backend in ("hybrid", "cueq") and not getattr(calculator, "_enable_cueq", False):
+    if backend in ("hybrid", "cueq") and not _cueq_enabled(calculator):
         raise BackendError("the constructed MACE calculator did not enable cuEquivariance")
     model = calculator.models[0]
     if backend == "hybrid":
