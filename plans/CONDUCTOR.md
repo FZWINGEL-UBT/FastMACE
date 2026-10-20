@@ -219,3 +219,16 @@ commands. Never print the token.
   - `python3 tools/ci/local_gpu.py status` shows who holds it.
   The conductor still assigns the local GPU to one task at a time, and still
   orders timing runs. The reservation only makes the order safe.
+- **WSL crashed again on 20 October 2026 (about 02:51)**, with
+  `HCS_E_CONNECTION_TIMEOUT` and the Ubuntu distribution stopped. Recovered
+  with `wsl --shutdown`.
+  - Cause: 2-T05's gate rerun ran under the reservation, with nothing else
+    running. Its CPU float64 reference step needed far more host RAM than
+    its estimate: available memory went from 8.4 GB to 0.34 GB in 30 s,
+    with the GPU almost empty.
+  - Lesson: on WSL2, exhausting RAM takes down the whole VM, and every
+    session's processes with it; on native Linux the OOM killer takes only
+    the child. So a memory estimate is not a safeguard on its own. Any child
+    that could use a lot of host RAM needs a hard cap (`setrlimit`), so that
+    an underestimate becomes a recorded failure. 2-T05 adds the cap before
+    any rerun.

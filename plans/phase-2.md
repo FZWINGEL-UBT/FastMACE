@@ -1373,6 +1373,32 @@ notes folder of the conductor's session (`2-T0x-…md`).
     24 hours.
   - One attribution was fixed at the merge: automatic runner updates were a
     conductor answer (Q8), not an owner decision.
+- **WSL crashed at about 02:51** during 2-T05's rerun, which ran under the
+  reservation with nothing else running. Its CPU float64 reference step
+  needed far more host RAM than estimated. Recovered with `wsl --shutdown`
+  (`CONDUCTOR.md`). 2-T05 now caps every CPU reference child with
+  `setrlimit` (min(estimate × safety, MemAvailable − 2 GiB)), records the
+  measured peak next to the estimate, and reruns only after the conductor
+  has reviewed this.
+- **2-T04 merged** (4b555c6).
+  - CPU trial: 2368 passed, 262 skipped.
+  - Full GPU tier on murphy: 240 passed, 1 failed. The failure,
+    `test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[default-dtype0]`,
+    is a float32 noise bound from one sample, and it fails on main too (1 of
+    9 repeat runs on main, 1 of 9 on the trial). It goes to 2-T14c (2-T14's
+    worker).
+  - The acceptance tier was not run before the merge. The docs' rule asks
+    for it on merges touching `model/` or `rewrites/`, because those change
+    numerics. On MACE 0.3.16, though, every hash gate passes and the same
+    patches are installed, so this change runs the same code. The
+    acceptance tier runs in the next free murphy window, and at T23.
+  - Follow-ups: 2-T09b (resume compares `ReferenceRecord.content_digest()`)
+    has started; 2-T04b waits for 2-T02.
+- **2-T14c started** (2-T14's worker): the float32 noise bound of that test
+  gets a robust noise estimate, and the test must still fail for a real
+  force change. Verified over 20 runs on murphy and 10 on the local card.
+- **2-T07 in trial:** CPU on murphy 2380 passed; the full GPU tier is
+  running (it touches `engine/`).
 
 ## Phase 1b items carried into phase 2
 
