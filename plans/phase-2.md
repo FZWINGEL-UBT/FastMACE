@@ -1466,6 +1466,16 @@ notes folder of the conductor's session (`2-T0x-…md`).
   The second machine (the local card) is running now.
 - **Order change:** 2-T03 merges before 2-T04b (2-T15 needs 2-T03, and
   2-T04b is small), and 2-T04b rebases.
+- **2-T13 merged** (f0bde74). CPU 2442 passed; the full GPU tier gave 243
+  passed.
+- **2-T05 merged** (af52f82), with SPEC §12.3's ninth amendment (c88d618).
+  CPU 2485 passed. The full GPU tier gave 242 passed, and the plain-cuEq
+  step-time assertion failed (172 against 98 ms/step) while 2-T08b's GPU
+  test shared the GPU; it then passed twice on the idle GPU.
+- **2-T14d started:** both step-time assertions move from the full tier to
+  `acceptance`. The numerical parts stay in the full tier.
+- **2-T15 started.** It builds against 2-T03's interface until 2-T03
+  merges.
 
 ## Phase 1b items carried into phase 2
 
