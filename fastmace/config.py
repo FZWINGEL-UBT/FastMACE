@@ -101,6 +101,9 @@ class RewriteConfig:
     # Residual products, gate and linear_2 of MH-1-class interactions on per-segment rows, without the
     # joins and copies between them (opt-1 OPT-T02 stage A); opt-in until its A/B on both GPUs.
     gated_rows: Toggle = "auto"
+    # linear_2's products in those chains written straight into its joined output by a gathered-row Triton
+    # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); opt-in until its A/B on both GPUs.
+    segment_gemm: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
     # MACE PR 1498 one-graph strain in the stress path (upstream_mace.use_single_graph_strain).

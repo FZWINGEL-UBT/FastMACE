@@ -51,6 +51,27 @@ class GatedRows(torch.nn.Module):
         self.gated = tuple(gated)  # per gated segment: (segment of first's outputs, gate offset, mul, dim)
         self.act_scalar, self.scalar_cst = act_scalar, scalar_cst
         self.act_gate, self.gate_cst = act_gate, gate_cst
+        self.joined = None  # segment_gemm: (input index, output offset, dim) per product of ``second``
+
+    def join_in_place(self):
+        """Let ``second``'s products write straight into its joined output (``segment_gemm``); returns
+        (True, "ok") or (False, reason). Needs one single-input product per output segment."""
+        second = self.second
+        plan, seen = [], set()
+        for index, (i, j) in enumerate(second.block_ends):
+            if isinstance(i, tuple):
+                if len(i) != 1:
+                    return False, f"output segment {j} of linear_2 sums {len(i)} grouped inputs"
+                i = i[0]
+            if j in seen:
+                return False, f"output segment {j} of linear_2 has several products"
+            seen.add(j)
+            offset, mul, dim = second.segments_out[j]
+            if second.segments_in[i][2] != dim:
+                return False, f"product {index} of linear_2 changes the irrep dimension"
+            plan.append((i, offset, dim, index))
+        self.joined = tuple(plan)
+        return True, "ok"
 
     def forward(self, x, y):
         outputs, n, like = self.first.output_rows(x, y)
@@ -71,6 +92,16 @@ class GatedRows(torch.nn.Module):
         from fastmace.rewrites.linear.modules import join_rows
 
         second = self.second
+        if self.joined is not None:  # segment_gemm: the products write into the joined output
+            from fastmace.kernels.triton.segment_gemm import joined_products
+
+            width = sum(mul * dim for _, mul, dim in second.segments_out)
+            out = joined_products([rows[i] for i, _, _, _ in self.joined],
+                                  [getattr(second, f"weight_{k}") for _, _, _, k in self.joined],
+                                  [getattr(second, f"weight_t_{k}") for _, _, _, k in self.joined],
+                                  [offset for _, offset, _, _ in self.joined], [dim for _, _, dim, _ in self.joined],
+                                  width)
+            return second.transpose_out(out)
         return second.transpose_out(join_rows(second.segments_out, second.products(rows), n, like))
 
 

@@ -133,3 +133,71 @@ def test_refuses_without_merged_residual_or_with_another_nonlinearity():
 def test_a_forward_that_does_not_read_it_is_left_alone():
     model, _ = tiny("mh1", backend="cueq")
     assert fusion.gate_rows(copy.deepcopy(model)) == []  # stock forward: no gated_rows attribute is read
+
+
+# --------------------------------------------------------------------------- segment_gemm (OPT-T02 stage B)
+
+
+def _requests_segment(segment):
+    return requests("on") | {"segment_gemm": segment}
+
+
+def _rewritten_segment(segment):
+    model, batch = tiny("mh1", backend="cueq")
+    regs = registry()
+    out = copy.deepcopy(model)
+    resolution = regs.resolve(out, _requests_segment(segment), strict=False)
+    applied = regs.apply(out, resolution, context(batch), original=model)
+    return model, out, batch, resolution, applied
+
+
+def test_segment_record_is_opt_in_rounding_deterministic():
+    record = fusion.RECORDS["segment_gemm"]
+    assert record.default == "off" and record.exactness == "rounding" and record.deterministic
+    assert record.requires == ("gated_rows",)
+    names = reg.default_registry().names()
+    assert names.index("segment_gemm") > names.index("gated_rows")
+
+
+def test_joined_products_on_the_cpu_equal_the_block_linear_bitwise():
+    from fastmace.kernels.triton.segment_gemm import joined_products
+    from fastmace.rewrites.linear.modules import join_rows
+
+    _, model, _, _, _ = rewritten("on")
+    generator = torch.Generator().manual_seed(5)
+    for interaction in model.interactions:
+        chain = interaction.gated_rows
+        assert chain.join_in_place() == (True, "ok")
+        second = chain.second
+        atoms = 6
+        rows = [torch.randn((atoms * second.segments_in[i][2], second.segments_in[i][1]), generator=generator,
+                            dtype=torch.float64).requires_grad_() for i, _, _, _ in chain.joined]
+        width = sum(m * d for _, m, d in second.segments_out)
+        grad = torch.randn((atoms, width), generator=generator, dtype=torch.float64)
+        stock = join_rows(second.segments_out, second.products(rows), atoms, rows[0])
+        joined = joined_products(rows, [getattr(second, f"weight_{k}") for *_, k in chain.joined],
+                                 [getattr(second, f"weight_t_{k}") for *_, k in chain.joined],
+                                 [o for _, o, _, _ in chain.joined], [d for _, _, d, _ in chain.joined], width)
+        assert torch.equal(joined, stock)
+        for a, b in zip(torch.autograd.grad(joined, rows, grad), torch.autograd.grad(stock, rows, grad)):
+            assert torch.equal(a, b)
+
+
+def test_segment_record_applies_selfchecks_and_keeps_the_model_bitwise_on_the_cpu():
+    original, model, batch, resolution, applied = _rewritten_segment("on")
+    assert resolution.decision("segment_gemm").enabled
+    entry = next(entry for entry in applied if entry.name == "segment_gemm")
+    assert entry.result.passed and entry.result.max_relative_error <= 1e-12
+    assert all(i.gated_rows.joined is not None for i in model.interactions)
+    _, without, _, _, _ = rewritten("on")
+    energy_and_forces(without, batch)
+    energy, forces = energy_and_forces(without, batch)
+    new_energy, new_forces = energy_and_forces(model, batch)
+    assert torch.equal(new_energy, energy) and torch.equal(new_forces, forces)  # the CPU path is PyTorch's
+
+
+def test_segment_record_needs_gated_rows():
+    model, _ = tiny("mh1", backend="cueq")
+    regs = registry()
+    asked = requests("off") | {"segment_gemm": "on"}
+    assert not regs.resolve(copy.deepcopy(model), asked, strict=False).decision("segment_gemm").enabled
