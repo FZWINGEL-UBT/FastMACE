@@ -12,6 +12,7 @@ murphy RTX 4000 Ada, shared with processes of our own account (untimed), FastMAC
 | `acc.log`, `acc.junit.xml`, `acc.events.jsonl`, `acc.attribution.json` | The same for the acceptance subset (`-m acceptance` of `test_engine_gpu.py`, `test_forces_gpu.py`, `test_selfcheck_gpu.py`; 7 passed, 72 min) |
 | `scripts/timing_hook_sitecustomize.py` | The timing hook, used as `sitecustomize.py` at the root of a scratch copy (never in the repository). This copy also logs atoms fingerprints for reference evaluations and the load arguments, added after the runs; the runs above logged the same kinds and times without them |
 | `scripts/run_full.sh` | The runner: environment, own caches, GPU process list before and after |
+| `langevin-power/` | The shortening check: `langevin_power.py` (one same-seed pair on a Lennard-Jones stand-in; prints one JSON line), `power_grid.sh` (the 30 runs of `grid.txt` on murphy's CPUs), `results.jsonl` |
 | `scripts/attribute.py` | Adds the events up per test against the junit times (`python attribute.py <events> <junit>`) |
 
 No tokens or other users' data are in these files. The only home paths are `/mnt/homes/zwingel`,

@@ -163,11 +163,76 @@ warm cache. The full tier would save about 0.8 min of 38, which does not justify
 
 No reference was computed twice in the acceptance subset.
 
+## Win 1, done
+
+`test_ase_calculator_gpu.py`: MACE's float64 LBFGS minimum now runs once per pytest process (a cached
+child of this environment's Python), and each parametrisation's child relaxes with `fm.calc` only.
+murphy (shared GPU): 2 passed, maximum displacement from MACE's minimum 5.8e-7 and 6.9e-7 Å (limit
+5e-3). The PolarMACE "triple" stays: two of its three calls are different computations (the released
+and the enabled path), and the one repeat costs 0.4 s.
+
+## Shortening the ASE Langevin reference (owner: "shorten first")
+
+The test `test_langevin_reproduces_ase_in_every_50_K_bin` runs 18,000 steps (heat 0 → 400 K in 2,000,
+cool 400 → 0 K in 16,000; SPEC §12.2 says "NaCl 9 ps") twice, with ASE and with FastMACE, and takes
+62 min, half of it ASE.
+
+**It is not a statistical test.** Both sides use one seed and FastMACE reproduces ASE's noise stream,
+so the two trajectories are the same to rounding. In 1b-T09's run the largest bin differences were
+3.5e-10 K and 3.8e-11 meV/atom, against limits of 0.1 K and 0.01 meV/atom, and the final positions
+differed by 1.0e-11 Å after 18,000 steps. Bin means do not need many samples here: every bin compares
+the same steps of two identical trajectories. A difference in the integrator shows from the first
+steps on.
+
+**Power check** (`results/2-T14e-murphy-20261020/langevin-power/`, murphy CPUs, no GPU). ASE's
+Langevin plays both sides on a Lennard-Jones fcc solid (256 atoms, epsilon 0.1 eV, solid to 400 K),
+with the test's timestep, friction, `fixcm` and ramp shape and the test's bin metrics. Each run pairs
+a baseline with a variant that carries one injected difference, from the same seed:
+
+| Schedule (heat + cool steps) | friction +1 % | target one step late | T +0.2 % | forces ×(1+1e-6) | forces ×(1+1e-9) | final T |
+| --- | --- | --- | --- | --- | --- | ---: |
+| 2,000 + 16,000 (now) | caught (1.08 K) | caught (0.163 K) | caught (0.72 K) | missed (1e-4 K) | missed | 24.8 K |
+| 2,000 + 8,000 | caught (1.14 K) | caught (0.163 K) | caught (0.65 K) | missed | missed | 49.0 K |
+| 2,000 + 4,000 | caught (1.16 K) | caught (0.163 K) | caught (0.58 K) | missed | missed | 95.4 K |
+| 2,000 + 2,000 | caught (1.20 K) | caught (0.163 K) | caught (0.54 K) | missed | missed | 154 K |
+| 1,000 + 1,000 | caught (1.19 K) | caught (0.235 K) | caught (0.41 K) | missed | missed | 147 K |
+
+(The values are the largest bin |dT|; the dPE column behaves the same way and is in `results.jsonl`.
+The unchanged pair gives exactly 0 at every length.)
+
+- Every schedule catches the same differences, by the same margins. The weakest catch, the
+  one-step-late target, is 1.6 times the limit at 18,000 steps and the same at 4,000.
+- Length does not amplify small differences: a 1e-6 force error stays at about 1e-4 K in every
+  schedule (the Langevin friction damps it), so no length catches it under the current limits.
+- The only assertion that depends on length is "the cooling ramp really cooled it" (final T < 50 K).
+  The stand-in's 24.8 K at 18,000 steps matches MH-1's 23.3 K in 1b-T09, as the thermostat's lag
+  (friction 0.02 per ASE time unit, about 0.5 ps) predicts for any solid: final T ≈ cooling rate × 0.5
+  ps.
+
+**Proposed step count.**
+- **Recommended: 4,000 steps** (heat 2,000 + cool 2,000, 2 ps). The test drops from about 62 to about
+  14 min (both sides scale with steps: ASE about 110 ms/step, FastMACE about 97 ms/step with a sync
+  every step), saving about 48 min of the acceptance tier. All 16 bins remain, with 250 steps each.
+  The final-temperature check becomes a ramp check that does not depend on length: the final T is
+  below half the peak (about 154 K expected, 200 K limit) and both sides end at the same T, which the
+  bins check anyway. SPEC §12.2's "NaCl 9 ps" becomes "NaCl 2 ps" (a conductor amendment).
+- **Conservative: 12,000 steps** (cool 10,000) keeps every assertion as it is (final T about 40 K
+  expected; 49 K at cool 8,000 is too close to 50 K). It saves about 21 min.
+- **Optional, independent of the length:** the limits are 10^8 times the agreement observed (0.1 K
+  against 3.5e-10 K). Limits of 1e-6 K and 1e-7 meV/atom would also catch a 1e-6 force error, at any
+  length, and still leave 3,000 times the observed agreement. That is a SPEC §12.2 change too, so it
+  is listed only as an option.
+
+Before the test changes, one MH-1 run of the chosen schedule on an idle murphy GPU would confirm the
+final temperature and the bin agreement on the real model. The stand-in shows the integrator-level
+behaviour, not MH-1's.
+
 ## Next steps (for the conductor's decision)
 
-- Take win 1 now: test-only, about 24 s per full-tier run.
-- Decide whether merge-time acceptance runs are frequent enough to justify the cache. If yes: build
-  `tests/_support/reference_cache.py` for the ASE-equivalence references first (two thirds of the
-  saving), then the research-engine runs.
-- Optionally rerun the acceptance subset on an idle GPU for absolute numbers. The recommendation does
-  not depend on them.
+- Win 1 is done (above).
+- The owner chose to shorten first; the reference cache waits for that result. Choose 4,000 (recommended)
+  or 12,000 steps, and amend SPEC §12.2. Then one MH-1 run of that schedule on an idle murphy GPU, and
+  the test change.
+- With 4,000 steps the acceptance tier falls from about 103 to about 54 min, and its cacheable part
+  from about 49 to about 23 min (43 %: ASE Langevin 7 min, ASE BAOAB 7 min, research engine 8 min).
+  Decide on the cache with those numbers.
