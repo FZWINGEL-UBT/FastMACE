@@ -84,7 +84,8 @@ def test_targets():
 def test_install_follows_the_config():
     records = engine.install()
     names = [r.name for r in records]
-    assert names[:2] == ["capture_safe_mask_head", "first_derivative_only"] and "single_graph_strain" in names
+    # The strain path is per model since 2-T08b: install never patches it.
+    assert names[:2] == ["capture_safe_mask_head", "first_derivative_only"] and "single_graph_strain" not in names
     for name in NAMES:
         _patches.restore(name)
     records = engine.install(EngineConfig(first_derivative_only=False, unfuse_full_addmm=False),
@@ -132,7 +133,9 @@ def test_records():
 def test_record_apply_installs_and_selfcheck_passes(name):
     record = engine.PROCESS_RECORDS[name]
     record.apply(None, reg.Context())
-    if name != "unfuse_full_addmm" or _patches.record_of(name) is not None:
+    if name == "single_graph_strain":  # per model since 2-T08b: nothing installed
+        assert _patches.record_of(name) is None
+    elif name != "unfuse_full_addmm" or _patches.record_of(name) is not None:
         assert _patches.record_of(name) is not None
     result = reg.CheckResult.coerce(record.selfcheck(None, None, reg.Context()))
     assert result.passed and result.max_relative_error <= 1e-10, result
@@ -145,7 +148,7 @@ def test_strain_through_the_registry():
     assert resolution.enabled == ("single_graph_strain",)
     applied = registry.apply(calc.models[0], resolution, original=calc.models[0])
     assert applied[0].result.passed and applied[0].result.modules == 2
-    assert _patches.record_of("single_graph_strain") is not None
+    assert _patches.record_of("single_graph_strain") is None  # the force field binds it (2-T08b)
 
 
 def test_strain_stays_qualified_after_its_own_patch():
