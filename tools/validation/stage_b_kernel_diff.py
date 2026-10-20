@@ -13,13 +13,19 @@ Variants (``--variant``), each a FastMACE child with one change, to bisect a dif
 Run from a checkout with the environment of the test (``FASTMACE_MODELS``, ``FASTMACE_BASELINE``):
 
     python tools/validation/stage_b_kernel_diff.py --steps 100 --variant main --variant no-fresh-basis
+
+``--load-gib N`` runs the comparison beside a GPU load of our own (continuous matmuls holding N GiB),
+to test whether a shared GPU changes run-time kernel choices (2-T08c: the failures were on a shared
+GPU, the passes on an idle one).
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import difflib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -68,6 +74,31 @@ print(json.dumps(out))
 """
 
 
+LOAD = """
+import sys, torch
+held = torch.empty(int(float(sys.argv[1]) * 2**30), dtype=torch.uint8, device="cuda")
+a = torch.randn(4096, 4096, device="cuda")
+print("load running", flush=True)
+while True:
+    a = (a @ a).tanh_()
+"""
+
+
+@contextlib.contextmanager
+def gpu_load(gib):
+    """A second process of ours on the GPU for the block: continuous matmuls holding ``gib`` GiB (0: none)."""
+    if not gib:
+        yield None
+        return
+    child = subprocess.Popen([sys.executable, "-c", LOAD, str(gib)], stdout=subprocess.PIPE, text=True)
+    try:
+        assert child.stdout.readline().strip() == "load running"
+        yield child.pid
+    finally:
+        child.kill()
+        child.wait()
+
+
 def environment():
     """Package versions and, where the checkout has hash gates (2-T04), every patch whose source does not hash."""
     return t.run_fresh(ENVIRONMENT)
@@ -79,6 +110,8 @@ def main(argv=None):
     parser.add_argument("--variant", action="append", choices=sorted(VARIANTS))
     parser.add_argument("--out", type=Path)
     parser.add_argument("--environment-only", action="store_true", help="versions and hash gates only (no GPU)")
+    parser.add_argument("--load-gib", type=float, default=0.0,
+                        help="run the comparison beside a GPU load of ours holding this many GiB (0: idle GPU)")
     args = parser.parse_args(argv)
     result = {"environment": environment()}
     print("== environment")
@@ -86,14 +119,16 @@ def main(argv=None):
     if args.environment_only:
         return
     spec = t.spec("cueq", modes=[("checked", args.steps)])
-    theirs = t.baseline_run(spec)["modes"]["checked"]
-    result["baseline"] = {"kinds": theirs["kinds"], "edge_sizes_used": theirs["edge_sizes_used"]}
-    for variant in args.variant or ["main"]:
-        ours = fastmace(spec, variant)
-        result[variant] = {"kinds": ours["kinds"], "edge_sizes_used": ours["info"]["edge_sizes_used"],
-                           "compare": compare(ours, theirs)}
-        print(f"== {variant}")
-        print(json.dumps(result[variant]["compare"], indent=1))
+    result["load_gib"] = args.load_gib
+    with gpu_load(args.load_gib):
+        theirs = t.baseline_run(spec)["modes"]["checked"]
+        result["baseline"] = {"kinds": theirs["kinds"], "edge_sizes_used": theirs["edge_sizes_used"]}
+        for variant in args.variant or ["main"]:
+            ours = fastmace(spec, variant)
+            result[variant] = {"kinds": ours["kinds"], "edge_sizes_used": ours["info"]["edge_sizes_used"],
+                               "compare": compare(ours, theirs)}
+            print(f"== {variant}")
+            print(json.dumps(result[variant]["compare"], indent=1))
     if args.out:
         args.out.write_text(json.dumps(result, indent=1) + "\n")
 
