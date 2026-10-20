@@ -76,6 +76,11 @@ class BlockLinear(torch.nn.Module):
         n = x.shape[0]
         rows = [x[:, offset:offset + dim * mul].reshape(n * dim, mul)
                 for offset, mul, dim in self.segments_in]
+        return self.transpose_out(join_rows(self.segments_out, self.products(rows), n, x))
+
+    def products(self, rows):
+        """Per output segment, its rows [n * dim, mul] (None where no product reaches it), from the
+        rows of every input segment (in the ir_mul core layout, after ``transpose_in``)."""
         outputs = [None] * len(self.segments_out)
         for index, (i, j) in enumerate(self.block_ends):
             if isinstance(i, tuple):  # grouped
@@ -85,11 +90,7 @@ class BlockLinear(torch.nn.Module):
             part = ConstantMatmul.apply(left, getattr(self, f"weight_{index}"),
                                         getattr(self, f"weight_t_{index}"))
             outputs[j] = part if outputs[j] is None else outputs[j] + part
-        pieces = []
-        for (offset, mul, dim), value in zip(self.segments_out, outputs):
-            pieces.append(value.reshape(n, dim * mul) if value is not None
-                          else x.new_zeros((n, dim * mul)))
-        return self.transpose_out(torch.cat(pieces, dim=1) if len(pieces) > 1 else pieces[0])
+        return outputs
 
 
 def raw_blocks(linear):
@@ -140,6 +141,12 @@ class ResidualBlockLinear(torch.nn.Module):
             self.register_buffer(f"weight_t_{index}", weight.t().contiguous())
 
     def forward(self, x, y):
+        outputs, n, x = self.output_rows(x, y)
+        return self.transpose_out(join_rows(self.segments_out, outputs, n, x))
+
+    def output_rows(self, x, y):
+        """(rows [n * dim, mul] of every output segment or None, n, x after its transpose), before the
+        output segments are joined into one [n, width] tensor and ``transpose_out``."""
         x, y = self.first_transpose(x), self.residual_transpose(y)
         n = x.shape[0]
         rows = ([x[:, o:o + d * m].reshape(n * d, m) for o, m, d in self.segments_in[:self.first_count]]
@@ -149,9 +156,14 @@ class ResidualBlockLinear(torch.nn.Module):
             left = rows[i[0]] if len(i) == 1 else torch.cat([rows[k] for k in i], dim=1)
             outputs[j] = ConstantMatmul.apply(left, getattr(self, f"weight_{index}"),
                                               getattr(self, f"weight_t_{index}"))
-        pieces = [value.reshape(n, d * m) if value is not None else x.new_zeros((n, d * m))
-                  for (o, m, d), value in zip(self.segments_out, outputs)]
-        return self.transpose_out(torch.cat(pieces, dim=1) if len(pieces) > 1 else pieces[0])
+        return outputs, n, x
+
+
+def join_rows(segments_out, outputs, n, like):
+    """The [n, width] ir_mul tensor of per-segment rows (zeros for a segment without rows)."""
+    pieces = [value.reshape(n, d * m) if value is not None else like.new_zeros((n, d * m))
+              for (o, m, d), value in zip(segments_out, outputs)]
+    return torch.cat(pieces, dim=1) if len(pieces) > 1 else pieces[0]
 
 
 def segments(irreps):
