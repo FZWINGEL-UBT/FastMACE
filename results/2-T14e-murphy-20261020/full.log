@@ -1,0 +1,398 @@
+start 2026-10-20T12:52:06+02:00 commit e24d48ea51cb2d02381818412535c1f92a24d4c9
+zwingel  2976732 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python -m pytest tests/gpu -m 
+zwingel  2988474 /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python main.py --resume /mnt/home
+zwingel  3036819 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python /mnt/homes/zwingel/2-T2
+zwingel  3036822 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python /mnt/homes/zwingel/2-T2
+zwingel  3040049 /mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python -c  import json, sys, time
+gpu apps listed
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /mnt/homes/zwingel/fastmace-2-T14e/cache/inductor, triton /mnt/homes/zwingel/fastmace-2-T14e/cache/triton
+rootdir: /mnt/homes/zwingel/fastmace-2-T14e/src
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+collected 269 items / 22 deselected / 247 selected
+
+tests/gpu/test_ase_calculator_gpu.py ..                                  [  0%]
+tests/gpu/test_canonical_restart_gpu.py .                                [  1%]
+tests/gpu/test_eager_gpu.py ..                                           [  2%]
+tests/gpu/test_energy_gpu.py ....                                        [  3%]
+tests/gpu/test_engine_gpu.py ...............                             [  9%]
+tests/gpu/test_forces_gpu.py ...........                                 [ 14%]
+tests/gpu/test_integrators_gpu.py .....                                  [ 16%]
+tests/gpu/test_io_gpu.py ....                                            [ 17%]
+tests/gpu/test_kernels_oeq_streaming_cuda.py ss                          [ 18%]
+tests/gpu/test_kernels_triton_cuda.py .................                  [ 25%]
+tests/gpu/test_load_hybrid_gpu.py ...                                    [ 26%]
+tests/gpu/test_loading_gpu.py ......................                     [ 35%]
+tests/gpu/test_neighbors_gpu.py ........................................ [ 51%]
+.......................................................                  [ 74%]
+tests/gpu/test_planner_gpu.py ...                                        [ 75%]
+tests/gpu/test_polar_gpu.py .......                                      [ 78%]
+tests/gpu/test_reference_gpu.py s                                        [ 78%]
+tests/gpu/test_reference_tier_gpu.py .                                   [ 78%]
+tests/gpu/test_registry_gpu.py ....                                      [ 80%]
+tests/gpu/test_rewrites_generic_gpu.py ..................                [ 87%]
+tests/gpu/test_rewrites_linear_gpu.py .....                              [ 89%]
+tests/gpu/test_rewrites_mh1_gpu.py ............                          [ 94%]
+tests/gpu/test_selfcheck_gpu.py .....                                    [ 96%]
+tests/gpu/test_simulation_gpu.py ..                                      [ 97%]
+tests/gpu/test_smoke.py ..                                               [ 98%]
+tests/gpu/test_tiny_engine_gpu.py ..                                     [ 99%]
+tests/gpu/test_tiny_released_gpu.py ..                                   [100%]
+
+=============================== warnings summary ===============================
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[none-dtype0]
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/graph_longrange/kspace.py:224: DeprecationWarning: invalid escape sequence '\p'
+    """
+
+tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[none-dtype0]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_forces_gpu.py:78: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+  Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:820.)
+    return float((got - expected).abs().max()) / float(expected.abs().max())
+
+tests/gpu/test_loading_gpu.py: 20 warnings
+tests/gpu/test_polar_gpu.py: 1 warning
+tests/gpu/test_rewrites_generic_gpu.py: 4 warnings
+tests/gpu/test_rewrites_mh1_gpu.py: 2 warnings
+  /mnt/homes/zwingel/fastmace-2-T14e/src/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/gpu/test_loading_gpu.py::test_mh1_plain_cueq_float64
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:71: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load("mh1-r2scan", backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[matpes-pbe]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: matpes-pbe (MACE-matpes-pbe-omat-ft.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[matpes-r2scan]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: matpes-r2scan (MACE-matpes-r2scan-omat-ft.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mp0-large]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: mp0-large (MACE_MPtrj_2022.9.model) is distributed under the MIT License
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mp0-medium]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: mp0-medium (2023-12-03-mace-128-L1_epoch-199.model) is distributed under the MIT License
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mp0b3-medium]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: mp0b3-medium (mace-mp-0b3-medium.model) is distributed under the MIT License
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mpa0-medium]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: mpa0-medium (mace-mpa-0-medium.model) is distributed under the MIT License
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-large]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off23-large (MACE-OFF23_large.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-medium]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off23-medium (MACE-OFF23_medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-small]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off23-small (MACE-OFF23_small.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23b-medium]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off23b-medium (MACE-OFF23b_medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off24-medium]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off24-medium (MACE-OFF24_medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[omat0-medium]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[omol0-xl]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: omol0-xl (MACE-omol-0-extra-large-1024.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-l]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: polar1-l (MACE-POLAR-1-L.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-m]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: polar1-m (MACE-POLAR-1-M.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-s]
+  /mnt/homes/zwingel/fastmace-2-T14e/src/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: polar1-s (MACE-POLAR-1-S.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_polar_gpu.py::test_tiny_polar_runs_without_host_synchronisation
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/cuda/__init__.py:1395: UserWarning: Synchronization debug mode is a prototype feature and does not yet detect all synchronizing operations (Triggered internally at /__w/pytorch/pytorch/torch/csrc/cuda/Module.cpp:1080.)
+    torch._C._cuda_set_sync_debug_mode(debug_mode)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+-- generated xml file: /mnt/homes/zwingel/fastmace-2-T14e/logs/full.junit.xml --
+============================== slowest durations ===============================
+714.12s call     tests/gpu/test_canonical_restart_gpu.py::test_mh1_plain_cueq_float64_resumes_within_1e_12
+512.65s call     tests/gpu/test_planner_gpu.py::test_mh1_plain_cueq_float64_planned_equals_hand_built_and_minimal
+224.00s call     tests/gpu/test_reference_tier_gpu.py::test_mh1_reference_tier_agrees_with_the_graph_tier_statistically
+216.11s call     tests/gpu/test_eager_gpu.py::test_mh1_hybrid_eager_equals_graph_within_float32_noise
+201.99s call     tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_plain_cueq
+149.56s call     tests/gpu/test_tiny_released_gpu.py::test_tiny_broken_captured_graph_fails_while_eager_passes
+137.03s call     tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_hybrid
+133.81s call     tests/gpu/test_planner_gpu.py::test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal
+133.01s call     tests/gpu/test_tiny_released_gpu.py::test_tiny_registry_plain_cueq_float64
+121.33s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[mh1-r2scan-nvt]
+117.59s call     tests/gpu/test_registry_gpu.py::test_polar_1_s
+111.37s call     tests/gpu/test_tiny_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_tiny_plain_cueq
+97.19s call     tests/gpu/test_registry_gpu.py::test_mh1_npt_baoab_full_cell
+92.99s call     tests/gpu/test_simulation_gpu.py::test_simulation_reaches_the_main_py_trajectory[hybrid]
+92.37s call     tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[default-dtype1]
+89.49s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float64-default]
+88.73s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[mh1-r2scan-npt-full]
+87.81s call     tests/gpu/test_tiny_engine_gpu.py::test_tiny_plain_cueq_float64_planned_equals_hand_built
+87.59s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[polar1-s]
+86.13s call     tests/gpu/test_simulation_gpu.py::test_simulation_reaches_the_main_py_trajectory[cueq]
+84.01s call     tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[default-dtype0]
+80.96s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float32-default]
+78.89s call     tests/gpu/test_selfcheck_gpu.py::test_a_broken_captured_graph_fails_while_eager_passes
+71.75s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[mp0-medium]
+70.92s call     tests/gpu/test_ase_calculator_gpu.py::test_lbfgs_with_fm_calc_reaches_maces_minimum[hybrid]
+69.57s call     tests/gpu/test_ase_calculator_gpu.py::test_lbfgs_with_fm_calc_reaches_maces_minimum[pytest]
+60.77s call     tests/gpu/test_registry_gpu.py::test_mh1_plain_cueq_float64
+53.72s call     tests/gpu/test_eager_gpu.py::test_polar1_s_plain_cueq_runs_gated_in_eager_mode
+49.66s call     tests/gpu/test_registry_gpu.py::test_mh1_hybrid_pipelined_nvt
+48.20s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[cueq-float64-eager-plain]
+38.05s call     tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[default-dtype0]
+37.15s call     tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[default-dtype1]
+35.68s call     tests/gpu/test_engine_gpu.py::test_process_constraints_refuse_a_mixed_process
+34.80s call     tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[none-dtype0]
+25.86s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[mp0-medium]
+25.34s call     tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_hybrid_float32_with_streaming
+23.95s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float32-none]
+23.32s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_hybrid_in_a_fresh_process[mp0-medium-float64]
+22.48s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float64-none]
+22.11s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_hybrid_in_a_fresh_process[mp0-medium-float32]
+20.57s call     tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[none-dtype1]
+18.23s call     tests/gpu/test_polar_gpu.py::test_polar1_s_hybrid_float32_in_a_fresh_process
+17.46s call     tests/gpu/test_rewrites_mh1_gpu.py::test_streaming_attaches_on_a_tiny_hybrid_model[float32]
+17.10s call     tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+16.68s call     tests/gpu/test_loading_gpu.py::test_mh1_hybrid_float32_in_a_fresh_process
+16.59s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_hybrid_in_a_fresh_process[off23-small-float32]
+16.32s call     tests/gpu/test_rewrites_mh1_gpu.py::test_streaming_attaches_on_a_tiny_hybrid_model[float64]
+15.42s call     tests/gpu/test_loading_gpu.py::test_mh1_plain_cueq_float64
+14.28s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_hybrid_in_a_fresh_process[off23-small-float64]
+13.29s call     tests/gpu/test_loading_gpu.py::test_hybrid_conversion_keeps_the_last_layer_irreps_of_a_tiny_polar_model
+11.76s call     tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[none-dtype0]
+11.34s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+9.44s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[mh1-cuda-dtype1]
+9.42s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-l]
+9.39s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[mh1-cuda-dtype0]
+9.05s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[omol-cuda-dtype0]
+8.73s call     tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+8.32s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[omol-cuda:0-dtype0]
+8.32s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[residual-dtype1-unfused]
+8.31s call     tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[none-dtype1]
+8.22s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[omol-cuda-dtype1]
+8.16s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[residual-dtype0-unfused]
+8.07s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[omol-cuda:0-dtype1]
+8.06s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[mh1-cuda:0-dtype0]
+7.98s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[mh1-cuda:0-dtype1]
+7.68s call     tests/gpu/test_forces_gpu.py::test_private_copy_keeps_the_fused_cueq_adapter[dtype0]
+7.07s call     tests/gpu/test_load_hybrid_gpu.py::test_fm_load_then_minimal_planner_gives_the_hybrid
+6.93s call     tests/gpu/test_forces_gpu.py::test_private_copy_keeps_the_fused_cueq_adapter[dtype1]
+6.52s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[residual-dtype0-fused]
+6.47s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[residual-dtype1-fused]
+6.17s call     tests/gpu/test_load_hybrid_gpu.py::test_mace_imported_first_gives_plain_cueq_with_the_reason
+5.85s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-m]
+5.55s call     tests/gpu/test_load_hybrid_gpu.py::test_without_oeq_fm_load_gives_plain_cueq
+5.52s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-large]
+5.40s call     tests/gpu/test_rewrites_linear_gpu.py::test_rewritten_tiny_models_agree_on_cuda[mh1-dtype0]
+5.38s call     tests/gpu/test_rewrites_linear_gpu.py::test_rewritten_tiny_models_agree_on_cuda[mh1-dtype1]
+4.99s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_fused_radial_equals_baseline[128]
+4.50s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_backward_equals_baseline[dtype1]
+4.39s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_backward_matches_reference[dtype1-1e-12]
+4.08s call     tests/gpu/test_rewrites_linear_gpu.py::test_default_original_is_a_copy_on_the_model_device
+4.08s call     tests/gpu/test_rewrites_linear_gpu.py::test_rewritten_tiny_models_agree_on_cuda[density-dtype1]
+4.01s call     tests/gpu/test_engine_gpu.py::test_replay_equals_eager_bitwise[True]
+3.81s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[density-dtype0-fused]
+3.76s call     tests/gpu/test_polar_gpu.py::test_tiny_polar_runs_without_host_synchronisation
+3.70s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-s]
+3.70s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mp0-large]
+3.69s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[matpes-pbe]
+3.65s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mh1-mp]
+3.64s setup    tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+3.61s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mh1-r2scan]
+3.48s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[omol0-xl]
+3.42s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[omat0-medium]
+3.36s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mpa0-medium]
+3.30s call     tests/gpu/test_engine_gpu.py::test_pipelined_and_speculative_equal_checked[pipelined]
+3.30s call     tests/gpu/test_engine_gpu.py::test_pipelined_and_speculative_equal_checked[speculative]
+3.29s call     tests/gpu/test_engine_gpu.py::test_replay_equals_eager_bitwise[False]
+3.07s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-medium]
+3.04s call     tests/gpu/test_rewrites_linear_gpu.py::test_rewritten_tiny_models_agree_on_cuda[density-dtype0]
+3.02s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mh1-omat]
+2.99s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[density-dtype0-unfused]
+2.96s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[density-dtype1-fused]
+2.94s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[density-dtype1-unfused]
+2.81s call     tests/gpu/test_polar_gpu.py::test_tiny_polar_force_and_stress_call_is_captured_in_a_cuda_graph
+2.73s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mp0b3-medium]
+2.72s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[matpes-r2scan]
+2.53s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[off-dtype0-unfused]
+2.51s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[off-dtype1-fused]
+2.50s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[off-dtype1-unfused]
+2.47s call     tests/gpu/test_rewrites_generic_gpu.py::test_tiny_models_on_cuda[off-dtype0-fused]
+2.43s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mp0-medium]
+2.36s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23b-medium]
+2.36s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off24-medium]
+2.04s call     tests/gpu/test_planner_gpu.py::test_label_facts_are_those_of_the_released_checkpoints
+1.86s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-small]
+1.56s call     tests/gpu/test_smoke.py::test_tiny_model_forward_on_gpu
+1.09s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_fused_radial_equals_baseline[64]
+1.08s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_backward_equals_baseline[dtype0]
+1.01s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_fused_radial_matches_modules
+0.89s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_fused_radial_equals_baseline[16]
+0.88s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x3-rattled-groups]
+0.88s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3x3-rattled-groups]
+0.85s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_input_gradient_matches_reference
+0.77s call     tests/gpu/test_engine_gpu.py::test_capture_warmups_leave_the_registered_state[npt]
+0.69s call     tests/gpu/test_engine_gpu.py::test_capture_warmups_leave_the_registered_state[checked]
+0.69s call     tests/gpu/test_engine_gpu.py::test_capture_warmups_leave_the_registered_state[pipelined]
+0.67s call     tests/gpu/test_engine_gpu.py::test_capture_warmups_leave_the_registered_state[speculative]
+0.61s call     tests/gpu/test_engine_gpu.py::test_async_output_is_bit_identical[checked]
+0.61s call     tests/gpu/test_engine_gpu.py::test_async_output_is_bit_identical[speculative]
+0.60s call     tests/gpu/test_engine_gpu.py::test_async_output_is_bit_identical[pipelined]
+0.57s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_input_gradient_equals_baseline[777-96-33]
+0.54s call     tests/gpu/test_io_gpu.py::test_async_output_writes_the_same_files
+0.43s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaClx3-rattled-unsorted-f64]
+0.43s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_input_gradient_equals_baseline[5-17-9]
+0.41s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_input_gradient_equals_baseline[4000-1280-65]
+0.33s call     tests/gpu/test_io_gpu.py::test_resume_continues_the_uninterrupted_trajectory
+0.32s call     tests/gpu/test_polar_gpu.py::test_polar1_s_uvu_self_check
+0.26s call     tests/gpu/test_neighbors_gpu.py::test_variable_cell_on_gpu[NaNbO3]
+0.25s call     tests/gpu/test_neighbors_gpu.py::test_variable_cell_on_gpu[NaCl]
+0.25s call     tests/gpu/test_neighbors_gpu.py::test_variable_cell_on_gpu[NbCl5]
+0.25s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-rattled-unsorted-f64]
+0.25s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-strained-groups-f64]
+0.25s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-rattled-groups-f64]
+0.25s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3x3-rattled-groups-f64]
+0.25s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x3-rattled-groups-f64]
+0.25s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-rattled-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaClx3-rattled-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x2-rattled-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-strained-groups-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-rattled-groups-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x3-rattled-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-strained-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3x3-rattled-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-rattled-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-strained-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-strained-groups-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3x3-rattled-unsorted-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-strained-sorted-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-rattled-groups-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x2-rattled-sorted-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-strained-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-rattled-unsorted-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-rattled-groups-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-rattled-sorted-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-strained-sorted-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-strained-unsorted-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x3-rattled-sorted-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-rattled-sorted-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaClx3-rattled-groups-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x2-rattled-unsorted-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-strained-sorted-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaClx3-rattled-sorted-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x3-rattled-unsorted-f32]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-strained-unsorted-f64]
+0.24s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-rattled-sorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-rattled-sorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x2-rattled-groups-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-rattled-sorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaClx3-rattled-sorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3x3-rattled-sorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-strained-sorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x3-rattled-unsorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-rattled-unsorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaClx3-rattled-unsorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-strained-sorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x2-rattled-unsorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-strained-unsorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-strained-sorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-strained-unsorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-rattled-unsorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3x3-rattled-sorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x3-rattled-sorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5x2-rattled-sorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3x3-rattled-unsorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-strained-unsorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NbCl5-rattled-unsorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaNbO3-rattled-sorted-f32]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-strained-unsorted-f64]
+0.23s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-rattled-unsorted-f32]
+0.21s call     tests/gpu/test_integrators_gpu.py::test_captured_half_steps_replay_the_eager_steps[npt-full]
+0.21s call     tests/gpu/test_integrators_gpu.py::test_captured_half_steps_replay_the_eager_steps[npt-full-ase-trace]
+0.20s call     tests/gpu/test_neighbors_gpu.py::test_device_stages_replay_in_a_cuda_graph[fixed]
+0.20s call     tests/gpu/test_polar_gpu.py::test_fixed_k_vectors_on_cuda[dtype0]
+0.20s call     tests/gpu/test_neighbors_gpu.py::test_device_stages_replay_in_a_cuda_graph[variable]
+0.19s call     tests/gpu/test_polar_gpu.py::test_fixed_k_vectors_on_cuda[dtype1]
+0.18s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x3-rattled-sorted]
+0.18s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_segmented_forward_equals_baseline
+0.17s call     tests/gpu/test_io_gpu.py::test_restart_round_trip_on_the_gpu
+0.16s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x3-rattled-unsorted]
+0.15s call     tests/gpu/test_integrators_gpu.py::test_captured_half_steps_replay_the_eager_steps[npt-hydrostatic]
+0.15s call     tests/gpu/test_engine_gpu.py::test_engine_refuses_auto_and_a_device_mismatch
+0.14s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3x3-rattled-sorted]
+0.14s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaClx3-rattled-sorted]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x2-rattled-groups]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5-rattled-groups]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3-rattled-groups]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaClx3-rattled-groups]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3-strained-groups]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaCl-strained-groups]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaCl-rattled-sorted]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5-strained-groups]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5-rattled-sorted]
+0.13s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3x3-rattled-unsorted]
+0.12s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5-strained-sorted]
+0.12s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaCl-rattled-groups]
+0.12s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaClx3-rattled-unsorted]
+0.12s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaCl-strained-sorted]
+0.12s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x2-rattled-sorted]
+0.12s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3-rattled-sorted]
+0.12s call     tests/gpu/test_integrators_gpu.py::test_captured_half_steps_replay_the_eager_steps[nvt]
+0.12s call     tests/gpu/test_integrators_gpu.py::test_captured_half_steps_replay_the_eager_steps[nvt-nofixcm]
+0.12s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3-strained-sorted]
+0.12s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x2-rattled-unsorted]
+0.11s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5-rattled-unsorted]
+0.11s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaCl-rattled-unsorted]
+0.11s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3-strained-unsorted]
+0.11s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3-rattled-unsorted]
+0.11s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NaCl-strained-unsorted]
+0.11s call     tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_cpu_build[NbCl5-strained-unsorted]
+0.06s call     tests/gpu/test_kernels_triton_cuda.py::test_kernels_replay_in_a_cuda_graph
+0.04s call     tests/gpu/test_io_gpu.py::test_copy_to_host_is_pinned_and_ordered_behind_the_step
+0.04s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_unsegmented_path_equals_baseline
+0.03s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_segmented_forward_matches_reference
+0.02s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_backward_matches_reference[dtype0-0.0001]
+0.02s teardown tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[default-dtype1]
+0.02s call     tests/gpu/test_kernels_triton_cuda.py::test_inplace_block_linear_equals_baseline_on_cuda
+0.02s setup    tests/gpu/test_neighbors_gpu.py::test_gpu_build_equals_baseline[NaCl-rattled-unsorted-f64]
+0.01s teardown tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[default-dtype0]
+0.01s teardown tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[default-dtype1]
+
+(490 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+SKIPPED [1] tests/gpu/test_kernels_oeq_streaming_cuda.py:155: openequivariance is not installed (the streaming kernels need it)
+SKIPPED [1] tests/gpu/test_kernels_oeq_streaming_cuda.py:159: openequivariance is not installed (the streaming kernels need it)
+SKIPPED [1] tests/gpu/test_reference_gpu.py:47: FASTMACE_1A_T19_POLAR1S is not set (1a-T19's gate-polar1-s run)
+=== 244 passed, 3 skipped, 22 deselected, 48 warnings in 4988.64s (1:23:08) ====
+exit 0 2026-10-20T14:15:32+02:00
+zwingel  3054297 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python /mnt/homes/zwingel/2-T2
+zwingel  3054295 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python /mnt/homes/zwingel/2-T2
+gpu apps at end
