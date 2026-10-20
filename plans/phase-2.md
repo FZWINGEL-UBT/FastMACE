@@ -870,6 +870,28 @@ trajectories agree to 1e-10 K, and a Lennard-Jones stand-in shows the same
 detection power at 4,000 steps as at 18,000. One MH-1 run of the new
 schedule on murphy comes before the test change.
 
+**Acceptance item 4, owner decision (20 October 2026).** On murphy (run
+`2-T23-murphy-20261020-runner2`), the hybrid runner-against-in-process
+comparison passes temperature and bin energies. The mean potential energy
+misses narrowly: 0.73 and 0.92 against a limit of 0.65 meV/atom. The whole
+gap sits in the first ~1,000 steps of a chaotic 2 fs heating from a 0 K
+crystal; after step 5,000 the two agree within 0.001 meV/atom. The owner
+chose an equilibrated repeat: the first result stays in the report as a
+narrow fail by 1b-T14's measure. Item 4 is judged on a repeat with the
+same limit, from an equilibrated start with 4 seeds, its protocol written
+down before it runs. Finding for the phase 3 notes: MH-1 NaCl at 2 fs from
+0 K has a large heating transient (466 K spike at step 280). The 0.5 fs
+production step is smooth.
+
+**2-T08c.** `test_mh1_plain_cueq_float64_against_the_research_engine` fails
+on murphy only. FastMACE's stage-B graph grew from 235 to 248–249 kernels
+after 9cff042, while the baseline stayed at 236–237; locally it passes.
+Ruled out: the source-hash gates (the pinned sources are byte-identical in
+murphy's NAS environment) and the planner path (the test bypasses it).
+Leading suspect: 2-T14's conversion between fresh cuEq basis caches, which
+leads to different kernel variants on sm_89. Settled by a murphy kernel-name
+diff after 2-T23's timed runs.
+
 ### Wave 4: acceptance
 
 #### 2-T23 Acceptance runs and report (L, GPU, conductor-scheduled) — after all except T20 and T22
