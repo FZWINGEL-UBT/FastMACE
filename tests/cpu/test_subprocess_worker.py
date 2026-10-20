@@ -31,18 +31,20 @@ import time
 
 import numpy as np
 import pytest
-import torch
+import test_subprocess_runner as base
 
 from _support.structures import nacl
-from fastmace import integrators
-from fastmace.config import EngineConfig, RunnerConfig
+from fastmace.config import RunnerConfig
 from fastmace.engine import subprocess as runner_module
 from fastmace.errors import SubprocessRunnerError
 from fastmace.io import output as output_io
 from fastmace.protocols import ramp
-from test_subprocess_runner import (  # noqa: F401  (fixtures)
-    CPU_ENGINE, _assert_same_state, _metadata, _output, _simulation, _state, _wrapper, cpu_planner, loaded,
-    runner_plans, runner_plans_later)
+
+# 2-T07's fixtures and helpers, bound here so that pytest finds the fixtures in this module.
+loaded, cpu_planner, runner_plans, runner_plans_later = (base.loaded, base.cpu_planner, base.runner_plans,
+                                                         base.runner_plans_later)
+_assert_same_state, _metadata, _output, _simulation, _state, _wrapper = (
+    base._assert_same_state, base._metadata, base._output, base._simulation, base._state, base._wrapper)
 
 pytestmark = [pytest.mark.filterwarnings("ignore::UserWarning"),
               pytest.mark.skipif(os.name != "posix", reason="the persistent worker is POSIX only (reply pipe)")]
