@@ -2703,3 +2703,25 @@ registered: its push and nightly triggers are off. Until then, GPU coverage
 comes from the conductor's trial tiers before merges and from each phase's
 acceptance runs. The question comes back when the owner registers the
 runners, at the latest in phase 6.
+
+**Draft 0.12, twelfth amendment (20–21 October 2026, owner decisions,
+optimisation round 1):** two new default rewrites in §6.2.
+- **`gated_rows`:** removes the layout copies around the per-irrep block
+  linears. It is exact: bitwise on the CPU and in the reproducible GPU mode.
+  It is on wherever the merged residual applies.
+- **`segment_gemm`:** a Triton GEMM that writes into the joined layout, chosen
+  by a shape rule from M, N, K and the SM count. It is rounding class, and
+  on in float32, non-reproducible plans. Float64 and reproducible plans
+  resolve it to off.
+
+Measured on murphy (sm_89) and the RTX 5060 Ti (sm_120): A gives NaCl −3.7
+to −4.4 % and NbCl5 −9.0 to −10.6 %. B on top gives NbCl5 −4.2 to −5.2 %, and
+NaCl is neutral. Both are FastMACE-only defaults, outside the research-engine
+plan equality. The combined acceptance's 19-label gate decides per model; a
+model that fails gets the rewrite switched off. Also added:
+`EngineConfig.model_template_cache` (OPT-T06, on: later plans copy the
+converted model). Rejected in the same round and recorded in
+`docs/rewrites.md`:
+- FP32-accurate tensor cores (OPT-T01) and their overlap (OPT-T01b);
+- OPT-T03's streams;
+- OPT-T02 stage C.
