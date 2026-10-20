@@ -44,6 +44,7 @@ from pathlib import Path
 
 import fastmace
 from fastmace import _patches, kernels
+from fastmace.io import durable
 
 __all__ = ["SCHEMA", "SPEC_13_KEYS", "collect", "cueq_versions", "environment", "fastmace_block",
            "generator_digest", "git_commit", "metadata_record", "model_block", "run_record", "sha256_file",
@@ -785,7 +786,7 @@ def metadata_record(*, model=None, checkpoint=None, identity=None, reference_rec
 
 
 def write_metadata(path, record):
-    """Write ``record`` (a ``metadata_record``) to ``path`` atomically: temporary file, then rename.
+    """Write ``record`` (a ``metadata_record``) to ``path`` durably and atomically (``io.durable.atomic_write``).
 
     Refuses a record of another schema and values JSON cannot hold (NaN, infinity); the file
     at ``path`` is then left as it was. Returns ``path`` as a ``Path``.
@@ -798,14 +799,4 @@ def write_metadata(path, record):
         text = json.dumps(record, indent=2, allow_nan=False) + "\n"
     except (TypeError, ValueError) as error:
         raise ValueError(f"metadata.json is not JSON-safe: {error}") from None
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    try:
-        with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    finally:
-        if temporary.exists():
-            temporary.unlink()
-    return path
+    return durable.atomic_write(path, text)
