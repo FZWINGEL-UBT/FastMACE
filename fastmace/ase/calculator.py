@@ -7,7 +7,9 @@ calculation, and again whenever the species or the atom count change, it makes a
 evaluation plan through the minimal planner (``MinimalPlanner.plan_evaluation``: compiled, with
 stress, no workload) and gets that plan's ``MACEForceField`` from ``build_evaluation``. Each plan's
 superset is its structure's species (owner decision D3), so new species get a fresh plan; the
-plans share one compiled-model cache.
+plans share one compiled-model cache. Evaluation plans compile with a dynamic edge dimension
+(``EngineConfig.dynamic_edges``, 2-T13), so relaxations, phonopy and NEB, whose edge counts change
+between calls, pay one compile.
 """
 
 from __future__ import annotations
