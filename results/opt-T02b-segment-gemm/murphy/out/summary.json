@@ -1,0 +1,128 @@
+{
+  "tool": "segment_gemm_bench",
+  "created_utc": "2026-10-20T19:37:16.788424+00:00",
+  "host": "murphy",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "triton": "3.8.0",
+  "fastmace_commit": "ff329d82333f68d770202e291c085062b897c2df",
+  "atoms": 1944,
+  "load": [
+    0.3525390625,
+    0.6904296875,
+    1.5615234375
+  ],
+  "cases": {
+    "linear2_forward": {
+      "cublas_plus_copy_us": 1749.9839663505554,
+      "cublas_only_us": 1355.1839590072632,
+      "segment_us": 1377.279981970787,
+      "configs": {
+        "0": [
+          64,
+          64,
+          32,
+          4,
+          3
+        ],
+        "1": [
+          64,
+          128,
+          32,
+          4,
+          3
+        ],
+        "2": [
+          64,
+          64,
+          32,
+          4,
+          3
+        ],
+        "3": [
+          64,
+          128,
+          32,
+          4,
+          3
+        ]
+      },
+      "max_rel_error": 9.806719962569674e-07,
+      "segment_over_cublas_plus_copy": 0.7870243433389785,
+      "segment_over_cublas_only": 1.016304814425128,
+      "copy_us": 394.80000734329224
+    },
+    "linear2_input_grad": {
+      "cublas_plus_copy_us": 1694.6880221366882,
+      "cublas_only_us": 1413.6320352554321,
+      "segment_us": 1400.3840237855911,
+      "configs": {
+        "0": [
+          32,
+          64,
+          32,
+          4,
+          3
+        ],
+        "1": [
+          64,
+          128,
+          32,
+          4,
+          3
+        ],
+        "2": [
+          64,
+          64,
+          32,
+          4,
+          3
+        ],
+        "3": [
+          64,
+          64,
+          32,
+          4,
+          3
+        ]
+      },
+      "max_rel_error": 9.624921613770647e-07,
+      "segment_over_cublas_plus_copy": 0.8263373585540339,
+      "segment_over_cublas_only": 0.9906283876288591,
+      "copy_us": 281.0559868812561
+    },
+    "residual_forward": {
+      "cublas_plus_copy_us": 1097.7280139923096,
+      "cublas_only_us": 916.4480268955231,
+      "segment_us": 896.8000262975693,
+      "configs": {
+        "0": [
+          64,
+          64,
+          32,
+          4,
+          3
+        ],
+        "2": [
+          64,
+          64,
+          32,
+          4,
+          3
+        ],
+        "3": [
+          128,
+          64,
+          32,
+          4,
+          3
+        ]
+      },
+      "max_rel_error": 8.887505925314516e-07,
+      "segment_over_cublas_plus_copy": 0.8169601348115473,
+      "segment_over_cublas_only": 0.9785607039119156,
+      "copy_us": 181.2799870967865
+    }
+  },
+  "go": true
+}
