@@ -177,3 +177,38 @@ Three planner decisions from the installed MACE, each with its Reason and code (
 On 0.3.16 none of them changes a plan (tested). A capture failure the planner cannot foresee,
 such as `torch.nonzero` in 0.3.15's unhashed MH-1 block, stays with 2-T15: the fallback takes it
 to the eager tier.
+
+## Acceptance 1 on the GPU, MACE 0.3.15: re-check after 2-T04b and 2-T15 (not passed)
+
+Run on 20 October 2026 on the local PC (WSL2): RTX 5060 Ti 16 GB, `fastmace_mace_other`
+(mace-torch 0.3.15, torch 2.14.1+cu130, cuEquivariance 0.12.0, no OEq). FastMACE was main at
+9862293, after 2-T04b and 2-T15. The case: MH-1 `matpes_r2scan` on NaCl 3x3x3 (216 atoms,
+rattle 0.02), NVT at 300 K, with the planner's own path (no engine overrides). The drivers and
+logs are in `results/2-T04-acc1-0315-local-20261020/`.
+
+**The plan is the one 2-T04/2-T04b intend:**
+
+| Decision | Choice | Code |
+| --- | --- | --- |
+| mode | graph (MH-1's mask hashes on 0.3.15) | `mode-graph` |
+| capture | on | |
+| backend | cueq (OpenEquivariance not installed here) | `backend-cueq-oeq-unavailable` |
+| compile_mode | none | `compile-unavailable` |
+| cueq_conv_fusion | off, MACE's own rule on `cuda:0` | `conv-fusion-mace-rule` |
+| force_precision | float32 (the float64 energy forward hashes on 0.3.15) | |
+
+**The run fails, and the fallback never runs.** The graph engine captures lazily, on its first
+`_run`, after `build`. 0.3.15's unhashed MH-1 interaction block calls `torch.nonzero`
+(`cudaErrorStreamCaptureUnsupported`), so the first capture fails. Where depends on `check`:
+- `check="gate"`: inside `selfcheck.production`'s replay. `Simulation._failure("gate", ...)`
+  re-raises it because it is not a `GateFailed`.
+- `check="skip"`: at the first step in `Simulation.run`, after the fallback window.
+
+So no revision is made and no gate result exists. The planner side of acceptance 1 holds: every
+unhashed record is off, nothing unhashed is patched, and the decisions are recorded. The
+"completes on the reported path and passes the gate" part waits for a fallback fix in
+`simulation.py`/2-T15 that does one of two things:
+- treats a capture error during the gate replay as stage `capture`;
+- or makes the first capture happen inside the fallback window (a warm-up at build).
+
+Reported to the conductor on 20 October 2026.
