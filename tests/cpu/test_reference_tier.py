@@ -195,6 +195,7 @@ def test_reference_tier_equals_graph_tier_with_rewrites_off_over_50_steps(loaded
     graph.run(steps=50)
     assert reference.committed().step == graph.committed().step == 50
     delta = float(np.abs(_positions(reference) - _positions(graph)).max())
+    print(f"\nreference tier against the graph tier with rewrites off, 50 steps: max |dx| = {delta:.3e} A")
     assert delta < 1e-10, delta
     assert abs(reference.committed().energy - graph.committed().energy) < 1e-8
 
