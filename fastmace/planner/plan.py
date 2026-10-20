@@ -81,6 +81,27 @@ class SoftwareTraits:
 
 
 @dataclass(frozen=True)
+class SelfCheck:
+    """One rewrite record's self-check at build time (SPEC §6.4; plan task 2-T04).
+
+    ``passed`` and the numbers are ``None`` when the force field was built with ``check=False``.
+    """
+
+    name: str
+    passed: bool | None
+    max_relative_error: float | None
+    threshold: float | None
+    modules: int
+    dtype: str | None
+    detail: str
+
+    @classmethod
+    def from_mapping(cls, record: Any) -> SelfCheck:
+        """From one entry of ``fastmace.rewrites.registry.selfcheck_records``."""
+        return cls(**{f.name: record[f.name] for f in dataclasses.fields(cls)})
+
+
+@dataclass(frozen=True)
 class Plan:
     """A frozen execution plan (SPEC §9.5).
 
@@ -107,7 +128,10 @@ class Plan:
       step it takes effect at;
     - ``runner``: ``"in-process"``, or ``"subprocess"`` where a process constraint of §8.7 forbids the
       plan in this process and the subprocess runner runs it in a child (2-T07). Not in the restart
-      record: the child resumes the plan in its own process.
+      record: the child resumes the plan in its own process;
+    - ``selfchecks``: the per-record self-checks (``SelfCheck``) of the built plan, in application
+      order; ``()`` before the build (``MinimalPlanner.build`` fills them, 2-T04). Not in the
+      restart record: a resume runs them again.
     """
 
     tier: str
@@ -131,6 +155,7 @@ class Plan:
     reason: str = "initial plan"
     step: int | None = None
     runner: Literal["in-process", "subprocess"] = "in-process"
+    selfchecks: tuple[SelfCheck, ...] = ()
 
     def __post_init__(self):
         if self.runner not in RUNNERS:
@@ -173,6 +198,10 @@ class Plan:
             lines.append("  allowed: " + ", ".join(self.allowances))
         if self.runner != "in-process":
             lines.append(f"  runner: {self.runner} (SPEC §8.7)")
+        if self.selfchecks:
+            failed = [check.name for check in self.selfchecks if check.passed is False]
+            lines.append(f"  self-checks: {len(self.selfchecks)} records"
+                         + (f", failed: {', '.join(failed)}" if failed else ""))
         if self.predecessor is not None:
             lines.append(f"  predecessor: revision {self.predecessor.revision}")
         return "\n".join(lines)

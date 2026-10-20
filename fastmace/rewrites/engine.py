@@ -183,6 +183,7 @@ def unfused_addmm_key():
 # --------------------------------------------------------------------------- installation
 
 
+
 def install(engine=None, rewrites=None, oeq=False):
     """Install the process-wide patches a force field needs; returns their PatchRecords.
 
@@ -192,18 +193,24 @@ def install(engine=None, rewrites=None, oeq=False):
     training=False; ``unfuse_full_addmm`` when asked for (nothing on a torch that does not need
     it); ``single_graph_strain`` unless it is "off". Nothing is undone here: a field that is off
     leaves an installed patch in force (a process constraint, SPEC §8.7).
+
+    A patch whose replaced source does not hash (another MACE or torch, SPEC §6.3) is not
+    installed, and the reason is logged (plan task 2-T04): MACE's own function stays. Without
+    the capture-safe mask a multi-head model cannot be captured
+    (``fastmace.rewrites.versions.capture_support``).
     """
     from fastmace.config import EngineConfig, RewriteConfig
 
     engine = engine or EngineConfig()
     rewrites = rewrites or RewriteConfig()
-    records = [_patches.set_capture_safe_mask_head(True)]
+    wanted = ["capture_safe_mask_head"]
     if engine.first_derivative_only and not oeq:
-        records.append(_patches.set_first_derivative_only(True))
+        wanted.append("first_derivative_only")
     if engine.unfuse_full_addmm:
-        records.append(_patches.set_unfuse_full_addmm(True))
+        wanted.append("unfuse_full_addmm")
     if rewrites.single_graph_strain != "off":
-        records.append(_patches.set_single_graph_strain(True))
+        wanted.append("single_graph_strain")
+    records = [_patches.install_if_qualified(name) for name in wanted]
     return tuple(record for record in records if record is not None)
 
 

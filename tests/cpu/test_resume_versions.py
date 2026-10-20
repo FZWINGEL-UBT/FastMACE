@@ -104,8 +104,11 @@ def test_the_resume_finds_the_records_this_fastmace_builds():
 
     record = records.record_for("0.3.16", "mh1")
     assert _same_reference(record.id, record.id)
+    # 2-T04: another MACE gets the unqualified stock record; with the same content it is the same
+    # reference up to the version (decision 23).
+    assert _same_reference(record.id, records.record_for("0.3.17", "mh1").id)
     # An id this FastMACE cannot rebuild cannot be compared, so it is not the same record.
-    assert not _same_reference(record.id, _record("0.3.17").id)
+    assert not _same_reference(record.id, _record("0.3.17", stock={**record.stock, "backend": "e3nn"}).id)
     assert not _same_reference(record.id, "fastmace.reference/0.3.16/mh1/0000000000000000")
     assert not _same_reference(record.id, "not an id")
 

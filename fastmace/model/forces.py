@@ -270,8 +270,18 @@ class MACEForceField:
         if self.is_polar:
             longrange.require_route(self.backend, self.compile_mode)
         self.float64_energy = bool(float64_energy)
+        # How the energy reaches float64 (2-T04, SPEC §18 decision 2): "patched" (the qualified
+        # forwards of fastmace.model.energy / longrange.polar), "native" (a float64 model whose
+        # forward is not qualified sums in float64 itself; the planner promotes the precision to
+        # it), or "off". A float32 model with an unqualified forward is refused here.
+        self.energy_treatment = "off"
+        if self.float64_energy:
+            self.energy_treatment = "patched"
+            if not self.is_polar and self._dtype == torch.float64 and energy64.source_problems():
+                self.energy_treatment = "native"
         # The float64 forward of a non-polar model (refused here if its source is not qualified).
-        energy_forward = energy64.float64_forward(source) if self.float64_energy and not self.is_polar else None
+        energy_forward = (energy64.float64_forward(source)
+                          if self.energy_treatment == "patched" and not self.is_polar else None)
 
         # The input batch, built once (charge and spin as MACE's calculator reads them from atoms.info).
         if loaded is not None:
@@ -322,7 +332,7 @@ class MACEForceField:
                 self._polar_model = private
             self.applied = registry.apply(private, resolution, context, original=source, check=check)
             # After the self-checks, which compare against MACE's own energy.
-            if self.float64_energy:
+            if self.energy_treatment == "patched":
                 if self.is_polar:
                     longrange.set_float64_energy(private)
                 else:
@@ -336,7 +346,7 @@ class MACEForceField:
             key = None if self.is_polar else (
                 id(source), self.compile_mode, self.backend, self.oeq, accelerated, tuple(enabled),
                 self.species_columns if species_dependent else None, engine.first_derivative_only,
-                engine.unfuse_full_addmm, self.float64_energy)
+                engine.unfuse_full_addmm, self.energy_treatment)
             entry = cache.get(key, source) if key is not None else None
             if entry is None:
                 if self.is_polar:
@@ -375,7 +385,7 @@ class MACEForceField:
         if energy_forward is not None and self.model is source:
             self._model_call = functools.partial(energy_forward, self.model)
         self.atomic_energies = None
-        if self.float64_energy:
+        if self.energy_treatment == "patched":
             if atomic_energies is None:
                 atomic_energies = getattr(loaded, "atomic_energies", None)
             if atomic_energies is None:
@@ -541,6 +551,9 @@ class MACEForceField:
 
         if not self.float64_energy:
             raise ValueError("per-atom energies need a force field built with float64_energy=True")
+        if self.energy_treatment != "patched":
+            raise ValueError("per-atom energies need the qualified float64 energy forward (MACE 0.3.16); this force "
+                             "field sums a float64 model natively (SPEC §18 decision 2)")
         out = self._outputs(self._prepare_one_off(atoms))
         return PerAtomEnergies(out["node_energy_float64"].detach().cpu().numpy().copy(),
                                float(out["energy_unresolved_float64"].detach().reshape(-1)[0]),
@@ -633,6 +646,12 @@ class MACEForceField:
             out.update({f"polar.{name}": tensor for name, tensor in state.buffers().items()})
         return out
 
+    def selfcheck_records(self):
+        """The per-record self-check results of this force field's rewrites (SPEC §6.4), as plain mappings."""
+        from fastmace.rewrites import registry as reg
+
+        return reg.selfcheck_records(self.applied)
+
     def info(self):
         """Counters and choices for provenance."""
         state = self._polar_state()
@@ -649,4 +668,5 @@ class MACEForceField:
             "species_columns": list(self.species_columns), "charge": self.charge,
             "spin_multiplicity": self.spin_multiplicity, "dynamo_reset": self.dynamo_reset,
             "polar": None if state is None else state.info(), "float64_energy": self.float64_energy,
+            "energy_treatment": self.energy_treatment,
         }
