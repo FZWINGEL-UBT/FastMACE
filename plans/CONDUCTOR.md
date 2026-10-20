@@ -188,3 +188,34 @@ commands. Never print the token.
   `TORCHINDUCTOR_COMPILE_THREADS=4`, starts only with at least 10 GB
   available, and no CPU suite starts while it runs. CPU suites need at
   least 6 GB available.
+- **Near-miss on 20 October 2026 (about 02:05).**
+  - What happened: a local GPU run (2-T05) started with 12 GB available,
+    while two sibling CPU suites (T04's and T07's) were still running.
+    Within two minutes, the run's main process (5.4 GB) and 5 compile
+    workers had brought available memory down to 4.8 GB.
+  - Why: the conductor's "wait for local machine free" and the siblings'
+    hold messages were still queued in the receivers' turns.
+  - Lessons:
+    - "10 GB available" is not enough on its own: a local GPU run also
+      needs no other local `pytest` process running.
+    - Deliver an urgent hold to a busy worker by stopping its turn
+      (`stop_session`; its detached jobs keep running), so that the queued
+      message is read at once.
+    - The conductor cannot kill another session's processes (the
+      permission check refuses it); the owning worker does it, by process
+      group.
+    - 2-T18 adds a local GPU reservation (`~/.fastmace-local-gpu`) that every
+      local GPU run takes and every local CPU suite checks first.
+- **The local GPU reservation (since 2-T18's merge, 20 October 2026)** replaces
+  the conductor's "local machine free" and "local GPU run done" messages.
+  Commands from the checkout, with WSL's `python3`
+  (`docs/development.md`, "The local GPU reservation"):
+  - every local GPU run (a GPU suite, a timing run, the CI runner) runs under
+    `python3 tools/ci/local_gpu.py run --purpose "2-Tnn ..." -- <command>`.
+    It waits for the marker, then for no other `pytest` and at least 10 GiB
+    available, and releases on any exit;
+  - every local CPU suite starts with
+    `python3 tools/ci/local_gpu.py check --min-available-gib 6 && <suite>`;
+  - `python3 tools/ci/local_gpu.py status` shows who holds it.
+  The conductor still assigns the local GPU to one task at a time, and still
+  orders timing runs. The reservation only makes the order safe.

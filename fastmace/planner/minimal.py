@@ -47,7 +47,7 @@ from fastmace.config import EngineConfig, IntegratorConfig, NeighbourConfig, Pol
 from fastmace.errors import ModelElementError, PlanRefused, Reason, SpeciesNotInSuperset
 
 from . import fixed
-from .plan import Hardware, Plan, SoftwareTraits
+from .plan import Hardware, Plan, SelfCheck, SoftwareTraits
 
 MODES = ("graph", "compiled", "eager", "reference")
 # Modes the minimal planner does not have for MD, and the phase that brings each (SPEC §16; owner decision D6).
@@ -224,8 +224,15 @@ class MinimalPlanner:
         return "cueq", Reason("requested 'cueq'", code="backend-cueq-requested")
 
     def _common(self, book, traits, atoms, species, precision, software, backend, allow_naive_cueq, loaded):
-        """Rules 2, 6 and D3, and the superset, software and precision decisions; returns the superset."""
+        """Rules 2, 6 and D3, and the superset, software and precision decisions.
+
+        Returns ``(superset, force precision, requested)``. The force precision is the effective one:
+        on a MACE whose float64 energy forward does not hash it is promoted to float64, and the
+        requested precision is returned as a ``requested`` entry (2-T04, SPEC §18 decision 2).
+        PolarMACE without its hashed forward is refused (rule 1).
+        """
         from fastmace.model import loading
+        from fastmace.rewrites import versions
 
         if precision not in ("float32", "float64"):
             raise ValueError(f"force precision must be 'float32' or 'float64', got {precision!r}")
@@ -250,7 +257,13 @@ class MinimalPlanner:
         book.decide("superset", _symbols(superset), Reason(
             "the structure's species" if species is None else "declared (species=), equal to the structure's",
             code="superset"))
-        book.decide("force_precision", precision, "the ForceField's precision (SPEC §7.1, §9.2)")
+        effective, promoted = versions.effective_precision(precision, polar_model=traits.polar,
+                                                           float64_energy=self.precision.float64_energy)
+        book.decide("force_precision", effective, promoted or "the ForceField's precision (SPEC §7.1, §9.2)")
+        requested = (("force_precision", precision),) if promoted else ()
+        polar_support = versions.polar_support() if traits.polar else None
+        if polar_support is not None and not polar_support.supported:
+            book.refuse(polar_support.reason, "polar-unqualified-source", 1)
         for name in ("oeq", "triton", "nvrtc", "fused_cueq"):
             available, reason = getattr(software, name)
             book.decide(f"software.{name}", "on" if available else "off", reason)
@@ -274,7 +287,7 @@ class MinimalPlanner:
             ("requested; the fused kernels load" if allow_naive_cueq else "not needed: no naive cuEq kernel")
             if not problems else "refused: naive cuEq kernels",
             code="allow-naive-cueq" if problems else "fused-cueq"))
-        return superset
+        return superset, effective, requested
 
     def _claim_family(self, plan, owner):
         """The process's compile family (§8.7): the first compiled plan fixes it."""
@@ -337,14 +350,15 @@ class MinimalPlanner:
             book.refuse("atom_count_changes=True: changing atom counts is not in 1.0 (SPEC §8.6, §9.3 rule 7)",
                         "atom-count-changes", 7)
         backend = self._backend(book, software, engine)
-        superset = self._common(book, traits, atoms, species, precision, software, backend[0], allow_naive_cueq,
-                                loaded)
+        superset, precision, requested = self._common(book, traits, atoms, species, precision, software, backend[0],
+                                                      allow_naive_cueq, loaded)
         self._workload_decisions(book, workload)
         parts = self._fixed(rewrites, precision, engine)._resolve(book, traits, atoms, integrator, hardware,
                                                                   backend_choice=backend, texts=TEXTS)
         if mode == "eager":
             self._eager(book, parts, traits)
         book.raise_refusals()
+        parts["requested"] = parts["requested"] + requested
         plan = Plan(**parts, superset=superset, workload=workload, software=software,
                     allowances=("allow_naive_cueq",) if allow_naive_cueq else (), reason="minimal plan (phase 1b)")
         self._claim_family(plan, f"a {plan.engine.backend} MD plan")
@@ -417,11 +431,12 @@ class MinimalPlanner:
         book.decide("mode", "compiled", Reason("one-off evaluation: compiled model, no CUDA graphs (SPEC §7.4)",
                                                code="mode-evaluation"))
         backend = self._backend(book, software)
-        superset = self._common(book, traits, atoms, species, precision, software, backend[0], allow_naive_cueq,
-                                loaded)
+        superset, precision, requested = self._common(book, traits, atoms, species, precision, software, backend[0],
+                                                      allow_naive_cueq, loaded)
         parts = self._fixed(rewrites, precision)._resolve(book, traits, atoms, None, hardware, backend_choice=backend,
                                                           evaluation=True, texts=TEXTS)
         book.raise_refusals()
+        parts["requested"] = parts["requested"] + requested
         plan = Plan(**parts, superset=superset, software=software,
                     allowances=("allow_naive_cueq",) if allow_naive_cueq else (),
                     reason="one-off evaluation (phase 1b)")
@@ -460,9 +475,13 @@ class MinimalPlanner:
         model = self._execution_model(plan, force_field)
         if temperature_K is None:
             temperature_K = plan.integrator.temperature_K or 0.0
-        return self._fixed(RewriteConfig(), plan.precision.dtype).build(
+        engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
             plan, model, atoms, temperature_K=temperature_K, compile_cache=compile_cache, constraints=self.process,
             check=check, capture=False if plan.tier == fixed.EAGER_TIER else None)
+        # The built plan with its per-record self-checks (SPEC §6.4, 2-T04); the caller records it.
+        engine.plan = dataclasses.replace(plan, selfchecks=tuple(
+            SelfCheck.from_mapping(record) for record in engine.force_field.selfcheck_records()))
+        return engine
 
     def build_evaluation(self, plan: Plan, force_field, atoms, *, compile_cache=None, check: bool = True):
         """The ``MACEForceField`` of an evaluation ``plan`` (``evaluate`` path, with stress, no graphs)."""

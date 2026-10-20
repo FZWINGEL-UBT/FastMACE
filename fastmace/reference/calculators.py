@@ -96,9 +96,11 @@ class ReferenceCalculator:
             raise ValueError(f"a reference model is float64 or float32, got {self.dtype}")
         self.role = ROLES[self.dtype]
         self.is_polar = polar.is_polar(model)
-        self.float64_energy = self.role == "yardstick"
-        if self.float64_energy and not any(entry["name"] == records.FLOAT64_ACCUMULATION["name"]
-                                           for entry in record.numerical):
+        numerical = {entry["name"] for entry in record.numerical}
+        # 2-T04: an unqualified MACE without the hashed float64 forward keeps MACE's float32 sum (recorded).
+        self.float32_sum = self.role == "yardstick" and records.FLOAT32_SUM_UNQUALIFIED["name"] in numerical
+        self.float64_energy = self.role == "yardstick" and not self.float32_sum
+        if self.float64_energy and records.FLOAT64_ACCUMULATION["name"] not in numerical:
             raise records.ReferencePolicyError(
                 f"record {record.id} has no float64 energy accumulation for the float32 yardstick",
                 why="without it the ratio rule measures the float32 E0 sum, not the forward pass (SPEC §12.1).")
@@ -250,6 +252,7 @@ class ReferenceCalculator:
         return {
             "record_id": self.record.id, "role": self.role, "dtype": self.dtype,
             "float64_energy": self.float64_energy,
+            "energy_bound": records.ENERGY_BOUND_UNQUALIFIED if self.float32_sum else "float64 accumulation",
             "e0_table": getattr(self, "e0_source", None),
             "backend": "cueq" if getattr(self.calculator, "_enable_cueq", False) else "e3nn",
             "cueq_conv_fusion": None if loaded is None else loaded.cueq_conv_fusion,

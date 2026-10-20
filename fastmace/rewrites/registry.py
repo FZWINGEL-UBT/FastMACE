@@ -23,7 +23,11 @@ together with the ``RewriteConfig`` field that switches each one, and provides:
 - **application and self-checks** (``Registry.apply``, ``Registry.selfcheck``, SPEC §6.4): the
   enabled records are applied in order, each followed by its self-check against the original
   model; the runner holds every result to the §6.4 threshold of its dtype (``THRESHOLDS``)
-  whatever the record claims, and a failure raises ``SelfCheckError``.
+  whatever the record claims, and a failure raises ``SelfCheckError``;
+- **the self-check reaction** (SPEC §9.3 rule 13; plan task 2-T04): the ``SelfCheckError`` carries
+  a ``Reaction`` (``Registry.disable_with_dependants``): the failed record and every record that
+  requires it off, with reasons. The planner side (``fastmace.planner.reactions``) turns it into
+  a plan revision that is built again from the pristine model; nothing is undone in place.
 
 Adding a family (plan tasks 1a-T07, 1a-T08): put a module or package whose ``RECORDS`` maps
 names to ``Rewrite`` records (or to dicts with the §6.1 fields plus an optional
@@ -351,6 +355,35 @@ class AppliedRewrite:
     detail: Any = None
 
 
+@dataclass(frozen=True)
+class Reaction:
+    """Rule 13's reaction to a failed self-check (SPEC §9.3): what goes off and the resolution without it."""
+
+    rewrite: str  # the record whose self-check failed
+    reason: str  # the check's detail
+    disabled: tuple[str, ...]  # that record and every enabled record that requires it, in order
+    fields: tuple[str, ...]  # their RewriteConfig fields, in order, without repeats
+    resolution: Resolution  # the resolution with them off
+
+
+def selfcheck_records(applied):
+    """The per-record self-check results of ``apply``'s ``AppliedRewrite`` tuple, as plain mappings.
+
+    The plan and provenance record these (SPEC §6.4, §13); ``None`` values mean ``check=False``.
+    """
+    out = []
+    for entry in applied:
+        result = entry.result
+        if result is None:
+            out.append({"name": entry.name, "passed": None, "max_relative_error": None, "threshold": None,
+                        "modules": 0, "dtype": None, "detail": "not checked (check=False)"})
+            continue
+        out.append({"name": entry.name, "passed": bool(result.passed),
+                    "max_relative_error": float(result.max_relative_error), "threshold": float(result.threshold),
+                    "modules": int(result.modules), "dtype": result.dtype, "detail": result.detail})
+    return tuple(out)
+
+
 def _toggle(name, value):
     if isinstance(value, bool):  # RewriteConfig's bool fields (polar_uvu): True asks for the default
         return "auto" if value else "off"
@@ -550,8 +583,11 @@ class Registry:
         """Apply the enabled records to ``model`` in place, in order, each followed by its self-check.
 
         ``original`` is the unrewritten model the self-checks compare against (the force field
-        passes the model it copied); by default a deep copy of ``model`` is taken first. Raises
-        SelfCheckError on a failed check. Returns a tuple of AppliedRewrite.
+        passes the model it copied); by default a deep copy of ``model`` is taken first. Returns a
+        tuple of AppliedRewrite. A failed check raises SelfCheckError with ``rewrite``, ``result``,
+        ``applied`` (the records applied before it) and ``reaction`` (rule 13); ``model`` is then
+        half rewritten and must be discarded, and a process-wide patch the record installed is
+        undone.
         """
         context = context or Context()
         if check and original is None:
@@ -563,10 +599,62 @@ class Registry:
             if check:
                 result = self.selfcheck(name, original, model, context)
                 if not result.passed:
-                    raise SelfCheckError(f"rewrite {name} failed its self-check: {result.detail}")
+                    raise self._selfcheck_failure(name, result, detail, resolution, applied)
             applied.append(AppliedRewrite(name, result, detail))
             context = dataclasses.replace(context, applied=context.applied + (name,))
         return tuple(applied)
+
+    # ---- rule 13: the self-check reaction (SPEC §9.3)
+
+    def dependants(self, name):
+        """The registered records that require ``name``, directly or through others, in application order."""
+        found = {name}
+        changed = True
+        while changed:
+            changed = False
+            for other, rewrite in self._records.items():
+                if other not in found and found & set(rewrite.requires):
+                    found.add(other)
+                    changed = True
+        return tuple(other for other in self.order() if other in found and other != name)
+
+    def disable_with_dependants(self, resolution, name, reason):
+        """Rule 13 (SPEC §9.3): ``resolution`` with ``name`` and every record requiring it off.
+
+        Returns a ``Reaction``; ``resolution`` itself is not changed. The decisions keep their
+        requested values, so an explicit "on" switched off here is recorded as such.
+        """
+        dependants = self.dependants(name)
+        disabled = (name,) + tuple(d for d in dependants if resolution.decision(d).enabled)
+        decisions = []
+        for d in resolution.decisions:
+            if d.name == name:
+                d = dataclasses.replace(d, enabled=False, refused=False,
+                                        reason=f"self-check failed (SPEC §9.3 rule 13): {reason}")
+            elif d.name in disabled:
+                d = dataclasses.replace(d, enabled=False, refused=False,
+                                        reason=f"requires {name}, whose self-check failed (SPEC §9.3 rule 13)")
+            decisions.append(d)
+        fields = tuple(dict.fromkeys(self._fields[d] for d in disabled))
+        return Reaction(name, str(reason), disabled, fields, Resolution(tuple(decisions)))
+
+    def _selfcheck_failure(self, name, result, detail, resolution, applied):
+        """The SelfCheckError for record ``name``, carrying rule 13's reaction; a process-wide patch is undone."""
+        from fastmace import _patches
+
+        if isinstance(detail, _patches.PatchRecord):  # process-wide records install a patch
+            _patches.restore(detail.name)
+        reaction = self.disable_with_dependants(resolution, name, result.detail)
+        error = SelfCheckError(
+            f"rewrite {name} failed its self-check: {result.detail}",
+            why="every rewrite is checked against the original module at setup (SPEC §6.4)",
+            next_step=f"re-plan without {', '.join(reaction.disabled)} (SPEC §9.3 rule 13: "
+                      "fastmace.planner.reactions.selfcheck_revision)")
+        error.rewrite = name
+        error.result = result
+        error.applied = tuple(entry.name for entry in applied)
+        error.reaction = reaction
+        return error
 
 
 def _copy(model):
@@ -594,7 +682,7 @@ def default_registry():
 
 __all__ = [
     "AppliedRewrite", "Candidate", "CheckResult", "Context", "DEFAULTS", "Decision", "EXACTNESS", "RECORD_SOURCES",
-    "Registry", "Resolution", "Rewrite", "RewriteError", "RewriteRefusedError", "SelfCheckError", "Support",
-    "THRESHOLDS", "check_tensors", "default_registry", "installed_mace_version", "qualify", "relative_error",
-    "source_sha256", "threshold_for",
+    "Reaction", "Registry", "Resolution", "Rewrite", "RewriteError", "RewriteRefusedError", "SelfCheckError",
+    "Support", "THRESHOLDS", "check_tensors", "default_registry", "installed_mace_version", "qualify",
+    "relative_error", "selfcheck_records", "source_sha256", "threshold_for",
 ]

@@ -23,6 +23,16 @@ The record id is ``fastmace.reference/<mace version>/<family>/<digest>``, the di
 the canonical JSON of every field, so any change of any entry changes it. It enters the
 force-field identity (§10.6, ``ForceFieldIdentity.reference_record_id``) and provenance (§13).
 Fallbacks keep the record: a polar model is refused with a record that lacks the stress fix.
+``content_digest()`` is the same digest without the MACE version: a resume that only changes the
+version compares it (2-T09, decision 23).
+
+**Unqualified versions** (SPEC §18 decision 2; plan task 2-T04). A MACE other than 0.3.16 gets an
+"unqualified stock" record: stock equivalence only, with the stock entries the installed sources
+allow. PR 1498's one-graph strain is stock only when its pinned source hashes, and the yardstick's
+float64 accumulation only when the float64 energy forward hashes (otherwise the
+``float32_sum_unqualified`` entry: MACE's own float32 sum, a looser energy bound that the gate
+record and the report name). PolarMACE is refused: its stress fix needs the patched forward. The
+qualified records never depend on the installed sources.
 """
 
 from __future__ import annotations
@@ -33,12 +43,13 @@ import json
 from dataclasses import dataclass, field
 
 from fastmace.errors import FastMACEError
+from fastmace.rewrites import versions
 
 SCHEMA = 1
 ID_PREFIX = "fastmace.reference"
 
-# MACE versions with a qualified record. Another version has no record: the reference is refused.
-QUALIFIED_MACE_VERSIONS = ("0.3.16",)
+# MACE versions with a qualified record. Another version gets the unqualified stock record.
+QUALIFIED_MACE_VERSIONS = versions.QUALIFIED_MACE_VERSIONS
 
 # Model families of the label table (``fastmace.model.labels.FAMILIES``), plus "unlabelled" for a
 # checkpoint outside it (a PolarMACE outside it is "polar").
@@ -95,6 +106,19 @@ FLOAT64_ACCUMULATION = {
     "polar_note": "the yardstick runs the corrected long-range path, so the electrostatic energy is reduced per k "
                   "into float64; MACE's own long-range code would give only the float32 total, upcast",
 }
+
+# The yardstick of an unqualified MACE whose float64 energy forward does not hash (2-T04): MACE's
+# own float32 sum. The energy bound of the ratio rule is then the looser one; production runs at
+# float64 there (the precision promotion), so its own energy error stays small.
+FLOAT32_SUM_UNQUALIFIED = {
+    "name": "float32_sum_unqualified",
+    "applies_to": "yardstick",
+    "what": "the float32 yardstick's energy is MACE's own float32 sum: the float64 energy forward does not hash on "
+            "this MACE",
+    "consequence": "the energy bound of the ratio rule is looser (up to the float32 E0 sum's error); forces and "
+                   "stress are unaffected",
+}
+ENERGY_BOUND_UNQUALIFIED = "looser: unqualified MACE, float32 yardstick energy sum (SPEC §18 decision 2)"
 
 
 class ReferencePolicyError(FastMACEError):
@@ -153,6 +177,18 @@ class ReferenceRecord:
         text = json.dumps(self._payload(), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(text.encode()).hexdigest()
 
+    def content_digest(self):
+        """SHA-256 of every entry except the MACE version: equal when only the version differs."""
+        payload = self._payload()
+        payload.pop("mace_version")
+        text = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(text.encode()).hexdigest()
+
+    @property
+    def qualified(self):
+        """Whether the record's MACE version is a qualified one (else stock equivalence only)."""
+        return self.mace_version in QUALIFIED_MACE_VERSIONS
+
     @property
     def id(self):
         return f"{ID_PREFIX}/{self.mace_version}/{self.family}/{self.digest[:16]}"
@@ -203,17 +239,19 @@ def record_for(mace_version, family, *, polar=None, d3=None):
     """The reference record for (MACE version, model family) and the requested physics options.
 
     ``polar``: a ``PolarConfig`` (its PR 1762 options become an optional-physics entry);
-    ``d3``: a ``D3`` record, refused until phase 3b. Raises ``ReferencePolicyError`` for a MACE
-    version without a qualified record, an unknown family, or options the family cannot take.
+    ``d3``: a ``D3`` record, refused until phase 3b. A version outside ``QUALIFIED_MACE_VERSIONS``
+    gets the unqualified stock record (module docstring). Raises ``ReferencePolicyError`` for
+    PolarMACE on such a version, an unknown family, or options the family cannot take.
     """
     from fastmace.reference.integrators import QUALIFICATION
 
-    if mace_version not in QUALIFIED_MACE_VERSIONS:
+    qualified = mace_version in QUALIFIED_MACE_VERSIONS
+    if not qualified and family == "polar":
         raise ReferencePolicyError(
-            f"no qualified reference record for MACE {mace_version}",
-            why=f"records exist for MACE {', '.join(QUALIFIED_MACE_VERSIONS)}; another version may change the "
-                "stock calculator, retire a fix or need a new one.",
-            next_step="Install a qualified MACE version, or qualify this one (a new record, SPEC §12.1).")
+            f"no reference record for PolarMACE on MACE {mace_version}: only 0.3.16 is qualified",
+            why="PolarMACE's stress fix (MACE issue 1642, SPEC §12.1) needs the hashed forward of the qualified "
+                "version; an unqualified version gets stock equivalence only (SPEC §18 decision 2).",
+            next_step="Install MACE 0.3.16 for PolarMACE models.")
     if family not in FAMILIES:
         raise ReferencePolicyError(f"unknown model family {family!r} for a reference record",
                                    why=f"the families are {', '.join(FAMILIES)}.")
@@ -230,9 +268,16 @@ def record_for(mace_version, family, *, polar=None, d3=None):
             raise ReferencePolicyError(f"the PR 1762 options apply to PolarMACE only, not to family {family!r}")
         optional = ({"name": "pr1762", **OPTIONAL_PHYSICS["pr1762"], "options": options},)
     correction = {"name": "baoab_full_cell_drag", "id": QUALIFICATION["id"], "qualification": QUALIFICATION}
-    return ReferenceRecord(schema=SCHEMA, mace_version=mace_version, family=family, stock=STOCK,
+    stock, numerical = STOCK, (FLOAT64_ACCUMULATION,)
+    if not qualified:
+        from fastmace import _patches
+
+        stock = {**STOCK, "single_graph_strain": not _patches.patch_problems("single_graph_strain")}
+        if versions.treatment("float64_energy").qualified is False:
+            numerical = (FLOAT32_SUM_UNQUALIFIED,)
+    return ReferenceRecord(schema=SCHEMA, mace_version=mace_version, family=family, stock=stock,
                            upstream_fixes=fixes, optional_physics=optional, integrator_corrections=(correction,),
-                           numerical=(FLOAT64_ACCUMULATION,))
+                           numerical=numerical)
 
 
 def require_record_for_model(record, model):
@@ -249,7 +294,8 @@ def require_record_for_model(record, model):
 
 
 __all__ = [
-    "FAMILIES", "FLOAT64_ACCUMULATION", "ID_PREFIX", "OPTIONAL_PHYSICS", "POLAR_STRESS_FIX", "QUALIFIED_MACE_VERSIONS",
+    "ENERGY_BOUND_UNQUALIFIED", "FAMILIES", "FLOAT32_SUM_UNQUALIFIED",
+    "FLOAT64_ACCUMULATION", "ID_PREFIX", "OPTIONAL_PHYSICS", "POLAR_STRESS_FIX", "QUALIFIED_MACE_VERSIONS",
     "ReferencePolicyError", "ReferenceRecord", "SCHEMA", "STOCK", "family_of", "mace_version", "record_for",
     "require_record_for_model",
 ]

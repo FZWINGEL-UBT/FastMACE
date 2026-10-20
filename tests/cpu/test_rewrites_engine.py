@@ -99,7 +99,8 @@ def test_refuses_other_signatures():
 
     key = "mace.modules.utils:get_symmetric_displacement"
     with mock.patch.dict(_patches._ORIGINALS, {key: other}):
-        with pytest.raises(RuntimeError, match="0.3.16 parameters"):
+        # The hash gate (2-T04) refuses it before the signature check.
+        with pytest.raises(_patches.UnqualifiedPatchError, match="get_symmetric_displacement"):
             _patches.set_single_graph_strain()
     assert _patches.record_of("single_graph_strain") is None
 
