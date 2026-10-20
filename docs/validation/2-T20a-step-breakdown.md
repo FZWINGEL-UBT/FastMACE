@@ -143,7 +143,7 @@ time, which are categorised by name.
 | of which < 2 µs | 276 gaps, 0.08 ms | 255 gaps, 0.04 ms |
 | of which 2–5 µs | 37 gaps, 0.10 ms | 31 gaps, 0.09 ms |
 | of which ≥ 5 µs | 0.2 per replay | 0.6 per replay |
-| Gaps between graph nodes, Nsight Systems | 0.20 ms | NBCL5_NSYS |
+| Gaps between graph nodes, Nsight Systems | 0.20 ms | 0.15 ms (rerun at 17:42 UTC, after the desktop load had ended) |
 
 The gaps are about 0.6 µs per kernel boundary, with a 2–5 µs tail mostly before cuBLAS GEMMs that follow a
 Triton copy kernel. One Nsight Systems replay on NaCl had a single 121 µs gap; it is the only gap above 25 µs
