@@ -58,5 +58,10 @@ none, no capture; graph plan: compiled and captured.
 20 steps: gate passed (0.00037 meV/atom, 3.4e-6 eV/Å), energies finite. Plain compiled cuEq is
 refused for PolarMACE (rule 3); eager plain is the combination rule 3 allows.
 
+**After the rebase on 2-T04** (merge 3eea4cd), same machine and setup, 2 passed in 114 s: MH-1 eager vs
+graph 5.5e-7 Å and 6.7e-5 meV/atom, against 2.6e-7 Å and 1.7e-5 meV/atom between two graph runs; eager
+gate passed. POLAR-1-S plain cuEq eager: gate passed (0.00033 meV/atom). The CPU suite on murphy's
+CPUs after the rebase: 2206 passed, 180 skipped.
+
 Step times in the JSON are whole-run means on a shared GPU, including setup effects. They are
 not timing results.
