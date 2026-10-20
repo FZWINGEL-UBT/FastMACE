@@ -193,6 +193,12 @@ LINEAR = {"block_linear", "grouped_linear", "merged_residual"}
 GENERIC = {"reassociate_first", "fused_folded_backward", "segmented_first_sum", "streaming_conv", "species_skip"}
 NOT_FACTORED = "interactions {} are not ('RealAgnosticResidualNonLinearInteractionBlock',)"
 NOT_GENERIC = "no MACE-MP-0 or density-family interaction"
+# The intended differences from main.py: FastMACE-only rewrites that are on by default. Everything else must
+# still equal the research engine's plan.
+FASTMACE_ONLY_DEFAULTS = {
+    # Owner decision, 20 October 2026 (plans/opt-1.md, OPT-T02 stage A): auto = on with merged_residual.
+    "gated_rows": "on_with_merged_residual",
+}
 
 
 def expected(label, backend):
@@ -225,7 +231,10 @@ def test_default_plans_equal_main_py(label, backend):
     want_on, want_off, dtype = expected(label, backend)
     got = plan_options(plan)
     assert {name for name in OPTIONS if got[name]} == want_on
-    assert dict(plan.auto_options_off) == want_off
+    assert {k: v for k, v in plan.auto_options_off.items() if k not in FASTMACE_ONLY_DEFAULTS} == want_off
+    # gated_rows follows merged_residual; stage 2 drops it with fold_cutoff (models without the factored interaction).
+    assert on(plan.rewrites.gated_rows) == (backend == "hybrid" and label in FACTORED_LABELS)
+    assert ("gated_rows" in plan.auto_options_off) == (backend == "hybrid" and label not in FACTORED_LABELS)
     assert (got["backend"], got["dtype"]) == (backend, dtype)
     assert got["cueq_conv_fusion"] == (True if backend == "cueq" else None)
     assert got["polar_uvu"] == "on" and plan.tier == "graph"
