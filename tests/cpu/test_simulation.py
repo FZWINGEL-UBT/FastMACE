@@ -193,9 +193,18 @@ def test_a_failing_gate_refuses_before_any_step(loaded, no_engines_yet, monkeypa
         return energy + 1.0, forces, values  # 1 eV off: fails on energy
 
     monkeypatch.setattr(selfcheck, "_read_outputs", poisoned)
+    from fastmace.config import FallbackConfig
+    from fastmace.errors import FallbackExhausted
+
+    # fallback="refuse": the failure raises as in 1b (decision 29)
     with pytest.raises(GateFailed) as raised:
-        _simulation(loaded, check="gate")
+        _simulation(loaded, check="gate", fallback=FallbackConfig(fallback="refuse"))
     assert raised.value.gate_record.status == "failed"
+    # the default fallback finds no candidate that passes either (every one is 1 eV off): refused
+    with pytest.raises(FallbackExhausted) as exhausted:
+        _simulation(loaded, check="gate")
+    assert exhausted.value.failure.gate.status == "failed"
+    assert exhausted.value.tried and all(t.outcome != "activated" for t in exhausted.value.tried)
 
 
 def test_unknown_check_mode_is_refused():

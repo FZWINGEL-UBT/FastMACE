@@ -21,7 +21,12 @@ What the constructor does, in this order (``docs/design/contracts-1b.md``):
 5. build the engine through the planner;
 6. the gate's production half through that engine (captured replay, registry snapshot and
    restore), then ``GateFailed`` or ``GateUnavailable`` if it says so; the record is ``sim.gate``.
-   Without a requested gate its status is ``skipped`` (owner decision D1).
+   Without a requested gate its status is ``skipped`` (owner decision D1);
+7. a failure of steps 5-6 (build, compile, capture, self-check or a failed gate, classified by the
+   step that raised it) goes to the fallback (§9.4, plan task 2-T15) under
+   ``FallbackConfig.fallback == "auto"`` (decision 29): the active plan becomes the validated
+   revision it finds, or ``FallbackExhausted`` is raised with the record. Under ``"refuse"`` the
+   failure raises as in 1b. A resume never falls back: it rebuilds the restart's revision.
 
 So a constructed ``Simulation`` is ready to step, and every refusal comes before the first step.
 
@@ -35,6 +40,7 @@ whole-run mean at the end of each ``run``.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 import time
 from collections import deque
@@ -242,7 +248,7 @@ class Simulation:
         from fastmace.errors import PlanRefused, Reason
         from fastmace.io.output import Output
         from fastmace.model.forcefield import ForceField
-        from fastmace.planner import minimal, selfcheck
+        from fastmace.planner import fallback, minimal, selfcheck
         from fastmace.planner.workload import Workload
 
         if not isinstance(integrator, (records.Langevin, records.LangevinBAOAB)):
@@ -298,8 +304,14 @@ class Simulation:
 
         planner = _planner(minimal.default_planner(ff), options)
         started = time.perf_counter()
+        stored = getattr(self, "_resume_plan", None)  # a resume of a fallback revision (2-T15)
         self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq,
-                                  allow_reference=options.allow_reference, mode=options.mode)
+                                  allow_reference=options.allow_reference,
+                                  mode=options.mode if stored is None else stored.tier)
+        if stored is not None:
+            from fastmace.planner.fallback import replay_off
+
+            self._plan = replay_off(stored, self._plan)
         setup["plan"] = time.perf_counter() - started
         if self._plan.runner == "subprocess":
             self._start_runner(setup)
@@ -313,21 +325,41 @@ class Simulation:
         gate_s = time.perf_counter() - started
 
         started = time.perf_counter()
-        self._engine = planner.build(self._plan, ff, atoms)
+        failure = None
+        try:
+            self._engine = planner.build(self._plan, ff, atoms)
+        except Exception as error:
+            failure = self._failure("build", error, stored)
+        else:
+            self._attach_engine()
         setup["build"] = time.perf_counter() - started
-        state = self._engine.state
-        state.force_field_identity = ff.identity
-        state.plan_revision = self._plan.revision
-        from fastmace.protocols import TargetFill
-
-        self._fill = TargetFill(self._engine.integrator)
 
         # The production half through this engine; GateFailed (and the unavailable record under
         # check="allow_unavailable") come from selfcheck. The record is final: sim.gate.
         started = time.perf_counter()
-        self._gate = selfcheck.production(self._engine, references, check=check)
+        if failure is None:
+            try:
+                self._gate = selfcheck.production(self._engine, references, check=check)
+            except Exception as error:
+                failure = self._failure("gate", error, stored)
         if check != "skip":
             setup["gate"] = gate_s + time.perf_counter() - started
+        if failure is not None:  # the fallback (§9.4; plan task 2-T15)
+            self._engine = None
+            started = time.perf_counter()
+            result = fallback.Fallback(planner, ff, atoms, self._config, references, options.fallback, seed=seed,
+                                       gate=options.gate).run(failure)
+            setup["fallback"] = time.perf_counter() - started
+            self._plan = result.plan
+            if result.runner:  # the candidate runs in a child (§9.4 step 3, 2-T07)
+                self.options = dataclasses.replace(options, mode=result.plan.tier, engine=dataclasses.replace(
+                    options.engine, backend=result.plan.engine.backend))
+                self._start_runner(setup)
+                return
+            self._engine = result.engine
+            self._attach_engine()
+            # The user's check="skip" stays "skipped"; the validation is in plan.fallbacks.
+            self._gate = result.gate if check != "skip" else selfcheck.skipped_record()
         # The software block of metadata.json, built once per process here, in the setup time,
         # not at the first run() (provenance.fastmace_block, 1b-T28).
         from fastmace import provenance
@@ -340,6 +372,37 @@ class Simulation:
         if output is not None:
             self._open_output()
         self._write_metadata()
+
+    def _attach_engine(self):
+        """The engine's state carries the force field's identity and the plan revision; the target fill."""
+        from fastmace.protocols import TargetFill
+
+        state = self._engine.state
+        state.force_field_identity = self.force_field.identity
+        state.plan_revision = self._plan.revision
+        self._fill = TargetFill(self._engine.integrator)
+
+    def _failure(self, step, error, stored):
+        """``error`` of the build or the gate as a ``fallback.Failure``, or raised again.
+
+        Classified by the step that raised it (conductor answers, T15 Q7). Refusals, process
+        constraints, out-of-memory and non-finite errors are not fallback triggers; neither is a gate
+        that did not fail (``GateUnavailable``), nor any failure while resuming (a resume rebuilds the
+        restart's revision and never falls back).
+        """
+        from fastmace.errors import CheckpointTrustError, GateFailed, ModelElementError, PlanRefused
+        from fastmace.planner import fallback
+
+        if stored is not None or getattr(self, "_resuming", False):
+            raise error
+        if step == "gate":
+            if not isinstance(error, GateFailed):
+                raise error
+            self._engine = None
+            return fallback.Failure(plan=self._plan, stage="gate", error=error, gate=error.gate_record)
+        if fallback._propagates(error) or isinstance(error, (PlanRefused, ModelElementError, CheckpointTrustError)):
+            raise error
+        return fallback.Failure(plan=self._plan, stage=fallback._build_stage(error), error=error)
 
     def _start_runner(self, setup):
         """The plan runs in a child (``Plan.runner == "subprocess"``, SPEC §8.7; 2-T07): no gate and no
@@ -820,12 +883,18 @@ class Simulation:
             output = Output(**output)
         sim = cls.__new__(cls)
         sim._resuming = True  # a plan that runs in a child takes this restart as its first hand-off (2-T07)
+        from fastmace.planner import fallback
+
+        previous = fallback.stored_fallback_plan(restart.plan_record(stored))
+        if previous is not None:  # a fallback revision is rebuilt as it is, never searched again (2-T15)
+            sim._resume_plan = previous
         sim.__init__(_restart_atoms(record["structure"], stored), ff, integrator=_integrator(record["integrator"]),
                      workload=_workload(record["workload"]), output=None, seed=record["seed"], check=check,
                      allow_naive_cueq=record["allow_naive_cueq"], mode=options.mode,
                      allow_reference=options.allow_reference, fallback=options.fallback, gate=options.gate,
                      runner=options.runner, engine=options.engine, neighbours=options.neighbours)
         del sim._resuming
+        sim.__dict__.pop("_resume_plan", None)
         sim._resume(stored, record, output, allow_plan_change, versions, source=directory)
         return sim
 

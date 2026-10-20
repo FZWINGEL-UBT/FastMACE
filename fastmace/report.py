@@ -29,6 +29,7 @@ from fastmace.model import labels as label_table
 from fastmace.planner.fixed import REWRITE_FIELDS
 
 INDENT = 9  # "licence: " is the longest field name
+FALLBACK_PREFIX = "fallback: "  # planner.fallback.PREFIX: the reason of a fallback revision (2-T15)
 DEFAULT_WARMUP_STEPS = 1000
 DEFAULT_WINDOW_STEPS = 1000
 SETUP_STAGES = ("load", "rewrites", "compilation", "capture", "gate")  # SPEC §12.5; others are kept as given
@@ -215,6 +216,20 @@ def gate_line(gate) -> str:
     return f"{status} ({detail})"
 
 
+
+def revision_lines(plan) -> list[str]:
+    """One line per fallback revision of ``plan``'s chain, oldest first (SPEC §9.4, §9.5; 2-T15):
+    ``plan revision 1 (fallback): rewrites X, Y off, reason …``. Empty when nothing fell back."""
+    if plan is None:
+        return []
+    lines = []
+    for revision in (*plan.chain(), plan):
+        reason = str(revision.reason)
+        if reason.startswith(FALLBACK_PREFIX):
+            change, _, why = reason[len(FALLBACK_PREFIX):].partition(": ")
+            lines.append(f"plan revision {revision.revision} (fallback): {change}" + (f", reason {why}" if why else ""))
+    return lines
+
 class Report:
     """The run report of one run (SPEC §7.7). Build it at setup; feed it the speed; read ``text()``.
 
@@ -396,6 +411,7 @@ class Report:
 
     def _lines(self):
         fields = [("", self._header()), ("physics", self._physics()), ("plan", self._plan())]
+        fields += [(None, line) for line in revision_lines(self.plan)]
         fields += self._why()
         fields += [("gate", self._gate()), ("setup", self._setup()), ("speed", self._speed()),
                    ("output", ", ".join(self.outputs) or "none"), ("licence", self.licence_line)]
