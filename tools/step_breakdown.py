@@ -17,6 +17,18 @@ after equilibrating at --temperature-K, so the tables compare row by row:
 4. Replays of the force graph under the profiler: kernels per replay, kernel time against the
    replay span, the largest gaps.
 
+Profiling columns for the optimisation round (plans/opt-1.md): per kernel the launch configuration and the
+profiler's estimated occupancy, per GEMM operator the FLOPs from its shapes and the achieved FLOP/s against
+the nominal FP32 peak (gemms.csv), and the gaps inside each force-graph replay. Two further processes, run
+under the external profilers after the main pass and writing into its directory:
+
+  --pass ncu    one eager force call between cudaProfilerStart/Stop, for ``ncu --profile-from-start off``
+                (NCU_METRICS: DRAM and L2 bytes, FP32 instructions, grid, block, registers, achieved
+                occupancy); ``--summarize-ncu`` joins ncu's kernels by launch order with the main pass's
+                kernel_sequence.csv and writes ncu_kernels.csv, ncu_categories.csv and ncu_ops.csv
+  --pass nsys   --calls force-graph replays in that range, for ``nsys profile --capture-range=cudaProfilerApi
+                --cuda-graph-trace=node``; ``--summarize-nsys`` adds the gaps between graph nodes
+
 The engine comes from the minimal planner (what ``Simulation`` and ``fm.md`` build) with every
 default of the plan. Velocities start from a Maxwell-Boltzmann distribution at --temperature-K with
 the research probe's seed. Measurement only: the engine's methods are wrapped on the instance for
@@ -160,8 +172,50 @@ def read_trace(path):
     return events.get("traceEvents", events)
 
 
-def kernel_table(events):
-    """{(kernel, op, input dims): [launches, µs]} with each kernel attributed to its innermost CPU operator."""
+def gemm_flops(op, dims):
+    """Floating-point operations of one GEMM operator from its input shapes (2 M K N per product), else None."""
+    try:
+        shapes = [s for s in json.loads(dims) if isinstance(s, list) and s] if dims else []
+    except json.JSONDecodeError:
+        return None
+    matrices = [s for s in shapes if len(s) in (2, 3) and all(isinstance(v, int) for v in s)]
+    if op == "aten::mm" and len(matrices) >= 2 and len(matrices[0]) == len(matrices[1]) == 2:
+        (m, k), (k2, n) = matrices[:2]
+    elif op == "aten::addmm" and len(matrices) >= 2:
+        (m, k), (k2, n) = matrices[-2:]
+    elif op == "aten::bmm" and len(matrices) >= 2 and len(matrices[0]) == len(matrices[1]) == 3:
+        (b, m, k), (b2, k2, n) = matrices[:2]
+        return 2 * b * m * k * n if (b, k) == (b2, k2) else None
+    else:
+        return None
+    return 2 * m * k * n if k == k2 else None
+
+
+def fp32_peak_tflops(major, minor, sms, clock_mhz):
+    """Nominal FP32 FMA peak: SMs x FP32 lanes per SM x 2 x the maximum SM clock (sm_80: 64 lanes, other
+    sm_8x to sm_12x: 128). A reporting reference, not a tuning input."""
+    lanes = 64 if (major, minor) == (8, 0) else 128
+    return sms * lanes * 2 * clock_mhz * 1e6 / 1e12
+
+
+def max_sm_clock_mhz():
+    import subprocess
+    try:
+        out = subprocess.check_output(["nvidia-smi", "--query-gpu=clocks.max.sm", "--format=csv,noheader,nounits"],
+                                      text=True)
+        return float(out.split()[0])
+    except (OSError, subprocess.CalledProcessError, ValueError, IndexError):
+        return None
+
+
+def new_row():
+    return dict(launches=0, us=0.0, ops=set(), grid=None, block=None, registers=None, shared_bytes=None,
+                occupancy_us=0.0, occupancy_weight=0.0)
+
+
+def _owners(events):
+    """(owner, launches, kernels): ``owner(launch)`` is the innermost CPU operator enclosing a kernel's launch,
+    as (name, input dims, invocation id), or ("?", "", None)."""
     ops = defaultdict(list)
     launches, kernels = {}, []
     for e in events:
@@ -179,7 +233,7 @@ def kernel_table(events):
 
     def owner(launch):
         if launch is None or launch["tid"] not in index:
-            return "?", ""
+            return "?", "", None
         starts, items = index[launch["tid"]]
         best = None
         for e in reversed(items[:bisect.bisect_right(starts, launch["ts"])]):
@@ -189,22 +243,313 @@ def kernel_table(events):
                 if launch["ts"] - e["ts"] > 2e5:
                     break
         if best is None:
-            return "?", ""
-        return best["name"], json.dumps(best.get("args", {}).get("Input Dims", ""))[:4000]
+            return "?", "", None
+        return (best["name"], json.dumps(best.get("args", {}).get("Input Dims", ""))[:4000],
+                (best["tid"], best["ts"]))
 
-    table = defaultdict(lambda: [0, 0.0])
+    return owner, launches, kernels
+
+
+def kernel_table(events):
+    """{(kernel, op, input dims): row} with each kernel attributed to its innermost CPU operator.
+
+    A row holds the launches, the kernel time in µs, the operator invocations it came from, the launch
+    configuration (grid, block, registers per thread, shared memory) and the profiler's estimated achieved
+    occupancy, weighted by duration."""
+    owner, launches, kernels = _owners(events)
+    table = defaultdict(new_row)
     for k in kernels:
-        op, dims = owner(launches.get(k.get("args", {}).get("correlation")))
+        args = k.get("args", {})
+        op, dims, invocation = owner(launches.get(args.get("correlation")))
         row = table[(k["name"][:120], op, dims)]
-        row[0] += 1
-        row[1] += k["dur"]
+        row["launches"] += 1
+        row["us"] += k["dur"]
+        if invocation is not None:
+            row["ops"].add(invocation)
+        for key, arg in (("grid", "grid"), ("block", "block"), ("registers", "registers per thread"),
+                         ("shared_bytes", "shared memory")):
+            if row[key] is None and arg in args:
+                row[key] = args[arg]
+        estimate = args.get("est. achieved occupancy %")
+        if isinstance(estimate, (int, float)):
+            row["occupancy_us"] += estimate * k["dur"]
+            row["occupancy_weight"] += k["dur"]
     return table, len(kernels)
+
+
+def occupancy(row):
+    """Duration-weighted estimated achieved occupancy (%) of a row, or None."""
+    return row["occupancy_us"] / row["occupancy_weight"] if row["occupancy_weight"] else None
+
+
+def op_gemm_rates(table, calls, peak_tflops):
+    """Per GEMM operator (op, dims): invocations and kernel time per force call, FLOPs and achieved TFLOP/s."""
+    ops = defaultdict(lambda: dict(invocations=set(), us=0.0, kernels=[]))
+    for (name, op, dims), row in table.items():
+        if gemm_flops(op, dims) is None:
+            continue
+        entry = ops[(op, dims)]
+        entry["invocations"] |= row["ops"]
+        entry["us"] += row["us"]
+        entry["kernels"].append(name)
+    rates = {}
+    for (op, dims), entry in ops.items():
+        flops = gemm_flops(op, dims) * len(entry["invocations"])
+        tflops = flops / (entry["us"] * 1e-6) / 1e12 if entry["us"] else None
+        rates[(op, dims)] = dict(invocations_per_call=len(entry["invocations"]) / calls,
+                                 us_per_call=entry["us"] / calls, gflop_per_call=flops / calls / 1e9,
+                                 achieved_tflops=tflops,
+                                 share_of_peak=(tflops / peak_tflops if tflops and peak_tflops else None),
+                                 kernels=sorted(set(entry["kernels"])))
+    return rates
+
+
+def split_replays(kernels, replays):
+    """``kernels`` [(name, start µs, end µs)] of ``replays`` back-to-back replays of one graph, in time order,
+    as one list per replay (each replay launches the same number of kernels), else None."""
+    if not kernels or len(kernels) % replays:
+        return None
+    n = len(kernels) // replays
+    return [kernels[i * n:(i + 1) * n] for i in range(replays)]
+
+
+def replay_gaps(per_replay):
+    """Idle gaps between consecutive kernels inside each graph replay (not between replays): totals, a
+    histogram and the largest gaps with their neighbours. ``per_replay``: one [(name, start, end)] per replay."""
+    buckets = {"<2us": [0, 0.0], "2-5us": [0, 0.0], "5-20us": [0, 0.0], ">=20us": [0, 0.0]}
+    gaps = []
+    for kernels in per_replay:
+        for (name_a, _, end_a), (name_b, start_b, _) in zip(kernels, kernels[1:]):
+            gap = max(start_b - end_a, 0.0)  # overlapping kernels count as no gap
+            key = "<2us" if gap < 2 else "2-5us" if gap < 5 else "5-20us" if gap < 20 else ">=20us"
+            buckets[key][0] += 1
+            buckets[key][1] += gap
+            gaps.append((gap, name_a[:80], name_b[:80]))
+    gaps.sort(reverse=True)
+    replays = len(per_replay)
+    return dict(gaps_per_replay=len(gaps) / replays, total_gap_us_per_replay=sum(g for g, _, _ in gaps) / replays,
+                histogram_per_replay={k: dict(count=v[0] / replays, us=v[1] / replays) for k, v in buckets.items()},
+                largest=[dict(gap_us=round(g, 2), before=a, after=b) for g, a, b in gaps[:20]])
+
+
+def write_sequence(events, edges, path):
+    """The kernels of one profiled force call in launch order, with operator, category and input shapes."""
+    owner, launches, kernels = _owners(events)
+    rows = []
+    for index, k in enumerate(sorted(kernels, key=lambda e: e["ts"])):
+        name = k["name"][:120]
+        op, dims, _ = owner(launches.get(k.get("args", {}).get("correlation")))
+        rows.append(dict(index=index, kernel=name, op=op, category=category(name, op, dims, edges),
+                         input_dims=dims[:300]))
+    with Path(path).open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=SEQUENCE_FIELDS)
+        writer.writeheader()
+        writer.writerows(rows)
+    return rows
+
+
+def force_graph_key(engine, edges):
+    """The captured B graph the engine replays now, else one for ``edges``, else None."""
+    key = ("B", int(engine._pipe_edges))
+    if key in engine._graphs:
+        return key
+    return next((k for k in engine._graphs if isinstance(k, tuple) and k[0] == "B" and k[1] == edges), None)
+
+
+NCU_METRICS = (
+    "gpu__time_duration.sum", "dram__bytes_read.sum", "dram__bytes_write.sum", "lts__t_bytes.sum",
+    "sm__warps_active.avg.pct_of_peak_sustained_active", "sm__maximum_warps_per_active_cycle_pct",
+    "launch__grid_size", "launch__block_size", "launch__registers_per_thread", "launch__waves_per_multiprocessor",
+    "smsp__sass_thread_inst_executed_op_ffma_pred_on.sum", "smsp__sass_thread_inst_executed_op_fadd_pred_on.sum",
+    "smsp__sass_thread_inst_executed_op_fmul_pred_on.sum", "sm__throughput.avg.pct_of_peak_sustained_elapsed",
+    "gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed")
+SEQUENCE_FIELDS = ("index", "kernel", "op", "category", "input_dims")
+
+
+def _number(text):
+    try:
+        return float(str(text).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def read_ncu_csv(path):
+    """Rows of ``ncu --csv --page raw --print-units base`` (a header row, then a units row, then one row per
+    kernel), as dicts with numbers where a cell is numeric."""
+    with Path(path).open(newline="") as handle:
+        lines = [line for line in handle if not line.startswith("==")]  # ncu's own messages
+    rows = list(csv.reader(lines))
+    if not rows:
+        return []
+    header, body = rows[0], rows[1:]
+    if body and not str(body[0][0]).strip().isdigit():
+        body = body[1:]  # the units row
+    out = []
+    for cells in body:
+        record = dict(zip(header, cells))
+        for key in NCU_METRICS:
+            if key in record:
+                record[key] = _number(record[key])
+        out.append(record)
+    return out
+
+
+def _base_name(name):
+    """A kernel name without template arguments and parameters, for matching ncu against the profiler."""
+    name = str(name).strip()
+    for stop in ("(", "<"):
+        name = name.split(stop)[0]
+    return name.split("::")[-1].strip()
+
+
+def join_ncu(ncu_rows, sequence, peak_tflops):
+    """ncu's kernels joined in launch order with the profiler's kernel sequence of one force call (same compiled
+    code, so the same order); each row gets the sequence's operator and category. Returns (rows, matched)."""
+    kernels = [s for s in sequence if not str(s["kernel"]).startswith(("Memcpy", "Memset"))]
+    rows, matched = [], 0
+    for record, entry in zip(ncu_rows, kernels):
+        name = record.get("Kernel Name", "")
+        same = _base_name(name) == _base_name(entry["kernel"])
+        matched += same
+        ns = record.get("gpu__time_duration.sum") or 0.0
+        flops = sum(2 * (record.get(k) or 0.0) if "ffma" in k else (record.get(k) or 0.0)
+                    for k in NCU_METRICS if "_op_f" in k)
+        tflops = flops / (ns * 1e-9) / 1e12 if ns else None
+        rows.append(dict(index=entry["index"], kernel=entry["kernel"], ncu_kernel=name, name_matches=same,
+                         op=entry["op"], category=entry["category"], input_dims=entry.get("input_dims", ""),
+                         duration_us=ns / 1e3, dram_read_bytes=record.get("dram__bytes_read.sum"),
+                         dram_write_bytes=record.get("dram__bytes_write.sum"), l2_bytes=record.get("lts__t_bytes.sum"),
+                         fp32_flops=flops, achieved_tflops=tflops,
+                         share_of_fp32_peak=tflops / peak_tflops if tflops is not None and peak_tflops else None,
+                         grid_size=record.get("launch__grid_size"), block_size=record.get("launch__block_size"),
+                         registers=record.get("launch__registers_per_thread"),
+                         waves_per_sm=record.get("launch__waves_per_multiprocessor"),
+                         achieved_occupancy_pct=record.get("sm__warps_active.avg.pct_of_peak_sustained_active"),
+                         theoretical_occupancy_pct=record.get("sm__maximum_warps_per_active_cycle_pct"),
+                         sm_throughput_pct=record.get("sm__throughput.avg.pct_of_peak_sustained_elapsed"),
+                         memory_throughput_pct=record.get(
+                             "gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed")))
+    return rows, matched
+
+
+def group_ncu(rows, key, peak_tflops):
+    """ncu rows summed by ``key`` (``"category"`` or ``"op"``): time, DRAM and L2 bytes, FLOPs, achieved FLOP/s,
+    and the duration-weighted achieved occupancy."""
+    groups = defaultdict(lambda: dict(kernels=0, duration_us=0.0, dram_bytes=0.0, l2_bytes=0.0, fp32_flops=0.0,
+                                      occupancy_weighted=0.0, occupancy_weight=0.0))
+    for row in rows:
+        g = groups[row[key] if key != "op" else (row["op"], row["input_dims"])]
+        g["kernels"] += 1
+        g["duration_us"] += row["duration_us"]
+        g["dram_bytes"] += (row["dram_read_bytes"] or 0.0) + (row["dram_write_bytes"] or 0.0)
+        g["l2_bytes"] += row["l2_bytes"] or 0.0
+        g["fp32_flops"] += row["fp32_flops"]
+        if row["achieved_occupancy_pct"] is not None:
+            g["occupancy_weighted"] += row["achieved_occupancy_pct"] * row["duration_us"]
+            g["occupancy_weight"] += row["duration_us"]
+    out = {}
+    for name, g in groups.items():
+        seconds = g["duration_us"] * 1e-6
+        tflops = g["fp32_flops"] / seconds / 1e12 if seconds else None
+        out[name] = dict(kernels=g["kernels"], duration_us=g["duration_us"], dram_mb=g["dram_bytes"] / 1e6,
+                         l2_mb=g["l2_bytes"] / 1e6, dram_gb_per_s=g["dram_bytes"] / seconds / 1e9 if seconds else None,
+                         fp32_gflop=g["fp32_flops"] / 1e9, achieved_tflops=tflops,
+                         share_of_fp32_peak=tflops / peak_tflops if tflops is not None and peak_tflops else None,
+                         achieved_occupancy_pct=(g["occupancy_weighted"] / g["occupancy_weight"]
+                                                 if g["occupancy_weight"] else None))
+    return out
+
+
+def read_nsys_gpu_trace(path):
+    """Kernels of ``nsys stats --report cuda_gpu_trace --format csv`` as [(name, start µs, end µs)] in time order
+    (memory operations dropped)."""
+    with Path(path).open(newline="") as handle:
+        lines = [line for line in handle if "," in line]
+    reader = csv.DictReader(lines)
+    kernels = []
+    for row in reader:
+        name = row.get("Name", "")
+        start, duration = _number(row.get("Start (ns)", "")), _number(row.get("Duration (ns)", ""))
+        if start is None or duration is None or name.startswith("[CUDA mem"):
+            continue
+        kernels.append((name, start / 1e3, (start + duration) / 1e3))
+    kernels.sort(key=lambda k: k[1])
+    return kernels
+
+
+def summarize_profiles(args):
+    """--summarize-ncu / --summarize-nsys: tables from the external profilers' exports into --output."""
+    summary = json.loads((args.output / "summary.json").read_text())
+    peak = summary.get("fp32_peak_tflops")
+    if args.summarize_ncu:
+        with (args.output / "kernel_sequence.csv").open(newline="") as handle:
+            sequence = list(csv.DictReader(handle))
+        rows, matched = join_ncu(read_ncu_csv(args.summarize_ncu), sequence, peak)
+        with (args.output / "ncu_kernels.csv").open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows[0]) if rows else ["index"])
+            writer.writeheader()
+            writer.writerows(rows)
+        for key, file in (("category", "ncu_categories.csv"), ("op", "ncu_ops.csv")):
+            groups = group_ncu(rows, key, peak)
+            with (args.output / file).open("w", newline="") as handle:
+                writer = csv.writer(handle)
+                fields = ["kernels", "duration_us", "dram_mb", "l2_mb", "dram_gb_per_s", "fp32_gflop",
+                          "achieved_tflops", "share_of_fp32_peak", "achieved_occupancy_pct"]
+                writer.writerow([key] + (["input_dims"] if key == "op" else []) + fields)
+                for name, g in sorted(groups.items(), key=lambda item: -item[1]["duration_us"]):
+                    head = list(name) if key == "op" else [name]
+                    writer.writerow(head + [g[f] if not isinstance(g[f], float) else f"{g[f]:.6g}" for f in fields])
+        summary["ncu"] = dict(kernels=len(rows), sequence_kernels=len(sequence), names_matched=matched,
+                              source=str(args.summarize_ncu))
+    if args.summarize_nsys:
+        per_replay = split_replays(read_nsys_gpu_trace(args.summarize_nsys), args.calls)
+        summary["nsys_force_graph_gaps"] = (replay_gaps(per_replay) if per_replay else
+                                            "kernel count not a multiple of the replays")
+    (args.output / "summary.json").write_text(json.dumps(summary, indent=2, default=str) + "\n")
+
+
+def profiler_pass(args, engine, torch):
+    """The ncu or nsys pass: the profiled range only, between cudaProfilerStart and cudaProfilerStop."""
+    field = engine.force_field
+    positions = engine.state.positions.detach().clone()
+    edges = int(field.data["edge_index"].shape[1])
+    for _ in range(3):
+        field(positions)
+    torch.cuda.synchronize()
+    record = dict(pass_=args.pass_, padded_edges=edges, created_utc=datetime.now(timezone.utc).isoformat())
+    if args.pass_ == "ncu":
+        torch.cuda.profiler.start()
+        field(positions)
+        torch.cuda.synchronize()
+        torch.cuda.profiler.stop()
+    else:
+        key = force_graph_key(engine, edges)
+        if key is None:
+            raise SystemExit("no captured force graph to replay")
+        graph = engine._graphs[key]
+        torch.cuda.synchronize()
+        torch.cuda.profiler.start()
+        for _ in range(args.calls):
+            graph.replay()
+        torch.cuda.synchronize()
+        torch.cuda.profiler.stop()
+        record.update(graph=str(key), replays=args.calls)
+    (args.output / f"{args.pass_}_pass.json").write_text(json.dumps(record, indent=2) + "\n")
+    return record
 
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--output", type=Path, required=True, help="Fresh directory")
-    p.add_argument("--checkpoint", type=Path, required=True)
+    p.add_argument("--output", type=Path,
+                   help="Fresh directory (main pass), or the main pass's directory (profiler passes, summaries)")
+    p.add_argument("--pass", dest="pass_", choices=("main", "ncu", "nsys"), default="main",
+                   help="main: the breakdown; ncu: one eager force call between cudaProfilerStart/Stop for "
+                        "`ncu --profile-from-start off`; nsys: --calls force-graph replays in that range for "
+                        "`nsys profile --capture-range=cudaProfilerApi --cuda-graph-trace=node`")
+    p.add_argument("--summarize-ncu", type=Path, help="ncu --csv --page raw --print-units base export to join")
+    p.add_argument("--summarize-nsys", type=Path, help="nsys stats --report cuda_gpu_trace --format csv export")
+    p.add_argument("--ncu-metrics", action="store_true", help="Print the ncu metric list (for --metrics) and exit")
+    p.add_argument("--checkpoint", type=Path, help="The label's checkpoint (passes)")
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--structure", default="NaCl",
                    help="Benchmark name under FASTMACE_STRUCTURES (3x3x3), or a file with PATH@NXxNYxNZ")
@@ -220,6 +565,15 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.ncu_metrics:
+        print(",".join(NCU_METRICS))
+        return None
+    if args.output is None:
+        raise SystemExit("--output is required")
+    if args.summarize_ncu or args.summarize_nsys:
+        return summarize_profiles(args)
+    if args.checkpoint is None:
+        raise SystemExit("--checkpoint is required for a pass")
     args.checkpoint = args.checkpoint.expanduser().resolve(strict=True)
     if args.backend == "hybrid":
         oeq_runtime = ab_step_time.prepare_fastmace_hybrid()  # before anything imports MACE
@@ -232,7 +586,10 @@ def main(argv=None):
 
     if not args.allow_busy_gpu and ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
-    args.output.mkdir(parents=True, exist_ok=False)
+    if args.pass_ == "main":
+        args.output.mkdir(parents=True, exist_ok=False)
+    elif not (args.output / "summary.json").is_file():
+        raise SystemExit(f"--pass {args.pass_} needs the main pass's directory {args.output}")
     structure, atoms = ab_step_time.read_structure(args.structure, None)
     MaxwellBoltzmannDistribution(atoms, temperature_K=args.temperature_K, rng=np.random.default_rng(args.velocity_seed))
     Stationary(atoms)
@@ -260,6 +617,13 @@ def main(argv=None):
     def delta(before):
         now = counters()
         return {key: now[key] - before[key] for key in now}
+
+    if args.pass_ != "main":
+        return profiler_pass(args, engine, torch)
+    properties = torch.cuda.get_device_properties(0)
+    clock_mhz = max_sm_clock_mhz()
+    peak_tflops = (fp32_peak_tflops(properties.major, properties.minor, properties.multi_processor_count, clock_mhz)
+                   if clock_mhz else None)
 
     # 1. Wall time of the uninstrumented loop (twice: the first window may capture new graphs).
     windows = []
@@ -334,27 +698,58 @@ def main(argv=None):
     trace = args.output / "trace.json"
     prof.export_chrome_trace(str(trace))
     table, kernel_count = kernel_table(read_trace(trace))
-    categories = defaultdict(lambda: [0.0, 0.0])
+    categories = defaultdict(lambda: dict(us=0.0, launches=0.0, gemm_flops=0.0, gemm_us=0.0, occupancy_us=0.0,
+                                          occupancy_weight=0.0))
+    rates = op_gemm_rates(table, args.calls, peak_tflops)
     with (args.output / "ops.csv").open("w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["us_per_call", "launches_per_call", "category", "kernel", "op", "input_dims"])
-        for (name, op, dims), (count, dur) in sorted(table.items(), key=lambda item: -item[1][1]):
+        writer.writerow(["us_per_call", "launches_per_call", "category", "kernel", "op", "grid", "block",
+                         "registers", "shared_bytes", "est_achieved_occupancy_pct", "input_dims"])
+        for (name, op, dims), row in sorted(table.items(), key=lambda item: -item[1]["us"]):
             group = category(name, op, dims, edges)
-            categories[group][0] += dur / args.calls
-            categories[group][1] += count / args.calls
-            writer.writerow([f"{dur / args.calls:.1f}", count / args.calls, group, name, op, dims[:300]])
-    kernel_ms = sum(v[0] for v in categories.values()) / 1e3
+            c = categories[group]
+            c["us"] += row["us"] / args.calls
+            c["launches"] += row["launches"] / args.calls
+            c["occupancy_us"] += row["occupancy_us"] / args.calls
+            c["occupancy_weight"] += row["occupancy_weight"] / args.calls
+            occ = occupancy(row)
+            writer.writerow([f"{row['us'] / args.calls:.1f}", row["launches"] / args.calls, group, name, op,
+                             row["grid"], row["block"], row["registers"], row["shared_bytes"],
+                             "" if occ is None else f"{occ:.1f}", dims[:300]])
+    with (args.output / "gemms.csv").open("w", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["category", "op", "gflop_per_call", "us_per_call", "invocations_per_call",
+                         "achieved_tflops", "share_of_fp32_peak", "kernels", "input_dims"])
+        for (op, dims), rate in sorted(rates.items(), key=lambda item: -item[1]["us_per_call"]):
+            group = category(rate["kernels"][0], op, dims, edges)
+            categories[group]["gemm_flops"] += rate["gflop_per_call"] * 1e9
+            categories[group]["gemm_us"] += rate["us_per_call"]
+            writer.writerow([group, op, f"{rate['gflop_per_call']:.4f}", f"{rate['us_per_call']:.1f}",
+                             rate["invocations_per_call"],
+                             "" if rate["achieved_tflops"] is None else f"{rate['achieved_tflops']:.3f}",
+                             "" if rate["share_of_peak"] is None else f"{rate['share_of_peak']:.3f}",
+                             " | ".join(rate["kernels"]), dims[:300]])
+    kernel_ms = sum(c["us"] for c in categories.values()) / 1e3
     with (args.output / "categories.csv").open("w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["category", "ms_per_force_call", "share_of_kernel_time", "kernels_per_call"])
-        for group, (us, count) in sorted(categories.items(), key=lambda item: -item[1][0]):
-            writer.writerow([group, f"{us / 1e3:.4f}", f"{us / 1e3 / kernel_ms:.4f}", f"{count:g}"])
+        writer.writerow(["category", "ms_per_force_call", "share_of_kernel_time", "kernels_per_call",
+                         "gemm_tflops", "gemm_share_of_fp32_peak", "est_achieved_occupancy_pct"])
+        for group, c in sorted(categories.items(), key=lambda item: -item[1]["us"]):
+            tflops = c["gemm_flops"] / (c["gemm_us"] * 1e-6) / 1e12 if c["gemm_us"] else None
+            occ = c["occupancy_us"] / c["occupancy_weight"] if c["occupancy_weight"] else None
+            writer.writerow([group, f"{c['us'] / 1e3:.4f}", f"{c['us'] / 1e3 / kernel_ms:.4f}", f"{c['launches']:g}",
+                             "" if tflops is None else f"{tflops:.3f}",
+                             "" if tflops is None or not peak_tflops else f"{tflops / peak_tflops:.3f}",
+                             "" if occ is None else f"{occ:.1f}"])
+    # One more call alone: its kernels in launch order, which the ncu pass joins by position.
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True) as prof:
+        field(positions)
+        torch.cuda.synchronize()
+    prof.export_chrome_trace(str(trace))
+    write_sequence(read_trace(trace), edges, args.output / "kernel_sequence.csv")
 
-    # 4. Replays of the force graph under the profiler: kernel time against the replay span.
-    graph_key = ("B", int(engine._pipe_edges)) if ("B", int(engine._pipe_edges)) in engine._graphs else None
-    if graph_key is None:
-        graph_key = next((key for key in engine._graphs if isinstance(key, tuple) and key[0] == "B"
-                          and key[1] == edges), None)
+    # 4. Replays of the force graph under the profiler: kernel time against the replay span, gaps inside.
+    graph_key = force_graph_key(engine, edges)
     replay_stats = None
     if graph_key is not None:
         graph = engine._graphs[graph_key]
@@ -368,19 +763,21 @@ def main(argv=None):
         if replay_kernels:
             busy = sum(e.time_range.elapsed_us() for e in replay_kernels)
             span = replay_kernels[-1].time_range.end - replay_kernels[0].time_range.start
-            gaps = sorted((b.time_range.start - a.time_range.end
-                           for a, b in zip(replay_kernels, replay_kernels[1:])), reverse=True)
+            listed = [(e.name, float(e.time_range.start), float(e.time_range.end)) for e in replay_kernels]
+            per_replay = split_replays(listed, args.calls)
             replay_stats = dict(graph=str(graph_key), kernels_per_replay=len(replay_kernels) / args.calls,
                                 kernel_ms_per_replay=busy / 1e3 / args.calls,
                                 span_ms_per_replay=span / 1e3 / args.calls,
-                                largest_gaps_us=[round(g, 1) for g in gaps[:10]],
-                                gaps_over_5us_ms_per_replay=sum(g for g in gaps if g > 5) / 1e3 / args.calls)
+                                gaps_inside_replays=(replay_gaps(per_replay) if per_replay else
+                                                     "kernel count not a multiple of the replays"))
 
     summary = dict(
         tool="step_breakdown", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
         python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), packages=package_versions(),
         gpu=torch.cuda.get_device_name(), cuda=torch.version.cuda, oeq_runtime=oeq_runtime,
         other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()],
+        compute_capability=f"{properties.major}.{properties.minor}", sms=properties.multi_processor_count,
+        max_sm_clock_mhz=clock_mhz, fp32_peak_tflops=peak_tflops,
         model=args.model, checkpoint=str(args.checkpoint), checkpoint_sha256=plan["sha256"], backend=args.backend,
         dtype="float32" if args.backend == "hybrid" else "float64", structure=structure, natoms=len(atoms),
         temperature_K=args.temperature_K, steps=args.steps, equilibrate_steps=args.equilibrate_steps,
