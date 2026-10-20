@@ -52,6 +52,9 @@ Open owner decisions that phases wait on (SPEC §18): none open. Decided on
 19 October 2026: minimum MACE version (2), gate default (3), CI GPU runners
 (5), and 22–30.
 
+The hosted CPU CI (`cpu.yml`) is off for now (owner, 20 October 2026, to
+save Actions minutes): it runs by hand only. Trial merges run ruff
+(`ruff==0.17.1`, in the NAS `mace_cueq_latest`) and the CPU suite on murphy.
 GPU CI is deferred (owner, 20 October 2026; SPEC draft 0.12, eleventh
 amendment). It is not part of phase 2's acceptance. `gpu.yml` runs by hand
 only until the runners are registered (`docs/development.md`, "Registering
