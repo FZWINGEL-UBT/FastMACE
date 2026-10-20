@@ -67,6 +67,23 @@ accuracy.
    says cuBLAS BF16×9 is limited to compute capabilities 10.0 and 10.3, so
    unavailable on both our GPUs. Verify it against the cuBLAS documentation.
    If it holds, 3×TF32 (Triton `tf32x3`, CUTLASS) is the candidate.
+   **Survey result (20 October 2026, `opt-T01-survey.md`):**
+   - BF16×9 is confirmed absent on both cards (cuBLAS table: 10.0 and 10.3
+     only).
+   - torch 2.14 has no FP32-accurate mode (`fp32_precision` accepts only
+     ieee, tf32 or none), and Inductor emits only tf32 or ieee.
+   - Triton's `tf32x3` is the only usable mode. `bf16x6` has a bug for K < 16
+     (triton#12252).
+   - On GeForce and workstation Ada/Blackwell, dense TF32 runs at the FP32
+     SIMT rate (third-party figures; to be checked with a peak test on the
+     card). 3×TF32 therefore tops out near a third of SIMT.
+   - The atom GEMMs already reach 11–13 TFLOPS against a practical ceiling of
+     about 14–16.
+
+   So step 2 runs narrowly: real shapes, forward and input gradient, against
+   cuBLAS SIMT and a Triton ieee control. If tf32x3 is slower everywhere,
+   OPT-T01 closes there: the rejection goes in `docs/rewrites.md`, CUTLASS is
+   skipped, and OPT-T02 and OPT-T03 move up.
 2. **Micro-benchmark (local, then murphy).**
    - Shapes: export the production GEMM shapes and strides from the compiled
      force call. Irrep layouts can fold components into rows, so M is not
