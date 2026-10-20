@@ -1,0 +1,13 @@
+category,kernels,duration_us,dram_mb,l2_mb,dram_gb_per_s,fp32_gflop,achieved_tflops,share_of_fp32_peak,achieved_occupancy_pct
+Atom-level linear layers (GEMM),95,1793.31,150.182,1061.29,83.7455,14.7618,8.23161,0.289057,20.3575
+"Atom-level elementwise (gates, products, residuals, readouts)",107,1159.58,203.753,374.433,175.712,0.260806,0.224914,0.00789796,60.0096
+Interaction 2: convolution backward (streaming),3,489.632,95.2637,172.535,194.562,0.842035,1.71973,0.0603892,64.7947
+Atom-level cuEq tensor products (symmetric contraction),7,280.576,45.8957,77.7674,163.577,0.751251,2.67753,0.0940229,27.3698
+Radial networks: other GEMMs,16,263.008,30.345,77.7084,115.377,1.0903,4.1455,0.145571,24.327
+"Radial networks: folded last layer, input gradient",1,230.144,40.0604,88.437,174.067,1.28532,5.58487,0.196116,23.96
+"Radial networks: elementwise (norms, activations)",14,227.04,37.9794,83.1323,167.281,0.235914,1.03909,0.0364881,74.572
+Interaction 2: convolution forward (streaming),1,215.68,44.4447,69.0985,206.068,0.254235,1.17876,0.0413928,46.22
+"Radial networks: folded last layer, forward GEMM",1,181.632,24.044,234.423,132.378,1.59252,8.76786,0.307888,47.86
+"Edge elementwise (geometry, radial basis, gathers, scatters)",13,97.568,10.5746,53.5414,108.382,0.0702093,0.719594,0.0252689,57.5173
+Interaction 1: reassociated edge sums,3,94.048,6.5641,24.0338,69.7952,0.112432,1.19548,0.0419798,25.538
+Copies and fills,12,31.36,1.45126,7.31462,46.2776,0,0,0,42.8661

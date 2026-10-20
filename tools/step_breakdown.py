@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import csv
+import difflib
 import hashlib
 import json
 import os
@@ -64,6 +65,46 @@ NOISE = "Noise upload (every step a slice; a new batch every noise_batch)"
 B_STAGE = STAGE_NAMES["B"]
 PACKAGES = ("torch", "triton", "mace-torch", "cuequivariance", "cuequivariance-torch", "cuequivariance-ops-torch-cu12",
             "cuequivariance-ops-torch-cu13", "openequivariance", "e3nn", "ase", "numpy")
+
+
+class _Labelled:
+    """A Triton launcher run under a profiler label: FastMACE's Triton kernels are all named ``kernel``, and
+    those launched from compiled backward code have no custom-op frame of their own in the profile. The
+    label (the custom op's name) attributes them. Set on the module for this process only (the research
+    probe's ``label_triton_kernels``)."""
+
+    def __init__(self, label, kernel):
+        self.label, self.kernel = label, kernel
+
+    def __getitem__(self, grid):
+        launch = self.kernel[grid]
+
+        def run(*args, **kwargs):
+            import torch
+            with torch.profiler.record_function(self.label):
+                return launch(*args, **kwargs)
+        return run
+
+
+def label_triton_kernels():
+    """Wrap the launchers of fastmace.kernels.triton (skinny_linear, edge_outer_sum, fused_radial)."""
+    from fastmace.kernels.triton import edge_outer_sum, fused_radial, skinny_linear
+
+    for module, attribute, label in ((skinny_linear, "_triton_kernel", "fastmace::folded_linear_input_grad"),
+                                     (edge_outer_sum, "_triton_forward", "fastmace::edge_outer_sum_forward"),
+                                     (edge_outer_sum, "_triton_backward", "fastmace::edge_outer_sum_backward")):
+        original = getattr(module, attribute)
+        setattr(module, attribute, lambda original=original, label=label: _Labelled(f"{label} (triton)",
+                                                                                    original()))
+    original_kernels = fused_radial._kernels
+
+    def labelled_kernels():
+        kernels = dict(original_kernels())
+        for key in ("forward", "backward"):
+            kernels[key] = _Labelled(f"fastmace::fused_radial_hidden_{key} (triton)", kernels[key])
+        return kernels
+
+    fused_radial._kernels = labelled_kernels
 
 
 def first_rows(dims):
@@ -364,7 +405,10 @@ def force_graph_key(engine, edges):
 
 
 NCU_METRICS = (
-    "gpu__time_duration.sum", "dram__bytes_read.sum", "dram__bytes_write.sum", "lts__t_bytes.sum",
+    # DRAM bytes: dram__bytes_read/write on most chips, dram__bytes_op_read/op_write on GB20x (ncu drops
+    # the names a chip does not have, so both families are requested).
+    "gpu__time_duration.sum", "dram__bytes_read.sum", "dram__bytes_write.sum", "dram__bytes_op_read.sum",
+    "dram__bytes_op_write.sum", "lts__t_bytes.sum",
     "sm__warps_active.avg.pct_of_peak_sustained_active", "sm__maximum_warps_per_active_cycle_pct",
     "launch__grid_size", "launch__block_size", "launch__registers_per_thread", "launch__waves_per_multiprocessor",
     "smsp__sass_thread_inst_executed_op_ffma_pred_on.sum", "smsp__sass_thread_inst_executed_op_fadd_pred_on.sum",
@@ -401,22 +445,45 @@ def read_ncu_csv(path):
     return out
 
 
+def _first(record, *keys):
+    """The first of ``keys`` that ``record`` has (a chip's metric name family), else None."""
+    return next((record[key] for key in keys if record.get(key) is not None), None)
+
+
 def _base_name(name):
-    """A kernel name without template arguments and parameters, for matching ncu against the profiler."""
+    """A kernel name without return type, template arguments and parameters, lower case and cut to 80
+    characters (the profiler keeps 120 of a name), for matching ncu against the profiler."""
     name = str(name).strip()
     for stop in ("(", "<"):
         name = name.split(stop)[0]
-    return name.split("::")[-1].strip()
+    name = name.split("::")[-1].strip()
+    if name.startswith("void "):
+        name = name[5:]
+    return name.lower()[:80]
 
 
 def join_ncu(ncu_rows, sequence, peak_tflops):
     """ncu's kernels joined in launch order with the profiler's kernel sequence of one force call (same compiled
     code, so the same order); each row gets the sequence's operator and category. Returns (rows, matched)."""
     kernels = [s for s in sequence if not str(s["kernel"]).startswith(("Memcpy", "Memset"))]
+    # Align by base name: ncu and the profiler see the same launches, but either may miss a few (ncu does
+    # not profile memory operations; the profiler may drop a kernel), so plain positions can drift.
+    matcher = difflib.SequenceMatcher(a=[_base_name(r.get("Kernel Name", "")) for r in ncu_rows],
+                                      b=[_base_name(k["kernel"]) for k in kernels], autojunk=False)
+    unknown = dict(index="", kernel="", op="?", category="Unattributed (not aligned with the profiler)",
+                   input_dims="")
+    partner = {}
+    for block in matcher.get_matching_blocks():
+        for offset in range(block.size):
+            partner[block.a + offset] = kernels[block.b + offset]
     rows, matched = [], 0
-    for record, entry in zip(ncu_rows, kernels):
+    for position, record in enumerate(ncu_rows):
         name = record.get("Kernel Name", "")
-        same = _base_name(name) == _base_name(entry["kernel"])
+        # Unaligned (cuEq picks its kernel variant at run time, so names can differ between processes):
+        # categorise by the kernel's own name.
+        entry = partner.get(position) or dict(unknown, category=category(name, "?", "", -1)
+                                              if category(name, "?", "", -1) != "Other" else unknown["category"])
+        same = position in partner
         matched += same
         ns = record.get("gpu__time_duration.sum") or 0.0
         flops = sum(2 * (record.get(k) or 0.0) if "ffma" in k else (record.get(k) or 0.0)
@@ -424,8 +491,10 @@ def join_ncu(ncu_rows, sequence, peak_tflops):
         tflops = flops / (ns * 1e-9) / 1e12 if ns else None
         rows.append(dict(index=entry["index"], kernel=entry["kernel"], ncu_kernel=name, name_matches=same,
                          op=entry["op"], category=entry["category"], input_dims=entry.get("input_dims", ""),
-                         duration_us=ns / 1e3, dram_read_bytes=record.get("dram__bytes_read.sum"),
-                         dram_write_bytes=record.get("dram__bytes_write.sum"), l2_bytes=record.get("lts__t_bytes.sum"),
+                         duration_us=ns / 1e3, dram_read_bytes=_first(record, "dram__bytes_read.sum",
+                                                                      "dram__bytes_op_read.sum"),
+                         dram_write_bytes=_first(record, "dram__bytes_write.sum", "dram__bytes_op_write.sum"),
+                         l2_bytes=record.get("lts__t_bytes.sum"),
                          fp32_flops=flops, achieved_tflops=tflops,
                          share_of_fp32_peak=tflops / peak_tflops if tflops is not None and peak_tflops else None,
                          grid_size=record.get("launch__grid_size"), block_size=record.get("launch__block_size"),
@@ -591,6 +660,7 @@ def main(argv=None):
     from ase.md.velocitydistribution import MaxwellBoltzmannDistribution, Stationary
     from torch.profiler import ProfilerActivity, profile
 
+    label_triton_kernels()
     if not args.allow_busy_gpu and ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     if args.pass_ == "main":
