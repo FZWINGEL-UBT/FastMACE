@@ -51,8 +51,9 @@ job() {  # name env_dir command...
   return $rc
 }
 note "source commit $(cat "$src/.source_commit") host $(hostname)"
-job gpu-test "$oeq" "${launcher[@]}" -m pytest -p no:cacheprovider -q -rf "$src/tests/gpu/test_segment_gemm_cuda.py" \
-  --basetemp="$run/pytest"
+# The NAS mace_cueq_oeq has no pytest; the kernel test needs no OEq, so it runs in mace_cueq_latest.
+job gpu-test "$latest" "$latest/bin/python" -m pytest -p no:cacheprovider -q -rf \
+  "$src/tests/gpu/test_segment_gemm_cuda.py" --basetemp="$run/pytest"
 job bench-rule "$oeq" "${launcher[@]}" "$src/tools/segment_gemm_bench.py" --output "$run/bench-rule" --rule
 job gate "$oeq" "$oeq/bin/python" "$src/tools/force_stress_gate.py" --output "$run/gate" --engine fastmace \
   --checkpoint "$checkpoint" --model mh1-r2scan --structures NaCl NbCl5 --structures-root "$baseline" \
