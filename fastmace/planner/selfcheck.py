@@ -98,6 +98,11 @@ REPEAT_TOLERANCE_A = 0.5
 REDUCED_SHRINK = 0.75
 # The CPU step runs only if its estimated memory times this margin is within MemAvailable.
 MEMORY_MARGIN = 1.25
+# A CPU reference child caps its own data segment (RLIMIT_DATA) at the smaller of MemAvailable less
+# this reserve and its estimate times MEMORY_CAP_FACTOR: on WSL2 a host out-of-memory takes down
+# the whole VM, not just the child (2-T05, 20 October 2026).
+MEMORY_RESERVE_BYTES = 2 * 2**30
+MEMORY_CAP_FACTOR = 3.0
 # The calibration boxes: cubes of this many cutoffs on a side, and one of twice the volume.
 CALIBRATION_SIDE_CUTOFFS = 2.0
 OUTCOMES = ("ran", "out of memory", "device failure", "failed", "declined", "skipped")
@@ -509,26 +514,31 @@ def _features(atoms, cutoff):
 def estimate_cost(points, target, *, polar: bool) -> dict[str, float | None]:
     """Seconds and bytes of one evaluation of ``target`` from the calibration ``points``.
 
-    Without PolarMACE: the larger of the points' costs per edge, times the target's edges. With it,
-    the k-space adds a term in atoms x volume: the two points fix a + b of cost = a edges + b atoms
-    volume, and the estimate is the larger of that and the per-edge one. Bytes likewise; ``None``
-    where a point has none.
+    Each term is extrapolated on its own and the largest counts: the points' largest cost per edge
+    times the target's edges, per atom times its atoms, and with PolarMACE (whose k-space grows with
+    atoms x volume) per atom x volume times its atoms x volume; plus the two-point fit of
+    cost = a edges + b atoms (x volume for PolarMACE) where it has no negative term. Conservative by
+    design: a wrong low estimate of memory can take down a WSL2 VM. ``None`` where a point has none.
     """
     result = {}
     for key in ("seconds", "bytes"):
         if any(point.get(key) is None for point in points):
             result[key] = None
             continue
-        linear = max(point[key] / point["edges"] for point in points) * target["edges"]
-        if polar and len(points) >= 2:
-            matrix = np.array([[point["edges"], point["atoms_volume"]] for point in points[:2]], float)
+        second = "atoms_volume" if polar else "atoms"
+        terms = [max(point[key] / point["edges"] for point in points) * target["edges"],
+                 max(point[key] / point["atoms"] for point in points) * target["atoms"]]
+        if polar:
+            terms.append(max(point[key] / point["atoms_volume"] for point in points) * target["atoms_volume"])
+        if len(points) >= 2:
+            matrix = np.array([[point["edges"], point[second]] for point in points[:2]], float)
             try:
                 a, b = np.linalg.solve(matrix, np.array([point[key] for point in points[:2]], float))
             except np.linalg.LinAlgError:
                 a = b = math.nan
             if math.isfinite(a) and math.isfinite(b) and a >= 0 and b >= 0:
-                linear = max(linear, a * target["edges"] + b * target["atoms_volume"])
-        result[key] = float(linear)
+                terms.append(a * target["edges"] + b * target[second])
+        result[key] = float(max(terms))
     return result
 
 
@@ -733,25 +743,75 @@ def _choose(job, points):
     return None, estimates, "; ".join(parts)
 
 
+def cap_memory(growth_bytes) -> int | None:
+    """Cap this process's data segment (``RLIMIT_DATA``) at its current size plus ``growth_bytes``.
+
+    An allocation beyond it fails (``MemoryError``, or torch's "can't allocate memory") instead of
+    exhausting the host. Returns the limit in bytes, or None where there is no such limit.
+    """
+    try:
+        import resource
+    except ImportError:  # pragma: no cover - not POSIX
+        return None
+    data = _status_kib("VmData")
+    if data is None:
+        return None
+    limit = int(data + max(growth_bytes, 0))
+    hard = resource.getrlimit(resource.RLIMIT_DATA)[1]
+    if hard != resource.RLIM_INFINITY:
+        limit = min(limit, hard)
+    resource.setrlimit(resource.RLIMIT_DATA, (limit, hard))
+    return limit
+
+
+def _cap_cpu_child(estimate_bytes=None):
+    """The CPU reference child's cap: MemAvailable less the reserve, and at most the estimate x the factor."""
+    available = _memory_available()
+    growth = None if available is None else available - MEMORY_RESERVE_BYTES
+    if estimate_bytes is not None:
+        estimated = MEMORY_CAP_FACTOR * estimate_bytes
+        growth = estimated if growth is None else min(growth, estimated)
+    if growth is None:
+        return None
+    limit = cap_memory(growth)
+    if limit is not None:
+        sys.stderr.write(f"gate-child: memory capped at {limit / 2**30:.3g} GiB (data segment)\n")
+    return limit
+
+
 def _evaluate_cpu(job):
-    """The CPU step: calibrate the float64 reference, choose a candidate within the limits, evaluate it."""
+    """The CPU step: calibrate the float64 reference, choose a candidate within the limits, evaluate it.
+
+    In a child (``job["cap"]``) the data segment is capped first at MemAvailable less the reserve,
+    then, once a candidate is chosen, at most at its estimate x ``MEMORY_CAP_FACTOR``; the measured
+    peak resident size of the evaluations is recorded next to the estimate.
+    """
     boxes = [_atoms(entry) for entry in job["calibration"]]
     info = {}
+    capped = job.get("cap", False)
+    info["cpu"] = {"memory_cap_bytes": _cap_cpu_child() if capped else None}
     reference = _load_reference(job, "float64", boxes[0])
     try:
         points = _calibrate(reference, boxes, job["cutoff"])
         chosen, estimates, why = _choose(job, points)
-        info["cpu"] = {"calibration": points, "estimates": estimates, "chosen": chosen}
+        info["cpu"].update({"calibration": points, "estimates": estimates, "chosen": chosen})
+        sys.stderr.write("gate-child: cpu estimates " + json.dumps(
+            [{key: e[key] for key in ("atoms", "seconds", "bytes", "memory_available")} for e in estimates]) + "\n")
         if chosen is None:
             info["declined"] = why
             return [], info
+        if capped:
+            info["cpu"]["memory_cap_bytes"] = _cap_cpu_child(estimates[chosen]["bytes"])
         entries = [_atoms(entry) for entry in job["candidates"][chosen]["copies"]]
         if reference.is_polar:
             reference.rebase(entries[0])
+        resident = _status_kib("VmRSS") if _reset_peak() else None
         values = [{} for _ in entries]
         for index, atoms in enumerate(entries):
             energy, forces, stress = _evaluate_one(reference, atoms)
             values[index]["reference"] = (float(energy), np.asarray(forces, float), np.asarray(stress, float))
+        peak = _status_kib("VmHWM") if resident is not None else None
+        info["cpu"]["measured_peak_bytes"] = None if peak is None else max(peak - resident, 0)
         info["reference"] = json.loads(json.dumps(reference.info(), default=str))
     finally:
         del reference
@@ -901,6 +961,9 @@ class _Ladder:
             cell, repeat, natoms = chosen["cell"], chosen["repeat"], chosen["atoms"]
         estimates = (info.get("cpu") or {}).get("estimates")
         extra = {"estimate": estimates[info["cpu"]["chosen"]]} if estimates else {}
+        if estimates:
+            extra["measured_peak_bytes"] = info["cpu"].get("measured_peak_bytes")
+            extra["memory_cap_bytes"] = info["cpu"].get("memory_cap_bytes")
         self._record(device, cell, repeat, natoms, seconds, "ran", **extra, **process)
         return values, info
 
@@ -1080,12 +1143,23 @@ def run_child(job, *, timeout_s: float | None = None) -> tuple[list[dict], dict]
         done = subprocess.run(argv, env=_child_environment(), capture_output=True, text=True, timeout=timeout_s,
                               check=False)
         if done.returncode != 0 or not result_path.is_file():
-            tail = "\n".join((done.stderr or done.stdout or "").strip().splitlines()[-5:])
+            tail = "\n".join((done.stderr or done.stdout or "").strip().splitlines()[-8:])
             raise GateJobError(f"the reference child process failed (exit code {done.returncode})", why=tail or None,
                                returncode=done.returncode)
         return _read_result(result_path)
     finally:
         shutil.rmtree(directory, ignore_errors=True)
+
+
+def resource_limit_text() -> str:
+    """" (capped at X GiB)" when this process's data segment is capped, else ""."""
+    try:
+        import resource
+
+        soft = resource.getrlimit(resource.RLIMIT_DATA)[0]
+    except (ImportError, ValueError):  # pragma: no cover - not POSIX
+        return ""
+    return "" if soft == resource.RLIM_INFINITY else f" (capped at {soft / 2**30:.3g} GiB)"
 
 
 def _write_result(path, values, info):
@@ -1110,7 +1184,16 @@ def _read_result(path):
 def _child_main(argv) -> int:
     job_path, result_path = argv
     job = json.loads(Path(job_path).read_text(encoding="utf-8"))
-    values, info = evaluate_references(job)
+    job["cap"] = True  # a CPU reference child caps its own memory (_evaluate_cpu)
+    try:
+        values, info = evaluate_references(job)
+    except (MemoryError, RuntimeError) as error:
+        if not (isinstance(error, MemoryError) or "can't allocate memory" in str(error)):
+            raise
+        limit = resource_limit_text()
+        sys.stderr.write(f"gate-child: {job['device']}: out of memory{limit}: {type(error).__name__}: "
+                         f"{str(error).splitlines()[0][:200] if str(error) else ''}\n")
+        return 3
     info["process"] = "child"
     _write_result(result_path, values, info)
     return 0

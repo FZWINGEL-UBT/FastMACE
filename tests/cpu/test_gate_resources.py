@@ -134,24 +134,40 @@ def test_calibration_boxes_are_periodic_cubes_cut_from_the_structure():
     assert 1.5 < len(large) / len(small) < 3.0  # twice the volume; few atoms, so not exactly twice
 
 
-def test_estimate_is_linear_in_edges_and_conservative():
-    points = [{"edges": 1000, "atoms_volume": 1e5, "seconds": 0.002, "bytes": 1e6},
-              {"edges": 2000, "atoms_volume": 4e5, "seconds": 0.005, "bytes": 2e6}]
-    target = {"edges": 100_000, "atoms_volume": 1e9}
+def test_estimate_takes_the_largest_term_and_is_conservative():
+    points = [{"edges": 1000, "atoms": 50, "atoms_volume": 1e5, "seconds": 0.002, "bytes": 1e6},
+              {"edges": 2000, "atoms": 100, "atoms_volume": 4e5, "seconds": 0.005, "bytes": 2e6}]
+    target = {"edges": 100_000, "atoms": 5000, "atoms_volume": 1e9}
     estimate = selfcheck.estimate_cost(points, target, polar=False)
-    assert estimate["seconds"] == pytest.approx(0.25)  # the larger rate, 2.5e-6 s per edge
+    assert estimate["seconds"] == pytest.approx(0.25)  # the larger rate, 2.5e-6 s per edge (5e-5 per atom)
     assert estimate["bytes"] == pytest.approx(1e8)
     assert selfcheck.estimate_cost([{**p, "bytes": None} for p in points], target, polar=False)["bytes"] is None
+    # A cost that grows per atom faster than per edge is not hidden by the per-edge term.
+    heavy = {**target, "atoms": 20_000}
+    assert selfcheck.estimate_cost(points, heavy, polar=False)["bytes"] == pytest.approx(4e8)
 
 
 def test_estimate_has_an_atoms_volume_term_for_polar_models():
     a, b = 1e-6, 1e-8  # s per edge, s per atom x Å^3
-    points = [{"edges": e, "atoms_volume": nv, "seconds": a * e + b * nv, "bytes": None}
-              for e, nv in ((1000, 1e5), (2000, 4e5))]
-    target = {"edges": 50_000, "atoms_volume": 2.5e8}
+    points = [{"edges": e, "atoms": n, "atoms_volume": nv, "seconds": a * e + b * nv, "bytes": None}
+              for e, n, nv in ((1000, 50, 1e5), (2000, 100, 4e5))]
+    target = {"edges": 50_000, "atoms": 2500, "atoms_volume": 2.5e8}
     polar = selfcheck.estimate_cost(points, target, polar=True)
-    assert polar["seconds"] == pytest.approx(a * 50_000 + b * 2.5e8)
+    exact = a * 50_000 + b * 2.5e8
+    assert polar["seconds"] >= exact  # the fit gives it exactly; the per atom x volume rate more
     assert polar["seconds"] > selfcheck.estimate_cost(points, target, polar=False)["seconds"]
+
+
+@pytest.mark.skipif(__import__("os").name != "posix", reason="RLIMIT_DATA is POSIX")
+def test_a_capped_process_cannot_exhaust_the_host():
+    import subprocess
+    import sys
+
+    script = ("from fastmace.planner import selfcheck; import numpy; "
+              "limit = selfcheck.cap_memory(256 * 2**20); assert limit is not None; "
+              "numpy.ones(2**28)")  # 2 GiB past a 256 MiB cap
+    done = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=120, check=False)
+    assert done.returncode != 0 and "MemoryError" in done.stderr, done.stderr[-2000:]
 
 
 # --------------------------------------------------------------------------- the ladder (simulated)
@@ -429,6 +445,35 @@ def test_real_child_processes_that_fail(pristine, no_engines_yet, monkeypatch, s
     assert steps[0]["device"] == "cuda:0" and steps[0]["outcome"] == outcome and steps[0]["process"] == "child"
     assert steps[1]["device"] == "cpu" and len(calls) == 2  # the CPU step ran a child too
     assert refs.unavailable.seconds["step_1_s"] > 0
+
+
+CAPPED_CHILD = """
+import sys
+from fastmace.planner import selfcheck
+
+def allocate_past_the_cap(job):
+    selfcheck.cap_memory(256 * 2**20)
+    import numpy
+    return numpy.ones(2**28)  # 2 GiB
+
+selfcheck.evaluate_references = allocate_past_the_cap
+sys.exit(selfcheck._child_main(sys.argv[1:]))
+"""
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+@pytest.mark.skipif(__import__("os").name != "posix", reason="RLIMIT_DATA is POSIX")
+def test_a_reference_child_past_its_cap_is_out_of_memory_and_the_ladder_goes_on(pristine, no_engines_yet,
+                                                                                  monkeypatch):
+    import sys
+
+    monkeypatch.setattr(selfcheck, "_child_command", lambda job, result: [sys.executable, "-c", CAPPED_CHILD,
+                                                                          str(job), str(result)])
+    refs = ladder(pristine, monkeypatch, selfcheck._run_step, gate=GateConfig(reduced_cell="off"),
+                  check="allow_unavailable")
+    steps = refs.unavailable.steps
+    assert [(s["device"], s["outcome"]) for s in steps[:2]] == [("cuda:0", "out of memory"), ("cpu", "out of memory")]
+    assert "out of memory (capped at" in steps[1]["reason"] and steps[1]["exit_code"] == 3
 
 
 @pytest.mark.filterwarnings("ignore::UserWarning")
