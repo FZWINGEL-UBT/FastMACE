@@ -10,6 +10,12 @@ MD steps" (20 October 2026), built from the research engine's step breakdown
 of 14–15 October (ResearchModule
 `Experiments/Langevin_Thermostat/studies/further_optimizations/2026-10-15-step-breakdown.md`).
 
+**Owner decision, 20 October 2026, evening:** no big accuracy runs on murphy
+until this round's optimisations are in. Phase 2's acceptance was stopped
+partway (2-T23). It runs once, as a combined acceptance of phase 2 and this
+round, on the optimised main. Short non-accuracy jobs (CPU trials, short
+speed runs) may still use murphy.
+
 ## Starting point
 
 - **NaCl 3×3×3 (216 atoms):** 3.81 ms per step on the RTX 5060 Ti. The force
