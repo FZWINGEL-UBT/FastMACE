@@ -28,8 +28,12 @@ References and process state. Production engines patch process-wide state that m
 reference by up to 7.8e-7 eV/Å (1a "after T10"). So the references run in this process only while
 no production engine has been built in it (``engine.base.production_engine_built``); afterwards
 they run in a child process in the same environment (``python -m fastmace.planner.selfcheck``),
-which builds no production engine. The record says which way they ran. For a hybrid plan the OEq
-runtime is prepared before a reference imports MACE.
+which builds no production engine. On a CUDA plan every GPU reference step runs in a child (2-T05):
+a GPU out-of-memory can leave the CUDA context unusable (on the RTX 5060 Ti it surfaced as "CUDA
+driver error: device not ready", and later CUDA calls in the process failed), and the child's exit
+frees its memory before the engine is built. A GPU reference child that fails with a CUDA error, a
+non-zero exit or a kill is a "device failure", and the ladder goes on. The record says which way
+they ran. For a hybrid plan the OEq runtime is prepared before a reference imports MACE.
 
 Resources (SPEC §12.3 "Resources"; plan task 2-T05). The references try, in order, until one runs:
 
@@ -96,11 +100,15 @@ REDUCED_SHRINK = 0.75
 MEMORY_MARGIN = 1.25
 # The calibration boxes: cubes of this many cutoffs on a side, and one of twice the volume.
 CALIBRATION_SIDE_CUTOFFS = 2.0
-OUTCOMES = ("ran", "out of memory", "failed", "declined", "skipped")
+OUTCOMES = ("ran", "out of memory", "device failure", "failed", "declined", "skipped")
 
 
 class GateJobError(FastMACEError, RuntimeError):
-    """The gate's reference child process failed or left no result."""
+    """The gate's reference child process failed or left no result; ``returncode`` is its exit code."""
+
+    def __init__(self, what, why=None, next_step=None, *, returncode=None, **kwargs):
+        super().__init__(what, why, next_step, **kwargs)
+        self.returncode = returncode
 
 
 def check_mode(check: Any) -> str:
@@ -806,10 +814,22 @@ def is_out_of_memory(error) -> bool:
     return isinstance(error, GateJobError) and "exit code -9" in text
 
 
-def _reason(error) -> str:
+def _is_cuda_error(error) -> bool:
+    """A CUDA runtime or driver error (an ``AcceleratorError``, or its text), also from a child's stderr."""
+    text = " ".join(str(part) for part in (getattr(error, "what", None) or str(error), getattr(error, "why", None))
+                    if part)
+    return (type(error).__name__ == "AcceleratorError" or "AcceleratorError" in text or "CUDA error" in text
+            or "CUDA driver error" in text)
+
+
+def _reason(error, kind=None) -> str:
     text = getattr(error, "what", None) or (str(error).splitlines() or [""])[0]
-    kind = "out of memory" if is_out_of_memory(error) else "failed"
-    return f"reference {kind}: {type(error).__name__}: {text}" if text else f"reference {kind}: {type(error).__name__}"
+    kind = kind or ("out of memory" if is_out_of_memory(error) else "failed")
+    reason = f"reference {kind}: {type(error).__name__}" + (f": {text}" if text else "")
+    why = getattr(error, "why", None)
+    if isinstance(error, GateJobError) and why:  # the child's last lines: the real error text
+        reason += " (" + " | ".join(line.strip() for line in str(why).splitlines() if line.strip()) + ")"
+    return reason
 
 
 def _run_step(job, *, child: bool):
@@ -828,6 +848,9 @@ class _Ladder:
         self.device = str(plan.engine.device)
         self.gpu = self.device.startswith("cuda")
         self.child = base.production_engine_built()
+        # On a CUDA plan every GPU reference step runs in a child: a GPU out-of-memory can leave the CUDA
+        # context unusable (2-T05), and the child's exit frees its memory before the engine is built.
+        self.plan_child = self.child or self.gpu
         self.cutoff = float(force_field.traits.r_max)
         self.steps = []
         self.smallest_out_of_memory = None  # atoms of the smallest cell that ran out of memory
@@ -841,29 +864,44 @@ class _Ladder:
         from fastmace.reference.calculators import ReferenceOrderError
 
         started = time.perf_counter()
+        process = {"process": "child" if child else "in-process"}
+        if child and self.child and device.startswith("cuda"):
+            process["gpu_free_bytes"] = _gpu_free_bytes(device)  # a production engine holds the rest
         try:
             values, info = _run_step(job, child=child)
         except ReferenceOrderError:
             raise  # a correction is not the active code path: a defect, not an unavailable reference
         except Exception as error:  # noqa: BLE001 - out of memory, or a reference failing (§12.3)
             seconds = time.perf_counter() - started
-            if not is_out_of_memory(error):
-                self._record(device, cell, repeat, natoms, seconds, "failed", _reason(error))
-                raise _Unavailable(_reason(error)) from error
-            self._record(device, cell, repeat, natoms, seconds, "out of memory", _reason(error))
+            if isinstance(error, GateJobError) and "ReferenceOrderError" in str(error.why or ""):
+                raise ReferenceOrderError("a correction of the reference record is not the active code path in the "
+                                          "reference child", why=str(error.why)) from error
+            if is_out_of_memory(error):
+                outcome = "out of memory"
+            elif device.startswith("cuda") and (isinstance(error, GateJobError) or _is_cuda_error(error)):
+                # A GPU reference child that failed: an out-of-memory can leave the CUDA context unusable
+                # and surface as another error (2-T05 on the RTX 5060 Ti), so the ladder goes on.
+                outcome = "device failure"
+            else:
+                outcome = "failed"
+            reason = _reason(error, outcome)
+            self._record(device, cell, repeat, natoms, seconds, outcome, reason,
+                         exit_code=getattr(error, "returncode", None), **process)
+            if outcome == "failed":
+                raise _Unavailable(reason) from error
             self.smallest_out_of_memory = min(natoms, self.smallest_out_of_memory or natoms)
             return None
         seconds = time.perf_counter() - started
         if info.get("declined"):
             self._record(device, cell, repeat, natoms, seconds, "declined", info["declined"],
-                         estimates=info.get("cpu", {}).get("estimates"))
+                         estimates=info.get("cpu", {}).get("estimates"), **process)
             return None
         if "candidates" in job:
             chosen = job["candidates"][info["cpu"]["chosen"]]
             cell, repeat, natoms = chosen["cell"], chosen["repeat"], chosen["atoms"]
         estimates = (info.get("cpu") or {}).get("estimates")
         extra = {"estimate": estimates[info["cpu"]["chosen"]]} if estimates else {}
-        self._record(device, cell, repeat, natoms, seconds, "ran", **extra)
+        self._record(device, cell, repeat, natoms, seconds, "ran", **extra, **process)
         return values, info
 
     def _copies(self, atoms):
@@ -888,7 +926,7 @@ class _Ladder:
         copies = self._copies(self.atoms)
         natoms = len(self.atoms)
         job = _job(self.plan, self.force_field, copies)
-        result = self._attempt(job, self.device, "production", None, natoms, child=self.child)
+        result = self._attempt(job, self.device, "production", None, natoms, child=self.plan_child)
         if result is not None:
             return (*result, self.device, None, copies)
         if self.gpu:
@@ -913,7 +951,7 @@ class _Ladder:
                 continue
             reduced_copies = self._copies(cell.atoms)
             job = _job(self.plan, self.force_field, reduced_copies, cell="reduced", repeat=cell.repeat)
-            result = self._attempt(job, self.device, "reduced", cell.repeat, cell.natoms, child=self.child)
+            result = self._attempt(job, self.device, "reduced", cell.repeat, cell.natoms, child=self.plan_child)
             if result is not None:
                 return (*result, self.device, cell, reduced_copies)
             limit = REDUCED_SHRINK * cell.natoms
@@ -972,7 +1010,7 @@ def references(plan, force_field, atoms, integrator, *, check: str, seed: int, g
     cell_mode = config.cell_mode if config.ensemble == "npt" else None
     ladder = _Ladder(plan, force_field, atoms, config, gate, seed, count)
     started = time.perf_counter()
-    ran = "child process" if ladder.child else "in-process"
+    ran = "child process" if ladder.plan_child else "in-process"
     try:
         values, info, device, reduced, reference_copies = ladder.run()
     except _Unavailable as error:
@@ -1017,18 +1055,34 @@ def _child_environment():
     return env
 
 
+def _child_command(job_path, result_path):
+    """The reference child's command: this Python, ``python -m fastmace.planner.selfcheck job result``."""
+    return [sys.executable, "-m", "fastmace.planner.selfcheck", str(job_path), str(result_path)]
+
+
+def _gpu_free_bytes(device):
+    """Free memory on ``device`` (``torch.cuda.mem_get_info``), or None."""
+    try:
+        import torch
+
+        return int(torch.cuda.mem_get_info(torch.device(device))[0])
+    except Exception:  # noqa: BLE001 - informational only
+        return None
+
+
 def run_child(job, *, timeout_s: float | None = None) -> tuple[list[dict], dict]:
     """``evaluate_references(job)`` in a fresh process of this environment, which builds no production engine."""
     directory = _scratch_directory()
     try:
         job_path, result_path = directory / "job.json", directory / "result.npz"
         job_path.write_text(json.dumps(job), encoding="utf-8")
-        argv = [sys.executable, "-m", "fastmace.planner.selfcheck", str(job_path), str(result_path)]
+        argv = _child_command(job_path, result_path)
         done = subprocess.run(argv, env=_child_environment(), capture_output=True, text=True, timeout=timeout_s,
                               check=False)
         if done.returncode != 0 or not result_path.is_file():
             tail = "\n".join((done.stderr or done.stdout or "").strip().splitlines()[-5:])
-            raise GateJobError(f"the reference child process failed (exit code {done.returncode})", why=tail or None)
+            raise GateJobError(f"the reference child process failed (exit code {done.returncode})", why=tail or None,
+                               returncode=done.returncode)
         return _read_result(result_path)
     finally:
         shutil.rmtree(directory, ignore_errors=True)

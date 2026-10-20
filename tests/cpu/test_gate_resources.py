@@ -6,7 +6,8 @@
   non-periodic structures. Smaller candidates follow, for the walk after an out-of-memory.
 - The CPU estimate: a per-edge rate (plus an atoms x volume term for PolarMACE's k-space) fitted to
   two calibration boxes, never stored; the boxes are periodic cubes cut from the structure.
-- The ladder, with simulated out-of-memory at each step: plan device on the production cell, CPU
+- The ladder, with simulated out-of-memory at each step: plan device on the production cell (on a
+  CUDA plan always in a child process: a GPU out-of-memory can leave the CUDA context unusable), CPU
   float64 on the production cell within the time and memory estimate (in a child process), the
   reduced cell on the plan device (walking down in size), then on the CPU; a non-memory failure is
   ``unavailable`` at once (decision 3); a cell is never larger than one that ran out of memory.
@@ -250,7 +251,7 @@ def ladder(pristine, monkeypatch, fake, gate=None, check="gate", gpu=True):
 def test_first_step_runs_and_records_its_device(pristine, no_engines_yet, monkeypatch):
     fake = FakeSteps()
     refs = ladder(pristine, monkeypatch, fake)
-    assert fake.calls == [("cuda:0", 216, False)]
+    assert fake.calls == [("cuda:0", 216, True)]
     assert refs.device == "cuda:0" and refs.reduced is None
     assert [step["outcome"] for step in refs.steps] == ["ran"]
     assert refs.steps[0]["cell"] == "production" and refs.steps[0]["atoms"] == 216
@@ -260,7 +261,7 @@ def test_first_step_runs_and_records_its_device(pristine, no_engines_yet, monkey
 def test_gpu_out_of_memory_goes_to_the_cpu_in_a_child(pristine, no_engines_yet, monkeypatch):
     fake = FakeSteps({("cuda:0", 216): "oom"})
     refs = ladder(pristine, monkeypatch, fake)
-    assert fake.calls == [("cuda:0", 216, False), ("cpu-estimate", (216,), True)]
+    assert fake.calls == [("cuda:0", 216, True), ("cpu-estimate", (216,), True)]
     assert refs.device == "cpu" and refs.reduced is None
     assert [(s["device"], s["cell"], s["outcome"]) for s in refs.steps] == [
         ("cuda:0", "production", "out of memory"), ("cpu", "production", "ran")]
@@ -271,7 +272,7 @@ def test_gpu_out_of_memory_goes_to_the_cpu_in_a_child(pristine, no_engines_yet, 
 def test_cpu_over_its_limit_goes_to_the_reduced_cell_on_the_gpu(pristine, no_engines_yet, monkeypatch):
     fake = FakeSteps({("cuda:0", 216): "oom"}, cpu="decline")
     refs = ladder(pristine, monkeypatch, fake)
-    assert fake.calls[-1] == ("cuda:0", 144, False)
+    assert fake.calls[-1] == ("cuda:0", 144, True)
     assert refs.device == "cuda:0" and refs.reduced.repeat == (3, 3, 2)
     assert [s["outcome"] for s in refs.steps] == ["out of memory", "declined", "ran"]
     assert "2400 s" in refs.steps[1]["reason"]
@@ -286,8 +287,8 @@ def test_every_step_out_of_memory_is_unavailable_and_memory_never_grows(pristine
         ladder(pristine, monkeypatch, fake)
     # Production on the GPU, then the CPU; the reduced cells on the GPU, each at most 3/4 of the last
     # one out of memory; then the CPU with only cells no larger than the last one out of memory.
-    assert fake.calls == [("cuda:0", 216, False), ("cpu-estimate", (216,), True), ("cuda:0", 144, False),
-                          ("cuda:0", 96, False), ("cuda:0", 64, False), ("cpu-estimate", (64,), True)]
+    assert fake.calls == [("cuda:0", 216, True), ("cpu-estimate", (216,), True), ("cuda:0", 144, True),
+                          ("cuda:0", 96, True), ("cuda:0", 64, True), ("cpu-estimate", (64,), True)]
     record = raised.value.gate_record
     assert record.status == "unavailable"
     steps = record.to_metadata()["steps"]
@@ -299,7 +300,7 @@ def test_every_step_out_of_memory_is_unavailable_and_memory_never_grows(pristine
 def test_a_failure_that_is_not_memory_is_unavailable_at_once(pristine, no_engines_yet, monkeypatch):
     fake = FakeSteps({("cuda:0", 216): "fail"})
     refs = ladder(pristine, monkeypatch, fake, check="allow_unavailable")
-    assert fake.calls == [("cuda:0", 216, False)]
+    assert fake.calls == [("cuda:0", 216, True)]
     assert refs.unavailable.status == "unavailable"
     assert refs.unavailable.reason.startswith("reference failed: RuntimeError")
     assert [s["outcome"] for s in refs.unavailable.steps] == ["failed"]
@@ -353,11 +354,89 @@ def test_steps_run_in_a_child_after_a_production_engine(pristine, no_engines_yet
 
 
 @pytest.mark.filterwarnings("ignore::UserWarning")
+@pytest.mark.parametrize("error", [
+    RuntimeError("CUDA driver error: device not ready"),
+    RuntimeError("CUDA error: an illegal memory access was encountered"),
+    selfcheck.GateJobError("the reference child process failed (exit code 1)", returncode=1,
+                           why="torch.AcceleratorError: CUDA error: out of memory\nSticky error detected"),
+    selfcheck.GateJobError("the reference child process failed (exit code 1)", returncode=1,
+                           why="ValueError: something else"),
+    selfcheck.GateJobError("the reference child process failed (exit code -9)", returncode=-9, why=None),
+], ids=["driver", "cuda", "accelerator", "exit", "kill"])
+def test_a_gpu_reference_child_failure_is_a_device_failure_and_the_ladder_goes_on(
+        pristine, no_engines_yet, monkeypatch, error):
+    def step(job, *, child):
+        if "candidates" not in job and job["device"].startswith("cuda") and job["cell"] == "production":
+            raise error
+        return FakeSteps()(job, child=child)
+
+    refs = ladder(pristine, monkeypatch, step)
+    first = refs.steps[0]
+    assert first["outcome"] in ("device failure", "out of memory")
+    assert first["outcome"] == ("device failure" if "out of memory" not in str(getattr(error, "why", "")) and
+                                "exit code -9" not in str(error) else "out of memory")
+    text = str(getattr(error, "what", None) or error)
+    assert text in first["reason"]
+    if isinstance(error, selfcheck.GateJobError):
+        assert first["exit_code"] == int(text.split("exit code ")[1].rstrip(")"))
+        if error.why:
+            assert error.why.splitlines()[0] in first["reason"]
+    assert refs.steps[1]["device"] == "cpu" and refs.device == "cpu"
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_a_failure_in_a_cpu_plan_is_still_unavailable_at_once(pristine, no_engines_yet, monkeypatch):
+    fake = FakeSteps({("cpu", 216): "fail"})
+    refs = ladder(pristine, monkeypatch, fake, gpu=False, check="allow_unavailable")
+    assert [s["outcome"] for s in refs.unavailable.steps] == ["failed"]
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_a_reference_order_error_in_a_child_still_raises(pristine, no_engines_yet, monkeypatch):
+    from fastmace.reference.calculators import ReferenceOrderError
+
+    def step(job, *, child):
+        raise selfcheck.GateJobError(
+            "the reference child process failed (exit code 1)",
+            why="fastmace.reference.calculators.ReferenceOrderError: the one-graph strain is off")
+
+    with pytest.raises(ReferenceOrderError):
+        ladder(pristine, monkeypatch, step)
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+@pytest.mark.parametrize("script, outcome", [
+    ("import sys; sys.stderr.write('RuntimeError: CUDA driver error: device not ready\\n'); sys.exit(1)",
+     "device failure"),
+    ("import os, signal; os.kill(os.getpid(), signal.SIGKILL)", "out of memory"),
+], ids=["exit", "kill"])
+def test_real_child_processes_that_fail(pristine, no_engines_yet, monkeypatch, script, outcome):
+    import os
+    import sys
+
+    if outcome == "out of memory" and os.name != "posix":
+        pytest.skip("SIGKILL is POSIX")
+    calls = []
+
+    def command(job_path, result_path):
+        calls.append(job_path)
+        return [sys.executable, "-c", script]
+
+    monkeypatch.setattr(selfcheck, "_child_command", command)
+    refs = ladder(pristine, monkeypatch, selfcheck._run_step, gate=GateConfig(reduced_cell="off"),
+                  check="allow_unavailable")
+    steps = refs.unavailable.steps
+    assert steps[0]["device"] == "cuda:0" and steps[0]["outcome"] == outcome and steps[0]["process"] == "child"
+    assert steps[1]["device"] == "cpu" and len(calls) == 2  # the CPU step ran a child too
+    assert refs.unavailable.seconds["step_1_s"] > 0
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
 def test_a_child_out_of_memory_is_recognised(pristine, no_engines_yet, monkeypatch):
-    error = selfcheck.GateJobError("the reference child process failed (exit code 1)",
+    error = selfcheck.GateJobError("the reference child process failed (exit code 1)", returncode=1,
                                    why="torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 2.00 GiB")
     assert selfcheck.is_out_of_memory(error)
-    killed = selfcheck.GateJobError("the reference child process failed (exit code -9)", why=None)
+    killed = selfcheck.GateJobError("the reference child process failed (exit code -9)", returncode=-9, why=None)
     assert selfcheck.is_out_of_memory(killed)
     assert not selfcheck.is_out_of_memory(RuntimeError("shape mismatch"))
     assert selfcheck.is_out_of_memory(MemoryError())

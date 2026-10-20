@@ -102,10 +102,10 @@ def test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell(label):
         print(f"  {step['device']} {step['cell']} {step['repeat']} {step['atoms']} atoms: {step['outcome']} "
               f"({gate['seconds'][f'step_{index}_s']:.1f} s) {step['reason'] or ''}")
     print(json.dumps({"case": label, **out}, default=str))
-    if out["gpu_bytes"] >= CASES[label]:
-        assert steps[0]["outcome"] == "ran", "the reference fits this card: acceptance 3 needs a 16 GB card"
+    if steps[0]["outcome"] == "ran":  # a card large enough for the reference: nothing to walk
+        assert out["gpu_bytes"] > 1.05 * CASES[label], f"the reference ran on a {out['gpu_bytes'] / 1e9:.1f} GB card"
         return
-    assert steps[0]["outcome"] == "out of memory"
+    assert steps[0]["outcome"] == "out of memory", steps[0]
     assert gate["status"] in ("passed", "passed-reduced"), gate
     if gate["status"] == "passed":
         assert gate["device"] == "cpu" and gate["reduced_cell"] is None
