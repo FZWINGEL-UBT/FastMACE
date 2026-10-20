@@ -339,6 +339,22 @@ def test_nothing_passes_raises_fallback_exhausted_with_the_record(pristine, monk
     assert all(not getattr(e, "_active", False) for e in faults.engines)
 
 
+def test_the_reference_tier_ends_the_sequence_only_if_it_fits(pristine, monkeypatch):
+    planner, ff, atoms, plan = setup_case(pristine)
+    faults = Faults(monkeypatch, bad_modes={"graph", "eager"})
+    error = RuntimeError("CUDA graph capture of stage B failed (injected)")
+    _, result = run_fallback(planner, ff, atoms, fallback.Failure(plan=plan, stage="capture", error=error))
+    assert result.plan.tier == "reference" and faults.built[-1].tier == "reference"
+    assert not fallback.enabled_rewrites(result.plan)
+    assert "terminal sequence: the reference tier" in result.plan.reason
+
+    monkeypatch.setattr(type(planner), "reference_fits", lambda self, *args: (False, "18.6 GB > 16 GB (injected)"))
+    with pytest.raises(FallbackExhausted) as caught:
+        run_fallback(planner, ff, atoms, fallback.Failure(plan=plan, stage="capture", error=error))
+    last = caught.value.tried[-1]
+    assert (last.change, last.outcome) == ("mode reference", "skipped") and "does not fit: 18.6 GB" in last.reason
+
+
 def test_a_failing_candidate_is_never_activated(pristine, monkeypatch):
     planner, ff, atoms, plan = setup_case(pristine)
     Faults(monkeypatch, bad=[{"block_linear"}], bad_modes={"graph"})

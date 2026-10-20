@@ -842,6 +842,11 @@ class Fallback:
         plan = self._candidate(mode, off, why, rule13)
         if plan is None:
             return None
+        if mode == "reference":  # the last candidate only if it fits (§9.4 step 5; 2-T03)
+            fits, reason = self.planner.reference_fits(plan, self.force_field, self.atoms, self._full_references())
+            if not fits:
+                self._skipped("mode", "mode reference", f"{why}; does not fit: {reason}")
+                return None
         self.revisions.append(plan)
         try:
             activation = activate(plan, self.planner, self.force_field, self.atoms,

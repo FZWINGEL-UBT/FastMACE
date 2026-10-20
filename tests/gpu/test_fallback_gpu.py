@@ -6,8 +6,10 @@ fresh process, in the hybrid environment when it is there, with one fault inject
 
 - **broken rewrite**: a model rewritten with ``block_linear`` on is wrong by 0.1 % in its readout
   (after the self-checks): ddmin finds it, and it and the rewrites that require it are off;
-- **broken pair**: the same error only when ``density_first`` and ``grouped_linear`` are both on:
-  ddmin finds the pair;
+- **broken pair**: the same error only when ``joint_radial_input`` and ``grouped_linear`` are both
+  on: ddmin finds the pair. No other rewrite requires either, so the pair is the only 1-minimal
+  failing set under the ``requires`` closure (a member that another record requires, such as
+  ``density_first`` for ``merged_residual``, admits a second minimal set: murphy, 20 October 2026);
 - **broken capture**: the captured stage B scales the forces by 1.001, eager is right: the gate
   fails in graph mode, eager passes, and the plan drops the graph mode.
 
@@ -106,7 +108,7 @@ print(json.dumps(out, default=str))
 
 CASES = {
     "rewrite": {"fields": ["block_linear"]},
-    "pair": {"fields": ["density_first", "grouped_linear"]},
+    "pair": {"fields": ["joint_radial_input", "grouped_linear"]},
     "capture": {},
 }
 DEPENDANTS = {"block_linear": {"grouped_linear", "merged_residual"}}
@@ -142,8 +144,8 @@ def test_ddmin_finds_the_broken_rewrites(case):
     for field in fields:
         expected |= DEPENDANTS.get(field, set()) & set(out["initial_on"])
     assert expected <= off_now, (expected, off_now)
-    if case == "pair":  # each alone passes: only the pair (and what requires its members) is off
-        assert len(off_now) < len(out["initial_on"]), off_now
+    if case == "pair":  # each alone passes: only the pair is off (nothing requires either member)
+        assert off_now == fields, off_now
 
 
 def test_a_broken_capture_drops_the_graph_mode():
