@@ -521,19 +521,31 @@ def deviation(rows, reference, upto=None):
     return float(max(np.abs(np.subtract(a, b)).max() for a, b in zip(rows, reference)))
 
 
-CUEQ_KERNEL = re.compile(r"segmented_polynomial(_bwd)?_(?:split(\d+)_of_\d+_)?algo\d+_\d+")
+CUEQ_KERNEL = re.compile(r"segmented_polynomial(_bwd)?_(?:split(\d+)_of_\d+_)?(?:tr\d+_\d+__)?algo\d+_\d+")
+# What cuEquivariance's transposed variants (segmented_polynomial_tr0_1__algo...) add before their kernel:
+# the edge indices grouped by cuEq's index_grouping kernels and a cub segmented radix sort, in buffers the
+# graph allocates and frees (2-T08c).
+CUEQ_INDEX_GROUPING = re.compile(r".*kernelcatcher12equivariance14index_grouping.*|.*DeviceSegmentedRadixSort.*"
+                                 r"|CU_GRAPH_NODE_TYPE_MEM_(?:ALLOC|FREE)")
 
 
 def kernel_sequence(kinds):
     """A graph's node sequence with cuEquivariance's run-time algorithm choice taken out.
 
     cuEq picks a variant of each segmented-polynomial kernel when it runs (``algo1_4``, ``algo2_2``,
-    or one split into two launches), and the choice differs between processes and engines: the research
-    engine's B graph of MH-1 NaCl had 242 nodes in one run and 239 in the next. Each such launch (or
-    split pair) counts as one node of its operation here; everything else must match by name.
+    one split into two or three launches, or a transposed variant ``tr0_1__algo...`` that first groups
+    the edge indices), and the choice differs between processes and engines: the research engine's B
+    graph of MH-1 NaCl had 242 nodes in one run and 239 in the next. On murphy (RTX 4000 Ada) a GPU
+    shared with another process makes cuEq pick the transposed variant for one forward polynomial,
+    in either engine, which adds 12 nodes (2-T08c: docs/validation/2-T08c-stage-b-kernels.md). Each
+    such launch (or split group) counts as one node of its operation here, and the index grouping of a
+    transposed variant (its kernels, sort and memory nodes) is left out; everything else must match by
+    name.
     """
     out = []
     for name in kinds:
+        if CUEQ_INDEX_GROUPING.fullmatch(name):
+            continue
         match = CUEQ_KERNEL.fullmatch(name)
         if match:
             if match.group(2) not in (None, "1"):
