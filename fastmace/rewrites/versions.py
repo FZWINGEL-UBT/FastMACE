@@ -40,6 +40,15 @@ TREATMENTS = {
 }
 
 PROMOTION_CODE = "precision-promoted-unqualified-energy"
+# Planner decision codes of 2-T04b.
+CAPTURE_CODE = "eager-unqualified-mask"
+CONV_FUSION_CODE = "conv-fusion-mace-rule"
+COMPILE_CODE = "compile-unavailable"
+
+# What fastmace.model.compile needs from MACE (0.3.16's compile API).
+COMPILE_API = {"mace.tools.compile": ("configure_autograd_for_compile", "disable_e3nn_codegen", "simplify",
+                                      "prepare"),
+               "mace.tools.scripts_utils": ("extract_model",)}
 
 
 @dataclass(frozen=True)
@@ -144,7 +153,42 @@ def capture_support(model):
                                  f"(unqualified source: {'; '.join(problems)})")
 
 
+def compile_support():
+    """``(supported, reason)`` of compilation: whether MACE has the compile API FastMACE uses (``COMPILE_API``).
+
+    A capability check, not a hash: MACE 0.3.15 has no ``configure_autograd_for_compile`` (2-T04b).
+    """
+    import importlib
+
+    missing = []
+    for module_name, names in COMPILE_API.items():
+        try:
+            module = importlib.import_module(module_name)
+        except ImportError as error:
+            missing.append(f"{module_name} ({error})")
+            continue
+        missing += [f"{module_name}.{name}" for name in names if not hasattr(module, name)]
+    if not missing:
+        return RewriteSupport(True, "ok")
+    return RewriteSupport(False, f"this MACE lacks the compile API FastMACE uses ({', '.join(missing)}): no "
+                                 "compilation, the model runs uncompiled (SPEC §18 decision 2)")
+
+
+def mace_conv_fusion(device):
+    """MACE's own fusion rule for a plain cuEq conversion on ``device`` when the converter does not hash.
+
+    ``None`` when it hashes (FastMACE's ``cueq_conv_fusion`` patch applies); else whether MACE's own
+    rule fuses there (only for the device string "cuda"), which the planner then follows (2-T04b).
+    """
+    if not _problems("cueq_conv_fusion"):
+        return None
+    from fastmace import _patches
+
+    return bool(_patches.conv_fusion_for(None, device))
+
+
 __all__ = [
-    "PROMOTION_CODE", "QUALIFIED_MACE_VERSIONS", "TREATMENTS", "Treatment", "capture_support",
-    "effective_precision", "head_count", "polar_support", "treatment", "treatments",
+    "CAPTURE_CODE", "COMPILE_API", "COMPILE_CODE", "CONV_FUSION_CODE", "PROMOTION_CODE",
+    "QUALIFIED_MACE_VERSIONS", "TREATMENTS", "Treatment", "capture_support", "compile_support",
+    "effective_precision", "head_count", "mace_conv_fusion", "polar_support", "treatment", "treatments",
 ]

@@ -52,6 +52,7 @@ from fastmace.config import (
     RewriteConfig,
 )
 from fastmace.errors import PlanRefused, Reason
+from fastmace.rewrites import versions
 
 from .plan import Hardware, Plan
 
@@ -257,7 +258,18 @@ class FixedPlanner:
             book.refuse(f"the hybrid backend needs a CUDA device (EngineConfig.device={engine.device!r})",
                         "hybrid-needs-cuda")
         rule = AUTO_RULES["EngineConfig.cueq_conv_fusion"]
-        if backend == "cueq":
+        mace_rule = versions.mace_conv_fusion(engine.device) if backend == "cueq" else None
+        if mace_rule is not None:
+            # 2-T04b: the converter does not hash, so FastMACE cannot patch it; MACE's own rule decides.
+            fusion = mace_rule
+            if engine.cueq_conv_fusion != "auto" and (engine.cueq_conv_fusion == "on") != mace_rule:
+                book.refuse(f"EngineConfig.cueq_conv_fusion={engine.cueq_conv_fusion!r} needs FastMACE's conversion "
+                            f"patch, whose source does not hash on this MACE; MACE's own rule gives "
+                            f"{_toggle(mace_rule)!r} on {engine.device!r} (SPEC §6.3)", versions.CONV_FUSION_CODE)
+            book.decide("EngineConfig.cueq_conv_fusion", _toggle(fusion), Reason(
+                f"MACE's own conversion rule ({_toggle(fusion)} on {engine.device!r}): FastMACE's fusion patch is "
+                "not qualified on this MACE (SPEC §6.3, §18 decision 2)", code=versions.CONV_FUSION_CODE))
+        elif backend == "cueq":
             fusion = engine.cueq_conv_fusion != "off"
             book.decide("EngineConfig.cueq_conv_fusion", _toggle(fusion), _why(
                 engine.cueq_conv_fusion, rule, "plain cuEq: cuEquivariance's fused convolution (MACE PR 1641)"
@@ -422,7 +434,13 @@ class FixedPlanner:
         # Engine options (stage 1 of parse_args) and the process constraints.
         engine = self.engine
         expandable = self._expandable_segments(book)
-        book.decide("EngineConfig.compile_mode", engine.compile_mode, "main.py's --compile-mode")
+        compiles = engine.compile_mode != "none"
+        support = versions.compile_support() if compiles else None
+        if support is not None and not support.supported:  # 2-T04b: a MACE without the compile API
+            engine = dataclasses.replace(engine, compile_mode="none")
+            book.decide("EngineConfig.compile_mode", "none", Reason(support.reason, code=versions.COMPILE_CODE))
+        else:
+            book.decide("EngineConfig.compile_mode", engine.compile_mode, "main.py's --compile-mode")
         if evaluation:
             pipelined = async_output = False
             for name in ("speculative_graph", "pipelined", "async_output"):

@@ -162,3 +162,18 @@ So on 0.3.15 the GPU path that is left is the eager tier (2-T02, `mode="eager"`)
 reach it: 2-T15's fallback takes a capture failure to eager, and a planner rule leaves
 compilation off when MACE lacks its compile API. The GPU part of acceptance 1 is re-run after
 2-T02 and 2-T15 merge. The CPU part, where nothing is compiled or captured, passes (see above).
+
+## 2-T04b: the planner's decisions on an unknown MACE
+
+Three planner decisions from the installed MACE, each with its Reason and code (tests:
+`tests/cpu/test_unknown_mace_planner.py`, fake hashes on 0.3.16):
+
+| Decision | Condition | Plan | Code |
+| --- | --- | --- | --- |
+| capture (`minimal.py`) | multi-head model, capture-safe mask does not hash | eager tier from revision 0 (`mode` decision) | `eager-unqualified-mask` |
+| conv fusion (`fixed.py`) | plain cuEq, the converter does not hash | MACE's own rule (`versions.mace_conv_fusion`: fused only for the device string `"cuda"`), so nothing is patched. An explicit value MACE cannot give is refused | `conv-fusion-mace-rule` |
+| compilation (`fixed.py`) | MACE lacks the compile API (`versions.compile_support`, `COMPILE_API`) | `compile_mode="none"`, also for evaluation plans | `compile-unavailable` |
+
+On 0.3.16 none of them changes a plan (tested). A capture failure the planner cannot foresee,
+such as `torch.nonzero` in 0.3.15's unhashed MH-1 block, stays with 2-T15: the fallback takes it
+to the eager tier.
