@@ -21,7 +21,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 MODELS = os.environ.get("FASTMACE_MODELS")
 HYBRID_PYTHON = os.environ.get("FASTMACE_HYBRID_PYTHON")
 
-pytestmark = [pytest.mark.gpu, pytest.mark.slow,
+# Acceptance tier (docs/development.md, "Test tiers"): two released checkpoints that run out of GPU
+# memory, then CPU float64 or a reduced cell on 1944 atoms, minutes each. The ladder itself is tested
+# on the CPU (tests/cpu/test_gate_resources.py, simulated out-of-memory at each step).
+pytestmark = [pytest.mark.gpu, pytest.mark.slow, pytest.mark.acceptance,
               pytest.mark.skipif(not MODELS, reason="FASTMACE_MODELS is not set")]
 
 CHILD = textwrap.dedent("""

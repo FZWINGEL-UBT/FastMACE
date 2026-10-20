@@ -447,6 +447,8 @@ def test_a_replay_that_differs_from_direct_evaluation_fails(pristine, no_engines
 def test_cpu_step_calibrates_estimates_and_runs_or_declines(pristine, no_engines_yet, limit, family):
     from fastmace.errors import PlanRefused
 
+    if family == "polar":
+        pytest.importorskip("graph_longrange")  # PolarMACE's long-range package (not in the CPU CI venv)
     try:
         planner, plan, ff, atoms = setup(pristine, family=family)
     except PlanRefused as error:  # PolarMACE has no CPU production route; the reference has one
