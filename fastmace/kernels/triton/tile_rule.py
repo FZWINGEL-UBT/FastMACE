@@ -46,7 +46,8 @@ def segment_gemm_choice(m: int, n: int, k: int, sms: int | None) -> GemmChoice:
     (None: not a CUDA device, so cuBLAS/PyTorch)."""
     if not sms:
         return GemmChoice("cublas", reason="not a CUDA device")
-    waves = row_waves(m, sms)
+    m, n, k, sms = int(m), int(n), int(k), int(sms)
+    waves = float(row_waves(m, sms))
     if waves < MIN_TRITON_WAVES:
         return GemmChoice("cublas", reason=f"{m} rows are {waves:.2f} waves of {BLOCK_M}-row tiles on {sms} SMs "
                                            f"(< {MIN_TRITON_WAVES})")
