@@ -330,6 +330,7 @@ class MinimalPlanner:
 
         workload = plan.workload
         if (offer_runner and workload is not None and workload.reproducible
+                and getattr(self.process, "reproducible", None) is not True
                 and str(plan.engine.device).startswith("cuda") and _cuda_initialised()):
             return _in_child(plan, Reason(
                 "reproducible=True after CUDA was initialised in this process: CUBLAS_WORKSPACE_CONFIG and "
@@ -374,13 +375,16 @@ class MinimalPlanner:
         runs here prepares the process (``planner.reproducible.prepare_process``).
         """
         superset = force_field.superset_for(atoms)
+        if (workload.reproducible and str(self.engine.device).startswith("cuda") and not _cuda_initialised()
+                and getattr(self.process, "reproducible", None) is not False):
+            # The first reproducible plan makes the process reproducible before anything starts CUDA:
+            # the hardware detection below does, and so may the gate's references (SPEC §8.7, decision 14).
+            reproducible_mode.prepare_process(self.process, owner="a reproducible MD plan")
         plan = self.plan_traits(force_field.traits, atoms, integrator, workload, hardware or self.hardware(),
                                 precision=force_field.precision, rewrites=force_field.rewrites, species=superset,
                                 loaded=force_field.model, variable_cell=variable_cell,
                                 allow_naive_cueq=allow_naive_cueq, allow_reference=allow_reference, mode=mode)
-        if workload.reproducible and plan.runner == "in-process":
-            # The first reproducible plan makes the process reproducible, before anything (the gate's
-            # references included) starts CUDA (SPEC §8.7, owner decision 14).
+        if workload.reproducible and plan.runner == "in-process":  # the CPU device, or already done above
             reproducible_mode.prepare_process(self.process, owner=f"a reproducible {plan.engine.backend} MD plan")
         return plan
 

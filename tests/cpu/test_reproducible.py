@@ -217,6 +217,35 @@ def test_reproducible_after_cuda_started_runs_in_a_child(monkeypatch):
     assert got.decision("reproducible")[2].code == "reproducible-qualified"  # qualified, then handed on
 
 
+def test_a_reproducible_process_keeps_its_plans_after_cuda_started(monkeypatch):
+    """The process was prepared before CUDA started (``plan`` does, before the hardware detection
+    initialises CUDA): its reproducible plans stay here."""
+    monkeypatch.setattr(minimal_module, "_cuda_initialised", lambda: True)
+    record = constraints.ProcessRecord()
+    record.claim_reproducible(True, "a reproducible plan")
+    assert plan(planner=planner(process=record)).runner == "in-process"
+
+
+def test_plan_prepares_the_process_before_the_hardware_detection(monkeypatch):
+    """``MinimalPlanner.plan`` prepares the process before ``hardware()``, which starts CUDA."""
+    calls = []
+    record = constraints.ProcessRecord()
+    monkeypatch.setattr(reproducible, "prepare_process",
+                        lambda process, **kw: (calls.append("prepare"), process.claim_reproducible(True, "test")))
+    chosen = planner(process=record)
+    monkeypatch.setattr(chosen, "hardware", lambda: calls.append("hardware") or tmp.GPU)
+
+    class _FF:
+        traits, precision, rewrites, model = tmp.tp.traits("mh1-r2scan"), "float64", "auto", None
+
+        @staticmethod
+        def superset_for(atoms):
+            return None
+
+    got = chosen.plan(_FF(), tmp.nacl(), tmp.IntegratorConfig(), REPRODUCIBLE)
+    assert calls[:2] == ["prepare", "hardware"] and got.runner == "in-process"
+
+
 def test_the_runner_hands_the_variables_to_its_children():
     from fastmace.config import RunnerConfig
     from fastmace.engine.subprocess import SubprocessRunner
