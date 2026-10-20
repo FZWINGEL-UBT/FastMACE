@@ -108,7 +108,25 @@ The first attempt (fead58f) failed in every case:
 
 ### Local RTX 5060 Ti
 
-PENDING: waiting for the local GPU reservation.
+- NVIDIA GeForce RTX 5060 Ti (sm_120) under WSL2, environment `mace_cueq_latest` (torch
+  2.14.1+cu130, cuequivariance_ops 0.12.0), FastMACE 344bda5.
+- The run held the local GPU reservation (`tools/ci/local_gpu.py`) and was untimed.
+
+| Case | Result | Final energy (eV) | Seconds (run 1, 2, 3, resume) |
+| --- | --- | --- | --- |
+| NaCl 3x3x3, float64 | bitwise equal | −1479.6391301040 | 137.3, 91.1, 87.8, 70.1 |
+| NaCl 3x3x3, float32 | bitwise equal | −1479.6392836571 | 71.4, 42.3, 42.0, 47.8 |
+| NbCl5 2x2x2, float64 | bitwise equal | −3048.3407240580 | 131.1, 97.6, 95.3, 72.7 |
+| NbCl5 2x2x2, float32 | bitwise equal | −3048.3408837318 | 76.7, 41.9, 41.3, 45.8 |
+| runner trigger | runs in a child, bitwise equal to a fresh reproducible process | | |
+
+5 passed in 1425 s.
+
+The two machines agree to the printed digits in float64 and differ in float32 (for example NaCl
+−1479.6391706 against −1479.6392837 eV). That is expected: §9.3 promises nothing across GPU models.
+
+**Verdict: acceptance 6 holds.** Plain cuEq MH-1 is qualified for `reproducible=True` on both
+machines, under the pinned `cuequivariance_ops` 0.12.0.
 
 ## Commands
 
