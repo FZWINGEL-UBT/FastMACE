@@ -1,0 +1,39 @@
+start 2026-10-20T14:16:29+02:00 commit e24d48ea51cb2d02381818412535c1f92a24d4c9
+zwingel  3054297 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python /mnt/homes/zwingel/2-T2
+zwingel  3054295 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python /mnt/homes/zwingel/2-T2
+gpu apps listed
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /mnt/homes/zwingel/fastmace-2-T14e/cache/inductor, triton /mnt/homes/zwingel/fastmace-2-T14e/cache/triton
+rootdir: /mnt/homes/zwingel/fastmace-2-T14e/src
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+collected 38 items / 31 deselected / 7 selected
+
+tests/gpu/test_engine_gpu.py ...                                         [ 42%]
+tests/gpu/test_forces_gpu.py ..                                          [ 71%]
+tests/gpu/test_selfcheck_gpu.py ..                                       [100%]
+
+=============================== warnings summary ===============================
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+-- generated xml file: /mnt/homes/zwingel/fastmace-2-T14e/logs/acc.junit.xml ---
+============================== slowest durations ===============================
+1196.29s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+925.99s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+595.65s call     tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+455.12s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[cueq-float64-compiled-production]
+444.17s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[omol0-xl]
+419.00s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[hybrid-float32-compiled-production]
+294.39s call     tests/gpu/test_selfcheck_gpu.py::test_gate_time_on_nbcl5
+0.01s setup    tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+
+(13 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========== 7 passed, 31 deselected, 1 warning in 4338.60s (1:12:18) ===========
+exit 0 2026-10-20T15:28:54+02:00
+zwingel  3054297 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python /mnt/homes/zwingel/2-T2
+zwingel  3054295 /mnt/homes/zwingel/environments/mace_cueq_latest/bin/python /mnt/homes/zwingel/2-T2
+gpu apps at end
