@@ -87,6 +87,7 @@ DOWNGRADES = {
     "backend-cueq-requested": "plain cuEq as requested (backend='cueq'); auto would choose hybrid where it builds",
     "host-callbacks-graph-sync": "frequent host callbacks: graph tier with a host sync at each callback (rule 9, "
                                  "owner decision D6); correct but slower",
+    "mode-eager-tier": "eager tier: no CUDA graphs, no compilation (mode='eager', SPEC §8.3); correct but slower",
     "allow-naive-cueq": "naive cuEq allowed (allow_naive_cueq=True): cuEquivariance's fused kernels do not load, "
                         "so this run is slow; install cuequivariance-ops-torch (`fastmace doctor`)",
 }
