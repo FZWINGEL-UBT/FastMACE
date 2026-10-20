@@ -2,7 +2,8 @@
 
 For each structure (3x3x3, rattled 0.05 A, seed 20261020) it builds three engines through the minimal
 planner: off, on (``RewriteConfig(gated_rows="on")``) and off again as a control. It compares their first
-force evaluation (the compiled force call the engine starts with): energy, forces and, with ``--stress``, stress. Plain cuEq float64
+force evaluation (the compiled force call the engine starts with): energy, forces and, with
+``--stress``, stress. Plain cuEq float64
 (``--backend cueq``) is expected to be bitwise equal; the hybrid float32 result is recorded the same way.
 Plain cuEq plans leave the MH-1 package and the block linears off (they are ``auto`` for the hybrid only),
 so there both sides request them explicitly (``CUEQ_PACKAGE``); ``reassociate_first`` stays off, as the
@@ -22,7 +23,6 @@ import fastmace  # noqa: F401  (before torch: soft file locks)
 
 sys.path.insert(0, str(Path(fastmace.__file__).resolve().parents[1] / "tools"))
 import ab_step_time  # noqa: E402
-
 
 CUEQ_PACKAGE = dict(factor_species="on", fold_cutoff="on", density_first="on", joint_radial_input="on",
                     block_linear="on", grouped_linear="on", merged_residual="on")
