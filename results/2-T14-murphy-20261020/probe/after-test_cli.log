@@ -1,0 +1,56 @@
+.............................................F                           [100%]
+=================================== FAILURES ===================================
+_________________ test_polar_force_field_enables_its_own_copy __________________
+
+    @needs_polar
+    def test_polar_force_field_enables_its_own_copy():
+        from fastmace.longrange import polar
+    
+        calc, cueq = polar_calculators()
+        atoms = structure(oxygen=False)
+        field = MACEForceField(cueq, atoms, neighbours=NEIGHBOURS, rewrites=only())
+        assert field.model is not cueq.models[0] and polar.get_state(cueq.models[0]) is None
+        assert polar.get_state(field.model) is not None and field.info()["polar"]["k_vectors"] > 0
+        assert "polar.overflow" in field.buffers()
+        positions = moved(atoms, 0.05)
+        reference(calc, atoms, positions)  # throwaway: the first model of a process rounds differently
+        energy, forces = evaluate(field, positions, padded=True)
+        expected_energy, expected_forces = reference(calc, atoms, positions)
+        # cuEq's naive kernels against e3nn, and graph_longrange's k-vectors summed with zeros
+        # interleaved (fastmace.longrange.polar): equal to rounding.
+        np.testing.assert_allclose(float(energy[0]), expected_energy, rtol=1e-12, atol=0)
+>       np.testing.assert_allclose(forces.numpy(), expected_forces, rtol=1e-12, atol=1e-12)
+E       AssertionError: 
+E       Not equal to tolerance rtol=1e-12, atol=1e-12
+E       
+E       Mismatched elements: 1 / 192 (0.521%)
+E       Max absolute difference among violations: 5.40856249e-12
+E       Max relative difference among violations: 2.02464222e-12
+E        ACTUAL: array([[-4.722116e+00,  6.002286e+00, -2.671367e+00],
+E              [ 8.131732e-01,  1.859680e+00,  7.300108e+00],
+E              [ 1.734902e+00,  2.658248e+00, -3.717024e+00],...
+E        DESIRED: array([[-4.722116e+00,  6.002286e+00, -2.671367e+00],
+E              [ 8.131732e-01,  1.859680e+00,  7.300108e+00],
+E              [ 1.734902e+00,  2.658248e+00, -3.717024e+00],...
+
+tests/cpu/test_forces.py:626: AssertionError
+=============================== warnings summary ===============================
+tests/cpu/test_cli.py::test_init_then_run_equals_md
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_cli.py::test_init_then_run_equals_md
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/graph_longrange/kspace.py:224: DeprecationWarning: invalid escape sequence '\p'
+    """
+
+tests/cpu/test_forces.py::test_polar_force_field_enables_its_own_copy
+tests/cpu/test_forces.py::test_polar_force_field_enables_its_own_copy
+tests/cpu/test_forces.py::test_polar_force_field_enables_its_own_copy
+tests/cpu/test_forces.py::test_polar_force_field_enables_its_own_copy
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py:183: UserWarning: cuequivariance_ops_torch is not available. Falling back to naive implementation.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/cpu/test_forces.py::test_polar_force_field_enables_its_own_copy
+1 failed, 45 passed, 6 warnings in 12.33s

@@ -1,0 +1,41 @@
+....................................................                     [100%]
+=============================== warnings summary ===============================
+tests/cpu/test_loading.py: 23 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_loading.py::test_load_records_the_hash_and_matches_mace
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/graph_longrange/kspace.py:224: DeprecationWarning: invalid escape sequence '\p'
+    """
+
+tests/cpu/test_loading.py: 22 warnings
+  /usr/lib/python3.10/ast.py:418: UserWarning: The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`.
+    return visitor(node)
+
+tests/cpu/test_loading.py::test_load_records_the_hash_and_matches_mace
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:89: FutureWarning: `torch.jit.save` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_loading.py::test_load_records_the_hash_and_matches_mace
+tests/cpu/test_loading.py::test_load_refuses_a_model_that_fell_back
+tests/cpu/test_loading.py::test_load_refuses_a_model_that_fell_back
+  /mnt/homes/zwingel/fastmace-2-T14/src/fastmace/model/loading.py:499: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/cpu/test_loading.py::test_load_records_the_hash_and_matches_mace
+tests/cpu/test_loading.py::test_load_records_the_hash_and_matches_mace
+tests/cpu/test_loading.py::test_load_records_the_hash_and_matches_mace
+tests/cpu/test_loading.py::test_load_records_the_hash_and_matches_mace
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_loading.py::test_load_records_the_hash_and_matches_mace
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/mace/calculators/mace.py:226: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    torch.load(f=model_path, map_location=device)
+
+tests/cpu/test_loading.py::test_load_refuses_a_model_that_fell_back
+  /mnt/homes/zwingel/fastmace-2-T14/src/tests/cpu/test_loading.py:364: ModelLicenceWarning: tiny-mh1.model (SHA-256 81b17609d5d7…) is not a label of the FastMACE table; its licence is unknown, check it with the model's release
+    loaded = loading.load(str(path), backend="e3nn", device="cpu", trusted=True, allow_naive_cueq=True)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+52 passed, 56 warnings in 10.77s

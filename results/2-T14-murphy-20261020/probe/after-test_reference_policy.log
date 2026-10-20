@@ -1,0 +1,34 @@
+............................                                             [100%]
+=============================== warnings summary ===============================
+tests/cpu/test_reference_policy.py::test_a_polar_record_without_the_fix_is_refused
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/cpu/test_reference_policy.py: 23 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_reference_policy.py::test_a_polar_record_without_the_fix_is_refused
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/graph_longrange/kspace.py:224: DeprecationWarning: invalid escape sequence '\p'
+    """
+
+tests/cpu/test_reference_policy.py: 22 warnings
+  /usr/lib/python3.10/ast.py:418: UserWarning: The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`.
+    return visitor(node)
+
+tests/cpu/test_reference_policy.py: 136 warnings
+tests/cpu/test_forces.py: 4 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py:183: UserWarning: cuequivariance_ops_torch is not available. Falling back to naive implementation.
+    warnings.warn(
+
+tests/cpu/test_reference_policy.py::test_load_builds_the_reference_from_a_checkpoint
+tests/cpu/test_reference_policy.py::test_load_builds_the_reference_from_a_checkpoint
+  /mnt/homes/zwingel/fastmace-2-T14/src/fastmace/model/loading.py:499: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/cpu/test_reference_policy.py::test_load_builds_the_reference_from_a_checkpoint
+  /mnt/homes/zwingel/fastmace-2-T14/src/fastmace/reference/calculators.py:302: ModelLicenceWarning: tiny-mh1.model (SHA-256 a07705f187c3…) is not a label of the FastMACE table; its licence is unknown, check it with the model's release
+    loaded = loading.load(source, head, backend=stock["backend"], dtype=dtype, device=device,
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+28 passed, 190 warnings in 65.57s (0:01:05)

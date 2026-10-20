@@ -1,0 +1,120 @@
+...FF.F                                                                  [100%]
+=================================== FAILURES ===================================
+______________ test_naive_cueq_converts_from_a_fresh_basis_cache _______________
+
+    def test_naive_cueq_converts_from_a_fresh_basis_cache():
+        from fastmace.model import compile as compiling
+    
+        cache = _basis_cache()
+        cache["stale"] = None
+        with compiling.naive_cueq():
+>           assert "stale" not in cache
+E           AssertionError: assert 'stale' not in {'stale': None}
+
+tests/cpu/test_cueq_basis_cache.py:96: AssertionError
+_______________________ test_a_missing_cache_is_skipped ________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x788819625480>
+
+    def test_a_missing_cache_is_skipped(monkeypatch):
+        from fastmace.model import loading
+    
+        module = pytest.importorskip(CACHE_MODULE)
+        monkeypatch.delattr(module, "_cache_reduce_basis_product")
+>       with loading._fresh_cueq_basis_cache():
+E       AttributeError: module 'fastmace.model.loading' has no attribute '_fresh_cueq_basis_cache'
+
+tests/cpu/test_cueq_basis_cache.py:106: AttributeError
+________ test_the_cache_holds_float32_rounded_products_without_clearing ________
+
+    def test_the_cache_holds_float32_rounded_products_without_clearing():
+        """The upstream behaviour the clearing works around; if this fails, cuequivariance or MACE changed."""
+        import cuequivariance as cue
+        from mace.tools.cg import O3_e3nn
+    
+        cache = _basis_cache()
+        irreps_in, irreps_out = cue.Irreps(O3_e3nn, "0e+1o+2e"), cue.Irreps(O3_e3nn, "0e+1o")
+    
+        def basis(dtype):
+            previous = torch.get_default_dtype()
+            torch.set_default_dtype(dtype)
+            try:
+                return np.asarray(cue.reduced_symmetric_tensor_product_basis(irreps_in, 2, keep_ir=irreps_out,
+                                                                             layout=cue.ir_mul).array)
+            finally:
+                torch.set_default_dtype(previous)
+    
+        cache.clear()
+        exact = basis(torch.float64)
+        cache.clear()
+        basis(torch.float32)
+        stale = basis(torch.float64)
+        cache.clear()
+>       assert 1e-10 < np.abs(stale - exact).max() < 1e-6
+E       AssertionError: assert 1e-10 < np.float64(0.0)
+E        +  where np.float64(0.0) = <built-in method max of numpy.ndarray object at 0x78881896c1b0>()
+E        +    where <built-in method max of numpy.ndarray object at 0x78881896c1b0> = array([[[0., 0., 0., 0., 0., 0., 0., 0., 0.],\n        [0., 0., 0., 0., 0., 0., 0., 0., 0.],\n        [0., 0., 0., 0., 0... 0., 0., 0., 0., 0., 0.],\n        [0., 0., 0., 0., 0., 0., 0., 0., 0.],\n        [0., 0., 0., 0., 0., 0., 0., 0., 0.]]]).max
+E        +      where array([[[0., 0., 0., 0., 0., 0., 0., 0., 0.],\n        [0., 0., 0., 0., 0., 0., 0., 0., 0.],\n        [0., 0., 0., 0., 0... 0., 0., 0., 0., 0., 0.],\n        [0., 0., 0., 0., 0., 0., 0., 0., 0.],\n        [0., 0., 0., 0., 0., 0., 0., 0., 0.]]]) = <ufunc 'absolute'>((array([[[ 1.        ,  0.        ,  0.        ,  0.        ,\n          0.        ,  0.        ,  0.        ,  0.      ...      ,  0.4472136 ,  0.        ,\n          0.        ,  0.        ,  0.        ,  0.        ,\n          0.        ]]]) - array([[[ 1.        ,  0.        ,  0.        ,  0.        ,\n          0.        ,  0.        ,  0.        ,  0.      ...      ,  0.4472136 ,  0.        ,\n          0.        ,  0.        ,  0.        ,  0.        ,\n          0.        ]]])))
+E        +        where <ufunc 'absolute'> = np.abs
+
+tests/cpu/test_cueq_basis_cache.py:143: AssertionError
+=============================== warnings summary ===============================
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/cpu/test_cueq_basis_cache.py: 23 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/graph_longrange/kspace.py:224: DeprecationWarning: invalid escape sequence '\p'
+    """
+
+tests/cpu/test_cueq_basis_cache.py: 22 warnings
+  /usr/lib/python3.10/ast.py:418: UserWarning: The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`.
+    return visitor(node)
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:89: FutureWarning: `torch.jit.save` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_pristine_load_after_a_float32_conversion_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_pristine_load_after_a_float32_conversion_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_pristine_load_after_a_float32_conversion_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_a_float32_load_leaves_no_float32_basis_for_later_conversions
+tests/cpu/test_cueq_basis_cache.py::test_polar_force_field_after_a_float32_conversion
+  /mnt/homes/zwingel/fastmace-2-T14/src2/fastmace/model/loading.py:499: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+    "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+
+tests/cpu/test_cueq_basis_cache.py: 28 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py:183: UserWarning: cuequivariance_ops_torch is not available. Falling back to naive implementation.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/cpu/test_cueq_basis_cache.py::test_naive_cueq_converts_from_a_fresh_basis_cache
+FAILED tests/cpu/test_cueq_basis_cache.py::test_a_missing_cache_is_skipped - ...
+FAILED tests/cpu/test_cueq_basis_cache.py::test_the_cache_holds_float32_rounded_products_without_clearing
+3 failed, 4 passed, 96 warnings in 17.73s

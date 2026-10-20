@@ -914,19 +914,12 @@ def _planner(default, options):
 
 
 def _write_json(path, record):
-    """Canonical JSON (sorted keys), written atomically: temporary file, then rename."""
+    """Canonical JSON (sorted keys), written durably and atomically (``io.durable.atomic_write``)."""
     import json
-    import os
 
-    text = json.dumps(record, indent=2, sort_keys=True, allow_nan=False) + "\n"
-    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    try:
-        with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
-        os.replace(temporary, path)
-    finally:
-        if temporary.exists():
-            temporary.unlink()
+    from fastmace.io import durable
+
+    durable.atomic_write(path, json.dumps(record, indent=2, sort_keys=True, allow_nan=False) + "\n")
 
 
 def _load_model(source):

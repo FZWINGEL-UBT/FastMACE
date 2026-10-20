@@ -1,0 +1,116 @@
+F..FF.                                                                   [100%]
+=================================== FAILURES ===================================
+_________ test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh __________
+
+tiny_checkpoint = PosixPath('/mnt/homes/zwingel/fastmace-2-T14/basetemp/probe-red2/test_float64_cueq_load_after_a0/tiny-mh1.model')
+
+    def test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh(tiny_checkpoint):
+        _fresh()
+        fresh = _load(tiny_checkpoint, "cueq", "float64")
+        _fresh()
+        _load(tiny_checkpoint, "cueq", "float32")
+>       _assert_bitwise(_load(tiny_checkpoint, "cueq", "float64"), fresh)
+
+tests/cpu/test_cueq_basis_cache.py:88: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+got = {'atomic_numbers': tensor([11, 17]), 'r_max': tensor(4.), 'num_interactions': tensor(2), 'node_embedding.linear.weight...40, -1.2755, -0.6232, -0.8664,
+         -1.2956,  1.5236,  0.3237,  2.0177,  1.1357, -1.2269,  0.0714,  0.3380]]), ...}
+expected = {'atomic_numbers': tensor([11, 17]), 'r_max': tensor(4.), 'num_interactions': tensor(2), 'node_embedding.linear.weight...40, -1.2755, -0.6232, -0.8664,
+         -1.2956,  1.5236,  0.3237,  2.0177,  1.1357, -1.2269,  0.0714,  0.3380]]), ...}
+
+    def _assert_bitwise(got, expected):
+        assert got.keys() == expected.keys()
+        differ = [name for name in expected if not torch.equal(got[name], expected[name])]
+>       assert not differ, f"{len(differ)} tensors differ, e.g. {differ[:3]}"
+E       AssertionError: 48 tensors differ, e.g. ['products.0.symmetric_contractions.weight', 'products.0.symmetric_contractions.f.m.graphs.1.graph.c0', 'products.0.symmetric_contractions.f.m.graphs.1.graph.c1']
+E       assert not ['products.0.symmetric_contractions.weight', 'products.0.symmetric_contractions.f.m.graphs.1.graph.c0', 'products.0.sy...oducts.0.symmetric_contractions.f.m.graphs.1.graph.c3', 'products.0.symmetric_contractions.f.m.graphs.1.graph.c4', ...]
+
+tests/cpu/test_cueq_basis_cache.py:80: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  root:mace.py:313 Default dtype float32 does not match model dtype float64, converting models to float32.
+__________________ test_naive_cueq_converts_from_fresh_caches __________________
+
+    def test_naive_cueq_converts_from_fresh_caches():
+        """MACE's own converter inside naive_cueq (as the tests' polar calculators use it) starts fresh too."""
+        from fastmace.model import compile as compiling
+    
+        cache = _basis_cache()
+        cache["stale"] = None
+        with compiling.naive_cueq():
+>           assert "stale" not in cache
+E           AssertionError: assert 'stale' not in {(frozenset({0e, 1o}), 0e, 0e, (1, 1, 1), (1, 1, 1), -4326143656143345163, ...): 0e [[[1.]]], (frozenset({0e, 1o}), 1o...\n[[[0.99999998 0.         0.        ]\n  [0.         0.99999998 0.        ]\n  [0.         0.         0.99999998]]], ...}
+
+tests/cpu/test_cueq_basis_cache.py:117: AssertionError
+_______________________ test_a_missing_cache_is_skipped ________________________
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x788356a540d0>
+
+    def test_a_missing_cache_is_skipped(monkeypatch):
+        from fastmace.model import loading
+    
+        module = pytest.importorskip(CACHE_MODULE)
+        monkeypatch.delattr(module, "_cache_reduce_basis_product")
+>       with loading._fresh_cueq_basis_cache():
+E       AttributeError: module 'fastmace.model.loading' has no attribute '_fresh_cueq_basis_cache'
+
+tests/cpu/test_cueq_basis_cache.py:127: AttributeError
+=============================== warnings summary ===============================
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/cpu/test_cueq_basis_cache.py: 23 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/graph_longrange/kspace.py:224: DeprecationWarning: invalid escape sequence '\p'
+    """
+
+tests/cpu/test_cueq_basis_cache.py: 22 warnings
+  /usr/lib/python3.10/ast.py:418: UserWarning: The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`.
+    return visitor(node)
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:89: FutureWarning: `torch.jit.save` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_pristine_load_after_a_float32_conversion_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_pristine_load_after_a_float32_conversion_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_pristine_load_after_a_float32_conversion_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_polar_force_field_after_a_float32_conversion
+  /mnt/homes/zwingel/fastmace-2-T14/src2/fastmace/model/loading.py:499: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+    "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+
+tests/cpu/test_cueq_basis_cache.py: 24 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/cuequivariance_torch/primitives/segmented_polynomial.py:183: UserWarning: cuequivariance_ops_torch is not available. Falling back to naive implementation.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/cpu/test_cueq_basis_cache.py::test_float64_cueq_load_after_a_float32_one_is_bitwise_fresh
+FAILED tests/cpu/test_cueq_basis_cache.py::test_naive_cueq_converts_from_fresh_caches
+FAILED tests/cpu/test_cueq_basis_cache.py::test_a_missing_cache_is_skipped - ...
+3 failed, 3 passed, 91 warnings in 13.86s
