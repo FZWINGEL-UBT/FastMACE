@@ -50,3 +50,27 @@ def test_small_cells_keep_cublas_and_equal_the_join_bitwise():
     joined = sg.joined_products(rows, weights, weights_t, offsets, list(DIMS), width)
     reference = torch.cat([(x @ w).reshape(8, -1) for x, w in zip(rows, weights)], dim=1)
     assert torch.equal(joined, reference)
+
+
+def test_gate_prologue_equals_the_products_of_the_gated_rows():
+    """gate_prologue (OPT-T02 stage C): the Triton GEMM multiplies the rows by their atom's gates as it loads
+    them. Each element's product is the gate's own and the GEMM is the same, so the values equal the joined
+    products of the gated rows bitwise; the gradients of the rows and the gates match to float32 rounding."""
+    sms = tile_rule.device_sms("cuda")
+    atoms = -(-tile_rule.MIN_TRITON_WAVES * sms * tile_rule.BLOCK_M // min(DIMS))
+    rows, weights, weights_t, offsets, width = _case(atoms, seed=2)
+    g = torch.Generator(device="cuda").manual_seed(3)
+    full = torch.rand((atoms, 2 * MUL * len(DIMS)), generator=g, device="cuda").requires_grad_()
+    gates = [full.narrow(1, 2 * MUL * i, MUL) for i in range(len(DIMS))]  # strided views, as GatedRows passes
+    grad = torch.randn((atoms, width), device="cuda")
+    gated = [(x.view(atoms, d, MUL) * gate.unsqueeze(-2)).reshape(atoms * d, MUL)
+             for x, gate, d in zip(rows, gates, DIMS)]
+    stock = sg.joined_products(gated, weights, weights_t, offsets, list(DIMS), width)
+    prologue = sg.joined_products(rows, weights, weights_t, offsets, list(DIMS), width, gates=gates)
+    assert torch.equal(prologue, stock)
+    got = torch.autograd.grad(prologue, [*rows, full], grad)
+    want = torch.autograd.grad(stock, [*rows, full], grad)
+    for a, b in zip(got, want):
+        assert float((a - b).abs().max() / b.abs().max()) <= 1e-5
+    again = sg.joined_products(rows, weights, weights_t, offsets, list(DIMS), width, gates=gates)
+    assert torch.equal(again, prologue)

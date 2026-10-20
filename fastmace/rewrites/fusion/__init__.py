@@ -1,6 +1,6 @@
 """The fusion family of optimisation round 1 (``plans/opt-1.md``, OPT-T02; ``docs/design/opt-T02-fusion.md``).
 
-``RECORDS`` holds ``gated_rows`` and ``segment_gemm``:
+``RECORDS`` holds ``gated_rows``, ``segment_gemm`` and ``gate_prologue``:
 
 - ``gated_rows`` (stage A): in every interaction whose forward reads ``gated_rows`` (the folded
   MH-1 forward, ``fastmace.rewrites.mh1.modules.cutoff_folded_forward``) and that has merged
@@ -18,6 +18,12 @@
   before the symmetric contraction and its backward. ``rounding`` (another GEMM), deterministic (no
   atomics). On by default with ``gated_rows`` in float32 plans that are not reproducible (owner decision,
   20 October 2026); float64 and ``reproducible=True`` keep the stock products and join.
+
+- ``gate_prologue`` (stage C, ``docs/design/opt-T02-C-gate-prologue.md``): where the shape rule sends one of
+  those products to the Triton GEMM, the GEMM multiplies the ungated rows by their atom's gates as it loads
+  them, so the gated rows are never stored. The product of each element is the gate's own, so the result
+  equals ``segment_gemm``'s; ``rounding`` against the stock path, deterministic. Opt-in
+  (``RewriteConfig.gate_prologue``).
 
 The self-check compares each chain with the unrewritten interaction's ``linear_2(gate(linear_1(x)
 + linear_res(y)))``, values and both input gradients, in the model's dtype (SPEC §6.4). The gate's
@@ -186,12 +192,81 @@ def _segment_selfcheck(original, rewritten, context):
     return check_tensors(cases, dtype)
 
 
+def _prologue_selfcheck(original, rewritten, context):
+    """``segment_gemm``'s checks, and each chain's gated joined products against the joined products of the
+    gated rows, on enough atoms that the shape rule picks Triton for every product on this device, values
+    and the gradients of the rows and the gates."""
+    import torch
+
+    from fastmace.kernels.triton import tile_rule
+    from fastmace.kernels.triton.segment_gemm import joined_products
+
+    first = _segment_selfcheck(original, rewritten, context)
+    if not first.passed:
+        return first
+    cases, dtype = [], None
+    generator = torch.Generator().manual_seed(context.seed + 2)
+    for index, interaction in enumerate(getattr(rewritten, "interactions", ())):
+        chain = getattr(interaction, "gated_rows", None)
+        if chain is None or chain.joined is None or not chain.gate_prologue:
+            continue
+        second = chain.second
+        weight = second.weight_0
+        dtype = dtype or weight.dtype
+        sms = tile_rule.device_sms(weight.device) or 1
+        products = [(i, o, d, k) for i, o, d, k in chain.joined if i > 0]
+        if not products:
+            continue
+        atoms = -(-tile_rule.MIN_TRITON_WAVES * sms * tile_rule.BLOCK_M // min(d for _, _, d, _ in products))
+        rows = [torch.randn((atoms * d, second.segments_in[i][1]), generator=generator, dtype=torch.float64)
+                .to(weight).requires_grad_() for i, _, d, _ in products]
+        gates = [torch.rand((atoms, second.segments_in[i][1]), generator=generator, dtype=torch.float64)
+                 .to(weight).requires_grad_() for i, _, _, _ in products]
+        width = sum(mul * dim for _, mul, dim in second.segments_out)
+        grad = torch.randn((atoms, width), generator=generator, dtype=torch.float64).to(weight)
+        args = ([getattr(second, f"weight_{k}") for _, _, _, k in products],
+                [getattr(second, f"weight_t_{k}") for _, _, _, k in products],
+                [o for _, o, _, _ in products], [d for _, _, d, _ in products], width)
+
+        def stock(xs, gs):
+            gated = [(x.view(atoms, d, -1) * g.unsqueeze(-2)).reshape(atoms * d, -1)
+                     for x, g, (_, _, d, _) in zip(xs, gs, products)]
+            return joined_products(gated, *args)
+
+        def prologue(xs, gs):
+            return joined_products(list(xs), *args, gates=list(gs))
+
+        with torch.enable_grad():
+            values = []
+            for function in (stock, prologue):
+                out = function(rows, gates)
+                values.append((out.detach(), *torch.autograd.grad(out, [*rows, *gates], grad)))
+        cases += [(f"interactions.{index}.gated_rows.prologue", a, b) for a, b in zip(*values)]
+    return check_tensors(cases, dtype) if cases else first
+
+
 def _apply(model, context):
     return gate_rows(model)
 
 
 def _apply_segment(model, context):
     return join_in_place(model)
+
+
+def gate_in_prologue(model):
+    """Let every joined ``gated_rows`` chain's Triton products apply the gate as they load their rows; returns
+    the names of the interactions."""
+    names = []
+    for index, interaction in enumerate(getattr(model, "interactions", ())):
+        chain = getattr(interaction, "gated_rows", None)
+        if chain is not None and chain.joined is not None and chain.gated:
+            chain.gate_prologue = True
+            names.append(f"interactions.{index}")
+    return names
+
+
+def _apply_prologue(model, context):
+    return gate_in_prologue(model)
 
 
 RECORDS = {
@@ -204,6 +279,12 @@ RECORDS = {
         mace_versions=MACE_VERSIONS, source_hashes={RESHAPE_FORWARD: RESHAPE_FORWARD_SHA256}, exactness="rounding",
         default="auto", deterministic=True, workload_constraints=(), apply=_apply_segment,
         selfcheck=_segment_selfcheck),
+    "gate_prologue": Rewrite(
+        name="gate_prologue", applies_to=_segment_support, requires=("segment_gemm",), conflicts=(),
+        mace_versions=MACE_VERSIONS, source_hashes={GATE_FORWARD: GATE_FORWARD_SHA256}, exactness="rounding",
+        default="off", deterministic=True, workload_constraints=(), apply=_apply_prologue,
+        selfcheck=_prologue_selfcheck),
 }
 
-__all__ = ["GATE_FORWARD", "GATE_FORWARD_SHA256", "READS_GATED_ROWS", "RECORDS", "gate_rows", "join_in_place"]
+__all__ = ["GATE_FORWARD", "GATE_FORWARD_SHA256", "READS_GATED_ROWS", "RECORDS", "gate_in_prologue", "gate_rows",
+           "join_in_place"]

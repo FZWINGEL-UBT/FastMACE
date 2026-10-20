@@ -105,6 +105,9 @@ class RewriteConfig:
     # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); auto = on with gated_rows in float32,
     # not reproducible (owner, 20 Oct 2026).
     segment_gemm: Toggle = "auto"
+    # The gate applied inside segment_gemm's Triton products as they load their rows, so the gated rows are
+    # never stored (opt-1 OPT-T02 stage C); opt-in until its A/B on both GPUs.
+    gate_prologue: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
     # MACE PR 1498 one-graph strain in the stress path (upstream_mace.use_single_graph_strain).

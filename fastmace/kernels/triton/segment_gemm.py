@@ -35,9 +35,10 @@ def _kernel():
     import triton.language as tl
 
     @triton.jit
-    def gemm(a_ptr, b_ptr, c_ptr, rows, N, K, D, a_n, a_m, b_k, b_n, c_n, c_m,
-             BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr):
+    def gemm(a_ptr, b_ptr, c_ptr, g_ptr, rows, N, K, D, a_n, a_m, b_k, b_n, c_n, c_m, g_n,
+             BLOCK_M: tl.constexpr, BLOCK_N: tl.constexpr, BLOCK_K: tl.constexpr, HAS_GATE: tl.constexpr):
         # Row r of A and C is (atom r // D, component r % D); A's and C's rows are gathered and scattered.
+        # HAS_GATE (gate_prologue): A's row (atom, m) is multiplied by the atom's gates G[atom, :] as it loads.
         pm, pn = tl.program_id(0), tl.program_id(1)
         r = (pm * BLOCK_M + tl.arange(0, BLOCK_M)).to(tl.int64)
         j = (pn * BLOCK_N + tl.arange(0, BLOCK_N)).to(tl.int64)
@@ -48,6 +49,9 @@ def _kernel():
         for start in range(0, K, BLOCK_K):
             k = start + kk
             a = tl.load(a_ptr + a_row[:, None] + k[None, :], mask=(r < rows)[:, None] & (k < K)[None, :], other=0.0)
+            if HAS_GATE:
+                a = a * tl.load(g_ptr + atom[:, None] * g_n + k[None, :],
+                                mask=(r < rows)[:, None] & (k < K)[None, :], other=0.0)
             b = tl.load(b_ptr + k[:, None] * b_k + j[None, :] * b_n, mask=(k < K)[:, None] & (j < N)[None, :],
                         other=0.0)
             acc += tl.dot(a, b, input_precision="ieee")
@@ -57,15 +61,25 @@ def _kernel():
     return gemm
 
 
-def _gemm(a, a_offset, a_n, a_m, b, c, c_offset, c_n, c_m, rows, dim, choice):
-    """C rows (atom, m) <- A rows (atom, m) @ B, A and C addressed from their flat storage."""
+def _gemm(a, a_offset, a_n, a_m, b, c, c_offset, c_n, c_m, rows, dim, choice, gate=None):
+    """C rows (atom, m) <- A rows (atom, m) @ B, A and C addressed from their flat storage; with ``gate``
+    (``[atoms, K]``, unit column stride) A's rows are multiplied by their atom's gates first."""
     import triton
 
     k, n = b.shape
     grid = (triton.cdiv(rows, choice.block_m), triton.cdiv(n, choice.block_n))
-    _kernel()[grid](a.reshape(-1)[a_offset:], b, c.reshape(-1)[c_offset:], rows, n, k, dim, a_n, a_m,
-                    b.stride(0), b.stride(1), c_n, c_m, BLOCK_M=choice.block_m, BLOCK_N=choice.block_n,
-                    BLOCK_K=choice.block_k, num_warps=choice.num_warps, num_stages=choice.num_stages)
+    has_gate = gate is not None
+    _kernel()[grid](a.reshape(-1)[a_offset:], b, c.reshape(-1)[c_offset:], gate if has_gate else a, rows, n, k, dim,
+                    a_n, a_m, b.stride(0), b.stride(1), c_n, c_m, gate.stride(0) if has_gate else 0,
+                    BLOCK_M=choice.block_m, BLOCK_N=choice.block_n, BLOCK_K=choice.block_k, HAS_GATE=has_gate,
+                    num_warps=choice.num_warps, num_stages=choice.num_stages)
+
+
+def _gated(x, gate, dim):
+    """``x``'s rows ``[atoms * dim, mul]`` times their atom's gates ``[atoms, mul]``, as ``GatedRows``
+    computes MACE's gate."""
+    atoms, mul = gate.shape
+    return (x.view(atoms, dim, mul) * gate.unsqueeze(-2)).reshape(atoms * dim, mul)
 
 
 def _choices(rows_per_product, weights, device, dtype):
@@ -79,19 +93,42 @@ def joined_products_op(rows: List[torch.Tensor], weights: List[torch.Tensor], of
                        width: int) -> torch.Tensor:
     """``[atoms, width]``: ``rows[i] @ weights[i]`` (rows ``[atoms * dims[i], K_i]``) at column ``offsets[i]``;
     columns no product reaches are zero."""
+    return _products(rows, [None] * len(rows), weights, offsets, dims, width)
+
+
+def _products(rows, gates, weights, offsets, dims, width):
     atoms = rows[0].shape[0] // dims[0]
     covered = sum(dim * int(w.shape[1]) for dim, w in zip(dims, weights))
     like = rows[0]
     out = like.new_zeros((atoms, width)) if covered != width else like.new_empty((atoms, width))
     choices = _choices([atoms * d for d in dims], weights, like.device, like.dtype)
-    for x, w, offset, dim, choice in zip(rows, weights, offsets, dims, choices):
+    for x, gate, w, offset, dim, choice in zip(rows, gates, weights, offsets, dims, choices):
         mul = int(w.shape[1])
+        gated = gate is not None and gate.numel() > 0
         if choice.backend == "triton" and atoms:
             x = x.contiguous()
-            _gemm(x, 0, dim * x.shape[1], x.shape[1], w, out, offset, width, mul, atoms * dim, dim, choice)
+            if gated and gate.stride(1) != 1:
+                gate = gate.contiguous()
+            _gemm(x, 0, dim * x.shape[1], x.shape[1], w, out, offset, width, mul, atoms * dim, dim, choice,
+                  gate if gated else None)
         else:
+            x = _gated(x, gate, dim) if gated else x
             out[:, offset:offset + dim * mul] = (x @ w).reshape(atoms, dim * mul)
     return out
+
+
+@torch.library.custom_op("fastmace::gated_joined_products", mutates_args=())
+def gated_joined_products_op(rows: List[torch.Tensor], gates: List[torch.Tensor], weights: List[torch.Tensor],
+                             offsets: List[int], dims: List[int], width: int) -> torch.Tensor:
+    """``joined_products_op`` where product i's rows are first multiplied by their atom's gates ``gates[i]``
+    (``[atoms, K_i]``; an empty tensor: no gate). The Triton GEMM applies the gate as it loads A
+    (``gate_prologue``), so the gated rows are never stored."""
+    return _products(rows, gates, weights, offsets, dims, width)
+
+
+@gated_joined_products_op.register_fake
+def _(rows, gates, weights, offsets, dims, width):
+    return rows[0].new_empty((rows[0].shape[0] // dims[0], width))
 
 
 @joined_products_op.register_fake
@@ -139,13 +176,48 @@ class _JoinedProducts(torch.autograd.Function):
         return (None, None, None, None, *grads, *([None] * (2 * ctx.count)))
 
 
-def joined_products(rows, weights, weights_t, offsets, dims, width):
+class _GatedJoinedProducts(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, offsets, dims, width, count, *tensors):
+        rows, gates = tensors[:count], tensors[count:2 * count]
+        weights, weights_t = tensors[2 * count:3 * count], tensors[3 * count:]
+        ctx.offsets, ctx.dims, ctx.count = offsets, dims, count
+        ctx.save_for_backward(*weights_t, *rows, *gates)
+        return gated_joined_products_op(list(rows), list(gates), list(weights), offsets, dims, width)
+
+    @staticmethod
+    def backward(ctx, grad):
+        count = ctx.count
+        saved = ctx.saved_tensors
+        weights_t, rows, gates = saved[:count], saved[count:2 * count], saved[2 * count:]
+        # The gradients of the gated rows (B's input-gradient op), then the gate's own backward in PyTorch:
+        # the formulas autograd derives for ``x * gate`` (no atomics; stage D stays out).
+        grads = joined_products_input_grads(grad, list(weights_t), ctx.offsets, ctx.dims)
+        grads_x, grads_gate = [], []
+        for g, x, gate, dim in zip(grads, rows, gates, ctx.dims):
+            if gate.numel() == 0:
+                grads_x.append(g)
+                grads_gate.append(None)
+                continue
+            atoms, mul = gate.shape
+            g = g.view(atoms, dim, mul)
+            grads_x.append((g * gate.unsqueeze(-2)).reshape(atoms * dim, mul))
+            grads_gate.append((g * x.view(atoms, dim, mul)).sum(-2))
+        return (None, None, None, None, *grads_x, *grads_gate, *([None] * (2 * count)))
+
+
+def joined_products(rows, weights, weights_t, offsets, dims, width, gates=None):
     """The joined ``[atoms, width]`` output of the products ``rows[i] @ weights[i]``; see the module docstring.
 
     ``weights_t[i]`` is the contiguous transpose of ``weights[i]`` (the input gradient's operand). Neither
-    weight may require a gradient."""
+    weight may require a gradient. ``gates`` (``gate_prologue``): per product None or its atom gates
+    ``[atoms, K_i]``, by which the rows are multiplied before the product."""
     count = len(rows)
-    return _JoinedProducts.apply(list(offsets), list(dims), int(width), count, *rows, *weights, *weights_t)
+    if gates is None or all(gate is None for gate in gates):
+        return _JoinedProducts.apply(list(offsets), list(dims), int(width), count, *rows, *weights, *weights_t)
+    gates = [rows[i].new_empty(0) if gate is None else gate for i, gate in enumerate(gates)]
+    return _GatedJoinedProducts.apply(list(offsets), list(dims), int(width), count, *rows, *gates, *weights,
+                                      *weights_t)
 
 
-__all__ = ["joined_products", "joined_products_input_grads", "joined_products_op"]
+__all__ = ["gated_joined_products_op", "joined_products", "joined_products_input_grads", "joined_products_op"]

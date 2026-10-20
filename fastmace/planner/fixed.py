@@ -84,6 +84,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
+    "RewriteConfig.gate_prologue": "never_automatic",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
 })
@@ -91,7 +92,7 @@ AUTO_RULES = MappingProxyType({
 # adapt_options_to_model's ``requires``: option -> rewrite_support key, in its order.
 STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
-    ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
+    ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"), ("gate_prologue", "fold_cutoff"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
     ("streaming_conv", "streaming_conv"), ("fold_cutoff", "fold_cutoff"), ("factor_species", "factor_species"),
     ("reassociate_first", "reassociate_first"), ("segmented_first_sum", "reassociate_first"),
@@ -99,7 +100,8 @@ STAGE2_SUPPORT = (
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "segmented_first_sum", "fused_radial_hidden", "streaming_conv",
-                  "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "species_skip",
+                  "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "gate_prologue",
+                  "species_skip",
                   "single_graph_strain")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
@@ -553,6 +555,9 @@ class FixedPlanner:
         needs("merged_residual", r.merged_residual != "off", v["block_linear"], "block_linear")
         needs("gated_rows", r.gated_rows != "off", v["merged_residual"], "merged_residual")
         needs("segment_gemm", r.segment_gemm != "off", v["gated_rows"], "gated_rows")
+        needs("gate_prologue", r.gate_prologue == "on", v["segment_gemm"], "segment_gemm")
+        if r.gate_prologue == "auto":
+            v["_why"]["gate_prologue"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
         note("single_graph_strain", r.single_graph_strain != "off",
              "acts where stress is computed (NPT)" if npt else "process-wide; acts only where stress is computed")
@@ -581,6 +586,10 @@ class FixedPlanner:
             v["segment_gemm"] = False
             v["_why"]["segment_gemm"] += ("; off: reproducible=True keeps the stock products" if reproducible
                                           else f"; off: {dtype} keeps the stock products (the Triton GEMM is float32)")
+        if v["gate_prologue"] and not v["segment_gemm"]:
+            book.refuse("RewriteConfig.gate_prologue='on' requires segment_gemm, which is off",
+                        "rewrite-requirement-missing")
+            v["gate_prologue"] = False
         if not hybrid and v["reassociate_first"]:
             if "reassociate_first" in explicit:
                 book.refuse(f"RewriteConfig.reassociate_first='on' on plain cuEq: {PLAIN_CUEQ_REASSOCIATION}",

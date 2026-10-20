@@ -212,3 +212,86 @@ def test_without_a_triton_product_the_stock_join_runs():
     chain = model.interactions[0].gated_rows
     rows = [torch.zeros((4 * d, 1)) for _ in range(2) for d in (1,)]
     assert not chain._any_triton(rows, 4)  # CPU: no SMs, so the shape rule never picks Triton
+
+
+# --------------------------------------------------------------------------- gate_prologue (OPT-T02 stage C)
+
+
+def _rewritten_prologue(prologue):
+    model, batch = tiny("mh1", backend="cueq")
+    regs = registry()
+    out = copy.deepcopy(model)
+    asked = _requests_segment("on") | {"gate_prologue": prologue}
+    resolution = regs.resolve(out, asked, strict=False)
+    applied = regs.apply(out, resolution, context(batch), original=model)
+    return model, out, batch, resolution, applied
+
+
+def test_prologue_record_is_opt_in_rounding_deterministic():
+    record = fusion.RECORDS["gate_prologue"]
+    assert record.default == "off" and record.exactness == "rounding" and record.deterministic
+    assert record.requires == ("segment_gemm",)
+    assert record.source_hashes == {fusion.GATE_FORWARD: fusion.GATE_FORWARD_SHA256}
+    names = reg.default_registry().names()
+    assert names.index("gate_prologue") > names.index("segment_gemm")
+
+
+def test_gated_joined_products_equal_the_joined_products_of_the_gated_rows():
+    """CPU path: the gate applied inside the op equals the gated rows' products, values bitwise and the
+    gradients of the ungated rows and the gates to rounding."""
+    from fastmace.kernels.triton.segment_gemm import joined_products
+
+    _, model, _, _, _ = _rewritten_prologue("on")
+    generator = torch.Generator().manual_seed(7)
+    chain = model.interactions[0].gated_rows
+    second = chain.second
+    products = [(i, o, d, k) for i, o, d, k in chain.joined if i > 0]
+    atoms = 5
+    rows = [torch.randn((atoms * d, second.segments_in[i][1]), generator=generator, dtype=torch.float64)
+            .requires_grad_() for i, _, d, _ in products]
+    gates = [torch.rand((atoms, second.segments_in[i][1]), generator=generator, dtype=torch.float64)
+             .requires_grad_() for i, _, _, _ in products]
+    width = sum(m * d for _, m, d in second.segments_out)
+    grad = torch.randn((atoms, width), generator=generator, dtype=torch.float64)
+    args = ([getattr(second, f"weight_{k}") for *_, k in products],
+            [getattr(second, f"weight_t_{k}") for *_, k in products],
+            [o for _, o, _, _ in products], [d for _, _, d, _ in products], width)
+    gated = [(x.view(atoms, d, -1) * g.unsqueeze(-2)).reshape(atoms * d, -1)
+             for x, g, (_, _, d, _) in zip(rows, gates, products)]
+    stock = joined_products(gated, *args)
+    prologue = joined_products(rows, *args, gates=gates)
+    assert torch.equal(prologue, stock)
+    inputs = [*rows, *gates]
+    for a, b in zip(torch.autograd.grad(prologue, inputs, grad), torch.autograd.grad(stock, inputs, grad)):
+        torch.testing.assert_close(a, b, rtol=1e-13, atol=1e-13)
+
+
+def test_prologue_record_applies_selfchecks_and_keeps_forces(monkeypatch):
+    """With a fake one-SM device and no wave threshold the shape rule sends the tiny model's products to the
+    joined op (its CPU path), so the forward takes the prologue branch: energy bitwise, forces to rounding."""
+    from fastmace.kernels.triton import segment_gemm, tile_rule
+
+    original, model, batch, resolution, applied = _rewritten_prologue("on")
+    assert resolution.decision("gate_prologue").enabled
+    entry = next(entry for entry in applied if entry.name == "gate_prologue")
+    assert entry.result.passed and entry.result.max_relative_error <= 1e-12
+    assert all(i.gated_rows.gate_prologue for i in model.interactions)
+    _, without, _, _, _ = _rewritten_segment("on")
+    calls = []
+    real = segment_gemm.gated_joined_products_op
+    monkeypatch.setattr(segment_gemm, "gated_joined_products_op", lambda *a: calls.append(1) or real(*a))
+    monkeypatch.setattr(tile_rule, "MIN_TRITON_WAVES", 0)
+    for m in (model, without):
+        for interaction in m.interactions:
+            interaction.gated_rows.sms = 1
+    energy, forces = energy_and_forces(without, batch)
+    new_energy, new_forces = energy_and_forces(model, batch)
+    assert calls, "the prologue branch did not run"
+    assert torch.equal(new_energy, energy)
+    torch.testing.assert_close(new_forces, forces, rtol=1e-12, atol=1e-12)
+
+
+def test_prologue_record_needs_segment_gemm():
+    model, _ = tiny("mh1", backend="cueq")
+    asked = requests("on") | {"segment_gemm": "off", "gate_prologue": "on"}
+    assert not registry().resolve(copy.deepcopy(model), asked, strict=False).decision("gate_prologue").enabled

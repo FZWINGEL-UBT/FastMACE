@@ -53,6 +53,7 @@ class GatedRows(torch.nn.Module):
         self.act_gate, self.gate_cst = act_gate, gate_cst
         self.joined = None  # segment_gemm: (input index, output offset, dim) per product of ``second``
         self.sms = None  # segment_gemm: the device's SM count for the shape rule (None: not float32 on CUDA)
+        self.gate_prologue = False  # gate_prologue: the Triton products apply the gate as they load their rows
 
     def join_in_place(self):
         """Let ``second``'s products write straight into its joined output (``segment_gemm``); returns
@@ -92,20 +93,30 @@ class GatedRows(torch.nn.Module):
         scalars = outputs[index].narrow(1, start, length)
         if self.act_scalar is not None:
             scalars = self.act_scalar(scalars) * self.scalar_cst
-        rows = [scalars]
+        joined = self.joined is not None and self._any_triton(None, n)  # segment_gemm: products write in place
+        prologue = set()  # gate_prologue: inputs of second whose Triton GEMM applies the gate as it loads them
+        if joined and self.gate_prologue:
+            from fastmace.kernels.triton import tile_rule
+
+            prologue = {i for i, _, dim, _ in self.joined if i > 0 and tile_rule.uses_triton(n * dim, self.sms)}
+        rows, row_gates = [scalars], {}
         if self.gated:
             index, start, length = self.gates
             gates = outputs[index].narrow(1, start, length)
             if self.act_gate is not None:
                 gates = self.act_gate(gates) * self.gate_cst
-            for segment, offset, mul, dim in self.gated:
+            for i, (segment, offset, mul, dim) in enumerate(self.gated, start=1):
+                gate = gates.narrow(-1, offset, mul)
+                if i in prologue:
+                    rows.append(outputs[segment].reshape(n * dim, mul))
+                    row_gates[i] = gate
+                    continue
                 gated = outputs[segment].view(n, dim, mul)
-                gate = gates.narrow(-1, offset, mul).unsqueeze(-2)
-                rows.append((gated * gate).reshape(n * dim, mul))
+                rows.append((gated * gate.unsqueeze(-2)).reshape(n * dim, mul))
         from fastmace.rewrites.linear.modules import join_rows
 
         second = self.second
-        if self.joined is not None and self._any_triton(rows, n):  # segment_gemm: products write into the output
+        if joined:
             from fastmace.kernels.triton.segment_gemm import joined_products
 
             width = sum(mul * dim for _, mul, dim in second.segments_out)
@@ -113,7 +124,7 @@ class GatedRows(torch.nn.Module):
                                   [getattr(second, f"weight_{k}") for _, _, _, k in self.joined],
                                   [getattr(second, f"weight_t_{k}") for _, _, _, k in self.joined],
                                   [offset for _, offset, _, _ in self.joined], [dim for _, _, dim, _ in self.joined],
-                                  width)
+                                  width, gates=[row_gates.get(i) for i, _, _, _ in self.joined] if row_gates else None)
             return second.transpose_out(out)
         return second.transpose_out(join_rows(second.segments_out, second.products(rows), n, like))
 
