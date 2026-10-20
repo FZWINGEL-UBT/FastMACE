@@ -75,6 +75,10 @@ A test is also marked `@pytest.mark.acceptance` (and keeps `slow`, so that the o
 - a statistical check over tens of thousands of steps (ASE equivalence, the hybrid restart);
 - a timing record (the gate's time on NbCl5).
 
+Fast- and full-tier tests make no step-time assertions: trials and workers share the GPU, so their
+step times are not comparable. A step-time comparison is an acceptance test of its own, which reuses
+the numerical test's measurement when both run in one process (2-T14d).
+
 `tests/cpu/test_tiers.py` fails for an `acceptance` mark without `slow`. When a `-m` expression
 selects acceptance tests (`-m acceptance`, or `-m slow`), `tests/conftest.py` stops the run with a
 usage error if `FASTMACE_BASELINE`, `FASTMACE_HYBRID_PYTHON` or `FASTMACE_MODELS` is unset or names
@@ -143,6 +147,9 @@ Behaviours tested **only in the acceptance tier** (1b-T27):
   (`test_canonical_restart_gpu.py::test_mh1_hybrid_resumes_statistically`; plain cuEq within
   1e-12 Å stays in the full tier);
 - the gate's time on NbCl5 (`test_selfcheck_gpu.py::test_gate_time_on_nbcl5`);
+- the planned MH-1 engine less than 25 % slower than the hand-built one, plain cuEq and hybrid
+  (`test_planner_gpu.py::*planned_is_as_fast_as_hand_built`, 2-T14d; their numerical comparison stays
+  in the full tier);
 - FastMACE against the research engine: the MH-1 engine in plain cuEq NVT and NPT and the hybrid
   (`test_engine_gpu.py::*against_the_research_engine`), and the compiled production force fields
   (`test_forces_gpu.py::test_mh1_agrees_with_maceforces[*compiled-production]`; the eager case stays
