@@ -1449,6 +1449,23 @@ notes folder of the conductor's session (`2-T0x-…md`).
 - **2-T08's audit, decision:** see 2-T08b above. Option a now, the per-model
   strain path (option c) as 2-T08b.
 - **Started:** 2-T06 (pushed 737527d; in trial with 2-T02), 2-T08, 2-T13 and 2-T16.
+- **2-T02 and 2-T06 merged** (28c4978, 875f8a2), trial-merged together.
+  - CPU: 2425 passed.
+  - The combined full GPU tier was killed externally by SIGKILL at 98 %
+    (05:04 CEST). Murphy shows no limit, and no worker kill was found. The
+    last 4 tests then passed on a rerun.
+  - 2-T02's own tier failed only the step-time assertion under GPU sharing.
+- **2-T08 merged** (ba782a5): tests and docs, CPU 2435 passed. A → B → A
+  passes on all three GPU paths, and no lease was needed. 2-T08b started.
+- **2-T13 pushed** (5db9daf). `fm.calc`'s LBFGS compiles once on both
+  backends: call 2 drops from 33.3 s to 0.016 s (plain cuEq) and from
+  23.1 s to 0.024 s (hybrid). The steady-state per-call time is unchanged
+  within the local A/B's resolution (about 2 %). It is in trial now.
+- **2-T16:** acceptance 6 passes bitwise on murphy with
+  `CUEQUIVARIANCE_OPS_U1D_ALGOS=1,1`. Unpinned, 1 of 3 fresh runs differed.
+  The second machine (the local card) is running now.
+- **Order change:** 2-T03 merges before 2-T04b (2-T15 needs 2-T03, and
+  2-T04b is small), and 2-T04b rebases.
 
 ## Phase 1b items carried into phase 2
 
