@@ -1309,6 +1309,14 @@ notes folder of the conductor's session (`2-T0x-…md`).
     the conductor sends "local GPU run done".
   The conductor's first grant wrongly allowed sibling CPU suites alongside
   it and was corrected within minutes.
+- **2-T14b merged:** the raw files of the flaky-test hunt are in
+  `results/2-T14-murphy-20261020/`, and the NAS scratch copy is deleted.
+- **2-T10 merged** (trial on murphy: 2280 passed, 260 skipped, ruff clean).
+  Output chunks, the restart file, `simulation.json` and `metadata.json`
+  are now fsynced, renamed and directory-fsynced. That costs 0.005 ms per
+  restart point on murphy's NFS and 25 ms on WSL ext4, so at most 2.5 µs per
+  step. T21's dependencies (T01, T09 and T10) are now all merged, but T21
+  starts after T02, T03 and T06, which T15 needs (critical path).
 
 ## Phase 1b items carried into phase 2
 
