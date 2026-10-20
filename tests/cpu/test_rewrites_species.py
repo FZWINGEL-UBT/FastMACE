@@ -31,7 +31,7 @@ pytestmark = pytest.mark.skipif(importlib.util.find_spec("cuequivariance_torch")
 from test_rewrites_mh1 import PACKAGE, context, energy_and_forces, relative, tiny  # noqa: E402
 
 LINEAR = ("block_linear", "grouped_linear", "merged_residual", "gated_rows")
-NAMES = ("species_tables", "fold_readout_tail")
+NAMES = ("species_tables", "fold_readout_tail", "fold_product_linear")
 
 
 def registry():
@@ -87,7 +87,8 @@ def test_planner_keeps_them_off_unless_asked():
 
     assert fixed.AUTO_RULES["RewriteConfig.species_tables"] == "never_automatic"
     assert fixed.AUTO_RULES["RewriteConfig.fold_readout_tail"] == "never_automatic"
-    assert RewriteConfig().species_tables == "auto" and RewriteConfig().fold_readout_tail == "auto"
+    assert fixed.AUTO_RULES["RewriteConfig.fold_product_linear"] == "never_automatic"
+    assert all(getattr(RewriteConfig(), name) == "auto" for name in NAMES)
     assert set(NAMES) <= set(fixed.REWRITE_FIELDS)
 
 
@@ -162,7 +163,7 @@ def test_fold_readout_tail_keeps_energy_and_forces_to_round_off():
 def test_both_records_together_keep_energy_and_forces_to_round_off():
     _, without, batch, _, _ = rewritten()
     _, both, _, _, applied = rewritten(species_tables="on", fold_readout_tail="on")
-    assert {item.name for item in applied} >= set(NAMES)
+    assert {item.name for item in applied} >= {"species_tables", "fold_readout_tail"}
     energy_and_forces(without, batch)
     energy, forces = energy_and_forces(without, batch)
     new_energy, new_forces = energy_and_forces(both, batch)
@@ -174,6 +175,43 @@ def test_fold_readout_tail_selfcheck_catches_a_wrong_fold():
     with torch.no_grad():
         model.products[-1].linear.weight_0.mul_(1 + 1e-8)
     assert not species.RECORDS["fold_readout_tail"].selfcheck(original, model, reg.Context()).passed
+
+
+# --------------------------------------------------------------------------- fold_product_linear (C3)
+
+
+def test_fold_product_linear_carries_species_and_folds_the_consumers():
+    _, model, _, resolution, applied = rewritten(species_tables="on", fold_product_linear="on")
+    assert resolution.decision("fold_product_linear").enabled
+    assert isinstance(model.products[0].linear, sm.PadColumns)
+    consumers = (model.interactions[1].skip_tp, model.interactions[1].linear_up, model.readouts[0].linear)
+    assert all(isinstance(c, sm.FoldedConsumer) for c in consumers)
+    result = entry(applied, "fold_product_linear").result
+    assert result.passed and result.max_relative_error <= 1e-12
+
+
+def test_fold_product_linear_needs_species_tables():
+    record = species.RECORDS["fold_product_linear"]
+    assert "species_tables" in record.requires and "block_linear" in record.requires
+    _, _, _, resolution, _ = rewritten(fold_product_linear="on")
+    assert not resolution.decision("fold_product_linear").enabled
+
+
+@pytest.mark.parametrize("tail", ["off", "on"])
+def test_fold_product_linear_keeps_energy_and_forces_to_round_off(tail):
+    _, without, batch, _, _ = rewritten()
+    _, folded, _, _, _ = rewritten(species_tables="on", fold_product_linear="on", fold_readout_tail=tail)
+    energy_and_forces(without, batch)
+    energy, forces = energy_and_forces(without, batch)
+    new_energy, new_forces = energy_and_forces(folded, batch)
+    assert relative(new_energy, energy) <= 1e-12 and relative(new_forces, forces) <= 1e-10
+
+
+def test_fold_product_linear_selfcheck_catches_a_wrong_table():
+    original, model, batch, _, _ = rewritten(species_tables="on", fold_product_linear="on")
+    with torch.no_grad():
+        model.interactions[1].linear_up.table.add_(1e-6)
+    assert not species.RECORDS["fold_product_linear"].selfcheck(original, model, context(batch)).passed
 
 
 def test_compose_block_linears_equals_applying_both():
@@ -224,7 +262,7 @@ def test_simulation_with_both_records_follows_the_default_to_round_off(tmp_path,
         return out
 
     positions, energy, _ = run()
-    new_positions, new_energy, decisions = run(species_tables="on", fold_readout_tail="on")
-    assert decisions["RewriteConfig.species_tables"] == "on" and decisions["RewriteConfig.fold_readout_tail"] == "on"
+    new_positions, new_energy, decisions = run(species_tables="on", fold_readout_tail="on", fold_product_linear="on")
+    assert all(decisions[f"RewriteConfig.{name}"] == "on" for name in NAMES)
     assert float(np.abs(new_positions - positions).max()) <= 1e-12
     assert abs(new_energy - energy) <= 1e-10 * abs(energy)

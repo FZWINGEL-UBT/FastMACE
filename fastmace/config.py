@@ -111,6 +111,9 @@ class RewriteConfig:
     # The last readout's first linear folded into the last product's linear and skip_tp (OPT-T08 C2);
     # opt-in, auto = off.
     fold_readout_tail: Toggle = "auto"
+    # products.0.linear folded into the linear consumers of layer 0's output, with the species carried next to
+    # the contraction (OPT-T08 C3); opt-in, auto = off; needs species_tables.
+    fold_product_linear: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
     # MACE PR 1498 one-graph strain in the stress path (upstream_mace.use_single_graph_strain).

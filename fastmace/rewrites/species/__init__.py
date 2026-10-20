@@ -211,6 +211,92 @@ def _tail_selfcheck(original, rewritten, context):
     return check_tensors(cases, dtype)
 
 
+# --------------------------------------------------------------------------- fold_product_linear
+
+
+def _consumers(model):
+    """(owner, attribute) of every linear consumer of layer 0's output: the second interaction's
+    ``skip_tp`` and ``linear_up`` and, with one readout per layer, the first readout's first linear."""
+    second = model.interactions[1]
+    out = [(second, "skip_tp"), (second, "linear_up")]
+    if len(model.readouts) == len(model.interactions):
+        attribute, _ = _readout_first(model.readouts[0])
+        if attribute is not None:
+            out.append((model.readouts[0], attribute))
+    return out
+
+
+def _product_support(model):
+    supported, reason = _tables_support(model)
+    if not supported:
+        return Support(False, reason)
+    if len(model.interactions) < 2:
+        return Support(False, "one interaction: nothing reads layer 0's output but the readout")
+    if type(model.interactions[1]).__name__ not in FACTORED_INTERACTIONS:
+        return Support(False, f"the second interaction is not of {FACTORED_INTERACTIONS}")
+    if not getattr(model.products[0], "use_sc", True):
+        return Support(False, "the first product has no skip connection")
+    if len(model.readouts) == len(model.interactions):
+        kind = type(model.readouts[0]).__name__
+        if kind not in ("NonLinearReadoutBlock", "LinearReadoutBlock"):
+            return Support(False, f"first readout {kind} is not MACE's linear or nonlinear readout")
+    return Support(True, "ok")
+
+
+def fold_product(model):
+    """Fold ``products.0.linear`` into the linear consumers of layer 0's output (needs species_tables)."""
+    import torch
+
+    from fastmace.rewrites.linear.modules import BlockLinear
+
+    m = _modules()
+    product, skip = model.products[0].linear, model.interactions[0].skip_tp
+    if not isinstance(product, BlockLinear):
+        raise ValueError("fold_product_linear needs block linears (block_linear)")
+    if not isinstance(skip, m.SpeciesTable):
+        raise ValueError("fold_product_linear needs the first skip_tp as a species table (species_tables)")
+    width = sum(mul * dim for _, mul, dim in product.segments_in)
+    elements = len(model.atomic_numbers)
+    names = []
+    with torch.no_grad():
+        for owner, attribute in _consumers(model):
+            consumer = getattr(owner, attribute)
+            if not isinstance(consumer, BlockLinear):
+                raise ValueError(f"fold_product_linear: {attribute} is not a block linear")
+            folded = m.compose(product, consumer)
+            setattr(owner, attribute, m.FoldedConsumer(
+                folded, width, consumer(skip.table), m.ConsumerReference(product, consumer, skip.table, width)))
+            names.append(attribute)
+        carried = torch.cat([skip.table.new_zeros((elements, width)),
+                             torch.eye(elements, dtype=skip.table.dtype, device=skip.table.device)], dim=1)
+        model.interactions[0].skip_tp = m.SpeciesTable(carried, m.SpeciesCarrier(width))
+        model.products[0].linear = m.PadColumns(elements)
+    return ["products.0.linear", "interactions.0.skip_tp", *names]
+
+
+def _product_selfcheck(original, rewritten, context):
+    import torch
+
+    from fastmace.rewrites.linear import _compare, _values_and_gradients
+
+    m = _modules()
+    generator = torch.Generator().manual_seed(context.seed)
+    attrs = _probe_attrs(rewritten, context, generator)
+    cases, dtype = [], None
+    for name, module in rewritten.named_modules():
+        if not isinstance(module, m.FoldedConsumer):
+            continue
+        dtype = dtype or module.table.dtype
+        left = torch.randn((attrs.shape[0], module.width), generator=generator, dtype=torch.float64)
+        left = left.to(dtype=module.table.dtype, device=module.table.device).requires_grad_()
+        grad = torch.randn((attrs.shape[0], module.table.shape[1]), generator=generator,
+                           dtype=torch.float64).to(left)
+        expected = _values_and_gradients(lambda a, f=module.reference: f(torch.cat([a, attrs], dim=1)), (left,), grad)
+        got = _values_and_gradients(lambda a, f=module: f(torch.cat([a, attrs], dim=1)), (left,), grad)
+        cases += _compare(name, expected, got)
+    return check_tensors(cases, dtype)
+
+
 # --------------------------------------------------------------------------- records
 
 
@@ -220,6 +306,10 @@ def _apply_tables(model, context):
 
 def _apply_tail(model, context):
     return fold_tail(model)
+
+
+def _apply_product(model, context):
+    return fold_product(model)
 
 
 RECORDS = {
@@ -234,6 +324,12 @@ RECORDS = {
         mace_versions=MACE_VERSIONS, source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256},
         exactness="rounding", default="off", workload_constraints=(),
         apply=_apply_tail, selfcheck=_tail_selfcheck, deterministic=True),
+    "fold_product_linear": Rewrite(
+        name="fold_product_linear", applies_to=_product_support, requires=("block_linear", "species_tables"),
+        conflicts=(), mace_versions=MACE_VERSIONS,
+        source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256, INTERACTION_FORWARD: INTERACTION_FORWARD_SHA256},
+        exactness="rounding", default="off", workload_constraints=("fixed_species_superset",),
+        apply=_apply_product, selfcheck=_product_selfcheck, deterministic=True),
 }
 
-__all__ = ["RECORDS", "fold_tail", "tabulate"]
+__all__ = ["RECORDS", "fold_product", "fold_tail", "tabulate"]
