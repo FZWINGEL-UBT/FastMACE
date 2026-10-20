@@ -169,8 +169,9 @@ def main(argv=None):
                 entry[v]["max_rel_diff_vs_sequential"] = diff
             entry["flop_tflops_sequential"] = 2 * starts[-1] * CHANNELS * CHANNELS / (base * 1e-6) / 1e12
             summary["cases"][f"{name}/{direction}"] = entry
-            print(name, direction, {v: (round(e["us"], 1), round(e["speedup"], 3), f"{e['max_rel_diff_vs_sequential']:.1e}")
-                                    for v, e in entry.items() if isinstance(e, dict)}, flush=True)
+            shown = {v: (round(e["us"], 1), round(e["speedup"], 3), f"{e['max_rel_diff_vs_sequential']:.1e}")
+                     for v, e in entry.items() if isinstance(e, dict)}
+            print(name, direction, shown, flush=True)
             (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     summary["load_after"] = list(os.getloadavg())
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
