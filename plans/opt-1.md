@@ -209,6 +209,19 @@ runbook's order, including the 19-label gate, the item 4 repeat and item 8
 against `fastmace-1b`. The phase 2 report and a round-1 summary are ready
 for the owner in the morning.
 
+- **OPT-T08 Atom-level linear audit (2-T16 worker; owner, 21 October
+  2026, night: "run the audit tonight and try out everything you can think
+  of").**
+  - **Tonight, CPU only:** an audit of the compiled force pass for
+    multiplies that share an input (merge into one wider GEMM), adjacent
+    linears without a nonlinearity between them (fold W2·W1 at load), and
+    other exact reductions.
+  - **Then:** build every candidate above about 1 % as an opt-in record, and
+    A/B it on both GPUs after the acceptance.
+- **OPT-T03 candidate 2, diagnosis (2-T20; owner):** why grouped_launch's
+  1.3× bench gain becomes a full-step loss. Local nsys/ncu until 02:45 UTC,
+  then a fix attempt.
+
 Not in this round:
 - a complete force megakernel. Our fit gives a ceiling of 8–16 % on NaCl, and
   the report budgets 0–15 % with regression possible. Months of work.
