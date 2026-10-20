@@ -200,7 +200,7 @@ def test_d3_superset_beyond_the_structure_is_phase_3():
     assert plan_label("mh1-r2scan", species=[17, 11]).superset == NA_CL
 
 
-@pytest.mark.parametrize(("mode", "phase"), [("compiled", "phase 3"), ("eager", "phase 2")])
+@pytest.mark.parametrize(("mode", "phase"), [("compiled", "phase 3")])  # eager: 2-T02, reference: 2-T03
 def test_other_modes_are_refused_with_their_phase(mode, phase):
     with pytest.raises(PlanRefused) as caught:
         plan_label("mh1-r2scan", mode=mode)
@@ -289,9 +289,18 @@ def test_the_process_family_is_enforced_at_plan_time():
     record = constraints.ProcessRecord()
     hybrid = plan_label("mh1-r2scan", planner=minimal(process=record))
     assert hybrid.engine.backend == "hybrid" and record.family == constraints.OEQ_FAMILY
+    # An MD plan of the other family runs in a child through the subprocess runner (2-T07); the
+    # process keeps its family.
+    plan = plan_label("mh1-r2scan", planner=minimal(process=record, engine=EngineConfig(backend="cueq")))
+    assert plan.runner == "subprocess" and plan.engine.backend == "cueq"
+    assert plan.decision("runner")[1] == "subprocess"
+    assert plan.decision("runner")[2].code == "runner-subprocess-family"
+    assert record.family == constraints.OEQ_FAMILY
+    # A one-off evaluation has no runner: refused, with the way out named.
     with pytest.raises(ProcessConstraintError) as caught:
-        plan_label("mh1-r2scan", planner=minimal(process=record, engine=EngineConfig(backend="cueq")))
-    assert "subprocess runner" in str(caught.value) and "phase 2" in str(caught.value)
+        minimal(process=record, engine=EngineConfig(backend="cueq")).plan_evaluation_traits(
+            tp.traits("mh1-r2scan"), nacl(), GPU, precision="float32")
+    assert "subprocess runner" in str(caught.value) and "phase 2" not in str(caught.value)
     # Uncompiled plain cuEq compiles nothing: allowed. Auto respects the family.
     plan_label("mh1-r2scan", planner=minimal(process=record, engine=EngineConfig(backend="cueq",
                                                                                   compile_mode="none")))
@@ -299,6 +308,31 @@ def test_the_process_family_is_enforced_at_plan_time():
     plan = plan_label("mh1-r2scan", planner=minimal(process=other), precision="float64")
     assert plan.engine.backend == "cueq"
     assert plan.decision("EngineConfig.backend")[2].code == "backend-cueq-process-family"
+
+
+def test_reproducible_after_cuda_was_initialised_offers_the_runner(monkeypatch):
+    """§8.7: the deterministic settings must precede CUDA's initialisation, so a ``reproducible=True``
+    plan in a process that already initialised CUDA runs in a child (2-T07). Rule 5 still refuses
+    every reproducible plan until 2-T16, so the trigger is tested on ``_claim_family`` itself."""
+    from fastmace.planner import minimal as minimal_module
+
+    planner = minimal()
+    plan = plan_label("mh1-r2scan", planner=planner)
+    reproducible = dataclasses.replace(plan, workload=dataclasses.replace(plan.workload, reproducible=True))
+    monkeypatch.setattr(minimal_module, "_cuda_initialised", lambda: True)
+    offered = planner._claim_family(reproducible, "a test plan", offer_runner=True)
+    assert offered.runner == "subprocess"
+    assert offered.decision("runner")[2].code == "runner-subprocess-reproducible"
+    assert planner._claim_family(plan, "a test plan", offer_runner=True).runner == "in-process"
+    monkeypatch.setattr(minimal_module, "_cuda_initialised", lambda: False)
+    assert planner._claim_family(reproducible, "a test plan", offer_runner=True).runner == "in-process"
+
+
+def test_default_plans_have_no_runner_decision():
+    plan = plan_label("mh1-r2scan")
+    assert plan.runner == "in-process"
+    with pytest.raises(KeyError):
+        plan.decision("runner")
 
 
 # --------------------------------------------------------------------------- the Plan record

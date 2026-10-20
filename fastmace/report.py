@@ -87,6 +87,7 @@ DOWNGRADES = {
     "backend-cueq-requested": "plain cuEq as requested (backend='cueq'); auto would choose hybrid where it builds",
     "host-callbacks-graph-sync": "frequent host callbacks: graph tier with a host sync at each callback (rule 9, "
                                  "owner decision D6); correct but slower",
+    "mode-eager-tier": "eager tier: no CUDA graphs, no compilation (mode='eager', SPEC §8.3); correct but slower",
     "precision-promoted-unqualified-energy": "float64 forces, promoted from float32: this MACE is not the "
                                              "qualified 0.3.16 and its float64 energy forward does not hash, so a "
                                              "float64 model sums the energy (SPEC §18 decision 2)",

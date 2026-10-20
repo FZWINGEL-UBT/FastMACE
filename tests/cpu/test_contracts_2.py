@@ -304,8 +304,8 @@ def test_subprocess_runner_stub():
     assert signature.parameters["config"].default is None
     run = inspect.signature(runner.SubprocessRunner.run)
     assert list(run.parameters) == ["self", "simulation", "steps", "schedule"]
-    _raises_naming("2-T07", lambda: runner.SubprocessRunner().run(None, steps=1))
-    _raises_naming("2-T07", lambda: runner.main(["directory"]))
+    assert runner.HANDOFF_NAME == ".fastmace-handoff"
+    # Implemented by 2-T07 (tests/cpu/test_subprocess_runner.py).
 
 
 def test_reference_force_field_contract():
@@ -321,10 +321,9 @@ def test_reference_force_field_contract():
 def test_fallback_stubs():
     from fastmace.planner import fallback
 
-    assert list(inspect.signature(fallback.candidate).parameters) == ["plan", "changes", "force_field", "atoms"]
+    # 2-T06 filled candidate and activate (tests/cpu/test_fallback_candidates.py); planner= is keyword-only.
+    assert list(inspect.signature(fallback.candidate).parameters)[:4] == ["plan", "changes", "force_field", "atoms"]
     assert list(inspect.signature(fallback.activate).parameters)[:1] == ["candidate"]
-    _raises_naming("2-T06", lambda: fallback.candidate(None, {}, None, None))
-    _raises_naming("2-T06", lambda: fallback.activate(None))
     ddmin = inspect.signature(fallback.ddmin)
     assert list(ddmin.parameters) == ["rewrites", "test", "requires", "budget"]
     _raises_naming("2-T15", lambda: fallback.ddmin(("a",), lambda subset: True, requires={}, budget=None))

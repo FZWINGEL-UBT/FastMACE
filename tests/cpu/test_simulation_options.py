@@ -80,11 +80,15 @@ def test_engine_and_neighbours_reach_the_planner(loaded, cpu_planner):
     assert cpu_planner.engine == CPU and cpu_planner.neighbours == NeighbourConfig()  # not changed in place
 
 
-@pytest.mark.parametrize("mode", ["eager", "compiled"])
+@pytest.mark.parametrize("mode", ["compiled"])
 def test_modes_other_than_graph_reach_the_planner(loaded, mode):
-    with pytest.raises(PlanRefused) as refused:  # until 2-T02 lifts the eager refusal (compiled: phase 3)
+    with pytest.raises(PlanRefused) as refused:  # the compiled MD tier: phase 3
         _simulation(loaded, mode=mode)
     assert f"mode-{mode}" in refused.value.codes
+
+
+def test_eager_mode_reaches_the_planner(loaded):  # 2-T02
+    assert _simulation(loaded, mode="eager").plan.tier == "eager"
 
 
 def test_mode_reference_reaches_the_planner(loaded):

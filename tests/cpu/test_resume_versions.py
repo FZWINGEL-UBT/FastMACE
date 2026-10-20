@@ -91,12 +91,10 @@ def _record(mace_version="0.3.16", **changes):
 
 
 def test_reference_content_drops_only_the_version():
-    from fastmace.simulation import _reference_content_digest
-
     assert _record().id != _record("0.3.17").id  # the id carries the version
-    assert _reference_content_digest(_record()) == _reference_content_digest(_record("0.3.17"))
+    assert _record().content_digest() == _record("0.3.17").content_digest()
     other = _record("0.3.17", numerical=())
-    assert _reference_content_digest(other) != _reference_content_digest(_record())
+    assert other.content_digest() != _record().content_digest()
 
 
 def test_the_resume_finds_the_records_this_fastmace_builds():

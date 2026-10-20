@@ -14,12 +14,15 @@ What 1b decides (the rules of §9.3 that have their tiers in 1b):
   unless ``allow_naive_cueq``; ``atom_count_changes``;
 - **owner decision D3**: the superset must equal the structure's species (compared as sets);
   a larger one is phase 3 (§8.5);
-- **mode**: graph, or reference (plan task 2-T03, SPEC §8.4): the reference calculator as the force
-  field of FastMACE's integrators on an uncaptured, unpadded ``GraphEngine``, every rewrite off, the
-  record's stock uncompiled cuEq backend; ``allow_reference=True`` is recorded (rule 1) and lifts no
-  §4.4 refusal, since the tier shares the integrators. ``reference_fits`` decides whether the tier
-  fits (§9.4 step 5). Other modes refuse with the phase that brings them. ``plan_evaluation``
-  plans the one-off compiled evaluation of ``fm.ForceField.evaluate`` and ``fm.calc``;
+- **mode**: graph; eager (2-T02, SPEC §8.3): the graph plan's backend, rewrites and precision
+  on the graph engine without capture or compilation (no compile family claimed, no speculative
+  graphs, rule 4 lifted: exact edge counts); or reference (2-T03, SPEC §8.4): the reference
+  calculator as the force field of FastMACE's integrators on an uncaptured, unpadded
+  ``GraphEngine``, every rewrite off, the record's stock uncompiled cuEq backend.
+  ``allow_reference=True`` is recorded (rule 1) and lifts no §4.4 refusal, since the tier shares
+  the integrators; ``reference_fits`` decides whether the tier fits (§9.4 step 5). Every other
+  mode refuses with the phase that brings it. ``plan_evaluation`` plans the one-off compiled
+  evaluation of ``fm.ForceField.evaluate`` and ``fm.calc``;
 - **backend** (§9.4, 1a-T00): hybrid when OpenEquivariance can build and MACE was not imported
   before FastMACE could prepare it, else plain cuEq with the reason. The process's compile family
   is respected (§8.7): the first compiled plan fixes it, a later plan of the other family raises
@@ -51,18 +54,24 @@ from . import fixed
 from .plan import Hardware, Plan, SelfCheck, SoftwareTraits
 
 MODES = ("graph", "compiled", "eager", "reference")
-# Modes 1b does not have for MD, and the phase that brings each (SPEC §16; owner decision D6).
+# Modes the minimal planner does not have for MD, and the phase that brings each (SPEC §16; owner decision D6).
 MODE_REFUSALS = {
     "compiled": "mode 'compiled' for MD is not in 1b: the compiled MD tier comes in phase 3 (SPEC §16, owner "
                 "decision D6)",
-    "eager": "mode 'eager' for MD is not in 1b: the eager tier comes with the fallback algorithm in phase 2 "
-             "(SPEC §9.4, §16)",
 }
+# The modes with an MD tier, and their mode decision.
+MODE_TIERS = {
+    "graph": Reason("molecular dynamics on the graph tier (SPEC §8.1)", code="mode-graph"),
+    "eager": Reason("molecular dynamics on the eager tier: the graph plan's backend, rewrites and precision, "
+                    "without CUDA graphs or compilation (SPEC §8.3)", code="mode-eager-tier"),
+    "reference": Reason("molecular dynamics on the reference tier: MACE's calculator with the reference record's "
+                        "corrections, FastMACE's integrators, noise, output and restart (SPEC §8.4)",
+                        code="mode-reference"),
+}
+EAGER_CAPTURE = "eager tier: no CUDA graphs"
 REFERENCE_TIER = "reference"
 # The reference tier's reasons (plan task 2-T03; SPEC §8.4).
 REFERENCE_REASONS = {
-    "mode": "molecular dynamics on the reference tier: MACE's calculator with the reference record's corrections, "
-            "FastMACE's integrators, noise, output and restart (SPEC §8.4)",
     "tier": "reference tier: MACE's calculator through the versioned reference record (SPEC §8.4, §12.1), no "
             "CUDA graphs, no padding, MACE's own neighbour list",
     "backend": "reference tier: the record's stock calculator, MACE's cuEquivariance model (SPEC §12.1)",
@@ -127,6 +136,19 @@ def _error_text(error) -> str:
     text = getattr(error, "what", None) or (str(error).splitlines() or [""])[0]
     why = getattr(error, "why", None)
     return f"{type(error).__name__}: {text}" + (f" ({why})" if why else "")
+
+
+def _cuda_initialised() -> bool:
+    """Whether this process has initialised CUDA (without importing torch to find out)."""
+    import sys
+
+    torch = sys.modules.get("torch")
+    return torch is not None and bool(torch.cuda.is_initialized())
+
+
+def _in_child(plan, reason):
+    """``plan`` marked to run in a child through the subprocess runner (SPEC §8.7, 2-T07)."""
+    return dataclasses.replace(plan, runner="subprocess", decisions=(*plan.decisions, ("runner", "subprocess", reason)))
 
 
 def _symbols(numbers):
@@ -211,12 +233,13 @@ class MinimalPlanner:
         """The engine device's ``Hardware``, after the process's allocator settings (as ``FixedPlanner``)."""
         return self._fixed("auto", "float32").hardware()
 
-    def _backend(self, book, software):
+    def _backend(self, book, software, engine=None):
         """(backend, Reason) of the backend rule (§9.4, 1a-T00, §8.7), with refusals in ``book``."""
         from fastmace.engine import constraints
 
-        request = self.engine.backend
-        compiled = self.engine.compile_mode != "none"
+        engine = engine or self.engine
+        request = engine.backend
+        compiled = engine.compile_mode != "none"
         family = self.process.family
         if self._device_type() != "cuda":
             code, why = "backend-cueq-cpu", "CPU device: the hybrid backend needs CUDA"
@@ -309,14 +332,37 @@ class MinimalPlanner:
             code="allow-naive-cueq" if problems else "fused-cueq"))
         return superset, effective, requested
 
-    def _claim_family(self, plan, owner):
-        """The process's compile family (§8.7): the first compiled plan fixes it."""
-        from fastmace.engine import constraints
+    def _claim_family(self, plan, owner, *, offer_runner=False):
+        """The process's compile family (§8.7): the first compiled plan fixes it; returns the plan.
 
+        With ``offer_runner`` (MD plans), a plan that a process constraint forbids here is returned with
+        ``runner="subprocess"`` and a ``runner`` decision instead of raising ``ProcessConstraintError``
+        (2-T07): a compiled plan of the other family, or ``reproducible=True`` after CUDA was
+        initialised. Such a plan claims nothing in this process; the child plans for itself.
+        """
+        from fastmace.engine import constraints
+        from fastmace.errors import ProcessConstraintError
+
+        workload = plan.workload
+        if (offer_runner and workload is not None and workload.reproducible
+                and str(plan.engine.device).startswith("cuda") and _cuda_initialised()):
+            return _in_child(plan, Reason(
+                "reproducible=True after CUDA was initialised in this process: CUBLAS_WORKSPACE_CONFIG and "
+                "deterministic algorithms must be set before (SPEC §8.7, owner decision 14), so the plan runs in a "
+                "child process", code="runner-subprocess-reproducible"))
         if plan.engine.compile_mode == "none":
-            return
+            return plan
         family = constraints.OEQ_FAMILY if plan.engine.backend == "hybrid" else constraints.AUTOGRAD_FAMILY
-        self.process.claim_family(family, owner)
+        try:
+            self.process.claim_family(family, owner)
+        except ProcessConstraintError:
+            if not offer_runner:
+                raise
+            return _in_child(plan, Reason(
+                f"this process already compiled a {self.process.family} model ({self.process.family_owner}); one "
+                f"compile family per process, so this {family} plan runs in a child process (SPEC §8.7)",
+                code="runner-subprocess-family"))
+        return plan
 
     # ------------------------------------------------------------------ plans
 
@@ -353,11 +399,10 @@ class MinimalPlanner:
         software = self.software or detect_software(self.engine.device)
         book = fixed._Book()
         reference = mode == REFERENCE_TIER
-        book.decide("mode", mode, Reason("molecular dynamics on the graph tier (SPEC §8.1)" if mode == "graph"
-                                         else REFERENCE_REASONS["mode"] if reference else MODE_REFUSALS[mode],
-                                         code=f"mode-{mode}"))
-        if mode not in ("graph", REFERENCE_TIER):
+        book.decide("mode", mode, MODE_TIERS.get(mode) or Reason(MODE_REFUSALS[mode], code=f"mode-{mode}"))
+        if mode not in MODE_TIERS:
             book.refuse(MODE_REFUSALS[mode], f"mode-{mode}")
+        engine = self._mode_engine(mode)
         book.decide("allow_reference", "on" if allow_reference else "off", Reason(
             "allowed (SPEC §9.3 rule 1); the reference tier runs FastMACE's integrators, so it lifts no refusal of "
             "§4.4 (3D PBC, no constraints, a barostat for a variable cell)" if allow_reference else "not requested",
@@ -375,22 +420,24 @@ class MinimalPlanner:
         if reference:
             backend = ("cueq", Reason(REFERENCE_REASONS["backend"], code="backend-reference-stock"))
         else:
-            backend = self._backend(book, software)
+            backend = self._backend(book, software, engine)
         superset, precision, requested = self._common(book, traits, atoms, species, precision, software, backend[0],
                                                       allow_naive_cueq, loaded)
         self._workload_decisions(book, workload)
         if reference:
             parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend)
         else:
-            parts = self._fixed(rewrites, precision)._resolve(book, traits, atoms, integrator, hardware,
-                                                              backend_choice=backend, texts=TEXTS)
+            parts = self._fixed(rewrites, precision, engine)._resolve(book, traits, atoms, integrator, hardware,
+                                                                      backend_choice=backend, texts=TEXTS)
+        if mode == "eager":
+            self._eager(book, parts, traits)
         book.raise_refusals()
         parts["requested"] = parts["requested"] + requested
         allowances = tuple(name for name, used in (("allow_naive_cueq", allow_naive_cueq),
                                                    ("allow_reference", allow_reference)) if used)
         plan = Plan(**parts, superset=superset, workload=workload, software=software, allowances=allowances,
                     reason="reference tier (phase 2)" if reference else "minimal plan (phase 1b)")
-        self._claim_family(plan, f"a {plan.engine.backend} MD plan")
+        plan = self._claim_family(plan, f"a {plan.engine.backend} MD plan", offer_runner=True)
         return plan
 
     def _reference_parts(self, book, traits, atoms, integrator, hardware, rewrites, precision, backend):
@@ -424,6 +471,37 @@ class MinimalPlanner:
             decisions=tuple(book.decisions),
             requested=self._fixed(rewrites, precision)._requested())
         return parts
+
+    def _mode_engine(self, mode):
+        """The planner's ``EngineConfig`` for ``mode``: the eager tier compiles nothing and captures no graphs."""
+        if mode != "eager":
+            return self.engine
+        return dataclasses.replace(self.engine, compile_mode="none", speculative_graph=False)
+
+    def _eager(self, book, parts, traits):
+        """The graph tier's decisions made eager (2-T02): tier, capture, and rule 4 lifted (exact edge counts).
+
+        ``parts`` holds the decisions as ``_resolve`` left them, and the eager engine's options as if
+        requested; the requested options stay the caller's.
+        """
+        book.refusals = [reason for reason in book.refusals if getattr(reason, "code", None) != "inexact-padding"]
+        replaced = {
+            "tier": (fixed.EAGER_TIER, "the graph engine without CUDA graphs or compilation, exact edge counts "
+                                       "(SPEC §8.3)"),
+            "capture": ("off", f"{EAGER_CAPTURE} (SPEC §8.3)"),
+            "EngineConfig.compile_mode": ("none", "eager tier: no compilation (SPEC §8.3)"),
+            "EngineConfig.speculative_graph": ("off", "eager tier: speculative combined graphs need CUDA graphs"),
+        }
+        book.decisions = [(key, *replaced[key]) if key in replaced else (key, choice, reason)
+                          for key, choice, reason in book.decisions]
+        if not traits.padding_is_exact:
+            book.decide("padding", "exact edge counts", Reason(
+                "edge padding is not exact for this model; the eager tier uses exact edge counts, so rule 4 does "
+                "not apply (SPEC §9.3 rule 4)", rule=4, code="eager-exact-edges"))
+        own = set(self._fixed("auto", "float32")._requested())
+        parts.update(tier=fixed.EAGER_TIER, decisions=tuple(book.decisions),
+                     requested=tuple(entry for entry in parts["requested"]
+                                     if entry in own or not entry[0].startswith("EngineConfig.")))
 
     def _workload_decisions(self, book, workload):
         book.decide("workload.max_temperature_K", f"{workload.max_temperature_K:g} K", Reason(
@@ -500,8 +578,9 @@ class MinimalPlanner:
         its ``ReferenceForceField`` on an uncaptured, unpadded ``GraphEngine`` (``build_reference``)."""
         if plan.tier == REFERENCE_TIER:
             return self.build_reference(plan, force_field, atoms, temperature_K=temperature_K)
-        if plan.tier != fixed.TIER:
-            raise ValueError(f"MinimalPlanner.build builds tier {fixed.TIER!r} plans, not {plan.tier!r}; "
+        if plan.tier not in (fixed.TIER, fixed.EAGER_TIER):
+            raise ValueError(f"MinimalPlanner.build builds tier {fixed.TIER!r} and {fixed.EAGER_TIER!r} plans, "
+                             f"not {plan.tier!r}; "
                              "use build_evaluation for an evaluation plan")
         self._check_atoms(plan, atoms)
         model = self._execution_model(plan, force_field)
@@ -509,7 +588,7 @@ class MinimalPlanner:
             temperature_K = plan.integrator.temperature_K or 0.0
         engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
             plan, model, atoms, temperature_K=temperature_K, compile_cache=compile_cache, constraints=self.process,
-            check=check)
+            check=check, capture=False if plan.tier == fixed.EAGER_TIER else None)
         # The built plan with its per-record self-checks (SPEC §6.4, 2-T04); the caller records it.
         engine.plan = dataclasses.replace(plan, selfchecks=tuple(
             SelfCheck.from_mapping(record) for record in engine.force_field.selfcheck_records()))
