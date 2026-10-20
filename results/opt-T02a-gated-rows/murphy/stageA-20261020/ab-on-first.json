@@ -1,0 +1,368 @@
+{
+  "tool": "opt-T02a ab_gated_rows",
+  "created_utc": "2026-10-20T18:46:32.074332+00:00",
+  "host": "murphy",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "fbb03ed2862aded5f1192ff1400433e6c0ed880f",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abba",
+  "order": [
+    "on",
+    "off"
+  ],
+  "load": [
+    1.083984375,
+    1.2314453125,
+    2.2568359375
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "on",
+          "off"
+        ],
+        "pattern": "abba",
+        "order": [
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on"
+        ],
+        "sides": {
+          "on": {
+            "median_ms": 3.483304154748718,
+            "mean_ms": 3.455275856475863,
+            "min_ms": 3.3310940116643906,
+            "max_ms": 3.5972363005081816,
+            "stdev_ms": 0.08001853516299369,
+            "spread": 0.07640512485278227,
+            "block_ms": [
+              3.3310940116643906,
+              3.354367446154356,
+              3.3637786780794463,
+              3.3781362076600394,
+              3.5972363005081816,
+              3.514297983298699,
+              3.4803716527918973,
+              3.4867492256065207,
+              3.474470960597197,
+              3.4862366567055383,
+              3.508851615091165,
+              3.487719539552927
+            ]
+          },
+          "off": {
+            "median_ms": 3.6471372594436007,
+            "mean_ms": 3.6167061453064284,
+            "min_ms": 3.4915893897414207,
+            "max_ms": 3.7677878700196743,
+            "stdev_ms": 0.08595729645404347,
+            "spread": 0.07573021266558796,
+            "block_ms": [
+              3.4915893897414207,
+              3.502704327305158,
+              3.520944559325774,
+              3.5237430470685163,
+              3.7677878700196743,
+              3.674374495943387,
+              3.6485024665792785,
+              3.651547164966663,
+              3.6440059604744115,
+              3.6457720523079233,
+              3.675456289201975,
+              3.6540461207429566
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0470338211699177,
+        "pair_ratios_b_over_a": [
+          1.048180981237704,
+          1.0442220131014162,
+          1.0467230148851714,
+          1.0431027141766245,
+          1.0474118337701082,
+          1.0455500681517145,
+          1.048308293067641,
+          1.0472640642320572,
+          1.0487944788717056,
+          1.0457614933557449,
+          1.0474812538080158,
+          1.0476892076050788
+        ]
+      },
+      "ratio_on_over_off": 0.9550789857796915,
+      "setup_s": {
+        "on": 31.535469291731715,
+        "off": 23.75920246168971
+      },
+      "plan_lines": {
+        "on": [
+          "RewriteConfig.gated_rows = on  (requested 'on': stage 1: on (with merged_residual); stage 2: supported (ok))",
+          "requested: RewriteConfig.gated_rows=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ],
+        "off": [
+          "RewriteConfig.gated_rows = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            2,
+            4
+          ],
+          "aot_autograd.ok": [
+            4,
+            6
+          ],
+          "aot_autograd.total": [
+            4,
+            6
+          ],
+          "frames.ok": [
+            9,
+            11
+          ],
+          "frames.total": [
+            9,
+            11
+          ],
+          "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x72a4bede1c60>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+            4,
+            6
+          ],
+          "inductor.async_compile_cache_hit": [
+            195,
+            386
+          ],
+          "inductor.async_compile_cache_miss": [
+            388,
+            770
+          ],
+          "inductor.decompose_mm": [
+            4,
+            8
+          ],
+          "inductor.extern_calls": [
+            218,
+            436
+          ],
+          "inductor.fxgraph_cache_miss": [
+            4,
+            8
+          ],
+          "inductor.pattern_matcher_count": [
+            314,
+            628
+          ],
+          "inductor.pattern_matcher_nodes": [
+            336,
+            672
+          ],
+          "inductor.removed_pointless_view_pair": [
+            4,
+            8
+          ],
+          "inductor.triton_bundler_save_kernel": [
+            1528,
+            3056
+          ],
+          "inductor.triton_bundler_save_static_autotuner": [
+            4,
+            8
+          ],
+          "stats.calls_captured": [
+            1326,
+            2650
+          ],
+          "stats.unique_graphs": [
+            4,
+            6
+          ]
+        },
+        "recompiled": true
+      },
+      "observables": {
+        "on": {
+          "temperature_K": 269.48214520619047,
+          "potential_eV_atom": -6.847992560377827,
+          "kinetic_eV_atom": 0.034833249978355185
+        },
+        "off": {
+          "temperature_K": 269.4821657339331,
+          "potential_eV_atom": -6.847992558170248,
+          "kinetic_eV_atom": 0.03483325263177027
+        }
+      },
+      "load_after": [
+        1.18408203125,
+        1.28076171875,
+        2.1484375
+      ],
+      "other_gpu_processes": [],
+      "valid": false
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "on",
+          "off"
+        ],
+        "pattern": "abba",
+        "order": [
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on",
+          "on",
+          "off",
+          "off",
+          "on"
+        ],
+        "sides": {
+          "on": {
+            "median_ms": 28.58182467830678,
+            "mean_ms": 28.461721336676018,
+            "min_ms": 27.7872189010183,
+            "max_ms": 28.655004476507504,
+            "stdev_ms": 0.28544051357696437,
+            "spread": 0.030361447712183395,
+            "block_ms": [
+              27.7872189010183,
+              27.952418445299067,
+              28.447667341679335,
+              28.49827686945597,
+              28.529916753371555,
+              28.57848900059859,
+              28.585160356014967,
+              28.612848923852045,
+              28.616857615609966,
+              28.6298864086469,
+              28.655004476507504,
+              28.646910948057972
+            ]
+          },
+          "off": {
+            "median_ms": 31.39367033727467,
+            "mean_ms": 31.268339111055766,
+            "min_ms": 30.623186280330025,
+            "max_ms": 31.443821725745995,
+            "stdev_ms": 0.2905475194525793,
+            "spread": 0.026140156171596297,
+            "block_ms": [
+              30.623186280330025,
+              30.682132728397846,
+              31.317797663311165,
+              31.31559380640586,
+              31.387923744817574,
+              31.382689885795116,
+              31.399416929731764,
+              31.400897713998955,
+              31.419908776879307,
+              31.416167772064608,
+              31.443821725745995,
+              31.430532305190958
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0983788015851221,
+        "pair_ratios_b_over_a": [
+          1.1020601374111534,
+          1.0976557462618357,
+          1.1008915876004615,
+          1.0988592029565636,
+          1.1001757914736385,
+          1.0981227833682106,
+          1.0984516629840984,
+          1.0974404470371615,
+          1.0979510468591887,
+          1.097320727146727,
+          1.0973239160204937,
+          1.0971700356167615
+        ]
+      },
+      "ratio_on_over_off": 0.9104327200751261,
+      "setup_s": {
+        "on": 32.12191947735846,
+        "off": 33.527674321085215
+      },
+      "plan_lines": {
+        "on": [
+          "RewriteConfig.gated_rows = on  (requested 'on': stage 1: on (with merged_residual); stage 2: supported (ok))",
+          "requested: RewriteConfig.gated_rows=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ],
+        "off": [
+          "RewriteConfig.gated_rows = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "on": {
+          "temperature_K": 296.4696746810078,
+          "potential_eV_atom": -10.58537599174574,
+          "kinetic_eV_atom": 0.03832165682540349
+        },
+        "off": {
+          "temperature_K": 296.46951833810016,
+          "potential_eV_atom": -10.585376000208129,
+          "kinetic_eV_atom": 0.03832163661652628
+        }
+      },
+      "load_after": [
+        1.0,
+        1.09375,
+        1.81787109375
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

@@ -1,0 +1,376 @@
+{
+  "tool": "opt-T02a ab_gated_rows",
+  "created_utc": "2026-10-20T18:39:25.678767+00:00",
+  "host": "murphy",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "fbb03ed2862aded5f1192ff1400433e6c0ed880f",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "order": [
+    "off",
+    "on"
+  ],
+  "load": [
+    1.19287109375,
+    1.548828125,
+    2.89501953125
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "off",
+          "on"
+        ],
+        "pattern": "abab",
+        "order": [
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on"
+        ],
+        "sides": {
+          "off": {
+            "median_ms": 3.6293177989621954,
+            "mean_ms": 3.603496140696936,
+            "min_ms": 3.4857024500767393,
+            "max_ms": 3.7623578185836477,
+            "stdev_ms": 0.08132509273633765,
+            "spread": 0.0762279259716573,
+            "block_ms": [
+              3.4857024500767393,
+              3.505562152713537,
+              3.512886483222246,
+              3.518210637072722,
+              3.7623578185836477,
+              3.6521667738755546,
+              3.6314293990532556,
+              3.630934997151295,
+              3.625051832447449,
+              3.627700600773096,
+              3.654215664913257,
+              3.6357348784804344
+            ]
+          },
+          "on": {
+            "median_ms": 3.4659942022214336,
+            "mean_ms": 3.4410292784579926,
+            "min_ms": 3.3315957399706044,
+            "max_ms": 3.5731591656804085,
+            "stdev_ms": 0.07521601887649637,
+            "spread": 0.06969527691505675,
+            "block_ms": [
+              3.3315957399706044,
+              3.3417332669099173,
+              3.3518717624247074,
+              3.3657618425786495,
+              3.5731591656804085,
+              3.4970853167275586,
+              3.466501161456108,
+              3.473041318356991,
+              3.464310715595881,
+              3.4654872429867587,
+              3.490603802104791,
+              3.4712000067035356
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9549988163650303,
+        "pair_ratios_b_over_a": [
+          0.9557889084586833,
+          0.9532660159293409,
+          0.9541645534045707,
+          0.9566686562516578,
+          0.949712743437448,
+          0.9575371370613974,
+          0.9545831077866623,
+          0.9565143196123912,
+          0.95565825696262,
+          0.9552848000323488,
+          0.9552265444047485,
+          0.9547450853056517
+        ]
+      },
+      "ratio_on_over_off": 0.9549988163650303,
+      "setup_s": {
+        "off": 39.25652713701129,
+        "on": 23.096622843295336
+      },
+      "plan_lines": {
+        "off": [
+          "RewriteConfig.gated_rows = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))"
+        ],
+        "on": [
+          "RewriteConfig.gated_rows = on  (requested 'on': stage 1: on (with merged_residual); stage 2: supported (ok))",
+          "requested: RewriteConfig.gated_rows=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            2,
+            4
+          ],
+          "aot_autograd.ok": [
+            4,
+            6
+          ],
+          "aot_autograd.total": [
+            4,
+            6
+          ],
+          "frames.ok": [
+            9,
+            11
+          ],
+          "frames.total": [
+            9,
+            11
+          ],
+          "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/mnt/homes/zwingel/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x73f21a8edc60>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+            4,
+            6
+          ],
+          "inductor.async_compile_cache_hit": [
+            195,
+            386
+          ],
+          "inductor.async_compile_cache_miss": [
+            388,
+            770
+          ],
+          "inductor.benchmarking.InductorBenchmarker.benchmark": [
+            85,
+            174
+          ],
+          "inductor.benchmarking.InductorBenchmarker.benchmark_gpu": [
+            85,
+            174
+          ],
+          "inductor.decompose_mm": [
+            4,
+            8
+          ],
+          "inductor.extern_calls": [
+            218,
+            436
+          ],
+          "inductor.fxgraph_cache_miss": [
+            4,
+            8
+          ],
+          "inductor.pattern_matcher_count": [
+            314,
+            628
+          ],
+          "inductor.pattern_matcher_nodes": [
+            336,
+            672
+          ],
+          "inductor.removed_pointless_view_pair": [
+            4,
+            8
+          ],
+          "inductor.triton_bundler_save_kernel": [
+            1952,
+            3936
+          ],
+          "inductor.triton_bundler_save_static_autotuner": [
+            4,
+            8
+          ],
+          "stats.calls_captured": [
+            1326,
+            2650
+          ],
+          "stats.unique_graphs": [
+            4,
+            6
+          ]
+        },
+        "recompiled": true
+      },
+      "observables": {
+        "off": {
+          "temperature_K": 269.48213680078413,
+          "potential_eV_atom": -6.847992578038463,
+          "kinetic_eV_atom": 0.034833248891872746
+        },
+        "on": {
+          "temperature_K": 269.4821568281469,
+          "potential_eV_atom": -6.847992568104355,
+          "kinetic_eV_atom": 0.03483325148060875
+        }
+      },
+      "load_after": [
+        1.3388671875,
+        1.53076171875,
+        2.6953125
+      ],
+      "other_gpu_processes": [],
+      "valid": false
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "off",
+          "on"
+        ],
+        "pattern": "abab",
+        "order": [
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on"
+        ],
+        "sides": {
+          "off": {
+            "median_ms": 31.366695469866194,
+            "mean_ms": 31.22930570246859,
+            "min_ms": 30.47410779322187,
+            "max_ms": 31.440489925444126,
+            "stdev_ms": 0.3245726597235187,
+            "spread": 0.03080917889965984,
+            "block_ms": [
+              30.47410779322187,
+              30.62953822935621,
+              31.227049995213747,
+              31.266864854842424,
+              31.33041693518559,
+              31.358794712771967,
+              31.37459622696042,
+              31.39671117688219,
+              31.40871789927284,
+              31.417743439475696,
+              31.440489925444126,
+              31.426637240995966
+            ]
+          },
+          "on": {
+            "median_ms": 28.55277253004412,
+            "mean_ms": 28.43618936267578,
+            "min_ms": 27.792927157133818,
+            "max_ms": 28.643204203496378,
+            "stdev_ms": 0.29399547096672407,
+            "spread": 0.02977914125389652,
+            "block_ms": [
+              27.792927157133818,
+              27.862168444941442,
+              28.40524571016431,
+              28.4570780582726,
+              28.49920304492116,
+              28.542499747127295,
+              28.563045312960945,
+              28.59741502751907,
+              28.611079584807158,
+              28.62888576462865,
+              28.643204203496378,
+              28.63152029613654
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9102894679318262,
+        "pair_ratios_b_over_a": [
+          0.9120177478441418,
+          0.9096502936579552,
+          0.9096358994691479,
+          0.910135320262701,
+          0.9096336989028436,
+          0.9101912241385465,
+          0.9103876622455626,
+          0.910841102636754,
+          0.9109279683609609,
+          0.9112330368277529,
+          0.9110291942466213,
+          0.911058987208049
+        ]
+      },
+      "ratio_on_over_off": 0.9102894679318262,
+      "setup_s": {
+        "off": 20.60992252640426,
+        "on": 20.17806257121265
+      },
+      "plan_lines": {
+        "off": [
+          "RewriteConfig.gated_rows = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))"
+        ],
+        "on": [
+          "RewriteConfig.gated_rows = on  (requested 'on': stage 1: on (with merged_residual); stage 2: supported (ok))",
+          "requested: RewriteConfig.gated_rows=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "off": {
+          "temperature_K": 296.4695769935586,
+          "potential_eV_atom": -10.585375994198607,
+          "kinetic_eV_atom": 0.038321644198328196
+        },
+        "on": {
+          "temperature_K": 296.46956384408605,
+          "potential_eV_atom": -10.585376000330772,
+          "kinetic_eV_atom": 0.03832164249862797
+        }
+      },
+      "load_after": [
+        1.00439453125,
+        1.22216796875,
+        2.26513671875
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}
