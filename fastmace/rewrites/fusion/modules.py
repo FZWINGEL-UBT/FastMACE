@@ -81,6 +81,7 @@ class GatedRows(torch.nn.Module):
         like = rows[0]
         sms = tile_rule.device_sms(like.device) if like.dtype == torch.float32 else None
         second = self.second
+        n = int(n)  # the atom count is fixed per engine; under torch.compile this specialises on it
         return any(tile_rule.segment_gemm_choice(n * dim, int(getattr(second, f"weight_{k}").shape[1]),
                                                  int(getattr(second, f"weight_{k}").shape[0]), sms).backend == "triton"
                    for _, _, dim, k in self.joined)
