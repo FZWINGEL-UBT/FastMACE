@@ -141,3 +141,24 @@ Still open: plain cuEq on the GPU asks for the fused convolution on `cuda:0`, wh
 rule does not give. On an unhashed converter that conversion raises `UnqualifiedPatchError`. The
 planner's `cueq_conv_fusion` decision is `fixed.py`'s (T02), and the hybrid default does not
 convert through this path.
+
+## GPU check: MH-1 on NaCl, MACE 0.3.15 (local RTX 5060 Ti)
+
+Run on 20 October 2026: local PC (WSL2), RTX 5060 Ti 16 GB, `fastmace_mace_other` (mace-torch
+0.3.15, torch 2.14.1+cu130, cuEquivariance 0.12.0), FastMACE at 67c09ff. MH-1 `matpes_r2scan` on
+NaCl 3x3x3 (216 atoms), NVT 300 K, 200 steps, `check="gate"`, plain cuEq (no OEq in this
+environment) with `cueq_conv_fusion="off"`. The run did not complete. It failed twice, on
+grounds outside the hash rules:
+
+1. **No compilation on 0.3.15.** `model/compile.py` imports
+   `mace.tools.compile.configure_autograd_for_compile`, which MACE 0.3.15 lacks (`ImportError`
+   at build).
+2. **No CUDA graph capture of the uncompiled 0.3.15 model.** With `compile_mode="none"`, MACE
+   0.3.15's `RealAgnosticResidualNonLinearInteractionBlock.forward` (unhashed, so its MH-1
+   rewrites are off) calls `torch.nonzero(node_attrs)` inside the capture
+   (`cudaErrorStreamCaptureUnsupported`).
+
+So on 0.3.15 the GPU path that is left is the eager tier (2-T02, `mode="eager"`). Two pieces
+reach it: 2-T15's fallback takes a capture failure to eager, and a planner rule leaves
+compilation off when MACE lacks its compile API. The GPU part of acceptance 1 is re-run after
+2-T02 and 2-T15 merge. The CPU part, where nothing is compiled or captured, passes (see above).
