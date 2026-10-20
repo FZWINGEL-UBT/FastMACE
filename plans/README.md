@@ -25,8 +25,9 @@ workers"). 2-T21 works in the ResearchModule worktree
 
 - Phase 1b: done, tagged `fastmace-1b` (673a8a1, with 1b-T27).
 - Merged in phase 2: 2-T11, 2-T01, 2-T14, 2-T09, 2-T12, 2-T10 (20 October 2026).
-- Working in phase 2: 2-T04, 2-T05 (local GPU), 2-T07, 2-T18.
-- Next go messages: 2-T02, 2-T03 and 2-T06 as slots free up, then 2-T21.
+- Working in phase 2: 2-T02, 2-T05 (local GPU), 2-T07 (murphy GPU), 2-T18; 2-T04 in
+  trial (CPU green, full GPU tier running on murphy).
+- Next go messages: 2-T03 and 2-T06 as slots free up, then 2-T21.
 - Waiting for go: the rest. Answers to all prestart reports are in
   `phase-2.md`, "Conductor answers to the prestart reports".
 

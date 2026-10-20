@@ -188,3 +188,21 @@ commands. Never print the token.
   `TORCHINDUCTOR_COMPILE_THREADS=4`, starts only with at least 10 GB
   available, and no CPU suite starts while it runs. CPU suites need at
   least 6 GB available.
+- **Near-miss on 20 October 2026 (about 02:05).**
+  - What happened: a local GPU run (2-T05) started with 12 GB available,
+    while two sibling CPU suites (T04's and T07's) were still running.
+    Within two minutes, the run's main process (5.4 GB) and 5 compile
+    workers had brought available memory down to 4.8 GB.
+  - Why: the conductor's "wait for local machine free" and the siblings'
+    hold messages were still queued in the receivers' turns.
+  - Lessons:
+    - "10 GB available" is not enough on its own: a local GPU run also
+      needs no other local `pytest` process running.
+    - Deliver an urgent hold to a busy worker by stopping its turn
+      (`stop_session`; its detached jobs keep running), so that the queued
+      message is read at once.
+    - The conductor cannot kill another session's processes (the
+      permission check refuses it); the owning worker does it, by process
+      group.
+    - 2-T18 adds a local GPU reservation (`~/.fastmace-local-gpu`) that every
+      local GPU run takes and every local CPU suite checks first.
