@@ -154,7 +154,8 @@ NbCl5. That agrees with the 8–16 % ceiling of a persistent kernel in `plans/op
 
 - **Atom-level GEMMs are near the hardware on large cells, not on small ones.**
   - NbCl5 runs them at 12.6 TFLOPS and its largest shapes at 15.1 TFLOPS. This card's SGEMM ceiling is
-    PEAK_LINE.
+    16.2 TFLOPS at 4096³, and 13.5–14.8 TFLOPS at the [7560–13608, 512] × [512, 512] shapes (the research
+    engine's standalone cuBLAS test, 15 October 2026). The local 4096³ rerun of OPT-T01 is pending.
   - NaCl runs them at 8.7 TFLOPS, with the l = 0 shapes at 5.8 TFLOPS on less than half a wave.
   - So the remaining GEMM gain on large cells has to come from less arithmetic or less traffic. On small
     cells, fuller grids (grouping, split-K by a shape rule: OPT-T03) can still help.
@@ -164,6 +165,56 @@ NbCl5. That agrees with the 8–16 % ceiling of a persistent kernel in `plans/op
   (0.5 %). This confirms that a megakernel is not this round's lever.
 - **OPT-T01 (tensor cores):** see `docs/validation/opt-T01-tensor-cores.md` (its step 2 uses this run's
   `gemms.csv` shapes and strides).
+
+## 5. murphy, RTX 4000 Ada (sm_89)
+
+The same main pass ran on murphy on 20 October 2026, 18:24–18:29 UTC.
+- **Environment:** NAS `mace_cueq_oeq`, the same versions, through the hybrid launcher. FastMACE
+  `80e2c47`, which has the same tool and library as `67940f6`.
+- **Conditions:** GPU empty before each process; 1-minute load 0.8 (NaCl) and 1.3 (NbCl5).
+- **Not run:** Nsight Compute and Nsight Systems. murphy's are version 2021.3, older than sm_89 and CUDA
+  13, and nothing was installed. So there are no DRAM or L2 bytes and no achieved occupancy here; the
+  profiler's columns are complete.
+- **Raw data:** `results/2-T20a-step-breakdown-20261020/murphy/`.
+
+| Stage (ms per step) | NaCl sm_120 | NaCl sm_89 | NbCl5 sm_120 | NbCl5 sm_89 |
+| --- | ---: | ---: | ---: | ---: |
+| **Total (GPU span)** | **3.71** | **3.68** | **27.43** | **31.58** |
+| B: forces + second half kick | 3.39 | 3.48 | 26.98 | 31.30 |
+| ACP | 0.14 | 0.14 | 0.17 | 0.19 |
+| Neighbour-list rebuild (amortised; ms per rebuild) | 0.13 (1.60) | 0.04 (0.54) | 0.17 (2.13) | 0.06 (0.80) |
+| Noise upload | 0.01 | 0.01 | 0.02 | 0.02 |
+| GPU idle between stages | 0.04 | 0.01 | 0.08 | 0.01 |
+| Uninstrumented wall time (two windows) | 3.77, 3.79 | 3.65, 3.66 | 27.11, 27.13 | 31.09, 31.30 |
+
+| Part (kernel ms per force call) | NaCl sm_120 | NaCl sm_89 | NbCl5 sm_120 | NbCl5 sm_89 |
+| --- | ---: | ---: | ---: | ---: |
+| Atom-level linear layers (GEMM) | 1.59 | 1.56 | 9.88 | 11.19 |
+| Atom-level elementwise | 0.36 | 0.44 | 7.35 | 8.95 |
+| Radial networks: folded last layer, forward GEMM | 0.19 | 0.14 | 1.23 | 0.99 |
+| Radial networks: folded last layer, input gradient | 0.16 | 0.13 | 0.84 | 1.05 |
+| Radial networks: other GEMMs | 0.18 | 0.20 | 0.93 | 1.27 |
+| Radial networks: layer norms and activations | 0.13 | 0.15 | 0.96 | 1.35 |
+| Interaction 2 convolution, streaming forward | 0.09 | 0.17 | 0.86 | 1.10 |
+| Interaction 2 convolution, streaming backward | 0.27 | 0.31 | 2.18 | 2.38 |
+| Edge geometry, radial basis, gathers | 0.07 | 0.08 | 0.58 | 0.67 |
+| Atom-level symmetric contraction (cuEq) | 0.08 | 0.09 | 1.20 | 1.55 |
+| Interaction 1, reassociated edge sums | 0.06 | 0.06 | 0.50 | 0.48 |
+| Copies and fills | 0.02 | 0.03 | 0.10 | 0.11 |
+| **Kernel sum (eager)** | **3.20** | **3.37** | **26.61** | **31.08** |
+| Atom-level GEMMs, TFLOPS | 8.7 | 8.9 | 12.6 | 11.1 |
+| Kernels per B replay; gaps inside it | 315; 0.19 ms | 294; 0.06 ms | 287; 0.14 ms | 302; 0.09 ms |
+
+Reading:
+- **The same picture on both cards.** The atom-level GEMMs and the atom-level elementwise kernels are the
+  two largest items. Together they are 59 % (NaCl) and 65 % (NbCl5) of murphy's force call.
+- **NbCl5 is 15 % slower on murphy.**
+  - Its atom-level elementwise time is 8.95 ms: the RTX 4000 Ada has 360 GB/s DRAM bandwidth against
+    the RTX 5060 Ti's 448 GB/s. OPT-T02's copy removal is worth more there.
+  - Its atom GEMMs run at 11.1 TFLOPS, against cuBLAS's 16.3 TFLOPS 4096³ peak on this card (OPT-T01
+    bench): 68 %.
+- **The gaps inside the graph are smaller on murphy** (0.06 and 0.09 ms), and the GPU neighbour-list
+  rebuild is about three times faster.
 
 ## Reproducing
 
