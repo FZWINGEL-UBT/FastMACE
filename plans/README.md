@@ -33,7 +33,7 @@ workers"). 2-T21 works in the ResearchModule worktree
 
   - 2-T21 (`main.py` on `Simulation`, its A/B on murphy);
   - 2-T04's acceptance 1 GPU re-check (MACE 0.3.15, local).
-- Next go messages: 2-T23 (acceptance) once 2-T16, 2-T17 and 2-T21 are in.
+- Next go messages: 2-T23 (acceptance) once 2-T21 is in.
   2-T20 and 2-T22 as resources allow.
 - Waiting for go: the rest. Answers to all prestart reports are in
   `phase-2.md`, "Conductor answers to the prestart reports".
