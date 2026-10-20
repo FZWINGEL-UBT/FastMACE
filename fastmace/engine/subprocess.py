@@ -141,7 +141,7 @@ class SubprocessRunner:
         sim = simulation
         if sim.output is not None:
             directory = Path(sim.output.directory)
-            existing = output_io.chunk_files(directory)
+            existing = output_io.chunk_files(directory) if directory.is_dir() else {}
             if existing:  # as ChunkedOutput refuses it in process, before any child starts
                 names = ", ".join(path.name for paths in existing.values() for path in paths)
                 raise FileExistsError(f"{directory} already holds output chunks ({names}); resume the run or use a "

@@ -304,8 +304,8 @@ def test_subprocess_runner_stub():
     assert signature.parameters["config"].default is None
     run = inspect.signature(runner.SubprocessRunner.run)
     assert list(run.parameters) == ["self", "simulation", "steps", "schedule"]
-    _raises_naming("2-T07", lambda: runner.SubprocessRunner().run(None, steps=1))
-    _raises_naming("2-T07", lambda: runner.main(["directory"]))
+    assert runner.HANDOFF_NAME == ".fastmace-handoff"
+    # Implemented by 2-T07 (tests/cpu/test_subprocess_runner.py).
 
 
 def test_reference_force_field_stub():

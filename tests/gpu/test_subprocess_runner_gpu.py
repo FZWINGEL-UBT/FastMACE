@@ -94,13 +94,15 @@ def run(directory, backend, precision, save_points=None):
             "handoff_left": (Path(directory) / ".fastmace-handoff").exists()}
 
 
-out = {"gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "fastmace": fastmace.__version__}
+# Nothing touches CUDA before the first Simulation: the planner sets the allocator before the first CUDA use.
+out = {}
 if SPEC["case"] == "reference":
     out["run"] = run(SPEC["directory"] + "/reference", SPEC["second"], SPEC["precision"],
                      save_points=SPEC["directory"] + "/points")
 else:
     out["first"] = first(SPEC["first"], "float32")
     out["run"] = run(SPEC["directory"] + "/runner", SPEC["second"], SPEC["precision"])
+out.update(gpu=torch.cuda.get_device_name(), torch=torch.__version__, fastmace=fastmace.__version__)
 print(json.dumps(out))
 """
 
