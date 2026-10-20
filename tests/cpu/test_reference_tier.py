@@ -151,6 +151,22 @@ def test_mode_reference_plans_the_reference_tier(loaded):
     assert any(line.startswith("plan:") and "reference," in line for line in lines), lines
 
 
+def test_reference_tier_is_float64_when_the_float64_energy_source_does_not_hash(loaded, monkeypatch):
+    """An unknown MACE (2-T04): the precision promotion holds for the reference tier too (conductor answer)."""
+    from fastmace.model.forcefield import ForceField
+    from fastmace.planner.workload import Workload
+    from fastmace.rewrites import versions
+
+    monkeypatch.setattr(versions, "_problems", lambda name: ["source hash differs"] if name == "float64_energy"
+                        else [])
+    atoms = _atoms()
+    ff = ForceField(loaded, atoms, precision="float32")
+    plan = minimal.default_planner(ff).plan(ff, atoms, LANGEVIN.to_config(seed=1), Workload(max_temperature_K=300.0),
+                                            mode="reference")
+    assert plan.tier == "reference" and plan.precision.dtype == "float64"
+    assert ("force_precision", "float32") in plan.requested
+
+
 def test_reference_tier_claims_no_compile_family(loaded, cpu_planner):
     _simulation(loaded, mode="reference")
     assert cpu_planner.process.family is None
