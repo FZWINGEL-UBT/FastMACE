@@ -9,6 +9,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 TOOLS = Path(__file__).resolve().parents[2] / "tools"
 
 
@@ -159,3 +161,11 @@ def test_stage_names_match_the_research_rows():
     assert tool.stage_name("ACP").startswith("ACP: Langevin half kick")
     assert tool.stage_name(("B", 8192)) == "B: forces + second half kick"
     assert tool.stage_name("C") == "C: edge compaction after a rebuild"
+
+
+def test_rewrite_overrides():
+    assert tool.rewrite_overrides(["block_linear=off", "polar_uvu=false"]) == {"block_linear": "off",
+                                                                                "polar_uvu": False}
+    for bad in (["nonsense=on"], ["block_linear"], ["polar_uvu=maybe"]):
+        with pytest.raises(ValueError):
+            tool.rewrite_overrides(bad)

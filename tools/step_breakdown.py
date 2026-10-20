@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import bisect
 import csv
+import dataclasses
 import difflib
 import hashlib
 import json
@@ -180,7 +181,7 @@ def sha256(path):
 
 def build_engine(args, base):
     """The minimal planner's engine for ``base`` (as tools/ab_fastmace.py's 1b side), and its plan."""
-    from fastmace.config import EngineConfig, IntegratorConfig
+    from fastmace.config import EngineConfig, IntegratorConfig, RewriteConfig
     from fastmace.model import loading
     from fastmace.model.forcefield import ForceField
     from fastmace.planner import fixed, minimal
@@ -192,7 +193,9 @@ def build_engine(args, base):
     loaded = loading.load_pristine(args.model, checkpoint=str(args.checkpoint), sha256=sha256(args.checkpoint))
     load_s = time.perf_counter() - started
     started = time.perf_counter()
-    force_field = ForceField(loaded, base, precision="float32" if args.backend == "hybrid" else "float64")
+    rewrites = RewriteConfig(**args.rewrites) if args.rewrites else "auto"
+    force_field = ForceField(loaded, base, precision="float32" if args.backend == "hybrid" else "float64",
+                             rewrites=rewrites)
     integrator = IntegratorConfig(temperature_K=args.temperature_K)
     plan = planner.plan(force_field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
     engine = planner.build(plan, force_field, base.copy(), temperature_K=args.temperature_K)
@@ -614,6 +617,25 @@ def profiler_pass(args, engine, torch):
     return record
 
 
+def rewrite_overrides(items):
+    """{field: value} of ``FIELD=VALUE`` items, each a RewriteConfig field; "on"/"off"/"auto" or true/false."""
+    from fastmace.config import RewriteConfig
+
+    fields = {f.name: f for f in dataclasses.fields(RewriteConfig)}
+    out = {}
+    for item in items:
+        name, _, value = item.partition("=")
+        if name not in fields or not value:
+            raise ValueError(f"--rewrites {item!r}: expected FIELD=VALUE with a RewriteConfig field")
+        if isinstance(fields[name].default, bool):
+            if value.lower() not in ("true", "false"):
+                raise ValueError(f"--rewrites {item!r}: {name} takes true or false")
+            out[name] = value.lower() == "true"
+        else:
+            out[name] = value
+    return out
+
+
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--output", type=Path,
@@ -635,8 +657,15 @@ def parse_args(argv=None):
     p.add_argument("--equilibrate-steps", type=int, default=300)
     p.add_argument("--steps", type=int, default=1000)
     p.add_argument("--calls", type=int, default=10)
+    p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="RewriteConfig fields (e.g. gated_rows=on); the others stay auto")
     p.add_argument("--allow-busy-gpu", action="store_true", help="CPU checks of the tool only (no timing)")
-    return p.parse_args(argv)
+    args = p.parse_args(argv)
+    try:
+        args.rewrites = rewrite_overrides(args.rewrites)
+    except ValueError as exc:
+        p.error(str(exc))
+    return args
 
 
 def main(argv=None):
