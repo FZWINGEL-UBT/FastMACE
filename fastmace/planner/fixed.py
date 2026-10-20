@@ -82,7 +82,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.block_linear": "on_for_hybrid_graph_engine",
     "RewriteConfig.grouped_linear": "on_with_block_linear",
     "RewriteConfig.merged_residual": "on_with_block_linear",
-    "RewriteConfig.gated_rows": "never_automatic",
+    "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "never_automatic",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
@@ -551,9 +551,7 @@ class FixedPlanner:
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")
         needs("merged_residual", r.merged_residual != "off", v["block_linear"], "block_linear")
-        needs("gated_rows", r.gated_rows == "on", v["merged_residual"], "merged_residual")
-        if r.gated_rows == "auto":
-            v["_why"]["gated_rows"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
+        needs("gated_rows", r.gated_rows != "off", v["merged_residual"], "merged_residual")
         needs("segment_gemm", r.segment_gemm == "on", v["gated_rows"], "gated_rows")
         if r.segment_gemm == "auto":
             v["_why"]["segment_gemm"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"

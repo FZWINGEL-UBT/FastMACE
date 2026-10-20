@@ -99,7 +99,7 @@ class RewriteConfig:
     # linear_1 and linear_res as one product per output segment (MERGED_RESIDUAL_LINEAR).
     merged_residual: Toggle = "auto"
     # Residual products, gate and linear_2 of MH-1-class interactions on per-segment rows, without the
-    # joins and copies between them (opt-1 OPT-T02 stage A); opt-in until its A/B on both GPUs.
+    # joins and copies between them (opt-1 OPT-T02 stage A); auto = on with merged_residual (owner, 20 Oct 2026).
     gated_rows: Toggle = "auto"
     # linear_2's products in those chains written straight into its joined output by a gathered-row Triton
     # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); opt-in until its A/B on both GPUs.
