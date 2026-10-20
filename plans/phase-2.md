@@ -196,6 +196,14 @@ These are 1b's principles, unchanged where they still apply:
   plus the local `fastmace_cpu` suite when the machine is free. The `fast`
   GPU tier runs on engine merges, `full` on merges that touch `engine/` or
   `planner/`, and `acceptance` on merges that change numerics.
+  - One trial's GPU tier at a time on a GPU (20 October 2026).
+  - The full tier keeps one step-time assertion,
+    `test_planner_gpu.py::test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal`
+    (planned < 1.25 × hand-built). It failed for 2-T02 at 4.90 against
+    3.52 ms/step while a second tier and two workers' tests shared murphy's
+    GPU. With the same code, the combined 2-T02 + 2-T06 tier passed it.
+  - A step-time failure in a shared run is re-checked on an idle GPU, never
+    read as a regression.
 - **NFS and git.** Tests that run git in a temporary directory on the NAS
   pass `safe.directory` in the tests only. The library never overrides it
   (1b-T28).
