@@ -278,6 +278,73 @@ def test_installed_mace_version_is_used_by_default():
     assert reg.installed_mace_version() == "0.3.16"
 
 
+@pytest.fixture
+def counted_metadata(monkeypatch):
+    """importlib.metadata.version replaced by a counter returning ``answer["version"]`` (2-T19b)."""
+    import importlib.metadata
+
+    answer = {"version": "9.9.9", "calls": 0}
+
+    def version(name):
+        assert name == "mace-torch"
+        answer["calls"] += 1
+        return answer["version"]
+
+    monkeypatch.setattr(importlib.metadata, "version", version)
+    reg.installed_mace_version.cache_clear()
+    yield answer
+    reg.installed_mace_version.cache_clear()
+
+
+def test_installed_mace_version_scans_the_metadata_once_per_process(counted_metadata):
+    # 2-T19: resolve asked once per record (19 sys.path scans), seconds on a slow file system.
+    assert [reg.installed_mace_version() for _ in range(19)] == ["9.9.9"] * 19
+    assert counted_metadata["calls"] == 1
+
+
+def test_installed_mace_version_cache_clear_reads_again(counted_metadata):
+    assert reg.installed_mace_version() == "9.9.9"
+    counted_metadata["version"] = "0.3.17"
+    assert reg.installed_mace_version() == "9.9.9"
+    reg.installed_mace_version.cache_clear()
+    assert reg.installed_mace_version() == "0.3.17"
+    assert counted_metadata["calls"] == 2
+
+
+def test_installed_mace_version_reads_again_when_sys_path_changes(counted_metadata, monkeypatch, tmp_path):
+    import sys
+
+    assert reg.installed_mace_version() == "9.9.9"
+    counted_metadata["version"] = "0.3.17"
+    monkeypatch.setattr(sys, "path", [str(tmp_path)] + sys.path)
+    assert reg.installed_mace_version() == "0.3.17"
+
+
+def test_resolve_reads_the_installed_version_once(counted_metadata):
+    registry = registry_of(toy("a"), toy("b"), toy("c"))
+    registry.resolve(model(), {})  # no mace_version: each record's qualification asks for the installed one
+    assert counted_metadata["calls"] == 1
+
+
+def test_installed_mace_version_caches_a_missing_package(monkeypatch):
+    import importlib.metadata
+
+    calls = []
+
+    def version(name):
+        calls.append(name)
+        raise importlib.metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(importlib.metadata, "version", version)
+    reg.installed_mace_version.cache_clear()
+    try:
+        assert reg.installed_mace_version() is None
+        assert reg.installed_mace_version() is None
+        assert len(calls) == 1
+    finally:
+        reg.installed_mace_version.cache_clear()
+
+
 # --------------------------------------------------------------------------- self-check runner
 
 

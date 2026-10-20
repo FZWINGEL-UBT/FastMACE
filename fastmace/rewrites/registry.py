@@ -35,18 +35,21 @@ names to ``Rewrite`` records (or to dicts with the §6.1 fields plus an optional
 A record's config field defaults to its name; a record whose name differs from its field (a
 ``GENERIC_*`` variant) names it with ``config_field``.
 
-The module holds no state: ``default_registry()`` builds a fresh registry on every call.
+The module holds no state but the installed MACE version, read once per ``sys.path``
+(``installed_mace_version``): ``default_registry()`` builds a fresh registry on every call.
 """
 
 from __future__ import annotations
 
 import copy
 import dataclasses
+import functools
 import hashlib
 import importlib
 import inspect
 import logging
 import math
+import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -216,14 +219,27 @@ def source_sha256(qualified):
     return hashlib.sha256(inspect.getsource(obj if original is None else original).encode()).hexdigest()
 
 
-def installed_mace_version():
-    """The installed mace-torch version, or None."""
+@functools.lru_cache(maxsize=8)
+def _mace_version_on(path):
     import importlib.metadata
 
     try:
         return importlib.metadata.version("mace-torch")
     except importlib.metadata.PackageNotFoundError:
         return None
+
+
+def installed_mace_version():
+    """The installed mace-torch version, or None.
+
+    Read once per ``sys.path``: every record's qualification asks, and each read scans the
+    metadata of every ``sys.path`` entry, seconds in all on a slow file system such as WSL's 9p
+    (2-T19). A changed ``sys.path`` reads again; ``installed_mace_version.cache_clear()`` forgets.
+    """
+    return _mace_version_on(tuple(sys.path))
+
+
+installed_mace_version.cache_clear = _mace_version_on.cache_clear
 
 
 def qualify(rewrite, mace_version=None):
