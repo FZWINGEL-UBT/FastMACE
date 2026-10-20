@@ -48,6 +48,11 @@ A float32 model with an unqualified forward is refused (`EnergyReductionError`);
 promotes before that happens. `fm.ForceField.identity` takes the effective precision, so a
 resume on the same MACE re-plans the same way.
 
+Known limitation: the identity assumes `float64_energy=True`. A plan with
+`PrecisionConfig(float64_energy=False)`, which exists for A/B against the research engine only,
+runs at float32 on a MACE whose float64 energy forward does not hash, but its identity records
+float64. Fixing it needs the plan's decided precision in `Simulation`, which records the identity.
+
 **Reference records.** A version other than 0.3.16 gets an "unqualified stock" record
 (`record_for(version, family)`, `record.qualified` is False):
 - stock equivalence only;

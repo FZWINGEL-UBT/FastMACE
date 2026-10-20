@@ -107,7 +107,10 @@ class ForceField:
         """The ``state.ForceFieldIdentity`` (SPEC §10.6); ``None`` until the superset is known.
 
         Its force precision is the effective one (``effective_precision``), so a resume on the same
-        MACE re-plans the same way and the identity matches.
+        MACE re-plans the same way and the identity matches. Known limitation (2-T04): it assumes
+        ``float64_energy=True``. A plan with ``PrecisionConfig(float64_energy=False)``, which is for A/B
+        against the research engine only, on a MACE whose float64 energy forward does not hash runs
+        at float32 but records a float64 identity.
         """
         if self.species is None:
             return None

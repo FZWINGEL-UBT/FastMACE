@@ -98,7 +98,9 @@ def effective_precision(precision, *, polar_model, float64_energy=True):
     """``(precision, reason)``: the force precision a plan runs at, and why it differs from ``precision``.
 
     With ``float64_energy`` on, a non-polar model whose float64 forward does not hash runs at
-    float64 (owner decision, 20 October 2026: promoted even when float32 was asked for, recorded).
+    float64. SPEC §18 decision 2 (owner) sets the rule's frame: 0.3.16 is the only qualified version
+    and the treatments follow 2-T04's rule. Promoting even when float32 was asked for, recorded, is
+    the conductor's shared decision implementing it (``plans/phase-2.md``, "Shared decisions").
     ``reason`` is a ``Reason`` with code ``PROMOTION_CODE``, or None when nothing changes.
     """
     if precision == "float64" or not float64_energy or polar_model:
