@@ -87,3 +87,19 @@ gain on small cells, nothing to lose on large ones.
 Exact and reproducible-mode bitwise, −2 to −2.4 % on NaCl on two GPUs, neutral on NbCl5: a candidate
 for the default (owner decision; it would be `True` with the PyTorch stage kept for NPT and the CPU).
 
+
+## The default (OPT3-T03-default, 22 October 2026 UTC)
+
+Branch `fastmace/opt3-T03-default` from main 5c48e26, pinned `125465d`, local RTX 5060 Ti; results in
+`results/opt3-T03-default/`.
+
+- Targeted CPU tests (`-n 2`): `test_fused_integrator`, `test_config`, `test_rewrites_species`,
+  `test_report`, `test_planner`, `test_overlap_rebuild`, `test_step_graph`, `test_canonical_restart`,
+  `test_engine`, `test_reference_policy`, `test_versioned_registry`, `test_simulation`: 442 passed, 20
+  skipped. ruff clean.
+- Force gate (`tools/force_stress_gate.py --engine fastmace`, default plan, NaCl and NbCl5): **passed**.
+  Ratios NaCl energy 0.05, forces 1.15, stress 0.31; NbCl5 0.19, 1.00, 0.67 (OPT-DEF-2: 0.05, 1.16, 0.35;
+  0.19, 1.01, 0.65). The integrator stage does not enter the force call, so this is the expected no-change.
+- `tests/gpu/test_simulation_gpu.py`: 2 passed.
+- Reproducible mode, the default against `fused_integrator=False` (plain cuEq float64, NaCl at 1000 K,
+  600 steps, pipelined with 162 rebuilds and checked with 136): positions and momenta bitwise equal.
