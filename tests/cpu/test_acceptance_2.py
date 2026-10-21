@@ -455,3 +455,20 @@ def test_round_tests_job_selects_the_round_files_outside_the_acceptance_tier():
 def test_regression_rows_one_sided(ratio, one_sided, passed):
     (row,) = summarize2.regression_rows("p", _ab_meta(ratio), "murphy", one_sided=one_sided)
     assert row["passed"] is passed and row["one_sided"] is one_sided
+
+
+def test_gate_omol0_suite_runs_frozen_and_without_the_template_cache():
+    jobs = suites.gate_omol0_jobs(suites.MACHINES["murphy"], Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
+    assert [job.name for job in jobs] == ["gate-omol0-xl", "gate-omol0-xl-no-template-cache"]
+    frozen, off = (list(job.argv) for job in jobs)
+    assert "--engine-config" not in frozen
+    assert off[off.index("--engine-config") + 1] == "model_template_cache=false"
+    assert off[off.index("--output") + 1].endswith("gate-omol0-xl-no-template-cache")
+
+
+def test_gate_tool_engine_overrides():
+    gate = _load(TOOLS / "force_stress_gate.py", "_tool_force_stress_gate_2t23")
+    assert gate.engine_overrides(["model_template_cache=false"]) == {"model_template_cache": False}
+    for bad in (["backend=cueq"], ["model_template_cache=off"], ["no_such_field=true"]):
+        with pytest.raises(ValueError):
+            gate.engine_overrides(bad)

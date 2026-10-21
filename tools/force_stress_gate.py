@@ -130,6 +130,25 @@ def rewrite_overrides(items):
     return out
 
 
+def engine_overrides(items):
+    """{field: value} of ``FIELD=VALUE`` items, each a boolean EngineConfig field (true/false), e.g.
+    model_template_cache=false (2-T23: the OMOL-0 XL production crash with and without OPT-T06's cache)."""
+    import dataclasses
+
+    from fastmace.config import EngineConfig
+
+    fields = {f.name: f for f in dataclasses.fields(EngineConfig)}
+    out = {}
+    for item in items:
+        name, _, value = item.partition("=")
+        if name not in fields or name == "backend" or not isinstance(fields[name].default, bool):
+            raise ValueError(f"--engine-config {item!r}: expected FIELD=true|false with a boolean EngineConfig field")
+        if value.lower() not in ("true", "false"):
+            raise ValueError(f"--engine-config {item!r}: {name} takes true or false")
+        out[name] = value.lower() == "true"
+    return out
+
+
 class GateJobError(RuntimeError):
     """A child process of the gate failed or left no result."""
 
@@ -419,6 +438,8 @@ def parse_args(argv=None):
                         "per configuration and calculator")
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="RewriteConfig fields for FastMACE's minimal planner (e.g. gated_rows=on); others stay auto")
+    p.add_argument("--engine-config", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="Boolean EngineConfig fields for FastMACE's minimal planner (e.g. model_template_cache=false)")
     p.add_argument("--reference-command", default=sys.executable,
                    help="Interpreter (with an optional launcher prefix) of the reference processes")
     p.add_argument("--production-command", default=sys.executable,
@@ -432,6 +453,12 @@ def parse_args(argv=None):
         args.rewrites = rewrite_overrides(args.rewrites)
     except ValueError as exc:
         p.error(str(exc))
+    try:
+        args.engine_config = engine_overrides(args.engine_config)
+    except ValueError as exc:
+        p.error(str(exc))
+    if args.engine_config and (args.engine != "fastmace" or args.planner != "minimal"):
+        p.error("--engine-config are EngineConfig fields of FastMACE's minimal planner (--engine fastmace)")
     if args.rewrites and (args.engine != "fastmace" or args.planner != "minimal"):
         p.error("--rewrites are RewriteConfig fields of FastMACE's minimal planner (--engine fastmace)")
     if args.engine == "baseline" and args.baseline is None:
@@ -528,7 +555,8 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
         # md_dtype is the production path's --dtype; a reference job's own dtype is its calculator's.
         common = dict(model=args.model, label=args.model, checkpoint=str(checkpoint),
                       checkpoint_sha256=checkpoint_sha256, baseline=str(export.root) if export else None,
-                      backend=args.backend, md_dtype=args.dtype, main_args=args.main_args, rewrites=args.rewrites)
+                      backend=args.backend, md_dtype=args.dtype, main_args=args.main_args, rewrites=args.rewrites,
+                      engine_config=args.engine_config)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
         # One finite-difference self-test, by the first float64 reference (it acts for polar models only), on
         # the gate's first NaCl 3x3x3 configuration (the same draw as a NaCl run's own hydrostatic-0).
@@ -832,7 +860,7 @@ def _fastmace_build(job, result):
         from fastmace.planner.fixed import auto_options_off, enabled_options
         from fastmace.planner.workload import Workload
 
-        planner = minimal.MinimalPlanner(engine=config.EngineConfig(backend=backend))
+        planner = minimal.MinimalPlanner(engine=config.EngineConfig(backend=backend, **job.get("engine_config", {})))
         started = time.perf_counter()
         # fm.load: prepares the OEq runtime before MACE is imported (1b-T08b), the hash as the trust decision.
         loaded = loading.load_pristine(job["model"], checkpoint=job["checkpoint"], sha256=job["checkpoint_sha256"])

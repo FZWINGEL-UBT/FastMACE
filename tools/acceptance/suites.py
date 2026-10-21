@@ -711,6 +711,18 @@ def gate_murphy_jobs(machine: Machine, run_root: Path) -> list:
     return gate_1b_jobs(machine, run_root, labels=MURPHY_GATE_LABELS)
 
 
+def gate_omol0_jobs(machine: Machine, run_root: Path) -> list:
+    """OMOL-0 XL's gate twice (conductor, 21 October 2026, after its local production crash): as frozen, and with
+    OPT-T06's template cache off (``--engine-config model_template_cache=false``)."""
+    (frozen,) = [job for job in gate_1b_jobs(machine, run_root, labels=("omol0-xl",)) if job.name == "gate-omol0-xl"]
+    output = check_location(machine, Path(run_root) / "gate-omol0-xl-no-template-cache")
+    argv = list(frozen.argv)
+    argv[argv.index("--output") + 1] = str(output)
+    argv += ["--engine-config", "model_template_cache=false"]
+    return [frozen, Job(name="gate-omol0-xl-no-template-cache", argv=tuple(argv), output=str(output),
+                        note="OMOL-0 XL with OPT-T06's template cache off")]
+
+
 def full_tier_jobs(machine: Machine, run_root: Path) -> list:
     """The full GPU tier (merge tier) on final main, one process; no step-time assertions."""
     return [_tier_job(machine, Path(run_root), "full-tier", "not acceptance", timing=False,
@@ -727,4 +739,4 @@ SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun
           "runner-statistics": runner_statistics_jobs,
           "runner-repeat": runner_statistics_repeat_jobs,
           "acceptance-tier": acceptance_tier_jobs, "full-tier": full_tier_jobs, "round-tests": round_tests_jobs,
-          "gate-local": gate_local_jobs, "gate-murphy": gate_murphy_jobs}
+          "gate-local": gate_local_jobs, "gate-murphy": gate_murphy_jobs, "gate-omol0": gate_omol0_jobs}
