@@ -438,3 +438,24 @@ def test_block_linear_check_reaches_the_wrapped_species_embeddings():
         embedding.weight_0.mul_(1 + 1e-8)
     result = registry().selfcheck("block_linear", model, rewritten, context(batch))
     assert not result.passed and "interactions.0.source_embedding.embedding" in result.detail
+
+
+@pytest.mark.parametrize("family", ["mh1", "omol"])
+def test_fused_radial_mlp_with_the_package_takes_the_entry_path_bitwise(family):
+    """With joint_radial_input, the weight network runs radial_entry (opt-2 OPT2-T02c): gathers, add, hidden stack
+    and [h c, c] in one op. On the CPU that op runs the same PyTorch operations, so the model is bitwise the
+    package without fused_radial_mlp, energy and forces."""
+    from fastmace.kernels.triton.radial_mlp import RadialStack
+
+    model, batch = tiny(family)
+    package = {name: "on" for name in PACKAGE}
+    plain, _, _ = apply(model, batch, package)
+    fused, applied, _ = apply(model, batch, {**package, "fused_radial_mlp": "on"})
+    assert "fused_radial_mlp" in [entry.name for entry in applied]
+    for interaction in fused.interactions:
+        assert getattr(interaction, "joint_radial_weight", None) is not None
+        assert isinstance(interaction.conv_tp_weights.fused_stack, RadialStack)
+    energy_and_forces(plain, batch)  # throwaway evaluation (docs/development.md)
+    energy, forces = energy_and_forces(plain, batch)
+    new_energy, new_forces = energy_and_forces(fused, batch)
+    assert torch.equal(new_energy, energy) and torch.equal(new_forces, forces)

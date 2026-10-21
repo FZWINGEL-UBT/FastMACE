@@ -88,7 +88,10 @@ class FactoredRadialMLP(torch.nn.Module):
                 return self.rest[-1](run_hidden_plan(hidden, self.fused_hidden))
             return self.rest(hidden)
         # Cutoff folded into the last layer: one GEMM over [h c, c], (h W + b) c = [h c, c] [W; b].
-        augmented = self.augmented_after_first(hidden, cutoff)
+        return self.folded(self.augmented_after_first(hidden, cutoff))
+
+    def folded(self, augmented):
+        """The folded last layer on its input [h c, c] (fused_folded_backward: Triton input gradient)."""
         if self.fused_backward:
             return folded_linear(augmented, self.folded_weight())
         return torch.nn.functional.linear(augmented, self.folded_weight())
@@ -184,7 +187,23 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     target_embedding = self.target_embedding(node_attrs)
     reassociation = getattr(self, "first_reassociation", None)  # reassociate_first
     joint = getattr(self, "joint_radial_weight", None)  # joint_radial_input
-    if joint is not None:
+    entry = getattr(self.conv_tp_weights, "fused_stack", None) if joint is not None else None  # fused_radial_mlp
+    augmented = None
+    if entry is not None:
+        # The weight network's hidden stack from the first layer's columns and the species tables, with the
+        # gathers, the add and [h c, c] inside its kernels (opt-2 OPT2-T02c); the density network as before.
+        from fastmace.kernels.triton.radial_mlp import radial_entry
+
+        first = torch.nn.functional.linear(edge_feats, joint)
+        width = self.joint_radial_widths[0]
+        density_hidden = (first[:, width:] + source_embedding[edge_index[0], width:]
+                          + target_embedding[edge_index[1], width:])
+        augmented = radial_entry(entry, first[:, :width], source_embedding[:, :width],
+                                 target_embedding[:, :width], edge_index, cutoff)
+        if reassociation is None:
+            tp_weights = self.conv_tp_weights.folded(augmented)
+        edge_density = torch.tanh(self.density_fn.after_first(density_hidden) ** 2)
+    elif joint is not None:
         # Both first layers at once; the gathered species terms join inside the add.
         first = torch.nn.functional.linear(edge_feats, joint)
         hidden = (first + source_embedding[edge_index[0]]
@@ -203,8 +222,9 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         edge_density = edge_density * cutoff
     density = scatter_sum(src=edge_density, index=edge_index[1], dim=0, dim_size=num_nodes)
     if reassociation is not None:
-        augmented = (self.conv_tp_weights.augmented_after_first(conv_hidden, cutoff) if joint is not None
-                     else self.conv_tp_weights.augmented(edge_feats, cutoff))
+        if augmented is None:
+            augmented = (self.conv_tp_weights.augmented_after_first(conv_hidden, cutoff) if joint is not None
+                         else self.conv_tp_weights.augmented(edge_feats, cutoff))
         message = reassociation(node_feats, node_attrs, edge_attrs, augmented, edge_index,
                                 self.conv_tp_weights.folded_weight())
     elif getattr(self, "streaming_kernels", None) is not None:  # streaming_conv

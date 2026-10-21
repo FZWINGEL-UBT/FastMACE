@@ -123,3 +123,72 @@ def _resources(d, k, config, rows=256):
 def test_the_tile_rule_never_spills(d, k):
     resources = _resources(d, k, radial_mlp.kernel_config(d))
     assert all(spills == 0 for _, spills in resources), resources
+
+
+# --------------------------------------------------------------------------- the entry (opt-2 OPT2-T02c)
+
+
+def _entry_case(d, k, rows, nodes, cutoff, seed=3):
+    modules = stack(d, k, seed)
+    generator = torch.Generator(device="cuda").manual_seed(seed)
+    first_wide = torch.randn(rows, 2 * d, device="cuda", generator=generator)
+    first = first_wide[:, :d]  # the joint first layer's column view, as the interaction passes it
+    tables = torch.randn(nodes, 2 * d, device="cuda", generator=generator)
+    edge_index = torch.randint(0, nodes, (2, rows), device="cuda", generator=generator)
+    cut = torch.rand(rows, 1, device="cuda", generator=generator) if cutoff else None
+    upstream = torch.randn(rows, d + 1, device="cuda", generator=generator)
+    return modules, first, tables[:, :d], tables[:, d:], edge_index, cut, upstream
+
+
+def _entry_run(model_stack, first, source, target, edge_index, cut, upstream, fused, dtype):
+    leaves = [first.detach().to(dtype).requires_grad_(True), source.detach().to(dtype).requires_grad_(True),
+              target.detach().to(dtype).requires_grad_(True)]
+    cutoff = cut.detach().to(dtype).requires_grad_(True) if cut is not None else None
+    inputs = leaves + ([cutoff] if cutoff is not None else [])
+    function = radial_mlp.radial_entry if fused else radial_mlp.entry_reference
+    out = function(model_stack, leaves[0], leaves[1], leaves[2], edge_index, cutoff)
+    grads = torch.autograd.grad(out, inputs, upstream.to(dtype))
+    return [out.double()] + [g.double() for g in grads]
+
+
+@pytest.mark.parametrize("cutoff", [True, False])
+@pytest.mark.parametrize(("d", "k", "rows", "nodes"), [(64, 2, 8192, 216), (64, 2, 1001, 97), (32, 1, 77, 5),
+                                                       (16, 3, 5, 3)])
+def test_entry_matches_the_reference(d, k, rows, nodes, cutoff):
+    modules, first, source, target, edge_index, cut, upstream = _entry_case(d, k, rows, nodes, cutoff)
+    exact = radial_mlp.RadialStack([m.double().cuda() for m in copy.deepcopy(modules)])
+    plain = radial_mlp.RadialStack([m.cuda() for m in copy.deepcopy(modules)])
+    fused = radial_mlp.RadialStack([m.cuda() for m in modules])
+    args = (first, source, target, edge_index, cut, upstream)
+    reference = _entry_run(exact, *args, fused=False, dtype=torch.float64)
+    rounding = _entry_run(plain, *args, fused=False, dtype=torch.float32)
+    got = _entry_run(fused, *args, fused=True, dtype=torch.float32)
+    names = ["output", "first", "source", "target", "cutoff"][:len(got)]
+    for name, g, r, e in zip(names, got, rounding, reference):
+        err = float((g - e).abs().max() / e.abs().max())
+        plain_err = float((r - e).abs().max() / e.abs().max())
+        assert err <= max(4 * plain_err, 1e-5), (name, err, plain_err)
+
+
+@pytest.mark.parametrize("k", [1, 2, 3, 4])
+@pytest.mark.parametrize("d", radial_mlp.WIDTHS)
+def test_the_entry_kernels_never_spill(d, k):
+    block_rows, num_warps, _ = radial_mlp.kernel_config(d)
+    modules, first, source, target, edge_index, cut, upstream = _entry_case(d, k, 256, 16, True)
+    fused = radial_mlp.RadialStack([m.cuda() for m in modules])
+    gamma, beta, weight, bias, eps = fused.operands()
+    rows = first.shape[0]
+    out, saved = first.new_empty((rows, d + 1)), first.new_empty((k, rows, d))
+    dx, dcut = first.new_empty((rows, d)), first.new_zeros((rows, 1))
+    kernels = radial_mlp._kernels()
+    common = dict(BE=block_rows, D=d, K=k, HAS_CUT=True, num_warps=num_warps, grid=(1,))
+    strides = (first.stride(0), source, source.stride(0), target, target.stride(0), edge_index.contiguous(), cut)
+    compiled = [
+        kernels["entry_forward"].warmup(first, *strides, out, saved, gamma, beta,
+                                        weight.transpose(1, 2).contiguous(), bias, rows, eps, **common),
+        kernels["entry_backward"].warmup(first, *strides, saved, upstream, dx, dcut, gamma, beta, weight.contiguous(),
+                                         rows, eps, **common)]
+    for kernel in compiled:
+        kernel._init_handles()
+    resources = [(int(kernel.n_regs), int(kernel.n_spills)) for kernel in compiled]
+    assert all(spills == 0 for _, spills in resources), resources
