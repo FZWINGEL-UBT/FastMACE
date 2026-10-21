@@ -14,6 +14,7 @@ ROOT=$1; shift
 FM=${FM:?set FM to a pinned source copy}
 B=$HOME/fastmace-baseline/1a-T18
 PY=$HOME/environments/mace_cueq_oeq/bin/python
+TESTPY=$HOME/environments/mace_cueq_latest/bin/python  # has pytest (the hybrid environment has none)
 CACHE=$HOME/fastmace-cache/opt-2-local
 WSMI=/mnt/c/Windows/System32/nvidia-smi.exe
 CK=$HOME/models/mace-mh-1.model
@@ -54,7 +55,7 @@ ab() {  # job structure order pattern
 note "fastmace=$(cat $FM/.source_commit) source=$FM host=$(hostname) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
 for job in "$@"; do
   case $job in
-    check) run $job "$PY" -m pytest -p no:cacheprovider -q -rf "$FM/tests/gpu/test_folded_tiles_cuda.py" ;;
+    check) run $job "$TESTPY" -m pytest -p no:cacheprovider -q -rf "$FM/tests/gpu/test_folded_tiles_cuda.py" ;;
     ncu) run $job "$NCU" --kernel-name kernel --section SpeedOfLight --section Occupancy \
              --section LaunchStats --csv --page details "$PY" "$FM/results/opt2-T03-folded-tiles/ncu_kernel.py" ;;
     nacl-ab) ab $job NaCl ab abab ;;
