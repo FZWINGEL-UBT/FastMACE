@@ -13,7 +13,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | Optimisation round 1 | [opt-1.md](opt-1.md) | done except OPT-T08's GPU A/B. Defaults since 20 October: `gated_rows`, `segment_gemm`, template cache, persistent worker. Measured end to end against `fastmace-1b`: NaCl −3.6 to −4.1 %, NbCl5 −13.5 to −14.9 % on both GPUs |
 | Optimisation round 2 | [opt-2.md](opt-2.md) | started 21 October 2026 (owner: "try all 5 ideas"); OPT2-T01 to T05 with 2-T20, 2-T19, 2-T15, 2-T21 and 2-T07 |
 | Optimisation round 3 | [opt-3.md](opt-3.md) | started 21 October 2026 (owner: "try all kernel opportunities"); OPT3-T01 to T05 |
-| 3. Dynamic topology and MC | [phase-3.md](phase-3.md) | **planned, draft for the owner** (22 October 2026): 20 tasks in 5 waves; owner decisions D1–D6 open; workers prestart after the decisions |
+| 3. Dynamic topology and MC | [phase-3.md](phase-3.md) | **planned** (22 October 2026): 20 tasks in 5 waves; D1–D6 decided (SPEC §18 decisions 31–36); all 20 workers prestarted (fm-3-t01 … fm-3-t21); 3-T01 goes first after the fused_integrator default merges |
 | 3b. NPT for the chlorides | — | |
 | 4. Physics | — | |
 | 5. Planner completion | — | |
