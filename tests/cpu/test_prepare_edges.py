@@ -162,3 +162,20 @@ def test_prepared_capture_follows_the_uncaptured_run_past_an_edge_count_change(p
     reference.close()
     np.testing.assert_array_equal(result.positions, expected.positions)
     np.testing.assert_array_equal(result.forces, expected.forces)
+
+
+def test_a_force_stage_captured_with_other_edges_is_refused(pristine, recorded_capture):
+    """The guard in ``GraphEngine._captured``: a B graph captured while other edge views are active raises
+    before the capture (prepare's old defect, and any caller that forgets ``use_edges``)."""
+    sim = simulation(pristine, "checked")
+    engine = sim._engine
+    key = ("B", engine._padded(engine.initial_edges))
+    assert key[1] != engine.initial_edges  # the padded size differs from the build's exact count
+    engine._graphs.pop(key, None)
+    engine.force_field.use_edges(engine.initial_edges)  # the views of the build, as 2-T15b's prepare left them
+    with pytest.raises(RuntimeError, match="active edges"):
+        engine._captured(key)
+    engine.force_field.use_edges(key[1])
+    engine._captured(key)  # its own edges: captured
+    assert key in engine._graphs
+    sim.close()

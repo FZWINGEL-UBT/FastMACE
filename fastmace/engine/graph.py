@@ -236,6 +236,12 @@ class GraphEngine(Engine):
             return int(key[1])
         return None
 
+    def _active_edges(self) -> int | None:
+        """The number of edges the force field's model reads now (its edge views), or None if it has none."""
+        data = getattr(self.force_field, "data", None)
+        index = data.get("edge_index") if isinstance(data, dict) else None
+        return None if index is None else int(index.shape[-1])
+
     def flush(self) -> None:
         """Validate every speculative or pipelined step still in flight (no-op otherwise)."""
         while self._pending:
@@ -589,7 +595,16 @@ class GraphEngine(Engine):
 
     def _captured(self, key) -> None:
         """``_capture(key)``; an error it raises is tagged with the stage ``"capture"`` (``CAPTURE_STAGE``)
-        and raised again unchanged, so the fallback can tell a capture failure from others (2-T15b)."""
+        and raised again unchanged, so the fallback can tell a capture failure from others (2-T15b).
+
+        A force stage (B, ACB) must be captured reading its key's edges: the graph keeps the edge
+        views active now for every replay. Anything else is a bug in the caller and raises before the
+        capture (2-T21d), instead of a graph that drops edges from the forces for the rest of the run.
+        """
+        edges, active = self._key_edges(key), self._active_edges()
+        if edges is not None and active is not None and active != edges:
+            raise RuntimeError(f"capturing {key!r} with {active} active edges, not its {edges}: the graph would "
+                               "read the wrong edges for the rest of the run (call force_field.use_edges first)")
         try:
             self._capture(key)
         except Exception as error:
