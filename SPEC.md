@@ -2369,6 +2369,34 @@ Open decisions for the owner:
    (11, §7.6); the `ForceField` is plan-free (12, §7.6); reproducible mode
    uses the unfused plain-cuEq convolution (13, §9.3); a process is
    reproducible or not, mixed plans are refused (14, §8.7).
+31–36. Decided (user, 22 October 2026, the phase 3 plan's D1–D6, the
+   recommendation of each; `plans/phase-3.md`):
+   - ResearchModule's old `main.py` adapter (`--fastmace-api adapter`,
+     `FixedPlanner` plus the research loop) is removed in phase 3.
+     `--engine gpu` stays for A/B baselines and for the options `Simulation`
+     refuses (31);
+   - production may run on Modal: a documented recipe and a thin wrapper,
+     one crystal per job, from a pinned commit, under the monthly budget
+     guard (at most the free $30 credit, everything metered included, owner
+     22 October 2026) (32);
+   - the swap-MC annealing protocol of phase 3 (§10.5) is O ↔ Cl anion swaps
+     in NaNbOCl4 (Ma 2026, I4/m, 3×3×3). It uses the anneal profile at 1 fs
+     and `Swap(every=100, attempts=50, velocities="exchange")` with
+     `min_mc_temperature_K=250`, on MH-1 `matpes_r2scan`. Its physical
+     outcome is recorded, not judged (33);
+   - phase 3's "one workstation GPU" (§16) is whichever Ada GPU is
+     available at acceptance time: leeloo or murphy when idle, else the
+     Modal L4 (sm_89). A workstation is preferred for timing items (34);
+   - MC plans always run the move-energy part of the gate (§12.3), even
+     though the gate is opt-in for MD (decision 3). The energy, force and
+     stress parts stay opt-in. A move-energy gate whose reference is
+     `unavailable` makes `mc_energy_precision="auto"` choose float64. This
+     resolves §10.4's "accuracy prerequisite" against decision 3 (35);
+   - the production timestep is 1 fs (user, 22 October 2026). FastMACE's own
+     defaults (`fm.md`, CLI) stay 0.5 fs, safe for models with hydrogen, and
+     the `init` template for inorganic crystals suggests 1 fs.
+     ResearchModule's `main.py` keeps physical output intervals: frames
+     every 10 fs, restarts and quench bins in time (36).
 
 ---
 

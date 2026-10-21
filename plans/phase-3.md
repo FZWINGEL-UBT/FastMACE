@@ -1,6 +1,9 @@
 # Phase 3: dynamic topology and Monte Carlo
 
-Status: **draft for the owner**, 22 October 2026. Spec: [SPEC.md](../SPEC.md)
+Status: **planned**, 22 October 2026. The owner accepted the
+recommendations for D1–D6 the same day ("Accept the recommendations for
+D1-D6 and prestart all phase 3 workers"). They are SPEC §18 decisions 31–36,
+and all workers were prestarted. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
 - §8.1: overflow before commit, the re-capture policy, the energy-only graph;
 - §8.2: the compiled tier;
@@ -873,6 +876,18 @@ Wave 4   T20 benchmarks (T09 T10 T11)   T21 acceptance
 3. After T21: the acceptance report, and the tag `fastmace-3`.
 
 ## Owner decisions
+
+**Decided (user, 22 October 2026): the recommendation of each, in D1–D6.**
+They are recorded as SPEC §18 decisions 31 (D1), 32 (D2), 33 (D3), 34 (D4),
+35 (D5) and 36 (D6). In short:
+- D1 (a): remove the old adapter;
+- D2 (a): a Modal recipe and wrapper in 3-T16a;
+- D3 (a): O ↔ Cl swaps in NaNbOCl4 (Ma 2026, I4/m);
+- D4 (c): whichever Ada GPU is available, a workstation preferred for
+  timing;
+- D5 (a): MC plans always run the move-energy gate;
+- D6 (a): library defaults stay 0.5 fs, and `main.py` keeps physical
+  output intervals.
 
 **D1. The old `main.py` adapter** (`--fastmace-api adapter`, `FixedPlanner`
 plus the research loop). Decision 28 kept it "for one phase"; phase 2's
