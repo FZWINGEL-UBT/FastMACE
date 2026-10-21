@@ -212,3 +212,51 @@ most of the gap. The rest is probably L2 pressure in the full step; a step break
 as inputs, and writes `[h·c, c]` directly. That is option (c), plus the cutoff concatenation. It would keep
 both of Inductor's fusions inside the fused kernel. Its output is OPT2-T01's input `a` (T01 agreed to take
 either h or a, 21 October). This is a new task, not a tile change.
+
+## OPT2-T02c: the entry kernels (21 October 2026)
+
+The conductor opened option (c): keep Inductor's two fusions inside the fused op.
+
+**What changed** (`fastmace/kernels/triton/radial_mlp.py`, `fastmace/rewrites/mh1/modules.py`):
+- With `joint_radial_input`, the weight network runs `radial_entry`. Its inputs are the joint first layer's
+  column view `first[:, :64]` and the two species tables (first 64 columns), with `edge_index` and the cutoff.
+- The forward kernel gathers and adds the species terms, runs the stack, and writes the folded last layer's
+  input `[h·c, c]`, `[E, 65]` (OPT2-T01's operand `a`). It also stores the LayerNorm inputs.
+- The backward kernel returns the gradients of x and of the cutoff. The table gradients come from `index_add`,
+  only when autograd asks for them.
+- The density network keeps its own 64-column add.
+- On the CPU the same PyTorch operations run, bitwise equal to the package without the record (tiny MH-1 and
+  OMOL, `test_fused_radial_mlp_with_the_package_takes_the_entry_path_bitwise`).
+- **Tiles:** the entry kernels keep more live per row, and their backward spilled at 8 elements per thread at
+  D = 64 (22–46 registers). `entry_config` uses 4 elements per thread: 16 rows and 8 warps at D = 64, no spills
+  (GPU test).
+
+**GPU tests:** 74 passed. They cover the entry output and its gradients for first, both tables and the cutoff,
+against float64 and float32 references, with and without a cutoff, plus no spills for both rules at
+D = 16/32/64 and K = 1–4.
+
+**Force gate with `fused_radial_mlp=on`** (source 2515146): passed. Ratios against the float32 calculator:
+
+| | energy | forces | stress |
+| --- | ---: | ---: | ---: |
+| NaCl | 0.093 | 1.162 | 0.355 |
+| NbCl5 | 0.053 | 1.015 | 0.70 |
+
+**Local A/B** (`tools/ab_rewrites.py`, 12 blocks, pinned source 2515146, both runs valid;
+`results/opt2-T02c-local-20261021/`):
+
+| | order ab: a / b (ms), b/a | order ba: b/a |
+| --- | --- | ---: |
+| NbCl5 | 23.284 / 23.302, **1.0008** | **1.0060** |
+
+**Verdict: stopped by the conductor's rule.** NbCl5 is not below 1.0 in both orders, so NaCl was not run. The
+record stays opt-in and off. Keeping the two fusions moved NbCl5 from +1.0 % to +0.1–0.6 %, which is about the
+0.3 ms estimated above. The stack's own −0.34 ms from the microbenchmark still does not show in the step.
+
+**Open, not pursued:** why the isolated saving does not reach the step. Candidates:
+- the entry backward at 16 rows is slower than the stack-only kernel measured at 32 rows;
+- the `[E, 128]` first-layer output and its gradient are now read in two halves by two kernels;
+- L2 pressure from the stored LayerNorm inputs next to the folded layer and the convolution.
+
+A step breakdown (nsys) with the record on and off would tell. Round 2 has no GPU budget left for it before
+the murphy outage, and the gain left (at most ~1.5 % of NbCl5) is small.
