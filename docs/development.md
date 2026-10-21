@@ -497,6 +497,41 @@ modal run tools/modal/fastmace_modal.py::job --gpu L4 --timeout-min 80 --commit 
 - **Cost control:** every function has a timeout, and the container stops when the call returns. Smoke on the
   L4 first.
 
+**Monthly cap** (MODAL-T02; owner: "on modal make sure to in total not use more than the 30$ credit i get for
+free per month"). The guard is in `tools/modal/budget.py`, called by every entry point before it launches
+anything:
+- **Cap:** $30 per calendar month (Modal's free credit), less a $3 reserve. A launch is refused when
+  this month's metered cost + the worst case of jobs still running from this checkout + this job's worst case
+  exceeds **$27**. The refusal names the numbers.
+- **Metered cost:** read from `modal.Workspace.from_context().billing.summary().metered_cost` (as
+  `modal billing summary`). It counts GPU, CPU, memory and container start, so it runs above the GPU-list
+  estimates in `modal.json`: $3.65 metered on 22 October 2026 against about $2.15 estimated.
+- **Worst case:** (function timeout + 300 s start allowance) × (GPU rate + CPU limit × CPU rate + memory
+  limit × memory rate). The rates come from `billing.rates()` (as `modal billing rates`).
+  - **The limits are hard:** `run_job` has `cpu=(4, 8)` cores and `memory=(16, 32)` GiB, so the bound holds.
+  - **Example:** a 60-minute L4 job has a function timeout of 70 min, and its worst case is about $1.79.
+- **Unreadable billing refuses:** this covers a network or permission error, a missing rate and an
+  unparsable value.
+- **Lower limits:** `--limit-usd 10` or `FASTMACE_MODAL_LIMIT_USD=10`.
+- **Higher limits:** need `--owner-override "<who>: <why>"`, and the ledger records it. Use it only on the
+  owner's word.
+- **Jobs still running:** `results/modal-in-flight.json` holds the worst case of each job until it returns,
+  or until its worst case has expired. Parallel launches therefore cannot each fit alone and overrun together.
+- **Ledger:** after every launch (also a failed one), `results/modal-ledger.csv` gets a row:
+  - the date, commit and GPU;
+  - the timeout and wall time;
+  - the estimated cost at the container limits, and the worst case;
+  - the metered cost before and after, and the delta;
+  - the limit, the override and the exit code.
+
+  Modal's metering lags by minutes, so the "after" value may not yet contain the job. The next launch reads
+  it fresh.
+- **No cost multipliers:** `retries=0` on every function and every `with_options`, and `scaledown_window=2`
+  (the container stops 2 s after the call). `tests/cpu/test_modal_budget.py` checks both, along with the
+  timeouts and that every `.remote` call is behind the guard.
+- **Not covered:** image builds (one per change of `requirements-hybrid.txt`, a few minutes of CPU) and jobs
+  started outside `fastmace_modal.py`.
+
 **Measured so far:**
 
 | Run | GPU, driver | Result | Wall time, GPU cost (est.) |
