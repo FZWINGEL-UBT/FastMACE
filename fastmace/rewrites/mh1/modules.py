@@ -148,6 +148,7 @@ class FirstInteractionReassociation(torch.nn.Module):
         self.ls = tuple(int(l) for l in ls)  # noqa: E741
         self.gammas = tuple(float(g) for g in gammas)
         self.ir_mul = bool(ir_mul)
+        self.node_major = False  # node_major_outer_sum (opt-3 OPT3-T05): per-l operands as views
 
     def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight):
         onehot = node_attrs[:, self.columns]
@@ -156,16 +157,23 @@ class FirstInteractionReassociation(torch.nn.Module):
         nodes, slots = onehot.shape
         width, dim = augmented.shape[1], edge_attrs.shape[1]
         key = edge_index[1] * slots + species[edge_index[0]]
-        # [nodes, slots, (l, m), k]; fused backward (edge_outer_sum)
-        summed = edge_outer_sum(augmented, edge_attrs, key, nodes * slots,
-                                segmented=self.segmented).view(nodes, slots, dim, width)
+        node_major = getattr(self, "node_major", False)
+        if node_major:  # [nodes, (l, m), slots, k]: each l's rows are a contiguous block
+            summed = edge_outer_sum(augmented, edge_attrs, key, nodes * slots, segmented=self.segmented,
+                                    node_slots=slots).view(nodes, dim, slots, width)
+        else:  # [nodes, slots, (l, m), k]; fused backward (edge_outer_sum)
+            summed = edge_outer_sum(augmented, edge_attrs, key, nodes * slots,
+                                    segmented=self.segmented).view(nodes, slots, dim, width)
         blocks = []
         start = 0
         c = self.channels
         for path, (l, gamma) in enumerate(zip(self.ls, self.gammas)):  # noqa: E741
             size = 2 * l + 1
             # [nodes * size, slots * width] @ [slots * width, C]
-            left = summed[:, :, start:start + size].transpose(1, 2).reshape(nodes * size, slots * width)
+            if node_major:  # a view
+                left = summed[:, start:start + size].reshape(nodes * size, slots * width)
+            else:
+                left = summed[:, :, start:start + size].transpose(1, 2).reshape(nodes * size, slots * width)
             right = (gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None]).reshape(slots * width, c)
             block = (left @ right).view(nodes, size, c)
             if not self.ir_mul:

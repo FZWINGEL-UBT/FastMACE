@@ -81,6 +81,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
     "RewriteConfig.folded_constants": "never_automatic",
+    "RewriteConfig.node_major_outer_sum": "never_automatic",
     "RewriteConfig.folded_backward_tiles": "on_with_fused_folded_backward",
     "RewriteConfig.block_linear": "on_for_hybrid_graph_engine",
     "RewriteConfig.grouped_linear": "on_with_block_linear",
@@ -105,11 +106,12 @@ STAGE2_SUPPORT = (
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
     ("streaming_conv", "streaming_conv"), ("fold_cutoff", "fold_cutoff"), ("factor_species", "factor_species"),
     ("reassociate_first", "reassociate_first"), ("segmented_first_sum", "reassociate_first"),
+    ("node_major_outer_sum", "reassociate_first"),
 )
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
-                  "direct_node_feats", "folded_constants", "streaming_conv",
+                  "direct_node_feats", "folded_constants", "node_major_outer_sum", "streaming_conv",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear")
@@ -555,6 +557,10 @@ class FixedPlanner:
               "fused_folded_backward")
         needs("segmented_first_sum", r.segmented_first_sum != "off", v["reassociate_first"] and v["sort_receivers"],
               "reassociate_first and sort_receivers")
+        needs("node_major_outer_sum", r.node_major_outer_sum == "on", v["segmented_first_sum"],
+              "segmented_first_sum")  # opt-3 OPT3-T05 (exact, opt-in)
+        if r.node_major_outer_sum == "auto":
+            v["_why"]["node_major_outer_sum"] = "off: only an explicit 'on' enables it (OPT3-T05, opt-in)"
         note("gpu_neighbour_list", n.gpu_neighbour_list != "off", "graph engine")
         needs("fused_radial_hidden", r.fused_radial_hidden == "on", v["fold_cutoff"], "fold_cutoff")
         if r.fused_radial_hidden == "auto":
@@ -635,6 +641,12 @@ class FixedPlanner:
                             "rewrite-requirement-missing")
             v["segmented_first_sum"] = False
             v["_why"]["segmented_first_sum"] += "; off: requires reassociate_first, which is off"
+        if v["node_major_outer_sum"] and not v["segmented_first_sum"]:
+            if "node_major_outer_sum" in explicit:
+                book.refuse("RewriteConfig.node_major_outer_sum='on' requires segmented_first_sum, which is off",
+                            "rewrite-requirement-missing")
+            v["node_major_outer_sum"] = False
+            v["_why"]["node_major_outer_sum"] += "; off: requires segmented_first_sum, which is off"
         if v["streaming_conv"] and not v["sort_receivers"]:  # cannot happen after stage 1; kept as the hard rule
             book.refuse("RewriteConfig.streaming_conv needs sort_receivers (NeighbourConfig.sort_receivers='on')",
                         "streaming-needs-sorted-receivers")
