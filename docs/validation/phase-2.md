@@ -81,9 +81,13 @@ yardstick, floor)):
    affected: item 8's tools, the gate (single evaluations at the start positions), item 1 (eager).
 2. **OMOL-0 XL's production build crashed** locally, in both its jobs. After three NaCl configurations,
    the next build in the same process raised `NameError: name '__compiled_fn_52_…' is not defined` in the
-   float64-energy forward under Dynamo (`gate-omol0-xl/logs/production-fastmace.log`). With OPT-T06's
-   template cache as the suspect, a murphy pair (as frozen, and `--engine-config
-   model_template_cache=false`) was queued but refused because the GPU was taken (point 4).
+   float64-energy forward under Dynamo (`gate-omol0-xl/logs/production-fastmace.log`). Cause (2-T19b,
+   reproduced on CPU with MACE's real `prepare_graph`): not OPT-T06's template cache but 2-T08b's per-build
+   strain rebinding. Each build rebuilds `prepare_graph` from MACE's code object with fresh globals, and
+   Dynamo's per-code-object frame cache reuses a frame compiled against another build's globals. Fix on
+   `fastmace/2-T19b` (`911ad7b`); the OMOL-0 XL gate is rerun on the fixed commit. A murphy pair (as
+   frozen, and `--engine-config model_template_cache=false`) was queued but refused because the GPU was
+   taken (point 4).
 3. **Two local acceptance failures, both test-side on WSL** (murphy passed both):
    `test_a_failed_candidates_memory_is_freed_before_the_next_build` (113 MiB stayed resident: OPT-T06's
    template; fixed in `fastmace/2-T15d`, `8ec5063`) and `test_a_killed_parent_releases_the_workers_gpu_memory`
