@@ -1,0 +1,44 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /mnt/homes/zwingel/fastmace-cache/acceptance-murphy/inductor, triton /mnt/homes/zwingel/fastmace-cache/acceptance-murphy/triton
+rootdir: /mnt/homes/zwingel/fastmace-2-T23/src-dda0323
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+collected 22 items
+
+../src-dda0323/tests/gpu/test_reproducible_gpu.py .....                  [ 22%]
+../src-dda0323/tests/gpu/test_subprocess_runner_gpu.py ..                [ 31%]
+../src-dda0323/tests/gpu/test_subprocess_worker_gpu.py ..                [ 40%]
+../src-dda0323/tests/gpu/test_fallback_gpu.py ........                   [ 77%]
+../src-dda0323/tests/gpu/test_simulation_gpu.py ..                       [ 86%]
+../src-dda0323/tests/gpu/test_eager_gpu.py ..                            [ 95%]
+../src-dda0323/tests/gpu/test_reference_tier_gpu.py .                    [100%]
+
+- generated xml file: /mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-fix/simulation-tests/junit.xml -
+============================= slowest 60 durations =============================
+329.45s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float64]
+306.98s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float64]
+235.08s call     tests/gpu/test_subprocess_worker_gpu.py::test_the_worker_equals_fresh_children_bitwise_and_releases_the_gpu
+200.94s call     tests/gpu/test_fallback_gpu.py::test_a_failed_candidates_memory_is_freed_before_the_next_build
+190.28s call     tests/gpu/test_subprocess_runner_gpu.py::test_plain_cueq_float64_after_a_hybrid_runs_in_a_child_within_1e_12
+146.67s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float32]
+144.32s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]
+143.91s call     tests/gpu/test_fallback_gpu.py::test_ddmin_finds_the_broken_rewrites[pair]
+107.47s call     tests/gpu/test_fallback_gpu.py::test_ddmin_finds_the_broken_rewrites[rewrite]
+104.80s call     tests/gpu/test_eager_gpu.py::test_mh1_hybrid_eager_equals_graph_within_float32_noise
+91.84s call     tests/gpu/test_fallback_gpu.py::test_prepare_leaves_the_default_trajectory_unchanged
+87.13s call     tests/gpu/test_reproducible_gpu.py::test_reproducible_after_cuda_started_runs_in_a_child_bitwise
+83.34s call     tests/gpu/test_fallback_gpu.py::test_prepared_graphs_keep_every_edge_after_the_edge_count_grows
+82.41s call     tests/gpu/test_reference_tier_gpu.py::test_mh1_reference_tier_agrees_with_the_graph_tier_statistically
+81.83s call     tests/gpu/test_simulation_gpu.py::test_simulation_reaches_the_main_py_trajectory[hybrid]
+79.48s call     tests/gpu/test_subprocess_runner_gpu.py::test_hybrid_after_a_plain_cueq_runs_in_a_child
+75.82s call     tests/gpu/test_fallback_gpu.py::test_a_broken_capture_drops_the_graph_mode
+66.13s call     tests/gpu/test_subprocess_worker_gpu.py::test_a_killed_parent_releases_the_workers_gpu_memory
+63.40s call     tests/gpu/test_fallback_gpu.py::test_a_capture_error_before_the_first_step_falls_back_to_eager[gate]
+62.93s call     tests/gpu/test_fallback_gpu.py::test_a_capture_error_before_the_first_step_falls_back_to_eager[skip]
+57.80s call     tests/gpu/test_simulation_gpu.py::test_simulation_reaches_the_main_py_trajectory[cueq]
+33.10s call     tests/gpu/test_eager_gpu.py::test_polar1_s_plain_cueq_runs_gated_in_eager_mode
+0.01s setup    tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float64]
+
+(37 durations < 0.005s hidden.  Use -vv to show these durations.)
+======================= 22 passed in 2776.43s (0:46:16) ========================

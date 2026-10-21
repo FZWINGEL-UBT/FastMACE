@@ -1,0 +1,105 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-21T08:16:21.438620+00:00",
+      "host": "Fabi-PC",
+      "machine": "local",
+      "suites": [
+        "simulation-tests"
+      ],
+      "run_root": "/home/fzwin/fastmace-acceptance/2-T23-local-20261021-fix",
+      "environment": {
+        "PYTHONPATH": "/home/fzwin/fastmace-2-T23/src-dda0323",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/home/fzwin/fastmace-cache/acceptance",
+        "FASTMACE_MODELS": "/home/fzwin/models",
+        "FASTMACE_STRUCTURES": "/home/fzwin/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/inductor",
+        "TRITON_CACHE_DIR": "/home/fzwin/fastmace-cache/acceptance/triton",
+        "MACE_COMPILE_CACHE": "/home/fzwin/fastmace-cache/acceptance/compile",
+        "XDG_CACHE_HOME": "/home/fzwin/fastmace-cache/acceptance/xdg",
+        "TMPDIR": "/home/fzwin/fastmace-acceptance/2-T23-local-20261021-fix/tmp",
+        "TMP": "/home/fzwin/fastmace-acceptance/2-T23-local-20261021-fix/tmp",
+        "TEMP": "/home/fzwin/fastmace-acceptance/2-T23-local-20261021-fix/tmp",
+        "TORCHINDUCTOR_COMPILE_THREADS": "4"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "dda0323972c7eba7663a977ec3401c5c7cb2a235",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/home/fzwin/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "simulation-tests",
+          "argv": [
+            "/home/fzwin/environments/mace_cueq_latest/bin/python",
+            "-m",
+            "pytest",
+            "/home/fzwin/fastmace-2-T23/src-dda0323/tests/gpu/test_reproducible_gpu.py",
+            "/home/fzwin/fastmace-2-T23/src-dda0323/tests/gpu/test_subprocess_runner_gpu.py",
+            "/home/fzwin/fastmace-2-T23/src-dda0323/tests/gpu/test_subprocess_worker_gpu.py",
+            "/home/fzwin/fastmace-2-T23/src-dda0323/tests/gpu/test_fallback_gpu.py",
+            "/home/fzwin/fastmace-2-T23/src-dda0323/tests/gpu/test_simulation_gpu.py",
+            "/home/fzwin/fastmace-2-T23/src-dda0323/tests/gpu/test_eager_gpu.py",
+            "/home/fzwin/fastmace-2-T23/src-dda0323/tests/gpu/test_reference_tier_gpu.py",
+            "-m",
+            "acceptance or not acceptance",
+            "-p",
+            "no:cacheprovider",
+            "--basetemp=/home/fzwin/fastmace-acceptance/2-T23-local-20261021-fix/simulation-tests-pytest",
+            "--durations=60",
+            "-rfEs",
+            "--junitxml=/home/fzwin/fastmace-acceptance/2-T23-local-20261021-fix/simulation-tests/junit.xml"
+          ],
+          "output": "/home/fzwin/fastmace-acceptance/2-T23-local-20261021-fix/simulation-tests",
+          "timing": false,
+          "note": "Simulation-driven GPU tests, all tiers (2-T21d rerun)",
+          "idle_check": {
+            "utc": "2026-10-21T08:16:22.224608+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 3920.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "windows_gpus": [
+              {
+                "name": "NVIDIA GeForce RTX 5060 Ti",
+                "driver": "610.88",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 3920.0,
+                "memory_total_MiB": 16311.0
+              }
+            ],
+            "load_average": [
+              1.05419921875,
+              0.54931640625,
+              0.29833984375
+            ],
+            "users": [
+              "fzwin    pts/1        2026-10-20 04:24"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-21T08:16:22.232412+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-21T09:00:34.353573+00:00",
+          "wall_s": 2652.1210005059984,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-21T09:00:34.353819+00:00"
+    }
+  ]
+}

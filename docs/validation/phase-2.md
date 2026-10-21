@@ -1,6 +1,7 @@
 # Phase 2 acceptance report
 
-**Status: combined acceptance run, 21 October 2026, about 07:00 UTC; not passed.** Plan task 2-T23, branch
+**Status: combined acceptance complete, 21 October 2026, 09:25 UTC.** Every item passes on main `f993713`
+(the freeze `be92979` plus the fixes for the two defects it found), except item 7, which the owner deferred. Plan task 2-T23, branch
 `fastmace/2-T23`.
 
 ## Combined acceptance of phase 2 and optimisation round 1 (21 October 2026)
@@ -27,11 +28,11 @@ Yesterday's "heating transient" (finding 1 of 20 October) was this defect.
 | # | Item | Local RTX 5060 Ti | murphy RTX 4000 Ada | Result |
 | --- | --- | --- | --- | --- |
 | 1 | Unknown MACE version (0.3.15) | gate passed, eager tier after the capture failure; `gated_rows` off (its pinned source does not hash on 0.3.15) | – (local only) | **pass** (eager: no capture, not affected) |
-| 2, 3, 5, 6 | Fallback, gate resources, isolation, reproducible mode | acceptance tier: the tests of these items passed | acceptance tier: passed | **pass**, with the caveat below for capture-on `Simulation` tests |
-| 4 | Subprocess runner | acceptance tier: runner tests passed | acceptance tier: passed; the equilibrated repeat: both cases diverged (NaN) | **not judgeable on the freeze**; cause confirmed (`prepare()` edge views, `d14be8c`); rerun on the fix |
+| 2, 3, 5, 6 | Fallback, gate resources, isolation, reproducible mode | acceptance tier: the tests of these items passed; on the fix: Simulation tests 22 / 22 | acceptance tier: passed; on the fix: 22 / 22 | **pass** (the capture-on `Simulation` tests confirmed on the fix) |
+| 4 | Subprocess runner | acceptance tier: runner tests passed; on the fix: Simulation tests 22 / 22 | on the freeze: the repeat diverged (NaN); on the fix: the repeat passes, Simulation tests 22 / 22 | not judgeable on the freeze (`prepare()` edge views, `d14be8c`); **pass on the fix** (main `f993713`, below) |
 | 7 | GPU CI | – | – | deferred by the owner (eleventh amendment) |
 | 8 | No regression against `fastmace-1b` | plans: only `gated_rows`, `segment_gemm` differ; trajectories pass; main 3.6–4.0 % (NaCl) and 14.6–14.9 % (NbCl5) faster | plans as local; main 3.7–4.1 % (NaCl, 6 processes) and 13.5–13.6 % (NbCl5) faster | **pass** |
-| Gate | 19 labels, new defaults | 9 of 10 pass; **OMOL-0 XL crashed** in its production build | all 9 pass (the 4 MACE-OFF labels rerun 06:38–07:02 after the GPU was taken); OMOL-0 XL as frozen crashes here too | **18 of 19 pass**; OMOL-0 XL fails to build at the freeze and passes with the fix (2-T19b, a fix check, not acceptance) |
+| Gate | 19 labels, new defaults | 9 of 10 pass; **OMOL-0 XL crashed** in its production build | all 9 pass (the 4 MACE-OFF labels rerun 06:38–07:02 after the GPU was taken); OMOL-0 XL as frozen crashes here too | **19 of 19 pass**: 18 at the freeze; OMOL-0 XL fails to build there and passes on `f993713` (2.00 / 1.29 / 1.67) |
 | Tier | Acceptance GPU tier | 31 passed, 2 failed, both test-side; both pass with their test fixes (rerun by 2-T23 and 2-T15) | **33 / 33 passed** | see below |
 | – | Round's GPU files outside the tier (`round-tests`) | 9 / 9 passed | – | pass |
 
@@ -115,7 +116,24 @@ yardstick, floor)):
    `2-T23-murphy-20261021-omol0-fixcheck`) it builds and passes; its NaNbO3 model-limited job runs and is,
    as in 1b, outside the count.
 
-**Rerun on the fix (prepared, waiting for the commit).** On main once 2-T21d is merged, as a pinned copy, on
+**Rerun on the fix: main `f993713`** (2-T21d's `prepare()` fix and capture guard, 2-T19b, 2-T15d, opt-T07b,
+2-T07c; opt-T08 opt-in and off), tools `dda0323` (its `fastmace/` tree equals `f993713`'s). Runs
+`2-T23-murphy-20261021-fix` and `2-T23-local-20261021-fix`, from 08:16 UTC.
+
+- **Item 4, equilibrated repeat: pass** (murphy, 08:16–08:34). The equilibration is clean: no energy jumps,
+  max T 332 K at 0.5 fs and 344 K at 2 fs, the 2 fs stage's second half at 300.0 K. Runner (subprocess,
+  one persistent child per seed) against fresh (in-process), 4 seeds, all hybrid: per seed |ΔT| < 5e-5 K,
+  |ΔE| < 5e-5 meV/atom, bins rms < 5e-5 meV/atom, against limits of 5.74 K, 0.694 meV/atom and
+  4.22 meV/atom (max(2 × the median of the 6 fresh-seed pairs, floor)). `results/2-T23-murphy-20261021-fix/`.
+- **Simulation-driven GPU tests, every tier: pass on both cards** (`simulation-tests`: the reproducible-mode,
+  subprocess-runner, subprocess-worker, fallback, `Simulation`, eager-tier and reference-tier files).
+  RTX 5060 Ti 22 / 22 (08:16–09:00), murphy 22 / 22 (08:34–09:20). They include the fallback-memory and
+  killed-parent worker tests that failed on WSL at the freeze.
+- **OMOL-0 XL's gate: pass** on `f993713` (murphy, 09:20–09:24): worst ratios 2.00 / 1.29 / 1.67, E max
+  0.0083 meV/atom (1b: 1.85 / 1.25 / 1.48). This is the label's acceptance result and replaces the fix
+  check. **The 19-label gate passes, 19 of 19.**
+
+The plan, as prepared before the commit: On main once 2-T21d is merged, as a pinned copy, on
 murphy (workstation jobs end on Thursday 22 October in the evening), one job at a time with the usual idle
 check; untimed:
 
