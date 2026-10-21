@@ -451,3 +451,45 @@ def test_save_restart_fsyncs_replaces_then_fsyncs_the_directory(tmp_path, monkey
     assert recorder.events == events
     with np.load(target / "restart.npz") as stored:
         assert stored["marker"].tolist() == [1]
+
+
+# --------------------------------------------------------------------------- the heartbeat (2-T07c)
+
+
+def test_concurrent_heartbeat_writes_never_raise(tmp_path):
+    """The heartbeat thread and the main thread both write the file: the writes must not race on one
+    temporary file (seen as FileNotFoundError on the rename under load, killing a call)."""
+    import threading
+
+    path = tmp_path / "child-0001.heartbeat"
+    beat = runner_module._Heartbeat(path)
+    beat.start(0.0005)  # the thread rewrites as fast as it can
+    errors = []
+
+    def hammer(name):
+        try:
+            for index in range(400):
+                beat.mark(f"{name}-{index}")
+        except Exception as error:  # noqa: BLE001  (any exception is the failure)
+            errors.append(error)
+
+    threads = [threading.Thread(target=hammer, args=(f"writer{number}",)) for number in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    beat.stop()
+    assert errors == []
+    assert path.read_text(encoding="utf-8").startswith("writer")
+    assert [entry.name for entry in tmp_path.iterdir()] == [path.name]  # no temporary file left
+
+
+def test_a_failing_heartbeat_write_never_raises(tmp_path, monkeypatch):
+    beat = runner_module._Heartbeat(tmp_path / "child-0001.heartbeat")
+
+    def broken(*args, **kwargs):
+        raise OSError("injected: the heartbeat's directory is gone")
+
+    monkeypatch.setattr(runner_module.os, "replace", broken)
+    beat.mark("call")  # the call goes on; the parent sees a stale heartbeat at worst
+    assert [entry.name for entry in tmp_path.iterdir()] == ["child-0001.heartbeat"]
