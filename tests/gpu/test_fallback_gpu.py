@@ -149,6 +149,19 @@ out = {
     "report": sim.report.text(), "check": SPEC.get("check", "gate"), "memory": memory,
 }
 sim.close()
+if SPEC.get("probe_memory"):
+    # The template's real footprint (opt-1 OPT-T06): what release_templates() gives back. Registered
+    # parameters and buffers (templates.nbytes) undercount it: converted modules hold tensors as attributes.
+    force_field = sim.force_field
+    del sim, plan
+    gc.collect()
+    torch.cuda.synchronize()
+    held = torch.cuda.memory_allocated()
+    released = force_field.release_templates()
+    gc.collect()
+    torch.cuda.synchronize()
+    out["template_release"] = {"allocated_drop_MiB": (held - torch.cuda.memory_allocated()) / 2**20,
+                               "nbytes_MiB": released / 2**20}
 print(json.dumps(out, default=str))
 """
 
@@ -288,9 +301,11 @@ def test_a_failed_candidates_memory_is_freed_before_the_next_build():
     failed engine still allocated.
 
     The converted-model template that the first build stores (opt-1 OPT-T06, one per conversion, by
-    design) stays resident; its own bytes are measured at each build and not counted as a leak
-    (2-T15d). Everything else must not grow: a leaked engine is far above the bound, and a residency
-    that grows from build to build fails too."""
+    design) stays resident and is not counted as a leak (2-T15d). Its footprint is measured as the
+    allocation ``release_templates()`` gives back at the end; the registered tensors
+    (``templates.nbytes``, recorded at each build) only show that one template is kept throughout.
+    Everything else must not grow: a leaked engine is far above the bound, and a residency that grows
+    from build to build fails too."""
     fixed = _run("rewrite", probe_memory=True)
     control = _run("rewrite", probe_memory=True, detach=False)
     for out in (fixed, control):
@@ -298,16 +313,17 @@ def test_a_failed_candidates_memory_is_freed_before_the_next_build():
         assert len(out["memory"]) >= 3, out["memory"]
     first = fixed["memory"][0]
     engine_MiB = first["after_MiB"] - first["before_MiB"]
-    base = first["before_MiB"] - first["templates_before_MiB"]
-    later = [entry["before_MiB"] - entry["templates_before_MiB"] - base for entry in fixed["memory"][1:]]
+    template_MiB = fixed["template_release"]["allocated_drop_MiB"]
+    later = [entry["before_MiB"] - template_MiB - first["before_MiB"] for entry in fixed["memory"][1:]]
     resident_templates = [entry["templates_before_MiB"] for entry in fixed["memory"][1:]]
     held = [entry["before_MiB"] - control["memory"][0]["before_MiB"] for entry in control["memory"][1:]]
     summary = {"engine_MiB": engine_MiB, "fixed_extra_at_build_MiB": later, "control_extra_at_build_MiB": held,
-               "templates_at_build_MiB": resident_templates,
+               "templates_at_build_MiB": resident_templates, "template_release": fixed["template_release"],
                "fixed": fixed["memory"], "control": control["memory"], "gpu": fixed["gpu"]}
     ENGINE.report("2-T15c-fallback-memory-mh1-nacl", summary)
     assert engine_MiB > 50, summary
     assert max(later) <= 0.1 * engine_MiB + 64, summary  # library workspaces may stay; no engine does
     assert max(later) - min(later) <= 0.1 * engine_MiB, summary  # and nothing grows from build to build
     assert max(resident_templates) - min(resident_templates) == 0, summary  # one template, kept, not repeated
+    assert min(resident_templates) > 0 and template_MiB >= fixed["template_release"]["nbytes_MiB"], summary
     assert min(held) >= 0.75 * engine_MiB, summary  # the claim, reproduced on the GPU
