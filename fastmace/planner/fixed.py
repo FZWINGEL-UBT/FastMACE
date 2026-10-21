@@ -85,6 +85,9 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.grouped_launch": "never_automatic",
+    "RewriteConfig.species_tables": "never_automatic",
+    "RewriteConfig.fold_readout_tail": "never_automatic",
+    "RewriteConfig.fold_product_linear": "never_automatic",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
 })
@@ -102,7 +105,7 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "fused_folded_backward", "segmented_first_sum", "fused_radial_hidden", "streaming_conv",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
-                  "single_graph_strain")
+                  "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
 SINGLE_GRAPH = "single_graph"  # one structure per evaluation: always, production is one structure
@@ -559,6 +562,16 @@ class FixedPlanner:
         if r.grouped_launch == "auto":
             v["_why"]["grouped_launch"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
+        # OPT-T08 (opt-in): only an explicit "on" enables them; the registry checks the model.
+        note("species_tables", r.species_tables == "on",
+             "opt-in (OPT-T08)" if r.species_tables != "auto" else "off: only an explicit 'on' enables it")
+        needs("fold_readout_tail", r.fold_readout_tail == "on", v["block_linear"], "block_linear")
+        if r.fold_readout_tail == "auto":
+            v["_why"]["fold_readout_tail"] = "off: only an explicit 'on' enables it"
+        needs("fold_product_linear", r.fold_product_linear == "on", v["block_linear"] and v["species_tables"],
+              "block_linear and species_tables")
+        if r.fold_product_linear == "auto":
+            v["_why"]["fold_product_linear"] = "off: only an explicit 'on' enables it"
         note("single_graph_strain", r.single_graph_strain != "off",
              "acts where stress is computed (NPT)" if npt else "process-wide; acts only where stress is computed")
         return v
