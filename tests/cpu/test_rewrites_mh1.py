@@ -33,7 +33,7 @@ pytest.importorskip("mace")
 Z_VALUES = [8, 11, 17, 26]  # Fe absent from the structure
 MH1_ORDER = ("factor_species", "fold_cutoff", "density_first", "joint_radial_input", "fused_folded_backward",
              "folded_backward_tiles", "fused_radial_hidden", "direct_node_feats", "folded_constants",
-             "streaming_conv", "reassociate_first", "segmented_first_sum", "lm_major_outer_sum")
+             "streaming_conv", "reassociate_first", "segmented_first_sum")
 # The research engine's default MH-1 package on the CPU (no OEq: no streaming; fused radial hidden is opt-in).
 PACKAGE = ("factor_species", "fold_cutoff", "density_first", "joint_radial_input", "fused_folded_backward",
            "reassociate_first", "segmented_first_sum")
@@ -121,13 +121,11 @@ def test_records_have_the_spec_fields():
         assert rewrite.mace_versions == SpecifierSet(">=0.3.16,<0.3.17")
     # Summation order only (SPEC §6.2); folded_backward_tiles keeps the order: bitwise (opt-2 OPT2-T03).
     # direct_node_feats and folded_constants (opt-3 OPT3-T05) move no value: bitwise.
-    exact = {"streaming_conv", "segmented_first_sum", "folded_backward_tiles", "direct_node_feats", "folded_constants",
-             "lm_major_outer_sum"}
+    exact = {"streaming_conv", "segmented_first_sum", "folded_backward_tiles", "direct_node_feats", "folded_constants"}
     assert {name for name, r in mh1.RECORDS.items() if r.exactness == "exact"} == exact
     assert all(r.exactness == "rounding" for name, r in mh1.RECORDS.items() if name not in exact)
     assert {name for name, r in mh1.RECORDS.items() if r.default != "auto"} == {
-        "fused_radial_hidden", "folded_backward_tiles", "direct_node_feats", "folded_constants",
-        "lm_major_outer_sum"}
+        "fused_radial_hidden", "folded_backward_tiles", "direct_node_feats", "folded_constants"}
     assert mh1.RECORDS["fused_radial_hidden"].default == "off"  # opt-in, no gain (SPEC §6.2)
     pinned = {name for name, r in mh1.RECORDS.items() if r.source_hashes}
     assert pinned == {"factor_species", "fold_cutoff"}
@@ -151,8 +149,7 @@ def test_requires_graph_matches_the_spec():
         "folded_backward_tiles": ("fused_folded_backward",), "fused_radial_hidden": ("fold_cutoff",),
         "direct_node_feats": ("fold_cutoff",), "folded_constants": ("fold_cutoff",),
         "streaming_conv": ("fold_cutoff",),
-        "reassociate_first": ("fold_cutoff",), "segmented_first_sum": ("reassociate_first",),
-        "lm_major_outer_sum": ("segmented_first_sum",)}
+        "reassociate_first": ("fold_cutoff",), "segmented_first_sum": ("reassociate_first",)}
     regs = registry()
     assert regs.order() == (*MH1_ORDER, "block_linear", "grouped_linear", "merged_residual")
     for name in MH1_ORDER:

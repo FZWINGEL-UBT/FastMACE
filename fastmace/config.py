@@ -102,9 +102,6 @@ class RewriteConfig:
     # The folded last radial layer's [W, b] and its halves built once, not per force call (opt-3 OPT3-T05);
     # exact, opt-in, auto = off.
     folded_constants: Toggle = "auto"
-    # The segmented first sum stored (l, m)-major, so that the reassociated first interaction's per-l GEMM
-    # operands are views (opt-3 OPT3-T05); exact, opt-in, auto = off.
-    lm_major_outer_sum: Toggle = "auto"
     # cuEq Linear layers as per-l products with extracted weights (BLOCK_LINEAR).
     block_linear: Toggle = "auto"
     # Same-irrep input segments of one output segment in one product (GROUPED_BLOCK_LINEAR).

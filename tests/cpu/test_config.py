@@ -59,7 +59,6 @@ AUTO_RULES = {
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
     "RewriteConfig.folded_constants": "never_automatic",
-    "RewriteConfig.lm_major_outer_sum": "never_automatic",
     "RewriteConfig.block_linear": "on_for_hybrid_graph_engine",
     "RewriteConfig.grouped_linear": "on_with_block_linear",
     "RewriteConfig.merged_residual": "on_with_block_linear",

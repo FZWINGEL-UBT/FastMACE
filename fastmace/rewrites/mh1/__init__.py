@@ -21,8 +21,6 @@ module switches became these records (docs/design/switch-map.md, section 1).
   the streaming convolution, forward and backward; exact, opt-in, off.
 - ``folded_constants`` (opt-3 OPT3-T05): the folded last radial layer's [W, b] and its halves as buffers, built
   once instead of a concatenation and two copies per force call; exact, opt-in, off.
-- ``lm_major_outer_sum`` (opt-3 OPT3-T05): the segmented first sum stored (l, m)-major, so that the reassociated
-  first interaction's per-l GEMM operands are views instead of transposed copies; exact, opt-in, off.
 - ``streaming_conv``: the receiver-streaming OEq convolution (OEq PR 223 kernels) in every
   interaction with an OEq-fused convolution.
 - ``reassociate_first``: the first interaction summed per receiver and sender species before
@@ -311,15 +309,6 @@ def reassociate_first_interaction(model, node_attrs):
     return tuple(int(c) for c in columns)
 
 
-def lm_major_outer_sum(model):
-    """(l, m)-major per-slot sums in the reassociated first interaction; returns its name."""
-    reassociation = getattr(model.interactions[0], "first_reassociation", None)
-    if reassociation is None or not reassociation.segmented:
-        raise RewriteError("lm_major_outer_sum requires the segmented first sum (segmented_first_sum)")
-    reassociation.lm_major = True
-    return ["interactions.0"]
-
-
 def segment_first_sum(model):
     """Run-segmented sum in the reassociated first interaction; returns its name."""
     reassociation = getattr(model.interactions[0], "first_reassociation", None)
@@ -557,10 +546,6 @@ RECORDS = {
     "segmented_first_sum": _record("segmented_first_sum", _reassociate_support, _apply(segment_first_sum),
                                    ("reassociate_first",), exactness="exact", constraints=(*_FIRST, SORT_RECEIVERS),
                                    deterministic=False),  # float32 Triton forward: relaxed atomics across chunks
-    # Layout audit (opt-3 OPT3-T05): the same sums at other addresses.
-    "lm_major_outer_sum": _record("lm_major_outer_sum", _reassociate_support, _apply(lm_major_outer_sum),
-                                    ("segmented_first_sum",), exactness="exact", default="off",
-                                    constraints=(*_FIRST, SORT_RECEIVERS)),
 }
 
 __all__ = [
@@ -569,6 +554,5 @@ __all__ = [
     "direct_node_feats", "factor_species_radial", "fold_radial_cutoff", "folded_backward_tiles", "folded_constants",
     "fuse_radial_hidden",
     "fused_folded_backward",
-    "joint_radial_input", "lm_major_outer_sum", "reassociate_first_interaction", "segment_first_sum",
-    "streaming_convolutions",
+    "joint_radial_input", "reassociate_first_interaction", "segment_first_sum", "streaming_convolutions",
 ]

@@ -5,8 +5,6 @@
   slices were strided, and the streaming convolution copied its input, forward and backward).
 - ``folded_constants``: the folded last radial layer's ``[W, b]`` and its two halves for the fused input
   gradient are built once, instead of a concatenation and two copies per force call.
-- ``lm_major_outer_sum``: the reassociated first interaction's per-slot sums (``edge_outer_sum``) are stored
-  (l, m)-major, ``[(l, m), slots, k]``, so that each l's GEMM operand is a view instead of a transposed copy.
 
 Both are exact: on the tiny MH-1-type model (CPU, float64) energy and forces are bitwise those without the
 record, and the records are opt-in, self-checked and refused where they cannot act.
@@ -27,9 +25,7 @@ pytestmark = pytest.mark.skipif(importlib.util.find_spec("cuequivariance_torch")
 
 from test_rewrites_mh1 import PACKAGE, context, energy_and_forces, registry, tiny  # noqa: E402
 
-NAMES = ("direct_node_feats", "folded_constants", "lm_major_outer_sum")
-REQUIRES = {"direct_node_feats": ("fold_cutoff",), "folded_constants": ("fold_cutoff",),
-            "lm_major_outer_sum": ("segmented_first_sum",)}
+NAMES = ("direct_node_feats", "folded_constants")
 
 
 def _rewritten(**records):
@@ -46,7 +42,7 @@ def _rewritten(**records):
 def test_the_records_are_exact_opt_in_and_need_the_folded_forward(name):
     record = mh1.RECORDS[name]
     assert (record.default, record.exactness, record.deterministic) == ("off", "exact", True)
-    assert record.requires == REQUIRES[name]
+    assert record.requires == ("fold_cutoff",)
     model, _ = tiny("mh1", backend="cueq")
     asked = {other: "off" for other in registry().names()} | {name: "on"}
     assert not registry().resolve(copy.deepcopy(model), asked, strict=False).decision(name).enabled
@@ -56,9 +52,7 @@ def test_the_records_are_exact_opt_in_and_need_the_folded_forward(name):
 
 
 @pytest.mark.parametrize("records", [{"direct_node_feats": "on"}, {"folded_constants": "on"},
-                                     {"lm_major_outer_sum": "on"},
-                                     {"direct_node_feats": "on", "folded_constants": "on",
-                                      "lm_major_outer_sum": "on"}])
+                                     {"direct_node_feats": "on", "folded_constants": "on"}])
 def test_energy_and_forces_are_bitwise_unchanged(records):
     _, without, batch, _, _ = _rewritten()
     _, model, _, resolution, applied = _rewritten(**records)
@@ -109,31 +103,3 @@ def test_the_folded_input_gradient_with_parts_equals_the_one_without():
         (grad,) = torch.autograd.grad((out * out).sum(), a)
         grads.append((out.detach(), grad))
     assert torch.equal(grads[0][0], grads[1][0]) and torch.equal(grads[0][1], grads[1][1])
-
-
-@pytest.mark.parametrize("segmented", [False, True])
-def test_lm_major_sums_are_the_slot_major_sums_rearranged_bitwise(segmented):
-    from fastmace.kernels.triton.edge_outer_sum import edge_outer_sum
-
-    generator = torch.Generator().manual_seed(9)
-    nodes, slots, d, k, edges = 5, 3, 4, 6, 40
-    a = torch.randn((edges, k), generator=generator, dtype=torch.float64).requires_grad_()
-    y = torch.randn((edges, d), generator=generator, dtype=torch.float64).requires_grad_()
-    key = torch.sort(torch.randint(0, nodes * slots, (edges,), generator=generator)).values
-    old = edge_outer_sum(a, y, key, nodes * slots, segmented=segmented)
-    new = edge_outer_sum(a, y, key, nodes * slots, segmented=segmented, lm_major=True)
-    assert new.shape == (d, nodes * slots * k)
-    rearranged = old.view(nodes * slots, d, k).transpose(0, 1).reshape(d, nodes * slots * k)
-    assert torch.equal(new, rearranged)
-    grad = torch.randn(new.shape, generator=generator, dtype=torch.float64)
-    old_grad = grad.view(d, nodes * slots, k).transpose(0, 1).reshape(nodes * slots, d * k)
-    got = torch.autograd.grad((new * grad).sum(), (a, y))
-    want = torch.autograd.grad((old * old_grad).sum(), (a, y))
-    assert all(torch.equal(g, w) for g, w in zip(got, want))
-
-
-def test_lm_major_outer_sum_marks_the_reassociation():
-    _, model, _, _, _ = _rewritten(lm_major_outer_sum="on")
-    assert model.interactions[0].first_reassociation.lm_major
-    _, without, _, _, _ = _rewritten()
-    assert not without.interactions[0].first_reassociation.lm_major
