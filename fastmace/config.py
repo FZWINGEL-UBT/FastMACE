@@ -183,6 +183,11 @@ class EngineConfig:
     # Pipelined steps: one CUDA graph per step (ACP, the flags' copy to the host and an event inside the
     # graph, then B) instead of two replays. Exact: the same kernels in the same order. Opt-in (OPT2-T04).
     step_graph: bool = False
+    # Fixed-cell Langevin on CUDA: the AC/ACP stage (half kick, drift, neighbour checks, compaction, saved
+    # velocities and flags) as four Triton kernels around PyTorch's centre-of-mass sums and cumsum instead of
+    # about 45 PyTorch kernels. Exact: the same float64 operations in the same order, the same noise.
+    # Anything else keeps the PyTorch stage. Opt-in (opt-3 OPT3-T03).
+    fused_integrator: bool = False
 
     def __post_init__(self):
         _check_choices(self)
