@@ -5,6 +5,7 @@
 #     env FM=<pinned source copy> bash results/opt3-T04-graph-gaps/local.sh ROOT JOB
 # FM is a pinned copy of the source (git archive, with .source_commit), never the live worktree. Jobs:
 # - check: the CUDA no-value-change test (tests/gpu/test_combo_kernels_cuda.py);
+# - repro: the reproducible mode, off, off and on in fresh processes (reproducible_check.py), bitwise;
 # - <structure>-ab, <structure>-ba (nacl, nbcl5, nanbo3): tools/ab_rewrites.py, 12 blocks, one order each;
 #   a = the default plan, b = a + combo_kernels.
 # Before each job: no WSL compute process and utilisation <= 5 % in both nvidia-smi views for 30 s.
@@ -53,6 +54,8 @@ ab() {  # job structure order pattern
 note "fastmace=$(cat $FM/.source_commit) source=$FM host=$(hostname) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
 for job in "$@"; do
   case $job in
+    repro) for side in off off on; do  # the reproducible mode: plain cuEq, so the mace_cueq_latest Python
+             n=$((${n:-0} + 1)); run "repro-$n-$side" "$TESTPY" "$FM/results/opt3-T04-graph-gaps/reproducible_check.py"                "$ROOT/repro-$n-$side.npz" $side; done ;;
     check) run $job "$TESTPY" -m pytest -p no:cacheprovider -q -rf "$FM/tests/gpu/test_combo_kernels_cuda.py" ;;
     nacl-ab) ab $job NaCl ab abab ;;
     nacl-ba) ab $job NaCl ba abba ;;
