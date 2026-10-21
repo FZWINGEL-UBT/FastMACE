@@ -1,0 +1,102 @@
+{
+  "model": "mh1-r2scan",
+  "backend": "cueq",
+  "precision": "float64",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "f993713",
+  "stress": false,
+  "reproducible": true,
+  "rewrites": {
+    "species_tables": "on"
+  },
+  "package": {
+    "factor_species": "on",
+    "fold_cutoff": "on",
+    "density_first": "on",
+    "joint_radial_input": "on",
+    "block_linear": "on",
+    "grouped_linear": "on",
+    "merged_residual": "on"
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ],
+        "on": [
+          "  RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.species_tables=on, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ],
+        "off2": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0,
+          "max_abs": 1485.200122673186
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 7.91033905045424e-16,
+          "max_abs": 0.6402363947270042
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0,
+          "max_abs": 1485.200122673186
+        },
+        "forces": {
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0,
+          "max_abs": 0.6402363947270042
+        }
+      }
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ],
+        "on": [
+          "  RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.species_tables=on, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ],
+        "off2": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0,
+          "max_abs": 20591.06611744949
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 5.551115123125783e-15,
+          "max_abs": 4.583933093895755
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0,
+          "max_abs": 20591.06611744949
+        },
+        "forces": {
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0,
+          "max_abs": 4.583933093895755
+        }
+      }
+    }
+  }
+}

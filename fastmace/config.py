@@ -84,7 +84,8 @@ class RewriteConfig:
     # GENERIC_FUSED_RADIAL_BACKWARD for MP-0 and the density family).
     fused_folded_backward: Toggle = "auto"
     # That input gradient's tiles by the waves rule (kernels.triton.skinny_linear.tile_choice): 128-row tiles
-    # where the 64-row grid is 2-8 waves over the SMs; bitwise the same (opt-2 OPT2-T03); opt-in, auto = off.
+    # where the 64-row grid is 2-8 waves over the SMs; bitwise the same (opt-2 OPT2-T03); auto = on with
+    # fused_folded_backward (owner decision, 21 October 2026).
     folded_backward_tiles: Toggle = "auto"
     # Run-segmented Triton sum of the reassociated first interaction (SEGMENTED_FIRST_SUM).
     segmented_first_sum: Toggle = "auto"
@@ -112,13 +113,14 @@ class RewriteConfig:
     # Triton launch (opt-1 OPT-T03 candidate 2); opt-in until its A/B on both GPUs.
     grouped_launch: Toggle = "auto"
     # Species-only atom-level products (embeddings, the first interaction's skip_tp and linear_up) as
-    # per-species tables gathered each step (opt-1 OPT-T08 C1); opt-in, auto = off.
+    # per-species tables gathered each step (opt-1 OPT-T08 C1); auto = on where the model takes it, in float32
+    # plans that are not reproducible (owner decision, 21 October 2026).
     species_tables: Toggle = "auto"
-    # The last readout's first linear folded into the last product's linear and skip_tp (OPT-T08 C2);
-    # opt-in, auto = off.
+    # The last readout's first linear folded into the last product's linear and skip_tp (OPT-T08 C2); auto = on
+    # with block_linear where the model takes it, float32, not reproducible (owner decision, 21 October 2026).
     fold_readout_tail: Toggle = "auto"
     # products.0.linear folded into the linear consumers of layer 0's output, with the species carried next to
-    # the contraction (OPT-T08 C3); opt-in, auto = off; needs species_tables.
+    # the contraction (OPT-T08 C3); auto = on with species_tables and block_linear (owner, 21 October 2026).
     fold_product_linear: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
@@ -176,8 +178,8 @@ class EngineConfig:
     model_template_cache: bool = True
     # Pipelined fixed-cell steps: an early neighbour rebuild runs on a side stream beside the force graph
     # in flight, instead of waiting for it (the rebuild reads positions, which B does not write). Exact:
-    # the same operations on the same positions. Opt-in (opt-2 OPT2-T04).
-    overlap_rebuild: bool = False
+    # the same operations on the same positions. On by default (owner decision, 21 October 2026; OPT2-T04).
+    overlap_rebuild: bool = True
     # Pipelined steps: one CUDA graph per step (ACP, the flags' copy to the host and an event inside the
     # graph, then B) instead of two replays. Exact: the same kernels in the same order. Opt-in (OPT2-T04).
     step_graph: bool = False

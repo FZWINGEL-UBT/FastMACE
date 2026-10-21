@@ -81,13 +81,16 @@ def test_default_registry_holds_the_family_after_the_fusion_family():
     assert min(names.index(n) for n in NAMES) > names.index("gated_rows")
 
 
-def test_planner_keeps_them_off_unless_asked():
+def test_planner_turns_them_on_by_default():
+    """Owner decision, 21 October 2026 (OPT-DEF-2): auto = on where the model takes them, float32, not reproducible."""
     from fastmace.config import RewriteConfig
     from fastmace.planner import fixed
 
-    assert fixed.AUTO_RULES["RewriteConfig.species_tables"] == "never_automatic"
-    assert fixed.AUTO_RULES["RewriteConfig.fold_readout_tail"] == "never_automatic"
-    assert fixed.AUTO_RULES["RewriteConfig.fold_product_linear"] == "never_automatic"
+    assert fixed.AUTO_RULES["RewriteConfig.species_tables"] == "on_float32_unless_reproducible_if_model_supports"
+    assert fixed.AUTO_RULES["RewriteConfig.fold_readout_tail"] == (
+        "on_with_block_linear_float32_unless_reproducible_if_model_supports")
+    assert fixed.AUTO_RULES["RewriteConfig.fold_product_linear"] == (
+        "on_with_species_tables_and_block_linear_if_model_supports")
     assert all(getattr(RewriteConfig(), name) == "auto" for name in NAMES)
     assert set(NAMES) <= set(fixed.REWRITE_FIELDS)
 
@@ -380,3 +383,68 @@ def test_fold_readout_tail_refuses_an_unpinned_last_interaction():
     model.interactions[-1] = type("RealAgnosticInteractionBlock", (), {})()
     supported, reason = species.RECORDS["fold_readout_tail"].applies_to(model)
     assert not supported and "RealAgnosticInteractionBlock" in reason
+
+
+# --------------------------------------------------------------------------- defaults (OPT-DEF-2)
+
+
+def _default_plan(label="mh1-r2scan", precision="float32", reproducible=False, rewrites="auto", **configs):
+    import test_minimal_planner as tmp
+
+    from fastmace.engine import constraints
+    from fastmace.planner import minimal as minimal_module
+    from fastmace.planner.workload import Workload
+
+    planner = tmp.minimal(process=constraints.ProcessRecord(), versions={"cuequivariance_ops": "0.12.0"}, **configs)
+    original = minimal_module._cuda_initialised
+    minimal_module._cuda_initialised = lambda: False
+    try:
+        return tmp.plan_label(label, workload=Workload(max_temperature_K=300.0, reproducible=reproducible),
+                              precision=precision, rewrites=rewrites, planner=planner)
+    finally:
+        minimal_module._cuda_initialised = original
+
+
+def test_default_mh1_hybrid_plan_has_all_three_on():
+    plan = _default_plan()
+    assert plan.engine.backend == "hybrid" and plan.precision.dtype == "float32"
+    assert all(getattr(plan.rewrites, name) == "on" for name in NAMES)
+    assert plan.rewrites.folded_backward_tiles == "on" and plan.engine.overlap_rebuild is True
+
+
+@pytest.mark.parametrize(("precision", "reproducible"), [("float64", False), ("float64", True), ("float32", True)])
+def test_float64_and_reproducible_plans_keep_the_stock_products(precision, reproducible):
+    """Rounding class (C2, C3) and species_tables (not bitwise on the GPU) stay off; the bitwise ones stay on."""
+    from fastmace.config import EngineConfig
+
+    configs = {"engine": EngineConfig(backend="cueq")} if reproducible else {}
+    plan = _default_plan(precision=precision, reproducible=reproducible, **configs)
+    assert all(getattr(plan.rewrites, name) == "off" for name in NAMES), plan.rewrites
+    assert plan.engine.overlap_rebuild is True
+    reason = str(plan.decision("RewriteConfig.species_tables")[2])
+    assert ("reproducible=True keeps the stock products" if reproducible else "float64 keeps the stock products") \
+        in reason
+
+
+def test_an_explicit_on_is_kept_in_float64():
+    from fastmace.config import RewriteConfig
+
+    plan = _default_plan(precision="float64", rewrites=RewriteConfig(species_tables="on", fold_product_linear="on"))
+    assert plan.rewrites.species_tables == "on" and plan.rewrites.fold_product_linear == "on"
+
+
+def test_an_explicit_product_fold_without_tables_is_refused_in_float64():
+    from fastmace.config import RewriteConfig
+    from fastmace.errors import PlanRefused
+
+    with pytest.raises(PlanRefused, match="requires species_tables"):
+        _default_plan(precision="float64", rewrites=RewriteConfig(fold_product_linear="on"))
+
+
+@pytest.mark.parametrize(("label", "tables", "tail"), [
+    ("mh1-omat", "on", "on"), ("omol0-xl", "off", "on"), ("polar1-s", "off", "off"), ("mp0-medium", "off", "off"),
+    ("off23-small", "off", "off")])
+def test_default_plans_follow_each_records_scope(label, tables, tail):
+    plan = _default_plan(label)
+    assert (plan.rewrites.species_tables, plan.rewrites.fold_product_linear, plan.rewrites.fold_readout_tail) == (
+        tables, tables, tail)

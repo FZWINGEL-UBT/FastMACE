@@ -60,3 +60,17 @@ their murphy A/B is still pending.
 4. Local A/B.
 5. Murphy A/B when free.
 6. A round report (`docs/validation/opt-2.md`).
+
+## Round-2 results and the defaults (21 October 2026)
+
+The owner's decision on 21 October 2026 ("Make all 3 defaults") was carried out in OPT-DEF-2
+(`docs/validation/opt-def-2.md`, SPEC thirteenth amendment).
+
+| Candidate | Result | Decision |
+| --- | --- | --- |
+| OPT2-T03 `folded_backward_tiles` | exact; NaCl −1.7 to −1.9 % (sm_120), neutral on the L4 | **default on** with `fused_folded_backward` |
+| OPT2-T04 `overlap_rebuild` | exact; NaCl −3.3 to −3.6 % at 1000 K and −1.6 to −1.9 % with `step_graph` at 300 K (sm_120); −0.4 to −1.3 % on the L4; NbCl5 neutral | **default on** |
+| OPT2-T04 `step_graph` | exact; neutral on both | stays off |
+| OPT-T08 (baseline of this round) | −7 to −10 % on sm_120, the L4 and the A100; force gate passed | **default on** (float32, not reproducible) |
+| OPT2-T01, T02, T05 | see their notes | not changed by OPT-DEF-2 |
+

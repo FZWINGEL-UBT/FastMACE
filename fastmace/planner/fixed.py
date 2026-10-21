@@ -79,16 +79,16 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
-    "RewriteConfig.folded_backward_tiles": "never_automatic",
+    "RewriteConfig.folded_backward_tiles": "on_with_fused_folded_backward",
     "RewriteConfig.block_linear": "on_for_hybrid_graph_engine",
     "RewriteConfig.grouped_linear": "on_with_block_linear",
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.grouped_launch": "never_automatic",
-    "RewriteConfig.species_tables": "never_automatic",
-    "RewriteConfig.fold_readout_tail": "never_automatic",
-    "RewriteConfig.fold_product_linear": "never_automatic",
+    "RewriteConfig.species_tables": "on_float32_unless_reproducible_if_model_supports",
+    "RewriteConfig.fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
+    "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
 })
@@ -97,6 +97,9 @@ AUTO_RULES = MappingProxyType({
 STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
+    ("folded_backward_tiles", "fold_cutoff"),
+    ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
+    ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
     ("streaming_conv", "streaming_conv"), ("fold_cutoff", "fold_cutoff"), ("factor_species", "factor_species"),
     ("reassociate_first", "reassociate_first"), ("segmented_first_sum", "reassociate_first"),
@@ -545,10 +548,9 @@ class FixedPlanner:
         note("sort_receivers", hybrid if request == "auto" else request == "on", f"{backend_name} backend")
         for name in ("density_first", "reassociate_first", "joint_radial_input", "fused_folded_backward"):
             needs(name, getattr(r, name) != "off", v["fold_cutoff"], "fold_cutoff")
-        needs("folded_backward_tiles", r.folded_backward_tiles == "on", v["fused_folded_backward"],
+        # Owner decision, 21 October 2026 (OPT-DEF-2): on wherever fused_folded_backward is; bitwise the same.
+        needs("folded_backward_tiles", r.folded_backward_tiles != "off", v["fused_folded_backward"],
               "fused_folded_backward")
-        if r.folded_backward_tiles == "auto":
-            v["_why"]["folded_backward_tiles"] = "off: only an explicit 'on' enables it (opt-in until its A/B)"
         needs("segmented_first_sum", r.segmented_first_sum != "off", v["reassociate_first"] and v["sort_receivers"],
               "reassociate_first and sort_receivers")
         note("gpu_neighbour_list", n.gpu_neighbour_list != "off", "graph engine")
@@ -568,16 +570,12 @@ class FixedPlanner:
         if r.grouped_launch == "auto":
             v["_why"]["grouped_launch"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
-        # OPT-T08 (opt-in): only an explicit "on" enables them; the registry checks the model.
-        note("species_tables", r.species_tables == "on",
-             "opt-in (OPT-T08)" if r.species_tables != "auto" else "off: only an explicit 'on' enables it")
-        needs("fold_readout_tail", r.fold_readout_tail == "on", v["block_linear"], "block_linear")
-        if r.fold_readout_tail == "auto":
-            v["_why"]["fold_readout_tail"] = "off: only an explicit 'on' enables it"
-        needs("fold_product_linear", r.fold_product_linear == "on", v["block_linear"] and v["species_tables"],
+        # OPT-T08 records, on by default (owner decision, 21 October 2026, OPT-DEF-2); stage 2 keeps them only
+        # where the model takes them, and the FastMACE rules drop them in float64 and reproducible plans.
+        note("species_tables", r.species_tables != "off", "stage 1: graph engine, any backend")
+        needs("fold_readout_tail", r.fold_readout_tail != "off", v["block_linear"], "block_linear")
+        needs("fold_product_linear", r.fold_product_linear != "off", v["block_linear"] and v["species_tables"],
               "block_linear and species_tables")
-        if r.fold_product_linear == "auto":
-            v["_why"]["fold_product_linear"] = "off: only an explicit 'on' enables it"
         note("single_graph_strain", r.single_graph_strain != "off",
              "acts where stress is computed (NPT)" if npt else "process-wide; acts only where stress is computed")
         return v
@@ -600,6 +598,20 @@ class FixedPlanner:
 
     def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False):
         """FastMACE's hard rules on the rewrites, then one decision per rewrite field and neighbour option."""
+        # OPT-DEF-2 (owner, 21 October 2026): the rounding-class OPT-T08 records keep the stock path in float64 and
+        # reproducible plans. species_tables too: its tables are not bitwise the per-atom products on the GPU
+        # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).
+        for name in ("species_tables", "fold_readout_tail", "fold_product_linear"):
+            if v[name] and name not in explicit and (dtype != "float32" or reproducible):
+                v[name] = False
+                v["_why"][name] += ("; off: reproducible=True keeps the stock products" if reproducible
+                                    else f"; off: {dtype} keeps the stock products (rounding class)")
+        if v["fold_product_linear"] and not v["species_tables"]:
+            if "fold_product_linear" in explicit:
+                book.refuse("RewriteConfig.fold_product_linear='on' requires species_tables, which is off",
+                            "rewrite-requirement-missing")
+            v["fold_product_linear"] = False
+            v["_why"]["fold_product_linear"] += "; off: requires species_tables, which is off"
         if v["segment_gemm"] and "segment_gemm" not in explicit and (dtype != "float32" or reproducible):
             # Owner decision, 20 October 2026: float64 and the reproducible mode keep the stock products and join.
             v["segment_gemm"] = False

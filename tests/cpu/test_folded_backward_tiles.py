@@ -97,9 +97,10 @@ def test_the_record_sets_the_waves_rule_and_changes_nothing_on_the_cpu():
     assert torch.equal(results["on"][0], results["off"][0]) and torch.equal(results["on"][1], results["off"][1])
 
 
-def test_the_planner_keeps_it_off_unless_asked():
+def test_the_planner_turns_it_on_with_the_fused_backward():
+    """Owner decision, 21 October 2026 (OPT-DEF-2): auto = on wherever fused_folded_backward is (MH-1 class)."""
     from fastmace.planner import fixed
 
-    assert fixed.AUTO_RULES["RewriteConfig.folded_backward_tiles"] == "never_automatic"
+    assert fixed.AUTO_RULES["RewriteConfig.folded_backward_tiles"] == "on_with_fused_folded_backward"
     assert fixed.REWRITE_FIELDS.index("folded_backward_tiles") == fixed.REWRITE_FIELDS.index(
         "fused_folded_backward") + 1
