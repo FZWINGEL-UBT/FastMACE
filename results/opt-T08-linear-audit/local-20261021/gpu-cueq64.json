@@ -1,0 +1,116 @@
+{
+  "model": "mh1-r2scan",
+  "backend": "cueq",
+  "precision": "float64",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "f993713",
+  "stress": false,
+  "reproducible": false,
+  "rewrites": {
+    "species_tables": "on",
+    "fold_readout_tail": "on",
+    "fold_product_linear": "on"
+  },
+  "package": {
+    "factor_species": "on",
+    "fold_cutoff": "on",
+    "density_first": "on",
+    "joint_radial_input": "on",
+    "block_linear": "on",
+    "grouped_linear": "on",
+    "merged_residual": "on"
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ],
+        "on": [
+          "  RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "  RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "  RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.species_tables=on, RewriteConfig.fold_readout_tail=on, RewriteConfig.fold_product_linear=on, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ],
+        "off2": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0,
+          "max_abs": 1485.2001226731854
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 9.43689570931383e-16,
+          "max_abs": 0.640236394727004
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 2.2737367544323206e-13,
+          "max_abs": 1485.2001226731854
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 7.91033905045424e-16,
+          "max_abs": 0.640236394727004
+        }
+      }
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ],
+        "on": [
+          "  RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "  RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "  RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))",
+          "  requested: RewriteConfig.factor_species=on, RewriteConfig.fold_cutoff=on, RewriteConfig.density_first=on, RewriteConfig.joint_radial_input=on, RewriteConfig.block_linear=on, RewriteConfig.grouped_linear=on, RewriteConfig.merged_residual=on, RewriteConfig.species_tables=on, RewriteConfig.fold_readout_tail=on, RewriteConfig.fold_product_linear=on, EngineConfig.backend=cueq, PrecisionConfig.dtype=float64"
+        ],
+        "off2": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 1.0913936421275139e-11,
+          "max_abs": 20591.066117449504
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 6.106226635438361e-15,
+          "max_abs": 4.583933093895755
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 1.0913936421275139e-11,
+          "max_abs": 20591.066117449504
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 3.885780586188048e-15,
+          "max_abs": 4.583933093895755
+        }
+      }
+    }
+  }
+}

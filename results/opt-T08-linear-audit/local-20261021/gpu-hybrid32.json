@@ -1,0 +1,108 @@
+{
+  "model": "mh1-r2scan",
+  "backend": "hybrid",
+  "precision": "float32",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "f993713",
+  "stress": false,
+  "reproducible": false,
+  "rewrites": {
+    "species_tables": "on",
+    "fold_readout_tail": "on",
+    "fold_product_linear": "on"
+  },
+  "package": "planner defaults",
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ],
+        "on": [
+          "  RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "  RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "  RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))",
+          "  requested: RewriteConfig.species_tables=on, RewriteConfig.fold_readout_tail=on, RewriteConfig.fold_product_linear=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ],
+        "off2": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 7.867813110351562e-06,
+          "max_abs": 1485.2001242637634
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 4.6193599700927734e-07,
+          "max_abs": 0.6402362585067749
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 1.1920928955078125e-06,
+          "max_abs": 1485.2001242637634
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 3.5762786865234375e-07,
+          "max_abs": 0.6402362585067749
+        }
+      }
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "plan_lines": {
+        "off": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ],
+        "on": [
+          "  RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "  RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "  RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))",
+          "  requested: RewriteConfig.species_tables=on, RewriteConfig.fold_readout_tail=on, RewriteConfig.fold_product_linear=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ],
+        "off2": [
+          "  RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "  RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ]
+      },
+      "on_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 0.00013780593872070312,
+          "max_abs": 20591.06604743004
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 2.205371856689453e-06,
+          "max_abs": 4.583950042724609
+        }
+      },
+      "off_vs_off": {
+        "energy": {
+          "bitwise_equal": false,
+          "max_abs_diff": 2.1457672119140625e-06,
+          "max_abs": 20591.06604743004
+        },
+        "forces": {
+          "bitwise_equal": false,
+          "max_abs_diff": 1.6093254089355469e-06,
+          "max_abs": 4.583950042724609
+        }
+      }
+    }
+  }
+}
