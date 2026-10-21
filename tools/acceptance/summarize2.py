@@ -54,7 +54,7 @@ def regression_rows(name, meta, machine, one_sided=False):
                          plan_differences=entry["plan_check"].get("differences"),
                          plan_describe_equal=entry.get("plan_describe_equal"),
                          observables_difference=entry.get("observables_difference"),
-                         one_sided=one_sided,
+                         valid=valid, one_sided=one_sided,
                          passed=bool(valid and (ratio - 1 <= floor if one_sided else abs(ratio - 1) <= floor))))
     return rows
 
@@ -110,7 +110,7 @@ def junit_totals(path):
 def summarize_run(run_root, machine, allowed=(), one_sided=False):
     run_root = Path(run_root)
     summary = dict(run_root=str(run_root), machine=machine, regression=[], controls=[], forces=[], trajectories={},
-                   tiers={})
+                   tiers={}, gate=[])
     ab, controls = [], []
     for directory in sorted(run_root.glob("regression2-*")):
         path = directory / "metadata.json"
@@ -142,7 +142,12 @@ def summarize_run(run_root, machine, allowed=(), one_sided=False):
             except ValueError as exc:
                 result = dict(error=str(exc), passed=False)
             summary["trajectories"][backend] = result
-    for tier in ("acceptance-tier", "full-tier"):
+    import summarize  # 1b-T23's gate_row: the verdict and the worst ratios per label
+    for directory in sorted(run_root.glob("gate-*")):
+        path = directory / "metadata.json"
+        if path.is_file():
+            summary["gate"].append(summarize.gate_row(directory.name, json.loads(path.read_text())))
+    for tier in ("acceptance-tier", "full-tier", "round-tests"):
         path = run_root / tier / "junit.xml"
         if path.is_file():
             summary["tiers"][tier] = junit_totals(path)
@@ -173,6 +178,16 @@ def markdown(summary):
                   for r in summary["forces"]]
     for backend, result in summary["trajectories"].items():
         lines += ["", f"Trajectories, {backend}: {json.dumps(result, default=str)}"]
+    if summary["gate"]:
+        lines += ["", "| Gate job | Model | E ratio | F ratio | S ratio | E max (meV/atom) | status | pass |",
+                  "| --- | --- | ---: | ---: | ---: | ---: | --- | --- |"]
+
+        def fmt(value, spec):
+            return format(value, spec) if value is not None else "–"
+        lines += [f"| {r['job']} | {r['model']} | {fmt(r['worst_energy_ratio'], '.2f')} | "
+                  f"{fmt(r['worst_force_ratio'], '.2f')} | {fmt(r['worst_stress_ratio'], '.2f')} | "
+                  f"{fmt(r['worst_energy_meV_per_atom'], '.4f')} | {r['status']} | {'yes' if r['passed'] else 'NO'} |"
+                  for r in summary["gate"]]
     for tier, totals in summary["tiers"].items():
         lines += ["", f"{tier}: {totals['passed']} passed, {totals['failures']} failed, {totals['errors']} errors, "
                       f"{totals['skipped']} skipped, {totals['time_s'] / 60:.1f} min; failed: {totals['failed_ids']}"]
