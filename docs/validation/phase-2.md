@@ -13,24 +13,26 @@ and `9f2aca7`. Runbook: [combined-acceptance-runbook.md](combined-acceptance-run
 `2-T23-local-20261021-combined` (RTX 5060 Ti) and `2-T23-murphy-20261021-combined` (RTX 4000 Ada), from
 03:08 UTC. Murphy stayed quiet for every timed job: other users' %CPU ≤ 5.3 over the whole run.
 
-**Main finding: a defect in the `fm.Simulation` path** (cause found by 2-T21; fix `fastmace/2-T21d`,
-`5bc12e9`). 2-T15b's `GraphEngine.prepare()` (`d14be8c`) captures the B and ACB graphs before the first
-step without first setting the edge views. Once the compacted edge count grows past the build's (about
-0.2 ps from 0 K, at any timestep), edges beyond it are dropped from the forces: the run heats and, at
-2 fs, reaches NaN. It affects every `Simulation` run with capture on the GPU since `d14be8c`, in-process
-and in subprocess-runner children; the planner's engine stepped directly (item 8's tools) captures lazily
-and is not affected. It explains item 4's failures today and yesterday's "heating transient" (finding 1
-of 20 October), which is withdrawn as physics.
+**Main finding: `fm.Simulation` runs heat up and diverge; cause under investigation (2-T21d bisect).**
+Hybrid MH-1 NaCl runs through `fm.Simulation`, in-process and in subprocess-runner children, break away
+from equilibrium at about 0.2 ps (from 0 K, at 0.5 fs and at 2 fs), heat far above their target and, at
+2 fs, reach NaN. The planner's engine stepped directly (item 8's tools) is smooth over the same window.
+A suspect is a real fault that 2-T21 found in 2-T15b's `GraphEngine.prepare()` (`d14be8c`): it captures
+the B and ACB graphs before the first step without first setting the edge views (fix on
+`fastmace/2-T21d`, `5bc12e9`). That fault did **not** reproduce the heating on the RTX 5060 Ti, though:
+2-T21 ran lazy, old and new `prepare()` for 1,000 steps there, all smooth. So the cause is not yet
+established. Yesterday's "heating transient" (finding 1 of 20 October) is probably the same defect and no
+longer counts as physics.
 
 | # | Item | Local RTX 5060 Ti | murphy RTX 4000 Ada | Result |
 | --- | --- | --- | --- | --- |
 | 1 | Unknown MACE version (0.3.15) | gate passed, eager tier after the capture failure; `gated_rows` off (its pinned source does not hash on 0.3.15) | – (local only) | **pass** (eager: no capture, not affected) |
 | 2, 3, 5, 6 | Fallback, gate resources, isolation, reproducible mode | acceptance tier: the tests of these items passed | acceptance tier: passed | **pass**, with the caveat below for capture-on `Simulation` tests |
-| 4 | Subprocess runner | acceptance tier: runner tests passed | acceptance tier: passed; the equilibrated repeat: both cases diverged (NaN) | **not judgeable**: root cause identified (`prepare()` edge-view capture, `d14be8c`); rerun after the fix |
+| 4 | Subprocess runner | acceptance tier: runner tests passed | acceptance tier: passed; the equilibrated repeat: both cases diverged (NaN) | **not judgeable**: `Simulation`-path heating, cause under investigation (2-T21d bisect); rerun after the fix |
 | 7 | GPU CI | – | – | deferred by the owner (eleventh amendment) |
 | 8 | No regression against `fastmace-1b` | plans: only `gated_rows`, `segment_gemm` differ; trajectories pass; main 3.6–4.0 % (NaCl) and 14.6–14.9 % (NbCl5) faster | plans as local; main 3.7–4.1 % (NaCl, 6 processes) and 13.5–13.6 % (NbCl5) faster | **pass** |
 | Gate | 19 labels, new defaults | 9 of 10 pass; **OMOL-0 XL crashed** in its production build | all 9 pass (the 4 MACE-OFF labels rerun 06:38–07:02 after the GPU was taken); OMOL-0 XL as frozen crashes here too | **18 of 19 pass**; OMOL-0 XL fails to build at the freeze and passes with the fix (2-T19b, a fix check, not acceptance) |
-| Tier | Acceptance GPU tier | 31 passed, 2 failed (test-side on WSL; rerun with the fixes pending) | **33 / 33 passed** | see below |
+| Tier | Acceptance GPU tier | 31 passed, 2 failed, both test-side; both pass with their test fixes (rerun by 2-T23 and 2-T15) | **33 / 33 passed** | see below |
 | – | Round's GPU files outside the tier (`round-tests`) | 9 / 9 passed | – | pass |
 
 **Item 8 in numbers** (main/1b, 12 blocks, all processes valid, the only plan differences are the two
@@ -76,13 +78,14 @@ yardstick, floor)):
 
 **Failures and open points of the combined run:**
 
-1. **`Simulation` with capture drops edges after the first edge growth** (above). Item 4's repeat on
+1. **`Simulation` runs heat up and diverge after about 0.2 ps** (above; cause under investigation). Item 4's repeat on
    murphy: the fresh case reached NaN at step 11,560 (seed 20261101) and 23,659 K (seed 20261001); the
    runner case reached NaN in a child at step 13,220 and 1.9e12 K. Stage 0 of the equilibration, at 0.5
-   fs, broke away at step ~420 and reached 897 K against a 300 K target. Results that rely on a capture-on
-   `Simulation` trajectory past ~0.2 ps are suspect until rerun on the fix: item 4, and the tier's runner,
-   worker and reproducible-mode tests, which compare two such runs and can pass with both wrong. Not
-   affected: item 8's tools, the gate (single evaluations at the start positions), item 1 (eager).
+   fs, broke away at step ~420 and reached 897 K against a 300 K target. Until the cause is found and fixed,
+   results that rely on a `Simulation` trajectory past ~0.2 ps are suspect: item 4, and the tier's runner,
+   worker and reproducible-mode tests, which compare two such runs and can pass with both wrong. Item 8's
+   tools step the planner's engine directly and stayed smooth; the gate evaluates single configurations;
+   item 1 ran 200 steps at 0.5 fs (0.1 ps) on the eager tier.
 2. **OMOL-0 XL's production build crashed** locally, in both its jobs. After three NaCl configurations,
    the next build in the same process raised `NameError: name '__compiled_fn_52_…' is not defined` in the
    float64-energy forward under Dynamo (`gate-omol0-xl/logs/production-fastmace.log`). Cause (2-T19b,
@@ -100,8 +103,9 @@ yardstick, floor)):
    - `test_a_failed_candidates_memory_is_freed_before_the_next_build`: 113 MiB stayed resident (OPT-T06's
      template). With 2-T15d's test (`8ec5063`), which subtracts the template, it **still fails**: 88.7 MiB
      at the first later builds against a bound of 82.1 MiB (0.1 × 180.7 + 64), then 24.6 MiB. The fallback
-     itself worked (ddmin found `block_linear` and its dependants; revision 1 passed the gate). Open for
-     the 2-T15 worker.
+     itself worked (ddmin found `block_linear` and its dependants; revision 1 passed the gate). **Test-side,
+     fixed:** the old count undercounted the template; 2-T15d's updated test (`d6b57d4`, bound unchanged)
+     passes on the RTX 5060 Ti in 2-T15's own rerun.
 4. **The gate on murphy was cut short** at 06:32 UTC when another session's GPU job
    (`2-T21d/gpu_confirm.py`) started on murphy during it. OFF23-M failed its own idle check, and OFF23-L,
    OFF23b-M, OFF24-M did not run. They were rerun as frozen once murphy was free again (run
@@ -378,8 +382,8 @@ repeat) and cleared the queue; murphy's GPU was then empty. The partial log and 
 
 ## Findings
 
-1. **Withdrawn on 21 October 2026: this was the `Simulation`-path defect, not physics** (see the combined
-   acceptance above; `prepare()` edge-view capture, `d14be8c`). As recorded on 20 October: **a violent
+1. **Reassessed on 21 October 2026: probably the `Simulation`-path defect, not physics** (see the combined
+   acceptance above; cause under investigation). As recorded on 20 October: **a violent
    heating transient at 2 fs from the 0 K crystal** (MH-1, NaCl 3×3×3, hybrid and plain cuEq
    float32 alike). In the first ~300 steps the potential energy rises 35–100 meV/atom above
    equipartition at 120–240 K, and the temperature of the fresh run spikes to 466 K at step 280. The same
