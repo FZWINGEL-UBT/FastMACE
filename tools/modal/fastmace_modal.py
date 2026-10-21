@@ -72,7 +72,7 @@ def _sh(command, env=None, cwd=None, timeout=None):
 
 def _gpu_record():
     _, smi = _sh("nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv,noheader")
-    _, cuda = _sh("nvidia-smi | grep -o 'CUDA Version: [0-9.]*'")
+    _, cuda = _sh("nvidia-smi | grep -oE 'CUDA (UMD )?Version: [0-9.]+'")
     _, freeze = _sh("pip freeze")
     import hashlib
 
