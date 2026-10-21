@@ -82,6 +82,8 @@ RECORD_SOURCES = (
     "fastmace.rewrites.species",
     # Process-wide stress-path patch (MACE PR 1498), as a record so the planner gets a decision and reason.
     "fastmace.rewrites.engine",
+    # Optimisation round 3 (OPT3-T04): Inductor options of the compiled model, last (they change no module).
+    "fastmace.rewrites.inductor",
 )
 
 LOGGER = logging.getLogger("fastmace.rewrites")
