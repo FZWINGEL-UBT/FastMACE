@@ -2,7 +2,7 @@
 
 An early neighbour rebuild of a pipelined step runs on a side stream beside the force graph in flight.
 The CPU has no streams, so here the option must change nothing: the same trajectory bitwise, and the
-default engine's ``info()`` without the new counter. The GPU test (tests/gpu/test_overlap_rebuild_gpu.py)
+default engine's ``info()`` without the new counter. The GPU test (tests/gpu/test_fixed_costs_gpu.py)
 checks the overlapped path itself, bitwise in float64 against the option off.
 """
 

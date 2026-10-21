@@ -53,6 +53,9 @@ def parse_args(argv=None):
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--a", nargs="*", default=[], metavar="FIELD=VALUE", help="Side a's RewriteConfig fields")
     p.add_argument("--b", nargs="*", default=[], metavar="FIELD=VALUE", help="Side b's RewriteConfig fields")
+    p.add_argument("--a-engine", nargs="*", default=[], metavar="FIELD=true|false",
+                   help="Side a's boolean EngineConfig fields (opt-2 OPT2-T04: overlap_rebuild, step_graph)")
+    p.add_argument("--b-engine", nargs="*", default=[], metavar="FIELD=true|false", help="Side b's, as --a-engine")
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5"])
     p.add_argument("--temperature-K", type=float, default=300.0)
     p.add_argument("--warmup", type=int, default=300)
@@ -63,11 +66,26 @@ def parse_args(argv=None):
     args = p.parse_args(argv)
     try:
         args.a, args.b = rewrite_overrides(args.a), rewrite_overrides(args.b)
+        args.a_engine, args.b_engine = engine_overrides(args.a_engine), engine_overrides(args.b_engine)
     except ValueError as exc:
         p.error(str(exc))
-    if args.a == args.b:
-        p.error("the two sides have the same rewrite fields")
+    if args.a == args.b and args.a_engine == args.b_engine:
+        p.error("the two sides have the same rewrite and engine fields")
     return args
+
+
+def engine_overrides(items):
+    """{field: bool} of ``FIELD=true|false`` items, each a boolean EngineConfig field."""
+    from fastmace.config import EngineConfig
+
+    fields = {f.name: f for f in dataclasses.fields(EngineConfig) if isinstance(f.default, bool)}
+    out = {}
+    for item in items:
+        name, _, value = item.partition("=")
+        if name not in fields or value.lower() not in ("true", "false"):
+            raise ValueError(f"{item!r}: expected FIELD=true|false with a boolean EngineConfig field")
+        out[name] = value.lower() == "true"
+    return out
 
 
 def main(argv=None):
@@ -86,8 +104,9 @@ def main(argv=None):
     if ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     protocol = step_time.TimingProtocol(warmup=args.warmup, block=args.block, blocks=args.blocks)
-    planner = minimal.MinimalPlanner(engine=EngineConfig(backend="hybrid"))
-    hardware = planner.hardware()
+    planners = {"a": minimal.MinimalPlanner(engine=EngineConfig(backend="hybrid", **args.a_engine)),
+                "b": minimal.MinimalPlanner(engine=EngineConfig(backend="hybrid", **args.b_engine))}
+    hardware = planners["a"].hardware()
     sha = hashlib.sha256(args.checkpoint.read_bytes()).hexdigest()
     loaded = loading.load_pristine(args.model, checkpoint=str(args.checkpoint), sha256=sha)
     fields = {"a": args.a, "b": args.b}
@@ -95,7 +114,8 @@ def main(argv=None):
     meta = dict(tool="ab_rewrites", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, checkpoint_sha256=sha,
-                sides=fields, protocol=protocol.as_dict(), pattern=args.pattern, order=order,
+                sides=fields, engine_sides={"a": args.a_engine, "b": args.b_engine},
+                protocol=protocol.as_dict(), pattern=args.pattern, order=order,
                 load=list(os.getloadavg()), structures={})
     for spec in args.structures:
         name, base = ab_step_time.read_structure(spec, None)
@@ -105,6 +125,7 @@ def main(argv=None):
             rewrites = RewriteConfig(**fields[side]) if fields[side] else "auto"
             field = ForceField(loaded, base, precision="float32", rewrites=rewrites)
             integrator = IntegratorConfig(temperature_K=args.temperature_K)
+            planner = planners[side]
             plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
             engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
             sides[side] = ab_step_time.FastMACESide(engine, torch)

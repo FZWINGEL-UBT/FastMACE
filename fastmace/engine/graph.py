@@ -170,6 +170,11 @@ class GraphEngine(Engine):
         self._pipe_flags = torch.zeros(3, dtype=torch.int64, device=device)
         self._pipe_flags_host = torch.zeros(3, **pinned)
         self._pipe_flags_view = self._pipe_flags_host.numpy()
+        # EngineConfig.step_graph (OPT2-T04): the event inside the one-per-step graph that the next
+        # step's validation waits on; external, so that it is recorded as a node of the graph.
+        self._step_event = None
+        if self.config.step_graph and self.cuda and self._pipe_flags_host.is_pinned():
+            self._step_event = torch.cuda.Event(external=True)
         self._pipe_pending = None
         self._pipe_floor = 0  # padded size kept after a count redo, until the next rebuild
         self._pipe_edges = self._padded(initial_edges)
@@ -219,6 +224,8 @@ class GraphEngine(Engine):
             return
         if self.speculative:
             keys = [("ACB", self._spec_edges, 0)]
+        elif self.pipelined and self.config.step_graph:
+            keys = [("ACPB", self._pipe_edges)]
         elif self.pipelined:
             keys = ["ACP", ("B", self._pipe_edges)]
         else:
@@ -233,8 +240,8 @@ class GraphEngine(Engine):
 
     @staticmethod
     def _key_edges(key) -> int | None:
-        """The edge count a stage key's replay reads (B and ACB keys), or None (AC, ACP, C)."""
-        if isinstance(key, tuple) and key[0] in ("B", "ACB"):
+        """The edge count a stage key's replay reads (B, ACB and ACPB keys), or None (AC, ACP, C)."""
+        if isinstance(key, tuple) and key[0] in ("B", "ACB", "ACPB"):
             return int(key[1])
         return None
 
@@ -450,6 +457,15 @@ class GraphEngine(Engine):
     def _step_pipelined(self) -> None:
         self._validate_pipelined()
         self.integrator.prepare_step(self.state)
+        if self.config.step_graph:
+            # One replay per step (OPT2-T04): ACP, the flags' copy to the host, an event the host waits
+            # on (inside the graph), then B. The kernels and their order are those of ACP and B.
+            edges = self._pipe_edges
+            self._use_edges(edges)  # before ACP, which reads no edge views
+            self._run(("ACPB", edges))
+            self._pipe_pending = (self._step_event, edges)
+            self.state.step += 1
+            return
         self._run("ACP")
         event = None
         self._pipe_flags_host.copy_(self._pipe_flags, non_blocking=True)
@@ -608,7 +624,17 @@ class GraphEngine(Engine):
                 self._stage_b()
 
             return combined
+        if isinstance(key, tuple) and key[0] == "ACPB":
+            return self._stage_acpb
         return {"C": self._stage_c, "AC": self._stage_ac, "ACP": self._stage_acp}.get(key, self._stage_b)
+
+    def _stage_acpb(self) -> None:
+        """ACP, the flags to the host, the event the next step's validation waits on, then B (step_graph)."""
+        self._stage_acp()
+        self._pipe_flags_host.copy_(self._pipe_flags, non_blocking=True)
+        if self._step_event is not None:
+            self._step_event.record(torch.cuda.current_stream())
+        self._stage_b()
 
     # ------------------------------------------------------------------ capture and replay
 
