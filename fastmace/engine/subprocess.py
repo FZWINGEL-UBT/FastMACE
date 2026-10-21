@@ -733,6 +733,11 @@ class _Heartbeat:
 
     A thread looks every ``interval`` seconds, so the step loop is never touched; a main thread that
     hangs (in Python or in a kernel) leaves the file unchanged, which the parent counts as a stall.
+
+    Both that thread and the main thread (``mark``) write the file. One lock makes them take turns,
+    and each write has its own temporary name, so no rename can find another writer's file gone
+    (2-T07c: ``FileNotFoundError`` under load). A failed write never raises: a heartbeat that does not
+    change is at worst read as a stall by the parent; it must not end the call.
     """
 
     def __init__(self, path):
@@ -742,6 +747,8 @@ class _Heartbeat:
         self.simulation = None
         self.interval = 1.0
         self._written = None
+        self._lock = threading.Lock()
+        self._writes = 0
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._loop, name="fastmace-heartbeat", daemon=True)
         self.write()
@@ -755,12 +762,24 @@ class _Heartbeat:
     def write(self):
         # An atomic rename without fsync: the heartbeat only shows liveness to the waiting parent,
         # is rewritten every few seconds, and means nothing after a crash of the machine.
-        text = self.text()
-        if text != self._written:
-            temporary = self.path.with_name(f".{self.path.name}.tmp")
-            temporary.write_text(text, encoding="utf-8")
-            os.replace(temporary, self.path)
-            self._written = text
+        with self._lock:
+            try:
+                text = self.text()
+            except Exception:  # an engine half built: the next write has it
+                return
+            if text == self._written:
+                return
+            self._writes += 1
+            temporary = self.path.with_name(f".{self.path.name}.{os.getpid()}.{self._writes}.tmp")
+            try:
+                temporary.write_text(text, encoding="utf-8")
+                os.replace(temporary, self.path)
+                self._written = text
+            except Exception:  # never let the heartbeat end the child
+                try:
+                    temporary.unlink()
+                except OSError:
+                    pass
 
     def mark(self, phase):
         self.phase = phase
@@ -778,10 +797,7 @@ class _Heartbeat:
         while not self._stop.wait(min(self.interval, PARENT_CHECK_S)):
             if os.name == "posix" and os.getppid() != self.parent:
                 os._exit(3)  # the parent is gone: nobody will read this child's results; free the GPU
-            try:
-                self.write()
-            except Exception:  # never let the heartbeat end the child
-                pass
+            self.write()  # never raises
 
 
 def main(argv: list[str] | None = None) -> int:

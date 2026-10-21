@@ -78,6 +78,8 @@ RECORD_SOURCES = (
     # Optimisation round 1 (plans/opt-1.md): after the linear family, whose modules it chains.
     "fastmace.rewrites.fusion",
     "fastmace.rewrites.polar",
+    # OPT-T08 (opt-in): species tables and the folded readout tail, after every module they replace.
+    "fastmace.rewrites.species",
     # Process-wide stress-path patch (MACE PR 1498), as a record so the planner gets a decision and reason.
     "fastmace.rewrites.engine",
 )

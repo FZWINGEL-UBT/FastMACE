@@ -16,6 +16,7 @@ Marked ``slow`` and ``acceptance``, untimed (the wall times are recorded, not ju
 import importlib.util
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -121,6 +122,15 @@ def test_the_worker_equals_fresh_children_bitwise_and_releases_the_gpu(tmp_path)
     assert abs(worker["free_change_MiB"]) <= 64
 
 
+def _result_line(stream):
+    """The driver's JSON line: libraries may print to stdout first (cuEquivariance's Triton cache
+    manager prints "GPU information: ..." where pynvml is not supported, as in WSL). ``None`` at EOF."""
+    for line in stream:
+        if line.startswith("{"):
+            return json.loads(line)
+    return None
+
+
 def test_a_killed_parent_releases_the_workers_gpu_memory(tmp_path):
     root = ENGINE.REPOSITORY_ROOT
     environment = dict(os.environ, PYTHONPATH=os.pathsep.join([str(root), str(root / "tests")]),
@@ -129,8 +139,8 @@ def test_a_killed_parent_releases_the_workers_gpu_memory(tmp_path):
     parent = subprocess.Popen([sys.executable, "-c", code], cwd=root, env=environment, stdout=subprocess.PIPE,
                               text=True)
     try:
-        line = parent.stdout.readline()
-        out = json.loads(line)
+        out = _result_line(parent.stdout)
+        assert out is not None, f"the parent exited ({parent.poll()}) without its result line"
         pid = out["subprocess"]["last"]["pid"]
         assert _listed(pid)
     finally:
@@ -140,3 +150,9 @@ def test_a_killed_parent_releases_the_workers_gpu_memory(tmp_path):
     while _listed(pid) and time.monotonic() < deadline:
         time.sleep(0.5)
     assert not _listed(pid), "the worker kept the GPU after its parent was killed"
+    # The killed parent could not remove its hand-off directory (kept, as after an error); the test does.
+    from fastmace import _cache
+    from fastmace.engine import subprocess as runner
+
+    for directory in (_cache.cache_root() / runner.CACHE_NAME).glob(f"{parent.pid}-*"):
+        shutil.rmtree(directory, ignore_errors=True)

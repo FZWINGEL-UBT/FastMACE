@@ -288,9 +288,10 @@ def test_compile_cache_key_includes_float64_energy(monkeypatch):
     again = field(calc, atoms, engine=engine, compile_cache=cache)
     assert len(compiled) == 2 and on.model is again.model and on.model is not off.model
     # Both bind their strain path on the instance (2-T08b); only "on" binds the float64 forward's code.
-    float64_code = energy.float64_forward(calc.models[0]).__code__
-    assert on.model.forward.__func__.__code__ is float64_code
-    assert off.model.forward.__func__.__code__ is type(calc.models[0]).forward.__code__
+    # The bound forward runs the same bytecode from its own code object (2-T19b).
+    assert on.model.forward.__func__.__code__ == energy.float64_forward(calc.models[0]).__code__
+    assert off.model.forward.__func__.__code__ == type(calc.models[0]).forward.__code__
+    assert on.model.forward.__func__.__code__ != off.model.forward.__func__.__code__
     assert "forward" not in calc.models[0].__dict__  # the caller's model is never changed
     np.testing.assert_allclose(on.evaluate(atoms)[0], stock(calc, atoms)[0], rtol=1e-12)
 

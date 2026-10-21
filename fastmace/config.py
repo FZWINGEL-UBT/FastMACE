@@ -105,6 +105,18 @@ class RewriteConfig:
     # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); auto = on with gated_rows in float32,
     # not reproducible (owner, 20 Oct 2026).
     segment_gemm: Toggle = "auto"
+    # A block linear's small per-l products (too few row tiles for the GPU by the shared shape rule) in one
+    # Triton launch (opt-1 OPT-T03 candidate 2); opt-in until its A/B on both GPUs.
+    grouped_launch: Toggle = "auto"
+    # Species-only atom-level products (embeddings, the first interaction's skip_tp and linear_up) as
+    # per-species tables gathered each step (opt-1 OPT-T08 C1); opt-in, auto = off.
+    species_tables: Toggle = "auto"
+    # The last readout's first linear folded into the last product's linear and skip_tp (OPT-T08 C2);
+    # opt-in, auto = off.
+    fold_readout_tail: Toggle = "auto"
+    # products.0.linear folded into the linear consumers of layer 0's output, with the species carried next to
+    # the contraction (OPT-T08 C3); opt-in, auto = off; needs species_tables.
+    fold_product_linear: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
     # MACE PR 1498 one-graph strain in the stress path (upstream_mace.use_single_graph_strain).

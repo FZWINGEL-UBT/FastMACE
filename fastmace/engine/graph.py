@@ -206,6 +206,12 @@ class GraphEngine(Engine):
         count, pipelined ACP and B at its first edge size, speculative ACB. A capture leaves the MD
         state as it was (the runtime-state registry restores it), so this only moves the captures
         earlier. A no-op without capture.
+
+        Each stage is captured with the edge views its replay will read, exactly as the step sets
+        them: a stage that evaluates forces (B, ACB) reads the first ``edges`` compacted edges of its
+        key (``force_field.use_edges``), and a CUDA graph records those views. Captured with the
+        build's exact count instead, a padded B graph read only the initial edges for the whole run,
+        and every edge beyond them was dropped from the forces (2-T21d).
         """
         if not self.capture:
             return
@@ -216,8 +222,25 @@ class GraphEngine(Engine):
         else:
             keys = ["AC", ("B", self._padded(self.initial_edges))]
         for key in keys:
-            if key not in self._graphs:
-                self._captured(key)
+            if key in self._graphs:
+                continue
+            edges = self._key_edges(key)
+            if edges is not None:  # as _step_checked, _step_pipelined and _step_speculative do
+                self.force_field.use_edges(edges)
+            self._captured(key)
+
+    @staticmethod
+    def _key_edges(key) -> int | None:
+        """The edge count a stage key's replay reads (B and ACB keys), or None (AC, ACP, C)."""
+        if isinstance(key, tuple) and key[0] in ("B", "ACB"):
+            return int(key[1])
+        return None
+
+    def _active_edges(self) -> int | None:
+        """The number of edges the force field's model reads now (its edge views), or None if it has none."""
+        data = getattr(self.force_field, "data", None)
+        index = data.get("edge_index") if isinstance(data, dict) else None
+        return None if index is None else int(index.shape[-1])
 
     def flush(self) -> None:
         """Validate every speculative or pipelined step still in flight (no-op otherwise)."""
@@ -572,7 +595,16 @@ class GraphEngine(Engine):
 
     def _captured(self, key) -> None:
         """``_capture(key)``; an error it raises is tagged with the stage ``"capture"`` (``CAPTURE_STAGE``)
-        and raised again unchanged, so the fallback can tell a capture failure from others (2-T15b)."""
+        and raised again unchanged, so the fallback can tell a capture failure from others (2-T15b).
+
+        A force stage (B, ACB) must be captured reading its key's edges: the graph keeps the edge
+        views active now for every replay. Anything else is a bug in the caller and raises before the
+        capture (2-T21d), instead of a graph that drops edges from the forces for the rest of the run.
+        """
+        edges, active = self._key_edges(key), self._active_edges()
+        if edges is not None and active is not None and active != edges:
+            raise RuntimeError(f"capturing {key!r} with {active} active edges, not its {edges}: the graph would "
+                               "read the wrong edges for the rest of the run (call force_field.use_edges first)")
         try:
             self._capture(key)
         except Exception as error:

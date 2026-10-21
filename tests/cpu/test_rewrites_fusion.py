@@ -212,3 +212,68 @@ def test_without_a_triton_product_the_stock_join_runs():
     chain = model.interactions[0].gated_rows
     rows = [torch.zeros((4 * d, 1)) for _ in range(2) for d in (1,)]
     assert not chain._any_triton(rows, 4)  # CPU: no SMs, so the shape rule never picks Triton
+
+
+# --------------------------------------------------------------------------- grouped_launch (OPT-T03 candidate 2)
+
+
+def test_grouped_products_on_the_cpu_equal_one_product_at_a_time_bitwise():
+    from fastmace.kernels.triton.grouped_gemm import grouped_products
+
+    generator = torch.Generator().manual_seed(11)
+    shapes = [(7, 5, 4), (21, 5, 6), (35, 3, 4), (49, 8, 2), (9, 4, 4)]  # (M, K, N); more than MAX_GROUPS
+    lefts = [torch.randn((m, k), generator=generator, dtype=torch.float64).requires_grad_() for m, k, _ in shapes]
+    weights = [torch.randn((k, n), generator=generator, dtype=torch.float64) for _, k, n in shapes]
+    weights_t = [w.t().contiguous() for w in weights]
+    grads = [torch.randn((m, n), generator=generator, dtype=torch.float64) for m, _, n in shapes]
+    got = grouped_products(lefts, weights, weights_t)
+    want = [x @ w for x, w in zip(lefts, weights)]
+    assert all(torch.equal(a, b) for a, b in zip(got, want))
+    total = sum((o * g).sum() for o, g in zip(got, grads))
+    reference = sum((o * g).sum() for o, g in zip(want, grads))
+    for a, b in zip(torch.autograd.grad(total, lefts), torch.autograd.grad(reference, lefts)):
+        assert torch.equal(a, b)
+
+
+def _rewritten_grouped(grouped):
+    model, batch = tiny("mh1", backend="cueq")
+    regs = registry()
+    out = copy.deepcopy(model)
+    asked = _requests_segment("on") | {"grouped_launch": grouped}
+    resolution = regs.resolve(out, asked, strict=False)
+    applied = regs.apply(out, resolution, context(batch), original=model)
+    return model, out, batch, resolution, applied
+
+
+def test_grouped_launch_record_is_opt_in_and_applies_to_every_block_linear(monkeypatch):
+    """With a fake one-SM device and a wave threshold no product reaches, every block linear groups all its
+    products (the op's CPU path): energy and forces bitwise unchanged."""
+    from fastmace.kernels.triton import grouped_gemm, tile_rule
+    from fastmace.rewrites.linear.modules import BlockLinear, ResidualBlockLinear
+
+    record = fusion.RECORDS["grouped_launch"]
+    assert record.default == "off" and record.exactness == "rounding" and record.deterministic
+    assert record.requires == ("block_linear",)
+    original, model, batch, resolution, applied = _rewritten_grouped("on")
+    assert resolution.decision("grouped_launch").enabled
+    entry = next(entry for entry in applied if entry.name == "grouped_launch")
+    assert entry.result.passed
+    blocks = [m for m in model.modules() if isinstance(m, (BlockLinear, ResidualBlockLinear))]
+    assert blocks and all(m.grouped_launch and m.sms is None for m in blocks)  # CPU: no SMs
+    _, without, _, _, _ = _rewritten_segment("on")
+    energy, forces = energy_and_forces(without, batch)
+    calls = []
+    real = grouped_gemm.grouped_products_op
+    monkeypatch.setattr(grouped_gemm, "grouped_products_op", lambda *a: calls.append(1) or real(*a))
+    monkeypatch.setattr(tile_rule, "MIN_TRITON_WAVES", 10 ** 9)
+    for m in blocks:
+        m.sms = 1
+    new_energy, new_forces = energy_and_forces(model, batch)
+    assert calls, "no grouped launch ran"
+    assert torch.equal(new_energy, energy) and torch.equal(new_forces, forces)
+
+
+def test_grouped_launch_needs_block_linear():
+    model, _ = tiny("mh1", backend="cueq")
+    asked = {name: "off" for name in registry().names()} | {"grouped_launch": "on"}
+    assert not registry().resolve(copy.deepcopy(model), asked, strict=False).decision("grouped_launch").enabled
