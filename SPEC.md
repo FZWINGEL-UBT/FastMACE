@@ -2725,3 +2725,27 @@ converted model). Rejected in the same round and recorded in
 - FP32-accurate tensor cores (OPT-T01) and their overlap (OPT-T01b);
 - OPT-T03's streams;
 - OPT-T02 stage C.
+
+**Draft 0.12, thirteenth amendment (21 October 2026, owner decision, "Make all
+3 defaults"; OPT-DEF-2):** three more FastMACE-only defaults in §6.2 and §8.
+- **The OPT-T08 records** (`species_tables`, `fold_product_linear`,
+  `fold_readout_tail`): the species-only atom-level products as per-species
+  tables, and two linear folds. They are on where the model takes them
+  (`species_tables` and `fold_product_linear`: the MH-1 labels;
+  `fold_readout_tail`: also OMOL-0), in float32 plans that are not
+  reproducible. All three are rounding class. `species_tables` is bitwise on the
+  CPU but not on the GPU (8e-16 eV/Å in the forces in the reproducible mode),
+  so float64 and reproducible plans resolve all three to off. Same-process A/B
+  of the three together, both orders: RTX 5060 Ti NaCl −9.2 to −9.6 %, NbCl5
+  −7.2 to −7.6 %; L4 NaCl −8.0 to −8.2 %, NbCl5 −7.8 to −8.0 %; A100 NaCl −9.3 to
+  −10.4 %, NbCl5 −9.3 %. The force gate passed on the RTX 5060 Ti and the L4.
+- **`EngineConfig.overlap_rebuild`:** a pipelined fixed-cell step's early
+  neighbour rebuild runs beside the force graph. Exact (bitwise in the
+  reproducible GPU mode). On by default: NaCl −0.4 to −3.6 % (more at high
+  temperature), NbCl5 neutral. `step_graph` stays off.
+- **`folded_backward_tiles`:** the folded radial layer's input gradient tiled
+  by a waves rule. Exact (same reduction order). On wherever the fused folded
+  backward is: NaCl −1.7 to −1.9 % on the RTX 5060 Ti, neutral on the L4.
+
+All five stay outside the research-engine plan equality, each with its own
+scope.
