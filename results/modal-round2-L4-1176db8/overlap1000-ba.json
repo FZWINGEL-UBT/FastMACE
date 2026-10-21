@@ -1,0 +1,196 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-10-21T16:45:37.809201+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA L4",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "1176db83b84d8a74385473a71c959c1e643527d0",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "sides": {
+    "a": {
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on"
+    },
+    "b": {
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {
+      "overlap_rebuild": true
+    }
+  },
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "load": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 4.4791448633331274,
+            "mean_ms": 4.468796791666705,
+            "min_ms": 4.275510196666801,
+            "max_ms": 4.744037080000301,
+            "stdev_ms": 0.11245307202297011,
+            "spread": 0.10460185987037915,
+            "block_ms": [
+              4.275510196666801,
+              4.316673993333401,
+              4.744037080000301,
+              4.4370095366669675,
+              4.486096423333189,
+              4.479236996666411,
+              4.479052729999845,
+              4.492302453333346,
+              4.488199429999895,
+              4.487915436666299,
+              4.473234780000439,
+              4.466292443333562
+            ]
+          },
+          "a": {
+            "median_ms": 4.53954055166605,
+            "mean_ms": 4.5326017441664765,
+            "min_ms": 4.329334533332863,
+            "max_ms": 4.84200660333272,
+            "stdev_ms": 0.12130285358111641,
+            "spread": 0.11293479244539445,
+            "block_ms": [
+              4.329334533332863,
+              4.380166876666559,
+              4.84200660333272,
+              4.521849056667027,
+              4.535550009999649,
+              4.535859346666105,
+              4.5475782000001645,
+              4.55137316333321,
+              4.543221756665996,
+              4.543618386666519,
+              4.547893480000009,
+              4.512769516666897
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.013483754193201,
+        "pair_ratios_b_over_a": [
+          1.0125889856859713,
+          1.0147087510966117,
+          1.0206510871817243,
+          1.0191208784427788,
+          1.0110237458136746,
+          1.0126410703523467,
+          1.015299098744998,
+          1.013149317218397,
+          1.0122593319490933,
+          1.0124117646123914,
+          1.0166900919963702,
+          1.010406186769679
+        ]
+      },
+      "ratio_b_over_a": 0.9866956385463377,
+      "pair_ratios": [
+        0.9875675265444024,
+        0.9855044601904579,
+        0.9797667513991023,
+        0.981237869964949,
+        0.9890964521265495,
+        0.9875167315227021,
+        0.9849314366929816,
+        0.987021343256196,
+        0.9878891391146889,
+        0.9877403986735147,
+        0.9835838943176898,
+        0.9897009866864056
+      ],
+      "setup_s": {
+        "b": 57.49240597500011,
+        "a": 43.83043857300004
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ],
+        "a": [
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 914.3181003602211,
+          "potential_eV_atom": -6.765072260741834,
+          "kinetic_eV_atom": 0.11818471656151418
+        },
+        "a": {
+          "temperature_K": 914.3182351818315,
+          "potential_eV_atom": -6.765072292751736,
+          "kinetic_eV_atom": 0.11818473398854946
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

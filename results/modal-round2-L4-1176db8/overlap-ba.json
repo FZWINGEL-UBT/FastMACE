@@ -1,0 +1,347 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-10-21T16:32:17.785766+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA L4",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "1176db83b84d8a74385473a71c959c1e643527d0",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "sides": {
+    "a": {
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on"
+    },
+    "b": {
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {
+      "overlap_rebuild": true
+    }
+  },
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "load": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 4.316519134999908,
+            "mean_ms": 4.264833708333463,
+            "min_ms": 4.054928110000067,
+            "max_ms": 4.489977686666862,
+            "stdev_ms": 0.13667600237687852,
+            "spread": 0.10078713033825201,
+            "block_ms": [
+              4.054928110000067,
+              4.103606846666328,
+              4.093978586667315,
+              4.117928613333485,
+              4.489977686666862,
+              4.337126380000124,
+              4.296840753333981,
+              4.320294146666583,
+              4.312744123333232,
+              4.332363456666523,
+              4.361265690000285,
+              4.356950106666773
+            ]
+          },
+          "a": {
+            "median_ms": 4.359105178333114,
+            "mean_ms": 4.309824387222281,
+            "min_ms": 4.1042611633330734,
+            "max_ms": 4.536301269999967,
+            "stdev_ms": 0.1354412404038164,
+            "spread": 0.09911210879112174,
+            "block_ms": [
+              4.1042611633330734,
+              4.140900343333366,
+              4.155760486667077,
+              4.160528450000432,
+              4.536301269999967,
+              4.346505346666921,
+              4.354352793332812,
+              4.364857180000096,
+              4.365200193333294,
+              4.363857563333416,
+              4.422070056666598,
+              4.403297800000321
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0098658298507015,
+        "pair_ratios_b_over_a": [
+          1.012166196784437,
+          1.0090879799309562,
+          1.0150909191857929,
+          1.0103449672558704,
+          1.0103171076931328,
+          1.0021624840608856,
+          1.0133847268959657,
+          1.010314814644715,
+          1.0121630378478192,
+          1.0072694978115075,
+          1.0139419083789663,
+          1.010637646105387
+        ]
+      },
+      "ratio_b_over_a": 0.9902305538428208,
+      "pair_ratios": [
+        0.9879800404092846,
+        0.9909938676193745,
+        0.9851334310054737,
+        0.9897609553260135,
+        0.9897882480514558,
+        0.9978421821857442,
+        0.9867920578031962,
+        0.9897904945120078,
+        0.9879831238713461,
+        0.9927829663984644,
+        0.9862497957094446,
+        0.9894743223286998
+      ],
+      "setup_s": {
+        "b": 57.86690725300002,
+        "a": 43.68602490199987
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ],
+        "a": [
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 269.4821715037773,
+          "potential_eV_atom": -6.847992292156926,
+          "kinetic_eV_atom": 0.03483325337758008
+        },
+        "a": {
+          "temperature_K": 269.48214713004324,
+          "potential_eV_atom": -6.847992287741767,
+          "kinetic_eV_atom": 0.03483325022703231
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 35.95228141333299,
+            "mean_ms": 35.921322960277784,
+            "min_ms": 34.89038537333348,
+            "max_ms": 36.43920743333335,
+            "stdev_ms": 0.38113724288559425,
+            "spread": 0.04307993816007145,
+            "block_ms": [
+              36.06954842333304,
+              34.89038537333348,
+              35.87445334666654,
+              36.43920743333335,
+              36.20153519000041,
+              36.224506396666435,
+              35.72997699000022,
+              35.934246236666546,
+              36.052229486667024,
+              35.85671430666707,
+              35.81275574999987,
+              35.970316589999435
+            ]
+          },
+          "a": {
+            "median_ms": 35.83341569333319,
+            "mean_ms": 35.8425027947222,
+            "min_ms": 35.135202236666984,
+            "max_ms": 36.540542716666856,
+            "stdev_ms": 0.3469218590540098,
+            "spread": 0.03921871395199804,
+            "block_ms": [
+              35.80137611999968,
+              35.135202236666984,
+              35.66794181333307,
+              35.524006086666304,
+              36.540542716666856,
+              36.18702087666634,
+              35.70064422333341,
+              35.84215306999947,
+              36.059890096667004,
+              35.969647783333585,
+              35.85693019666678,
+              35.824678316666905
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9966937920118827,
+        "pair_ratios_b_over_a": [
+          0.9925651327766588,
+          1.007016742885294,
+          0.9942434932363183,
+          0.9748841588187275,
+          1.0093644516699967,
+          0.9989651889361963,
+          0.9991790432253843,
+          0.9974371754993678,
+          1.0002124864428374,
+          1.003149576832407,
+          1.0012334835938144,
+          0.9959511539753025
+        ]
+      },
+      "ratio_b_over_a": 1.003317175259458,
+      "pair_ratios": [
+        1.0074905585314513,
+        0.993032148735492,
+        1.0057898359937403,
+        1.0257628980367324,
+        0.9907224277073527,
+        1.001035883007,
+        1.0008216312983964,
+        1.0025694094461128,
+        0.9997875586980591,
+        0.9968603118566304,
+        0.998768036013551,
+        1.0040653058220141
+      ],
+      "setup_s": {
+        "b": 53.8455410040001,
+        "a": 54.41556757300009
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ],
+        "a": [
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 296.46963846261235,
+          "potential_eV_atom": -10.585375700713184,
+          "kinetic_eV_atom": 0.038321652143815325
+        },
+        "a": {
+          "temperature_K": 296.46950320105356,
+          "potential_eV_atom": -10.585375698382963,
+          "kinetic_eV_atom": 0.03832163465991231
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}
