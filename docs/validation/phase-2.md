@@ -33,7 +33,7 @@ Yesterday's "heating transient" (finding 1 of 20 October) was this defect.
 | 4 | Subprocess runner | acceptance tier: runner tests passed; on the fix: Simulation tests 22 / 22 | on the freeze: the repeat diverged (NaN); on the fix: the repeat passes, Simulation tests 22 / 22 | not judgeable on the freeze (`prepare()` edge views, `d14be8c`); **pass on the fix** (main `f993713`, below) |
 | 7 | GPU CI | – | – | deferred by the owner (eleventh amendment) |
 | 8 | No regression against `fastmace-1b` | plans: only `gated_rows`, `segment_gemm` differ; trajectories pass; main 3.6–4.0 % (NaCl) and 14.6–14.9 % (NbCl5) faster | plans as local; main 3.7–4.1 % (NaCl, 6 processes) and 13.5–13.6 % (NbCl5) faster | **pass** |
-| Gate | 19 labels, new defaults | 9 of 10 pass; **OMOL-0 XL crashed** in its production build | all 9 pass (the 4 MACE-OFF labels rerun 06:38–07:02 after the GPU was taken); OMOL-0 XL as frozen crashes here too | **19 of 19 pass**: 18 at the freeze; OMOL-0 XL fails to build there and passes on `f993713` (2.00 / 1.29 / 1.67) |
+| Gate | 19 labels, new defaults | 9 of 10 pass; **OMOL-0 XL crashed** in its production build | all 9 pass (the 4 MACE-OFF labels rerun 06:38–07:02 after the GPU was taken); OMOL-0 XL as frozen crashes here too | **19 of 19 pass**: 18 at the freeze; OMOL-0 XL fails to build there and passes on `f993713` (2.0019* / 1.29 / 1.67; * below the energy floor) |
 | Tier | Acceptance GPU tier | 31 passed, 2 failed, both test-side; both pass with their test fixes (rerun by 2-T23 and 2-T15) | **33 / 33 passed** | see below |
 | – | Round's GPU files outside the tier (`round-tests`) | 9 / 9 passed | – | pass |
 
@@ -130,8 +130,11 @@ yardstick, floor)):
   subprocess-runner, subprocess-worker, fallback, `Simulation`, eager-tier and reference-tier files).
   RTX 5060 Ti 22 / 22 (08:16–09:00), murphy 22 / 22 (08:34–09:20). They include the fallback-memory and
   killed-parent worker tests that failed on WSL at the freeze.
-- **OMOL-0 XL's gate: pass** on `f993713` (murphy, 09:20–09:24): worst ratios 2.00 / 1.29 / 1.67, E max
-  0.0083 meV/atom (1b: 1.85 / 1.25 / 1.48). This is the label's acceptance result and replaces the fix
+- **OMOL-0 XL's gate: pass** on `f993713` (murphy, 09:20–09:24): worst ratios 2.0019 (energy) / 1.29 /
+  1.67 (1b: 1.85 / 1.25 / 1.48). The energy ratio is above 2 and passes by the floor, as MP-0 medium's
+  2.52 does: the worst production error is 0.008260 meV/atom (NaCl, full cell, configuration 0) against
+  the largest float32 yardstick error 0.004126 meV/atom (NaCl, hydrostatic, configuration 2), so the
+  limit is max(2 × 0.004126, 0.01) = 0.01 meV/atom and 0.008260 is below it. NbCl5: 0.9247. This is the label's acceptance result and replaces the fix
   check. **The 19-label gate passes, 19 of 19.**
 
 The plan, as prepared before the commit: On main once 2-T21d is merged, as a pinned copy, on
