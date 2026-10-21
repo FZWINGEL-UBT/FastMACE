@@ -1,0 +1,9 @@
+/usr/local/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+getpid 14 ppid 13
+nvidia-smi pids 1, /bin/dumb-init
+  PID COMMAND
+    1 /bin/dumb-init -- python -u -R --check-hash-based-pycs never -m modal._container_entrypoint
+    2 python -u -R --check-hash-based-pycs never -m modal._container_entrypoint
+   13 /bin/sh -c python -c "import os, subprocess, torch; x = torch.ones(1, device=\"cuda\"); print(\"getpid\", os.getpid(), \"ppid\", os.getppid()); print(\"nvidia-smi pids\", subprocess.check_output([\"nvidia-smi\", \"--query-compute-apps=pid,process_name\", \"--format=csv,noheader\"], text=True).strip())" > $OUT/pids.txt 2>&1; ps -eo pid,args >> $OUT/pids.txt
+   21 ps -eo pid,args

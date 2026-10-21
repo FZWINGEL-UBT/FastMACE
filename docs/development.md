@@ -502,6 +502,8 @@ modal run tools/modal/fastmace_modal.py::job --gpu L4 --timeout-min 80 --commit 
 | Run | GPU, driver | Result | Wall time, GPU cost (est.) |
 | --- | --- | --- | --- |
 | Smoke, `724c118` | NVIDIA L4 (sm_89, 23 GB), driver 610.57.04, CUDA UMD 13.3; torch 2.14.1+cu130 sees capability (8, 9) | `tests/gpu/test_smoke.py`: 2 passed | 31 s, ≈ $0.007 |
+| Smoke, `340b23c` | NVIDIA A100-SXM4-40GB (sm_80), driver 610.57.04, CUDA UMD 13.3 | `tests/gpu/test_smoke.py`: 2 passed | 30 s, ≈ $0.017 |
+| OPT-T08 (`tools/modal/opt_t08.sh`), `3e5decd`, "Modal L4, not murphy" | L4 as above | force gate passed (NaCl ratios: energy 0.33, forces 1.15, stress 0.39; NbCl5: 0.61, 1.00, 0.85). Same-process A/B, all three records on/off, 12 blocks: NaCl 0.918 (off first) / 0.920 (on first), NbCl5 0.922 / 0.920; medians NaCl 4.69 → 4.31 ms, NbCl5 37.29 → 34.37 ms. Results: `results/modal-opt-T08-L4-3e5decd/` | 38 min, ≈ $0.51 |
 
 **Timing on Modal:**
 - **Labelling:** label every result "Modal <GPU>, not murphy".
@@ -509,3 +511,10 @@ modal run tools/modal/fastmace_modal.py::job --gpu L4 --timeout-min 80 --commit 
   the same physical GPU or clocks between calls. Compare only within one container, in the same-process A/B
   (both orders).
 - **Noise floor:** not measured yet on Modal.
+- **The validity flag:** the A/B tools mark Modal runs `INVALID` because of a sandbox artifact.
+  - Inside Modal's sandbox, `nvidia-smi --query-compute-apps` reports every GPU process as PID 1 (the
+    container's `dumb-init`), not under its own PID. So `tools/ab_step_time.gpu_processes()` sees the A/B
+    itself as "another" process (`results/modal-opt-T08-L4-3e5decd/pid-check.txt`: the job is PID 14,
+    `nvidia-smi` lists 1).
+  - The container runs nothing else. Read `valid` there as `not recompiled`, until the tools learn to
+    ignore PID 1 in a container.
