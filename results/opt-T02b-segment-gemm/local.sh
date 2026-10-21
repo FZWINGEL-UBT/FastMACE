@@ -2,14 +2,18 @@
 # Optimisation round 1 on the local RTX 5060 Ti (sm_120, WSL2), one job at a time. Launch detached, holding the
 # local GPU reservation:
 #   setsid -f python3 tools/ci/local_gpu.py run --purpose "opt-1 local runs" -- \
-#     bash results/opt-T02b-segment-gemm/local.sh ROOT JOB... >/dev/null 2>&1
+#     env FM=<pinned source copy> bash results/opt-T02b-segment-gemm/local.sh ROOT JOB... >/dev/null 2>&1
+# FM is a pinned copy of the source (git archive into ~/fastmace-runs/src-<sha>, with .source_commit), never the
+# live worktree. A monitor samples Windows nvidia-smi (utilisation, memory, SM clock, temperature), the load and
+# free memory every 5 s into ROOT/monitor.log, so blocks run under desktop load can be found afterwards.
+# Further jobs: naclA-ab, naclA-ba (the stage A A/B on NaCl only).
 # Jobs: stageA-ab, stageA-ba (gated_rows off against on, tools/ab_rewrites.py, 12 blocks, both orders);
 # stageB-ab, stageB-ba (gated_rows against gated_rows + segment_gemm); t03 (block_linear_concurrency_bench);
 # t01 (gemm_precision_bench with the 4096^3 peak test, on 2-T20a's gemms.csv). Before each job: no WSL compute
 # process and utilisation <= 5 % in both nvidia-smi views for 30 s (the desktop idle), else it stops.
 set -u -o pipefail
 ROOT=$1; shift
-FM=/mnt/d/Margraf/FastMACE/.claude/worktrees/2-t20-5ac2bd
+FM=${FM:?set FM to a pinned source copy}
 B=$HOME/fastmace-baseline/1a-T18
 PY=$HOME/environments/mace_cueq_oeq/bin/python
 CACHE=$HOME/fastmace-cache/opt-1-local
@@ -42,7 +46,17 @@ run() {  # name command...
   "$@" > "$ROOT/$name.log" 2>&1 < /dev/null
   note "end $name exit=$?"
 }
-note "fastmace=$(cat $FM/.source_commit) host=$(hostname) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
+monitor() {
+  while true; do
+    echo "$(date -u +%FT%TZ) win=$($WSMI --query-gpu=utilization.gpu,memory.used,clocks.sm,temperature.gpu \
+      --format=csv,noheader | tr -d ' \r') load=$(cut -d' ' -f1 /proc/loadavg) avail_mb=$(free -m | awk '/^Mem:/{print $7}')" \
+      >> "$ROOT/monitor.log"
+    sleep 5
+  done
+}
+monitor & MON=$!
+trap 'kill $MON 2>/dev/null' EXIT
+note "fastmace=$(cat $FM/.source_commit) source=$FM host=$(hostname) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
 for job in "$@"; do
   case $job in
     stageA-ab) run $job "$PY" "$FM/tools/ab_rewrites.py" --output "$ROOT/$job" --checkpoint "$CK" --b gated_rows=on \
@@ -54,6 +68,10 @@ for job in "$@"; do
     stageB-ba) run $job "$PY" "$FM/tools/ab_rewrites.py" --output "$ROOT/$job" --checkpoint "$CK" --a gated_rows=on \
                  --b gated_rows=on segment_gemm=on --order ba --pattern abba ;;
     t03) run $job "$PY" "$FM/tools/block_linear_concurrency_bench.py" --output "$ROOT/$job" ;;
+    naclA-ab) run $job "$PY" "$FM/tools/ab_rewrites.py" --output "$ROOT/$job" --checkpoint "$CK" --b gated_rows=on \
+                --structures NaCl --order ab --pattern abab ;;
+    naclA-ba) run $job "$PY" "$FM/tools/ab_rewrites.py" --output "$ROOT/$job" --checkpoint "$CK" --b gated_rows=on \
+                --structures NaCl --order ba --pattern abba ;;
     t01) run $job "$PY" "$FM/tools/gemm_precision_bench.py" --output "$ROOT/$job" \
            --gemms "$FM/results/2-T20a-step-breakdown-20261020/NaCl/gemms.csv" \
            "$FM/results/2-T20a-step-breakdown-20261020/NbCl5/gemms.csv" ;;

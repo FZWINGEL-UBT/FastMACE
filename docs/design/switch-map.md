@@ -45,8 +45,8 @@ How to read the tables:
 | `--block-linear`; `BLOCK_LINEAR` | `RewriteConfig.block_linear` | `"auto"` (global `False`) | `on_for_hybrid_graph_engine` | §6.2 `block_linear` |
 | `--grouped-linear`; `GROUPED_BLOCK_LINEAR` | `RewriteConfig.grouped_linear` | `"auto"` (global `False`) | `on_with_block_linear` | §6.2 `grouped_linear` |
 | `--merged-residual`; `MERGED_RESIDUAL_LINEAR` | `RewriteConfig.merged_residual` | `"auto"` (global `False`) | `on_with_block_linear` | §6.2 `merged_residual` |
-| — (FastMACE only: optimisation round 1, OPT-T02 stage A) | `RewriteConfig.gated_rows` | `"auto"` | `never_automatic` | `docs/design/opt-T02-fusion.md`, stage A |
-| — (FastMACE only: optimisation round 1, OPT-T02 stage B) | `RewriteConfig.segment_gemm` | `"auto"` | `never_automatic` | `docs/design/opt-T02-BC-go-no-go.md` |
+| — (FastMACE only: optimisation round 1, OPT-T02 stage A) | `RewriteConfig.gated_rows` | `"auto"` | `on_with_merged_residual` | `docs/design/opt-T02-fusion.md`, stage A; default on by owner decision, 20 October 2026 |
+| — (FastMACE only: optimisation round 1, OPT-T02 stage B) | `RewriteConfig.segment_gemm` | `"auto"` | `on_with_gated_rows_float32_unless_reproducible` | `docs/design/opt-T02-BC-go-no-go.md`; default on by owner decision, 20 October 2026 |
 | `INPLACE_BLOCK_LINEAR` (no flag) | `RewriteConfig.inplace_block_linear` | `False` | — | §6.2 opt-in "in-place block linear (slower)" |
 | `--single-graph-strain`; `upstream_mace.use_single_graph_strain` (process-wide patch of MACE) | `RewriteConfig.single_graph_strain` | `"auto"` | `on` | §6.2 `single_graph_strain` |
 | `--polar-uvu`; `polar_gpu.REASSOCIATE_UVU` | `RewriteConfig.polar_uvu` | `True` (flag `on`) | — | §6.2 `polar_uvu` |
@@ -72,6 +72,7 @@ How to read the tables:
 | `EMPTY_CACHE_BEFORE_CAPTURE` | `EngineConfig.empty_cache_before_capture` | `True` | — | engine |
 | `WARMUP_IN_GRAPH_POOL` | `EngineConfig.warmup_in_graph_pool` | `True` | — | engine |
 | none: the research engine's `fm.calc` path recompiles on a new edge count (new in the library, 2-T01; filled by 2-T13) | `EngineConfig.dynamic_edges` | `False` | — | engine (evaluation plans; no effect until 2-T13) |
+| none: the research engine loads and converts once per process (new in the library, opt-1 OPT-T06) | `EngineConfig.model_template_cache` | `True` | — | planner (`ForceField.execution_model`: later plans copy a converted template; CUDA cuEq and hybrid only) |
 
 ## 3. Precision → `PrecisionConfig`
 
@@ -202,6 +203,7 @@ reach the planner through `Simulation(fallback=, gate=, runner=)` and `fm.md`
 | none (new, SPEC §8.7) | `RunnerConfig.inherit_environment` | `True` | — | subprocess runner |
 | none (new, SPEC §8.7) | `RunnerConfig.timeout_s` | `None` | — | subprocess runner |
 | none (new, SPEC §8.7) | `RunnerConfig.stall_timeout_s` | `1800.0` | — | subprocess runner |
+| none (new, OPT-T07) | `RunnerConfig.persistent` | `True` | — | subprocess runner: one worker child per `Simulation` (`False`: a fresh child per `run()`) |
 
 ## Auto resolution rules
 
@@ -234,8 +236,10 @@ tier 1, §8.1); "hybrid" the resolved backend. Support keys are those of
 | `on_with_reassociate_first_and_sort_receivers` | Stage 1: on when `reassociate_first` and `sort_receivers` are on. Stage 2: off unless support `reassociate_first`. | `RewriteConfig.segmented_first_sum` |
 | `on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports` | Stage 1: on with the hybrid backend, `fold_cutoff` (stage 1) and `sort_receivers`. Stage 2: off unless support `streaming_conv` (folded MH-1 class or a `GENERIC_INTERACTIONS` model). | `RewriteConfig.streaming_conv` |
 | `on_with_graph_engine_if_model_supports` | Stage 1: on with the graph engine, **any backend**. Stage 2: off unless support `species_skip` (a `GENERIC_INTERACTIONS` model). | `RewriteConfig.species_skip` |
-| `never_automatic` | Off; only `"on"` enables it (`fused_radial_hidden` requires `fold_cutoff`, `gated_rows` requires `merged_residual`, `segment_gemm` requires `gated_rows`). | `RewriteConfig.fused_radial_hidden`, `RewriteConfig.gated_rows`, `RewriteConfig.segment_gemm` |
+| `never_automatic` | Off; only `"on"` enables it (`fused_radial_hidden` requires `fold_cutoff`). | `RewriteConfig.fused_radial_hidden` |
 | `on_with_block_linear` | On when `block_linear` is on. `merged_residual` acts only in interactions where `density_first` applies; the rewrite's `requires` handles that, not the rule. | `RewriteConfig.grouped_linear`, `RewriteConfig.merged_residual` |
+| `on_with_merged_residual` | On when `merged_residual` is on, so wherever block linear applies with `density_first` (owner decision, 20 October 2026). Stage 2: off unless the model supports `fold_cutoff`; the rewrite's own `applies_to` (MACE's `GatedEquivariantBlock` in a factored interaction) decides where it acts. | `RewriteConfig.gated_rows` |
+| `on_with_gated_rows_float32_unless_reproducible` | On when `gated_rows` is on, except in float64 plans and `reproducible=True` plans, which keep the stock products and join (owner decision, 20 October 2026); an explicit `"on"` is kept (in float64 its op runs the PyTorch path). At run time, per force call, the shared shape rule (`fastmace.kernels.triton.tile_rule`) picks the Triton GEMM; where no product qualifies (NaCl-sized cells) the stock products and join run. | `RewriteConfig.segment_gemm` |
 | `on` | On for every engine; acts only where stress is computed (NPT, stress-path relaxations). | `RewriteConfig.single_graph_strain` |
 | `on_for_plain_cueq_unless_reproducible` | Plain cuEq backend: on, except in a `reproducible=True` plan, which needs the unfused convolution (§9.3, owner decision 13). Hybrid: not applicable (the research engine records `None`). | `EngineConfig.cueq_conv_fusion` |
 | `on_for_torch_2_14_unless_alloc_conf_set` | Set `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` before the first CUDA allocation when torch ≥ 2.14 and the variable is unset; otherwise leave the allocator alone. | `EngineConfig.expandable_segments` |
@@ -269,9 +273,11 @@ model is an error with a reason, never a silent downgrade.
 - Phase 2 (plan task 2-T01) added two fields to existing records,
   `EngineConfig.dynamic_edges` and `RewriteConfig.selfcheck_cache`, and three
   records with 11 fields (section 10: `FallbackConfig` 3, `GateConfig` 3,
-  `RunnerConfig` 5), 70 in all. Two admit `"auto"` (`FallbackConfig.fallback`,
+  `RunnerConfig` 5), 70 in all. OPT-T07 added `RunnerConfig.persistent` (71). Two admit `"auto"` (`FallbackConfig.fallback`,
   `GateConfig.reduced_cell`).
   None comes from the research engine.
+- Optimisation round 1 (plan task OPT-T06) added `EngineConfig.model_template_cache`,
+  71 in all. It does not come from the research engine, which loaded once per process.
 
 ## Open questions for the conductor
 

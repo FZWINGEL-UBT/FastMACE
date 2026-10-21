@@ -99,10 +99,11 @@ class RewriteConfig:
     # linear_1 and linear_res as one product per output segment (MERGED_RESIDUAL_LINEAR).
     merged_residual: Toggle = "auto"
     # Residual products, gate and linear_2 of MH-1-class interactions on per-segment rows, without the
-    # joins and copies between them (opt-1 OPT-T02 stage A); opt-in until its A/B on both GPUs.
+    # joins and copies between them (opt-1 OPT-T02 stage A); auto = on with merged_residual (owner, 20 Oct 2026).
     gated_rows: Toggle = "auto"
     # linear_2's products in those chains written straight into its joined output by a gathered-row Triton
-    # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); opt-in until its A/B on both GPUs.
+    # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); auto = on with gated_rows in float32,
+    # not reproducible (owner, 20 Oct 2026).
     segment_gemm: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
@@ -155,6 +156,9 @@ class EngineConfig:
     # Evaluation plans compile with the edge dimension dynamic from the first call, so a changed edge
     # count does not recompile (2-T13). No effect until 2-T13.
     dynamic_edges: bool = False
+    # Keep each conversion's model as a template and give later plans a private copy of it instead of
+    # reloading and converting the checkpoint (CUDA cuEq and hybrid only; opt-1 OPT-T06).
+    model_template_cache: bool = True
 
     def __post_init__(self):
         _check_choices(self)
@@ -365,6 +369,9 @@ class RunnerConfig:
     timeout_s: float | None = None
     # A child without progress (no committed step) for this long is killed, s.
     stall_timeout_s: float = 1800.0
+    # One child serves every run() of the Simulation, keeping its compiled engine (OPT-T07); False: a
+    # fresh child per run(), resuming the last restart write (2-T07's path; also on Windows).
+    persistent: bool = True
 
     def __post_init__(self):
         _check_choices(self)
@@ -385,6 +392,8 @@ class RunnerConfig:
         if self.timeout_s is not None:
             _positive(self, "timeout_s")
         _positive(self, "stall_timeout_s")
+        if not isinstance(self.persistent, bool):
+            raise ValueError(f"RunnerConfig.persistent must be a bool, got {self.persistent!r}")
 
     def resolved_python(self) -> str:
         """The child's interpreter: ``python``, else this process's ``sys.executable``."""

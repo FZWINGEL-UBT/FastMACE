@@ -441,6 +441,8 @@ class Rewrite:
 | `block_linear` | rounding (GEMM grouping) | cuEq `Linear` (internal shared weights) | −11.8% NaCl (MH-1) | — |
 | `grouped_linear` | rounding | with `block_linear` | MH-1 −2 to −5%, OMOL −4% | — |
 | `merged_residual` | rounding | with `block_linear` + `density_first` | included above | — |
+| `gated_rows` (residual products, gate and `linear_2` on per-segment rows; FastMACE optimisation round 1, OPT-T02 stage A) | exact (bitwise on the CPU and in the reproducible GPU mode) | with `merged_residual`, MACE's `GatedEquivariantBlock` in the folded MH-1 forward | MH-1: NaCl −4.4 % (sm_89) / −3.7 % (sm_120), NbCl5 −9.0 % / −10.6 %, on top of the rest | default on by owner decision, 20 October 2026; switched off for any model that fails the 19-label gate in the combined acceptance |
+| `segment_gemm` (`linear_2`'s products in the `gated_rows` chains write straight into the joined output, Triton gathered-row GEMM where the shared shape rule picks it; OPT-T02 stage B) | rounding (another GEMM; deterministic, no atomics) | with `gated_rows`, float32, not `reproducible=True` | MH-1 NbCl5 −4.8 to −5.2 % (sm_89) / −4.2 to −4.3 % (sm_120) on top of `gated_rows`; NaCl neutral (stock path below the rule's threshold) | default on by owner decision, 20 October 2026; float64 and the reproducible mode keep the stock path; switched off for any model that fails the 19-label gate in the combined acceptance |
 | `streaming_conv` (OEq PR 223 kernels, NVRTC) | exact (summation order; atomic sums, not bitwise reproducible) | folded MH-1 class, `GENERIC_*` with OEq fusion | −7.7% NaNbO3; generic −16 to −28% with reassociation | OEq present; per-engine edge counter (§8.1) |
 | `generic_species_skip` | exact (absent columns multiply zeros) | MP-0/density family | −7 to −39% | fixed species superset |
 | `generic_fused_radial_backward` | rounding | MP-0/density family | −3 to −5% large cells | — |
@@ -512,6 +514,16 @@ ff = fm.ForceField(model, atoms, precision="float32", rewrites="auto",
                    species=["Na", "Nb", "Cl", "O"])    # declared superset (§8.5)
 e, f, s = ff.evaluate(atoms, stress=True)               # one-off evaluation
 ```
+
+**Execution copies and templates** (opt-1 OPT-T06). Each plan converts its own copy of the pristine model
+(decision 24). On CUDA with the cuEq or hybrid backend, the `ForceField` keeps the first conversion of each kind
+as a template: checkpoint hash, head, backend, dtype, device, conversion options, process patches and package
+versions. Every later plan of that kind gets a private deep copy of the template instead of a reload and
+conversion; this includes the gate's reduced cell and fallback candidates. No module, tensor or calculator state
+is shared between plans (§8.7). Self-checks run on every copy as before.
+- A `ForceField` keeps at most two templates.
+- `ff.release_templates()` frees them.
+- `EngineConfig(model_template_cache=False)` turns the cache off.
 
 ### 7.2 Simulation
 
@@ -2691,3 +2703,25 @@ registered: its push and nightly triggers are off. Until then, GPU coverage
 comes from the conductor's trial tiers before merges and from each phase's
 acceptance runs. The question comes back when the owner registers the
 runners, at the latest in phase 6.
+
+**Draft 0.12, twelfth amendment (20–21 October 2026, owner decisions,
+optimisation round 1):** two new default rewrites in §6.2.
+- **`gated_rows`:** removes the layout copies around the per-irrep block
+  linears. It is exact: bitwise on the CPU and in the reproducible GPU mode.
+  It is on wherever the merged residual applies.
+- **`segment_gemm`:** a Triton GEMM that writes into the joined layout, chosen
+  by a shape rule from M, N, K and the SM count. It is rounding class, and
+  on in float32, non-reproducible plans. Float64 and reproducible plans
+  resolve it to off.
+
+Measured on murphy (sm_89) and the RTX 5060 Ti (sm_120): A gives NaCl −3.7
+to −4.4 % and NbCl5 −9.0 to −10.6 %. B on top gives NbCl5 −4.2 to −5.2 %, and
+NaCl is neutral. Both are FastMACE-only defaults, outside the research-engine
+plan equality. The combined acceptance's 19-label gate decides per model; a
+model that fails gets the rewrite switched off. Also added:
+`EngineConfig.model_template_cache` (OPT-T06, on: later plans copy the
+converted model). Rejected in the same round and recorded in
+`docs/rewrites.md`:
+- FP32-accurate tensor cores (OPT-T01) and their overlap (OPT-T01b);
+- OPT-T03's streams;
+- OPT-T02 stage C.

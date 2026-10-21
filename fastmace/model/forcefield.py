@@ -133,17 +133,51 @@ class ForceField:
         Called by the planner only, once per plan. The checkpoint is loaded again, its hash checked
         against the pristine model's, so the pristine model is never changed and no two plans share
         a model (the per-model state that SPEC §8.7's instance isolation is about stays per plan).
+        On CUDA with cuEq or hybrid, a later plan of the same conversion gets a private copy of the
+        first plan's converted model instead (``fastmace.model.templates``; opt-1 OPT-T06), unless
+        ``EngineConfig.model_template_cache`` is False.
         """
-        from fastmace.model import loading
+        from fastmace.model import loading, templates
 
         engine = plan.engine
         fusion = engine.cueq_conv_fusion == "on" if engine.backend == "cueq" else None
         allow = "allow_naive_cueq" in plan.allowances
         model = self.model
-        return loading.load(
-            model.label or str(model.path), None if model.label else model.head, checkpoint=str(model.path),
-            backend=engine.backend, dtype=plan.precision.dtype, device=engine.device, cueq_conv_fusion=fusion,
-            sha256=model.sha256, allow_naive_cueq=allow, charge=model.charge, spin_multiplicity=model.spin_multiplicity)
+        source, head = model.label or str(model.path), None if model.label else model.head
+        options = dict(checkpoint=str(model.path), backend=engine.backend, dtype=plan.precision.dtype,
+                       device=engine.device, cueq_conv_fusion=fusion, sha256=model.sha256, allow_naive_cueq=allow,
+                       charge=model.charge, spin_multiplicity=model.spin_multiplicity)
+
+        def load():
+            return loading.load(source, head, **options)
+
+        # CUDA cuEq and hybrid: later plans copy the first plan's converted model instead of converting
+        # again (opt-1 OPT-T06); each plan still gets its own model, and the template is never handed out.
+        if not (getattr(engine, "model_template_cache", True) and templates.applies(engine.backend, engine.device)):
+            return load()
+        return self._template_cache().execution_model(templates.conversion_key(model, options), load)
+
+    def _template_cache(self):
+        from fastmace.model import templates
+
+        cache = self.__dict__.get("_templates")
+        if cache is None:
+            cache = self._templates = templates.TemplateCache()
+        return cache
+
+    def template_count(self) -> int:
+        """How many converted models this force field keeps as templates (opt-1 OPT-T06)."""
+        cache = self.__dict__.get("_templates")
+        return 0 if cache is None else len(cache)
+
+    def release_templates(self) -> int:
+        """Drop the converted models kept as templates; returns the bytes their tensors held.
+
+        The next plan of each conversion converts the checkpoint again. Use it to give the memory back,
+        for example before an out-of-memory retry (opt-1 OPT-T06).
+        """
+        cache = self.__dict__.get("_templates")
+        return 0 if cache is None else cache.release()
 
     # ------------------------------------------------------------------ one-off evaluation
 

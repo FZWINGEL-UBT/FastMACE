@@ -1,0 +1,115 @@
+{
+  "tool": "block_linear_concurrency_bench",
+  "created_utc": "2026-10-20T21:47:14.107804+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "sms": 36,
+  "torch": "2.14.1+cu130",
+  "triton": "3.8.0",
+  "fastmace_commit": "3d301ec109ecc79aac1b8f082a91f0f190e8931e",
+  "load": [
+    0.31640625,
+    2.25537109375,
+    12.1728515625
+  ],
+  "repeats": 100,
+  "cases": {
+    "NaCl/forward": {
+      "sequential": {
+        "us": 193.16799938678741,
+        "speedup": 1.0,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams2": {
+        "us": 284.5280021429062,
+        "speedup": 0.6789068138529558,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams4": {
+        "us": 283.31199288368225,
+        "speedup": 0.681820763818125,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "grouped": {
+        "us": 144.16000247001648,
+        "speedup": 1.3399555776711645,
+        "max_rel_diff_vs_sequential": 9.365115261061874e-07
+      },
+      "flop_tflops_sequential": 9.380121623415931
+    },
+    "NaCl/input_grad": {
+      "sequential": {
+        "us": 188.01599740982056,
+        "speedup": 1.0,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams2": {
+        "us": 267.69600808620453,
+        "speedup": 0.7023489022267186,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams4": {
+        "us": 192.76799261569977,
+        "speedup": 0.9753486295032768,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "grouped": {
+        "us": 144.49600130319595,
+        "speedup": 1.3011847782230777,
+        "max_rel_diff_vs_sequential": 9.737418622535188e-07
+      },
+      "flop_tflops_sequential": 9.637155098299937
+    },
+    "NbCl5/forward": {
+      "sequential": {
+        "us": 1126.3200044631958,
+        "speedup": 1.0,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams2": {
+        "us": 1199.2799639701843,
+        "speedup": 0.9391635300355919,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams4": {
+        "us": 1172.815978527069,
+        "speedup": 0.9603552689295151,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "grouped": {
+        "us": 1156.336009502411,
+        "speedup": 0.9740421427746322,
+        "max_rel_diff_vs_sequential": 8.321503628394566e-07
+      },
+      "flop_tflops_sequential": 14.478526428883002
+    },
+    "NbCl5/input_grad": {
+      "sequential": {
+        "us": 1133.6320042610168,
+        "speedup": 1.0,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams2": {
+        "us": 1236.2239956855774,
+        "speedup": 0.9170118103332352,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "streams4": {
+        "us": 1163.0719900131226,
+        "speedup": 0.9746877355787981,
+        "max_rel_diff_vs_sequential": 0.0
+      },
+      "grouped": {
+        "us": 1158.1599712371826,
+        "speedup": 0.9788216070445224,
+        "max_rel_diff_vs_sequential": 1.0479142247277196e-06
+      },
+      "flop_tflops_sequential": 14.385138996345093
+    }
+  },
+  "load_after": [
+    0.31640625,
+    2.25537109375,
+    12.1728515625
+  ]
+}

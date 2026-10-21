@@ -204,10 +204,39 @@ asked for about 10 hours of queued work):
 **Code freeze at about 03:00 UTC:** whatever is merged by then is in the
 combined acceptance. Anything later waits for the next round.
 
+**Freeze recorded 21 October 2026, 03:05 UTC:** the code under test is main
+at `4f90a92`. This plans-only commit adds the freeze record and changes no
+code.
+- In the freeze, all merged and trialled: stage A (`gated_rows`) and stage B
+  (`segment_gemm`) as defaults, OPT-T06 (template cache), OPT-T07
+  (persistent worker), and the records of stage C, OPT-T01/T01b, OPT-T03
+  and OPT-T04.
+- Not in the freeze, all opt-in and waiting for the next round's trial merge:
+  - `fastmace/opt-T03b` (`a741349`): grouped_launch fixed. It gains on sm_120
+    only (NaCl b/a 0.977 / 0.982), and on sm_89 it gives 1.005 / 1.003, so
+    it is not a default candidate.
+  - `fastmace/opt-T08` (`eecda68`): C1 `species_tables`, C2
+    `fold_readout_tail`, C3 `fold_product_linear`; CPU-tested. Its GPU runs
+    did not start before the freeze, because the worker's permission check
+    refused the launch. They follow the acceptance.
+
 **Combined acceptance from about 03:00 UTC (2-T23):** both GPUs, the
 runbook's order, including the 19-label gate, the item 4 repeat and item 8
 against `fastmace-1b`. The phase 2 report and a round-1 summary are ready
 for the owner in the morning.
+
+- **OPT-T08 Atom-level linear audit (2-T16 worker; owner, 21 October
+  2026, night: "run the audit tonight and try out everything you can think
+  of").**
+  - **Tonight, CPU only:** an audit of the compiled force pass for
+    multiplies that share an input (merge into one wider GEMM), adjacent
+    linears without a nonlinearity between them (fold W2·W1 at load), and
+    other exact reductions.
+  - **Then:** build every candidate above about 1 % as an opt-in record, and
+    A/B it on both GPUs after the acceptance.
+- **OPT-T03 candidate 2, diagnosis (2-T20; owner):** why grouped_launch's
+  1.3× bench gain becomes a full-step loss. Local nsys/ncu until 02:45 UTC,
+  then a fix attempt.
 
 Not in this round:
 - a complete force megakernel. Our fit gives a ceiling of 8–16 % on NaCl, and

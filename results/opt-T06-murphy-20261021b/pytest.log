@@ -1,0 +1,60 @@
+....FF                                                                   [100%]
+=================================== FAILURES ===================================
+_ test_a_second_simulation_from_a_template_copy_runs_as_from_a_reload[hybrid-float32] _
+
+backend = 'hybrid', dtype = 'float32'
+tiny_checkpoint = PosixPath('/mnt/homes/zwingel/fastmace-opt-t06/runs/opt-T06-murphy-20261021b/pytest/tiny0/tiny-mh1.model')
+tmp_path = PosixPath('/mnt/homes/zwingel/fastmace-opt-t06/runs/opt-T06-murphy-20261021b/pytest/test_a_second_simulation_from_0')
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize(("backend", "dtype"), [("hybrid", "float32"), ("cueq", "float32")])
+    def test_a_second_simulation_from_a_template_copy_runs_as_from_a_reload(backend, dtype, tiny_checkpoint, tmp_path):
+        _skip_unless_possible(backend)
+        engine = _probe(backend, dtype, tiny_checkpoint, tmp_path, engine_steps=10)["engine"]
+>       assert engine["templates_kept"] == {"on": 1, "off": 0}
+E       AssertionError: assert {'on': 2, 'off': 0} == {'on': 1, 'off': 0}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'on': 2} != {'on': 1}
+E         Use -v to get more diff
+
+../../src/tests/gpu/test_template_cache_gpu.py:84: AssertionError
+_ test_a_second_simulation_from_a_template_copy_runs_as_from_a_reload[cueq-float32] _
+
+backend = 'cueq', dtype = 'float32'
+tiny_checkpoint = PosixPath('/mnt/homes/zwingel/fastmace-opt-t06/runs/opt-T06-murphy-20261021b/pytest/tiny0/tiny-mh1.model')
+tmp_path = PosixPath('/mnt/homes/zwingel/fastmace-opt-t06/runs/opt-T06-murphy-20261021b/pytest/test_a_second_simulation_from_1')
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize(("backend", "dtype"), [("hybrid", "float32"), ("cueq", "float32")])
+    def test_a_second_simulation_from_a_template_copy_runs_as_from_a_reload(backend, dtype, tiny_checkpoint, tmp_path):
+        _skip_unless_possible(backend)
+        engine = _probe(backend, dtype, tiny_checkpoint, tmp_path, engine_steps=10)["engine"]
+>       assert engine["templates_kept"] == {"on": 1, "off": 0}
+E       AssertionError: assert {'on': 2, 'off': 0} == {'on': 1, 'off': 0}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'on': 2} != {'on': 1}
+E         Use -v to get more diff
+
+../../src/tests/gpu/test_template_cache_gpu.py:84: AssertionError
+=============================== warnings summary ===============================
+tests/gpu/test_template_cache_gpu.py: 23 warnings
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_template_cache_gpu.py: 22 warnings
+  /usr/lib/python3.10/ast.py:418: UserWarning: The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`.
+    return visitor(node)
+
+tests/gpu/test_template_cache_gpu.py::test_a_template_copy_is_the_reload[hybrid-float32]
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:89: FutureWarning: `torch.jit.save` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ../../src/tests/gpu/test_template_cache_gpu.py::test_a_second_simulation_from_a_template_copy_runs_as_from_a_reload[hybrid-float32]
+FAILED ../../src/tests/gpu/test_template_cache_gpu.py::test_a_second_simulation_from_a_template_copy_runs_as_from_a_reload[cueq-float32]
+2 failed, 4 passed, 46 warnings in 199.44s (0:03:19)

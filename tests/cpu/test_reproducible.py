@@ -77,7 +77,8 @@ def test_reproducible_mh1_plan_is_plain_unfused_cueq(precision):
     assert got.runner == "in-process"
     assert got.decision("EngineConfig.backend")[2].code == "backend-cueq-reproducible"
     assert "reproducible" in str(got.decision("EngineConfig.cueq_conv_fusion")[2])
-    for name in ("factor_species", "streaming_conv", "segmented_first_sum", "reassociate_first", "block_linear"):
+    for name in ("factor_species", "streaming_conv", "segmented_first_sum", "reassociate_first", "block_linear",
+                 "gated_rows", "segment_gemm"):
         assert getattr(got.rewrites, name) == "off", name
     key, choice, reason = got.decision("reproducible")
     assert choice.startswith("qualified") and reason.code == "reproducible-qualified"

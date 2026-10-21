@@ -82,8 +82,8 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.block_linear": "on_for_hybrid_graph_engine",
     "RewriteConfig.grouped_linear": "on_with_block_linear",
     "RewriteConfig.merged_residual": "on_with_block_linear",
-    "RewriteConfig.gated_rows": "never_automatic",
-    "RewriteConfig.segment_gemm": "never_automatic",
+    "RewriteConfig.gated_rows": "on_with_merged_residual",
+    "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
 })
@@ -410,7 +410,7 @@ class FixedPlanner:
         hybrid = backend == "hybrid"
         values = self._stage1(book, hybrid, npt)
         self._stage2(book, values, traits, explicit)
-        self._fastmace_rules(book, values, hybrid, explicit)
+        self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible)
         rewrite_values = {name: _toggle(values[name]) for name in REWRITE_FIELDS}
 
         rewrites = self.rewrites
@@ -551,12 +551,8 @@ class FixedPlanner:
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")
         needs("merged_residual", r.merged_residual != "off", v["block_linear"], "block_linear")
-        needs("gated_rows", r.gated_rows == "on", v["merged_residual"], "merged_residual")
-        if r.gated_rows == "auto":
-            v["_why"]["gated_rows"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
-        needs("segment_gemm", r.segment_gemm == "on", v["gated_rows"], "gated_rows")
-        if r.segment_gemm == "auto":
-            v["_why"]["segment_gemm"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
+        needs("gated_rows", r.gated_rows != "off", v["merged_residual"], "merged_residual")
+        needs("segment_gemm", r.segment_gemm != "off", v["gated_rows"], "gated_rows")
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
         note("single_graph_strain", r.single_graph_strain != "off",
              "acts where stress is computed (NPT)" if npt else "process-wide; acts only where stress is computed")
@@ -578,8 +574,13 @@ class FixedPlanner:
             elif v[name]:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
 
-    def _fastmace_rules(self, book, v, hybrid, explicit):
+    def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False):
         """FastMACE's hard rules on the rewrites, then one decision per rewrite field and neighbour option."""
+        if v["segment_gemm"] and "segment_gemm" not in explicit and (dtype != "float32" or reproducible):
+            # Owner decision, 20 October 2026: float64 and the reproducible mode keep the stock products and join.
+            v["segment_gemm"] = False
+            v["_why"]["segment_gemm"] += ("; off: reproducible=True keeps the stock products" if reproducible
+                                          else f"; off: {dtype} keeps the stock products (the Triton GEMM is float32)")
         if not hybrid and v["reassociate_first"]:
             if "reassociate_first" in explicit:
                 book.refuse(f"RewriteConfig.reassociate_first='on' on plain cuEq: {PLAIN_CUEQ_REASSOCIATION}",

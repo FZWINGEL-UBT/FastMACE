@@ -181,7 +181,8 @@ def test_two_hand_offs_continue_bitwise_against_an_in_process_run(loaded, tmp_pa
     metadata, reference = _metadata(tmp_path / "child"), _metadata(tmp_path / "whole")
     assert metadata["restart_points"] == reference["restart_points"]
     assert [point["step"] for point in metadata["restart_points"]] == [0, 2, 3, 5, 6, 7]
-    assert metadata["subprocess"]["children"] == 4  # setup and three runs
+    assert metadata["subprocess"]["calls"] == 4  # setup and three runs
+    assert metadata["subprocess"]["children"] == 1 and metadata["subprocess"]["persistent"]  # one worker (OPT-T07)
     assert metadata["timing"]["status"] == "complete"
     assert not (tmp_path / "child" / runner_module.HANDOFF_NAME).exists()  # removed by a clean close()
 
@@ -294,9 +295,10 @@ def test_the_ase_shim_through_the_runner(loaded, tmp_path, monkeypatch, runner_p
 # --------------------------------------------------------------------------- errors
 
 
-def _wrapper(tmp_path, body):
+def _wrapper(tmp_path, body, **config):
     """A wrapper interpreter (``RunnerConfig.python``) whose child runs ``body`` in place of
-    ``Simulation.run``."""
+    ``Simulation.run``. ``body`` may call ``ORIGINAL(self, *args, **kwargs)`` and count the calls in
+    this child process in ``CALLS[0]``; ``config`` goes to ``RunnerConfig``."""
     script = tmp_path / "child.py"
     script.write_text(textwrap.dedent("""\
         import os
@@ -305,20 +307,24 @@ def _wrapper(tmp_path, body):
 
         import fastmace.simulation as simulation
 
+        ORIGINAL = simulation.Simulation.run
+        CALLS = [0]
+
 
         def run(self, *args, **kwargs):
+            CALLS[0] += 1
         {body}
 
 
         simulation.Simulation.run = run
         from fastmace.engine import subprocess as runner
 
-        sys.exit(runner.main(sys.argv[-1:]))
+        sys.exit(runner.main(sys.argv[3:]))  # after "-m fastmace.engine.subprocess"
         """).format(body=textwrap.indent(textwrap.dedent(body), "    ")))
     python = tmp_path / "python"
     python.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n')
     python.chmod(0o755)
-    return RunnerConfig(python=str(python))
+    return RunnerConfig(python=str(python), **config)
 
 
 @POSIX

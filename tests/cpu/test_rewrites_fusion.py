@@ -49,15 +49,16 @@ def rewritten(gated_rows, family="mh1"):
     return model, out, batch, resolution, applied
 
 
-def test_record_is_opt_in_exact_deterministic_and_pinned():
+def test_record_is_default_exact_deterministic_and_pinned():
     record = fusion.RECORDS["gated_rows"]
-    assert record.default == "off" and record.exactness == "exact" and record.deterministic
+    assert record.default == "auto" and record.exactness == "exact" and record.deterministic
     assert record.requires == ("block_linear", "merged_residual")
     assert record.source_hashes == {fusion.GATE_FORWARD: fusion.GATE_FORWARD_SHA256}
     assert reg.source_sha256(fusion.GATE_FORWARD) == fusion.GATE_FORWARD_SHA256
     regs = registry()
     model, _ = tiny("mh1", backend="cueq")
-    assert not regs.resolve(copy.deepcopy(model), requests("auto"), strict=False).decision("gated_rows").enabled
+    assert regs.resolve(copy.deepcopy(model), requests("auto"), strict=False).decision("gated_rows").enabled
+    assert not regs.resolve(copy.deepcopy(model), requests("off"), strict=False).decision("gated_rows").enabled
 
 
 def test_default_registry_holds_the_record_after_the_linear_family():
@@ -151,9 +152,9 @@ def _rewritten_segment(segment):
     return model, out, batch, resolution, applied
 
 
-def test_segment_record_is_opt_in_rounding_deterministic():
+def test_segment_record_is_default_rounding_deterministic():
     record = fusion.RECORDS["segment_gemm"]
-    assert record.default == "off" and record.exactness == "rounding" and record.deterministic
+    assert record.default == "auto" and record.exactness == "rounding" and record.deterministic
     assert record.requires == ("gated_rows",)
     assert record.source_hashes == {fusion.RESHAPE_FORWARD: fusion.RESHAPE_FORWARD_SHA256}
     assert reg.source_sha256(fusion.RESHAPE_FORWARD) == fusion.RESHAPE_FORWARD_SHA256
