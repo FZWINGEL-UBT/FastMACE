@@ -9,7 +9,8 @@ those of the PyTorch stage:
 
 - every elementwise operation is the PyTorch expression's, in its order, in float64, with the
   coefficients loaded from float64 tensors (a Python float argument would be float32) and FMA
-  contraction off (``enable_fp_fusion=False``);
+  contraction off (``enable_fp_fusion=False``); a division of a tensor by a Python number is a
+  multiplication by its reciprocal, as PyTorch's CUDA kernel does it;
 - a sum over the three components is ``(x + z) + y``, the order of PyTorch's ``sum(dim=1)`` over a
   width-3 float64 row on CUDA (``tools/opt3_t03_order_probe.py``); ``x ** 2`` is ``x * x``;
 - the largest squared displacement is an exact maximum (atomic max of the bit patterns of
@@ -71,15 +72,19 @@ def _kernels():
         dt = tl.load(coef_ptr + 2)
         nf = tl.load(coef_ptr + 3)  # float(n)
         factor = tl.load(coef_ptr + 4)
+        inv_dt = tl.load(coef_ptr + 5)  # PyTorch's CUDA tensor / Python scalar is tensor * (1 / scalar)
+        inv_n = tl.load(coef_ptr + 6)
         m = tl.load(m_ptr + a, mask=live, other=1.0)
         den = m * nf
-        squared = []
+        s0 = tl.zeros([BLOCK], dtype=tl.float64)  # squared displacement components (static branches below)
+        s1 = tl.zeros([BLOCK], dtype=tl.float64)
+        s2 = tl.zeros([BLOCK], dtype=tl.float64)
         for c in tl.static_range(3):
             k = a * 3 + c
             rp = tl.load(rp_raw_ptr + k, mask=live)
             rv = tl.load(rv_raw_ptr + k, mask=live)
             if FIX_COM:
-                rp = (rp - tl.load(sp_ptr + c) / nf) * factor
+                rp = (rp - tl.load(sp_ptr + c) * inv_n) * factor
                 rv = (rv - tl.load(sq_ptr + c) / den) * factor
             tl.store(rp_ptr + k, rp, mask=live)
             tl.store(rv_ptr + k, rv, mask=live)
@@ -88,15 +93,20 @@ def _kernels():
             f = tl.load(f_ptr + k, mask=live)
             v = v + (((c1 * f) / m - c2 * v) + rv)
             xn = x + (dt * v + rp)
-            v = ((xn - x) - rp) / dt
+            v = ((xn - x) - rp) * inv_dt
             tl.store(xold_ptr + k, x, mask=live)
             tl.store(x_ptr + k, xn, mask=live)
             tl.store(v_ptr + k, v, mask=live)
             if SAVE_MID:
                 tl.store(mid_ptr + k, v, mask=live)
             d = xn - tl.load(ref_ptr + k, mask=live)
-            squared.append(d * d)
-        s = (squared[0] + squared[2]) + squared[1]  # PyTorch's order for sum(dim=1) of width 3
+            if c == 0:
+                s0 = d * d
+            elif c == 1:
+                s1 = d * d
+            else:
+                s2 = d * d
+        s = (s0 + s2) + s1  # PyTorch's order for sum(dim=1) of width 3
         s = tl.where(live, s, 0.0)
         tl.atomic_max(max_ptr, tl.max(s, axis=0).to(tl.int64, bitcast=True))
 
@@ -107,12 +117,19 @@ def _kernels():
         live = e < capacity
         sender = tl.load(index_ptr + e, mask=live, other=0)
         receiver = tl.load(index_ptr + capacity + e, mask=live, other=0)
-        squared = []
+        s0 = tl.zeros([BLOCK], dtype=tl.float64)
+        s1 = tl.zeros([BLOCK], dtype=tl.float64)
+        s2 = tl.zeros([BLOCK], dtype=tl.float64)
         for c in tl.static_range(3):
             d = (tl.load(x_ptr + receiver * 3 + c, mask=live) - tl.load(x_ptr + sender * 3 + c, mask=live)) \
                 + tl.load(shifts64_ptr + e * 3 + c, mask=live)
-            squared.append(d * d)
-        s = (squared[0] + squared[2]) + squared[1]
+            if c == 0:
+                s0 = d * d
+            elif c == 1:
+                s1 = d * d
+            else:
+                s2 = d * d
+        s = (s0 + s2) + s1
         tl.store(inside_ptr + e, (s < tl.load(cut_ptr)).to(tl.int64), mask=live)
 
     @triton.jit
@@ -181,9 +198,10 @@ class FusedIntegrator:
         device = state.positions.device
         n = integrator.natoms
         factor = (n / (n - 1.0)) ** 0.5 if integrator.fix_com else 1.0
-        # c1, c2, dt, float(n), factor: float64 on the device (a Python float kernel argument is float32).
-        self.coefficients = torch.tensor([integrator.c1, integrator.c2, integrator.dt, float(n), factor],
-                                         dtype=torch.float64, device=device)
+        # c1, c2, dt, float(n), factor, 1 / dt, 1 / n: float64 on the device (a Python float kernel argument
+        # is float32). The reciprocals are the host's, as PyTorch forms them for a division by a scalar.
+        self.coefficients = torch.tensor([integrator.c1, integrator.c2, integrator.dt, float(n), factor,
+                                          1.0 / integrator.dt, 1.0 / float(n)], dtype=torch.float64, device=device)
         neighbours = engine.force_field.neighbours
         fraction = engine.config.pipeline_rebuild_fraction
         # The neighbour checks' thresholds as SkinNeighbourList.needs_rebuild forms them.
