@@ -1,6 +1,6 @@
 """The fusion family of optimisation round 1 (``plans/opt-1.md``, OPT-T02; ``docs/design/opt-T02-fusion.md``).
 
-``RECORDS`` holds ``gated_rows``, ``segment_gemm`` and ``grouped_launch``:
+``RECORDS`` holds ``gated_rows``, ``segment_gemm``, ``grouped_launch`` and ``split_k``:
 
 - ``gated_rows`` (stage A): in every interaction whose forward reads ``gated_rows`` (the folded
   MH-1 forward, ``fastmace.rewrites.mh1.modules.cutoff_folded_forward``) and that has merged
@@ -24,6 +24,13 @@
   shared shape rule calls small run together in one Triton launch (``fastmace.kernels.triton.grouped_gemm``),
   forward and input gradient; the others keep cuBLAS. ``rounding`` (another GEMM), deterministic. Opt-in
   (``RewriteConfig.grouped_launch``).
+
+- ``split_k`` (optimisation round 2, OPT2-T05, ``docs/design/opt2-T05-split-k.md``): in every block linear,
+  a product whose output tiles do not fill one wave of the SMs (NaCl's l = 0 products) is split along K by
+  the shared shape rule (``tile_rule.split_k_parts``) into a batched cuBLAS product and a sum, forward and
+  input gradient each by its own shape; the large cells' products never qualify. ``rounding``,
+  deterministic. Opt-in (``RewriteConfig.split_k``); conflicts with ``grouped_launch``, which takes the same
+  small products.
 
 The self-check compares each chain with the unrewritten interaction's ``linear_2(gate(linear_1(x)
 + linear_res(y)))``, values and both input gradients, in the model's dtype (SPEC §6.4). The gate's
@@ -258,6 +265,57 @@ def _apply_grouped_launch(model, context):
     return group_launches(model)
 
 
+def split_products(model):
+    """Let every block linear split its products below one wave along K; returns the names of the modules."""
+    import torch
+
+    from fastmace.kernels.triton import tile_rule
+
+    names = []
+    for name, module in _block_modules(model):
+        weight = module.weight_0
+        module.split_k = True
+        # Read once at setup: the forward evaluates the shape rule while torch.compile traces it.
+        module.sms = tile_rule.device_sms(weight.device) if weight.dtype == torch.float32 else None
+        names.append(name)
+    return names
+
+
+def _split_k_selfcheck(original, rewritten, context):
+    """Each block linear's products split along K (2 parts where K allows, and the rule's own choice on this
+    device) against one cuBLAS product, on 7 atoms' rows, values and input gradients, in the model's dtype."""
+    import torch
+
+    from fastmace.kernels.triton import tile_rule
+    from fastmace.rewrites.linear.modules import ConstantMatmul, SplitKMatmul
+
+    generator = torch.Generator().manual_seed(context.seed + 5)
+    cases, dtype = [], None
+    for name, module in _block_modules(rewritten):
+        for k in range(len(module.block_ends)):
+            weight, weight_t = getattr(module, f"weight_{k}"), getattr(module, f"weight_t_{k}")
+            dtype = dtype or weight.dtype
+            n_in, n_out = weight.shape
+            forced = (2 if n_in % 2 == 0 else 1, 2 if n_out % 2 == 0 else 1)
+            ruled = (tile_rule.split_k_parts(7, n_out, n_in, module.sms),
+                     tile_rule.split_k_parts(7, n_in, n_out, module.sms))
+            for label, (forward, backward) in (("forced", forced), ("rule", ruled)):
+                x = torch.randn((7, n_in), generator=generator, dtype=torch.float64).to(weight).requires_grad_()
+                grad = torch.randn((7, n_out), generator=generator, dtype=torch.float64).to(weight)
+                with torch.enable_grad():
+                    values = []
+                    for function in (lambda x: ConstantMatmul.apply(x, weight, weight_t),
+                                     lambda x, f=forward, b=backward: SplitKMatmul.apply(x, weight, weight_t, f, b)):
+                        out = function(x)
+                        values.append((out.detach(), *torch.autograd.grad((out * grad).sum(), x)))
+                cases += [(f"{name}.split_k.{k}.{label}", a, b) for a, b in zip(*values)]
+    return check_tensors(cases, dtype)
+
+
+def _apply_split_k(model, context):
+    return split_products(model)
+
+
 def _apply(model, context):
     return gate_rows(model)
 
@@ -280,6 +338,11 @@ RECORDS = {
         name="grouped_launch", applies_to=_grouped_launch_support, requires=("block_linear",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
         workload_constraints=(), apply=_apply_grouped_launch, selfcheck=_grouped_launch_selfcheck),
+    "split_k": Rewrite(
+        name="split_k", applies_to=_grouped_launch_support, requires=("block_linear",), conflicts=("grouped_launch",),
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
+        workload_constraints=(), apply=_apply_split_k, selfcheck=_split_k_selfcheck),
 }
 
-__all__ = ["GATE_FORWARD", "GATE_FORWARD_SHA256", "READS_GATED_ROWS", "RECORDS", "gate_rows", "join_in_place"]
+__all__ = ["GATE_FORWARD", "GATE_FORWARD_SHA256", "READS_GATED_ROWS", "RECORDS", "gate_rows", "join_in_place",
+           "split_products"]

@@ -108,6 +108,9 @@ class RewriteConfig:
     # A block linear's small per-l products (too few row tiles for the GPU by the shared shape rule) in one
     # Triton launch (opt-1 OPT-T03 candidate 2); opt-in until its A/B on both GPUs.
     grouped_launch: Toggle = "auto"
+    # A block linear's products whose output tiles do not fill one wave of the SMs (NaCl's l = 0 products)
+    # split along K by the shared shape rule (optimisation round 2, OPT2-T05); opt-in, auto = off.
+    split_k: Toggle = "auto"
     # Species-only atom-level products (embeddings, the first interaction's skip_tp and linear_up) as
     # per-species tables gathered each step (opt-1 OPT-T08 C1); opt-in, auto = off.
     species_tables: Toggle = "auto"

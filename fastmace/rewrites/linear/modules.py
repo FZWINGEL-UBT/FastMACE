@@ -38,6 +38,33 @@ class ConstantMatmul(torch.autograd.Function):
         return grad @ weight_t, None, None
 
 
+def split_k_mm(a, b, parts):
+    """``a @ b`` with K split into ``parts`` equal parts: one batched product of ``[parts, M, K/parts]`` by
+    ``[parts, K/parts, N]``, then the sum over the parts (record ``split_k``, OPT2-T05). Deterministic: no
+    atomics, a fixed order of the sum. ``a``'s rows may be a strided view with a unit last stride."""
+    if parts == 1:
+        return a @ b
+    m, k = a.shape
+    part = k // parts
+    return torch.bmm(a.reshape(m, parts, part).transpose(0, 1), b.reshape(parts, part, b.shape[1])).sum(0)
+
+
+class SplitKMatmul(torch.autograd.Function):
+    """x @ weight with K split in ``parts``, and the input gradient grad @ weight_t with its own K (the
+    forward's N) split in ``grad_parts`` (``split_k``)."""
+
+    @staticmethod
+    def forward(ctx, x, weight, weight_t, parts, grad_parts):
+        ctx.save_for_backward(weight_t)
+        ctx.grad_parts = grad_parts
+        return split_k_mm(x, weight, parts)
+
+    @staticmethod
+    def backward(ctx, grad):
+        (weight_t,) = ctx.saved_tensors
+        return split_k_mm(grad, weight_t, ctx.grad_parts), None, None, None, None
+
+
 def block_products(module, lefts):
     """``lefts[k] @ weight_k`` for every product of a BlockLinear or ResidualBlockLinear.
 
@@ -46,7 +73,11 @@ def block_products(module, lefts):
     same weight shape run together in one Triton launch, if there are at least two of them. Equal K and N give
     every tile of the launch, forward and input gradient, the same work: a larger-K product's tiles would run
     several times longer and set the launch's length, where cuBLAS splits K (OPT-T03b diagnosis). The others,
-    and everything on the CPU or in other dtypes (``module.sms`` None), keep cuBLAS."""
+    and everything on the CPU or in other dtypes (``module.sms`` None), keep cuBLAS.
+
+    With ``module.split_k`` (record ``split_k``, OPT2-T05) a product whose output tiles do not fill one wave
+    is split along K by the shared shape rule (``tile_rule.split_k_parts``), forward and input gradient each
+    by its own shape."""
     count = len(lefts)
     weights = [getattr(module, f"weight_{k}") for k in range(count)]
     weights_t = [getattr(module, f"weight_t_{k}") for k in range(count)]
@@ -68,6 +99,17 @@ def block_products(module, lefts):
                                     [weights_t[k] for k in members])
             for k, part in zip(members, done):
                 parts[k] = part
+    if getattr(module, "split_k", False) and sms:
+        from fastmace.kernels.triton import tile_rule
+
+        for k, (x, w) in enumerate(zip(lefts, weights)):
+            if parts[k] is not None:
+                continue
+            m, n_in, n_out = x.shape[0], w.shape[0], w.shape[1]
+            forward = tile_rule.split_k_parts(m, n_out, n_in, sms)
+            backward = tile_rule.split_k_parts(m, n_in, n_out, sms)
+            if forward > 1 or backward > 1:
+                parts[k] = SplitKMatmul.apply(x, w, weights_t[k], forward, backward)
     return [part if part is not None else ConstantMatmul.apply(x, w, wt)
             for part, x, w, wt in zip(parts, lefts, weights, weights_t)]
 
@@ -97,7 +139,8 @@ class BlockLinear(torch.nn.Module):
         self.segments_out = tuple(segments_out)
         self.grouped = bool(grouped)
         self.grouped_launch = False  # grouped_launch: small products in one Triton launch (block_products)
-        self.sms = None  # grouped_launch: the device's SM count for the shape rule (None: not float32 on CUDA)
+        self.split_k = False  # split_k: products below one wave split along K (block_products)
+        self.sms = None  # grouped_launch, split_k: the device's SM count (None: not float32 on CUDA)
         if self.grouped:  # one product per output segment
             blocks = _group(blocks)
             self.block_ends = tuple((i, j) for i, j, _ in blocks)
@@ -172,6 +215,7 @@ class ResidualBlockLinear(torch.nn.Module):
                 grouped.setdefault(j, []).append((i + shift, weight))
         self.block_ends = tuple((tuple(i for i, _ in members), j) for j, members in grouped.items())
         self.grouped_launch = False  # grouped_launch (see block_products)
+        self.split_k = False  # split_k (see block_products)
         self.sms = None
         for index, members in enumerate(grouped.values()):
             weight = torch.cat([w for _, w in members], dim=0).contiguous()

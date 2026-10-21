@@ -10,6 +10,10 @@ measured at run time (SPEC §9.1). The thresholds are in waves, tiles over SMs, 
   contiguous Triton GEMM on small M was 38 % slower (OPT-T01 bench). Below ``MIN_TRITON_WAVES`` waves of
   ``BLOCK_M``-row tiles per SM, cuBLAS keeps the product.
 - **Tiles.** One configuration, the one the pre-check picked most often: 64 × 64 × 32, 4 warps, 3 stages.
+- **Split-K** (``split_k_parts``, record ``split_k``, OPT2-T05, ``docs/design/opt2-T05-split-k.md``): a product
+  whose nominal 64 × 64 output tiles do not fill one wave of the SMs is split along K into a power of two
+  of parts, until it reaches ``SPLIT_K_TARGET_WAVES`` waves, while every part keeps at least
+  ``SPLIT_K_MIN_PART`` of K and K divides evenly.
 """
 
 from __future__ import annotations
@@ -21,6 +25,9 @@ from dataclasses import dataclass
 BLOCK_M, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES = 64, 64, 32, 4, 3
 # Triton only where M covers at least this many waves of BLOCK_M-row tiles over the SMs (one column of tiles).
 MIN_TRITON_WAVES = 2
+# Split-K: the waves a split product aims for, and the smallest K of one part (a real GEMM, not a reduction).
+SPLIT_K_TARGET_WAVES = MIN_TRITON_WAVES
+SPLIT_K_MIN_PART = 128
 
 
 @dataclass(frozen=True)
@@ -62,6 +69,25 @@ def segment_gemm_choice(m: int, n: int, k: int, sms: int | None) -> GemmChoice:
     return GemmChoice("triton", reason=f"{m} rows are {waves:.2f} waves of {BLOCK_M}-row tiles on {sms} SMs")
 
 
+def split_k_parts(m, n, k, sms) -> int:
+    """How many parts of K the product ``[m, k] @ [k, n]`` is split into on ``sms`` SMs (1: not split).
+
+    Only where its 64 × 64 output tiles are fewer than one wave; then doubled while the tiles times the
+    parts stay below ``SPLIT_K_TARGET_WAVES`` waves, K divides evenly and every part keeps at least
+    ``SPLIT_K_MIN_PART``. Integer arithmetic only (the forward evaluates it while torch.compile traces).
+    """
+    if not sms:
+        return 1
+    tiles = ((m + BLOCK_M - 1) // BLOCK_M) * ((n + BLOCK_N - 1) // BLOCK_N)
+    if tiles >= sms:
+        return 1
+    parts = 1
+    while (tiles * parts < SPLIT_K_TARGET_WAVES * sms and k % (2 * parts) == 0
+           and k // (2 * parts) >= SPLIT_K_MIN_PART):
+        parts *= 2
+    return int(parts)
+
+
 def device_sms(device) -> int | None:
     """The SM count of a CUDA ``device``, else None (cached per device: forwards ask it while tracing)."""
     import torch
@@ -80,4 +106,5 @@ def _sms(index: int) -> int:
 
 
 __all__ = ["BLOCK_K", "BLOCK_M", "BLOCK_N", "GemmChoice", "MIN_TRITON_WAVES", "NUM_STAGES", "NUM_WARPS",
-           "device_sms", "row_waves", "segment_gemm_choice"]
+           "SPLIT_K_MIN_PART", "SPLIT_K_TARGET_WAVES", "device_sms", "row_waves", "segment_gemm_choice",
+           "split_k_parts"]

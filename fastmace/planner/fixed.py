@@ -85,6 +85,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.grouped_launch": "never_automatic",
+    "RewriteConfig.split_k": "never_automatic",
     "RewriteConfig.species_tables": "never_automatic",
     "RewriteConfig.fold_readout_tail": "never_automatic",
     "RewriteConfig.fold_product_linear": "never_automatic",
@@ -104,7 +105,7 @@ STAGE2_SUPPORT = (
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "segmented_first_sum", "fused_radial_hidden", "streaming_conv",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
-                  "species_skip",
+                  "split_k", "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
@@ -561,6 +562,9 @@ class FixedPlanner:
         needs("grouped_launch", r.grouped_launch == "on", v["block_linear"], "block_linear")
         if r.grouped_launch == "auto":
             v["_why"]["grouped_launch"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
+        needs("split_k", r.split_k == "on", v["block_linear"], "block_linear")
+        if r.split_k == "auto":
+            v["_why"]["split_k"] = "off: only an explicit 'on' enables it (OPT2-T05, opt-in)"
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
         # OPT-T08 (opt-in): only an explicit "on" enables them; the registry checks the model.
         note("species_tables", r.species_tables == "on",
