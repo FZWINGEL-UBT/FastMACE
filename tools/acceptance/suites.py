@@ -686,7 +686,7 @@ def acceptance_tier_jobs(machine: Machine, run_root: Path) -> list:
 # GPU tests if merged at the freeze (their files are added here then). The acceptance-marked tests of these files run
 # in the acceptance tier.
 ROUND_TEST_FILES = ("test_canonical_restart_gpu.py", "test_reproducible_gpu.py", "test_subprocess_runner_gpu.py",
-                    "test_segment_gemm_cuda.py")
+                    "test_segment_gemm_cuda.py", "test_template_cache_gpu.py")
 
 
 def round_tests_jobs(machine: Machine, run_root: Path) -> list:
