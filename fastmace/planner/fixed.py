@@ -88,6 +88,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.grouped_launch": "never_automatic",
+    "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.species_tables": "on_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
@@ -112,7 +113,8 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "direct_node_feats", "folded_constants", "streaming_conv",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
-                  "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear")
+                  "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
+                  "combo_kernels")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
 SINGLE_GRAPH = "single_graph"  # one structure per evaluation: always, production is one structure
@@ -584,6 +586,9 @@ class FixedPlanner:
               "block_linear and species_tables")
         note("single_graph_strain", r.single_graph_strain != "off",
              "acts where stress is computed (NPT)" if npt else "process-wide; acts only where stress is computed")
+        note("combo_kernels", r.combo_kernels == "on",
+             "on: Inductor's pointwise combo kernels in the compiled model" if r.combo_kernels == "on"
+             else "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)")
         return v
 
     def _stage2(self, book, v, traits, explicit):

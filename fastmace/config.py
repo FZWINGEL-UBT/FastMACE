@@ -128,6 +128,10 @@ class RewriteConfig:
     # products.0.linear folded into the linear consumers of layer 0's output, with the species carried next to
     # the contraction (OPT-T08 C3); auto = on with species_tables and block_linear (owner, 21 October 2026).
     fold_product_linear: Toggle = "auto"
+    # Inductor's combo kernels, pointwise only, in the compiled model: independent adjacent pointwise kernels in
+    # one launch; rounding (the energy moves by ~1e-9 relative), not adopted (opt-3 OPT3-T04,
+    # fastmace.rewrites.inductor); opt-in, auto = off.
+    combo_kernels: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
     # MACE PR 1498 one-graph strain in the stress path (upstream_mace.use_single_graph_strain).

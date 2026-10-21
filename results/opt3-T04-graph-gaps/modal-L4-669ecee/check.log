@@ -1,0 +1,37 @@
+nvcc intentionally unavailable: FastMACE builds the OEq host extension without it
+W1021 20:17:14.077000 591 site-packages/torch/_inductor/utils.py:1806] [0/0_1] Not enough SMs to use max_autotune_gemm mode
+
+combo_kernels: off repeat 1.67e-06, on vs off 9.54e-07
+.
+=============================== warnings summary ===============================
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+  /tmp/fastmace-src/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+  /usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+  /usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+  Precompiled extension shared object not found.
+  For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+  
+    from openequivariance._torch.TensorProduct import TensorProduct
+
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+  /usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+  /tmp/fastmace-src/fastmace/model/loading.py:748: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+1 passed, 11 warnings in 252.37s (0:04:12)

@@ -278,6 +278,7 @@ def compile_model(model, mode, *, accelerated, oeq=False, prepare: Callable[[Any
     from mace.tools.scripts_utils import extract_model
 
     from fastmace.config import EngineConfig
+    from fastmace.rewrites import inductor as inductor_records
 
     engine = engine or EngineConfig()
     if oeq and not accelerated:
@@ -292,14 +293,20 @@ def compile_model(model, mode, *, accelerated, oeq=False, prepare: Callable[[Any
         configure_autograd_for_compile(allow_autograd=not oeq)
         if prepare is not None:
             prepare(private)
+        options = inductor_records.inductor_options(private)  # read before simplify replaces the module
         with disable_e3nn_codegen():
             private = simplify_traceable(private, simplify)
     else:
         private = prepare_for_compile(extract_model)(model=model, map_location=_device_of(model))
         if prepare is not None:
             prepare(private)
+        options = inductor_records.inductor_options(private)
     for parameter in private.parameters():
         parameter.requires_grad_(False)
+    if options:  # a record's Inductor options (fastmace.rewrites.inductor; OPT3-T04)
+        if mode not in (None, "default"):
+            raise ValueError(f"Inductor options {sorted(options)} need compile mode 'default', got {mode!r}")
+        return torch.compile(private, options=options, fullgraph=False)
     return torch.compile(private, mode=mode, fullgraph=False)
 
 
