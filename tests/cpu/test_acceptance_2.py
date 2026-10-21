@@ -472,3 +472,13 @@ def test_gate_tool_engine_overrides():
     for bad in (["backend=cueq"], ["model_template_cache=off"], ["no_such_field=true"]):
         with pytest.raises(ValueError):
             gate.engine_overrides(bad)
+
+
+def test_simulation_tests_job_covers_every_tier_of_the_simulation_files():
+    (job,) = suites.simulation_tests_jobs(suites.MACHINES["murphy"], Path("/mnt/homes/zwingel/fastmace-acceptance/r"))
+    argv = list(job.argv)
+    assert argv[argv.index("-m", argv.index("pytest")) + 1] == "acceptance or not acceptance" and not job.timing
+    files = {Path(item).name for item in argv if item.endswith(".py")}
+    assert files == set(suites.SIMULATION_TEST_FILES)
+    for name in files:
+        assert (REPOSITORY_ROOT / "tests" / "gpu" / name).is_file()
