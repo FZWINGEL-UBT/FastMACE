@@ -96,6 +96,12 @@ class RewriteConfig:
     species_skip: Toggle = "auto"
     # Radial hidden block as one Triton kernel pair (FUSED_RADIAL_HIDDEN); opt-in, no measured gain.
     fused_radial_hidden: Toggle = "auto"
+    # Without LAMMPS, the folded MH-1 forward skips the join of node features and attributes for handle_lammps,
+    # whose strided slices the streaming convolution copied (opt-3 OPT3-T05); exact, opt-in, auto = off.
+    direct_node_feats: Toggle = "auto"
+    # The folded last radial layer's [W, b] and its halves built once, not per force call (opt-3 OPT3-T05);
+    # exact, opt-in, auto = off.
+    folded_constants: Toggle = "auto"
     # cuEq Linear layers as per-l products with extracted weights (BLOCK_LINEAR).
     block_linear: Toggle = "auto"
     # Same-irrep input segments of one output segment in one product (GROUPED_BLOCK_LINEAR).

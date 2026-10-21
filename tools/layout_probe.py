@@ -87,8 +87,9 @@ def main(argv=None):
         rows[key]["launches"] += 1
     out = []
     for (name, shapes, strides, stack), row in sorted(rows.items(), key=lambda item: -item[1]["us"]):
-        out.append({"name": name, "us_per_call": row["us"] / args.calls, "launches_per_call": row["launches"] / args.calls,
-                    "input_shapes": json.loads(shapes), "input_strides": json.loads(strides), "stack": stack})
+        out.append({"name": name, "us_per_call": row["us"] / args.calls,
+                    "launches_per_call": row["launches"] / args.calls, "input_shapes": json.loads(shapes),
+                    "input_strides": json.loads(strides), "stack": stack})
     result = {"structure": args.structure, "gpu": torch.cuda.get_device_name(), "plan": info["describe"],
               "rows": out}
     (args.output / f"layout-{args.structure}.json").write_text(json.dumps(result, indent=1) + "\n")
