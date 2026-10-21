@@ -171,6 +171,10 @@ class EngineConfig:
     # Keep each conversion's model as a template and give later plans a private copy of it instead of
     # reloading and converting the checkpoint (CUDA cuEq and hybrid only; opt-1 OPT-T06).
     model_template_cache: bool = True
+    # Pipelined fixed-cell steps: an early neighbour rebuild runs on a side stream beside the force graph
+    # in flight, instead of waiting for it (the rebuild reads positions, which B does not write). Exact:
+    # the same operations on the same positions. Opt-in (opt-2 OPT2-T04).
+    overlap_rebuild: bool = False
 
     def __post_init__(self):
         _check_choices(self)

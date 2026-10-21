@@ -77,6 +77,7 @@ How to read the tables:
 | `WARMUP_IN_GRAPH_POOL` | `EngineConfig.warmup_in_graph_pool` | `True` | — | engine |
 | none: the research engine's `fm.calc` path recompiles on a new edge count (new in the library, 2-T01; filled by 2-T13) | `EngineConfig.dynamic_edges` | `False` | — | engine (evaluation plans; no effect until 2-T13) |
 | none: the research engine loads and converts once per process (new in the library, opt-1 OPT-T06) | `EngineConfig.model_template_cache` | `True` | — | planner (`ForceField.execution_model`: later plans copy a converted template; CUDA cuEq and hybrid only) |
+| none: the research engine's early rebuild waits for the force call in flight (new in the library, opt-2 OPT2-T04) | `EngineConfig.overlap_rebuild` | `False` | — | engine (`GraphEngine._rebuild(beside=True)`: a pipelined fixed-cell CUDA step's early rebuild runs on a side stream; exact) |
 
 ## 3. Precision → `PrecisionConfig`
 
@@ -282,6 +283,8 @@ model is an error with a reason, never a silent downgrade.
   None comes from the research engine.
 - Optimisation round 1 (plan task OPT-T06) added `EngineConfig.model_template_cache`,
   71 in all. It does not come from the research engine, which loaded once per process.
+- Optimisation round 2 (plan task OPT2-T04) added `EngineConfig.overlap_rebuild`, 72 in all
+  (opt-in).
 
 ## Open questions for the conductor
 

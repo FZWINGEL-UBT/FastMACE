@@ -147,6 +147,8 @@ class GraphEngine(Engine):
         self._pool_captures = 0
         self._captured_kinds = set()
         self._side_stream = None
+        self._rebuild_stream = None  # EngineConfig.overlap_rebuild (OPT2-T04)
+        self.rebuilds_beside = 0
         self.capture_memory = []
         self.pool_resets = 0
         self.edge_sizes_used = set()
@@ -270,7 +272,8 @@ class GraphEngine(Engine):
         return float(self.state.energy[0])
 
     def info(self) -> Mapping[str, Any]:
-        return {
+        extra = {"rebuilds_beside": self.rebuilds_beside} if self.config.overlap_rebuild else {}
+        return {**extra,
             "engine": "graph", "mode": self.mode, "capture": self.capture, "pad_edges": self.pad_edges,
             "variable_cell": self.variable_cell, "initial_edges": self.initial_edges, "edge_bucket": self.edge_bucket,
             "edge_sizes_used": sorted(self.edge_sizes_used), "neighbour_rebuilds": self.rebuilds,
@@ -388,10 +391,34 @@ class GraphEngine(Engine):
         self.force_field.use_edges(edges)
         self.edge_sizes_used.add(edges)
 
-    def _rebuild(self) -> None:
-        """Host-side rebuild of the candidates; a grown capacity moved the buffers, so every graph is stale."""
+    def _rebuild(self, beside: bool = False) -> None:
+        """Host-side rebuild of the candidates; a grown capacity moved the buffers, so every graph is stale.
+
+        ``beside`` (an early rebuild of a pipelined step, with ``EngineConfig.overlap_rebuild``): the rebuild
+        runs on a side stream while the force graph in flight finishes on the current stream, and the
+        current stream waits for it before the next step (OPT2-T04). Its host syncs then wait for the
+        rebuild alone, not for the force call. Only for fixed-cell CUDA engines: the rebuild reads the
+        positions, which the second half of a Langevin step does not write.
+        """
         self.rebuilds += 1
-        if self.force_field.rebuild(self.state.positions):
+        if beside and self.config.overlap_rebuild and self.cuda and not self.variable_cell:
+            main = torch.cuda.current_stream()
+            if self._rebuild_stream is None:
+                self._rebuild_stream = torch.cuda.Stream()
+            neighbours = getattr(self.force_field, "neighbours", None)
+            if neighbours is not None:
+                neighbours.reader_stream = main  # a growth waits for the force call and allocates on main
+            try:
+                with torch.cuda.stream(self._rebuild_stream):
+                    grew = self.force_field.rebuild(self.state.positions)
+            finally:
+                if neighbours is not None:
+                    neighbours.reader_stream = None
+            main.wait_stream(self._rebuild_stream)  # the next AC compacts the new candidates
+            self.rebuilds_beside += 1
+        else:
+            grew = self.force_field.rebuild(self.state.positions)
+        if grew:
             self._clear_graphs()
 
     def _clear_graphs(self) -> None:
@@ -463,7 +490,7 @@ class GraphEngine(Engine):
             # Rebuild before the hard limit; the next AC compacts the new candidates.
             self.pipelined_early_rebuilds += 1
             self._pipe_floor = 0
-            self._rebuild()
+            self._rebuild(beside=event is not None)  # beside the force graph still in flight (OPT2-T04)
             capacity = self.force_field.edge_capacity
         wanted = int(math.ceil(count * (1.0 + self.config.pipeline_edge_margin)))
         edges = self._padded(wanted) if self.pad_edges else min(wanted, capacity)
