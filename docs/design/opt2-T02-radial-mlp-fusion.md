@@ -107,3 +107,47 @@ its gradient (both workers told, 21 October).
 
 **Stop rule:** if the microbenchmark saving is below 0.15 ms on NbCl5 (under 1 % of the step), stop after
 the microbenchmark and report, as 15 October should have.
+
+## Result: stopped at the microbenchmark (21 October 2026)
+
+The kernels are correct on the GPU: `tests/gpu/test_radial_mlp_cuda.py`, 9 passed (RTX 5060 Ti,
+`mace_cueq_latest`). Forward and input gradient are within 4× of PyTorch's own float32 rounding against
+float64, for D = 16–128 and K = 1–4, with strided input, empty rows, and compiled against eager. Their largest
+relative difference from the compiled modules in the microbenchmark is 6e-7.
+
+**Microbenchmark** (`results/opt2-T02-probes/microbench.py`, `results/opt2-T02-local-20261021/microbench.json`).
+One MH-1 hidden stack (D = 64, K = 2), forward plus input gradient. Each side is captured in a CUDA graph and its
+replays are timed, median of 8 alternating blocks of 200 replays. Rows are the padded edge counts of the
+3×3×3 cells. Local RTX 5060 Ti, under the GPU reservation:
+
+| Rows (cell) | compiled modules (µs) | fused_radial_mlp (µs) | saving per force call (2 stacks) |
+| ---: | ---: | ---: | ---: |
+| 8,192 (NaCl) | 86.8 | 92.1 | −11 µs |
+| 56,320 (NbCl5) | 539.9 | 541.7 | −4 µs |
+| 82,688 (NaNbO3) | 930.9 | 794.9 | +272 µs (~1.4 % of 18.8 ms) |
+
+A first run without graphs measured about 0.6 ms of host overhead per call (Python, Dynamo guards, autograd) and
+said nothing about the kernels; it is superseded.
+
+**Verdict:** below the stop rule (0.15 ms on NbCl5), so no force gate and no A/B. The record stays opt-in and
+off, like `fused_radial_hidden`.
+
+**Why there is no gain, and what is left:**
+- **NbCl5:** the fused pair runs 3.2 GFLOP in 0.54 ms, about 6 TFLOPS, a quarter of the card's FP32 peak. It is
+  compute-limited: 5 IEEE FP32 `[32, 64] @ [64, 64]` dots per row in the backward, 3 of them only to recompute
+  the forward.
+- **The baseline is already good:** Inductor's version (cuBLAS/MAGMA GEMMs plus its fused LayerNorm/SiLU kernels)
+  takes the same time, because it moves more bytes but does fewer flops.
+- **NaNbO3:** more rows tip the balance, and only there does the fusion win.
+- **Remaining headroom by the floors:** about 0.15 ms of compute and 0.16 ms of memory per stack at NbCl5, against
+  0.54 ms today.
+
+**Options that might move it** (not tried; each is a separate screen):
+- **(a)** Store the per-layer normalised inputs and sigmoids in the forward instead of recomputing them. Two fewer
+  dots per row, at 2 × 256 B per row of extra traffic.
+- **(b)** A rows-per-program and warps rule (e.g. 64 rows, 8 warps), chosen by a shape rule and checked for
+  register spills.
+- **(c)** Fusing the species gathers and joint-slice add into the forward, which Inductor fuses today.
+
+The 15 October lesson holds: Inductor's fusion of this stack is near the cost of a straightforward fused
+kernel, so a gain needs a kernel built for the FP32 FMA throughput, not only for bytes.

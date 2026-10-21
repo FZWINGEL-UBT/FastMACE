@@ -71,8 +71,7 @@ def _kernels():
         c = tl.arange(0, D)
         x = tl.load(x_ptr + r64[:, None] * stride + c[None, :], mask=live[:, None], other=0.0)
         grad = tl.load(grad_ptr + r64[:, None] * D + c[None, :], mask=live[:, None], other=0.0)
-        for back in tl.static_range(K + 1):
-            j: tl.constexpr = K - back
+        for j in tl.static_range(K, -1, -1):  # unrolled, last LayerNorm first
             # The input of LayerNorm j, recomputed from x (registers only; K <= 4).
             a = x
             for i in tl.static_range(j):
