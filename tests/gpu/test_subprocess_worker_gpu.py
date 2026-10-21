@@ -16,6 +16,7 @@ Marked ``slow`` and ``acceptance``, untimed (the wall times are recorded, not ju
 import importlib.util
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -149,3 +150,9 @@ def test_a_killed_parent_releases_the_workers_gpu_memory(tmp_path):
     while _listed(pid) and time.monotonic() < deadline:
         time.sleep(0.5)
     assert not _listed(pid), "the worker kept the GPU after its parent was killed"
+    # The killed parent could not remove its hand-off directory (kept, as after an error); the test does.
+    from fastmace import _cache
+    from fastmace.engine import subprocess as runner
+
+    for directory in (_cache.cache_root() / runner.CACHE_NAME).glob(f"{parent.pid}-*"):
+        shutil.rmtree(directory, ignore_errors=True)
