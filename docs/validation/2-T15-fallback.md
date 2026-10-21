@@ -81,3 +81,15 @@ build's start; one engine is 156 MiB:
 | --- | --- |
 | with `detach` | 64.0 MiB at every build (library workspaces, no engine) |
 | control, `detach` disabled (as before 2-T15c) | 220.3 MiB at every build (the same 64 MiB plus the first, failed engine) |
+
+### 2-T15d: OPT-T06's template is resident by design
+
+After opt-1 OPT-T06 (converted-model templates, kept per `ForceField`), the combined acceptance (freeze
+`be92979`, local RTX 5060 Ti) measured 113.24 MiB at every later build instead of 64.0 MiB, constant,
+not growing. The 49.24 MiB difference is the MH-1 template: `force_field.release_templates()` at the end
+of the run gives back exactly 49.24 MiB, while its registered parameters and buffers
+(`templates.nbytes`) are 24.58 MiB, so they undercount the template's footprint. The test now subtracts
+the measured release; the bound (`0.1 × engine + 64 MiB`), the growth check, a one-template check and
+the control are kept. Rerun (FastMACE `9b95d1f` test on the freeze, local RTX 5060 Ti, through
+`local_gpu.py run`): 1 passed in 219 s; extra at each later build 64.0 MiB; control 244.94 MiB (the
+first, failed engine of 180.7 MiB held); template released 49.24 MiB.
