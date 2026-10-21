@@ -504,17 +504,17 @@ modal run tools/modal/fastmace_modal.py::job --gpu L4 --timeout-min 80 --commit 
 | Smoke, `724c118` | NVIDIA L4 (sm_89, 23 GB), driver 610.57.04, CUDA UMD 13.3; torch 2.14.1+cu130 sees capability (8, 9) | `tests/gpu/test_smoke.py`: 2 passed | 31 s, ≈ $0.007 |
 | Smoke, `340b23c` | NVIDIA A100-SXM4-40GB (sm_80), driver 610.57.04, CUDA UMD 13.3 | `tests/gpu/test_smoke.py`: 2 passed | 30 s, ≈ $0.017 |
 | OPT-T08 (`tools/modal/opt_t08.sh`), `3e5decd`, "Modal L4, not murphy" | L4 as above | force gate passed (NaCl ratios: energy 0.33, forces 1.15, stress 0.39; NbCl5: 0.61, 1.00, 0.85). Same-process A/B, all three records on/off, 12 blocks: NaCl 0.918 (off first) / 0.920 (on first), NbCl5 0.922 / 0.920; medians NaCl 4.69 → 4.31 ms, NbCl5 37.29 → 34.37 ms. Results: `results/modal-opt-T08-L4-3e5decd/` | 38 min, ≈ $0.51 |
+| Noise floor, `1176db8`, "Modal L4, not murphy" (`round2.sh` noise-ab/ba: a = `gated_rows=auto`, b = `gated_rows=on`, the same plan) | L4 | b/a NaCl 1.0008 / 1.0019, NbCl5 1.0056 / 0.9979: **floor ≈ 0.2 % NaCl, 0.6 % NbCl5**. NbCl5's block-to-block spread is 8–13 % within a run, and absolute times differ by 4 % between containers (36.0 against 37.4 ms) | 21 min, ≈ $0.28 |
+| Round 2 on L4, `1176db8` (main `32a0dd9` + this branch), "Modal L4, not murphy", OPT-T08's records on both sides | L4 | `overlap_rebuild` (OPT2-T04): NaCl 300 K 0.996 / 0.990, NbCl5 0.996 / 1.003, NaCl 1000 K 0.988 / 0.987. `folded_backward_tiles` (OPT2-T03): NaCl 1.005 / 1.000, NbCl5 1.000 / 1.001 | 54 min, ≈ $0.72 |
+| OPT-T08 on A100, `1176db8`, "Modal A100, not murphy" (records off against on) | A100-SXM4-40GB | NaCl 0.907 / 0.896 (3.11 → 2.82 ms), NbCl5 0.907 / 0.906 (15.07 → 13.66 ms); runs valid with the PID-1 fix | 18 min, ≈ $0.62 |
 
 **Timing on Modal:**
 - **Labelling:** label every result "Modal <GPU>, not murphy".
 - **Same-process A/Bs only:** a Modal container's GPU is not shared, but its host is, and nothing guarantees
   the same physical GPU or clocks between calls. Compare only within one container, in the same-process A/B
   (both orders).
-- **Noise floor:** not measured yet on Modal.
-- **The validity flag:** the A/B tools mark Modal runs `INVALID` because of a sandbox artifact.
-  - Inside Modal's sandbox, `nvidia-smi --query-compute-apps` reports every GPU process as PID 1 (the
-    container's `dumb-init`), not under its own PID. So `tools/ab_step_time.gpu_processes()` sees the A/B
-    itself as "another" process (`results/modal-opt-T08-L4-3e5decd/pid-check.txt`: the job is PID 14,
-    `nvidia-smi` lists 1).
-  - The container runs nothing else. Read `valid` there as `not recompiled`, until the tools learn to
-    ignore PID 1 in a container.
+- **Noise floor (L4, same-process, 12 blocks):** about 0.2 % on NaCl and 0.6 % on NbCl5 (run `modal-noise-L4-1176db8`).
+- **The validity flag:** inside Modal's sandbox `nvidia-smi --query-compute-apps` lists every GPU process as PID 1, the
+  container's `dumb-init` (`results/modal-opt-T08-L4-3e5decd/pid-check.txt`). `tools/ab_step_time.gpu_processes()`
+  therefore drops PID 1 inside a container (`MODAL_IS_REMOTE`, `MODAL_TASK_ID` or `/.dockerenv`). Runs before that
+  fix, such as `modal-opt-T08-L4-3e5decd`, show `INVALID` for this reason only.
