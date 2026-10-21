@@ -31,6 +31,24 @@ def test_strain_prepare_graph_is_made_once_per_choice(one_graph):
     assert engine.strain_prepare_graph(not one_graph) is not first
 
 
+def test_another_mace_function_object_gets_its_own_entry(monkeypatch):
+    # The memo is keyed by the function objects, never by names: a replaced prepare_graph (another MACE,
+    # or a test that swaps and restores MACE's functions) gets a rebinding of its own, and the original
+    # gets its first one back.
+    from mace.modules import models, utils
+
+    original = engine.strain_prepare_graph(True)
+    replacement = engine._rebound(utils.prepare_graph, dict(vars(utils)))
+    monkeypatch.setattr(utils, "prepare_graph", replacement)
+    other = engine.strain_prepare_graph(True)
+    assert other is not original and other.__code__ is not replacement.__code__
+    monkeypatch.undo()
+    assert engine.strain_prepare_graph(True) is original
+    forward = engine.strain_forward(models.ScaleShiftMACE.forward, True)
+    swapped = engine._rebound(models.ScaleShiftMACE.forward, dict(vars(models)))
+    assert engine.strain_forward(swapped, True) is not forward
+
+
 @pytest.mark.parametrize("one_graph", [True, False])
 def test_strain_forward_is_made_once_per_function_and_choice(one_graph):
     from mace.modules import models
