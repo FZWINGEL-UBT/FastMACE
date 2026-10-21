@@ -67,8 +67,15 @@ out = dict(trials=[], dtype=str(nb.shifts.dtype), backend=sim.plan.engine.backen
 half_skin = nb.skin / 2
 for trial, move in enumerate([0.0, 0.0, 0.0, 0.9 * half_skin, 1.2 * half_skin]):
     integ.prepare_step(state)
-    reference_atom0 = nb.reference_positions[0].clone()
-    nb.reference_positions[0, 0] -= move
+    reference = nb.reference_positions.clone()
+    if trial >= 2:  # displacements of exactly 0 (2), 0.9 (3) and 1.2 (4) half skins: no flag, early, hard
+        before = {{k: v.clone() for k, v in written.items()}}
+        eng._fused = None
+        eng._stage_acp()
+        nb.reference_positions.copy_(state.positions)  # the positions this stage moves to
+        for k, v in written.items():
+            v.copy_(before[k])
+        nb.reference_positions[0, 0] -= move
     for pipelined in (True, False):
         before = {{k: v.clone() for k, v in written.items()}}
         eng._fused = None
@@ -82,7 +89,7 @@ for trial, move in enumerate([0.0, 0.0, 0.0, 0.9 * half_skin, 1.2 * half_skin]):
         bad = {{k: int((as_bytes(v) != as_bytes(expected[k])).sum()) for k, v in written.items()}}
         out["trials"].append(dict(trial=trial, move=move, pipelined=pipelined, mismatched_bytes=bad,
                                   flags=eng._flags.tolist(), pipe_flags=eng._pipe_flags.tolist()))
-    nb.reference_positions[0].copy_(reference_atom0)
+    nb.reference_positions.copy_(reference)
 sim.close()
 print(json.dumps(out))
 """
@@ -138,7 +145,8 @@ def test_the_fused_stage_writes_the_pytorch_stage_bytes(fixcm):
     assert len(trials) == 10, run
     for trial in trials:
         assert all(count == 0 for count in trial["mismatched_bytes"].values()), trial
-    early, hard = trials[6], trials[8]  # pipelined trials of the moved atom
+    none, early, hard = trials[4], trials[6], trials[8]  # pipelined trials 2, 3, 4
+    assert none["pipe_flags"][0] == 0 and none["pipe_flags"][2] == 0, none
     assert early["pipe_flags"][0] == 0 and early["pipe_flags"][2] == 1, early
     assert hard["pipe_flags"][0] == 1 and hard["flags"][0] == 1, hard
 
