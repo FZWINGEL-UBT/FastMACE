@@ -1,0 +1,79 @@
+{
+ "tool": "runner_statistics",
+ "status": "complete",
+ "case": "runner",
+ "created_utc": "2026-10-20T15:33:14.204432+00:00",
+ "host": "Fabi-PC",
+ "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+ "fastmace_commit": "4b35b60bf4c8dccdd07c956b7c705988743b7dee",
+ "model": "mh1-r2scan",
+ "structure": "NaCl",
+ "steps": 20000,
+ "every": 20,
+ "seeds": [
+  20261001,
+  20261101
+ ],
+ "targets": [
+  300.0,
+  600.0
+ ],
+ "timestep_fs": 2.0,
+ "runs": {
+  "20261001": {
+   "backend": "hybrid",
+   "dtype": "float32",
+   "runner": "subprocess",
+   "setup_s": 29.482596678004484,
+   "run_s": 169.41856658400502,
+   "subprocess": {
+    "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+    "reason": "this process already compiled a autograd-in-graph model (a cueq MD plan); one compile family per process, so this oeq plan runs in a child process (SPEC \u00a78.7)",
+    "directory": "/home/fzwin/fastmace-acceptance/2-T23-local-20261020/runner-statistics-runner/seed-20261001/.fastmace-handoff/104892-25bd379a2d45",
+    "children": 3,
+    "seconds": 198.71672027900058,
+    "failed": null,
+    "last": {
+     "action": "run",
+     "stage": "0003",
+     "pid": 105881,
+     "exit_code": 0,
+     "seconds": 92.39733325799898,
+     "steps": 10000
+    }
+   },
+   "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 12 rewrites on, 2 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nsetup:   29 s (plan 0.0042 s, child plan 0.01 s, child build 20 s, child capture 0.082 s, child provenance 0.0052 s, child process 9.2 s)\nspeed:   4.89 ms/step, whole-run mean over steps 10,001\u201320,000\noutput:  /home/fzwin/fastmace-acceptance/2-T23-local-20261020/runner-statistics-runner/seed-20261001\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    the plan runs in a child process through the subprocess runner (SPEC \u00a78.7): each run() starts a child that resumes the last restart write, so the setup cost is paid per run()"
+  },
+  "20261101": {
+   "backend": "hybrid",
+   "dtype": "float32",
+   "runner": "subprocess",
+   "setup_s": 28.728623704999336,
+   "run_s": 164.8780093000023,
+   "subprocess": {
+    "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+    "reason": "this process already compiled a autograd-in-graph model (a cueq MD plan); one compile family per process, so this oeq plan runs in a child process (SPEC \u00a78.7)",
+    "directory": "/home/fzwin/fastmace-acceptance/2-T23-local-20261020/runner-statistics-runner/seed-20261101/.fastmace-handoff/104892-407800ebbb8c",
+    "children": 3,
+    "seconds": 192.1421365619899,
+    "failed": null,
+    "last": {
+     "action": "run",
+     "stage": "0003",
+     "pid": 107040,
+     "exit_code": 0,
+     "seconds": 89.55244637999567,
+     "steps": 10000
+    }
+   },
+   "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 12 rewrites on, 2 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nsetup:   28 s (plan 0.0043 s, child plan 0.01 s, child build 17 s, child capture 0.082 s, child provenance 0.005 s, child process 10 s)\nspeed:   4.87 ms/step, whole-run mean over steps 10,001\u201320,000\noutput:  /home/fzwin/fastmace-acceptance/2-T23-local-20261020/runner-statistics-runner/seed-20261101\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    the plan runs in a child process through the subprocess runner (SPEC \u00a78.7): each run() starts a child that resumes the last restart write, so the setup cost is paid per run()"
+  }
+ },
+ "first": {
+  "backend": "cueq",
+  "runner": "in-process"
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "finished_utc": "2026-10-20T15:40:17.652456+00:00"
+}

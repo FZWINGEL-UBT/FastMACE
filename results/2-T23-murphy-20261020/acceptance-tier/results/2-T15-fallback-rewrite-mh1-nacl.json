@@ -1,0 +1,241 @@
+{
+ "case": "rewrite",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "tier": "graph",
+ "revision": 1,
+ "reason": "fallback: rewrites block_linear, grouped_linear, merged_residual off: ddmin: minimal failing set block_linear (and grouped_linear, merged_residual, which require it) (GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 5.44e-05, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.6e-06, floor 1e-05))",
+ "chain": [
+  "minimal plan (phase 1b)"
+ ],
+ "initial_on": [
+  "factor_species",
+  "fold_cutoff",
+  "density_first",
+  "reassociate_first",
+  "joint_radial_input",
+  "fused_folded_backward",
+  "segmented_first_sum",
+  "streaming_conv",
+  "block_linear",
+  "grouped_linear",
+  "merged_residual",
+  "single_graph_strain",
+  "polar_uvu"
+ ],
+ "off": [
+  "block_linear",
+  "fused_radial_hidden",
+  "grouped_linear",
+  "inplace_block_linear",
+  "merged_residual",
+  "species_skip"
+ ],
+ "gate": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 7.299832271167328e-05,
+  "force_eV_per_A": 2.990691435222903e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 7.299832271167328e-05,
+    "yardstick": 5.440313720504896e-05,
+    "ratio": 1.3418035514484736,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 2.990691435222903e-06,
+    "yardstick": 2.6009790700665114e-06,
+    "ratio": 1.1498329493079797,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "captured replay of stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+   "oeq_runtime": "prepared",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 22.318580901250243,
+   "production_s": 0.07699569873511791,
+   "step_1_s": 22.274214897304773
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null
+ },
+ "setup_s": 133.57564279064536,
+ "tried": [
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 5.44e-05, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.6e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, every rewrite off",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites segmented_first_sum, block_linear, grouped_linear, merged_residual, polar_uvu, single_graph_strain off",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites joint_radial_input, fused_folded_backward, streaming_conv off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 5.44e-05, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.6e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites density_first, joint_radial_input, fused_folded_backward, streaming_conv, merged_residual, polar_uvu, single_graph_strain off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 5.44e-05, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.6e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites density_first, joint_radial_input, fused_folded_backward, streaming_conv, grouped_linear, merged_residual, polar_uvu, single_graph_strain off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 5.44e-05, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.6e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites density_first, joint_radial_input, fused_folded_backward, streaming_conv, block_linear, grouped_linear, merged_residual, polar_uvu, single_graph_strain off",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites factor_species, fold_cutoff, density_first, joint_radial_input, fused_folded_backward, streaming_conv, reassociate_first, segmented_first_sum, grouped_linear, merged_residual, polar_uvu, single_graph_strain off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.234 meV/atom above the limit 0.01 (2 x float32 yardstick 5.44e-05, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.6e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "rewrites block_linear, grouped_linear, merged_residual off",
+   "outcome": "activated",
+   "reason": "ddmin: minimal failing set block_linear (and grouped_linear, merged_residual, which require it) (GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 5.44e-05, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.6e-06, floor 1e-05))",
+   "stage": null,
+   "revision": 1,
+   "reduced_gate_runs": 0,
+   "full_gate_runs": 1
+  }
+ ],
+ "reduced_gate_runs": 8,
+ "full_gate_runs": 1,
+ "finite": true,
+ "check": "gate"
+}

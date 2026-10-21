@@ -1,0 +1,168 @@
+{
+ "case": "capture",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "tier": "eager",
+ "revision": 1,
+ "reason": "fallback: mode eager: eager passes the reduced gate: the fault is in capture or compilation (GateFailed: the gate on this structure failed: force error 0.000649 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05))",
+ "chain": [
+  "minimal plan (phase 1b)"
+ ],
+ "initial_on": [
+  "factor_species",
+  "fold_cutoff",
+  "density_first",
+  "reassociate_first",
+  "joint_radial_input",
+  "fused_folded_backward",
+  "segmented_first_sum",
+  "streaming_conv",
+  "block_linear",
+  "grouped_linear",
+  "merged_residual",
+  "single_graph_strain",
+  "polar_uvu"
+ ],
+ "off": [
+  "fused_radial_hidden",
+  "inplace_block_linear",
+  "species_skip"
+ ],
+ "gate": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 0.00011825369904693584,
+  "force_eV_per_A": 2.6531331342172226e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 0.00011825369904693584,
+    "yardstick": 0.0006659026410118342,
+    "ratio": 0.17758406674472743,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 2.6531331342172226e-06,
+    "yardstick": 2.638231973023375e-06,
+    "ratio": 1.0056481618546875,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "eager stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+   "oeq_runtime": "prepared",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 21.382556814001873,
+   "production_s": 0.055307628004811704,
+   "step_1_s": 21.37999849899643
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null
+ },
+ "setup_s": 59.28515178000089,
+ "tried": [
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, force_eV_per_A) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "activated",
+   "reason": "eager passes the reduced gate: the fault is in capture or compilation (GateFailed: the gate on this structure failed: force error 0.000649 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05))",
+   "stage": null,
+   "revision": 1,
+   "reduced_gate_runs": 0,
+   "full_gate_runs": 1
+  }
+ ],
+ "reduced_gate_runs": 1,
+ "full_gate_runs": 1,
+ "finite": true,
+ "check": "gate"
+}

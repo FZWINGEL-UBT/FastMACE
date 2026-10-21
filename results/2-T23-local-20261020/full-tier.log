@@ -1,0 +1,227 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/acceptance/inductor, triton /home/fzwin/fastmace-cache/acceptance/triton
+rootdir: /home/fzwin/fastmace-2-T23/src-4b35b60
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 277 items / 30 deselected / 247 selected
+
+../src-4b35b60/tests/gpu/test_ase_calculator_gpu.py ..                   [  0%]
+../src-4b35b60/tests/gpu/test_canonical_restart_gpu.py .                 [  1%]
+../src-4b35b60/tests/gpu/test_eager_gpu.py ..                            [  2%]
+../src-4b35b60/tests/gpu/test_energy_gpu.py ....                         [  3%]
+../src-4b35b60/tests/gpu/test_engine_gpu.py ...............              [  9%]
+../src-4b35b60/tests/gpu/test_forces_gpu.py ...........                  [ 14%]
+../src-4b35b60/tests/gpu/test_integrators_gpu.py .....                   [ 16%]
+../src-4b35b60/tests/gpu/test_io_gpu.py ....                             [ 17%]
+../src-4b35b60/tests/gpu/test_kernels_oeq_streaming_cuda.py ss           [ 18%]
+../src-4b35b60/tests/gpu/test_kernels_triton_cuda.py .................   [ 25%]
+../src-4b35b60/tests/gpu/test_load_hybrid_gpu.py ...                     [ 26%]
+../src-4b35b60/tests/gpu/test_loading_gpu.py ......................      [ 35%]
+../src-4b35b60/tests/gpu/test_neighbors_gpu.py ......................... [ 45%]
+......................................................................   [ 74%]
+../src-4b35b60/tests/gpu/test_planner_gpu.py ...                         [ 75%]
+../src-4b35b60/tests/gpu/test_polar_gpu.py .......                       [ 78%]
+../src-4b35b60/tests/gpu/test_reference_gpu.py F                         [ 78%]
+../src-4b35b60/tests/gpu/test_reference_tier_gpu.py .                    [ 78%]
+../src-4b35b60/tests/gpu/test_registry_gpu.py ....                       [ 80%]
+../src-4b35b60/tests/gpu/test_rewrites_generic_gpu.py .................. [ 87%]
+                                                                         [ 87%]
+../src-4b35b60/tests/gpu/test_rewrites_linear_gpu.py .....               [ 89%]
+../src-4b35b60/tests/gpu/test_rewrites_mh1_gpu.py ............           [ 94%]
+../src-4b35b60/tests/gpu/test_selfcheck_gpu.py .....                     [ 96%]
+../src-4b35b60/tests/gpu/test_simulation_gpu.py ..                       [ 97%]
+../src-4b35b60/tests/gpu/test_smoke.py ..                                [ 98%]
+../src-4b35b60/tests/gpu/test_tiny_engine_gpu.py ..                      [ 99%]
+../src-4b35b60/tests/gpu/test_tiny_released_gpu.py ..                    [100%]
+
+=================================== FAILURES ===================================
+_____________________ test_polar1s_reference_equals_1a_t19 _____________________
+
+    def test_polar1s_reference_equals_1a_t19():
+        from fastmace.reference import calculators, records
+    
+        run = Path(RUN)
+>       metadata = json.loads((run / "metadata.json").read_text())
+
+../src-4b35b60/tests/gpu/test_reference_gpu.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/pathlib.py:1134: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/home/fzwin/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s/metadata.json')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return self._accessor.open(self, mode, buffering, encoding, errors,
+                                   newline)
+E       FileNotFoundError: [Errno 2] No such file or directory: '/home/fzwin/fastmace-acceptance/1a-T19-gate-leto-20261018/gate-polar1-s/metadata.json'
+
+../../.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/pathlib.py:1119: FileNotFoundError
+=============================== warnings summary ===============================
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[none-dtype0]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_forces_gpu.py:78: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+  Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:820.)
+    return float((got - expected).abs().max()) / float(expected.abs().max())
+
+tests/gpu/test_loading_gpu.py: 20 warnings
+tests/gpu/test_polar_gpu.py: 1 warning
+tests/gpu/test_rewrites_generic_gpu.py: 4 warnings
+tests/gpu/test_rewrites_mh1_gpu.py: 2 warnings
+  /home/fzwin/fastmace-2-T23/src-4b35b60/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/gpu/test_loading_gpu.py::test_mh1_plain_cueq_float64
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:71: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load("mh1-r2scan", backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[matpes-pbe]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: matpes-pbe (MACE-matpes-pbe-omat-ft.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[matpes-r2scan]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: matpes-r2scan (MACE-matpes-r2scan-omat-ft.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mp0-large]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: mp0-large (MACE_MPtrj_2022.9.model) is distributed under the MIT License
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mp0-medium]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: mp0-medium (2023-12-03-mace-128-L1_epoch-199.model) is distributed under the MIT License
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mp0b3-medium]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: mp0b3-medium (mace-mp-0b3-medium.model) is distributed under the MIT License
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[mpa0-medium]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: mpa0-medium (mace-mpa-0-medium.model) is distributed under the MIT License
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-large]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off23-large (MACE-OFF23_large.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-medium]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off23-medium (MACE-OFF23_medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-small]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off23-small (MACE-OFF23_small.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23b-medium]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off23b-medium (MACE-OFF23b_medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off24-medium]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: off24-medium (MACE-OFF24_medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[omat0-medium]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: omat0-medium (mace-omat-0-medium.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[omol0-xl]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: omol0-xl (MACE-omol-0-extra-large-1024.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-l]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: polar1-l (MACE-POLAR-1-L.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-m]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: polar1-m (MACE-POLAR-1-M.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-s]
+  /home/fzwin/fastmace-2-T23/src-4b35b60/tests/gpu/test_loading_gpu.py:149: ModelLicenceWarning: polar1-s (MACE-POLAR-1-S.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = loading.load(label, backend="cueq", dtype="float64", device="cuda:0")
+
+tests/gpu/test_polar_gpu.py::test_tiny_polar_runs_without_host_synchronisation
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/cuda/__init__.py:1395: UserWarning: Synchronization debug mode is a prototype feature and does not yet detect all synchronizing operations (Triggered internally at /__w/pytorch/pytorch/torch/csrc/cuda/Module.cpp:1080.)
+    torch._C._cuda_set_sync_debug_mode(debug_mode)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /home/fzwin/fastmace-acceptance/2-T23-local-20261020/full-tier/junit.xml -
+============================= slowest 60 durations =============================
+209.98s call     tests/gpu/test_planner_gpu.py::test_mh1_plain_cueq_float64_planned_equals_hand_built_and_minimal
+198.29s call     tests/gpu/test_canonical_restart_gpu.py::test_mh1_plain_cueq_float64_resumes_within_1e_12
+108.95s call     tests/gpu/test_eager_gpu.py::test_mh1_hybrid_eager_equals_graph_within_float32_noise
+105.60s call     tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_plain_cueq
+95.61s call     tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_hybrid
+85.50s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[mh1-r2scan-nvt]
+80.51s call     tests/gpu/test_reference_tier_gpu.py::test_mh1_reference_tier_agrees_with_the_graph_tier_statistically
+76.77s call     tests/gpu/test_planner_gpu.py::test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal
+68.86s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[polar1-s]
+67.87s call     tests/gpu/test_simulation_gpu.py::test_simulation_reaches_the_main_py_trajectory[hybrid]
+63.54s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[mh1-r2scan-npt-full]
+62.36s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[mp0-medium]
+59.36s call     tests/gpu/test_selfcheck_gpu.py::test_a_broken_captured_graph_fails_while_eager_passes
+56.36s call     tests/gpu/test_simulation_gpu.py::test_simulation_reaches_the_main_py_trajectory[cueq]
+50.42s call     tests/gpu/test_tiny_released_gpu.py::test_tiny_broken_captured_graph_fails_while_eager_passes
+48.27s call     tests/gpu/test_tiny_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_tiny_plain_cueq
+38.67s call     tests/gpu/test_registry_gpu.py::test_mh1_npt_baoab_full_cell
+36.65s call     tests/gpu/test_registry_gpu.py::test_mh1_plain_cueq_float64
+34.94s call     tests/gpu/test_registry_gpu.py::test_mh1_hybrid_pipelined_nvt
+34.47s call     tests/gpu/test_ase_calculator_gpu.py::test_lbfgs_with_fm_calc_reaches_maces_minimum[hybrid]
+30.60s call     tests/gpu/test_eager_gpu.py::test_polar1_s_plain_cueq_runs_gated_in_eager_mode
+29.83s call     tests/gpu/test_ase_calculator_gpu.py::test_lbfgs_with_fm_calc_reaches_maces_minimum[pytest]
+28.78s call     tests/gpu/test_registry_gpu.py::test_polar_1_s
+28.45s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[cueq-float64-eager-plain]
+25.03s call     tests/gpu/test_engine_gpu.py::test_process_constraints_refuse_a_mixed_process
+24.41s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float32-default]
+22.60s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float64-default]
+21.57s call     tests/gpu/test_tiny_released_gpu.py::test_tiny_registry_plain_cueq_float64
+21.23s call     tests/gpu/test_tiny_engine_gpu.py::test_tiny_plain_cueq_float64_planned_equals_hand_built
+20.72s call     tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[default-dtype1]
+19.64s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_hybrid_in_a_fresh_process[mp0-medium-float32]
+18.78s call     tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_hybrid_float32_with_streaming
+16.22s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_hybrid_in_a_fresh_process[mp0-medium-float64]
+15.47s call     tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[default-dtype0]
+15.40s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float32-none]
+14.45s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_hybrid_in_a_fresh_process[off23-small-float32]
+14.26s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float64-none]
+12.13s call     tests/gpu/test_polar_gpu.py::test_polar1_s_hybrid_float32_in_a_fresh_process
+12.07s call     tests/gpu/test_loading_gpu.py::test_mh1_hybrid_float32_in_a_fresh_process
+11.80s call     tests/gpu/test_rewrites_mh1_gpu.py::test_streaming_attaches_on_a_tiny_hybrid_model[float32]
+11.44s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_hybrid_in_a_fresh_process[off23-small-float64]
+11.35s call     tests/gpu/test_rewrites_mh1_gpu.py::test_streaming_attaches_on_a_tiny_hybrid_model[float64]
+11.00s call     tests/gpu/test_loading_gpu.py::test_hybrid_conversion_keeps_the_last_layer_irreps_of_a_tiny_polar_model
+10.67s call     tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[none-dtype0]
+8.10s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[mp0-medium]
+7.69s call     tests/gpu/test_load_hybrid_gpu.py::test_mace_imported_first_gives_plain_cueq_with_the_reason
+7.47s call     tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[default-dtype0]
+7.43s call     tests/gpu/test_loading_gpu.py::test_mh1_plain_cueq_float64
+6.50s call     tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+6.41s call     tests/gpu/test_load_hybrid_gpu.py::test_fm_load_then_minimal_planner_gives_the_hybrid
+6.31s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-l]
+6.18s call     tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[default-dtype1]
+5.09s call     tests/gpu/test_load_hybrid_gpu.py::test_without_oeq_fm_load_gives_plain_cueq
+4.55s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+4.34s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[off23-large]
+4.17s call     tests/gpu/test_kernels_triton_cuda.py::test_triton_fused_radial_equals_baseline[128]
+4.17s call     tests/gpu/test_forces_gpu.py::test_private_copy_keeps_the_fused_cueq_adapter[dtype0]
+4.04s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[mh1-cuda-dtype0]
+3.95s call     tests/gpu/test_rewrites_mh1_gpu.py::test_package_on_cueq_gpu_models[omol-cuda-dtype1]
+3.82s call     tests/gpu/test_loading_gpu.py::test_every_label_loads_with_its_hash_and_licence[polar1-m]
+=========================== short test summary info ============================
+FAILED ../src-4b35b60/tests/gpu/test_reference_gpu.py::test_polar1s_reference_equals_1a_t19
+SKIPPED [1] ../src-4b35b60/tests/gpu/test_kernels_oeq_streaming_cuda.py:155: openequivariance is not installed (the streaming kernels need it)
+SKIPPED [1] ../src-4b35b60/tests/gpu/test_kernels_oeq_streaming_cuda.py:159: openequivariance is not installed (the streaming kernels need it)
+= 1 failed, 244 passed, 2 skipped, 30 deselected, 47 warnings in 2245.50s (0:37:25) =

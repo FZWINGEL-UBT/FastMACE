@@ -1,0 +1,40 @@
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "reference": {
+  "tier": "reference",
+  "backend": "cueq",
+  "dtype": "float32",
+  "gate": "passed",
+  "setup_s": 29.20218444099737,
+  "run_s": 7.357156168000074
+ },
+ "graph": {
+  "tier": "graph",
+  "backend": "cueq",
+  "dtype": "float32",
+  "gate": "skipped",
+  "setup_s": 23.490321985002083,
+  "run_s": 6.726487962005194
+ },
+ "mean_temperature_K": {
+  "reference": 207.2513930983864,
+  "graph": 207.25138592448877
+ },
+ "std_temperature_K": {
+  "reference": 15.621576464859473,
+  "graph": 15.621570626674579
+ },
+ "mean_potential_eV_atom": {
+  "reference": -6.8609988395814545,
+  "graph": -6.8609988785305145
+ },
+ "std_potential_eV_atom": {
+  "reference": 0.0026267219221060975,
+  "graph": 0.0026267269066490755
+ },
+ "temperature_limit_K": 15.811388300841896,
+ "final_position_deviation_A": 5.626586272455825e-07,
+ "reference_report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    reference, plain cuEq (unfused convolution), float32, 0 rewrites on, 14 off (reasons in run.plan)\ngate:    passed (2 rattled (0.05 \u00c5); 0.00067 meV/atom, 3.1e-06 eV/\u00c5; floors \u00a712.3)\nsetup:   28 s (plan 0.019 s, build 7.6 s, gate 21 s, provenance 0.0095 s)\nspeed:   36.7 ms/step, whole-run mean over steps 1\u2013200\noutput:  /home/fzwin/fastmace-acceptance/2-T23-local-20261020/full-tier-pytest/test_mh1_reference_tier_agrees0/reference\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+}

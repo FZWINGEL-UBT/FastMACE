@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import os
 import shlex
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 
 NAS_HOME = PurePosixPath("/mnt/homes/zwingel")
@@ -529,9 +529,214 @@ def compile_checks_jobs(machine: Machine, run_root: Path) -> list:
     return jobs
 
 
+# --- phase 2 (plan task 2-T23) ------------------------------------------------------------------------------
+
+
+# Options whose default changed after fastmace-1b by owner decision (optimisation round 1, 20 October 2026: OPT-T02
+# stages A and B on by default). Item 8 of the combined acceptance expects exactly these plan differences.
+ROUND_OPTION_CHANGES = ("gated_rows", "segment_gemm")
+
+
+def _regression2_job(machine, run_root, name, sides, *, blocks, pattern="abab", note=""):
+    output = check_location(machine, run_root / name)
+    argv = [machine.python("mace_cueq_oeq"), _tool(machine, "ab_fastmace.py"), "--release", "1b",
+            "--output", str(output), "--model", PRIMARY_MODEL, "--checkpoint", checkpoint_path(machine, PRIMARY_MODEL),
+            "--structures", *REGRESSION_STRUCTURES, "--sides", *sides, "--warmup", str(WARMUP), "--block", str(BLOCK),
+            "--blocks", str(blocks), "--pattern", pattern, "--dump-forces",
+            "--allow-option-changes", *ROUND_OPTION_CHANGES]
+    if "1b" in sides:
+        argv += ["--renamed", str(machine.path(machine.versions))]
+    return Job(name=name, argv=tuple(argv), output=str(output), timing=True, note=note)
+
+
+def regression2_jobs(machine: Machine, run_root: Path) -> list:
+    """Phase 2 acceptance item 8: this checkout (side 2) against the tag fastmace-1b in one process, MH-1 NaCl
+    and NbCl5 hybrid NVT, 12 blocks, three A/B processes, then one control per side."""
+    run_root = Path(run_root)
+    jobs = [
+        _regression2_job(machine, run_root, "regression2-ab-abab", ("1b", "2"), blocks=AB_BLOCKS,
+                         note="ABAB, 1b built first"),
+        _regression2_job(machine, run_root, "regression2-ab-2-first", ("2", "1b"), blocks=AB_BLOCKS,
+                         note="ABAB, 2 built first"),
+        _regression2_job(machine, run_root, "regression2-ab-abba", ("1b", "2"), blocks=AB_BLOCKS, pattern="abba",
+                         note="ABBA, 1b built first"),
+    ]
+    jobs += [_regression2_job(machine, run_root, f"regression2-control-{side}", (side,), blocks=CONTROL_BLOCKS,
+                              note="one version alone: setup, forces outside an A/B process")
+             for side in ("1b", "2")]
+    return jobs
+
+
+def regression2_nacl_jobs(machine: Machine, run_root: Path) -> list:
+    """Three more NaCl-only A/B processes for item 8 on murphy (conductor, 20 October 2026, after one of the first
+    three NaCl processes ended 0.004 points over the floor): 1b built first in two of them."""
+    run_root = Path(run_root)
+    jobs = [
+        _regression2_job(machine, run_root, "regression2-nacl-abab-1b-first", ("1b", "2"), blocks=AB_BLOCKS,
+                         note="NaCl only, ABAB, 1b built first"),
+        _regression2_job(machine, run_root, "regression2-nacl-abab-2-first", ("2", "1b"), blocks=AB_BLOCKS,
+                         note="NaCl only, ABAB, 2 built first"),
+        _regression2_job(machine, run_root, "regression2-nacl-abba-1b-first", ("1b", "2"), blocks=AB_BLOCKS,
+                         pattern="abba", note="NaCl only, ABBA, 1b built first"),
+    ]
+    out = []
+    for job in jobs:
+        argv = list(job.argv)
+        start = argv.index("--structures") + 1
+        argv[start:start + len(REGRESSION_STRUCTURES)] = ["NaCl"]
+        out.append(replace(job, argv=tuple(argv)))
+    return out
+
+
+# 1b-T14's protocols: plain cuEq float64 500 steps (positions every 50), hybrid 20,000 steps (every 20), two seeds;
+# the target ramps from 300 to 600 K.
+TRAJECTORY_CASES = {"cueq": dict(environment="mace_cueq_latest", steps=500, every=50, seeds=(20261019,),
+                                 positions=True),
+                    "hybrid": dict(environment="mace_cueq_oeq", steps=20_000, every=20, seeds=(20261001, 20261101),
+                                   positions=False)}
+
+
+def _trajectory2_job(machine, run_root, backend, side, suffix=""):
+    case = TRAJECTORY_CASES[backend]
+    name = f"trajectory2-{backend}-{side}{suffix}"
+    output = check_location(machine, run_root / name)
+    argv = [machine.python(case["environment"]), _tool(machine, "trajectory_versions.py"), "run", "--side", side,
+            "--output", str(output), "--model", PRIMARY_MODEL, "--checkpoint", checkpoint_path(machine, PRIMARY_MODEL),
+            "--structure", "NaCl", "--backend", backend, "--steps", str(case["steps"]), "--every", str(case["every"]),
+            "--seeds", *(str(seed) for seed in case["seeds"])]
+    if case["positions"]:
+        argv.append("--positions")
+    if side == "1b":
+        argv += ["--renamed", str(machine.path(machine.versions))]
+    return Job(name=name, argv=tuple(argv), output=str(output),
+               note="default trajectory, one version per process (1b-T14's measures)")
+
+
+def trajectory2_jobs(machine: Machine, run_root: Path) -> list:
+    """Phase 2 acceptance item 8, trajectories: MH-1 NaCl 3x3x3 on this checkout and on fastmace-1b, one version per
+    process; plain cuEq float64 (with a repeat of this checkout as the floor) and hybrid statistics. Untimed."""
+    run_root = Path(run_root)
+    return [_trajectory2_job(machine, run_root, "cueq", "1b"), _trajectory2_job(machine, run_root, "cueq", "2"),
+            _trajectory2_job(machine, run_root, "cueq", "2", "-repeat"),
+            _trajectory2_job(machine, run_root, "hybrid", "1b"), _trajectory2_job(machine, run_root, "hybrid", "2")]
+
+
+def runner_statistics_jobs(machine: Machine, run_root: Path) -> list:
+    """Phase 2 acceptance item 4, hybrid: MH-1 NaCl in subprocess-runner children (after a compiled plain cuEq)
+    against a fresh process, 20,000 steps, two seeds, 1b-T14's measure. Untimed."""
+    jobs = []
+    for case in ("fresh", "runner"):
+        name = f"runner-statistics-{case}"
+        output = check_location(machine, Path(run_root) / name)
+        argv = [machine.python("mace_cueq_oeq"), _tool(machine, "runner_statistics.py"), "run", "--case", case,
+                "--output", str(output), "--model", PRIMARY_MODEL]
+        jobs.append(Job(name=name, argv=tuple(argv), output=str(output), note="hybrid, 1b-T14's measure"))
+    return jobs
+
+
+REPEAT_SEEDS = (20261001, 20261101, 20261201, 20261301)
+
+
+def runner_statistics_repeat_jobs(machine: Machine, run_root: Path) -> list:
+    """Item 4's repeat (owner, 20 October 2026, after the first comparison was dominated by the heating transient
+    from 0 K): one equilibrated start (300 K: 2 ps at 0.5 fs, then 10 ps at 2 fs), then fresh and runner from it,
+    four seeds. Untimed."""
+    run_root = Path(run_root)
+    equilibrated = check_location(machine, run_root / "runner-repeat-equilibrate")
+    jobs = [Job(name="runner-repeat-equilibrate", output=str(equilibrated), note="the shared start state",
+                argv=(machine.python("mace_cueq_oeq"), _tool(machine, "runner_statistics.py"), "equilibrate",
+                      "--output", str(equilibrated), "--model", PRIMARY_MODEL))]
+    for case in ("fresh", "runner"):
+        name = f"runner-repeat-{case}"
+        output = check_location(machine, run_root / name)
+        argv = [machine.python("mace_cueq_oeq"), _tool(machine, "runner_statistics.py"), "run", "--case", case,
+                "--output", str(output), "--model", PRIMARY_MODEL, "--start", str(equilibrated / "start.extxyz"),
+                "--seeds", *(str(seed) for seed in REPEAT_SEEDS)]
+        jobs.append(Job(name=name, argv=tuple(argv), output=str(output), note="hybrid, equilibrated start, 4 seeds"))
+    return jobs
+
+
+def _tier_job(machine, run_root, name, marker, *, timing, note, files=None):
+    output = check_location(machine, run_root / name)
+    basetemp = check_location(machine, run_root / f"{name}-pytest")
+    gpu = machine.path(machine.fastmace) / "tests" / "gpu"
+    tests = [str(gpu / file) for file in files] if files else [str(gpu)]
+    argv = [machine.python("mace_cueq_latest"), "-m", "pytest", *tests, "-m", marker, "-p", "no:cacheprovider",
+            f"--basetemp={basetemp}", "--durations=60", "-rfEs", f"--junitxml={output / 'junit.xml'}"]
+    env = {"FASTMACE_HYBRID_PYTHON": machine.python("mace_cueq_oeq"),
+           "FASTMACE_BASELINE": str(machine.path(machine.baseline)),
+           "FASTMACE_RESULTS": str(output / "results")}
+    # 1a-T19's stored POLAR-1-S references are on the NAS only; elsewhere the test skips (run 2-T23-local-20261020:
+    # the variable pointed at a missing directory and the test failed reading it).
+    polar = machine.path(machine.root) / "1a-T19-gate-leto-20261018" / "gate-polar1-s"
+    if polar.is_dir():
+        env["FASTMACE_1A_T19_POLAR1S"] = str(polar)
+    return Job(name=name, argv=tuple(argv), output=str(output), env=env, timing=timing, note=note)
+
+
+def acceptance_tier_jobs(machine: Machine, run_root: Path) -> list:
+    """The acceptance GPU tier (docs/development.md, "Test tiers") on final main, one process. It holds the
+    planner's step-time assertions (2-T14d), so it needs an idle GPU."""
+    return [_tier_job(machine, Path(run_root), "acceptance-tier", "acceptance", timing=True,
+                      note="pytest tests/gpu -m acceptance")]
+
+
+# The combined acceptance's own GPU files (optimisation round 1): the non-acceptance tests of the restart,
+# reproducible-mode and runner files with the round's rewrites on by default, stage B's kernel test, and OPT-T06/T07's
+# GPU tests if merged at the freeze (their files are added here then). The acceptance-marked tests of these files run
+# in the acceptance tier.
+ROUND_TEST_FILES = ("test_canonical_restart_gpu.py", "test_reproducible_gpu.py", "test_subprocess_runner_gpu.py",
+                    "test_segment_gemm_cuda.py", "test_template_cache_gpu.py")
+
+
+def round_tests_jobs(machine: Machine, run_root: Path) -> list:
+    """The round's GPU files outside the acceptance tier, one process (untimed)."""
+    present = [file for file in ROUND_TEST_FILES if (machine.path(machine.fastmace) / "tests" / "gpu" / file).is_file()]
+    return [_tier_job(machine, Path(run_root), "round-tests", "not acceptance", timing=False, files=present,
+                      note="restart, reproducible, runner and round files outside the acceptance tier")]
+
+
+# The 19-label gate split over the two cards: labels whose float64 references fit the RTX 5060 Ti's 16 GB (1b-T23's
+# local runs and 1b-T03's peaks) run there; the polar, MACE-OFF and MP-0 large labels run on murphy's 20 GB.
+LOCAL_GATE_LABELS = ("mp0-medium", "mp0b3-medium", "mpa0-medium", "omat0-medium", "matpes-pbe", "matpes-r2scan",
+                     "mh1-omat", "mh1-mp", "mh1-r2scan", "omol0-xl")
+MURPHY_GATE_LABELS = tuple(label for label in GATE_LABELS if label not in LOCAL_GATE_LABELS)
+
+
+def gate_local_jobs(machine: Machine, run_root: Path) -> list:
+    return gate_1b_jobs(machine, run_root, labels=LOCAL_GATE_LABELS)
+
+
+def gate_murphy_jobs(machine: Machine, run_root: Path) -> list:
+    return gate_1b_jobs(machine, run_root, labels=MURPHY_GATE_LABELS)
+
+
+def gate_omol0_jobs(machine: Machine, run_root: Path) -> list:
+    """OMOL-0 XL's gate twice (conductor, 21 October 2026, after its local production crash): as frozen, and with
+    OPT-T06's template cache off (``--engine-config model_template_cache=false``)."""
+    (frozen,) = [job for job in gate_1b_jobs(machine, run_root, labels=("omol0-xl",)) if job.name == "gate-omol0-xl"]
+    output = check_location(machine, Path(run_root) / "gate-omol0-xl-no-template-cache")
+    argv = list(frozen.argv)
+    argv[argv.index("--output") + 1] = str(output)
+    argv += ["--engine-config", "model_template_cache=false"]
+    return [frozen, Job(name="gate-omol0-xl-no-template-cache", argv=tuple(argv), output=str(output),
+                        note="OMOL-0 XL with OPT-T06's template cache off")]
+
+
+def full_tier_jobs(machine: Machine, run_root: Path) -> list:
+    """The full GPU tier (merge tier) on final main, one process; no step-time assertions."""
+    return [_tier_job(machine, Path(run_root), "full-tier", "not acceptance", timing=False,
+                      note='pytest tests/gpu -m "not acceptance"')]
+
+
 SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun_jobs, "alternating": alternating_jobs,
           "alternating-cueq": alternating_cueq_jobs,
           "gate": gate_jobs, "workflow": workflow_jobs,
           "gate-1b": gate_1b_jobs, "gate-1b-subset": gate_1b_subset_jobs, "library-gate": library_gate_jobs,
           "regression": regression_jobs, "frontends": frontends_jobs, "gpu-suite": gpu_suite_jobs,
-          "adapter-tests": adapter_jobs, "compile-checks": compile_checks_jobs}
+          "adapter-tests": adapter_jobs, "compile-checks": compile_checks_jobs,
+          "regression2": regression2_jobs, "regression2-nacl": regression2_nacl_jobs, "trajectory2": trajectory2_jobs,
+          "runner-statistics": runner_statistics_jobs,
+          "runner-repeat": runner_statistics_repeat_jobs,
+          "acceptance-tier": acceptance_tier_jobs, "full-tier": full_tier_jobs, "round-tests": round_tests_jobs,
+          "gate-local": gate_local_jobs, "gate-murphy": gate_murphy_jobs, "gate-omol0": gate_omol0_jobs}

@@ -1,0 +1,76 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/acceptance/inductor, triton /home/fzwin/fastmace-cache/acceptance/triton
+rootdir: /home/fzwin/fastmace-2-T23/src-37c4014
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 277 items / 247 deselected / 30 selected
+
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_ase_equivalence_gpu.py . [  3%]
+.                                                                        [  6%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_canonical_restart_gpu.py . [ 10%]
+                                                                         [ 10%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_engine_gpu.py . [ 13%]
+..                                                                       [ 20%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_fallback_gpu.py . [ 23%]
+.....                                                                    [ 40%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_forces_gpu.py . [ 43%]
+.                                                                        [ 46%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_gate_resources_gpu.py . [ 50%]
+.                                                                        [ 53%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_isolation_gpu.py . [ 56%]
+..                                                                       [ 63%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_planner_gpu.py . [ 66%]
+.                                                                        [ 70%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_reproducible_gpu.py . [ 73%]
+....                                                                     [ 86%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_selfcheck_gpu.py . [ 90%]
+.                                                                        [ 93%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-37c4014/tests/gpu/test_subprocess_runner_gpu.py . [ 96%]
+.                                                                        [100%]
+
+=============================== warnings summary ===============================
+../../../../../../../home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /home/fzwin/fastmace-acceptance/2-T23-local-20261020/acceptance-tier/junit.xml -
+============================= slowest 60 durations =============================
+4108.70s call     tests/gpu/test_ase_equivalence_gpu.py::test_langevin_reproduces_ase_in_every_50_K_bin
+1016.18s call     tests/gpu/test_ase_equivalence_gpu.py::test_baoab_variants_reproduce_their_references
+400.16s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+384.32s call     tests/gpu/test_gate_resources_gpu.py::test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[polar1-l]
+369.41s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float64]
+358.58s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float64]
+357.53s call     tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[polar1-s-hybrid]
+352.63s call     tests/gpu/test_canonical_restart_gpu.py::test_mh1_hybrid_resumes_statistically
+297.42s call     tests/gpu/test_subprocess_runner_gpu.py::test_plain_cueq_float64_after_a_hybrid_runs_in_a_child_within_1e_12
+289.30s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+272.86s call     tests/gpu/test_gate_resources_gpu.py::test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[omol0-xl]
+216.91s call     tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[mh1-plain-cueq]
+209.11s call     tests/gpu/test_planner_gpu.py::test_mh1_plain_cueq_float64_planned_is_as_fast_as_hand_built
+200.64s call     tests/gpu/test_subprocess_runner_gpu.py::test_hybrid_after_a_plain_cueq_runs_in_a_child
+190.40s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float32]
+180.36s call     tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+179.98s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]
+179.75s call     tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[mh1-hybrid]
+167.44s call     tests/gpu/test_fallback_gpu.py::test_ddmin_finds_the_broken_rewrites[pair]
+135.76s call     tests/gpu/test_fallback_gpu.py::test_ddmin_finds_the_broken_rewrites[rewrite]
+128.40s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[hybrid-float32-compiled-production]
+128.22s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[cueq-float64-compiled-production]
+110.47s call     tests/gpu/test_reproducible_gpu.py::test_reproducible_after_cuda_started_runs_in_a_child_bitwise
+78.15s call     tests/gpu/test_selfcheck_gpu.py::test_gate_time_on_nbcl5
+77.90s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[omol0-xl]
+73.20s call     tests/gpu/test_planner_gpu.py::test_mh1_hybrid_float32_planned_is_as_fast_as_hand_built
+68.77s call     tests/gpu/test_fallback_gpu.py::test_a_broken_capture_drops_the_graph_mode
+67.72s call     tests/gpu/test_fallback_gpu.py::test_prepare_leaves_the_default_trajectory_unchanged
+58.06s call     tests/gpu/test_fallback_gpu.py::test_a_capture_error_before_the_first_step_falls_back_to_eager[gate]
+57.78s call     tests/gpu/test_fallback_gpu.py::test_a_capture_error_before_the_first_step_falls_back_to_eager[skip]
+0.03s setup    tests/gpu/test_ase_equivalence_gpu.py::test_langevin_reproduces_ase_in_every_50_K_bin
+0.01s setup    tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float64]
+
+(28 durations < 0.005s hidden.  Use -vv to show these durations.)
+========= 30 passed, 247 deselected, 1 warning in 10726.47s (2:58:46) ==========

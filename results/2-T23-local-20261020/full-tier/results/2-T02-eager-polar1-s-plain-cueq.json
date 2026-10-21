@@ -1,0 +1,150 @@
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "tier": "eager",
+ "backend": "cueq",
+ "dtype": "float32",
+ "compile_mode": "none",
+ "capture": false,
+ "gate": "passed",
+ "gate_record": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 0.00042352972000285434,
+  "force_eV_per_A": 3.6295699608612786e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 0.00042352972000285434,
+    "yardstick": 0.00046843800831724094,
+    "ratio": 0.9041318434520085,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 3.6295699608612786e-06,
+    "yardstick": 3.928286564452987e-06,
+    "ratio": 0.9239575324532606,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "eager stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/MACE-POLAR-1-S.model",
+     "sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+     "label": "polar1-s",
+     "head": "Default"
+    },
+    "patches": [
+     "single_graph_strain",
+     "polar_longrange"
+    ],
+    "corrections_active": [
+     "polar_kspace_stress"
+    ],
+    "optional_physics": [],
+    "polar": {
+     "bounds": [
+      6,
+      6,
+      6
+     ],
+     "k_vectors": 346,
+     "k_superset": 786,
+     "headroom": 0.1
+    }
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/MACE-POLAR-1-S.model",
+     "sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+     "label": "polar1-s",
+     "head": "Default"
+    },
+    "patches": [
+     "single_graph_strain",
+     "polar_longrange"
+    ],
+    "corrections_active": [
+     "polar_kspace_stress"
+    ],
+    "optional_physics": [],
+    "polar": {
+     "bounds": [
+      6,
+      6,
+      6
+     ],
+     "k_vectors": 346,
+     "k_superset": 786,
+     "headroom": 0.1
+    }
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 15.878110900004685,
+   "production_s": 0.41846353500295663,
+   "step_1_s": 15.875418769996031
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null
+ },
+ "speed": {
+  "status": "whole-run mean",
+  "seconds_per_step": 0.08676348704975681,
+  "first_step": 1,
+  "last_step": 20
+ },
+ "report": "FastMACE 0.0.1.dev0  |  polar1-s (head Default)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    eager, plain cuEq (fused convolution), float32, 1 rewrites on, 13 off (reasons in run.plan)\nwhy:     eager tier: no CUDA graphs, no compilation (mode='eager', SPEC \u00a78.3); correct but slower\nwhy:     plain cuEq as requested (backend='cueq'); auto would choose hybrid where it builds\ngate:    passed (2 rattled (0.05 \u00c5); 0.00042 meV/atom, 3.6e-06 eV/\u00c5; floors \u00a712.3)\nsetup:   23 s (plan 0.017 s, build 6.8 s, gate 16 s, provenance 0.0064 s)\nspeed:   86.8 ms/step, whole-run mean over steps 1\u201320\noutput:  none\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none",
+ "energies_eV_per_atom": [
+  -8471.41708495117,
+  -8471.401069395042
+ ]
+}

@@ -1,0 +1,812 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/acceptance/inductor, triton /home/fzwin/fastmace-cache/acceptance/triton
+rootdir: /home/fzwin/fastmace-2-T23/src-rerun-8ec5063-9f2aca7
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 2 items
+
+../../../../../../../home/fzwin/fastmace-2-T23/src-rerun-8ec5063-9f2aca7/tests/gpu/test_fallback_gpu.py F [ 50%]
+                                                                         [ 50%]
+../../../../../../../home/fzwin/fastmace-2-T23/src-rerun-8ec5063-9f2aca7/tests/gpu/test_subprocess_worker_gpu.py . [100%]
+
+=================================== FAILURES ===================================
+________ test_a_failed_candidates_memory_is_freed_before_the_next_build ________
+
+    @pytest.mark.slow
+    def test_a_failed_candidates_memory_is_freed_before_the_next_build():
+        """2-T15c: the broken-rewrite case, with ``torch.cuda.memory_allocated`` at every build. With
+        ``detach`` each build starts at the first build's level (the failed engines are gone); the control
+        without it (failures keep their frames, as before) starts every later build with the first,
+        failed engine still allocated.
+    
+        The converted-model template that the first build stores (opt-1 OPT-T06, one per conversion, by
+        design) stays resident; its own bytes are measured at each build and not counted as a leak
+        (2-T15d). Everything else must not grow: a leaked engine is far above the bound, and a residency
+        that grows from build to build fails too."""
+        fixed = _run("rewrite", probe_memory=True)
+        control = _run("rewrite", probe_memory=True, detach=False)
+        for out in (fixed, control):
+            _common(out)
+            assert len(out["memory"]) >= 3, out["memory"]
+        first = fixed["memory"][0]
+        engine_MiB = first["after_MiB"] - first["before_MiB"]
+        base = first["before_MiB"] - first["templates_before_MiB"]
+        later = [entry["before_MiB"] - entry["templates_before_MiB"] - base for entry in fixed["memory"][1:]]
+        resident_templates = [entry["templates_before_MiB"] for entry in fixed["memory"][1:]]
+        held = [entry["before_MiB"] - control["memory"][0]["before_MiB"] for entry in control["memory"][1:]]
+        summary = {"engine_MiB": engine_MiB, "fixed_extra_at_build_MiB": later, "control_extra_at_build_MiB": held,
+                   "templates_at_build_MiB": resident_templates,
+                   "fixed": fixed["memory"], "control": control["memory"], "gpu": fixed["gpu"]}
+        ENGINE.report("2-T15c-fallback-memory-mh1-nacl", summary)
+        assert engine_MiB > 50, summary
+>       assert max(later) <= 0.1 * engine_MiB + 64, summary  # library workspaces may stay; no engine does
+E       AssertionError: {'engine_MiB': 180.6875, 'fixed_extra_at_build_MiB': [88.66101455688477, 88.66101455688477, 88.66101455688477, 88.6610...3115234, 24.581172943115234, 24.581172943115234, 24.581172943115234, 24.581172943115234, 24.581172943115234, ...], ...}
+E       assert 88.66101455688477 <= ((0.1 * 180.6875) + 64)
+E        +  where 88.66101455688477 = max([88.66101455688477, 88.66101455688477, 88.66101455688477, 88.66101455688477, 88.66101455688477, 88.66101455688477, ...])
+
+/home/fzwin/fastmace-2-T23/src-rerun-8ec5063-9f2aca7/tests/gpu/test_fallback_gpu.py:310: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+2-T15-fallback-rewrite-probe_memory-True-mh1-nacl: {
+ "case": "rewrite",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "tier": "graph",
+ "revision": 1,
+ "reason": "fallback: rewrites block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm off: ddmin: minimal failing set block_linear (and grouped_linear, merged_residual, gated_rows, segment_gemm, which require it) (GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000646, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05))",
+ "chain": [
+  "minimal plan (phase 1b)"
+ ],
+ "initial_on": [
+  "factor_species",
+  "fold_cutoff",
+  "density_first",
+  "reassociate_first",
+  "joint_radial_input",
+  "fused_folded_backward",
+  "segmented_first_sum",
+  "streaming_conv",
+  "block_linear",
+  "grouped_linear",
+  "merged_residual",
+  "gated_rows",
+  "segment_gemm",
+  "single_graph_strain",
+  "polar_uvu"
+ ],
+ "off": [
+  "block_linear",
+  "fused_radial_hidden",
+  "gated_rows",
+  "grouped_linear",
+  "inplace_block_linear",
+  "merged_residual",
+  "segment_gemm",
+  "species_skip"
+ ],
+ "gate": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 2.884673188384989e-05,
+  "force_eV_per_A": 2.9012844683096173e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 2.884673188384989e-05,
+    "yardstick": 0.0006460344260867041,
+    "ratio": 0.0446520041642152,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 2.9012844683096173e-06,
+    "yardstick": 2.6382319726625525e-06,
+    "ratio": 1.099707871928179,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "captured replay of stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+   "oeq_runtime": "prepared",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 20.880593112000497,
+   "production_s": 0.20367216899467167,
+   "step_1_s": 20.87592527300876
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null
+ },
+ "setup_s": 86.48937615800241,
+ "tried": [
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000646, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, every rewrite off",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm, polar_uvu, single_graph_strain off",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites joint_radial_input, fused_folded_backward, streaming_conv, reassociate_first, segmented_first_sum off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000646, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites joint_radial_input, fused_folded_backward, streaming_conv, reassociate_first, segmented_first_sum, segment_gemm, polar_uvu, single_graph_strain off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000646, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites factor_species, fold_cutoff, density_first, joint_radial_input, fused_folded_backward, streaming_conv, reassociate_first, segmented_first_sum, merged_residual, gated_rows, segment_gemm, polar_uvu, single_graph_strain off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.234 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000646, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites factor_species, fold_cutoff, density_first, joint_radial_input, fused_folded_backward, streaming_conv, reassociate_first, segmented_first_sum, grouped_linear, merged_residual, gated_rows, segment_gemm, polar_uvu, single_graph_strain off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.234 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000646, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "rewrites block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm off",
+   "outcome": "activated",
+   "reason": "ddmin: minimal failing set block_linear (and grouped_linear, merged_residual, gated_rows, segment_gemm, which require it) (GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000646, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05))",
+   "stage": null,
+   "revision": 1,
+   "reduced_gate_runs": 0,
+   "full_gate_runs": 1
+  }
+ ],
+ "reduced_gate_runs": 7,
+ "full_gate_runs": 1,
+ "finite": true,
+ "check": "gate",
+ "memory": [
+  {
+   "tier": "graph",
+   "before_MiB": 0.0,
+   "templates_before_MiB": 0.0,
+   "after_MiB": 180.6875
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 205.32861328125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 141.87548828125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 166.5078125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 205.31640625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 205.31640625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 189.3173828125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 189.3173828125
+  },
+  {
+   "tier": "graph",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 166.5078125
+  }
+ ]
+}
+FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1×1×1), 3D PBC, NVT Langevin 2 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    graph, hybrid cuEq/OEq, float32, 9 rewrites on, 7 off (reasons in run.plan)
+         plan revision 1 (fallback): rewrites block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm off, reason ddmin: minimal failing set block_linear (and grouped_linear, merged_residual, gated_rows, segment_gemm, which require it) (GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000646, floor 0.01); force error 0.00011 eV/Å above the limit 1e-05 (2 x float32 yardstick 2.64e-06, floor 1e-05))
+gate:    passed (2 rattled (0.05 Å); 2.9e-05 meV/atom, 2.9e-06 eV/Å; floors §12.3)
+setup:   86 s (plan 0.016 s, build 22 s, capture 0.16 s, gate 30 s, fallback 35 s, provenance 0.0064 s)
+speed:   5.76 ms/step, whole-run mean over steps 1–20
+output:  none
+licence: ASL (non-commercial), from the label table (§4.3)
+warn:    none
+
+2-T15-fallback-rewrite-probe_memory-True-detach-False-mh1-nacl: {
+ "case": "rewrite",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "tier": "graph",
+ "revision": 1,
+ "reason": "fallback: rewrites block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm off: ddmin: minimal failing set block_linear (and grouped_linear, merged_residual, gated_rows, segment_gemm, which require it) (GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000668, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.61e-06, floor 1e-05))",
+ "chain": [
+  "minimal plan (phase 1b)"
+ ],
+ "initial_on": [
+  "factor_species",
+  "fold_cutoff",
+  "density_first",
+  "reassociate_first",
+  "joint_radial_input",
+  "fused_folded_backward",
+  "segmented_first_sum",
+  "streaming_conv",
+  "block_linear",
+  "grouped_linear",
+  "merged_residual",
+  "gated_rows",
+  "segment_gemm",
+  "single_graph_strain",
+  "polar_uvu"
+ ],
+ "off": [
+  "block_linear",
+  "fused_radial_hidden",
+  "gated_rows",
+  "grouped_linear",
+  "inplace_block_linear",
+  "merged_residual",
+  "segment_gemm",
+  "species_skip"
+ ],
+ "gate": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 2.8381093754972053e-05,
+  "force_eV_per_A": 2.9757902741678333e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 2.8381093754972053e-05,
+    "yardstick": 0.0006681102183426481,
+    "ratio": 0.04247965825964434,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 2.9757902741678333e-06,
+    "yardstick": 2.6084296506634352e-06,
+    "ratio": 1.1408359329955333,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "captured replay of stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+   "oeq_runtime": "prepared",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 23.039832403999753,
+   "production_s": 0.13851349300239235,
+   "step_1_s": 23.037553079993813
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null
+ },
+ "setup_s": 85.87059996499738,
+ "tried": [
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000668, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.61e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, every rewrite off",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm, polar_uvu, single_graph_strain off",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites joint_radial_input, fused_folded_backward, streaming_conv, reassociate_first, segmented_first_sum off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000668, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.61e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites joint_radial_input, fused_folded_backward, streaming_conv, reassociate_first, segmented_first_sum, segment_gemm, polar_uvu, single_graph_strain off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000668, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.61e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites factor_species, fold_cutoff, density_first, joint_radial_input, fused_folded_backward, streaming_conv, reassociate_first, segmented_first_sum, merged_residual, gated_rows, segment_gemm, polar_uvu, single_graph_strain off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.234 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000668, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.61e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "mode eager, rewrites factor_species, fold_cutoff, density_first, joint_radial_input, fused_folded_backward, streaming_conv, reassociate_first, segmented_first_sum, grouped_linear, merged_residual, gated_rows, segment_gemm, polar_uvu, single_graph_strain off",
+   "outcome": "failed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A) failed at gate: GateFailed: the gate on this structure failed: energy per atom error 0.234 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000668, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.61e-06, floor 1e-05)",
+   "stage": "gate",
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "rewrites",
+   "change": "rewrites block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm off",
+   "outcome": "activated",
+   "reason": "ddmin: minimal failing set block_linear (and grouped_linear, merged_residual, gated_rows, segment_gemm, which require it) (GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000668, floor 0.01); force error 0.00011 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.61e-06, floor 1e-05))",
+   "stage": null,
+   "revision": 1,
+   "reduced_gate_runs": 0,
+   "full_gate_runs": 1
+  }
+ ],
+ "reduced_gate_runs": 7,
+ "full_gate_runs": 1,
+ "finite": true,
+ "check": "gate",
+ "memory": [
+  {
+   "tier": "graph",
+   "before_MiB": 0.0,
+   "templates_before_MiB": 0.0,
+   "after_MiB": 180.6875
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 337.02783203125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 273.57470703125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 298.20703125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 337.015625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 337.015625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 321.0166015625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 321.0166015625
+  },
+  {
+   "tier": "graph",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 298.20703125
+  }
+ ]
+}
+FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1×1×1), 3D PBC, NVT Langevin 2 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    graph, hybrid cuEq/OEq, float32, 9 rewrites on, 7 off (reasons in run.plan)
+         plan revision 1 (fallback): rewrites block_linear, grouped_linear, merged_residual, gated_rows, segment_gemm off, reason ddmin: minimal failing set block_linear (and grouped_linear, merged_residual, gated_rows, segment_gemm, which require it) (GateFailed: the gate on this structure failed: energy per atom error 0.233 meV/atom above the limit 0.01 (2 x float32 yardstick 0.000668, floor 0.01); force error 0.00011 eV/Å above the limit 1e-05 (2 x float32 yardstick 2.61e-06, floor 1e-05))
+gate:    passed (2 rattled (0.05 Å); 2.8e-05 meV/atom, 3e-06 eV/Å; floors §12.3)
+setup:   86 s (plan 0.011 s, build 20 s, capture 0.28 s, gate 32 s, fallback 33 s, provenance 0.0049 s)
+speed:   5.51 ms/step, whole-run mean over steps 1–20
+output:  none
+licence: ASL (non-commercial), from the label table (§4.3)
+warn:    none
+
+2-T15c-fallback-memory-mh1-nacl: {
+ "engine_MiB": 180.6875,
+ "fixed_extra_at_build_MiB": [
+  88.66101455688477,
+  88.66101455688477,
+  88.66101455688477,
+  88.66101455688477,
+  88.66101455688477,
+  88.66101455688477,
+  88.66101455688477,
+  88.66101455688477
+ ],
+ "control_extra_at_build_MiB": [
+  244.94140625,
+  244.94140625,
+  244.94140625,
+  244.94140625,
+  244.94140625,
+  244.94140625,
+  244.94140625,
+  244.94140625
+ ],
+ "templates_at_build_MiB": [
+  24.581172943115234,
+  24.581172943115234,
+  24.581172943115234,
+  24.581172943115234,
+  24.581172943115234,
+  24.581172943115234,
+  24.581172943115234,
+  24.581172943115234
+ ],
+ "fixed": [
+  {
+   "tier": "graph",
+   "before_MiB": 0.0,
+   "templates_before_MiB": 0.0,
+   "after_MiB": 180.6875
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 205.32861328125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 141.87548828125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 166.5078125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 205.31640625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 205.31640625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 189.3173828125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 189.3173828125
+  },
+  {
+   "tier": "graph",
+   "before_MiB": 113.2421875,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 166.5078125
+  }
+ ],
+ "control": [
+  {
+   "tier": "graph",
+   "before_MiB": 0.0,
+   "templates_before_MiB": 0.0,
+   "after_MiB": 180.6875
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 337.02783203125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 273.57470703125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 298.20703125
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 337.015625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 337.015625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 321.0166015625
+  },
+  {
+   "tier": "eager",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 321.0166015625
+  },
+  {
+   "tier": "graph",
+   "before_MiB": 244.94140625,
+   "templates_before_MiB": 24.581172943115234,
+   "after_MiB": 298.20703125
+  }
+ ],
+ "gpu": "NVIDIA GeForce RTX 5060 Ti"
+}
+- generated xml file: /home/fzwin/fastmace-acceptance/2-T23-local-20261021-combined/rerun-two-tests/junit.xml -
+============================= slowest 10 durations =============================
+189.26s call     tests/gpu/test_fallback_gpu.py::test_a_failed_candidates_memory_is_freed_before_the_next_build
+65.90s call     tests/gpu/test_subprocess_worker_gpu.py::test_a_killed_parent_releases_the_workers_gpu_memory
+0.03s setup    tests/gpu/test_fallback_gpu.py::test_a_failed_candidates_memory_is_freed_before_the_next_build
+
+(3 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+FAILED ../../../../../../../home/fzwin/fastmace-2-T23/src-rerun-8ec5063-9f2aca7/tests/gpu/test_fallback_gpu.py::test_a_failed_candidates_memory_is_freed_before_the_next_build
+=================== 1 failed, 1 passed in 257.75s (0:04:17) ====================

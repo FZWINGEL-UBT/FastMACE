@@ -1,0 +1,41 @@
+{
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "prepare_vs_lazy_A": 4.048726758298926e-07,
+ "lazy_again_vs_lazy_A": 5.955225379494777e-07,
+ "prepare_vs_lazy_momenta": 4.447549296404674e-06,
+ "graphs_after_setup": {
+  "lazy": [],
+  "prepare": [
+   "ACP",
+   "('B', 7168)"
+  ]
+ },
+ "setup_s": {
+  "lazy": {
+   "plan": 0.015487531200051308,
+   "build": 19.870124246925116,
+   "capture": 1.4510005712509155e-06,
+   "provenance": 0.009808087721467018
+  },
+  "prepare": {
+   "plan": 0.004758583381772041,
+   "build": 14.723424529656768,
+   "capture": 0.04668303020298481,
+   "provenance": 8.169375360012054e-05
+  },
+  "lazy_again": {
+   "plan": 0.004775552079081535,
+   "build": 14.9426014367491,
+   "capture": 1.5832483768463135e-06,
+   "provenance": 8.236430585384369e-05
+  }
+ },
+ "loop_s": {
+  "lazy": 11.109779292717576,
+  "prepare": 0.7409086171537638,
+  "lazy_again": 0.7925207484513521
+ }
+}

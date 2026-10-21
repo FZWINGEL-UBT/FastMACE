@@ -1,0 +1,38 @@
+{
+ "tool": "runner_statistics",
+ "status": "failed",
+ "case": "fresh",
+ "created_utc": "2026-10-21T05:45:33.305629+00:00",
+ "host": "murphy",
+ "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+ "fastmace_commit": "a3eaf89a9136da4afb323538f0d587d1c620881d",
+ "model": "mh1-r2scan",
+ "structure": "NaCl",
+ "steps": 20000,
+ "every": 20,
+ "seeds": [
+  20261001,
+  20261101,
+  20261201,
+  20261301
+ ],
+ "targets": [
+  300.0,
+  600.0
+ ],
+ "timestep_fs": 2.0,
+ "start": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-combined/runner-repeat-equilibrate/start.extxyz",
+ "runs": {
+  "20261001": {
+   "backend": "hybrid",
+   "dtype": "float32",
+   "runner": "in-process",
+   "setup_s": 47.374531054869294,
+   "run_s": 94.46445585973561,
+   "subprocess": null,
+   "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 14 rewrites on, 2 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nsetup:   47 s (plan 0.016 s, build 47 s, capture 0.12 s, provenance 0.011 s)\nspeed:   4.72 ms/step, whole-run mean over steps 1\u201320,000\noutput:  /mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-combined/runner-repeat-fresh/seed-20261001\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+  }
+ },
+ "error": "NonFiniteError: non-finite energy (nan) at step 11560\nWhy: the run stops at a non-finite energy; it is never fixed (SPEC \u00a79.6)\nNext: Check the structure and the timestep, and resume from the last restart point.\nRecord: metadata.json",
+ "finished_utc": "2026-10-21T05:49:44.861513+00:00"
+}

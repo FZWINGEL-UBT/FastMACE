@@ -1,0 +1,22 @@
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "cueq",
+ "dtype": "float32",
+ "mode": "pipelined",
+ "gate": "skipped",
+ "simulation_vs_fixed_A": 2.0163910363635296e-07,
+ "repeat_vs_fixed_A": 1.5999779101605327e-07,
+ "simulation_vs_fixed_energy_meV_per_atom": 1.9868214629070735e-05,
+ "repeat_vs_fixed_energy_meV_per_atom": 3.31136913445107e-05,
+ "same_options": true,
+ "setup_s": 23.520293451001635,
+ "speed": {
+  "status": "whole-run mean",
+  "seconds_per_step": 0.09163154843336088,
+  "first_step": 1,
+  "last_step": 60
+ },
+ "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, plain cuEq (fused convolution), float32, 1 rewrites on, 13 off (reasons in run.plan)\nwhy:     plain cuEq, not hybrid: OpenEquivariance cannot build; `fastmace doctor` names the missing piece\ngate:    not run (opt-in: check=\"gate\")\nsetup:   23 s (plan 0.021 s, build 23 s, capture 0.25 s, provenance 0.0057 s)\nspeed:   91.6 ms/step, whole-run mean over steps 1\u201360\noutput:  /home/fzwin/fastmace-acceptance/2-T23-local-20261020/full-tier-pytest/test_simulation_reaches_the_ma0/run\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+}
