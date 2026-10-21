@@ -723,6 +723,20 @@ def gate_omol0_jobs(machine: Machine, run_root: Path) -> list:
                         note="OMOL-0 XL with OPT-T06's template cache off")]
 
 
+# The GPU files whose tests drive fm.Simulation (or fm.md) with capture on: rerun on the fix of 2-T15b's prepare()
+# edge-view capture (2-T21d), every tier (acceptance and full). The canonical-restart and isolation files build the
+# planner's engine directly and are not affected.
+SIMULATION_TEST_FILES = ("test_reproducible_gpu.py", "test_subprocess_runner_gpu.py", "test_subprocess_worker_gpu.py",
+                         "test_fallback_gpu.py", "test_simulation_gpu.py", "test_eager_gpu.py",
+                         "test_reference_tier_gpu.py")
+
+
+def simulation_tests_jobs(machine: Machine, run_root: Path) -> list:
+    """The Simulation-driven GPU files in every tier, one process (untimed)."""
+    return [_tier_job(machine, Path(run_root), "simulation-tests", "acceptance or not acceptance", timing=False,
+                      files=SIMULATION_TEST_FILES, note="Simulation-driven GPU tests, all tiers (2-T21d rerun)")]
+
+
 def full_tier_jobs(machine: Machine, run_root: Path) -> list:
     """The full GPU tier (merge tier) on final main, one process; no step-time assertions."""
     return [_tier_job(machine, Path(run_root), "full-tier", "not acceptance", timing=False,
@@ -739,4 +753,5 @@ SUITES = {"speed": speed_jobs, "primary": primary_jobs, "nacl-rerun": nacl_rerun
           "runner-statistics": runner_statistics_jobs,
           "runner-repeat": runner_statistics_repeat_jobs,
           "acceptance-tier": acceptance_tier_jobs, "full-tier": full_tier_jobs, "round-tests": round_tests_jobs,
-          "gate-local": gate_local_jobs, "gate-murphy": gate_murphy_jobs, "gate-omol0": gate_omol0_jobs}
+          "gate-local": gate_local_jobs, "gate-murphy": gate_murphy_jobs, "gate-omol0": gate_omol0_jobs,
+          "simulation-tests": simulation_tests_jobs}
