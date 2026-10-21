@@ -25,7 +25,7 @@ def stack(d=64, k=2, *, affine=True, bias=True, activation=torch.nn.SiLU, seed=0
     return modules
 
 
-@pytest.mark.parametrize(("d", "k"), [(64, 2), (64, 1), (32, 4), (128, 3), (16, 1)])
+@pytest.mark.parametrize(("d", "k"), [(64, 2), (64, 1), (32, 4), (32, 3), (16, 1)])
 def test_mace_hidden_stacks_qualify(d, k):
     layers = radial_mlp.stack_layers(stack(d, k))
     assert not isinstance(layers, str)
@@ -38,6 +38,7 @@ def test_mace_hidden_stacks_qualify(d, k):
     (stack(64, 0), "modules"),  # no hidden Linear (MH-1's density net is longer)
     (stack(64, 5), "at most"),
     (stack(48, 2), "width"),
+    (stack(128, 2), "width"),  # the D x D weight tile spills registers at 128
     (stack(64, 2, affine=False), "affine"),
     (stack(64, 2, bias=False), "bias"),
     (stack(64, 2, activation=torch.nn.Tanh), "SiLU"),
@@ -83,8 +84,7 @@ def test_the_stack_keeps_the_original_parameters():
     assert eps.tolist() == [pytest.approx(1e-5)] * 3
 
 
-@pytest.mark.parametrize(("d", "expected"), [(16, (32, 2, True)), (32, (32, 4, True)), (64, (32, 8, True)),
-                                             (128, (16, 8, True))])
+@pytest.mark.parametrize(("d", "expected"), [(16, (32, 2, True)), (32, (32, 4, True)), (64, (32, 8, True))])
 def test_kernel_config_is_a_rule_from_the_width(d, expected):
     # 8 elements of a [rows, D] tile per thread: the budget at which the OPT2-T02 screen found no spills.
     config = radial_mlp.kernel_config(d)

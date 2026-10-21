@@ -58,7 +58,7 @@ step. Compute, not memory, becomes the bound: IEEE FP32 with TF32 off is the pro
 **Applies when** a network's hidden run `rest[:-1]` is exactly LN, SiLU, then k ≥ 1 times (Linear(D, D) with
 bias, LN, SiLU):
 - every LN is affine over (D,);
-- D is a power of two ≤ 128;
+- D is 16, 32 or 64 (at 128 the D × D weight tile spills registers in both kernels: refused);
 - k ≤ 4.
 
 MH-1: both the weight network and the density network, D = 64, k = 2. Anything else is refused with the
@@ -94,7 +94,7 @@ its gradient (both workers told, 21 October).
 1. **Applicability and refusal:**
    - MH-1's two networks apply;
    - any other layout is refused with its reason: a missing affine LN, a Linear without bias, D not a power
-     of two or above 128, k = 0 or k > 4, or another activation;
+     of two or above 64, k = 0 or k > 4, or another activation;
    - the record conflicts with `fused_radial_hidden` and requires `fold_cutoff`.
 2. **CPU float64:** the record's model against the original on random graphs (the family self-check) and on
    the MH-1 tiny model: energy, forces and stress agree to rounding.

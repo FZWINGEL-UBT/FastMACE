@@ -60,7 +60,7 @@ CONFIGS = [None, (64, 8, False), (32, 4, True), (64, 8, True), (16, 4, True)]
 
 @pytest.mark.parametrize("config", CONFIGS)
 @pytest.mark.parametrize(("d", "k", "rows"), [(64, 2, 8192), (64, 2, 1001), (64, 1, 77), (32, 4, 513),
-                                              (64, 3, 33), (128, 2, 129), (16, 1, 5)])
+                                              (64, 3, 33), (32, 2, 129), (16, 1, 5)])
 def test_kernels_match_autograd(d, k, rows, config):
     errors = _errors(d, k, rows, config=config)
     assert errors["fused_out"] <= max(4 * errors["plain_out"], 1e-6), errors

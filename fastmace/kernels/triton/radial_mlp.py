@@ -26,7 +26,9 @@ from functools import cache
 import torch
 
 MAX_LAYERS = 4  # K, the hidden Linear layers one kernel takes
-WIDTHS = (16, 32, 64, 128)
+# Widths up to 64: each program holds a D x D weight tile in registers, and at D = 128 both kernels spill at
+# any tile tried (OPT2-T02's GPU test; 400-1,200 spilled registers), so 128 is refused, not slowed down.
+WIDTHS = (16, 32, 64)
 ELEMENTS_PER_THREAD = 8  # of a [rows, D] tile: the budget at which neither kernel spills
 MAX_WARPS = 8
 
@@ -34,11 +36,10 @@ MAX_WARPS = 8
 def kernel_config(d):
     """(rows per program, warps, store) for width ``d``: a rule from the shape, the same on every GPU.
 
-    32 rows per program (16 above D = 64, which keeps the warps at 8 or fewer), and as many warps as give each
-    thread ELEMENTS_PER_THREAD elements of a row tile; the forward stores the LayerNorm inputs. MH-1 (D = 64):
-    32 rows, 8 warps.
+    32 rows per program and as many warps as give each thread ELEMENTS_PER_THREAD elements of a row tile (at
+    most MAX_WARPS); the forward stores the LayerNorm inputs. MH-1 (D = 64): 32 rows, 8 warps.
     """
-    rows = 32 if d <= 64 else 16
+    rows = 32
     warps = max(1, min(MAX_WARPS, rows * d // (32 * ELEMENTS_PER_THREAD)))
     return rows, warps, True
 
