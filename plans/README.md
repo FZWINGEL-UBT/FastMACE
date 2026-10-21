@@ -11,7 +11,8 @@ phase before it is under way, not all in advance. Worker rules are in
 | 1b. Contracts | [phase-1b.md](phase-1b.md) | **done** (19–20 October 2026), tag `fastmace-1b`; acceptance report `docs/validation/phase-1b.md` |
 | 2. Safety | [phase-2.md](phase-2.md) | **acceptance complete** (21 October 2026, report `docs/validation/phase-2.md`, merged `89ea581`): every item passes except item 7 (deferred by the owner). Results come from the freeze `be92979`, and from `f993713` for what its two defects touched (item 4, the Simulation-driven GPU tests, OMOL-0 XL). The 19-label gate passes 19 of 19. tagged `fastmace-2` (e52c482, owner, 21 October 2026) |
 | Optimisation round 1 | [opt-1.md](opt-1.md) | done except OPT-T08's GPU A/B. Defaults since 20 October: `gated_rows`, `segment_gemm`, template cache, persistent worker. Measured end to end against `fastmace-1b`: NaCl −3.6 to −4.1 %, NbCl5 −13.5 to −14.9 % on both GPUs |
-| 3. Dynamic topology and MC | — | after optimisation round 1 |
+| Optimisation round 2 | [opt-2.md](opt-2.md) | started 21 October 2026 (owner: "try all 5 ideas"); OPT2-T01 to T05 with 2-T20, 2-T19, 2-T15, 2-T21 and 2-T07 |
+| 3. Dynamic topology and MC | — | after optimisation round 2 |
 | 3b. NPT for the chlorides | — | |
 | 4. Physics | — | |
 | 5. Planner completion | — | |
