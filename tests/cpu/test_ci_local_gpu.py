@@ -76,6 +76,8 @@ def test_process_table(proc):
     (["pytest"], True),
     (["bash", "-lc", "cd x && python -m pytest tests/cpu"], False),  # a shell that mentions pytest is not one
     (["python3", "tools/test_budget.py", "junit.xml"], False),
+    # a queued reservation wrapper whose command is pytest is not a running pytest (round-2 deadlock)
+    (["python3", "/x/tools/ci/local_gpu.py", "run", "--purpose", "p", "--", "python", "-m", "pytest", "t"], False),
 ])
 def test_pytest_processes(proc, argv, is_pytest):
     proc.add(20, argv)

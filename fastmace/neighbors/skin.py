@@ -108,6 +108,10 @@ class SkinNeighbourList:
         self._pair_search_state = {}
         self.reference_positions = None
         self.count = torch.zeros((), dtype=torch.int64, device=self.device)
+        # The stream that reads the edge buffers, set while a build runs on another stream beside it
+        # (GraphEngine's overlap_rebuild, OPT2-T04): a growth then waits for it and allocates there, so
+        # the old buffers are not freed while a force call in flight still reads them.
+        self.reader_stream = None
 
     # ------------------------------------------------------------------ host side
 
@@ -125,6 +129,13 @@ class SkinNeighbourList:
         self.build_cell.copy_(self.cell_t)
 
     def _allocate(self, needed, exact=False):
+        if self.reader_stream is not None:
+            self.reader_stream.synchronize()  # the force call in flight reads the old buffers
+            with torch.cuda.stream(self.reader_stream):
+                return self._allocate_now(needed, exact)
+        return self._allocate_now(needed, exact)
+
+    def _allocate_now(self, needed, exact=False):
         capacity = needed if exact else edge_capacity(needed, self.headroom, self.edge_multiple)
         self.capacity = capacity
 
