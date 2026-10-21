@@ -151,3 +151,64 @@ off, like `fused_radial_hidden`.
 
 The 15 October lesson holds: Inductor's fusion of this stack is near the cost of a straightforward fused
 kernel, so a gain needs a kernel built for the FP32 FMA throughput, not only for bytes.
+
+## Screen (a)+(b), force gate and local A/B (21 October 2026)
+
+The conductor asked for options (a) and (b) as one more screen, under the same stop rule.
+
+**Screen** (`results/opt2-T02-probes/screen.py`, `results/opt2-T02-local-20261021/screen.json`). One stack,
+CUDA-graph replays, median of 6 alternating blocks of 200. Spills come from Triton's compiled kernels.
+
+| Configuration | spills fwd / bwd | NaCl 8,192 | NbCl5 56,320 | NaNbO3 82,688 (µs) |
+| --- | --- | ---: | ---: | ---: |
+| compiled modules | – | 86.9 | 517.3 | 909.9 |
+| recompute, 32 rows, 4 warps (first default) | 0 / 188 | 91.7 | 537.3 | 787.2 |
+| store, 16 rows, 4 warps | 0 / 0 | 53.6 | 369.9 | 539.9 |
+| **store, 32 rows, 8 warps** | **0 / 0** | **53.5** | **348.7** | **514.8** |
+| store, 64 rows, 8 warps | 0 / 4 | 53.4 | 359.9 | 531.7 |
+| store, 32 rows, 4 warps; 64 × 4; 128 × 8 | spill | slower | | |
+
+- **The first version was slow because its backward spilled 188 registers.** Storing the LayerNorm inputs (a)
+  and giving each thread 8 elements of a row tile (b) removes all spills.
+- **The rule** (`kernel_config`): 32 rows, warps = rows × D / 256 (at most 8), store. It is the default and is
+  checked spill-free by `test_the_tile_rule_never_spills` for D = 16, 32, 64 and K = 1–4.
+- **D = 128 spills at every tile tried** (the D × D weight tile alone is 64 registers per thread), so it is
+  refused rather than slowed down.
+- The first run of the screen had an eager baseline above 8,192 rows, because Dynamo's recompile limit was
+  exceeded. That run is kept as `screen-1-invalid-baseline.json`.
+
+**Force gate with `fused_radial_mlp=on`** (`tools/force_stress_gate.py --engine fastmace`, local RTX 5060 Ti,
+source 215d8b8, `results/opt2-T02-local-20261021/gate-*`). Passed; the production error is at most 2× that of
+the float32 calculator, ratios below:
+
+| | energy | forces | stress |
+| --- | ---: | ---: | ---: |
+| NaCl | 0.09 | 1.24 | 0.38 |
+| NbCl5 | 0.06 | 1.01 | 0.79 |
+
+**Local A/B** (`tools/ab_rewrites.py`, default against `--b fused_radial_mlp=on`, same process, 12 blocks of 300
+steps, one structure and one build order per reservation, pinned source 215d8b8, mace_cueq_oeq; all four runs
+valid; `results/opt2-T02-local-20261021/ab-215d8b8/`):
+
+| | order ab: a / b (ms), b/a | order ba: b/a | local floor |
+| --- | --- | ---: | ---: |
+| NaCl | 3.419 / 3.367, **0.985** | **0.985** | 1.1 % |
+| NbCl5 | 23.204 / 23.450, **1.011** | **1.009** | 0.4 % |
+
+**Verdict: not adopted.** NbCl5 is 1 % slower, beyond its floor in both orders. NaCl gains 1.5 %, just beyond
+its floor. The record stays opt-in and off.
+
+**Why the step lost what the stack gained.** The microbenchmark compared the stack in isolation: −0.34 ms per
+NbCl5 force call expected. The step measured +0.23 ms, a gap of about 0.57 ms. Around an opaque op, Inductor
+loses two fusions it makes today:
+- the species gathers and the add fused into the first LayerNorm (forward) and its gradient (backward);
+- the last SiLU fused into the `[h·c, c]` concatenation, and its backward.
+
+So x and h are written and read again in both directions: about 4 × 256 B per row and stack, plus the stored
+LayerNorm inputs (2 × 256 B written and read). At NbCl5 that is about 0.3 ms per force call of extra traffic,
+most of the gap. The rest is probably L2 pressure in the full step; a step breakdown would show it.
+
+**What could still win:** a kernel that takes the joint-slice column view and the two gathered species tables
+as inputs, and writes `[h·c, c]` directly. That is option (c), plus the cutoff concatenation. It would keep
+both of Inductor's fusions inside the fused kernel. Its output is OPT2-T01's input `a` (T01 agreed to take
+either h or a, 21 October). This is a new task, not a tile change.
