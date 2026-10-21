@@ -147,3 +147,53 @@ traffic on NaNbO3.
    - CPU tests of the planner and the refusal path (the kernel itself needs CUDA);
    - the force gate on NaCl and NbCl5;
    - the local A/B in both orders, then murphy before Thursday 16:00 UTC if it is free.
+
+## 6. Gate 1 result (21 October 2026): failed, stopped
+
+`tools/fused_conv_bench.py` with `tools/fused_conv/fused_forward.cuh`, pinned copy `~/fastmace-runs/src-aed96b4`.
+Setup:
+- local RTX 5060 Ti (sm_120), local GPU reservation;
+- MH-1's second-interaction problem: `ir_mul`, x 512, Y 16, weights 1280, message 5120, 128 channels;
+- receiver-sorted ASE edges at r_max = 6 Å of the 3×3×3 cells, random float32 inputs;
+- each variant captured in a CUDA graph, median of 50 replays.
+
+Raw data: `results/opt2-T01-gate1-aed96b4/`.
+
+| Structure (edges, mean degree) | folded GEMM + streaming forward | fused forward, best (CS 16, R 8, T 4) | saving | other configurations |
+| --- | ---: | ---: | ---: | --- |
+| NaCl (6,912; 32.0) | 229 µs (GEMM 168 + conv 101) | 251 µs | **−9.6 %** | T 2: −44 %; CS 8 / R 16: −58 %; CS 32 / R 4: −70 % |
+| NbCl5 (51,084; 26.3) | 1,944 µs (1,133 + 801) | 1,857 µs | **+4.5 %** | −18 to −56 % |
+| NaNbO3 (83,808; 77.6) | 3,045 µs (1,848 + 1,186) | 3,105 µs | **−2.0 %** | −32 to −54 % |
+
+- **Correctness:** every configuration's message equals the reference bitwise. The kernel accumulates the 65
+  products in the same order as cuBLAS's SIMT GEMM (one FMA chain over K), and the path code is the
+  template's.
+- **Speed:** the fused forward is at parity, from −10 % to +4.5 %. Gate 1 needed a 40 % saving on NbCl5 and
+  NaNbO3. **Gate 1 fails, so the backward (gate 2) and the record were not built.**
+
+**Why:**
+- **Low FMA efficiency.** On NbCl5 the fused kernel performs the 4.7 GMAC of weight generation plus the
+  convolution in 1.86 ms. The weight generation alone runs at about 18 % of FP32 FMA peak; cuBLAS's GEMM
+  would need about 0.6 ms at its measured rate. The time saved by not writing and re-reading `w`
+  (about 0.8 ms on NbCl5) is spent again on in-kernel arithmetic.
+- **Shared-memory issue rate.** Each thread forms T × 10 weights per k from 10 `Wf` loads and T broadcast
+  `a` loads, 14 loads per 40 FMAs at T = 4. That is above the 1:4 ratio this SM can issue.
+- **Larger T** would reuse more but needs more registers. The thread already holds 40 message
+  accumulators: 5120 outputs ÷ 128 channels.
+- **Occupancy:** 128 registers and 37–87 KB of shared memory per block leave 1–2 blocks (4–8 warps) per SM.
+- **The receiver-owned layout:** one thread per (receiver, channel) is what makes PR 223's forward
+  atomic-free. It forbids the register-tiled GEMM micro-kernel (each thread a tile of edges × channels × slots)
+  that reaching the GEMM's rate would need: the edges' contributions would then need a cross-thread
+  reduction per receiver.
+- **The backward** would do two such products in the same layout, so it could not do better than the
+  forward.
+
+This agrees with the October study's Triton result: parity for the forward, 4.30 against about 4.3 ms on
+NaNbO3. Owning the PR 223 path code and the explicit `Wf` reuse did not change the outcome, because the
+limit is the arithmetic layout, not the convolution code.
+
+**Verdict:** rejected (conductor's rule: stop at a failed gate). The prototype and its bench stay on
+`fastmace/opt2-T01` for the record; no library code was changed. A future attempt would need a different
+decomposition, not more tuning. One example: a tensor-core-free register-tiled GEMM micro-kernel with a
+deterministic per-receiver reduction. Its own design would have to show more than 40 % of the forward
+before any build.
