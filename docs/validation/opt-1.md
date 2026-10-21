@@ -1,5 +1,9 @@
 # Optimisation round 1: summary
 
+> **The combined A + B step-time change in §1 (NaCl ≈ −4.2 to −4.7 %, NbCl5 ≈ −13.6 to −14.4 %) is an
+> estimate,** the product of the two separate A/Bs. It is pending the combined acceptance's end-to-end
+> measurement against `fastmace-1b` (runbook item 8).
+
 Plan: `plans/opt-1.md`, 20–21 October 2026, between phases 2 and 3. Code freeze for the combined acceptance
 (2-T23): main `4f90a92`, recorded in `be92979`. This summary collects the round's records on main, plus the
 branch `fastmace/opt-T03b`, which is not in the freeze. Every A/B number below is the same-process `b/a`
@@ -92,9 +96,10 @@ joins and copies between them.
 | NaCl | 0.957 / 0.954 | 0.961 / 0.965 |
 | NbCl5 | 0.909 / 0.911 | 0.895 / 0.893 |
 
-The local numbers come from the clean rerun (pinned `85d741d`, `~/fastmace-acceptance/opt1-local-rerun-20261020`).
-The first local run was disturbed by a desktop video and is invalid. Stage A's report on main still lists
-sm_120 as pending; these are those numbers.
+The local numbers come from the clean rerun (pinned `85d741d`), now added to Stage A's report
+(`docs/validation/opt-T02a-gated-rows.md`, "Speed (local RTX 5060 Ti, sm_120)"; results in
+`results/opt-T02a-gated-rows/local/stageA-rerun-85d741d/`). The first local run was disturbed by a desktop
+video and is invalid.
 
 **Stage B (`segment_gemm`)**, on top of A:
 - NbCl5 −4.2 to −5.2 % on both GPUs; NaCl neutral, since no product reaches the shape rule and the stock path
@@ -171,5 +176,4 @@ unmerged on `fastmace/opt-T02c`.
 2. `fastmace/opt-T03b` (opt-in `grouped_launch`): trial merge, as an opt-in record.
 3. The 19-label gate results for `gated_rows` and `segment_gemm` (combined acceptance): switch off for any
    model that fails.
-4. Stage A's validation report: add the sm_120 rows above (it still says "pending").
-5. OPT-T05 (persistence) is not started. Its precondition, C landing, failed; it needs a new owner decision.
+4. OPT-T05 (persistence) is not started. Its precondition, C landing, failed; it needs a new owner decision.
