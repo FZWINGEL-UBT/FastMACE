@@ -6,7 +6,8 @@ and NbCl5 3×3×3; Modal L4 below. Results: `results/opt3-T03-local-20261021/`.
 
 ## What it does
 
-`EngineConfig.fused_integrator` (opt-in, `False` by default). On a fixed-cell CUDA `Langevin` engine the
+`EngineConfig.fused_integrator`, on by default since the owner's decision of 21 October 2026 (branch
+`fastmace/opt3-T03-default`; SPEC fourteenth amendment); it was opt-in when measured here. On a fixed-cell CUDA `Langevin` engine the
 AC stage (and the pipelined ACP) runs as four Triton kernels instead of about 45 PyTorch kernels:
 
 1. noise terms `rnd_pos`, `rnd_vel` and `rnd_vel * m` per element; clears the displacement maximum;

@@ -195,9 +195,10 @@ class EngineConfig:
     step_graph: bool = False
     # Fixed-cell Langevin on CUDA: the AC/ACP stage (half kick, drift, neighbour checks, compaction, saved
     # velocities and flags) as four Triton kernels around PyTorch's centre-of-mass sums and cumsum instead of
-    # about 45 PyTorch kernels. Exact: the same float64 operations in the same order, the same noise.
-    # Anything else keeps the PyTorch stage. Opt-in (opt-3 OPT3-T03).
-    fused_integrator: bool = False
+    # about 45 PyTorch kernels. Exact: the same float64 operations in the same order, the same noise, so it
+    # stays on in reproducible plans. Anything else (NPT, CPU, no Triton) keeps the PyTorch stage. On by
+    # default (owner decision, 21 October 2026; OPT3-T03).
+    fused_integrator: bool = True
 
     def __post_init__(self):
         _check_choices(self)

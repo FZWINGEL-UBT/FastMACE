@@ -2749,3 +2749,24 @@ converted model). Rejected in the same round and recorded in
 
 All five stay outside the research-engine plan equality, each with its own
 scope.
+
+**Draft 0.12, fourteenth amendment (21 October 2026, owner decision, "Yes";
+optimisation round 3, OPT3-T03):** one more FastMACE-only engine default.
+- **`EngineConfig.fused_integrator`:** on a fixed-cell CUDA Langevin engine
+  the AC/ACP stage (half kick, drift, neighbour checks, compaction, saved
+  velocities and flags) runs as four Triton kernels around PyTorch's
+  centre-of-mass sums and cumsum. It reads the same host-drawn noise and
+  performs the same float64 operations in the same order, so it is exact:
+  every written buffer is byte-identical at stage level, and reproducible-mode
+  trajectories are bitwise equal with it off (pipelined, checked, resumed).
+  It therefore stays on in reproducible plans. NPT (`LangevinBAOAB`), the CPU
+  and installations without Triton keep the PyTorch stage, and
+  `info()["fused_integrator"]` gives the reason. Same-process A/B, 300 K,
+  both orders: RTX 5060 Ti NaCl −2.4 %, NbCl5 −0.3 to −0.7 %; L4 NaCl −1.9 to
+  −2.0 %, NbCl5 neutral.
+
+The rest of round 3 changed no default: OPT3-T01 (fused gate VJP) and
+OPT3-T02 (symmetric contraction) were screened and not built, OPT3-T04's
+`combo_kernels` was rejected (NbCl5 slower), and OPT3-T05's layout records
+stay opt-in (no gain above noise). Details in `plans/opt-3.md` and
+`docs/rewrites.md`.

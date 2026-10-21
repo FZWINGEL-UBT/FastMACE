@@ -45,21 +45,22 @@ def simulation(pristine, pipelined="on", **engine):
                       engine=EngineConfig(device="cpu", compile_mode="none", pipelined=pipelined, **engine))
 
 
-def test_the_option_is_off_by_default_and_carried_by_the_plan(pristine):
-    assert EngineConfig().fused_integrator is False
-    default, fused = simulation(pristine), simulation(pristine, fused_integrator=True)
-    assert default.plan.engine.fused_integrator is False and fused.plan.engine.fused_integrator is True
-    assert "fused_integrator" not in default._engine.info()  # the switched-off engine's record is the old one
-    assert fused._engine.info()["fused_integrator"] == "not a CUDA engine"
-    assert fused._engine._fused is None
+def test_the_option_is_on_by_default_and_carried_by_the_plan(pristine):
+    """Owner decision, 21 October 2026: on by default; it acts only on fixed-cell CUDA Langevin engines."""
+    assert EngineConfig().fused_integrator is True
+    default, plain = simulation(pristine), simulation(pristine, fused_integrator=False)
+    assert default.plan.engine.fused_integrator is True and plain.plan.engine.fused_integrator is False
+    assert "fused_integrator" not in plain._engine.info()  # the switched-off engine's record is the old one
+    assert default._engine.info()["fused_integrator"] == "not a CUDA engine"
+    assert default._engine._fused is None
     default.close()
-    fused.close()
+    plain.close()
 
 
 @pytest.mark.parametrize("pipelined", ["on", "off"])
 def test_without_cuda_the_option_changes_nothing(pristine, pipelined):
     runs = []
-    for engine in ({}, {"fused_integrator": True}):
+    for engine in ({"fused_integrator": False}, {}):
         sim = simulation(pristine, pipelined=pipelined, **engine)
         sim.run(steps=120)
         runs.append((sim.committed(), sim._engine.rebuilds))
