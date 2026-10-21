@@ -5,7 +5,9 @@ ordering is fixed: for each structure, fixed then waves.
     ncu --kernel-name kernel --launch-skip 2 --launch-count ... python ncu_kernel.py
 """
 
-import fastmace  # noqa: F401
+import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
+
+# isort: split
 import torch
 
 from fastmace.kernels.triton import skinny_linear, tile_rule
