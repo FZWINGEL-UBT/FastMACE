@@ -1,0 +1,325 @@
+{
+ "structure": "NaCl",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "plan": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = Na Cl  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 300 K  (recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3)\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_constants = on  (requested 'on': stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.lm_major_outer_sum = on  (requested 'on': stage 1: on (with segmented_first_sum); stage 2: supported (ok))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: RewriteConfig.direct_node_feats=on, RewriteConfig.folded_constants=on, RewriteConfig.lm_major_outer_sum=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+ "rows": [
+  {
+   "name": "triton_poi_fused_cat_view_28",
+   "us_per_call": 8.170000000000982,
+   "launches_per_call": 2.0,
+   "input_shapes": [
+    [
+     1512,
+     512
+    ],
+    [
+     216,
+     3584
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_cat_view_28",
+   "us_per_call": 8.170000000000982,
+   "launches_per_call": 2.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_7",
+   "us_per_call": 8.10566666666576,
+   "launches_per_call": 2.0,
+   "input_shapes": [
+    [
+     216,
+     8192
+    ],
+    [
+     216,
+     3584
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_7",
+   "us_per_call": 8.10566666666576,
+   "launches_per_call": 2.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_cat_view_25",
+   "us_per_call": 5.73700000000008,
+   "launches_per_call": 2.0,
+   "input_shapes": [
+    [
+     1080,
+     512
+    ],
+    [
+     216,
+     2560
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_cat_view_25",
+   "us_per_call": 5.73700000000008,
+   "launches_per_call": 2.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_5",
+   "us_per_call": 5.640000000001237,
+   "launches_per_call": 2.0,
+   "input_shapes": [
+    [
+     216,
+     8192
+    ],
+    [
+     216,
+     2560
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_5",
+   "us_per_call": 5.640000000001237,
+   "launches_per_call": 2.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "aten::copy_",
+   "us_per_call": 5.575666666666318,
+   "launches_per_call": 1.0,
+   "input_shapes": [
+    [
+     216,
+     3
+    ],
+    [
+     216,
+     3
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_cat_clone_transpose_view_17",
+   "us_per_call": 4.53199999999985,
+   "launches_per_call": 1.0,
+   "input_shapes": [
+    [
+     216,
+     128
+    ],
+    [
+     648,
+     128
+    ],
+    [
+     1080,
+     128
+    ],
+    [
+     1512,
+     128
+    ],
+    [
+     216,
+     2048
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused__unsafe_view_cat_clone_transpose_view_17",
+   "us_per_call": 4.53199999999985,
+   "launches_per_call": 1.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_4",
+   "us_per_call": 4.079999999998715,
+   "launches_per_call": 2.0,
+   "input_shapes": [
+    [
+     216,
+     8192
+    ],
+    [
+     216,
+     1536
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_4",
+   "us_per_call": 4.079999999998715,
+   "launches_per_call": 2.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_cat_view_22",
+   "us_per_call": 3.5303333333319338,
+   "launches_per_call": 2.0,
+   "input_shapes": [
+    [
+     648,
+     512
+    ],
+    [
+     216,
+     1536
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_cat_view_22",
+   "us_per_call": 3.5303333333319338,
+   "launches_per_call": 2.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_22",
+   "us_per_call": 1.5070000000002135,
+   "launches_per_call": 1.0,
+   "input_shapes": [
+    [
+     216,
+     2048
+    ],
+    [
+     7,
+     216,
+     128
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_22",
+   "us_per_call": 1.5070000000002135,
+   "launches_per_call": 1.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_21",
+   "us_per_call": 1.291666666669092,
+   "launches_per_call": 1.0,
+   "input_shapes": [
+    [
+     216,
+     2048
+    ],
+    [
+     5,
+     216,
+     128
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_21",
+   "us_per_call": 1.291666666669092,
+   "launches_per_call": 1.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_20",
+   "us_per_call": 1.0013333333323924,
+   "launches_per_call": 1.0,
+   "input_shapes": [
+    [
+     216,
+     2048
+    ],
+    [
+     3,
+     216,
+     128
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused_clone_slice_transpose_view_20",
+   "us_per_call": 1.0013333333323924,
+   "launches_per_call": 1.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused__to_copy_select_34",
+   "us_per_call": 0.9686666666663465,
+   "launches_per_call": 1.0,
+   "input_shapes": [
+    [
+     2,
+     6912
+    ],
+    [
+     6912
+    ],
+    []
+   ],
+   "input_strides": [],
+   "stack": ""
+  },
+  {
+   "name": "triton_poi_fused__to_copy_select_34",
+   "us_per_call": 0.9686666666663465,
+   "launches_per_call": 1.0,
+   "input_shapes": [],
+   "input_strides": [],
+   "stack": ""
+  }
+ ]
+}

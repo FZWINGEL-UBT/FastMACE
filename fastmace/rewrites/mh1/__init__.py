@@ -16,6 +16,11 @@ module switches became these records (docs/design/switch-map.md, section 1).
 - ``folded_backward_tiles``: that pass's tiles by the waves rule (``skinny_linear.tile_choice``); exact
   (the same reduction order), opt-in (opt-2 OPT2-T03), off.
 - ``fused_radial_hidden``: the radial hidden block as Triton kernels; opt-in (no gain), off.
+- ``direct_node_feats`` (opt-3 OPT3-T05): without LAMMPS, the folded forward skips MACE's join of the node
+  features and attributes for ``handle_lammps`` (the identity then), whose slices were strided and copied by
+  the streaming convolution, forward and backward; exact, opt-in, off.
+- ``folded_constants`` (opt-3 OPT3-T05): the folded last radial layer's [W, b] and its halves as buffers, built
+  once instead of a concatenation and two copies per force call; exact, opt-in, off.
 - ``streaming_conv``: the receiver-streaming OEq convolution (OEq PR 223 kernels) in every
   interaction with an OEq-fused convolution.
 - ``reassociate_first``: the first interaction summed per receiver and sender species before
@@ -208,6 +213,24 @@ def folded_backward_tiles(model):
         if interaction.conv_tp_weights.fused_backward:
             interaction.conv_tp_weights.folded_tiles = "waves"
             names.append(f"interactions.{index}")
+    return names
+
+
+def direct_node_feats(model):
+    """Skip the LAMMPS-only join of node features and attributes in every folded interaction; returns their names."""
+    names = []
+    for index, interaction in _folded_interactions(model, "direct_node_feats"):
+        interaction.direct_node_feats = True
+        names.append(f"interactions.{index}")
+    return names
+
+
+def folded_constants(model):
+    """Build every folded radial layer's [W, b] and its halves once; returns the interactions' names."""
+    names = []
+    for index, interaction in _folded_interactions(model, "folded_constants"):
+        interaction.conv_tp_weights.hold_folded_constants()
+        names.append(f"interactions.{index}")
     return names
 
 
@@ -509,6 +532,11 @@ RECORDS = {
                                      ("fused_folded_backward",), exactness="exact", default="off"),
     "fused_radial_hidden": _record("fused_radial_hidden", _hidden_support, _apply(fuse_radial_hidden),
                                    ("fold_cutoff",), default="off"),
+    # Layout audit (opt-3 OPT3-T05): the same values without a copy, so bitwise the results without them.
+    "direct_node_feats": _record("direct_node_feats", _fold_support, _apply(direct_node_feats), ("fold_cutoff",),
+                                 exactness="exact", default="off"),
+    "folded_constants": _record("folded_constants", _fold_support, _apply(folded_constants), ("fold_cutoff",),
+                                exactness="exact", default="off"),
     "streaming_conv": _record("streaming_conv", _streaming_support, _apply(streaming_convolutions),
                               ("fold_cutoff",), exactness="exact",
                               constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
@@ -523,7 +551,8 @@ RECORDS = {
 __all__ = [
     "FIXED_SPECIES_SUPERSET", "MACE_VERSIONS", "OEQ", "PER_ENGINE_EDGE_COUNTER", "RECORDS", "SINGLE_GRAPH",
     "SORT_RECEIVERS", "bind_streaming_count", "density_before_linear",
-    "factor_species_radial", "fold_radial_cutoff", "folded_backward_tiles", "fuse_radial_hidden",
+    "direct_node_feats", "factor_species_radial", "fold_radial_cutoff", "folded_backward_tiles", "folded_constants",
+    "fuse_radial_hidden",
     "fused_folded_backward",
     "joint_radial_input", "reassociate_first_interaction", "segment_first_sum", "streaming_convolutions",
 ]
