@@ -4,8 +4,8 @@ Copied from the research engine (``langevin/gpu_langevin.py``) with its module s
 replaced by attributes that the rewrite records of ``fastmace.rewrites.mh1`` set on each
 interaction or radial network:
 
-- ``FactoredRadialMLP``: ``fused_backward`` (fused_folded_backward), ``fused_hidden``
-  (fused_radial_hidden);
+- ``FactoredRadialMLP``: ``fused_backward`` (fused_folded_backward), ``folded_tiles``
+  (folded_backward_tiles), ``fused_hidden`` (fused_radial_hidden);
 - the interaction: ``density_before_linear`` (density_first), ``joint_radial_weight`` and
   ``joint_radial_widths`` (joint_radial_input), ``first_reassociation`` (reassociate_first),
   ``streaming_kernels`` and ``streaming_count`` (streaming_conv), ``residual_linear``
@@ -67,6 +67,7 @@ class FactoredRadialMLP(torch.nn.Module):
         self.source = tuple(int(i) for i in source)
         self.target = tuple(int(i) for i in target)
         self.fused_backward = False  # fused_folded_backward
+        self.folded_tiles = "fixed"  # folded_backward_tiles: "waves" (opt-2 OPT2-T03)
         self.fused_hidden = None  # fused_radial_hidden: a fused_radial.hidden_plan
 
     def first(self, inputs):
@@ -87,7 +88,7 @@ class FactoredRadialMLP(torch.nn.Module):
         # Cutoff folded into the last layer: one GEMM over [h c, c], (h W + b) c = [h c, c] [W; b].
         augmented = self.augmented_after_first(hidden, cutoff)
         if self.fused_backward:
-            return folded_linear(augmented, self.folded_weight())
+            return folded_linear(augmented, self.folded_weight(), tile_rule=self.folded_tiles)
         return torch.nn.functional.linear(augmented, self.folded_weight())
 
     def augmented(self, inputs, cutoff):

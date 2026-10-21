@@ -1,0 +1,194 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-10-21T15:11:49.069458+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "27e7718",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "sides": {
+    "a": {
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "folded_backward_tiles": "off"
+    },
+    "b": {
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "folded_backward_tiles": "on"
+    }
+  },
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "load": [
+    0.57373046875,
+    1.3037109375,
+    1.4814453125
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 3.0437221966667494,
+            "mean_ms": 3.0562101372222767,
+            "min_ms": 2.942398153333367,
+            "max_ms": 3.175920959999985,
+            "stdev_ms": 0.07011170786318112,
+            "spread": 0.07672277283464107,
+            "block_ms": [
+              2.942398153333367,
+              3.0006930633332254,
+              3.019921743333119,
+              2.992985293333277,
+              3.1731284200001633,
+              3.0960568166672906,
+              3.086412166666529,
+              3.028783370000383,
+              3.0235008600000888,
+              3.0586610233331157,
+              3.175920959999985,
+              3.076059776666777
+            ]
+          },
+          "a": {
+            "median_ms": 3.102727175000079,
+            "mean_ms": 3.104996233333345,
+            "min_ms": 3.006778319999436,
+            "max_ms": 3.246488853333176,
+            "stdev_ms": 0.07515142130783407,
+            "spread": 0.0772580120047886,
+            "block_ms": [
+              3.006778319999436,
+              3.035872406667295,
+              3.046083803333204,
+              3.0254555566671115,
+              3.2273921166673367,
+              3.1162950933329134,
+              3.116134926666897,
+              3.1225834166662025,
+              3.0893194233332606,
+              3.0826228099999753,
+              3.246488853333176,
+              3.1449280733333276
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0193857962457769,
+        "pair_ratios_b_over_a": [
+          1.0218801682542977,
+          1.0117237393467333,
+          1.008663158261581,
+          1.0108487881334267,
+          1.0171010086844108,
+          1.0065367911068919,
+          1.0096301979111462,
+          1.0309695462524306,
+          1.0217689911069414,
+          1.007834077226625,
+          1.0222196629645315,
+          1.0223884780097403
+        ]
+      },
+      "ratio_b_over_a": 0.9809828660383818,
+      "pair_ratios": [
+        0.978588322844472,
+        0.988412114008214,
+        0.9914112474609343,
+        0.9892676449130839,
+        0.983186518803545,
+        0.9935056610303301,
+        0.9904616582080544,
+        0.9699607555189145,
+        0.978694801568251,
+        0.9922268184777171,
+        0.9782633187664456,
+        0.9781017895924224
+      ],
+      "setup_s": {
+        "b": 24.97015918200009,
+        "a": 18.889137735000077
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.folded_backward_tiles = on  (requested 'on': stage 1: on (with fused_folded_backward))",
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ],
+        "a": [
+          "RewriteConfig.folded_backward_tiles = off  (requested 'off': stage 1: off)",
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 269.4821433443234,
+          "potential_eV_atom": -6.847992441168538,
+          "kinetic_eV_atom": 0.034833249737690336
+        },
+        "a": {
+          "temperature_K": 269.4821435265428,
+          "potential_eV_atom": -6.847992443376118,
+          "kinetic_eV_atom": 0.03483324976124401
+        }
+      },
+      "load_after": [
+        2.53515625,
+        1.78125,
+        1.63427734375
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

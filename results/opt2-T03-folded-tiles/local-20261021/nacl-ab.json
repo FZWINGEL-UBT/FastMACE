@@ -1,0 +1,194 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-10-21T15:08:14.460069+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "27e7718",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "sides": {
+    "a": {
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "folded_backward_tiles": "off"
+    },
+    "b": {
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "folded_backward_tiles": "on"
+    }
+  },
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "load": [
+    0.5673828125,
+    1.7802734375,
+    1.634765625
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 3.1085200750000768,
+            "mean_ms": 3.117209976111105,
+            "min_ms": 2.965770263333146,
+            "max_ms": 3.369008149999975,
+            "stdev_ms": 0.11471779499764166,
+            "spread": 0.12972021313609153,
+            "block_ms": [
+              2.965770263333146,
+              2.9825622933333307,
+              3.0641202800003002,
+              3.0111299633332087,
+              3.369008149999975,
+              3.1544829533333996,
+              3.2473926933331163,
+              3.1860525933332915,
+              3.10429640333344,
+              3.1127437466667134,
+              3.1407926066666887,
+              3.0681677666666474
+            ]
+          },
+          "b": {
+            "median_ms": 3.0563659033331687,
+            "mean_ms": 3.0550117380555424,
+            "min_ms": 2.9333538833335147,
+            "max_ms": 3.243065920000087,
+            "stdev_ms": 0.08941662605447323,
+            "spread": 0.10133342880471569,
+            "block_ms": [
+              2.9333538833335147,
+              2.9753995033335436,
+              2.9696768266668037,
+              2.969293013333072,
+              3.243065920000087,
+              3.139608410000013,
+              3.14224595999993,
+              3.069737253333263,
+              3.067784779999935,
+              3.044947026666402,
+              3.080403449999949,
+              3.0246248299999934
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9832221859892905,
+        "pair_ratios_b_over_a": [
+          0.9890698276935317,
+          0.9975984441244371,
+          0.9691776285839904,
+          0.9861058969524434,
+          0.9626174160487296,
+          0.9952846334713369,
+          0.9676211831266813,
+          0.9634923352353272,
+          0.9882383578790033,
+          0.9782196269535802,
+          0.9807726379199451,
+          0.9858081630542777
+        ]
+      },
+      "ratio_b_over_a": 0.9832221859892905,
+      "pair_ratios": [
+        0.9890698276935317,
+        0.9975984441244371,
+        0.9691776285839904,
+        0.9861058969524434,
+        0.9626174160487296,
+        0.9952846334713369,
+        0.9676211831266813,
+        0.9634923352353272,
+        0.9882383578790033,
+        0.9782196269535802,
+        0.9807726379199451,
+        0.9858081630542777
+      ],
+      "setup_s": {
+        "a": 24.992120399999976,
+        "b": 21.345734583999956
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.folded_backward_tiles = off  (requested 'off': stage 1: off)",
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ],
+        "b": [
+          "RewriteConfig.folded_backward_tiles = on  (requested 'on': stage 1: on (with fused_folded_backward))",
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 269.48213704465513,
+          "potential_eV_atom": -6.84799243344201,
+          "kinetic_eV_atom": 0.03483324892339549
+        },
+        "b": {
+          "temperature_K": 269.48214537965185,
+          "potential_eV_atom": -6.84799239591316,
+          "kinetic_eV_atom": 0.0348332500007768
+        }
+      },
+      "load_after": [
+        1.0634765625,
+        1.61279296875,
+        1.59130859375
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

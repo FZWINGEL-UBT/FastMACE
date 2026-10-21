@@ -13,6 +13,8 @@ module switches became these records (docs/design/switch-map.md, section 1).
 - ``density_first``: linear_1(m) / s = linear_1(m / s) for a bias-free ``linear_1``.
 - ``joint_radial_input``: one first layer for both radial networks.
 - ``fused_folded_backward``: the folded last layer's input gradient as one Triton pass.
+- ``folded_backward_tiles``: that pass's tiles by the waves rule (``skinny_linear.tile_choice``); exact
+  (the same reduction order), opt-in (opt-2 OPT2-T03), off.
 - ``fused_radial_hidden``: the radial hidden block as Triton kernels; opt-in (no gain), off.
 - ``streaming_conv``: the receiver-streaming OEq convolution (OEq PR 223 kernels) in every
   interaction with an OEq-fused convolution.
@@ -196,6 +198,16 @@ def fused_folded_backward(model):
     for index, interaction in _folded_interactions(model, "fused_folded_backward"):
         interaction.conv_tp_weights.fused_backward = True
         names.append(f"interactions.{index}")
+    return names
+
+
+def folded_backward_tiles(model):
+    """The waves tile rule for the fused input gradient of every folded interaction; returns their names."""
+    names = []
+    for index, interaction in _folded_interactions(model, "folded_backward_tiles"):
+        if interaction.conv_tp_weights.fused_backward:
+            interaction.conv_tp_weights.folded_tiles = "waves"
+            names.append(f"interactions.{index}")
     return names
 
 
@@ -492,6 +504,9 @@ RECORDS = {
     "joint_radial_input": _record("joint_radial_input", _fold_support, _apply(joint_radial_input), ("fold_cutoff",)),
     "fused_folded_backward": _record("fused_folded_backward", _fold_support, _apply(fused_folded_backward),
                                      ("fold_cutoff",)),
+    # Same reduction order (BLOCK_K unchanged): bitwise the fixed tiles' results (opt-2 OPT2-T03).
+    "folded_backward_tiles": _record("folded_backward_tiles", _fold_support, _apply(folded_backward_tiles),
+                                     ("fused_folded_backward",), exactness="exact", default="off"),
     "fused_radial_hidden": _record("fused_radial_hidden", _hidden_support, _apply(fuse_radial_hidden),
                                    ("fold_cutoff",), default="off"),
     "streaming_conv": _record("streaming_conv", _streaming_support, _apply(streaming_convolutions),
@@ -508,6 +523,7 @@ RECORDS = {
 __all__ = [
     "FIXED_SPECIES_SUPERSET", "MACE_VERSIONS", "OEQ", "PER_ENGINE_EDGE_COUNTER", "RECORDS", "SINGLE_GRAPH",
     "SORT_RECEIVERS", "bind_streaming_count", "density_before_linear",
-    "factor_species_radial", "fold_radial_cutoff", "fuse_radial_hidden", "fused_folded_backward",
+    "factor_species_radial", "fold_radial_cutoff", "folded_backward_tiles", "fuse_radial_hidden",
+    "fused_folded_backward",
     "joint_radial_input", "reassociate_first_interaction", "segment_first_sum", "streaming_convolutions",
 ]
