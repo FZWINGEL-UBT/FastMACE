@@ -3,14 +3,16 @@
 Plan: `plans/opt-1.md` OPT-T02; design `docs/design/opt-T02-fusion.md`, stage A (approved 20 October 2026).
 Branch `fastmace/opt-T02a`, from main `29203fe`.
 
-**Result:** opt-in record `gated_rows` (`RewriteConfig.gated_rows`, default off).
+**Result:** record `gated_rows` (`RewriteConfig.gated_rows`), opt-in when built and default on since 20 October 2026.
 - It is exact: bitwise equal on the CPU in float64, and on the GPU in the reproducible mode (plain cuEq
   float64, NVT and NPT). Outside that mode on against off scatters exactly as much as off against off.
 - It passes the hybrid float32 force gate.
 - On murphy (sm_89) it shortens the MH-1 step by **9.0 % on NbCl5** and **4.4 % on NaCl**, same process,
   both build orders.
-- The local sm_120 A/B waits for the PC. Making it a default is for the conductor and owner after that
-  A/B.
+- On the local RTX 5060 Ti (sm_120) it shortens it by **10.5–10.7 % on NbCl5** and **3.5–3.9 % on NaCl**
+  (21 October addendum, below).
+- **Default on** since the owner decision of 20 October 2026, night (rule `on_with_merged_residual`; see
+  `docs/validation/opt-1.md`).
 
 ## What it does
 
@@ -71,8 +73,36 @@ Setup:
 - The gain exceeds the design note's estimate for NbCl5 (5–7 %, from the local card). murphy's
   atom-level elementwise time is larger (8.95 against 7.35 ms, 2-T20a §5), and the copies removed scale
   with it.
-- **sm_120 (local RTX 5060 Ti):** pending, while the local PC is off limits. Its noise floor is 1.1 %
-  (NaCl) and 0.4 % (NbCl5) (2-T12).
+- **sm_120 (local RTX 5060 Ti):** below. Its noise floor is 1.1 % (NaCl) and 0.4 % (NbCl5) (2-T12).
+
+## Speed (local RTX 5060 Ti, sm_120)
+
+Added 21 October 2026. `tools/ab_rewrites.py`, the same protocol as `results/opt-T02a-gated-rows/ab_gated_rows.py`
+(two engines from the minimal planner that differ only in `gated_rows`, 300 warm-up steps per side outside the
+compile-counter window, then 12 alternating blocks of 300 steps), MH-1 hybrid float32 NVT at 300 K.
+
+- **Setup:** RTX 5060 Ti (36 SMs), driver 610.88, WSL2, `~/environments/mace_cueq_oeq` (torch 2.14.1+cu130,
+  Triton 3.8.0).
+- **Source:** pinned copy `~/fastmace-runs/src-85d741d` (`fastmace/opt-1-local` 85d741d: opt-T02b merged with
+  opt-T03 and opt-T01b; `segment_gemm` is off on both sides here).
+- **Conditions:** local GPU reservation held; utilisation 0 % in both the Windows and WSL views and no WSL
+  compute process before each job; a 5 s monitor of Windows utilisation, memory, clock and temperature. 20:19–
+  20:31 UTC 20 October 2026. No compilation while timed, all blocks valid.
+
+| Structure | Build order, pattern | off (ms/step) | on (ms/step) | on/off | Block-pair ratios |
+| --- | --- | ---: | ---: | ---: | --- |
+| NaCl 216 atoms | off first, ABAB | 3.585 | 3.445 | **0.961** | 0.949–0.984 |
+| NaCl | on first, ABBA | 3.571 | 3.446 | **0.965** | 0.949–0.976 |
+| NbCl5 1944 atoms | off first, ABAB | 27.43 | 24.53 | **0.895** | 0.890–0.896 |
+| NbCl5 | on first, ABBA | 27.13 | 24.21 | **0.893** | 0.887–0.895 |
+
+- **Run:** `results/opt-T02a-gated-rows/local/stageA-rerun-85d741d/` (`run.log`, `monitor.log`, both JSON
+  summaries).
+- **Discarded earlier run:** the first local run (`~/fastmace-acceptance/opt1-local-20261020`, 20:00 UTC) was
+  disturbed by video playback on the desktop. Its first order gave 0.967 / 0.894, but the second order's NaCl
+  drifted (1.002). It is invalid and only the rerun counts.
+- **On the JSON files:** in the b-a JSON, `ratio_b_over_a` is the first-built side over the second. The table
+  takes the ratio from the two sides' medians.
 
 ## Files
 
