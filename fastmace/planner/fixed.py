@@ -79,6 +79,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
+    "RewriteConfig.fused_radial_mlp": "never_automatic",
     "RewriteConfig.block_linear": "on_for_hybrid_graph_engine",
     "RewriteConfig.grouped_linear": "on_with_block_linear",
     "RewriteConfig.merged_residual": "on_with_block_linear",
@@ -95,6 +96,7 @@ AUTO_RULES = MappingProxyType({
 # adapt_options_to_model's ``requires``: option -> rewrite_support key, in its order.
 STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
+    ("fused_radial_mlp", "fold_cutoff"),
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
     ("streaming_conv", "streaming_conv"), ("fold_cutoff", "fold_cutoff"), ("factor_species", "factor_species"),
@@ -102,9 +104,9 @@ STAGE2_SUPPORT = (
 )
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
-                  "fused_folded_backward", "segmented_first_sum", "fused_radial_hidden", "streaming_conv",
-                  "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
-                  "species_skip",
+                  "fused_folded_backward", "segmented_first_sum", "fused_radial_hidden", "fused_radial_mlp",
+                  "streaming_conv", "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm",
+                  "grouped_launch", "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
@@ -549,6 +551,9 @@ class FixedPlanner:
         needs("fused_radial_hidden", r.fused_radial_hidden == "on", v["fold_cutoff"], "fold_cutoff")
         if r.fused_radial_hidden == "auto":
             v["_why"]["fused_radial_hidden"] = "off: only an explicit 'on' enables it (no measured gain)"
+        needs("fused_radial_mlp", r.fused_radial_mlp == "on", v["fold_cutoff"], "fold_cutoff")
+        if r.fused_radial_mlp == "auto":
+            v["_why"]["fused_radial_mlp"] = "off: only an explicit 'on' enables it (opt-in screen, opt-2 OPT2-T02)"
         needs("streaming_conv", r.streaming_conv != "off", hybrid and v["fold_cutoff"] and v["sort_receivers"],
               "the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming "
               "kernels on unsorted edges give wrong results)")

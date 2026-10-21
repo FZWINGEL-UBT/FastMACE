@@ -32,7 +32,7 @@ pytest.importorskip("mace")
 
 Z_VALUES = [8, 11, 17, 26]  # Fe absent from the structure
 MH1_ORDER = ("factor_species", "fold_cutoff", "density_first", "joint_radial_input", "fused_folded_backward",
-             "fused_radial_hidden", "streaming_conv", "reassociate_first", "segmented_first_sum")
+             "fused_radial_hidden", "fused_radial_mlp", "streaming_conv", "reassociate_first", "segmented_first_sum")
 # The research engine's default MH-1 package on the CPU (no OEq: no streaming; fused radial hidden is opt-in).
 PACKAGE = ("factor_species", "fold_cutoff", "density_first", "joint_radial_input", "fused_folded_backward",
            "reassociate_first", "segmented_first_sum")
@@ -116,13 +116,16 @@ BACKENDS = ["e3nn", pytest.param("cueq", marks=pytest.mark.skipif(
 def test_records_have_the_spec_fields():
     assert tuple(mh1.RECORDS) == MH1_ORDER
     for name, rewrite in mh1.RECORDS.items():
-        assert isinstance(rewrite, reg.Rewrite) and rewrite.name == name and rewrite.conflicts == ()
+        assert isinstance(rewrite, reg.Rewrite) and rewrite.name == name
+        assert rewrite.conflicts == (("fused_radial_hidden",) if name == "fused_radial_mlp" else ())
         assert rewrite.mace_versions == SpecifierSet(">=0.3.16,<0.3.17")
     exact = {"streaming_conv", "segmented_first_sum"}  # summation order only (SPEC §6.2)
     assert {name for name, r in mh1.RECORDS.items() if r.exactness == "exact"} == exact
     assert all(r.exactness == "rounding" for name, r in mh1.RECORDS.items() if name not in exact)
-    assert {name for name, r in mh1.RECORDS.items() if r.default != "auto"} == {"fused_radial_hidden"}
+    opt_in = {name for name, r in mh1.RECORDS.items() if r.default != "auto"}
+    assert opt_in == {"fused_radial_hidden", "fused_radial_mlp"}
     assert mh1.RECORDS["fused_radial_hidden"].default == "off"  # opt-in, no gain (SPEC §6.2)
+    assert mh1.RECORDS["fused_radial_mlp"].default == "off"  # opt-in screen (opt-2 OPT2-T02)
     pinned = {name for name, r in mh1.RECORDS.items() if r.source_hashes}
     assert pinned == {"factor_species", "fold_cutoff"}
     assert mh1.RECORDS["fold_cutoff"].source_hashes == {m_forward(): mh1.NONLINEAR_FORWARD_SHA256}
@@ -142,7 +145,8 @@ def test_requires_graph_matches_the_spec():
     assert requires == {
         "factor_species": (), "fold_cutoff": ("factor_species",), "density_first": ("fold_cutoff",),
         "joint_radial_input": ("fold_cutoff",), "fused_folded_backward": ("fold_cutoff",),
-        "fused_radial_hidden": ("fold_cutoff",), "streaming_conv": ("fold_cutoff",),
+        "fused_radial_hidden": ("fold_cutoff",), "fused_radial_mlp": ("fold_cutoff",),
+        "streaming_conv": ("fold_cutoff",),
         "reassociate_first": ("fold_cutoff",), "segmented_first_sum": ("reassociate_first",)}
     regs = registry()
     assert regs.order() == (*MH1_ORDER, "block_linear", "grouped_linear", "merged_residual")
@@ -170,6 +174,26 @@ def test_resolution_follows_the_requirements():
         regs.resolve(model, {"fold_cutoff": "off", "reassociate_first": "on"})
     assert not regs.resolve(model).decision("fused_radial_hidden").enabled  # default off
     assert regs.resolve(model, {"fused_radial_hidden": "on"}).decision("fused_radial_hidden").enabled
+    assert not regs.resolve(model).decision("fused_radial_mlp").enabled  # default off (opt-2 OPT2-T02)
+    assert regs.resolve(model, {"fused_radial_mlp": "on"}).decision("fused_radial_mlp").enabled
+    with pytest.raises(reg.RewriteRefusedError, match="fused_radial_hidden|fused_radial_mlp"):
+        regs.resolve(model, {"fused_radial_hidden": "on", "fused_radial_mlp": "on"})
+
+
+def test_fused_radial_mlp_takes_the_networks_with_a_hidden_stack():
+    from fastmace.kernels.triton.radial_mlp import RadialStack, stack_layers
+
+    model, _ = tiny("mh1")
+    mh1.factor_species_radial(model)
+    mh1.fold_radial_cutoff(model)
+    names = mh1.fuse_radial_mlp(model)
+    assert names
+    for index, interaction in enumerate(model.interactions):
+        for attribute in ("conv_tp_weights", "density_fn"):
+            net = getattr(interaction, attribute)
+            qualifies = not isinstance(stack_layers(list(net.rest[:-1])), str)
+            assert (f"interactions.{index}.{attribute}" in names) is qualifies
+            assert isinstance(net.fused_stack, RadialStack) is qualifies
 
 
 @pytest.mark.parametrize("family, options, factor, fold, reassociate", [
@@ -184,7 +208,7 @@ def test_applies_to_follows_the_model(family, options, factor, fold, reassociate
     verdicts = {name: r.applies_to(model) for name, r in mh1.RECORDS.items()}
     assert verdicts["factor_species"].supported is factor
     for name in ("fold_cutoff", "density_first", "joint_radial_input", "fused_folded_backward",
-                 "fused_radial_hidden"):
+                 "fused_radial_hidden", "fused_radial_mlp"):
         assert verdicts[name].supported is fold, (name, verdicts[name])
     assert verdicts["reassociate_first"].supported is reassociate
     assert verdicts["segmented_first_sum"].supported is reassociate
@@ -270,7 +294,7 @@ def test_joint_fused_and_segmented_attributes():
 
 @pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("family", ["mh1", "omol"])
-@pytest.mark.parametrize("name", [*PACKAGE, "fused_radial_hidden"])
+@pytest.mark.parametrize("name", [*PACKAGE, "fused_radial_hidden", "fused_radial_mlp"])
 def test_each_rewrite_passes_its_selfcheck_and_keeps_the_model(family, backend, name):
     """Each record with what it requires, through the registry, at the SPEC §6.4 float64 threshold."""
     model, batch = tiny(family, backend)

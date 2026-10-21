@@ -330,6 +330,43 @@ def _density_support(model):
     return verdict
 
 
+def fuse_radial_mlp(model):
+    """The whole hidden stack of every qualifying radial network in one kernel per direction (opt-2 OPT2-T02).
+
+    Returns the networks fused. A network whose hidden run is not LayerNorm, SiLU, (Linear, LayerNorm, SiLU) x K
+    (MH-1's density networks: LayerNorm, SiLU only) keeps its modules.
+    """
+    from fastmace.kernels.triton.radial_mlp import RadialStack, stack_layers
+
+    names = []
+    for index, interaction in _folded_interactions(model, "fused_radial_mlp"):
+        for attribute in ("conv_tp_weights", "density_fn"):
+            net = getattr(interaction, attribute)
+            modules = list(net.rest[:-1])
+            if not isinstance(stack_layers(modules), str):
+                net.fused_stack = RadialStack(modules)
+                names.append(f"interactions.{index}.{attribute}")
+    return names
+
+
+def _mlp_support(model):
+    from fastmace.kernels.triton.radial_mlp import stack_layers
+
+    verdict = _fold_support(model)
+    if not verdict.supported:
+        return verdict
+    reasons = []
+    for index, interaction in _factored(model):
+        for attribute in ("conv_tp_weights", "density_fn"):
+            net = getattr(interaction, attribute)
+            modules = net.rest[:-1] if hasattr(net, "rest") else net.net[1:-1]
+            why = stack_layers(modules)
+            if not isinstance(why, str):
+                return verdict
+            reasons.append(f"interactions.{index}.{attribute}: {why}")
+    return Support(False, "no radial network with a fusable hidden stack: " + "; ".join(reasons))
+
+
 def _hidden_support(model):
     from fastmace.kernels.triton.fused_radial import hidden_plan
 
@@ -471,10 +508,11 @@ def _apply_reassociate(model, context):
 
 
 def _record(name, applies_to, apply, requires=(), exactness="rounding", default="auto", constraints=(),
-            hashes=None, deterministic=True):
+            hashes=None, deterministic=True, conflicts=()):
     # deterministic (SPEC §9.3, 2-T16): torch reformulations, MACE's scatter_add_ and FastMACE's Triton
     # kernels without atomics are; the streaming convolution and the segmented forward are not.
-    return Rewrite(name=name, applies_to=applies_to, requires=requires, conflicts=(), mace_versions=MACE_VERSIONS,
+    return Rewrite(name=name, applies_to=applies_to, requires=requires, conflicts=conflicts,
+                   mace_versions=MACE_VERSIONS,
                    deterministic=deterministic,
                    source_hashes=hashes or {}, exactness=exactness, default=default,
                    workload_constraints=constraints, apply=apply, selfcheck=_selfcheck)
@@ -494,6 +532,9 @@ RECORDS = {
                                      ("fold_cutoff",)),
     "fused_radial_hidden": _record("fused_radial_hidden", _hidden_support, _apply(fuse_radial_hidden),
                                    ("fold_cutoff",), default="off"),
+    # opt-2 OPT2-T02: the whole hidden stack per direction; covers what fused_radial_hidden fuses.
+    "fused_radial_mlp": _record("fused_radial_mlp", _mlp_support, _apply(fuse_radial_mlp), ("fold_cutoff",),
+                                default="off", conflicts=("fused_radial_hidden",)),
     "streaming_conv": _record("streaming_conv", _streaming_support, _apply(streaming_convolutions),
                               ("fold_cutoff",), exactness="exact",
                               constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
@@ -508,6 +549,6 @@ RECORDS = {
 __all__ = [
     "FIXED_SPECIES_SUPERSET", "MACE_VERSIONS", "OEQ", "PER_ENGINE_EDGE_COUNTER", "RECORDS", "SINGLE_GRAPH",
     "SORT_RECEIVERS", "bind_streaming_count", "density_before_linear",
-    "factor_species_radial", "fold_radial_cutoff", "fuse_radial_hidden", "fused_folded_backward",
+    "factor_species_radial", "fold_radial_cutoff", "fuse_radial_hidden", "fuse_radial_mlp", "fused_folded_backward",
     "joint_radial_input", "reassociate_first_interaction", "segment_first_sum", "streaming_convolutions",
 ]

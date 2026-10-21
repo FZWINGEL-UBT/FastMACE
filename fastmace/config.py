@@ -92,6 +92,9 @@ class RewriteConfig:
     species_skip: Toggle = "auto"
     # Radial hidden block as one Triton kernel pair (FUSED_RADIAL_HIDDEN); opt-in, no measured gain.
     fused_radial_hidden: Toggle = "auto"
+    # The radial networks' whole hidden stack, forward and backward, as one Triton kernel each (opt-2 OPT2-T02);
+    # opt-in. Conflicts with fused_radial_hidden.
+    fused_radial_mlp: Toggle = "auto"
     # cuEq Linear layers as per-l products with extracted weights (BLOCK_LINEAR).
     block_linear: Toggle = "auto"
     # Same-irrep input segments of one output segment in one product (GROUPED_BLOCK_LINEAR).

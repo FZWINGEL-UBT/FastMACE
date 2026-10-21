@@ -1,0 +1,91 @@
+"""The fused radial hidden stack's Triton kernels against PyTorch autograd (opt-2 OPT2-T02).
+
+Forward output and input gradient of ``RadialStack`` in float32 on CUDA, against the original modules in
+float64 (the exact values), held to the float32 rounding of the original modules in float32: the kernels
+may differ from cuBLAS/Inductor's float32 rounding, never by more than a small multiple of it.
+"""
+
+import copy
+
+import pytest
+import torch
+
+from fastmace.kernels.triton import radial_mlp
+
+pytestmark = pytest.mark.skipif(not torch.cuda.is_available(), reason="no CUDA device")
+
+
+def stack(d, k, seed):
+    torch.manual_seed(seed)
+    modules = [torch.nn.LayerNorm(d), torch.nn.SiLU()]
+    for _ in range(k):
+        modules += [torch.nn.Linear(d, d), torch.nn.LayerNorm(d), torch.nn.SiLU()]
+    with torch.no_grad():
+        for module in modules:
+            if isinstance(module, torch.nn.LayerNorm):
+                module.weight.uniform_(0.5, 1.5)
+                module.bias.uniform_(-0.2, 0.2)
+    return modules
+
+
+def _errors(d, k, rows, seed=0):
+    modules = stack(d, k, seed)
+    exact = torch.nn.Sequential(*copy.deepcopy(modules)).double().cuda()
+    plain = torch.nn.Sequential(*copy.deepcopy(modules)).cuda()
+    fused = radial_mlp.RadialStack([m.cuda() for m in modules])
+    generator = torch.Generator(device="cuda").manual_seed(seed)
+    x = torch.randn(rows, d, device="cuda", generator=generator) * 2.0
+    grad = torch.randn(rows, d, device="cuda", generator=generator)
+
+    def run(model, inputs):
+        inputs = inputs.detach().clone().requires_grad_(True)
+        out = model(inputs)
+        (dx,) = torch.autograd.grad(out, inputs, grad.to(out.dtype))
+        return out.double(), dx.double()
+
+    out64, dx64 = run(exact, x.double())
+    out32, dx32 = run(plain, x)
+    outf, dxf = run(fused, x)
+
+    def rel(a, b):
+        return float((a - b).abs().max() / b.abs().max())
+
+    return dict(fused_out=rel(outf, out64), fused_dx=rel(dxf, dx64), plain_out=rel(out32, out64),
+                plain_dx=rel(dx32, dx64))
+
+
+@pytest.mark.parametrize(("d", "k", "rows"), [(64, 2, 8192), (64, 2, 1001), (64, 1, 77), (32, 4, 513),
+                                              (64, 3, 33), (128, 2, 129), (16, 1, 5)])
+def test_kernels_match_autograd(d, k, rows):
+    errors = _errors(d, k, rows)
+    assert errors["fused_out"] <= max(4 * errors["plain_out"], 1e-6), errors
+    assert errors["fused_dx"] <= max(4 * errors["plain_dx"], 1e-5), errors
+
+
+def test_strided_input_and_empty_rows():
+    modules = stack(64, 2, 1)
+    fused = radial_mlp.RadialStack([m.cuda() for m in modules])
+    plain = torch.nn.Sequential(*copy.deepcopy(modules)).cuda()
+    wide = torch.randn(300, 128, device="cuda")
+    x = wide[:, 32:96]  # a column slice, as the joint radial input's split gives
+    assert x.stride(1) == 1 and x.stride(0) == 128
+    torch.testing.assert_close(fused(x), plain(x), rtol=1e-5, atol=1e-6)
+    empty = torch.empty(0, 64, device="cuda", requires_grad=True)
+    out = fused(empty)
+    assert out.shape == (0, 64)
+    out.sum().backward()
+    assert empty.grad.shape == (0, 64)
+
+
+def test_compiled_matches_eager():
+    modules = stack(64, 2, 2)
+    fused = radial_mlp.RadialStack([m.cuda() for m in modules])
+    x = torch.randn(2048, 64, device="cuda", requires_grad=True)
+
+    def energy(inputs):
+        return (fused(inputs) ** 2).sum()
+
+    (eager,) = torch.autograd.grad(energy(x), x)
+    compiled = torch.compile(energy, fullgraph=True)
+    (traced,) = torch.autograd.grad(compiled(x), x)
+    torch.testing.assert_close(traced, eager, rtol=1e-5, atol=1e-6)

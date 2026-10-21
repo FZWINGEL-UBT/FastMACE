@@ -42,6 +42,7 @@ How to read the tables:
 | `GENERIC_STREAMING` (set from `--streaming-conv`) | `RewriteConfig.streaming_conv` | `"auto"` (global `False`) | `on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports` | §6.2 `streaming_conv` |
 | `--species-skip`; `GENERIC_SPECIES_SKIP` | `RewriteConfig.species_skip` | `"auto"` (global `False`) | `on_with_graph_engine_if_model_supports` | §6.2 `generic_species_skip` |
 | `--fused-radial-hidden`; `FUSED_RADIAL_HIDDEN` | `RewriteConfig.fused_radial_hidden` | `"auto"` (global `False`) | `never_automatic` | §6.2 opt-in "fused radial hidden (no gain)" |
+| none: new in the library (opt-2 OPT2-T02) | `RewriteConfig.fused_radial_mlp` | `"auto"` | `never_automatic` | opt-in: the radial networks' whole hidden stack, one Triton kernel per direction; conflicts with `fused_radial_hidden` |
 | `--block-linear`; `BLOCK_LINEAR` | `RewriteConfig.block_linear` | `"auto"` (global `False`) | `on_for_hybrid_graph_engine` | §6.2 `block_linear` |
 | `--grouped-linear`; `GROUPED_BLOCK_LINEAR` | `RewriteConfig.grouped_linear` | `"auto"` (global `False`) | `on_with_block_linear` | §6.2 `grouped_linear` |
 | `--merged-residual`; `MERGED_RESIDUAL_LINEAR` | `RewriteConfig.merged_residual` | `"auto"` (global `False`) | `on_with_block_linear` | §6.2 `merged_residual` |
@@ -240,7 +241,7 @@ tier 1, §8.1); "hybrid" the resolved backend. Support keys are those of
 | `on_with_reassociate_first_and_sort_receivers` | Stage 1: on when `reassociate_first` and `sort_receivers` are on. Stage 2: off unless support `reassociate_first`. | `RewriteConfig.segmented_first_sum` |
 | `on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports` | Stage 1: on with the hybrid backend, `fold_cutoff` (stage 1) and `sort_receivers`. Stage 2: off unless support `streaming_conv` (folded MH-1 class or a `GENERIC_INTERACTIONS` model). | `RewriteConfig.streaming_conv` |
 | `on_with_graph_engine_if_model_supports` | Stage 1: on with the graph engine, **any backend**. Stage 2: off unless support `species_skip` (a `GENERIC_INTERACTIONS` model). | `RewriteConfig.species_skip` |
-| `never_automatic` | Off; only `"on"` enables it (`fused_radial_hidden` requires `fold_cutoff`, `grouped_launch` and `fold_readout_tail` require `block_linear`, `fold_product_linear` requires `block_linear` and `species_tables`). | `RewriteConfig.fused_radial_hidden`, `RewriteConfig.grouped_launch`, `RewriteConfig.species_tables`, `RewriteConfig.fold_readout_tail`, `RewriteConfig.fold_product_linear` |
+| `never_automatic` | Off; only `"on"` enables it (`fused_radial_hidden` and `fused_radial_mlp` require `fold_cutoff`, `grouped_launch` and `fold_readout_tail` require `block_linear`, `fold_product_linear` requires `block_linear` and `species_tables`). | `RewriteConfig.fused_radial_hidden`, `RewriteConfig.fused_radial_mlp`, `RewriteConfig.grouped_launch`, `RewriteConfig.species_tables`, `RewriteConfig.fold_readout_tail`, `RewriteConfig.fold_product_linear` |
 | `on_with_block_linear` | On when `block_linear` is on. `merged_residual` acts only in interactions where `density_first` applies; the rewrite's `requires` handles that, not the rule. | `RewriteConfig.grouped_linear`, `RewriteConfig.merged_residual` |
 | `on_with_merged_residual` | On when `merged_residual` is on, so wherever block linear applies with `density_first` (owner decision, 20 October 2026). Stage 2: off unless the model supports `fold_cutoff`; the rewrite's own `applies_to` (MACE's `GatedEquivariantBlock` in a factored interaction) decides where it acts. | `RewriteConfig.gated_rows` |
 | `on_with_gated_rows_float32_unless_reproducible` | On when `gated_rows` is on, except in float64 plans and `reproducible=True` plans, which keep the stock products and join (owner decision, 20 October 2026); an explicit `"on"` is kept (in float64 its op runs the PyTorch path). At run time, per force call, the shared shape rule (`fastmace.kernels.triton.tile_rule`) picks the Triton GEMM; where no product qualifies (NaCl-sized cells) the stock products and join run. | `RewriteConfig.segment_gemm` |
@@ -282,6 +283,8 @@ model is an error with a reason, never a silent downgrade.
   None comes from the research engine.
 - Optimisation round 1 (plan task OPT-T06) added `EngineConfig.model_template_cache`,
   71 in all. It does not come from the research engine, which loaded once per process.
+- Optimisation round 2 (plan task OPT2-T02) added `RewriteConfig.fused_radial_mlp`, opt-in
+  (`never_automatic`). It does not come from the research engine.
 
 ## Open questions for the conductor
 

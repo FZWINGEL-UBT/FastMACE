@@ -68,6 +68,7 @@ class FactoredRadialMLP(torch.nn.Module):
         self.target = tuple(int(i) for i in target)
         self.fused_backward = False  # fused_folded_backward
         self.fused_hidden = None  # fused_radial_hidden: a fused_radial.hidden_plan
+        self.fused_stack = None  # fused_radial_mlp: a radial_mlp.RadialStack of rest[:-1]
 
     def first(self, inputs):
         """Output of the first linear layer (before its activation) for the concatenated inputs."""
@@ -81,6 +82,8 @@ class FactoredRadialMLP(torch.nn.Module):
     def after_first(self, hidden, cutoff=None):
         """The network from its first layer's output on (joint_radial_input computes that output)."""
         if cutoff is None:
+            if self.fused_stack is not None:
+                return self.rest[-1](self.fused_stack(hidden))
             if self.fused_hidden is not None:
                 return self.rest[-1](run_hidden_plan(hidden, self.fused_hidden))
             return self.rest(hidden)
@@ -95,7 +98,9 @@ class FactoredRadialMLP(torch.nn.Module):
         return self.augmented_after_first(self.first(inputs), cutoff)
 
     def augmented_after_first(self, hidden, cutoff):
-        if self.fused_hidden is not None:
+        if self.fused_stack is not None:
+            hidden = self.fused_stack(hidden)
+        elif self.fused_hidden is not None:
             hidden = run_hidden_plan(hidden, self.fused_hidden)
         else:
             hidden = self.rest[:-1](hidden)
