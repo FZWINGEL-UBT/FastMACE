@@ -436,3 +436,76 @@ full command is in `docs/validation/phase-0.md`. pytest needs
 `--basetemp=/mnt/homes/zwingel/fastmace-cache/<name>`: under a `TMPDIR` on
 the NAS it refuses its `pytest-of-zwingel` directory, because NFS reports
 another owner uid (1024) than the workstation login (1012).
+
+## Modal
+
+Plan task MODAL-T01 (owner, 21 October 2026): GPU jobs on [Modal](https://modal.com) while the
+workstations are unreachable.
+- **L4 (sm_89):** a stand-in for murphy's RTX 4000 Ada.
+- **A100 (sm_80):** a third architecture.
+- **H100:** also available.
+
+The code is in `tools/modal/`.
+
+**Client:**
+- **Venv:** `~/environments/modal_client` in WSL, Modal 1.6.2; the package list is
+  `~/environments/modal_client.requirements.txt`.
+- **Authentication:** the owner authenticates once with `modal token new`, and the token lives in
+  `~/.modal.toml`. Never print, copy or commit it.
+- **Profile:** `fzwingel`.
+
+**Image** (`tools/modal/fastmace_modal.py`):
+- **Base:** `debian_slim`, Python 3.10, with `g++`, `git` and `procps`.
+- **Packages:** `tools/modal/requirements-hybrid.txt`, which pins every package of
+  `~/environments/mace_cueq_oeq.requirements.txt` (recipe C/hybrid: torch 2.14.1+cu130 from the PyTorch
+  cu130 index, cuEquivariance 0.12.0, OpenEquivariance 0.7.0, MACE 0.3.16, e3nn 0.4.4, ASE 3.27.0,
+  NumPy 2.2.6). It drops the local `nfs-soft-locks` hook and adds pytest 9.1.1 and pytest-xdist 3.8.0.
+- **OpenEquivariance:** FastMACE builds its host extension in-process (`fastmace/kernels/_oeq_runtime.py`),
+  with `g++`; no `nvcc` and no `oeq_no_nvcc.sh` launcher.
+- **Records:** every job records the image's `pip freeze` (`pip-freeze.txt` and its sha256 in `modal.json`).
+
+**Volume** `fastmace-data`, mounted at `/data`:
+- `models/`: checkpoints from `~/models`;
+- `baseline/1a-T18/`: the research-engine export with the benchmark structures (`FASTMACE_STRUCTURES`);
+- `cache/<GPU>/`: FastMACE, Inductor, Triton and OEq caches, one set per GPU type. These are committed after
+  every job, so later runs skip compilation.
+
+**Entry points**, run from WSL in the worktree with the client's `modal`:
+
+```bash
+modal run tools/modal/fastmace_modal.py::upload --models mace-mh-1.model
+```
+
+```bash
+modal run tools/modal/fastmace_modal.py::smoke --commit <sha> --gpu L4
+```
+
+```bash
+modal run tools/modal/fastmace_modal.py::job --gpu L4 --timeout-min 80 --commit <sha> --command "bash tools/modal/opt_t08.sh" --out ~/fastmace-acceptance/modal-<run>
+```
+
+- **What a job runs:** `--commit` is `git archive`d from `--repo` (default: the main checkout, which sees
+  every pushed branch) with `.source_commit`, like the pinned copies. `--tarball` takes a ready archive
+  instead.
+- **Where the command runs:** from the source root, with `$OUT` as its results directory. The results come
+  back as `<out>/out/`, with `modal.json` holding:
+  - the GPU, driver and CUDA;
+  - the source commit and the command;
+  - the exit code and the wall time;
+  - an estimated GPU cost at the list prices in `PRICE_PER_HOUR`. CPU, memory and container start are billed
+    on top; the dashboard has the exact figure.
+- **Cost control:** every function has a timeout, and the container stops when the call returns. Smoke on the
+  L4 first.
+
+**Measured so far:**
+
+| Run | GPU, driver | Result | Wall time, GPU cost (est.) |
+| --- | --- | --- | --- |
+| Smoke, `724c118` | NVIDIA L4 (sm_89, 23 GB), driver 610.57.04, CUDA UMD 13.3; torch 2.14.1+cu130 sees capability (8, 9) | `tests/gpu/test_smoke.py`: 2 passed | 31 s, ≈ $0.007 |
+
+**Timing on Modal:**
+- **Labelling:** label every result "Modal <GPU>, not murphy".
+- **Same-process A/Bs only:** a Modal container's GPU is not shared, but its host is, and nothing guarantees
+  the same physical GPU or clocks between calls. Compare only within one container, in the same-process A/B
+  (both orders).
+- **Noise floor:** not measured yet on Modal.
