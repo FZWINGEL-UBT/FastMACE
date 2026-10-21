@@ -83,6 +83,9 @@ class RewriteConfig:
     # Triton input gradient of the folded last radial layer (FUSED_FOLDED_BACKWARD;
     # GENERIC_FUSED_RADIAL_BACKWARD for MP-0 and the density family).
     fused_folded_backward: Toggle = "auto"
+    # That input gradient's tiles by the waves rule (kernels.triton.skinny_linear.tile_choice): 128-row tiles
+    # where the 64-row grid is 2-8 waves over the SMs; bitwise the same (opt-2 OPT2-T03); opt-in, auto = off.
+    folded_backward_tiles: Toggle = "auto"
     # Run-segmented Triton sum of the reassociated first interaction (SEGMENTED_FIRST_SUM).
     segmented_first_sum: Toggle = "auto"
     # Receiver-streaming OEq convolution, OEq PR 223 kernels (STREAMING_CONVOLUTION;
@@ -171,6 +174,13 @@ class EngineConfig:
     # Keep each conversion's model as a template and give later plans a private copy of it instead of
     # reloading and converting the checkpoint (CUDA cuEq and hybrid only; opt-1 OPT-T06).
     model_template_cache: bool = True
+    # Pipelined fixed-cell steps: an early neighbour rebuild runs on a side stream beside the force graph
+    # in flight, instead of waiting for it (the rebuild reads positions, which B does not write). Exact:
+    # the same operations on the same positions. Opt-in (opt-2 OPT2-T04).
+    overlap_rebuild: bool = False
+    # Pipelined steps: one CUDA graph per step (ACP, the flags' copy to the host and an event inside the
+    # graph, then B) instead of two replays. Exact: the same kernels in the same order. Opt-in (OPT2-T04).
+    step_graph: bool = False
 
     def __post_init__(self):
         _check_choices(self)

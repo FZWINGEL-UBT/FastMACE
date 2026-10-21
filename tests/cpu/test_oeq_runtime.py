@@ -6,6 +6,7 @@ torch or OpenEquivariance and nothing touches a GPU.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import textwrap
@@ -181,7 +182,8 @@ def test_build_key_ignores_shapes_and_the_process(tmp_path):
     plan, runtime, driver, cache = make_plan(tmp_path)
     identity = identity_of(plan)
     text = repr(identity)
-    assert str(os.getpid()) not in text and "torch-extensions-x" not in text  # not the per-process directory
+    # not the per-process directory; the pid as a whole token, since a short pid can occur inside a hash
+    assert not re.search(rf"(?<![0-9a-fA-F]){os.getpid()}(?![0-9a-fA-F])", text) and "torch-extensions-x" not in text
     assert set(identity) == {"python", "prefix", "torch", "openequivariance", "cuda_runtime", "compiler",
                              "environment"}
 
