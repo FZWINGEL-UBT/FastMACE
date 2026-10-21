@@ -105,6 +105,10 @@ def _is_pytest(argv):
     """``pytest ...``, ``.../pytest ...`` or ``python -m pytest ...`` (not a shell whose script mentions it)."""
     if not argv:
         return False
+    # A queued ``local_gpu.py run -- python -m pytest ...`` wrapper is not a running pytest: counting it
+    # made the holder wait for every queued reservation (deadlock, round 2, 21 October 2026).
+    if any(Path(arg).name == "local_gpu.py" for arg in argv[:2]):
+        return False
     if Path(argv[0]).name == "pytest":
         return True
     return any(argv[i] == "-m" and argv[i + 1] == "pytest" for i in range(len(argv) - 1))
