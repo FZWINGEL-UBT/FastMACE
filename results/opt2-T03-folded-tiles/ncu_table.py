@@ -38,8 +38,8 @@ def table(path):
 
 
 if __name__ == "__main__":
-    print("| Structure | Tiles | Grid × block | Duration (µs) | DRAM % | L1 % | SM % | Occupancy achieved / theoretical % "
-          "| Registers | Waves |")
+    print("| Structure | Tiles | Grid × block | Duration (µs) | DRAM % | L1 % | SM % "
+          "| Occupancy achieved / theoretical % | Registers | Waves |")
     print("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in table(sys.argv[1]):
         print(f"| {r['structure']} | {r['rule']} | {r['grid']} × {r['block']} | {r['duration_us']} | {r['dram_pct']} | "
