@@ -1,0 +1,200 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-21T06:34:06.803240+00:00",
+      "host": "murphy",
+      "machine": "murphy",
+      "suites": [
+        "gate-omol0"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-2-T23/src-8e35fc4",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/tmp",
+        "TORCHINDUCTOR_COMPILE_THREADS": "4"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "8e35fc4f4ad7de08ae009258525e55b3b1f8cd6c",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-omol0-xl",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-2-T23/src-8e35fc4/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/gate-omol0-xl",
+            "--engine",
+            "fastmace",
+            "--structures-root",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--planner",
+            "minimal",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-omol-0-extra-large-1024.model",
+            "--model",
+            "omol0-xl",
+            "--structures",
+            "NaCl",
+            "NbCl5@2x2x2",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/gate-omol0-xl",
+          "timing": false,
+          "note": "counts (NbCl5 reduced)",
+          "idle_check": {
+            "utc": "2026-10-21T06:34:06.844165+00:00",
+            "compute_pids": [
+              3717024
+            ],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2800.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              10.35693359375,
+              6.4140625,
+              5.25830078125
+            ],
+            "users": [],
+            "idle": false,
+            "reasons": [
+              "compute processes on the GPU: [3717024]"
+            ],
+            "attempts": 1
+          },
+          "status": "gpu-busy"
+        }
+      ],
+      "status": "stopped",
+      "stopped": "GPU busy before gate-omol0-xl",
+      "failed": [],
+      "finished_utc": "2026-10-21T06:34:06.846980+00:00"
+    },
+    {
+      "started_utc": "2026-10-21T07:02:36.952666+00:00",
+      "host": "murphy",
+      "machine": "murphy",
+      "suites": [
+        "gate-omol0"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-2-T23/src-8e35fc4",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/tmp",
+        "TORCHINDUCTOR_COMPILE_THREADS": "4"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "8e35fc4f4ad7de08ae009258525e55b3b1f8cd6c",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-omol0-xl",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-2-T23/src-8e35fc4/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/gate-omol0-xl",
+            "--engine",
+            "fastmace",
+            "--structures-root",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--planner",
+            "minimal",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-omol-0-extra-large-1024.model",
+            "--model",
+            "omol0-xl",
+            "--structures",
+            "NaCl",
+            "NbCl5@2x2x2",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0/gate-omol0-xl",
+          "timing": false,
+          "note": "counts (NbCl5 reduced)",
+          "idle_check": {
+            "utc": "2026-10-21T07:02:36.997639+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              2.859375,
+              3.14599609375,
+              4.23974609375
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-21T07:02:37.000166+00:00",
+          "exit_code": 1,
+          "finished_utc": "2026-10-21T07:05:11.997954+00:00",
+          "wall_s": 154.99557323753834,
+          "status": "failed"
+        }
+      ],
+      "status": "failed",
+      "stopped": null,
+      "failed": [
+        "gate-omol0-xl"
+      ],
+      "finished_utc": "2026-10-21T07:05:12.000873+00:00"
+    }
+  ]
+}

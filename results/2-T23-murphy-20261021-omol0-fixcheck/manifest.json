@@ -1,0 +1,160 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-21T07:05:12.058698+00:00",
+      "host": "murphy",
+      "machine": "murphy",
+      "suites": [
+        "gate-local"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0-fixcheck",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-2-T23/src-fixcheck-911ad7b",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0-fixcheck/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0-fixcheck/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0-fixcheck/tmp",
+        "TORCHINDUCTOR_COMPILE_THREADS": "4"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "8e35fc4 (fastmace/ = be92979) + fastmace/rewrites/engine.py@911ad7b (2-T19b fix check, not acceptance)",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "gate-omol0-xl",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-2-T23/src-fixcheck-911ad7b/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0-fixcheck/gate-omol0-xl",
+            "--engine",
+            "fastmace",
+            "--structures-root",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--planner",
+            "minimal",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-omol-0-extra-large-1024.model",
+            "--model",
+            "omol0-xl",
+            "--structures",
+            "NaCl",
+            "NbCl5@2x2x2",
+            "--configs",
+            "3",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0-fixcheck/gate-omol0-xl",
+          "timing": false,
+          "note": "counts (NbCl5 reduced)",
+          "idle_check": {
+            "utc": "2026-10-21T07:05:12.107065+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 72.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              3.4375,
+              3.318359375,
+              4.1328125
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-21T07:05:12.110088+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-21T07:09:16.920792+00:00",
+          "wall_s": 244.8089912403375,
+          "status": "complete"
+        },
+        {
+          "name": "gate-omol0-xl-NaNbO3-model-limited",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "/mnt/homes/zwingel/fastmace-2-T23/src-fixcheck-911ad7b/tools/force_stress_gate.py",
+            "run",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0-fixcheck/gate-omol0-xl-NaNbO3-model-limited",
+            "--engine",
+            "fastmace",
+            "--structures-root",
+            "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+            "--planner",
+            "minimal",
+            "--checkpoint",
+            "/mnt/homes/zwingel/ResearchModule/Models/MACE-omol-0-extra-large-1024.model",
+            "--model",
+            "omol0-xl",
+            "--structures",
+            "NaNbO3@2x2x2",
+            "--configs",
+            "1",
+            "--reference-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python",
+            "--production-command",
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-omol0-fixcheck/gate-omol0-xl-NaNbO3-model-limited",
+          "timing": false,
+          "note": "model-limited",
+          "idle_check": {
+            "utc": "2026-10-21T07:09:16.963371+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 22.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              2.77685546875,
+              3.0400390625,
+              3.82177734375
+            ],
+            "users": [],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-21T07:09:16.966411+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-21T07:11:43.631673+00:00",
+          "wall_s": 146.6636044755578,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-21T07:11:43.633766+00:00"
+    }
+  ]
+}

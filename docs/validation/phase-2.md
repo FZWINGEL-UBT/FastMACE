@@ -29,7 +29,7 @@ of 20 October), which is withdrawn as physics.
 | 4 | Subprocess runner | acceptance tier: runner tests passed | acceptance tier: passed; the equilibrated repeat: both cases diverged (NaN) | **not judgeable**: root cause identified (`prepare()` edge-view capture, `d14be8c`); rerun after the fix |
 | 7 | GPU CI | – | – | deferred by the owner (eleventh amendment) |
 | 8 | No regression against `fastmace-1b` | plans: only `gated_rows`, `segment_gemm` differ; trajectories pass; main 3.6–4.0 % (NaCl) and 14.6–14.9 % (NbCl5) faster | plans as local; main 3.7–4.1 % (NaCl, 6 processes) and 13.5–13.6 % (NbCl5) faster | **pass** |
-| Gate | 19 labels, new defaults | 9 of 10 pass; **OMOL-0 XL crashed** in its production build | 5 of 9 judged: MP-0 L, POLAR-1-S/M/L, OFF23-S pass; OFF23-M, OFF23-L, OFF23b-M, OFF24-M not run (GPU taken) | **incomplete**: 14 of 19 pass, OMOL-0 XL fails to build, 4 labels still to run |
+| Gate | 19 labels, new defaults | 9 of 10 pass; **OMOL-0 XL crashed** in its production build | all 9 pass (the 4 MACE-OFF labels rerun 06:38–07:02 after the GPU was taken); OMOL-0 XL as frozen crashes here too | **18 of 19 pass**; OMOL-0 XL fails to build at the freeze and passes with the fix (2-T19b, a fix check, not acceptance) |
 | Tier | Acceptance GPU tier | 31 passed, 2 failed (test-side on WSL; rerun with the fixes pending) | **33 / 33 passed** | see below |
 | – | Round's GPU files outside the tier (`round-tests`) | 9 / 9 passed | – | pass |
 
@@ -64,9 +64,13 @@ yardstick, floor)):
 | polar1-s (NaCl; NbCl5 ×4) | 1.10 / 1.04 | 1.03 / 1.94 | 1.65 / 1.50 | murphy | yes |
 | polar1-m (NaCl, NaNbO3; NbCl5 ×4) | 1.36 / 0.87 | 1.47 / 0.70 | 1.48 / 0.62 | murphy | yes |
 | polar1-l (NaCl, NaNbO3 2×2×2; NbCl5 ×4) | 0.79 / 1.43 | 1.12 / 0.94 | 1.00 / 1.12 | murphy | yes |
-| omol0-xl | – | – | – | local | **build crash** |
+| omol0-xl | – | – | – | local, murphy | **build crash** at the freeze (same `NameError` on both cards) |
+| omol0-xl, fix check with 2-T19b `911ad7b` | 1.90 | 1.14 | 1.19 | murphy | yes (E max 0.0082 meV/atom; 1b: 1.85 / 1.25 / 1.48) |
 | off23-small | 1.32 | 1.13 | 1.00 | murphy | yes |
-| off23-medium, off23-large, off23b-medium, off24-medium | – | – | – | murphy | **not run** |
+| off23-medium | 1.25 | 1.02 | 1.19 | murphy | yes |
+| off23-large (paracetamol 2×2×2) | 1.14 | 1.03 | 1.11 | murphy | yes |
+| off23b-medium | 1.36 | 1.05 | 0.96 | murphy | yes |
+| off24-medium | 1.36 | 1.06 | 1.67 | murphy | yes |
 
 \* below the 0.01 meV/atom floor, so it passes (1b: 2.65).
 
@@ -88,14 +92,24 @@ yardstick, floor)):
    `fastmace/2-T19b` (`911ad7b`); the OMOL-0 XL gate is rerun on the fixed commit. A murphy pair (as
    frozen, and `--engine-config model_template_cache=false`) was queued but refused because the GPU was
    taken (point 4).
-3. **Two local acceptance failures, both test-side on WSL** (murphy passed both):
-   `test_a_failed_candidates_memory_is_freed_before_the_next_build` (113 MiB stayed resident: OPT-T06's
-   template; fixed in `fastmace/2-T15d`, `8ec5063`) and `test_a_killed_parent_releases_the_workers_gpu_memory`
-   (cuEquivariance's "GPU information" line on stdout ahead of the JSON; fixed in `fastmace/opt-T07b`,
-   `9f2aca7`). The rerun of just these two with the fixed test files waits for the local reservation.
+3. **Two local acceptance failures, both judged test-side on WSL** (murphy passed both). Rerun of just these
+   two with the fixed test files (`rerun-two-tests`, 06:37–06:41 UTC):
+   - `test_a_killed_parent_releases_the_workers_gpu_memory`: cuEquivariance prints "GPU information" to
+     stdout ahead of the test's JSON line where pynvml is unsupported; fixed in `fastmace/opt-T07b`
+     (`9f2aca7`). **Passed** on rerun.
+   - `test_a_failed_candidates_memory_is_freed_before_the_next_build`: 113 MiB stayed resident (OPT-T06's
+     template). With 2-T15d's test (`8ec5063`), which subtracts the template, it **still fails**: 88.7 MiB
+     at the first later builds against a bound of 82.1 MiB (0.1 × 180.7 + 64), then 24.6 MiB. The fallback
+     itself worked (ddmin found `block_linear` and its dependants; revision 1 passed the gate). Open for
+     the 2-T15 worker.
 4. **The gate on murphy was cut short** at 06:32 UTC when another session's GPU job
-   (`2-T21d/gpu_confirm.py`) started on murphy during it. OFF23-M failed its own idle check, and
-   OFF23-L, OFF23b-M, OFF24-M and the OMOL-0 XL pair did not run.
+   (`2-T21d/gpu_confirm.py`) started on murphy during it. OFF23-M failed its own idle check, and OFF23-L,
+   OFF23b-M, OFF24-M did not run. They were rerun as frozen once murphy was free again (run
+   `2-T23-murphy-20261021-gate-rest`) and all pass. OMOL-0 XL ran as frozen on murphy (run
+   `2-T23-murphy-20261021-omol0`): the same `NameError` as locally. With 2-T19b's one-file fix (copy
+   `src-fixcheck-911ad7b`: tools `8e35fc4`, `fastmace/rewrites/engine.py` from `911ad7b`; run
+   `2-T23-murphy-20261021-omol0-fixcheck`) it builds and passes; its NaNbO3 model-limited job runs and is,
+   as in 1b, outside the count.
 
 ## The runs of 20 October 2026 (main `85360cc`)
 
