@@ -83,7 +83,7 @@ How to read the tables:
 | none: the research engine loads and converts once per process (new in the library, opt-1 OPT-T06) | `EngineConfig.model_template_cache` | `True` | — | planner (`ForceField.execution_model`: later plans copy a converted template; CUDA cuEq and hybrid only) |
 | none: the research engine's early rebuild waits for the force call in flight (new in the library, opt-2 OPT2-T04) | `EngineConfig.overlap_rebuild` | `True` | — | engine (`GraphEngine._rebuild(beside=True)`: a pipelined fixed-cell CUDA step's early rebuild runs on a side stream; exact) |
 | none: the research engine replays ACP and B as two graphs (new in the library, opt-2 OPT2-T04) | `EngineConfig.step_graph` | `False` | — | engine (`GraphEngine._step_pipelined`: one `("ACPB", edges)` graph per step with the flags' copy and an external event inside; exact) |
-| none: the research engine runs the integrator stage as PyTorch operations (new in the library, opt-3 OPT3-T03) | `EngineConfig.fused_integrator` | `False` | — | engine (`GraphEngine._stage_ac`/`_stage_acp`: fixed-cell CUDA Langevin's half kick, drift, neighbour checks, compaction and flags in four Triton kernels; exact) |
+| none: the research engine runs the integrator stage as PyTorch operations (new in the library, opt-3 OPT3-T03) | `EngineConfig.fused_integrator` | `True` | — | engine (`GraphEngine._stage_ac`/`_stage_acp`: fixed-cell CUDA Langevin's half kick, drift, neighbour checks, compaction and flags in four Triton kernels; exact, also in reproducible plans; default on by owner decision, 21 October 2026; NPT, CPU and no Triton keep the PyTorch stage) |
 
 ## 3. Precision → `PrecisionConfig`
 
@@ -295,7 +295,8 @@ model is an error with a reason, never a silent downgrade.
   71 in all. It does not come from the research engine, which loaded once per process.
 - Optimisation round 2 (plan task OPT2-T04) added `EngineConfig.overlap_rebuild` and
   `EngineConfig.step_graph`, 73 in all (both opt-in).
-- Optimisation round 3 (plan task OPT3-T03) added `EngineConfig.fused_integrator`, 74 in all (opt-in).
+- Optimisation round 3 (plan task OPT3-T03) added `EngineConfig.fused_integrator`, 74 in all; on by default
+  since the owner's decision of 21 October 2026.
 
 ## Open questions for the conductor
 

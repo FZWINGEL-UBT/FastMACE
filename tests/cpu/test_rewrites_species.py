@@ -410,6 +410,7 @@ def test_default_mh1_hybrid_plan_has_all_three_on():
     assert plan.engine.backend == "hybrid" and plan.precision.dtype == "float32"
     assert all(getattr(plan.rewrites, name) == "on" for name in NAMES)
     assert plan.rewrites.folded_backward_tiles == "on" and plan.engine.overlap_rebuild is True
+    assert plan.engine.fused_integrator is True  # OPT3-T03, owner decision 21 October 2026
 
 
 @pytest.mark.parametrize(("precision", "reproducible"), [("float64", False), ("float64", True), ("float32", True)])
@@ -420,7 +421,7 @@ def test_float64_and_reproducible_plans_keep_the_stock_products(precision, repro
     configs = {"engine": EngineConfig(backend="cueq")} if reproducible else {}
     plan = _default_plan(precision=precision, reproducible=reproducible, **configs)
     assert all(getattr(plan.rewrites, name) == "off" for name in NAMES), plan.rewrites
-    assert plan.engine.overlap_rebuild is True
+    assert plan.engine.overlap_rebuild is True and plan.engine.fused_integrator is True  # exact: stays on
     reason = str(plan.decision("RewriteConfig.species_tables")[2])
     assert ("reproducible=True keeps the stock products" if reproducible else "float64 keeps the stock products") \
         in reason

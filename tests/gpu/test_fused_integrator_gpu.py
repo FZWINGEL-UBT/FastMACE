@@ -8,9 +8,9 @@
    velocities) is compared byte for byte. Also with an atom moved past the early and the hard
    rebuild limit (so the flags are set), and with ``fixcm=False``.
 2. Trajectories in ``reproducible=True`` (plain cuEq float64, the deterministic process), NaCl at
-   1000 K and 2 fs, 600 steps, each in a fresh process: the option off and on, pipelined and checked,
-   a save/resume at step 300 off and on, and NPT (``LangevinBAOAB``, which keeps the PyTorch stage).
-   Positions and momenta bitwise equal to the option off.
+   1000 K and 2 fs, 600 steps, each in a fresh process: the default (the option on) and the option off,
+   pipelined and checked, a save/resume at step 300, and NPT (``LangevinBAOAB``, which keeps the PyTorch
+   stage). Positions and momenta bitwise equal to the option off: it stays on in reproducible plans.
 """
 
 import importlib.util
@@ -151,13 +151,18 @@ def test_the_fused_stage_writes_the_pytorch_stage_bytes(fixcm):
     assert hard["pipe_flags"][0] == 1 and hard["flags"][0] == 1, hard
 
 
+def _engine(fused):
+    """The default engine (on since the owner's decision of 21 October 2026) or the option switched off."""
+    return {} if fused else {"fused_integrator": False}
+
+
 GROUPS = {
-    "nvt": {f"{pipelined}-{fused}": dict(pipelined=pipelined, engine={"fused_integrator": fused}, restart=False,
+    "nvt": {f"{pipelined}-{fused}": dict(pipelined=pipelined, engine=_engine(fused), restart=False,
                                          npt=False) for pipelined in ("on", "off") for fused in (False, True)},
     "restart-npt": {
-        **{f"restart-{fused}": dict(pipelined="on", engine={"fused_integrator": fused}, restart=True, npt=False)
+        **{f"restart-{fused}": dict(pipelined="on", engine=_engine(fused), restart=True, npt=False)
            for fused in (False, True)},
-        **{f"npt-{fused}": dict(pipelined="off", engine={"fused_integrator": fused}, restart=False, npt=True)
+        **{f"npt-{fused}": dict(pipelined="off", engine=_engine(fused), restart=False, npt=True)
            for fused in (False, True)}},
 }
 
