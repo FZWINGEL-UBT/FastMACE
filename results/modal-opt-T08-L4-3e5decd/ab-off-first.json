@@ -1,0 +1,340 @@
+{
+  "tool": "opt-T08 ab_species",
+  "created_utc": "2026-10-21T15:34:43.171134+00:00",
+  "host": "modal",
+  "gpu": "NVIDIA L4",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "3e5decd3f8ae7c7d6258f945ad6436138ac3420f",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "rewrites": {
+    "species_tables": "on",
+    "fold_readout_tail": "on",
+    "fold_product_linear": "on"
+  },
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "order": [
+    "off",
+    "on"
+  ],
+  "load": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "off",
+          "on"
+        ],
+        "pattern": "abab",
+        "order": [
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on"
+        ],
+        "sides": {
+          "off": {
+            "median_ms": 4.694483216666944,
+            "mean_ms": 4.648124373611293,
+            "min_ms": 4.455992423333252,
+            "max_ms": 4.911620983333856,
+            "stdev_ms": 0.13275056650582268,
+            "spread": 0.09705616975750905,
+            "block_ms": [
+              4.455992423333252,
+              4.503300409999913,
+              4.495976700000028,
+              4.500857436667047,
+              4.911620983333856,
+              4.698210690000148,
+              4.670835946666709,
+              4.703842356667186,
+              4.690755743333739,
+              4.7132142033334885,
+              4.725833356666651,
+              4.707052233333495
+            ]
+          },
+          "on": {
+            "median_ms": 4.310272513333378,
+            "mean_ms": 4.261084331388803,
+            "min_ms": 4.07562769999989,
+            "max_ms": 4.523627263333765,
+            "stdev_ms": 0.13612709253798855,
+            "spread": 0.10393764244558437,
+            "block_ms": [
+              4.07562769999989,
+              4.093062623333026,
+              4.09079754000004,
+              4.123030306666351,
+              4.523627263333765,
+              4.306203263333069,
+              4.294297766666659,
+              4.3257165366662775,
+              4.314825973333427,
+              4.314341763333687,
+              4.340092206666668,
+              4.331389033332774
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9181569758371927,
+        "pair_ratios_b_over_a": [
+          0.9146397284381299,
+          0.9089028602764487,
+          0.9098796130326952,
+          0.9160544106723623,
+          0.9210049551224262,
+          0.9165623994893539,
+          0.9193852697248419,
+          0.9196134157291738,
+          0.9198573128574081,
+          0.9153714593073887,
+          0.9183760575357943,
+          0.9201914103819749
+        ]
+      },
+      "ratio_on_over_off": 0.9181569758371927,
+      "pair_ratios": [
+        0.9146397284381299,
+        0.9089028602764487,
+        0.9098796130326952,
+        0.9160544106723623,
+        0.9210049551224262,
+        0.9165623994893539,
+        0.9193852697248419,
+        0.9196134157291738,
+        0.9198573128574081,
+        0.9153714593073887,
+        0.9183760575357943,
+        0.9201914103819749
+      ],
+      "setup_s": {
+        "off": 103.92387280100002,
+        "on": 74.00960688800001
+      },
+      "plan_lines": {
+        "off": [
+          "RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ],
+        "on": [
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))",
+          "requested: RewriteConfig.species_tables=on, RewriteConfig.fold_readout_tail=on, RewriteConfig.fold_product_linear=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "off": {
+          "temperature_K": 269.4821391583065,
+          "potential_eV_atom": -6.847992540509613,
+          "kinetic_eV_atom": 0.03483324919660597
+        },
+        "on": {
+          "temperature_K": 269.48217974160104,
+          "potential_eV_atom": -6.847992297675875,
+          "kinetic_eV_atom": 0.034833254442400804
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "other_gpu_processes": [
+        1
+      ],
+      "valid": false
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "off",
+          "on"
+        ],
+        "pattern": "abab",
+        "order": [
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on",
+          "off",
+          "on"
+        ],
+        "sides": {
+          "off": {
+            "median_ms": 37.293742216666416,
+            "mean_ms": 37.27294571805544,
+            "min_ms": 37.115151303333576,
+            "max_ms": 37.44283903333326,
+            "stdev_ms": 0.09014889986618033,
+            "spread": 0.008786667964182981,
+            "block_ms": [
+              37.34329637999963,
+              37.115151303333576,
+              37.19981782999942,
+              37.17144125000004,
+              37.315396859999815,
+              37.44283903333326,
+              37.28306824333306,
+              37.18314135333306,
+              37.29558303333306,
+              37.32979456333321,
+              37.30391736666737,
+              37.291901399999766
+            ]
+          },
+          "on": {
+            "median_ms": 34.37361303333357,
+            "mean_ms": 34.3244177622222,
+            "min_ms": 33.77683731000009,
+            "max_ms": 34.53428065666685,
+            "stdev_ms": 0.20471278656805222,
+            "spread": 0.022035604634643324,
+            "block_ms": [
+              34.53428065666685,
+              33.77683731000009,
+              34.14407342000004,
+              34.216959860000316,
+              34.506956746666525,
+              34.43912909333297,
+              34.32561377666616,
+              34.354344729999866,
+              34.404104006666785,
+              34.361813936667055,
+              34.443487479999625,
+              34.38541213000008
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9216992178910955,
+        "pair_ratios_b_over_a": [
+          0.9247785815491845,
+          0.9100552233762914,
+          0.9178559308014916,
+          0.9205174378327414,
+          0.9247377664541525,
+          0.9197787876788336,
+          0.9206756684464736,
+          0.9239226025458006,
+          0.9224712743039302,
+          0.9204929825790839,
+          0.9233209247556489,
+          0.9220611135156624
+        ]
+      },
+      "ratio_on_over_off": 0.9216992178910955,
+      "pair_ratios": [
+        0.9247785815491845,
+        0.9100552233762914,
+        0.9178559308014916,
+        0.9205174378327414,
+        0.9247377664541525,
+        0.9197787876788336,
+        0.9206756684464736,
+        0.9239226025458006,
+        0.9224712743039302,
+        0.9204929825790839,
+        0.9233209247556489,
+        0.9220611135156624
+      ],
+      "setup_s": {
+        "off": 105.75863744000003,
+        "on": 108.51853784900004
+      },
+      "plan_lines": {
+        "off": [
+          "RewriteConfig.species_tables = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "RewriteConfig.fold_readout_tail = off  (auto (never_automatic): off: only an explicit 'on' enables it)",
+          "RewriteConfig.fold_product_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it)"
+        ],
+        "on": [
+          "RewriteConfig.species_tables = on  (requested 'on': opt-in (OPT-T08))",
+          "RewriteConfig.fold_readout_tail = on  (requested 'on': stage 1: on (with block_linear))",
+          "RewriteConfig.fold_product_linear = on  (requested 'on': stage 1: on (with block_linear and species_tables))",
+          "requested: RewriteConfig.species_tables=on, RewriteConfig.fold_readout_tail=on, RewriteConfig.fold_product_linear=on, EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "off": {
+          "temperature_K": 296.469502415478,
+          "potential_eV_atom": -10.585376010878097,
+          "kinetic_eV_atom": 0.03832163455836886
+        },
+        "on": {
+          "temperature_K": 296.4695720072755,
+          "potential_eV_atom": -10.585375723279553,
+          "kinetic_eV_atom": 0.03832164355380147
+        }
+      },
+      "load_after": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "other_gpu_processes": [
+        1
+      ],
+      "valid": false
+    }
+  }
+}
