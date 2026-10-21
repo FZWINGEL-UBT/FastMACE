@@ -9,7 +9,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | 0. Skeleton | [phase-0.md](phase-0.md) | done (17 October 2026); report `docs/validation/phase-0.md` |
 | 1a. Extraction | [phase-1a.md](phase-1a.md) | **all 20 merged; acceptance passed** (18 October 2026, `docs/validation/phase-1a.md`); owner checkpoint 3 decided (19 October: `main.py` defaults to FastMACE) |
 | 1b. Contracts | [phase-1b.md](phase-1b.md) | **done** (19–20 October 2026), tag `fastmace-1b`; acceptance report `docs/validation/phase-1b.md` |
-| 2. Safety | [phase-2.md](phase-2.md) | **combined acceptance run 21 October 2026, not yet passed** (freeze `be92979`; report `docs/validation/phase-2.md`). Item 8 passes; the gate passes 18 of 19, with OMOL-0 XL fixed by 2-T19b. Item 4 can't be judged: hybrid `Simulation` runs heat up, and the cause is under investigation (2-T21d) |
+| 2. Safety | [phase-2.md](phase-2.md) | **acceptance complete** (21 October 2026, report `docs/validation/phase-2.md`, merged `89ea581`): every item passes except item 7 (deferred by the owner). Results come from the freeze `be92979`, and from `f993713` for what its two defects touched (item 4, the Simulation-driven GPU tests, OMOL-0 XL). The 19-label gate passes 19 of 19. Tag `fastmace-2`: owner's call |
 | Optimisation round 1 | [opt-1.md](opt-1.md) | done except OPT-T08's GPU A/B. Defaults since 20 October: `gated_rows`, `segment_gemm`, template cache, persistent worker. Measured end to end against `fastmace-1b`: NaCl −3.6 to −4.1 %, NbCl5 −13.5 to −14.9 % on both GPUs |
 | 3. Dynamic topology and MC | — | after optimisation round 1 |
 | 3b. NPT for the chlorides | — | |
@@ -48,10 +48,12 @@ workers"). 2-T21 works in the ResearchModule worktree
     - the murphy tier, 33 of 33;
     - the local tier, 31 of 33. Its 2 failures were test-side and are fixed in 2-T15d and opt-T07b, both merged.
   - **Gate:** 18 of 19 labels pass. OMOL-0 XL hit a Dynamo `NameError` from per-build strain rebinding. It is fixed in 2-T19b (merged in `314210d`), and the GPU fix check passed on murphy.
-  - **Open:** item 4. Hybrid `fm.Simulation` runs (in-process and runner) heat up after about 0.2 ps and reach NaN, while the direct planner-engine path stays smooth.
-    - 2-T21d is bisecting on murphy.
-    - Its first suspect, `prepare()` capturing B/ACB with the build's edge views, is a real fault. Its fix stays as hardening, but it did not reproduce the heating locally.
-    - ResearchModule's `AGENTS.md` warns that hybrid `main.py --engine fastmace` (`--fastmace-api simulation`) runs on FastMACE ≥ `d14be8c` are suspect.
+  - **Item 4, resolved:** hybrid `fm.Simulation` runs heated and reached NaN because `GraphEngine.prepare()` (2-T15b, `d14be8c`) captured B/ACB with the build's edge views. Edges added later inside the padded bucket were dropped.
+    - Fixed by 2-T21d (merged in `5d1848b`), confirmed on both GPUs.
+    - Item 4 then passed on `f993713`.
+    - ResearchModule's `AGENTS.md` records `d14be8c` up to `5d1848b` as the invalid range for hybrid `main.py --engine fastmace`.
+  - **Also merged:** 2-T07c, the heartbeat rename race under load.
+  - **Follow-up, not urgent:** a fallback's reason truncates chained compile errors and should carry the innermost message (2-T21d note).
 - Working in phase 2:
   - 2-T14e (float64 reuse: duplicate removed; owner decisions of 20 October:
     ASE-equivalence reference 4,000 steps, limits 1e-6 K and 1e-7 meV/atom;
