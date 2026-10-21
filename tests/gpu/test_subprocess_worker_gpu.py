@@ -121,6 +121,15 @@ def test_the_worker_equals_fresh_children_bitwise_and_releases_the_gpu(tmp_path)
     assert abs(worker["free_change_MiB"]) <= 64
 
 
+def _result_line(stream):
+    """The driver's JSON line: libraries may print to stdout first (cuEquivariance's Triton cache
+    manager prints "GPU information: ..." where pynvml is not supported, as in WSL). ``None`` at EOF."""
+    for line in stream:
+        if line.startswith("{"):
+            return json.loads(line)
+    return None
+
+
 def test_a_killed_parent_releases_the_workers_gpu_memory(tmp_path):
     root = ENGINE.REPOSITORY_ROOT
     environment = dict(os.environ, PYTHONPATH=os.pathsep.join([str(root), str(root / "tests")]),
@@ -129,8 +138,8 @@ def test_a_killed_parent_releases_the_workers_gpu_memory(tmp_path):
     parent = subprocess.Popen([sys.executable, "-c", code], cwd=root, env=environment, stdout=subprocess.PIPE,
                               text=True)
     try:
-        line = parent.stdout.readline()
-        out = json.loads(line)
+        out = _result_line(parent.stdout)
+        assert out is not None, f"the parent exited ({parent.poll()}) without its result line"
         pid = out["subprocess"]["last"]["pid"]
         assert _listed(pid)
     finally:

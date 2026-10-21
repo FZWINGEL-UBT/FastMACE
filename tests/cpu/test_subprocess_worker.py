@@ -319,7 +319,9 @@ def _parent(loaded, tmp_path, mode):
                        FASTMACE_CACHE=str(tmp_path / "cache"), CUDA_VISIBLE_DEVICES="")
     process = subprocess.Popen([sys.executable, str(script), str(loaded.path), mode], stdout=subprocess.PIPE,
                                env=environment, text=True)
-    pid = int(process.stdout.readline())
+    # The pid line; a library may print to stdout first (cuEquivariance's "GPU information: ..." line).
+    pid = next((int(line) for line in process.stdout if line.strip().isdigit()), None)
+    assert pid is not None, f"the parent exited ({process.poll()}) without printing the worker's pid"
     return process, pid
 
 
