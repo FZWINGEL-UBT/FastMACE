@@ -84,6 +84,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
+    "RewriteConfig.grouped_launch": "never_automatic",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
 })
@@ -99,7 +100,8 @@ STAGE2_SUPPORT = (
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "segmented_first_sum", "fused_radial_hidden", "streaming_conv",
-                  "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "species_skip",
+                  "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
+                  "species_skip",
                   "single_graph_strain")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
@@ -553,6 +555,9 @@ class FixedPlanner:
         needs("merged_residual", r.merged_residual != "off", v["block_linear"], "block_linear")
         needs("gated_rows", r.gated_rows != "off", v["merged_residual"], "merged_residual")
         needs("segment_gemm", r.segment_gemm != "off", v["gated_rows"], "gated_rows")
+        needs("grouped_launch", r.grouped_launch == "on", v["block_linear"], "block_linear")
+        if r.grouped_launch == "auto":
+            v["_why"]["grouped_launch"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
         note("single_graph_strain", r.single_graph_strain != "off",
              "acts where stress is computed (NPT)" if npt else "process-wide; acts only where stress is computed")
