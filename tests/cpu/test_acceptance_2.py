@@ -482,3 +482,19 @@ def test_simulation_tests_job_covers_every_tier_of_the_simulation_files():
     assert files == set(suites.SIMULATION_TEST_FILES)
     for name in files:
         assert (REPOSITORY_ROOT / "tests" / "gpu" / name).is_file()
+
+
+# --- tools/ab_fastmace.py --release 2 (native Ada A/B on leeloo, 22 October 2026) ----------------------------
+
+
+def test_release_2_sides_and_commit(tmp_path):
+    args = ab_fastmace.parse_args(_args(tmp_path, "--release", "2"))
+    assert args.sides == ["2", "3"] and args.current == "3" and args.expected_commit == "e52c482"
+    assert ab_fastmace.RELEASES["2"].tag == "fastmace-2" and ab_fastmace.RELEASES["2"].renamed == "fastmace_2"
+
+
+def test_engine_options_apply_to_this_checkout_only(tmp_path):
+    args = ab_fastmace.parse_args(_args(tmp_path, "--release", "2", "--engine-option", "fused_integrator=on"))
+    assert args.engine_options == {"fused_integrator": True}
+    with pytest.raises(SystemExit):
+        ab_fastmace.parse_args(_args(tmp_path, "--release", "2", "--engine-option", "fused_integrator"))
