@@ -448,3 +448,10 @@ def test_round_tests_job_selects_the_round_files_outside_the_acceptance_tier():
     assert argv[argv.index("-m", argv.index("pytest")) + 1] == "not acceptance" and not job.timing
     files = [Path(item).name for item in argv if item.endswith(".py")]
     assert "test_canonical_restart_gpu.py" in files and "test_reproducible_gpu.py" in files
+
+
+@pytest.mark.parametrize("ratio, one_sided, passed", [
+    (0.96, True, True), (0.96, False, False), (1.0015, True, True), (1.0017, True, False)])
+def test_regression_rows_one_sided(ratio, one_sided, passed):
+    (row,) = summarize2.regression_rows("p", _ab_meta(ratio), "murphy", one_sided=one_sided)
+    assert row["passed"] is passed and row["one_sided"] is one_sided

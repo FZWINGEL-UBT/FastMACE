@@ -5,7 +5,8 @@
 Reads the jobs' outputs under RUN_ROOT (from run.py) and derives:
 
 - regression (item 8): this checkout's median step time over fastmace-1b's, per A/B process and
-  structure. The rule is |ratio - 1| <= that machine's own noise floor for 12 blocks (murphy 0.16 %,
+  structure. The rule is |ratio - 1| <= that machine's own noise floor for 12 blocks (with --one-sided,
+  ratio - 1 <= floor: the combined acceptance after optimisation round 1) (murphy 0.16 %,
   docs/validation/1a-noise-floor.md; RTX 5060 Ti 1.1 % NaCl and 0.4 % NbCl5,
   docs/validation/2-T12-local-noise-floor.md). A row is valid only if nothing compiled and no process-wide
   patch changed while timed, and the two plans' engine options are equal;
@@ -35,7 +36,7 @@ def noise_floor(machine, structure):
     return floors.get(structure, floors.get(None))
 
 
-def regression_rows(name, meta, machine):
+def regression_rows(name, meta, machine, one_sided=False):
     """One row per structure of an A/B process of tools/ab_fastmace.py --release 1b."""
     current, release = meta["current_side"], meta["release_side"]
     rows = []
@@ -53,7 +54,8 @@ def regression_rows(name, meta, machine):
                          plan_differences=entry["plan_check"].get("differences"),
                          plan_describe_equal=entry.get("plan_describe_equal"),
                          observables_difference=entry.get("observables_difference"),
-                         valid=valid, passed=bool(valid and abs(ratio - 1) <= floor)))
+                         one_sided=one_sided,
+                         passed=bool(valid and (ratio - 1 <= floor if one_sided else abs(ratio - 1) <= floor))))
     return rows
 
 
@@ -105,7 +107,7 @@ def junit_totals(path):
     return totals
 
 
-def summarize_run(run_root, machine, allowed=()):
+def summarize_run(run_root, machine, allowed=(), one_sided=False):
     run_root = Path(run_root)
     summary = dict(run_root=str(run_root), machine=machine, regression=[], controls=[], forces=[], trajectories={},
                    tiers={})
@@ -119,7 +121,7 @@ def summarize_run(run_root, machine, allowed=()):
             summary["regression"].append(dict(job=directory.name, status=meta.get("status"), error=meta.get("error")))
             continue
         if len(meta["sides"]) == 2:
-            summary["regression"] += regression_rows(directory.name, meta, machine)
+            summary["regression"] += regression_rows(directory.name, meta, machine, one_sided)
             ab.append(directory.name)
         else:
             summary["controls"] += control_rows(directory.name, meta)
@@ -182,10 +184,13 @@ def main(argv=None):
     p.add_argument("run_root", type=Path)
     p.add_argument("--machine", required=True, choices=sorted(NOISE_FLOORS))
     p.add_argument("--output", type=Path, help="Write the summary JSON here")
+    p.add_argument("--one-sided", action="store_true",
+                   help="Step times: only slower than the floor fails (the combined acceptance, where main is "
+                        "expected to be faster than the release)")
     p.add_argument("--allow-option-changes", nargs="*", default=[], metavar="OPTION",
                    help="Plan options whose difference between the versions is expected (the trajectory checks)")
     args = p.parse_args(argv)
-    summary = summarize_run(args.run_root, args.machine, args.allow_option_changes)
+    summary = summarize_run(args.run_root, args.machine, args.allow_option_changes, args.one_sided)
     if args.output:
         args.output.write_text(json.dumps(summary, indent=2, default=str) + "\n")
     print(markdown(summary))
