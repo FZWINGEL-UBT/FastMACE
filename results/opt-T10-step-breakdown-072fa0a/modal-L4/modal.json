@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "L4",
+  "source_commit": "072fa0ae3763f36d853d64829456d1b776539dd5",
+  "command": "for s in NaCl NbCl5 NaNbO3; do python tools/step_breakdown.py --output $OUT/$s --checkpoint $FASTMACE_MODELS/mace-mh-1.model --model mh1-r2scan --backend hybrid --temperature-K 1000 --structure $s > $OUT/$s.log 2>&1; echo \"$s exit=$?\" >> $OUT/run.log; done",
+  "nvidia_smi": "NVIDIA L4, 610.57.04, 23034 MiB, 8.9",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "b63263d3360b82d4b5301216531d2ee2287b83819fe6a2aaf1b8dc3ecc3a9dbf",
+  "exit": 0,
+  "wall_s": 766.0764408111572,
+  "estimated_gpu_cost_usd": 0.17023920906914605
+}
