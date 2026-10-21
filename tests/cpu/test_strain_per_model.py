@@ -32,6 +32,20 @@ from fastmace.rewrites import registry as reg
 pytest.importorskip("mace")
 
 
+def _dynamo_name(name):
+    """A global Dynamo adds to the dict of a frame it compiles (2-T19b: rebound globals live per process)."""
+    return name.startswith(("__compiled_fn", "__resume_at", "__import_", "___", "__builtins_dict"))
+
+
+def _module_names(namespace):
+    return {name for name in namespace if not _dynamo_name(name)}
+
+
+def _same_bytecode(rebound, original):
+    """A rebound function runs MACE's bytecode from its own code object (2-T19b: Dynamo caches per code object)."""
+    return rebound.__code__ == original.__code__ and rebound.__code__ is not original.__code__
+
+
 @pytest.fixture(autouse=True)
 def _no_strain_patch():
     """Every test starts and ends without the process patch (the reference calculators' toggle)."""
@@ -72,11 +86,11 @@ def test_prepare_graph_variant_is_a_snapshot_of_utils_except_the_strain_function
     from mace.modules import utils
 
     variant = engine.strain_prepare_graph(one_graph)
-    assert variant.__code__ is utils.prepare_graph.__code__
+    assert _same_bytecode(variant, utils.prepare_graph)
     module = vars(utils)
     assert variant.__globals__ is not module
-    assert set(variant.__globals__) == set(module)
-    differ = [name for name in module if variant.__globals__[name] is not module[name]]
+    assert _module_names(variant.__globals__) == _module_names(module)
+    differ = [name for name in _module_names(module) if variant.__globals__[name] is not module[name]]
     # Off without the process patch: MACE's own function, the same object as the module's.
     assert differ == (["get_symmetric_displacement"] if one_graph else [])
     expected = (engine.single_graph_symmetric_displacement if one_graph
@@ -99,9 +113,9 @@ def test_rebound_forward_differs_from_its_module_only_in_prepare_graph(one_graph
     from mace.modules import models
 
     forward = engine.strain_forward(models.ScaleShiftMACE.forward, one_graph)
-    assert forward.__code__ is models.ScaleShiftMACE.forward.__code__
+    assert _same_bytecode(forward, models.ScaleShiftMACE.forward)
     module = vars(models)
-    differ = [name for name in module if forward.__globals__[name] is not module[name]]
+    differ = [name for name in _module_names(module) if forward.__globals__[name] is not module[name]]
     assert differ == ["prepare_graph"]
     assert forward.__globals__["get_outputs"] is models.get_outputs  # MACE's, reading utils' live globals
 
@@ -191,7 +205,7 @@ def test_bind_on_a_private_copy_and_on_the_float64_forward():
     assert "forward" in private.__dict__ and "forward" not in source.__dict__
     assert type(private).forward is type(source).forward  # the class is untouched
     bound = private.forward.__func__
-    assert bound.__code__ is energy64.float64_forward(source).__code__
+    assert _same_bytecode(bound, energy64.float64_forward(source))
     assert bound.__globals__["prepare_graph"].__globals__["get_symmetric_displacement"] is \
         engine.single_graph_symmetric_displacement
     assert engine.strain_path(private) == "one_graph"

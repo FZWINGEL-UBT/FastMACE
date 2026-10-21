@@ -22,11 +22,13 @@ fourth, ``single_graph_strain``, is per model since 2-T08b (docs/design/strain-p
   calls ``get_symmetric_displacement`` as a global of ``mace.modules.utils``; the bound forward
   is the same code with a copy of its module's globals in which ``prepare_graph`` is
   ``strain_prepare_graph``: the same code again, with a copy of ``mace.modules.utils``' globals
-  holding the one-graph function or MACE's own. The copies are taken at bind time, so a forward
-  that reads a global some process-wide patch replaces is refused (``strain_problems``): the
-  copy would freeze it. MACE's forwards read none (``get_outputs`` looks ``compute_forces`` up in
-  ``mace.modules.utils`` itself). ``_patches.set_single_graph_strain`` remains for the reference
-  calculators, which describe MACE's own calculator.
+  holding the one-graph function or MACE's own. The copies are taken at the first binding of each
+  forward and choice, and every later binding reuses them (2-T19b: under torch.compile all builds
+  must share one globals dict). So a forward that reads a global some process-wide patch replaces
+  is refused (``strain_problems``): the copy would freeze it. MACE's forwards read none
+  (``get_outputs`` looks ``compute_forces`` up in ``mace.modules.utils`` itself).
+  ``_patches.set_single_graph_strain`` remains for the reference calculators, which describe
+  MACE's own calculator.
 
 ``PROCESS_RECORDS`` holds all four as §6.1 ``Rewrite`` records, and their self-checks compare the
 replacement with MACE's function on random inputs. The ``apply`` of the first three installs the
@@ -244,9 +246,26 @@ def strain_problems(function):
     return problems
 
 
+# The rebound functions, made once per process for each (function, strain function); the keys hold
+# the originals, so an id is never reused. Dynamo caches a compiled frame on its code object but keeps
+# its __compiled_fn_* in the globals of the frame it compiled. When every binding made a new function
+# from MACE's code object with a fresh copy of the globals, a later build reused a cached frame in a
+# dict without that name (NameError; 2-T23, OMOL-0, plan task 2-T19b). So each (function, strain
+# function) gets one rebound function with its own code object (_rebound), reused by every build.
+_REBOUND: dict = {}
+
+
 def _rebound(function, namespace):
-    """``function`` with the same code, defaults and closure, and ``namespace`` as its globals."""
-    out = types.FunctionType(function.__code__, namespace, function.__name__, function.__defaults__,
+    """``function`` with the same bytecode, defaults and closure, and ``namespace`` as its globals.
+
+    The code object is a copy: Dynamo caches compiled frames per code object, so a rebound
+    function sharing MACE's (or another strain choice's) code object would reuse a frame compiled
+    in other globals (2-T19b).
+    """
+    code = function.__code__.replace()
+    if code is function.__code__:  # an interpreter that returns the same object for an empty replace
+        code = function.__code__.replace(co_name=function.__code__.co_name + "")
+    out = types.FunctionType(code, namespace, function.__name__, function.__defaults__,
                              function.__closure__)
     out.__kwdefaults__ = dict(function.__kwdefaults__) if function.__kwdefaults__ else None
     out.__qualname__, out.__module__, out.__doc__ = function.__qualname__, function.__module__, function.__doc__
@@ -258,33 +277,45 @@ def _rebound(function, namespace):
 def strain_prepare_graph(one_graph):
     """MACE's ``prepare_graph`` with its own strain function: one-graph (True) or MACE's (False).
 
-    The same code, with a copy of ``mace.modules.utils``' globals taken now; only
+    The same code, with a copy of ``mace.modules.utils``' globals taken at the first call; only
     ``get_symmetric_displacement`` differs, and MACE's own is the original even while the
-    reference calculators' process patch is in force.
+    reference calculators' process patch is in force. Made once per process for each choice
+    (``_REBOUND``), so all builds share it under torch.compile.
     """
     utils = _mace_utils()
     frozen = _frozen_patches(utils.prepare_graph)
     if frozen:
         raise StrainBindingError("mace.modules.utils.prepare_graph reads " + ", ".join(frozen)
                                  + ", which a process-wide patch replaces")
-    namespace = dict(vars(utils))
-    namespace["get_symmetric_displacement"] = (
-        single_graph_symmetric_displacement if one_graph else _patches._original(utils, "get_symmetric_displacement"))
-    return _rebound(utils.prepare_graph, namespace)
+    strain = (single_graph_symmetric_displacement if one_graph
+              else _patches._original(utils, "get_symmetric_displacement"))
+    key = (utils.prepare_graph, strain)
+    found = _REBOUND.get(key)
+    if found is None:
+        namespace = dict(vars(utils))
+        namespace["get_symmetric_displacement"] = strain
+        found = _REBOUND[key] = _rebound(utils.prepare_graph, namespace)
+    return found
 
 
 def strain_forward(function, one_graph):
     """``function`` (a model forward) whose ``prepare_graph`` is ``strain_prepare_graph(one_graph)``.
 
-    The same code, with a copy of its globals taken now. Raises ``StrainBindingError`` with
-    ``strain_problems`` when the forward does not qualify.
+    The same code, with a copy of its globals taken at the first call for this function and choice
+    (``_REBOUND``: made once per process, so all builds share it under torch.compile). Raises
+    ``StrainBindingError`` with ``strain_problems`` when the forward does not qualify.
     """
     problems = strain_problems(function)
     if problems:
         raise StrainBindingError("; ".join(problems))
-    namespace = dict(function.__globals__)
-    namespace["prepare_graph"] = strain_prepare_graph(one_graph)
-    return _rebound(function, namespace)
+    prepare_graph = strain_prepare_graph(one_graph)
+    key = (function, prepare_graph)
+    found = _REBOUND.get(key)
+    if found is None:
+        namespace = dict(function.__globals__)
+        namespace["prepare_graph"] = prepare_graph
+        found = _REBOUND[key] = _rebound(function, namespace)
+    return found
 
 
 def bind_strain_path(model, one_graph):
