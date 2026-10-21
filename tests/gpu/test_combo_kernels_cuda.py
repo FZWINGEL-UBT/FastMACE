@@ -1,4 +1,4 @@
-"""``combo_kernels`` changes no value (opt-3 OPT3-T04): MH-1 energy, forces and stress, compiled, on CUDA.
+"""``combo_kernels`` moves no value beyond the backend's own repeatability (opt-3 OPT3-T04), on CUDA.
 
 In one process: ``fm.ForceField.evaluate`` (the compiled evaluation plan) of MH-1 on a rattled NaCl 2×2×2 with
 the record off, off again (the backend's own repeatability) and on. Where two "off" evaluations are bitwise

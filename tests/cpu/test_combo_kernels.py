@@ -1,6 +1,7 @@
 """The ``combo_kernels`` record: Inductor's pointwise combo kernels for the compiled model (opt-3 OPT3-T04).
 
-- the record is exact, deterministic, opt-in (``never_automatic``), registered last, and only marks the model
+- the record is rounding-class (measured: the energy moves), deterministic, opt-in (``never_automatic``),
+  registered last, and only marks the model
   with its Inductor options; its self-check refuses combo kernels without the pointwise-only restriction;
 - ``compile_model`` passes a marked model's options to ``torch.compile(options=...)`` (and refuses them with
   another compile mode), an unmarked model compiles as before.
@@ -27,7 +28,7 @@ from test_rewrites_mh1 import PACKAGE, context, tiny  # noqa: E402
 
 def test_the_record_is_exact_opt_in_and_registered_last():
     record = inductor.RECORDS["combo_kernels"]
-    assert (record.default, record.exactness, record.deterministic, record.requires) == ("off", "exact", True, ())
+    assert (record.default, record.exactness, record.deterministic, record.requires) == ("off", "rounding", True, ())
     assert reg.RECORD_SOURCES[-1] == "fastmace.rewrites.inductor"
     registry = reg.default_registry()
     assert registry.order()[-1] == "combo_kernels" and registry.config_field("combo_kernels") == "combo_kernels"
