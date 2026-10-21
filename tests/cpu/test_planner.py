@@ -200,7 +200,29 @@ FASTMACE_ONLY_DEFAULTS = {
     "gated_rows": "on_with_merged_residual",
     # Owner decision, 20 October 2026 (OPT-T02 stage B): auto = on with gated_rows, float32, not reproducible.
     "segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
+    # Owner decision, 21 October 2026 (OPT-DEF-2): OPT2-T03's tiles wherever fused_folded_backward is (MH-1 class),
+    # and the OPT-T08 records where the model takes them, float32, not reproducible.
+    "folded_backward_tiles": "on_with_fused_folded_backward",
+    "species_tables": "on_float32_unless_reproducible_if_model_supports",
+    "fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
+    "fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
 }
+# Where each FastMACE-only default applies (labels): the factored interaction, or the OPT-T08 records' own scope
+# (docs/design/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
+MH1_LABELS = ("mh1-omat", "mh1-mp", "mh1-r2scan")
+APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "folded_backward_tiles": FACTORED_LABELS,
+           "species_tables": MH1_LABELS, "fold_product_linear": MH1_LABELS,
+           "fold_readout_tail": (*MH1_LABELS, "omol0-xl")}
+
+
+def fastmace_only_expected(name, label, backend):
+    """(on, switched off by stage 2) of a FastMACE-only default for main.py's defaults on ``backend``."""
+    applies = label in APPLIES[name]
+    hybrid = backend == "hybrid"
+    # species_tables is noted in stage 1 for any backend (plain cuEq drops it later, as float64), so stage 2 sees it
+    # on plain cuEq too; the others follow hybrid-only rewrites.
+    reaches_stage2 = hybrid or name == "species_tables"
+    return hybrid and applies, reaches_stage2 and not applies
 
 
 def expected(label, backend):
@@ -234,11 +256,12 @@ def test_default_plans_equal_main_py(label, backend):
     got = plan_options(plan)
     assert {name for name in OPTIONS if got[name]} == want_on
     assert {k: v for k, v in dict(plan.auto_options_off).items() if k not in FASTMACE_ONLY_DEFAULTS} == want_off
-    # gated_rows follows merged_residual and segment_gemm gated_rows (float32 here: the hybrid); stage 2 drops
-    # both with fold_cutoff (models without the factored interaction).
+    # The FastMACE-only defaults are on where they apply on the hybrid (float32); stage 2 drops them where the
+    # model does not take them; plain cuEq (float64) keeps the rounding-class ones off.
     for name in FASTMACE_ONLY_DEFAULTS:
-        assert on(getattr(plan.rewrites, name)) == (backend == "hybrid" and label in FACTORED_LABELS), name
-        assert (name in dict(plan.auto_options_off)) == (backend == "hybrid" and label not in FACTORED_LABELS), name
+        want_on, want_dropped = fastmace_only_expected(name, label, backend)
+        assert on(getattr(plan.rewrites, name)) == want_on, name
+        assert (name in dict(plan.auto_options_off)) == want_dropped, name
     assert (got["backend"], got["dtype"]) == (backend, dtype)
     assert got["cueq_conv_fusion"] == (True if backend == "cueq" else None)
     assert got["polar_uvu"] == "on" and plan.tier == "graph"
@@ -613,10 +636,10 @@ def test_plans_equal_the_research_engine(label, capsys):
     # The stand-ins give the baseline's own verdicts too.
     assert {k: tuple(v) for k, v in gpu_langevin.rewrite_support(model).items()} == \
            {k: tuple(v) for k, v in capabilities.rewrite_support(model).items() if k not in FASTMACE_ONLY_DEFAULTS}
-    for name in FASTMACE_ONLY_DEFAULTS:  # unknown to the research engine; not applicable without the factored block
+    for name in FASTMACE_ONLY_DEFAULTS:  # unknown to the research engine; each has its own scope
         if name in capabilities.rewrite_support(model):
             supported, _ = capabilities.rewrite_support(model)[name]
-            assert supported == (label in FACTORED_LABELS), name
+            assert supported == (label in APPLIES[name]), name
     compared = 0
     for argv in ARGV_CASES:
         research, off = research_engine(argv, model, label)
@@ -635,11 +658,13 @@ def test_plans_equal_the_research_engine(label, capsys):
         assert plan_options(plan) == research, (label, argv)
         got_off = dict(plan.auto_options_off)
         assert {k: v for k, v in got_off.items() if k not in FASTMACE_ONLY_DEFAULTS} == off, (label, argv)
-        # The FastMACE-only rewrites, unknown to the research engine, are switched off only where they do not
-        # apply: models without the factored interaction.
+        # The FastMACE-only rewrites, unknown to the research engine, are switched off by stage 2 only where the
+        # model does not take them, with the model's own reason.
+        stage2 = dict(fixed.STAGE2_SUPPORT)
         for name in FASTMACE_ONLY_DEFAULTS:
             if name in got_off:
-                assert label not in FACTORED_LABELS and " are not " in got_off[name], (label, argv, name)
+                supported, reason = capabilities.rewrite_support(model)[stage2[name]]
+                assert label not in APPLIES[name] and not supported and got_off[name] == reason, (label, argv, name)
         compared += 1
     assert compared >= len(ARGV_CASES) - 8
     capsys.readouterr()  # adapt_options_to_model prints what it switched off

@@ -46,15 +46,16 @@ def simulation(pristine, **engine):
                       engine=EngineConfig(device="cpu", compile_mode="none", pipelined="on", **engine))
 
 
-def test_the_option_is_off_by_default_and_carried_by_the_plan(pristine):
-    assert EngineConfig().overlap_rebuild is False
-    default, overlapped = simulation(pristine), simulation(pristine, overlap_rebuild=True)
-    assert default.plan.engine.overlap_rebuild is False and overlapped.plan.engine.overlap_rebuild is True
-    assert overlapped._engine.config.overlap_rebuild is True
-    assert "rebuilds_beside" not in default._engine.info()  # the default engine's record is unchanged
-    assert overlapped._engine.info()["rebuilds_beside"] == 0
+def test_the_option_is_on_by_default_and_carried_by_the_plan(pristine):
+    """Owner decision, 21 October 2026 (OPT-DEF-2): on by default; it acts only on pipelined fixed-cell CUDA steps."""
+    assert EngineConfig().overlap_rebuild is True
+    default, plain = simulation(pristine), simulation(pristine, overlap_rebuild=False)
+    assert default.plan.engine.overlap_rebuild is True and plain.plan.engine.overlap_rebuild is False
+    assert default._engine.config.overlap_rebuild is True
+    assert "rebuilds_beside" not in plain._engine.info()  # the switched-off engine's record is the old one
+    assert default._engine.info()["rebuilds_beside"] == 0  # no CUDA here: nothing runs beside
     default.close()
-    overlapped.close()
+    plain.close()
 
 
 def test_without_cuda_the_option_changes_nothing(pristine):

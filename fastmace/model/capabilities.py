@@ -202,6 +202,25 @@ def rewrite_support(model: Any) -> dict[str, RewriteSupport]:
                                              "no MACE-MP-0 or density-family interaction")
     support["fused_folded_backward"] = RewriteSupport(fold or generic,
                                                       "ok" if fold or generic else support["fold_cutoff"].reason)
+    # OPT-T08 (fastmace.rewrites.species): ScaleShiftMACE only (its forward is pinned). species_tables and
+    # fold_product_linear: a factored first interaction with species-only inputs; fold_readout_tail: a factored
+    # last interaction (its skip_tp is a linear layer).
+    scale_shift = type(model).__name__ == "ScaleShiftMACE"
+    first = bool(interactions) and interactions[0] in FACTORED_INTERACTIONS
+    last = bool(interactions) and interactions[-1] in FACTORED_INTERACTIONS
+    class_reason = f"{type(model).__name__}: only ScaleShiftMACE's forward is pinned"
+    joint = hasattr(model, "joint_embedding")
+    tables = scale_shift and first and species_only and not joint
+    support["species_tables"] = RewriteSupport(
+        tables,
+        "ok" if tables else class_reason if not scale_shift else
+        f"the first interaction is not {FACTORED_INTERACTIONS}" if not first else
+        "a joint embedding (charge/spin) is added to the first input, which is then not species-only" if joint
+        else "first-interaction inputs are not species-only")
+    support["fold_readout_tail"] = RewriteSupport(
+        scale_shift and last,
+        "ok" if scale_shift and last else class_reason if not scale_shift else
+        f"the last interaction is not {FACTORED_INTERACTIONS} (its skip_tp is element-dependent)")
     return support
 
 
