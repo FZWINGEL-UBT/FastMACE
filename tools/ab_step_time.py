@@ -185,10 +185,22 @@ def fastmace_commit():
         return marker.read_text().strip() if marker.is_file() else None
 
 
-def gpu_processes():
-    """PIDs of the compute processes on the GPU."""
+def in_container(environ=os.environ, dockerenv="/.dockerenv"):
+    """True inside a Modal container (MODAL_IS_REMOTE, MODAL_TASK_ID) or a Docker one (/.dockerenv)."""
+    return bool(environ.get("MODAL_IS_REMOTE") or environ.get("MODAL_TASK_ID")) or os.path.exists(dockerenv)
+
+
+def gpu_processes(container=None):
+    """PIDs of the compute processes on the GPU.
+
+    Inside a container, nvidia-smi lists every GPU process as PID 1 (the container's init; Modal L4 check,
+    results/modal-opt-T08-L4-3e5decd/pid-check.txt), our own included, so PID 1 is dropped there: a container's
+    init never runs on the GPU. On a workstation the list is nvidia-smi's, unchanged."""
     output = subprocess.check_output(["nvidia-smi", "--query-compute-apps=pid", "--format=csv,noheader"], text=True)
-    return [int(line) for line in output.split() if line.strip()]
+    pids = [int(line) for line in output.split() if line.strip()]
+    if in_container() if container is None else container:
+        pids = [pid for pid in pids if pid != 1]
+    return pids
 
 
 def prepare_fastmace_hybrid():

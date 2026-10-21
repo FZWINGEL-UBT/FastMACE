@@ -834,3 +834,15 @@ def test_slug():
     assert summarize._slug("ab-mh1-npt") == "mh1-npt"
     assert summarize._slug("ab-mp0-medium-nvt") == "mp0-medium-nvt"
     assert summarize._slug("ab-polar1-s-nvt") == "polar1-s-nvt"
+
+
+def test_gpu_processes_drops_pid_1_only_inside_a_container(monkeypatch, tmp_path):
+    """MODAL-T01: in a Modal container nvidia-smi lists every GPU process as PID 1 (our own included)."""
+    monkeypatch.setattr(ab_tool.subprocess, "check_output", lambda *a, **k: "1\n4242\n")
+    assert ab_tool.gpu_processes(container=False) == [1, 4242]  # a workstation: unchanged
+    assert ab_tool.gpu_processes(container=True) == [4242]
+    assert not ab_tool.in_container({}, dockerenv=str(tmp_path / "absent"))
+    assert ab_tool.in_container({"MODAL_IS_REMOTE": "1"}, dockerenv=str(tmp_path / "absent"))
+    assert ab_tool.in_container({"MODAL_TASK_ID": "ta-1"}, dockerenv=str(tmp_path / "absent"))
+    (tmp_path / "dockerenv").write_text("")
+    assert ab_tool.in_container({}, dockerenv=str(tmp_path / "dockerenv"))
