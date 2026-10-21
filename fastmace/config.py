@@ -83,6 +83,9 @@ class RewriteConfig:
     # Triton input gradient of the folded last radial layer (FUSED_FOLDED_BACKWARD;
     # GENERIC_FUSED_RADIAL_BACKWARD for MP-0 and the density family).
     fused_folded_backward: Toggle = "auto"
+    # That input gradient's tiles by the waves rule (kernels.triton.skinny_linear.tile_choice): 128-row tiles
+    # where the 64-row grid is 2-8 waves over the SMs; bitwise the same (opt-2 OPT2-T03); opt-in, auto = off.
+    folded_backward_tiles: Toggle = "auto"
     # Run-segmented Triton sum of the reassociated first interaction (SEGMENTED_FIRST_SUM).
     segmented_first_sum: Toggle = "auto"
     # Receiver-streaming OEq convolution, OEq PR 223 kernels (STREAMING_CONVOLUTION;

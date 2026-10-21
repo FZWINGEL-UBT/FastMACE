@@ -79,6 +79,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
+    "RewriteConfig.folded_backward_tiles": "never_automatic",
     "RewriteConfig.block_linear": "on_for_hybrid_graph_engine",
     "RewriteConfig.grouped_linear": "on_with_block_linear",
     "RewriteConfig.merged_residual": "on_with_block_linear",
@@ -102,7 +103,8 @@ STAGE2_SUPPORT = (
 )
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
-                  "fused_folded_backward", "segmented_first_sum", "fused_radial_hidden", "streaming_conv",
+                  "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
+                  "streaming_conv",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear")
@@ -543,6 +545,10 @@ class FixedPlanner:
         note("sort_receivers", hybrid if request == "auto" else request == "on", f"{backend_name} backend")
         for name in ("density_first", "reassociate_first", "joint_radial_input", "fused_folded_backward"):
             needs(name, getattr(r, name) != "off", v["fold_cutoff"], "fold_cutoff")
+        needs("folded_backward_tiles", r.folded_backward_tiles == "on", v["fused_folded_backward"],
+              "fused_folded_backward")
+        if r.folded_backward_tiles == "auto":
+            v["_why"]["folded_backward_tiles"] = "off: only an explicit 'on' enables it (opt-in until its A/B)"
         needs("segmented_first_sum", r.segmented_first_sum != "off", v["reassociate_first"] and v["sort_receivers"],
               "reassociate_first and sort_receivers")
         note("gpu_neighbour_list", n.gpu_neighbour_list != "off", "graph engine")

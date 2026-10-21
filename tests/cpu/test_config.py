@@ -52,6 +52,7 @@ AUTO_RULES = {
     "RewriteConfig.reassociate_first": "on_with_stage1_fold_cutoff_if_model_supports",
     "RewriteConfig.joint_radial_input": "on_with_fold_cutoff_if_model_supports",
     "RewriteConfig.fused_folded_backward": "on_with_stage1_fold_cutoff_if_model_supports",
+    "RewriteConfig.folded_backward_tiles": "never_automatic",
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
