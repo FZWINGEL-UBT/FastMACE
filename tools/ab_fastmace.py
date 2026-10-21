@@ -15,6 +15,12 @@ one for a control or an alternating-process run):
     1b  the release at tag ``fastmace-1b`` (673a8a1), exported as ``fastmace_1b``
         (``... export --ref fastmace-1b --name fastmace_1b ...``), through its own minimal planner, so
         both sides build what ``Simulation`` builds
+  --release 2:
+    3   this checkout, as above
+    2   the release at tag ``fastmace-2`` (e52c482), exported as ``fastmace_2``, through its minimal planner
+
+``--engine-option FIELD=VALUE`` (repeatable) sets an ``EngineConfig`` field on this checkout's side only
+(``fused_integrator=on``: an option the release does not have); ``on``/``off`` read as booleans.
 
 Both are FastMACE, so they patch the same process-wide objects (fastmace.bench.versions): this tool
 gives each side its own patches (``ProcessPatches``) before its load, build, warm-up and every timed
@@ -69,6 +75,7 @@ class Release:
 RELEASES = {
     "1a": Release("fastmace-1a", "bb35363", versions.DEFAULT_NAME, "fixed", "1b"),
     "1b": Release("fastmace-1b", "673a8a1", "fastmace_1b", "minimal", "2"),
+    "2": Release("fastmace-2", "e52c482", "fastmace_2", "minimal", "3"),
 }
 SIDES = ("1a", "1b")
 FASTMACE_1A_TAG = RELEASES["1a"].tag
@@ -89,11 +96,13 @@ def parse_args(argv=None):
     p.add_argument("--output", required=True, type=Path, help="Fresh directory")
     p.add_argument("--release", choices=sorted(RELEASES), default="1a",
                    help="The earlier release timed against this checkout (1a: sides 1a and 1b; 1b: sides 1b and 2)")
-    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2"),
+    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3"),
                    help="Build order; two sides for an A/B process, one for a control (default: release, checkout)")
     p.add_argument("--renamed", type=Path, help="Directory holding the release's exported renamed package")
     p.add_argument("--expected-commit", help="Commit (prefix) the release's copy must be (default: the release's)")
     p.add_argument("--planner-1b", choices=("minimal", "fixed"), default="minimal")
+    p.add_argument("--engine-option", action="append", default=[], metavar="FIELD=VALUE",
+                   help="EngineConfig field for this checkout's side only (on/off read as booleans)")
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--checkpoint", required=True, type=Path)
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5"],
@@ -114,6 +123,12 @@ def parse_args(argv=None):
     p.add_argument("--dump-final", action="store_true",
                    help="Write each side's positions and forces after its last timed block, per structure")
     args = p.parse_args(argv)
+    args.engine_options = {}
+    for item in args.engine_option:
+        field, sep, value = item.partition("=")
+        if not sep or not field:
+            p.error(f"--engine-option {item!r}: expected FIELD=VALUE")
+        args.engine_options[field] = {"on": True, "off": False}.get(value, value)
     release = RELEASES[args.release]
     args.current = release.current
     if args.sides is None:
@@ -182,7 +197,8 @@ class Version:
     def prepare(self):
         """The planner and its allocator rule, before the first CUDA allocation."""
         config = self.module("config")
-        engine = config.EngineConfig(backend=self.args.backend)
+        options = getattr(self.args, "engine_options", {}) if self.side == self.args.current else {}
+        engine = config.EngineConfig(backend=self.args.backend, **options)
         if self.minimal:
             self.planner = self.module("planner.minimal").MinimalPlanner(engine=engine)
         else:
