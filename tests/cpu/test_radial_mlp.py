@@ -93,6 +93,13 @@ def test_kernel_config_is_a_rule_from_the_width(d, expected):
     assert rows * d == radial_mlp.ELEMENTS_PER_THREAD * 32 * warps
 
 
+@pytest.mark.parametrize(("d", "expected"), [(16, (32, 4)), (32, (32, 8)), (64, (16, 8))])
+def test_entry_config_is_the_rule_at_four_elements_per_thread(d, expected):
+    rows, warps = radial_mlp.entry_config(d)
+    assert (rows, warps) == expected
+    assert rows * d == radial_mlp.ENTRY_ELEMENTS_PER_THREAD * 32 * warps
+
+
 def test_the_default_config_is_the_rule():
     fused = radial_mlp.RadialStack(stack(64, 2))
     assert fused.config is None  # resolved per call from the input width

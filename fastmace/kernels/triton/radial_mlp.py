@@ -39,9 +39,28 @@ def kernel_config(d):
     32 rows per program and as many warps as give each thread ELEMENTS_PER_THREAD elements of a row tile (at
     most MAX_WARPS); the forward stores the LayerNorm inputs. MH-1 (D = 64): 32 rows, 8 warps.
     """
-    rows = 32
-    warps = max(1, min(MAX_WARPS, rows * d // (32 * ELEMENTS_PER_THREAD)))
-    return rows, warps, True
+    return _tiles(d, ELEMENTS_PER_THREAD) + (True,)
+
+
+# The entry kernels keep more live per row (the gradient of [h c, c], the cutoff's, the re-gathered input): at 8
+# elements per thread their backward spilled at D = 64 (OPT2-T02c's GPU test), at 4 it does not.
+ENTRY_ELEMENTS_PER_THREAD = 4
+
+
+def entry_config(d):
+    """(rows per program, warps) of the entry kernels for width ``d``: the same rule at ENTRY_ELEMENTS_PER_THREAD.
+
+    MH-1 (D = 64): 16 rows, 8 warps.
+    """
+    return _tiles(d, ENTRY_ELEMENTS_PER_THREAD)
+
+
+def _tiles(d, elements_per_thread):
+    """32 rows per program (16 when that would need more than MAX_WARPS warps) and the warps that give each thread
+    ``elements_per_thread`` elements of a [rows, d] tile."""
+    rows = 32 if 32 * d // (32 * elements_per_thread) <= MAX_WARPS else 16
+    warps = max(1, min(MAX_WARPS, rows * d // (32 * elements_per_thread)))
+    return rows, warps
 
 
 @cache
@@ -430,13 +449,13 @@ def radial_entry(stack, first, source, target, edge_index, cutoff):
     [E, 1] or None: the fused kernels on CUDA float32, else ``entry_reference`` (opt-2 OPT2-T02c)."""
     if not _use_entry_triton(first, source, target, cutoff):
         return entry_reference(stack, first, source, target, edge_index, cutoff)
-    block_rows, num_warps, _ = stack.config or kernel_config(first.shape[1])
+    block_rows, num_warps = stack.config[:2] if stack.config else entry_config(first.shape[1])
     has_cutoff = cutoff is not None
     cut = cutoff if has_cutoff else first.new_empty((0, 1))
     return _RadialEntry.apply(first, source, target, edge_index, cut, *stack.operands(), has_cutoff,
                               int(block_rows), int(num_warps))
 
 
-__all__ = ["ELEMENTS_PER_THREAD", "MAX_LAYERS", "MAX_WARPS", "RadialStack", "WIDTHS", "entry_reference",
-           "kernel_config", "radial_entry", "radial_entry_backward", "radial_entry_forward", "radial_mlp_backward",
-           "radial_mlp_forward", "stack_layers"]
+__all__ = ["ELEMENTS_PER_THREAD", "ENTRY_ELEMENTS_PER_THREAD", "MAX_LAYERS", "MAX_WARPS", "RadialStack", "WIDTHS",
+           "entry_config", "entry_reference", "kernel_config", "radial_entry", "radial_entry_backward",
+           "radial_entry_forward", "radial_mlp_backward", "radial_mlp_forward", "stack_layers"]

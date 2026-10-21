@@ -173,7 +173,7 @@ def test_entry_matches_the_reference(d, k, rows, nodes, cutoff):
 @pytest.mark.parametrize("k", [1, 2, 3, 4])
 @pytest.mark.parametrize("d", radial_mlp.WIDTHS)
 def test_the_entry_kernels_never_spill(d, k):
-    block_rows, num_warps, _ = radial_mlp.kernel_config(d)
+    block_rows, num_warps = radial_mlp.entry_config(d)
     modules, first, source, target, edge_index, cut, upstream = _entry_case(d, k, 256, 16, True)
     fused = radial_mlp.RadialStack([m.cuda() for m in modules])
     gamma, beta, weight, bias, eps = fused.operands()
