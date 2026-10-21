@@ -28,11 +28,11 @@ def stack(d, k, seed):
     return modules
 
 
-def _errors(d, k, rows, seed=0):
+def _errors(d, k, rows, seed=0, config=None):
     modules = stack(d, k, seed)
     exact = torch.nn.Sequential(*copy.deepcopy(modules)).double().cuda()
     plain = torch.nn.Sequential(*copy.deepcopy(modules)).cuda()
-    fused = radial_mlp.RadialStack([m.cuda() for m in modules])
+    fused = radial_mlp.RadialStack([m.cuda() for m in modules], config=config)
     generator = torch.Generator(device="cuda").manual_seed(seed)
     x = torch.randn(rows, d, device="cuda", generator=generator) * 2.0
     grad = torch.randn(rows, d, device="cuda", generator=generator)
@@ -54,17 +54,23 @@ def _errors(d, k, rows, seed=0):
                 plain_dx=rel(dx32, dx64))
 
 
+# (rows per program, warps, store): the default and the screen's variants (opt-2 OPT2-T02 (a)+(b)).
+CONFIGS = [None, (64, 8, False), (32, 4, True), (64, 8, True), (16, 4, True)]
+
+
+@pytest.mark.parametrize("config", CONFIGS)
 @pytest.mark.parametrize(("d", "k", "rows"), [(64, 2, 8192), (64, 2, 1001), (64, 1, 77), (32, 4, 513),
                                               (64, 3, 33), (128, 2, 129), (16, 1, 5)])
-def test_kernels_match_autograd(d, k, rows):
-    errors = _errors(d, k, rows)
+def test_kernels_match_autograd(d, k, rows, config):
+    errors = _errors(d, k, rows, config=config)
     assert errors["fused_out"] <= max(4 * errors["plain_out"], 1e-6), errors
     assert errors["fused_dx"] <= max(4 * errors["plain_dx"], 1e-5), errors
 
 
-def test_strided_input_and_empty_rows():
+@pytest.mark.parametrize("config", CONFIGS)
+def test_strided_input_and_empty_rows(config):
     modules = stack(64, 2, 1)
-    fused = radial_mlp.RadialStack([m.cuda() for m in modules])
+    fused = radial_mlp.RadialStack([m.cuda() for m in modules], config=config)
     plain = torch.nn.Sequential(*copy.deepcopy(modules)).cuda()
     wide = torch.randn(300, 128, device="cuda")
     x = wide[:, 32:96]  # a column slice, as the joint radial input's split gives
@@ -77,9 +83,10 @@ def test_strided_input_and_empty_rows():
     assert empty.grad.shape == (0, 64)
 
 
-def test_compiled_matches_eager():
+@pytest.mark.parametrize("config", [None, (32, 4, True)])
+def test_compiled_matches_eager(config):
     modules = stack(64, 2, 2)
-    fused = radial_mlp.RadialStack([m.cuda() for m in modules])
+    fused = radial_mlp.RadialStack([m.cuda() for m in modules], config=config)
     x = torch.randn(2048, 64, device="cuda", requires_grad=True)
 
     def energy(inputs):

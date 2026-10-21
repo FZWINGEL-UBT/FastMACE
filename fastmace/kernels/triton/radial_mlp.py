@@ -47,8 +47,8 @@ def _kernels():
         return tl.dot(s, wt, input_precision="ieee") + tl.load(bias_ptr + layer * D + c)[None, :]
 
     @triton.jit
-    def forward_kernel(x_ptr, stride, out_ptr, g_ptr, b_ptr, wt_ptr, bias_ptr, rows, eps_ptr,
-                       BE: tl.constexpr, D: tl.constexpr, K: tl.constexpr):
+    def forward_kernel(x_ptr, stride, out_ptr, saved_ptr, g_ptr, b_ptr, wt_ptr, bias_ptr, rows, eps_ptr,
+                       BE: tl.constexpr, D: tl.constexpr, K: tl.constexpr, STORE: tl.constexpr):
         r = tl.program_id(0) * BE + tl.arange(0, BE)
         live = r < rows
         r64 = r.to(tl.int64)
@@ -56,6 +56,8 @@ def _kernels():
         a = tl.load(x_ptr + r64[:, None] * stride + c[None, :], mask=live[:, None], other=0.0)
         s = a
         for i in tl.static_range(K + 1):
+            if STORE and i > 0:  # the input of LayerNorm i, for a backward without recomputation
+                tl.store(saved_ptr + (i - 1) * rows * D + r64[:, None] * D + c[None, :], a, mask=live[:, None])
             _, _, y, sig = _layer_norm_silu(a, g_ptr, b_ptr, i, tl.load(eps_ptr + i), c, D)
             s = y * sig
             if i < K:
@@ -63,8 +65,8 @@ def _kernels():
         tl.store(out_ptr + r64[:, None] * D + c[None, :], s, mask=live[:, None])
 
     @triton.jit
-    def backward_kernel(x_ptr, stride, grad_ptr, dx_ptr, g_ptr, b_ptr, wt_ptr, w_ptr, bias_ptr, rows, eps_ptr,
-                        BE: tl.constexpr, D: tl.constexpr, K: tl.constexpr):
+    def backward_kernel(x_ptr, stride, saved_ptr, grad_ptr, dx_ptr, g_ptr, b_ptr, wt_ptr, w_ptr, bias_ptr, rows,
+                        eps_ptr, BE: tl.constexpr, D: tl.constexpr, K: tl.constexpr, STORE: tl.constexpr):
         r = tl.program_id(0) * BE + tl.arange(0, BE)
         live = r < rows
         r64 = r.to(tl.int64)
@@ -72,11 +74,15 @@ def _kernels():
         x = tl.load(x_ptr + r64[:, None] * stride + c[None, :], mask=live[:, None], other=0.0)
         grad = tl.load(grad_ptr + r64[:, None] * D + c[None, :], mask=live[:, None], other=0.0)
         for j in tl.static_range(K, -1, -1):  # unrolled, last LayerNorm first
-            # The input of LayerNorm j, recomputed from x (registers only; K <= 4).
-            a = x
-            for i in tl.static_range(j):
-                _, _, y, sig = _layer_norm_silu(a, g_ptr, b_ptr, i, tl.load(eps_ptr + i), c, D)
-                a = _linear(y * sig, wt_ptr, bias_ptr, i, c, D)
+            # The input of LayerNorm j: stored by the forward, or recomputed from x (registers only; K <= 4).
+            if STORE and j > 0:
+                a = tl.load(saved_ptr + (j - 1) * rows * D + r64[:, None] * D + c[None, :], mask=live[:, None],
+                            other=0.0)
+            else:
+                a = x
+                for i in tl.static_range(j):
+                    _, _, y, sig = _layer_norm_silu(a, g_ptr, b_ptr, i, tl.load(eps_ptr + i), c, D)
+                    a = _linear(y * sig, wt_ptr, bias_ptr, i, c, D)
             ahat, rstd, y, sig = _layer_norm_silu(a, g_ptr, b_ptr, j, tl.load(eps_ptr + j), c, D)
             dy = grad * sig * (1.0 + y * (1.0 - sig))  # SiLU'
             dahat = dy * tl.load(g_ptr + j * D + c)[None, :]  # LayerNorm j
@@ -136,8 +142,10 @@ class RadialStack(torch.nn.Module):
     kernel operands are built from them at each call (a few small tensors).
     """
 
-    def __init__(self, modules):
+    def __init__(self, modules, config=None):
         super().__init__()
+        # (rows per program, warps, store the LayerNorm inputs); the OPT2-T02 screen chooses the rule.
+        self.config = tuple(config) if config is not None else (BLOCK_ROWS, 4, False)
         layers = stack_layers(modules)
         if isinstance(layers, str):
             raise ValueError(f"radial stack not fusable: {layers}")
@@ -156,7 +164,8 @@ class RadialStack(torch.nn.Module):
     def forward(self, x):
         if not _use_triton(x):
             return self.modules_(x)
-        return _RadialStack.apply(x, *self.operands())
+        block_rows, num_warps, store = self.config
+        return _RadialStack.apply(x, *self.operands(), int(block_rows), int(num_warps), bool(store))
 
 
 def _use_triton(x):
@@ -168,51 +177,60 @@ def _use_triton(x):
 
 @torch.library.custom_op("fastmace::radial_mlp_forward", mutates_args=())
 def radial_mlp_forward(x: torch.Tensor, gamma: torch.Tensor, beta: torch.Tensor, weight: torch.Tensor,
-                       bias: torch.Tensor, eps: torch.Tensor) -> torch.Tensor:
+                       bias: torch.Tensor, eps: torch.Tensor, block_rows: int, num_warps: int,
+                       store: bool) -> tuple[torch.Tensor, torch.Tensor]:
+    """(h, saved): ``saved`` holds the inputs of LayerNorms 1..K, [K, rows, D], when ``store``; else it is empty."""
     import triton
     rows, d = x.shape
+    k = weight.shape[0]
     out = x.new_empty((rows, d))
+    saved = x.new_empty((k, rows, d) if store else (0,))
     if rows:
-        _kernels()["forward"][(triton.cdiv(rows, BLOCK_ROWS),)](
-            x, x.stride(0), out, gamma.contiguous(), beta.contiguous(), weight.transpose(1, 2).contiguous(),
-            bias.contiguous(), rows, eps.contiguous(), BE=BLOCK_ROWS, D=d, K=weight.shape[0], num_warps=4)
-    return out
+        _kernels()["forward"][(triton.cdiv(rows, block_rows),)](
+            x, x.stride(0), out, saved, gamma.contiguous(), beta.contiguous(), weight.transpose(1, 2).contiguous(),
+            bias.contiguous(), rows, eps.contiguous(), BE=block_rows, D=d, K=k, STORE=store, num_warps=num_warps)
+    return out, saved
 
 
 @radial_mlp_forward.register_fake
-def _(x, gamma, beta, weight, bias, eps):
-    return x.new_empty((x.shape[0], x.shape[1]))
+def _(x, gamma, beta, weight, bias, eps, block_rows, num_warps, store):
+    rows, d = x.shape
+    return x.new_empty((rows, d)), x.new_empty((weight.shape[0], rows, d) if store else (0,))
 
 
 @torch.library.custom_op("fastmace::radial_mlp_backward", mutates_args=())
-def radial_mlp_backward(x: torch.Tensor, grad: torch.Tensor, gamma: torch.Tensor, beta: torch.Tensor,
-                        weight: torch.Tensor, bias: torch.Tensor, eps: torch.Tensor) -> torch.Tensor:
+def radial_mlp_backward(x: torch.Tensor, saved: torch.Tensor, grad: torch.Tensor, gamma: torch.Tensor,
+                        beta: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor, eps: torch.Tensor,
+                        block_rows: int, num_warps: int, store: bool) -> torch.Tensor:
     import triton
     rows, d = x.shape
     dx = x.new_empty((rows, d))
     if rows:
-        _kernels()["backward"][(triton.cdiv(rows, BLOCK_ROWS),)](
-            x, x.stride(0), grad.contiguous(), dx, gamma.contiguous(), beta.contiguous(),
+        _kernels()["backward"][(triton.cdiv(rows, block_rows),)](
+            x, x.stride(0), saved, grad.contiguous(), dx, gamma.contiguous(), beta.contiguous(),
             weight.transpose(1, 2).contiguous(), weight.contiguous(), bias.contiguous(), rows, eps.contiguous(),
-            BE=BLOCK_ROWS, D=d, K=weight.shape[0], num_warps=4)
+            BE=block_rows, D=d, K=weight.shape[0], STORE=store, num_warps=num_warps)
     return dx
 
 
 @radial_mlp_backward.register_fake
-def _(x, grad, gamma, beta, weight, bias, eps):
+def _(x, saved, grad, gamma, beta, weight, bias, eps, block_rows, num_warps, store):
     return x.new_empty((x.shape[0], x.shape[1]))
 
 
 class _RadialStack(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, gamma, beta, weight, bias, eps):
-        ctx.save_for_backward(x, gamma, beta, weight, bias, eps)
-        return radial_mlp_forward(x, gamma, beta, weight, bias, eps)
+    def forward(ctx, x, gamma, beta, weight, bias, eps, block_rows, num_warps, store):
+        out, saved = radial_mlp_forward(x, gamma, beta, weight, bias, eps, block_rows, num_warps, store)
+        ctx.save_for_backward(x, saved, gamma, beta, weight, bias, eps)
+        ctx.config = (block_rows, num_warps, store)
+        return out
 
     @staticmethod
     def backward(ctx, grad):
-        x, gamma, beta, weight, bias, eps = ctx.saved_tensors
-        return radial_mlp_backward(x, grad, gamma, beta, weight, bias, eps), None, None, None, None, None
+        x, saved, gamma, beta, weight, bias, eps = ctx.saved_tensors
+        dx = radial_mlp_backward(x, saved, grad, gamma, beta, weight, bias, eps, *ctx.config)
+        return dx, None, None, None, None, None, None, None, None
 
 
 __all__ = ["BLOCK_ROWS", "MAX_LAYERS", "RadialStack", "WIDTHS", "radial_mlp_backward", "radial_mlp_forward",
