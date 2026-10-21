@@ -280,6 +280,55 @@ def test_prepare_leaves_the_default_trajectory_unchanged():
         assert summary["prepare_vs_lazy_A"] <= summary["lazy_again_vs_lazy_A"] * 10, summary
 
 
+PREPARED_FORCES_CHILD = """
+import fastmace as fm
+import torch
+from ase import units
+from ase.build import bulk
+
+atoms = bulk("NaCl", "rocksalt", a=5.64, cubic=True).repeat((3, 3, 3))  # from 0 K, as 2-T23's runs
+model = fm.load(SPEC["label"])
+integrator = fm.integrators.Langevin(timestep_fs=0.5, temperature_K=300.0, friction_per_fs=0.02 * units.fs)
+sim = fm.Simulation(atoms, model, integrator=integrator, seed=20261020)
+engine = sim._engine
+temperatures, counts = [], []
+for _ in range(SPEC["steps"] // 50):
+    sim.run(steps=50)
+    committed = sim.committed()
+    kinetic_twice = ((committed.momenta ** 2).sum(axis=1) / atoms.get_masses()).sum()  # 2 E_kin, eV
+    temperatures.append(float(kinetic_twice / (3 * len(atoms) * units.kB)))
+    counts.append(int(engine.force_field.edge_count))
+committed = sim.committed()
+graphs = list(engine.info()["graphs"])
+initial = int(engine.initial_edges)
+backend, dtype = sim.plan.engine.backend, sim.plan.precision.dtype
+sim.close()
+del sim, engine
+torch.cuda.empty_cache()
+probe = atoms.copy()
+probe.positions = committed.positions
+_, forces, _ = fm.ForceField(model, probe, precision="float32").evaluate(probe)
+print(json.dumps({"max_force_error": float(np.abs(np.asarray(forces) - committed.forces).max()),
+                  "max_force": float(np.abs(committed.forces).max()), "temperatures": temperatures,
+                  "counts": counts, "initial_edges": initial, "graphs": graphs, "backend": backend, "dtype": dtype,
+                  "gpu": torch.cuda.get_device_name()}))
+"""
+
+
+@pytest.mark.slow
+def test_prepared_graphs_keep_every_edge_after_the_edge_count_grows():
+    """2-T21d: ``prepare()`` captured B with the build's exact edge views, so a padded B graph read only
+    the initial edges and dropped the rest from the forces once the count grew (2-T23: MH-1 hybrid NaCl
+    3x3x3 from 0 K heated to 897 K at a 300 K target). After 1,000 steps (0.5 ps, well past the
+    count's growth at about 0.2 ps) the committed forces equal a fresh evaluation at the same positions."""
+    out = ENGINE.run_fresh(ENGINE.COMMON.format(spec={"temperature": 300.0, "label": "mh1-r2scan", "steps": 1000})
+                           + PREPARED_FORCES_CHILD, python=ENGINE.HYBRID_PYTHON)
+    ENGINE.report("2-T21d-prepared-forces-mh1-nacl", out)
+    assert max(out["counts"]) > out["initial_edges"], out  # the test reaches the defect's condition
+    assert out["max_force_error"] <= 1e-3, out  # float32 rounding; dropped edges gave eV/A-sized errors
+    assert max(out["temperatures"]) < 500.0, out  # 300 K target from 0 K: no runaway heating
+
+
 @pytest.mark.slow
 def test_a_failed_candidates_memory_is_freed_before_the_next_build():
     """2-T15c: the broken-rewrite case, with ``torch.cuda.memory_allocated`` at every build. With
