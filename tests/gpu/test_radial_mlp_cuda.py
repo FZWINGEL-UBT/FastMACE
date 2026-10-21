@@ -96,3 +96,30 @@ def test_compiled_matches_eager(config):
     compiled = torch.compile(energy, fullgraph=True)
     (traced,) = torch.autograd.grad(compiled(x), x)
     torch.testing.assert_close(traced, eager, rtol=1e-5, atol=1e-6)
+
+
+def _resources(d, k, config, rows=256):
+    """Registers and spills of the forward and backward kernels for width d, K layers and config."""
+    modules = stack(d, k, 0)
+    fused = radial_mlp.RadialStack([m.cuda() for m in modules], config=config)
+    gamma, beta, weight, bias, eps = fused.operands()
+    block_rows, num_warps, store = config
+    x = torch.randn(rows, d, device="cuda")
+    out, grad, dx = torch.empty_like(x), torch.randn_like(x), torch.empty_like(x)
+    saved = x.new_empty((k, rows, d) if store else (0,))
+    kernels = radial_mlp._kernels()
+    common = dict(BE=block_rows, D=d, K=k, STORE=store, num_warps=num_warps, grid=(1,))
+    wt = weight.transpose(1, 2).contiguous()
+    compiled = [kernels["forward"].warmup(x, x.stride(0), out, saved, gamma, beta, wt, bias, rows, eps, **common),
+                kernels["backward"].warmup(x, x.stride(0), saved, grad, dx, gamma, beta, wt, weight.contiguous(), bias,
+                                           rows, eps, **common)]
+    for kernel in compiled:
+        kernel._init_handles()  # Triton fills n_regs and n_spills when it loads the binary
+    return [(int(kernel.n_regs), int(kernel.n_spills)) for kernel in compiled]
+
+
+@pytest.mark.parametrize("k", [1, 2, 3, 4])
+@pytest.mark.parametrize("d", radial_mlp.WIDTHS)
+def test_the_tile_rule_never_spills(d, k):
+    resources = _resources(d, k, radial_mlp.kernel_config(d))
+    assert all(spills == 0 for _, spills in resources), resources

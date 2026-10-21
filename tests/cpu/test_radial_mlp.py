@@ -81,3 +81,19 @@ def test_the_stack_keeps_the_original_parameters():
     gamma, beta, weight, bias, eps = fused.operands()
     assert gamma.shape == (3, 64) and weight.shape == (2, 64, 64) and bias.shape == (2, 64)
     assert eps.tolist() == [pytest.approx(1e-5)] * 3
+
+
+@pytest.mark.parametrize(("d", "expected"), [(16, (32, 2, True)), (32, (32, 4, True)), (64, (32, 8, True)),
+                                             (128, (16, 8, True))])
+def test_kernel_config_is_a_rule_from_the_width(d, expected):
+    # 8 elements of a [rows, D] tile per thread: the budget at which the OPT2-T02 screen found no spills.
+    config = radial_mlp.kernel_config(d)
+    assert config == expected
+    rows, warps, _ = config
+    assert rows * d == radial_mlp.ELEMENTS_PER_THREAD * 32 * warps
+
+
+def test_the_default_config_is_the_rule():
+    fused = radial_mlp.RadialStack(stack(64, 2))
+    assert fused.config is None  # resolved per call from the input width
+    assert radial_mlp.RadialStack(stack(64, 2), config=(16, 4, False)).config == (16, 4, False)

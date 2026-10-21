@@ -3,11 +3,15 @@
 ``radial_mlp(x, modules)`` evaluates LayerNorm -> SiLU, then K times Linear(D, D) -> LayerNorm -> SiLU, the
 hidden layers of a radial network before its last layer (MH-1: K = 2, D = 64), for rows of width D:
 
-- **forward:** one Triton program per tile of rows reads x, runs every layer in registers and writes only the
-  output;
-- **backward:** one program per tile reads x and the output's gradient, recomputes the forward up to each
-  layer as it walks back through the chain, and writes only the input's gradient. The parameters are
-  constants in MD: no parameter gradients.
+- **forward:** one Triton program per tile of rows reads x, runs every layer in registers, writes the output
+  and the inputs of LayerNorms 1..K (``saved``);
+- **backward:** one program per tile reads x, ``saved`` and the output's gradient, walks back through the
+  chain with only the K gradient products, and writes only the input's gradient. The parameters are
+  constants in MD: no parameter gradients. (Recomputing the forward instead of storing it is kept as an
+  option; it was slower and its backward spilled registers: OPT2-T02 screen, 21 October 2026.)
+
+Tiles by a rule from the width alone (``kernel_config``): 8 elements of a row tile per thread, the register
+budget at which neither kernel spills (Triton's spill counts, checked by a GPU test for every width).
 
 The products are IEEE FP32 dots (no TF32), the same operations as the PyTorch modules: exact up to rounding.
 The kernels run for CUDA float32 rows only; anything else (the CPU, float64 reference plans) runs the
@@ -21,9 +25,22 @@ from functools import cache
 
 import torch
 
-BLOCK_ROWS = 32  # rows per program, for every crystal and GPU (register budget at D <= 128, K <= 4)
 MAX_LAYERS = 4  # K, the hidden Linear layers one kernel takes
 WIDTHS = (16, 32, 64, 128)
+ELEMENTS_PER_THREAD = 8  # of a [rows, D] tile: the budget at which neither kernel spills
+MAX_WARPS = 8
+
+
+def kernel_config(d):
+    """(rows per program, warps, store) for width ``d``: a rule from the shape, the same on every GPU.
+
+    32 rows per program (16 above D = 64, which keeps the warps at 8 or fewer), and as many warps as give each
+    thread ELEMENTS_PER_THREAD elements of a row tile; the forward stores the LayerNorm inputs. MH-1 (D = 64):
+    32 rows, 8 warps.
+    """
+    rows = 32 if d <= 64 else 16
+    warps = max(1, min(MAX_WARPS, rows * d // (32 * ELEMENTS_PER_THREAD)))
+    return rows, warps, True
 
 
 @cache
@@ -144,8 +161,8 @@ class RadialStack(torch.nn.Module):
 
     def __init__(self, modules, config=None):
         super().__init__()
-        # (rows per program, warps, store the LayerNorm inputs); the OPT2-T02 screen chooses the rule.
-        self.config = tuple(config) if config is not None else (BLOCK_ROWS, 4, False)
+        # (rows per program, warps, store the LayerNorm inputs); None takes the rule (kernel_config).
+        self.config = tuple(config) if config is not None else None  # None: kernel_config(width)
         layers = stack_layers(modules)
         if isinstance(layers, str):
             raise ValueError(f"radial stack not fusable: {layers}")
@@ -164,7 +181,7 @@ class RadialStack(torch.nn.Module):
     def forward(self, x):
         if not _use_triton(x):
             return self.modules_(x)
-        block_rows, num_warps, store = self.config
+        block_rows, num_warps, store = self.config or kernel_config(x.shape[1])
         return _RadialStack.apply(x, *self.operands(), int(block_rows), int(num_warps), bool(store))
 
 
@@ -233,5 +250,6 @@ class _RadialStack(torch.autograd.Function):
         return dx, None, None, None, None, None, None, None, None
 
 
-__all__ = ["BLOCK_ROWS", "MAX_LAYERS", "RadialStack", "WIDTHS", "radial_mlp_backward", "radial_mlp_forward",
+__all__ = ["ELEMENTS_PER_THREAD", "MAX_LAYERS", "MAX_WARPS", "RadialStack", "WIDTHS", "kernel_config",
+           "radial_mlp_backward", "radial_mlp_forward",
            "stack_layers"]
