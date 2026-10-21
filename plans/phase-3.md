@@ -186,9 +186,9 @@ These are phase 2's principles, unchanged where they still apply:
     22 October 2026), everything Modal meters included. `modal billing
     summary` is the truth. The GPU list price alone underestimates it: on
     21 October it showed $3.65 against about $3 estimated. The guard in
-    `fastmace_modal.py` (MODAL-T02) refuses a job whose worst case would
-    pass $27 (a $3 reserve). Until it is merged, the conductor approves each
-    Modal job;
+    `fastmace_modal.py` (MODAL-T02, merged in d35496f) refuses a job whose
+    worst case would pass $27 (a $3 reserve), and records every job in
+    `results/modal-ledger.csv`;
   - budget per task as in its brief;
   - the noise floors are 0.2 % for NaCl and 0.6 % for NbCl5 on the L4, and
     only same-container ratios count.
