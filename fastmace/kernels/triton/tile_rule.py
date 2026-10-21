@@ -11,9 +11,11 @@ measured at run time (SPEC §9.1). The thresholds are in waves, tiles over SMs, 
   ``BLOCK_M``-row tiles per SM, cuBLAS keeps the product.
 - **Tiles.** One configuration, the one the pre-check picked most often: 64 × 64 × 32, 4 warps, 3 stages.
 - **Split-K** (``split_k_parts``, record ``split_k``, OPT2-T05, ``docs/design/opt2-T05-split-k.md``): a product
-  whose nominal 64 × 64 output tiles do not fill one wave of the SMs is split along K into a power of two
-  of parts, until it reaches ``SPLIT_K_TARGET_WAVES`` waves, while every part keeps at least
-  ``SPLIT_K_MIN_PART`` of K and K divides evenly.
+  whose nominal 64 × 64 output tiles do not fill one wave of the SMs, and whose K is not deeper than its N,
+  is split along K into a power of two of parts, until it reaches ``SPLIT_K_TARGET_WAVES`` waves, while every
+  part keeps at least ``SPLIT_K_MIN_PART`` of K and K divides evenly. A deep K (K > N) stays with cuBLAS, whose
+  heuristics split it themselves (opt-T03b: ``[16, 1, 8]`` grids for the K = 2048 inputs); splitting it again
+  lost 24-36 % in the micro-benchmark (``tools/split_k_bench.py``).
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ BLOCK_M, BLOCK_N, BLOCK_K, NUM_WARPS, NUM_STAGES = 64, 64, 32, 4, 3
 # Triton only where M covers at least this many waves of BLOCK_M-row tiles over the SMs (one column of tiles).
 MIN_TRITON_WAVES = 2
 # Split-K: the waves a split product aims for, and the smallest K of one part (a real GEMM, not a reduction).
-SPLIT_K_TARGET_WAVES = MIN_TRITON_WAVES
+SPLIT_K_TARGET_WAVES = 1  # 2 parts on NaCl's l = 0 products: the micro-benchmark's best (4 and 8 parts gain less)
 SPLIT_K_MIN_PART = 128
 
 
@@ -72,11 +74,11 @@ def segment_gemm_choice(m: int, n: int, k: int, sms: int | None) -> GemmChoice:
 def split_k_parts(m, n, k, sms) -> int:
     """How many parts of K the product ``[m, k] @ [k, n]`` is split into on ``sms`` SMs (1: not split).
 
-    Only where its 64 × 64 output tiles are fewer than one wave; then doubled while the tiles times the
-    parts stay below ``SPLIT_K_TARGET_WAVES`` waves, K divides evenly and every part keeps at least
-    ``SPLIT_K_MIN_PART``. Integer arithmetic only (the forward evaluates it while torch.compile traces).
+    Only where its 64 × 64 output tiles are fewer than one wave and K is at most N; then doubled while the
+    tiles times the parts stay below ``SPLIT_K_TARGET_WAVES`` waves, K divides evenly and every part keeps at
+    least ``SPLIT_K_MIN_PART``. Integer arithmetic only (the forward evaluates it while torch.compile traces).
     """
-    if not sms:
+    if not sms or k > n:
         return 1
     tiles = ((m + BLOCK_M - 1) // BLOCK_M) * ((n + BLOCK_N - 1) // BLOCK_N)
     if tiles >= sms:

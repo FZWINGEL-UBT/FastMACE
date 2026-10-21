@@ -34,8 +34,8 @@ RTX_5060_TI, RTX_4000_ADA = 36, 48
 @pytest.mark.parametrize("sms", [RTX_5060_TI, RTX_4000_ADA])
 def test_the_rule_splits_only_products_below_one_wave(sms):
     parts = tile_rule.split_k_parts
-    assert parts(216, 512, 512, sms) == 4  # NaCl l = 0, forward and input gradient
-    assert parts(216, 512, 2048, sms) == 4  # NaCl grouped l = 0 input, forward
+    assert parts(216, 512, 512, sms) == 2  # NaCl l = 0, forward and input gradient
+    assert parts(216, 512, 2048, sms) == 1  # NaCl grouped l = 0 input, forward: K > N, cuBLAS splits it itself
     assert parts(216, 2048, 512, sms) == 1  # its input gradient: 128 tiles
     for m in (648, 1080, 1512):  # NaCl l = 1-3
         assert parts(m, 512, 512, sms) == 1
@@ -45,13 +45,13 @@ def test_the_rule_splits_only_products_below_one_wave(sms):
 
 def test_the_rule_respects_k():
     parts = tile_rule.split_k_parts
-    assert parts(64, 64, 512, 36) == 4  # one tile: 4 x 128 is the smallest part allowed
-    assert parts(64, 64, 256, 36) == 2
-    assert parts(64, 64, 128, 36) == 1  # no part below SPLIT_K_MIN_PART
-    assert parts(64, 64, 384, 36) == 2  # 2 parts of 192; 4 parts of 96 are too small
-    assert parts(64, 64, 768, 36) == 4  # 4 parts of 192
-    assert parts(64, 64, 513, 36) == 1  # K must divide into equal parts
-    assert parts(64, 64, 300, 36) == 2  # 2 parts of 150; 4 parts of 75 are too small
+    assert parts(64, 512, 512, 36) == 4  # 8 tiles: 4 parts of 128, the smallest part allowed
+    assert parts(64, 512, 256, 36) == 2
+    assert parts(64, 512, 128, 36) == 1  # no part below SPLIT_K_MIN_PART
+    assert parts(64, 512, 384, 36) == 2  # 2 parts of 192; 4 parts of 96 are too small
+    assert parts(64, 512, 511, 36) == 1  # K must divide into equal parts
+    assert parts(64, 512, 300, 36) == 2  # 2 parts of 150; 4 parts of 75 are too small
+    assert parts(64, 256, 512, 36) == 1  # K > N: a deep K stays with cuBLAS
     assert parts(216, 512, 512, None) == 1 and parts(216, 512, 512, 0) == 1  # no SMs: not CUDA
 
 

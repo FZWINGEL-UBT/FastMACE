@@ -29,14 +29,29 @@ measures nothing at run time (SPEC §9.1). It lives beside the shared rule in
 ```
 split_k_parts(m, n, k, sms):
     tiles = ceil(m / 64) * ceil(n / 64)         # the same nominal 64 × 64 tiles as the shared rule
-    if no SMs, or tiles >= sms: 1               # a full wave already: leave the product alone
+    if no SMs, or k > n, or tiles >= sms: 1     # deep K stays with cuBLAS; a full wave: leave it alone
     parts = 1
-    while tiles * parts < 2 * sms               # aim for 2 waves (MIN_TRITON_WAVES, as the shared rule)
+    while tiles * parts < 1 * sms               # aim for one wave (SPLIT_K_TARGET_WAVES)
           and k % (2 * parts) == 0
           and k / (2 * parts) >= 128:           # every part a real GEMM (SPLIT_K_MIN_PART)
         parts *= 2
     return parts
 ```
+
+The first version aimed for two waves and also split deep K. The micro-benchmark
+(`tools/split_k_bench.py`, local RTX 5060 Ti, products replayed in a CUDA graph) changed both:
+
+| Product | cuBLAS | 2 parts | 4 parts | 8 parts |
+| --- | ---: | ---: | ---: | ---: |
+| `[216, 512] @ [512, 512]` (NaCl l = 0) | 20.8 µs | **18.5 µs** | 19.4 µs | 20.9 µs |
+| `[216, 2048] @ [2048, 512]` (grouped l = 0, deep K) | 45.8 µs | 61.2 µs | 62.1 µs | 56.9 µs |
+| `[216, 512] @ [512, 2048]` | 48.0 µs | 58.3 µs | 58.2 µs | 66.7 µs |
+| `[648, 512] @ [512, 512]` (l = 1) | 38.1 µs | 43.0 µs | 45.2 µs | 50.5 µs |
+
+- **Deep K stays with cuBLAS.** cuBLAS already splits deep K itself (the opt-T03b `[16, 1, 8]`
+  grids), and splitting it again loses 24–36 %.
+- **One wave is enough.** 2 parts are best on the one shape that gains.
+- **The rule's other choices hold.** Splitting the products it leaves alone loses.
 
 The rule uses integer arithmetic only, because the forward evaluates it while `torch.compile`
 traces (the lesson of OPT-T02b, which hit a format error inside a traced rule).
@@ -49,11 +64,14 @@ What it gives:
 
 | Product (atoms × (2l+1), K, N) | sm_120 (36 SMs) | sm_89 (48 SMs) |
 | --- | --- | --- |
-| NaCl l = 0, `[216, 512] @ [512, 512]`, forward and gradient | 4 parts | 4 parts |
-| NaCl l = 0, grouped `[216, 2048] @ [2048, 512]`, forward | 4 parts | 4 parts |
+| NaCl l = 0, `[216, 512] @ [512, 512]`, forward and gradient | 2 parts | 2 parts |
+| NaCl l = 0, grouped `[216, 2048] @ [2048, 512]`, forward (deep K) | 1 | 1 |
 | its input gradient `[216, 512] @ [512, 2048]` (128 tiles) | 1 | 1 |
 | NaCl l ≥ 1 (M ≥ 648: 88 tiles and more) | 1 | 1 |
 | every NbCl5 and NaNbO3 product (M ≥ 1944) | 1 | 1 |
+
+**Expected size.** About 2 µs per split product, on a few products per step: about 0.5 % of NaCl's
+3.2 ms step. That is below the local noise floor (1.1 % on NaCl) and above murphy's (0.16 %).
 
 So NbCl5 is unchanged by construction. The rule's only cost there is evaluating it while tracing.
 
