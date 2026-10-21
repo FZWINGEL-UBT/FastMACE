@@ -1,0 +1,190 @@
+{
+ "machine": "local PC (WSL2)",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "environment": "~/environments/fastmace_mace_other",
+ "mace": "0.3.15",
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": "",
+ "model": "mh-1 matpes_r2scan",
+ "structure": "NaCl 3x3x3 (216 atoms), rattle 0.02 seed 1",
+ "md": "NVT 300 K, 200 steps, seed 7, defaults otherwise",
+ "check": "gate",
+ "wall_s": 54.541475649006316,
+ "plan": {
+  "revision": 1,
+  "tier": "eager",
+  "reason": "fallback: mode eager: eager passes the reduced gate: the fault is in capture or compilation (AcceleratorError: CUDA error: operation failed due to a previous error during capture)",
+  "step": 0,
+  "compile_mode": "none",
+  "backend": "cueq",
+  "capture": "off",
+  "mode": [
+   "eager",
+   "molecular dynamics on the eager tier: the graph plan's backend, rewrites and precision, without CUDA graphs or compilation (SPEC \u00a78.3)",
+   "mode-eager-tier"
+  ]
+ },
+ "chain": [
+  {
+   "revision": 0,
+   "tier": "graph",
+   "reason": "minimal plan (phase 1b)",
+   "step": null,
+   "compile_mode": "none",
+   "backend": "cueq",
+   "capture": "on",
+   "mode": [
+    "graph",
+    "molecular dynamics on the graph tier (SPEC \u00a78.1)",
+    "mode-graph"
+   ]
+  }
+ ],
+ "fallbacks": [
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A, stress_eV_per_A3) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "activated",
+   "reason": "eager passes the reduced gate: the fault is in capture or compilation (AcceleratorError: CUDA error: operation failed due to a previous error during capture)",
+   "stage": null,
+   "revision": 1,
+   "reduced_gate_runs": 0,
+   "full_gate_runs": 1
+  }
+ ],
+ "precision": "float32",
+ "energy_treatment": "patched",
+ "float64_energy_sources": "hash",
+ "gate": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 0.0006868531714745688,
+  "force_eV_per_A": 2.6617785301996655e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 0.0006868531714745688,
+    "yardstick": 0.000680230433166192,
+    "ratio": 1.0097360217736078,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 2.6617785301996655e-06,
+    "yardstick": 2.6543930698452733e-06,
+    "ratio": 1.0027823536906773,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "eager stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.15/mh1/38072e65be0b6359",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.15/mh1/38072e65be0b6359",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "e3nn",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.15/mh1/38072e65be0b6359",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "e3nn",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 28.12176402899786,
+   "production_s": 0.10002210301172454,
+   "step_1_s": 28.11888718800037
+  },
+  "notes": [],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null
+ },
+ "unhashed_records": {
+  "factor_species": "source mace.modules.blocks:RealAgnosticResidualNonLinearInteractionBlock.forward differs on MACE 0.3.15 (sha256 f214ff02b0b2..., pinned 727c37b796de...)",
+  "fold_cutoff": "source mace.modules.blocks:RealAgnosticResidualNonLinearInteractionBlock.forward differs on MACE 0.3.15 (sha256 f214ff02b0b2..., pinned 727c37b796de...)",
+  "gated_rows": "source mace.modules.gate:GatedEquivariantBlock.forward cannot be read on MACE 0.3.15 (ModuleNotFoundError: No module named 'mace.modules.gate')",
+  "polar_uvu": "source mace.modules.field_blocks:SparseUvuTensorProduct.forward cannot be read on MACE 0.3.15 (ModuleNotFoundError: No module named 'mace.modules.field_blocks')",
+  "single_graph_strain": "source mace.modules.utils:get_symmetric_displacement differs on MACE 0.3.15 (sha256 3deee151e8c3..., pinned d75106300f96...)"
+ },
+ "enabled_records": [],
+ "treatments": {
+  "float64_energy": "patched",
+  "polar_forward": "refuse PolarMACE",
+  "capture_safe_mask_head": "installed",
+  "first_derivative_only": "installed",
+  "single_graph_strain": "not installed",
+  "unfuse_full_addmm": "installed",
+  "cueq_conv_fusion": "MACE's own rule"
+ },
+ "compile_support": [
+  false,
+  "this MACE lacks the compile API FastMACE uses (mace.tools.compile.configure_autograd_for_compile): no compilation, the model runs uncompiled (SPEC \u00a718 decision 2)"
+ ],
+ "patches_in_force": {
+  "capture_safe_mask_head": "hashes"
+ }
+}

@@ -1,0 +1,1259 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "tool": "ab_fastmace",
+  "created_utc": "2026-10-21T03:15:59.798873+00:00",
+  "host": "murphy",
+  "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "a3eaf89a9136da4afb323538f0d587d1c620881d",
+  "release": {
+    "tag": "fastmace-1b",
+    "commit": "673a8a1",
+    "renamed": "fastmace_1b",
+    "planner": "minimal",
+    "current": "2"
+  },
+  "release_source": {
+    "name": "fastmace_1b",
+    "ref": "fastmace-1b",
+    "commit": "673a8a14cdb6ef869c7b186d82201ff182669cf5",
+    "renamed": "fastmace -> fastmace_1b (standalone words, .py files)",
+    "tree_sha256": "d545e02bd1920d96c5514a56aff67424378bb405041aeec757fbed3754adfdaa"
+  },
+  "current_side": "2",
+  "release_side": "1b",
+  "model": "mh1-r2scan",
+  "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "tf32": false,
+  "ensemble": "nvt",
+  "temperature_K": 300.0,
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "sides": [
+    "2",
+    "1b"
+  ],
+  "build_order": [
+    "2",
+    "1b"
+  ],
+  "planner_1b": "minimal",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:CXX', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "oeq_runtime_shared": {
+    "name": "oeq_runtime",
+    "value": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/cuda-runtime",
+    "targets": [
+      "env:CMAKE_CUDA_COMPILER",
+      "env:CPATH",
+      "env:CUDACXX",
+      "env:CUDA_HOME",
+      "env:CUDA_PATH",
+      "env:CXX",
+      "env:MAX_JOBS",
+      "env:OEQ_JIT_EXTENSION",
+      "env:OEQ_NVCC_ATTEMPTS",
+      "env:PATH",
+      "env:PYTORCH_NVCC",
+      "env:TORCH_EXTENSIONS_DIR"
+    ],
+    "detail": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13 (shared from fastmace._patches)"
+  },
+  "args": {
+    "output": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261021-combined/regression2-ab-2-first",
+    "release": "1b",
+    "sides": [
+      "2",
+      "1b"
+    ],
+    "renamed": "/mnt/homes/zwingel/fastmace-2-T23/versions",
+    "expected_commit": "673a8a1",
+    "planner_1b": "minimal",
+    "model": "mh1-r2scan",
+    "checkpoint": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+    "structures": [
+      "NaCl",
+      "NbCl5"
+    ],
+    "temperature_K": 300.0,
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12,
+    "pattern": "abab",
+    "seed": 1,
+    "backend": "hybrid",
+    "ensemble": "nvt",
+    "cell_mode": "hydrostatic",
+    "dump_forces": true,
+    "allow_option_changes": [
+      "gated_rows",
+      "segment_gemm"
+    ],
+    "dump_final": false,
+    "current": "2"
+  },
+  "versions": {
+    "2": {
+      "load_s": 0.18731173500418663,
+      "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+      "package": "fastmace",
+      "planner": "MinimalPlanner"
+    },
+    "1b": {
+      "load_s": 0.17984870448708534,
+      "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+      "package": "fastmace_1b",
+      "planner": "MinimalPlanner"
+    }
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "structure": "NaCl",
+      "sides": {
+        "2": {
+          "schema_version": 1,
+          "created_utc": "2026-10-21T03:17:27.172408+00:00",
+          "median_ms": 3.48614012512068,
+          "mean_ms": 3.4500735667016773,
+          "min_ms": 3.3086223465700946,
+          "max_ms": 3.5606079548597336,
+          "stdev_ms": 0.08193687982708481,
+          "spread": 0.07228212270466781,
+          "block_ms": [
+            3.3086223465700946,
+            3.320759373406569,
+            3.3342487178742886,
+            3.5606079548597336,
+            3.4483040558795133,
+            3.4952570187548795,
+            3.493863524248203,
+            3.4750807471573353,
+            3.4836203480760255,
+            3.5022110243638354,
+            3.489647787064314,
+            3.4886599021653337
+          ],
+          "setup_s": 23.806666972115636,
+          "peak_memory_bytes": 2713714688,
+          "observables": {
+            "temperature_K": 311.626469619041,
+            "potential_eV_atom": -6.853655722406176,
+            "kinetic_eV_atom": 0.040280823457920896
+          },
+          "info": {
+            "engine": "graph",
+            "mode": "pipelined",
+            "capture": true,
+            "pad_edges": true,
+            "variable_cell": false,
+            "initial_edges": 6912,
+            "edge_bucket": 512,
+            "edge_sizes_used": [
+              7168,
+              7680
+            ],
+            "neighbour_rebuilds": 154,
+            "graphs": [
+              "ACP",
+              "('B', 7168)",
+              "('B', 7680)"
+            ],
+            "pool_resets": 0,
+            "capture_memory": [
+              {
+                "key": "ACP",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 2588.0,
+                "max_reserved_after_capture_MiB": 2588.0
+              },
+              {
+                "key": "('B', 7168)",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 2588.0,
+                "max_reserved_after_capture_MiB": 2588.0
+              },
+              {
+                "key": "('B', 7680)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 2588.0,
+                "max_reserved_after_capture_MiB": 2588.0
+              }
+            ],
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "pipelined_redos": 15,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 154,
+            "canonical_points": 0,
+            "polar_overflow_steps": [],
+            "process": {
+              "allocator": "expandable_segments:True",
+              "dynamo_cache_size_limit": 64,
+              "compile_family": "oeq"
+            },
+            "force_field": {
+              "backend": "hybrid",
+              "dtype": "float32",
+              "device": "cuda:0",
+              "compile_mode": "default",
+              "training": false,
+              "compute_stress": false,
+              "padding_exact": true,
+              "rewrites": [
+                "factor_species",
+                "fold_cutoff",
+                "density_first",
+                "joint_radial_input",
+                "fused_folded_backward",
+                "streaming_conv",
+                "reassociate_first",
+                "segmented_first_sum",
+                "block_linear",
+                "grouped_linear",
+                "merged_residual",
+                "gated_rows",
+                "segment_gemm",
+                "single_graph_strain"
+              ],
+              "decisions": {
+                "factor_species": "on",
+                "fold_cutoff": "on",
+                "density_first": "on",
+                "joint_radial_input": "on",
+                "fused_folded_backward": "on",
+                "fused_radial_hidden": "off",
+                "streaming_conv": "on",
+                "reassociate_first": "on",
+                "segmented_first_sum": "on",
+                "generic_species_skip": "off",
+                "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+                "generic_segmented_first_sum": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field segmented_first_sum honoured by segmented_first_sum)",
+                "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+                "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+                "block_linear": "on",
+                "grouped_linear": "on",
+                "merged_residual": "on",
+                "gated_rows": "on",
+                "segment_gemm": "on",
+                "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+                "single_graph_strain": "on"
+              },
+              "selfchecks": {
+                "factor_species": 1.1425172502527599e-06,
+                "fold_cutoff": 5.273156539628123e-07,
+                "density_first": 6.665433271709953e-07,
+                "joint_radial_input": 7.169226503328892e-07,
+                "fused_folded_backward": 8.079474559451501e-07,
+                "streaming_conv": 6.732895466209584e-07,
+                "reassociate_first": 2.753315136335471e-06,
+                "segmented_first_sum": 2.246125505957884e-06,
+                "block_linear": 6.039514733043886e-07,
+                "grouped_linear": 6.039514733043886e-07,
+                "merged_residual": 2.7917198334199386e-07,
+                "gated_rows": 5.287709056788073e-07,
+                "segment_gemm": 8.776468952714491e-07,
+                "single_graph_strain": 0.0
+              },
+              "streaming_interactions": 2,
+              "sort_receivers": true,
+              "gpu_neighbour_list": true,
+              "neighbour_rebuilds": 155,
+              "edge_capacity": 14080,
+              "candidates": 10076,
+              "species_columns": [
+                10,
+                16
+              ],
+              "charge": null,
+              "spin_multiplicity": null,
+              "dynamo_reset": false,
+              "polar": null,
+              "float64_energy": true,
+              "energy_treatment": "patched",
+              "strain_path": "one_graph"
+            }
+          }
+        },
+        "1b": {
+          "schema_version": 1,
+          "created_utc": "2026-10-21T03:17:27.172527+00:00",
+          "median_ms": 3.6347997436920805,
+          "mean_ms": 3.5994753908986845,
+          "min_ms": 3.4541595789293447,
+          "max_ms": 3.7231873100002604,
+          "stdev_ms": 0.08507993280917953,
+          "spread": 0.07401445747810259,
+          "block_ms": [
+            3.4541595789293447,
+            3.468504709502061,
+            3.4790131201346717,
+            3.7231873100002604,
+            3.5950499027967453,
+            3.6438956297934055,
+            3.644260447472334,
+            3.624553283055623,
+            3.6323141306638718,
+            3.6535662226378918,
+            3.6379149990777178,
+            3.6372853567202887
+          ],
+          "setup_s": 13.808107361197472,
+          "peak_memory_bytes": 2713714688,
+          "observables": {
+            "temperature_K": 311.6264253049808,
+            "potential_eV_atom": -6.8536557235099655,
+            "kinetic_eV_atom": 0.040280817729887466
+          },
+          "info": {
+            "engine": "graph",
+            "mode": "pipelined",
+            "capture": true,
+            "pad_edges": true,
+            "variable_cell": false,
+            "initial_edges": 6912,
+            "edge_bucket": 512,
+            "edge_sizes_used": [
+              7168,
+              7680
+            ],
+            "neighbour_rebuilds": 154,
+            "graphs": [
+              "ACP",
+              "('B', 7168)",
+              "('B', 7680)"
+            ],
+            "pool_resets": 0,
+            "capture_memory": [
+              {
+                "key": "ACP",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 2588.0,
+                "max_reserved_after_capture_MiB": 2588.0
+              },
+              {
+                "key": "('B', 7168)",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 2588.0,
+                "max_reserved_after_capture_MiB": 2588.0
+              },
+              {
+                "key": "('B', 7680)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 2588.0,
+                "max_reserved_after_capture_MiB": 2588.0
+              }
+            ],
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "pipelined_redos": 15,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 154,
+            "canonical_points": 0,
+            "polar_overflow_steps": [],
+            "process": {
+              "allocator": "expandable_segments:True",
+              "dynamo_cache_size_limit": 64,
+              "compile_family": "oeq"
+            },
+            "force_field": {
+              "backend": "hybrid",
+              "dtype": "float32",
+              "device": "cuda:0",
+              "compile_mode": "default",
+              "training": false,
+              "compute_stress": false,
+              "padding_exact": true,
+              "rewrites": [
+                "factor_species",
+                "fold_cutoff",
+                "density_first",
+                "joint_radial_input",
+                "fused_folded_backward",
+                "streaming_conv",
+                "reassociate_first",
+                "segmented_first_sum",
+                "block_linear",
+                "grouped_linear",
+                "merged_residual",
+                "single_graph_strain"
+              ],
+              "decisions": {
+                "factor_species": "on",
+                "fold_cutoff": "on",
+                "density_first": "on",
+                "joint_radial_input": "on",
+                "fused_folded_backward": "on",
+                "fused_radial_hidden": "off",
+                "streaming_conv": "on",
+                "reassociate_first": "on",
+                "segmented_first_sum": "on",
+                "generic_species_skip": "off",
+                "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+                "generic_segmented_first_sum": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field segmented_first_sum honoured by segmented_first_sum)",
+                "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+                "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+                "block_linear": "on",
+                "grouped_linear": "on",
+                "merged_residual": "on",
+                "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+                "single_graph_strain": "on"
+              },
+              "selfchecks": {
+                "factor_species": 7.909734809442184e-07,
+                "fold_cutoff": 5.361326762027571e-07,
+                "density_first": 6.665433271709953e-07,
+                "joint_radial_input": 6.665433271709953e-07,
+                "fused_folded_backward": 8.079474559451501e-07,
+                "streaming_conv": 7.406185012830542e-07,
+                "reassociate_first": 2.535947784400385e-06,
+                "segmented_first_sum": 3.115593669490433e-06,
+                "block_linear": 6.039514733043886e-07,
+                "grouped_linear": 6.039514733043886e-07,
+                "merged_residual": 2.7917198334199386e-07,
+                "single_graph_strain": 0.0
+              },
+              "streaming_interactions": 2,
+              "sort_receivers": true,
+              "gpu_neighbour_list": true,
+              "neighbour_rebuilds": 155,
+              "edge_capacity": 14080,
+              "candidates": 10076,
+              "species_columns": [
+                10,
+                16
+              ],
+              "charge": null,
+              "spin_multiplicity": null,
+              "dynamo_reset": false,
+              "polar": null,
+              "float64_energy": true
+            }
+          }
+        }
+      },
+      "plans": {
+        "2": {
+          "describe": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = Na Cl  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 300 K  (recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3)\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+          "options": {
+            "factor_species": true,
+            "fold_cutoff": true,
+            "density_first": true,
+            "reassociate_first": true,
+            "joint_radial_input": true,
+            "fused_folded_backward": true,
+            "segmented_first_sum": true,
+            "streaming_conv": true,
+            "block_linear": true,
+            "grouped_linear": true,
+            "merged_residual": true,
+            "gated_rows": true,
+            "segment_gemm": true,
+            "single_graph_strain": true,
+            "sort_receivers": true,
+            "gpu_neighbour_list": true,
+            "off:species_skip": "no MACE-MP-0 or density-family interaction"
+          }
+        },
+        "1b": {
+          "describe": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  superset = Na Cl  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 300 K  (recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3)\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+          "options": {
+            "factor_species": true,
+            "fold_cutoff": true,
+            "density_first": true,
+            "reassociate_first": true,
+            "joint_radial_input": true,
+            "fused_folded_backward": true,
+            "segmented_first_sum": true,
+            "streaming_conv": true,
+            "block_linear": true,
+            "grouped_linear": true,
+            "merged_residual": true,
+            "single_graph_strain": true,
+            "sort_receivers": true,
+            "gpu_neighbour_list": true,
+            "off:species_skip": "no MACE-MP-0 or density-family interaction"
+          }
+        }
+      },
+      "plan_check": {
+        "equal": false,
+        "differences": {
+          "gated_rows": [
+            null,
+            true
+          ],
+          "segment_gemm": [
+            null,
+            true
+          ]
+        },
+        "allowed": [
+          "gated_rows",
+          "segment_gemm"
+        ],
+        "unexpected": [],
+        "as_expected": true
+      },
+      "plan_describe_equal": false,
+      "ab": {
+        "names": [
+          "2",
+          "1b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b"
+        ],
+        "sides": {
+          "2": {
+            "median_ms": 3.48614012512068,
+            "mean_ms": 3.4500735667016773,
+            "min_ms": 3.3086223465700946,
+            "max_ms": 3.5606079548597336,
+            "stdev_ms": 0.08193687982708481,
+            "spread": 0.07228212270466781,
+            "block_ms": [
+              3.3086223465700946,
+              3.320759373406569,
+              3.3342487178742886,
+              3.5606079548597336,
+              3.4483040558795133,
+              3.4952570187548795,
+              3.493863524248203,
+              3.4750807471573353,
+              3.4836203480760255,
+              3.5022110243638354,
+              3.489647787064314,
+              3.4886599021653337
+            ]
+          },
+          "1b": {
+            "median_ms": 3.6347997436920805,
+            "mean_ms": 3.5994753908986845,
+            "min_ms": 3.4541595789293447,
+            "max_ms": 3.7231873100002604,
+            "stdev_ms": 0.08507993280917953,
+            "spread": 0.07401445747810259,
+            "block_ms": [
+              3.4541595789293447,
+              3.468504709502061,
+              3.4790131201346717,
+              3.7231873100002604,
+              3.5950499027967453,
+              3.6438956297934055,
+              3.644260447472334,
+              3.624553283055623,
+              3.6323141306638718,
+              3.6535662226378918,
+              3.6379149990777178,
+              3.6372853567202887
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0426430416552044,
+        "pair_ratios_b_over_a": [
+          1.0439872602898068,
+          1.044491430869298,
+          1.0434173975937453,
+          1.0456605605564153,
+          1.0425559476598427,
+          1.0425258028925941,
+          1.043046021168355,
+          1.0430126799270947,
+          1.0426836933220833,
+          1.04321704124084,
+          1.0424877297253357,
+          1.0426024487118124
+        ]
+      },
+      "ratio": 0.9591010154467552,
+      "ratio_2_over_1b": 0.9591010154467552,
+      "timing_wall_s": 25.37983930669725,
+      "warmup_s": {
+        "2": 12.0189204569906,
+        "1b": 11.867689980193973
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "patches_changed_while_timed": [],
+      "valid": true,
+      "observables_difference": {
+        "temperature_K": 4.4314060232863994e-05,
+        "potential_eV_atom": 1.1037899483312685e-09,
+        "kinetic_eV_atom": 5.728033429519552e-09
+      },
+      "patches": {
+        "targets": [
+          "mace.modules.blocks:mask_head",
+          "mace.modules.utils:compute_forces",
+          "mace.modules.utils:compute_forces_virials",
+          "mace.modules.utils:get_symmetric_displacement",
+          "mace.modules.models:get_symmetric_displacement",
+          "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm",
+          "torch._inductor.config:post_grad_custom_pre_pass",
+          "mace.cli.convert_e3nn_cueq:run",
+          "mace.calculators.mace:run_e3nn_to_cueq"
+        ],
+        "pristine": {
+          "mace.modules.blocks:mask_head": "mace.modules.irreps_tools.mask_head",
+          "mace.modules.utils:compute_forces": "mace.modules.utils.compute_forces",
+          "mace.modules.utils:compute_forces_virials": "mace.modules.utils.compute_forces_virials",
+          "mace.modules.utils:get_symmetric_displacement": "mace.modules.utils.get_symmetric_displacement",
+          "mace.modules.models:get_symmetric_displacement": "mace.modules.utils.get_symmetric_displacement",
+          "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm": "torch._inductor.fx_passes.post_grad.should_prefer_unfused_addmm",
+          "torch._inductor.config:post_grad_custom_pre_pass": "None",
+          "mace.cli.convert_e3nn_cueq:run": "mace.cli.convert_e3nn_cueq.run",
+          "mace.calculators.mace:run_e3nn_to_cueq": "mace.cli.convert_e3nn_cueq.run"
+        },
+        "sides": {
+          "2": {
+            "mace.modules.blocks:mask_head": "fastmace.rewrites.engine.capture_safe_mask_head",
+            "mace.modules.utils:compute_forces": "mace.modules.utils.compute_forces",
+            "mace.modules.utils:compute_forces_virials": "mace.modules.utils.compute_forces_virials",
+            "mace.modules.utils:get_symmetric_displacement": "mace.modules.utils.get_symmetric_displacement",
+            "mace.modules.models:get_symmetric_displacement": "mace.modules.utils.get_symmetric_displacement",
+            "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm": "fastmace.rewrites.engine.unfused_full_addmm_rule.<locals>.should_prefer_unfused_addmm",
+            "torch._inductor.config:post_grad_custom_pre_pass": "custom pass fastmace-unfused-full-addmm-v1",
+            "mace.cli.convert_e3nn_cueq:run": "mace.cli.convert_e3nn_cueq.run",
+            "mace.calculators.mace:run_e3nn_to_cueq": "mace.cli.convert_e3nn_cueq.run"
+          },
+          "1b": {
+            "mace.modules.blocks:mask_head": "fastmace_1b.rewrites.engine.capture_safe_mask_head",
+            "mace.modules.utils:compute_forces": "mace.modules.utils.compute_forces",
+            "mace.modules.utils:compute_forces_virials": "mace.modules.utils.compute_forces_virials",
+            "mace.modules.utils:get_symmetric_displacement": "fastmace_1b.rewrites.engine.single_graph_symmetric_displacement",
+            "mace.modules.models:get_symmetric_displacement": "fastmace_1b.rewrites.engine.single_graph_symmetric_displacement",
+            "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm": "fastmace_1b.rewrites.engine.unfused_full_addmm_rule.<locals>.should_prefer_unfused_addmm",
+            "torch._inductor.config:post_grad_custom_pre_pass": "custom pass fastmace_1b-unfused-full-addmm-v1",
+            "mace.cli.convert_e3nn_cueq:run": "mace.cli.convert_e3nn_cueq.run",
+            "mace.calculators.mace:run_e3nn_to_cueq": "mace.cli.convert_e3nn_cueq.run"
+          }
+        }
+      },
+      "other_gpu_processes": []
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "structure": "NbCl5",
+      "sides": {
+        "2": {
+          "schema_version": 1,
+          "created_utc": "2026-10-21T03:21:56.999162+00:00",
+          "median_ms": 27.17698567546904,
+          "mean_ms": 27.08241107149257,
+          "min_ms": 26.319995218267042,
+          "max_ms": 27.515939703832068,
+          "stdev_ms": 0.3324110761346162,
+          "spread": 0.0440057812093756,
+          "block_ms": [
+            26.319995218267042,
+            26.497003523012005,
+            27.515939703832068,
+            27.13981408625841,
+            27.159789471576612,
+            27.17434847727418,
+            27.17180583626032,
+            27.179622873663902,
+            27.182135557134945,
+            27.18341752886772,
+            27.272191022833187,
+            27.192869558930397
+          ],
+          "setup_s": 21.859050696715713,
+          "peak_memory_bytes": 3363831808,
+          "observables": {
+            "temperature_K": 295.498379794873,
+            "potential_eV_atom": -10.587099175271675,
+            "kinetic_eV_atom": 0.03819610729207339
+          },
+          "info": {
+            "engine": "graph",
+            "mode": "pipelined",
+            "capture": true,
+            "pad_edges": true,
+            "variable_cell": false,
+            "initial_edges": 51084,
+            "edge_bucket": 2560,
+            "edge_sizes_used": [
+              51200,
+              53760,
+              56320
+            ],
+            "neighbour_rebuilds": 149,
+            "graphs": [
+              "ACP",
+              "('B', 51200)",
+              "('B', 53760)",
+              "('B', 56320)"
+            ],
+            "pool_resets": 0,
+            "capture_memory": [
+              {
+                "key": "ACP",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 3208.0,
+                "max_reserved_after_capture_MiB": 3208.0
+              },
+              {
+                "key": "('B', 51200)",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 3208.0,
+                "max_reserved_after_capture_MiB": 3208.0
+              },
+              {
+                "key": "('B', 53760)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 3208.0,
+                "max_reserved_after_capture_MiB": 3208.0
+              },
+              {
+                "key": "('B', 56320)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 3208.0,
+                "max_reserved_after_capture_MiB": 3208.0
+              }
+            ],
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "pipelined_redos": 3,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 149,
+            "canonical_points": 0,
+            "polar_overflow_steps": [],
+            "process": {
+              "allocator": "expandable_segments:True",
+              "dynamo_cache_size_limit": 64,
+              "compile_family": "oeq"
+            },
+            "force_field": {
+              "backend": "hybrid",
+              "dtype": "float32",
+              "device": "cuda:0",
+              "compile_mode": "default",
+              "training": false,
+              "compute_stress": false,
+              "padding_exact": true,
+              "rewrites": [
+                "factor_species",
+                "fold_cutoff",
+                "density_first",
+                "joint_radial_input",
+                "fused_folded_backward",
+                "streaming_conv",
+                "reassociate_first",
+                "segmented_first_sum",
+                "block_linear",
+                "grouped_linear",
+                "merged_residual",
+                "gated_rows",
+                "segment_gemm",
+                "single_graph_strain"
+              ],
+              "decisions": {
+                "factor_species": "on",
+                "fold_cutoff": "on",
+                "density_first": "on",
+                "joint_radial_input": "on",
+                "fused_folded_backward": "on",
+                "fused_radial_hidden": "off",
+                "streaming_conv": "on",
+                "reassociate_first": "on",
+                "segmented_first_sum": "on",
+                "generic_species_skip": "off",
+                "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+                "generic_segmented_first_sum": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field segmented_first_sum honoured by segmented_first_sum)",
+                "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+                "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+                "block_linear": "on",
+                "grouped_linear": "on",
+                "merged_residual": "on",
+                "gated_rows": "on",
+                "segment_gemm": "on",
+                "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+                "single_graph_strain": "on"
+              },
+              "selfchecks": {
+                "factor_species": 7.498591670751837e-07,
+                "fold_cutoff": 7.055779859668379e-07,
+                "density_first": 1.0191682818523995e-06,
+                "joint_radial_input": 1.254361060618723e-06,
+                "fused_folded_backward": 1.8957408863441728e-06,
+                "streaming_conv": 2.014224930393718e-06,
+                "reassociate_first": 1.7098717736982695e-06,
+                "segmented_first_sum": 1.4081296959868103e-06,
+                "block_linear": 6.039514733043886e-07,
+                "grouped_linear": 6.039514733043886e-07,
+                "merged_residual": 2.7917198334199386e-07,
+                "gated_rows": 5.287709056788073e-07,
+                "segment_gemm": 8.776468952714491e-07,
+                "single_graph_strain": 0.0
+              },
+              "streaming_interactions": 2,
+              "sort_receivers": true,
+              "gpu_neighbour_list": true,
+              "neighbour_rebuilds": 150,
+              "edge_capacity": 76032,
+              "candidates": 67842,
+              "species_columns": [
+                16,
+                40
+              ],
+              "charge": null,
+              "spin_multiplicity": null,
+              "dynamo_reset": false,
+              "polar": null,
+              "float64_energy": true,
+              "energy_treatment": "patched",
+              "strain_path": "one_graph"
+            }
+          }
+        },
+        "1b": {
+          "schema_version": 1,
+          "created_utc": "2026-10-21T03:21:56.999297+00:00",
+          "median_ms": 31.43592917981247,
+          "mean_ms": 31.354959311688116,
+          "min_ms": 30.62303553024928,
+          "max_ms": 31.861891591300566,
+          "stdev_ms": 0.33443116561366143,
+          "spread": 0.03940892136399314,
+          "block_ms": [
+            30.62303553024928,
+            30.763841600467764,
+            31.861891591300566,
+            31.396798112740118,
+            31.410434724142156,
+            31.42948169261217,
+            31.430031253645815,
+            31.441827105979126,
+            31.445006492237248,
+            31.44821203624209,
+            31.543814173589155,
+            31.465137427051864
+          ],
+          "setup_s": 19.898167796432972,
+          "peak_memory_bytes": 3363831808,
+          "observables": {
+            "temperature_K": 295.4982865040813,
+            "potential_eV_atom": -10.587099187168075,
+            "kinetic_eV_atom": 0.03819609523330985
+          },
+          "info": {
+            "engine": "graph",
+            "mode": "pipelined",
+            "capture": true,
+            "pad_edges": true,
+            "variable_cell": false,
+            "initial_edges": 51084,
+            "edge_bucket": 2560,
+            "edge_sizes_used": [
+              51200,
+              53760,
+              56320
+            ],
+            "neighbour_rebuilds": 149,
+            "graphs": [
+              "ACP",
+              "('B', 51200)",
+              "('B', 53760)",
+              "('B', 56320)"
+            ],
+            "pool_resets": 0,
+            "capture_memory": [
+              {
+                "key": "ACP",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 3208.0,
+                "max_reserved_after_capture_MiB": 3208.0
+              },
+              {
+                "key": "('B', 51200)",
+                "warmup_in_pool": false,
+                "max_reserved_after_warmup_MiB": 3208.0,
+                "max_reserved_after_capture_MiB": 3208.0
+              },
+              {
+                "key": "('B', 53760)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 3208.0,
+                "max_reserved_after_capture_MiB": 3208.0
+              },
+              {
+                "key": "('B', 56320)",
+                "warmup_in_pool": true,
+                "max_reserved_after_warmup_MiB": 3208.0,
+                "max_reserved_after_capture_MiB": 3208.0
+              }
+            ],
+            "speculative_launches": 0,
+            "speculative_rollbacks": 0,
+            "speculative_rebuild_rollbacks": 0,
+            "speculative_bucket_rollbacks": 0,
+            "pipelined_redos": 3,
+            "pipelined_rebuild_redos": 0,
+            "pipelined_early_rebuilds": 149,
+            "canonical_points": 0,
+            "polar_overflow_steps": [],
+            "process": {
+              "allocator": "expandable_segments:True",
+              "dynamo_cache_size_limit": 64,
+              "compile_family": "oeq"
+            },
+            "force_field": {
+              "backend": "hybrid",
+              "dtype": "float32",
+              "device": "cuda:0",
+              "compile_mode": "default",
+              "training": false,
+              "compute_stress": false,
+              "padding_exact": true,
+              "rewrites": [
+                "factor_species",
+                "fold_cutoff",
+                "density_first",
+                "joint_radial_input",
+                "fused_folded_backward",
+                "streaming_conv",
+                "reassociate_first",
+                "segmented_first_sum",
+                "block_linear",
+                "grouped_linear",
+                "merged_residual",
+                "single_graph_strain"
+              ],
+              "decisions": {
+                "factor_species": "on",
+                "fold_cutoff": "on",
+                "density_first": "on",
+                "joint_radial_input": "on",
+                "fused_folded_backward": "on",
+                "fused_radial_hidden": "off",
+                "streaming_conv": "on",
+                "reassociate_first": "on",
+                "segmented_first_sum": "on",
+                "generic_species_skip": "off",
+                "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+                "generic_segmented_first_sum": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field segmented_first_sum honoured by segmented_first_sum)",
+                "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+                "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+                "block_linear": "on",
+                "grouped_linear": "on",
+                "merged_residual": "on",
+                "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+                "single_graph_strain": "on"
+              },
+              "selfchecks": {
+                "factor_species": 7.394172143557359e-07,
+                "fold_cutoff": 8.293866377755755e-07,
+                "density_first": 9.799694249539414e-07,
+                "joint_radial_input": 1.0583669789502568e-06,
+                "fused_folded_backward": 1.8957408863441728e-06,
+                "streaming_conv": 2.014224930393718e-06,
+                "reassociate_first": 1.4081296959868103e-06,
+                "segmented_first_sum": 1.4081296959868103e-06,
+                "block_linear": 6.039514733043886e-07,
+                "grouped_linear": 6.039514733043886e-07,
+                "merged_residual": 2.7917198334199386e-07,
+                "single_graph_strain": 0.0
+              },
+              "streaming_interactions": 2,
+              "sort_receivers": true,
+              "gpu_neighbour_list": true,
+              "neighbour_rebuilds": 150,
+              "edge_capacity": 76032,
+              "candidates": 67842,
+              "species_columns": [
+                16,
+                40
+              ],
+              "charge": null,
+              "spin_multiplicity": null,
+              "dynamo_reset": false,
+              "polar": null,
+              "float64_energy": true
+            }
+          }
+        }
+      },
+      "plans": {
+        "2": {
+          "describe": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = Cl Nb  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 300 K  (recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3)\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (1944 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+          "options": {
+            "factor_species": true,
+            "fold_cutoff": true,
+            "density_first": true,
+            "reassociate_first": true,
+            "joint_radial_input": true,
+            "fused_folded_backward": true,
+            "segmented_first_sum": true,
+            "streaming_conv": true,
+            "block_linear": true,
+            "grouped_linear": true,
+            "merged_residual": true,
+            "gated_rows": true,
+            "segment_gemm": true,
+            "single_graph_strain": true,
+            "sort_receivers": true,
+            "gpu_neighbour_list": true,
+            "off:species_skip": "no MACE-MP-0 or density-family interaction"
+          }
+        },
+        "1b": {
+          "describe": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  superset = Cl Nb  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 300 K  (recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3)\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (1944 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA RTX 4000 Ada Generation  (compute capability 8.9, 19.5 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+          "options": {
+            "factor_species": true,
+            "fold_cutoff": true,
+            "density_first": true,
+            "reassociate_first": true,
+            "joint_radial_input": true,
+            "fused_folded_backward": true,
+            "segmented_first_sum": true,
+            "streaming_conv": true,
+            "block_linear": true,
+            "grouped_linear": true,
+            "merged_residual": true,
+            "single_graph_strain": true,
+            "sort_receivers": true,
+            "gpu_neighbour_list": true,
+            "off:species_skip": "no MACE-MP-0 or density-family interaction"
+          }
+        }
+      },
+      "plan_check": {
+        "equal": false,
+        "differences": {
+          "gated_rows": [
+            null,
+            true
+          ],
+          "segment_gemm": [
+            null,
+            true
+          ]
+        },
+        "allowed": [
+          "gated_rows",
+          "segment_gemm"
+        ],
+        "unexpected": [],
+        "as_expected": true
+      },
+      "plan_describe_equal": false,
+      "ab": {
+        "names": [
+          "2",
+          "1b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b",
+          "2",
+          "1b"
+        ],
+        "sides": {
+          "2": {
+            "median_ms": 27.17698567546904,
+            "mean_ms": 27.08241107149257,
+            "min_ms": 26.319995218267042,
+            "max_ms": 27.515939703832068,
+            "stdev_ms": 0.3324110761346162,
+            "spread": 0.0440057812093756,
+            "block_ms": [
+              26.319995218267042,
+              26.497003523012005,
+              27.515939703832068,
+              27.13981408625841,
+              27.159789471576612,
+              27.17434847727418,
+              27.17180583626032,
+              27.179622873663902,
+              27.182135557134945,
+              27.18341752886772,
+              27.272191022833187,
+              27.192869558930397
+            ]
+          },
+          "1b": {
+            "median_ms": 31.43592917981247,
+            "mean_ms": 31.354959311688116,
+            "min_ms": 30.62303553024928,
+            "max_ms": 31.861891591300566,
+            "stdev_ms": 0.33443116561366143,
+            "spread": 0.03940892136399314,
+            "block_ms": [
+              30.62303553024928,
+              30.763841600467764,
+              31.861891591300566,
+              31.396798112740118,
+              31.410434724142156,
+              31.42948169261217,
+              31.430031253645815,
+              31.441827105979126,
+              31.445006492237248,
+              31.44821203624209,
+              31.543814173589155,
+              31.465137427051864
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.1567114011539443,
+        "pair_ratios_b_over_a": [
+          1.1634894032577852,
+          1.16103096615246,
+          1.1579430662461894,
+          1.1568538389007288,
+          1.1565050884143984,
+          1.1565863931897593,
+          1.1567148478480207,
+          1.1568161652619966,
+          1.15682619660777,
+          1.1568895633834606,
+          1.1566292619166396,
+          1.1571098577464551
+        ]
+      },
+      "ratio": 0.8645198785128185,
+      "ratio_2_over_1b": 0.8645198785128185,
+      "timing_wall_s": 210.37654634006321,
+      "warmup_s": {
+        "2": 8.204221135005355,
+        "1b": 9.432229615747929
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "patches_changed_while_timed": [],
+      "valid": true,
+      "observables_difference": {
+        "temperature_K": 9.329079171038757e-05,
+        "potential_eV_atom": 1.189640030929695e-08,
+        "kinetic_eV_atom": 1.2058763543265627e-08
+      },
+      "patches": {
+        "targets": [
+          "mace.modules.blocks:mask_head",
+          "mace.modules.utils:compute_forces",
+          "mace.modules.utils:compute_forces_virials",
+          "mace.modules.utils:get_symmetric_displacement",
+          "mace.modules.models:get_symmetric_displacement",
+          "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm",
+          "torch._inductor.config:post_grad_custom_pre_pass",
+          "mace.cli.convert_e3nn_cueq:run",
+          "mace.calculators.mace:run_e3nn_to_cueq"
+        ],
+        "pristine": {
+          "mace.modules.blocks:mask_head": "mace.modules.irreps_tools.mask_head",
+          "mace.modules.utils:compute_forces": "mace.modules.utils.compute_forces",
+          "mace.modules.utils:compute_forces_virials": "mace.modules.utils.compute_forces_virials",
+          "mace.modules.utils:get_symmetric_displacement": "mace.modules.utils.get_symmetric_displacement",
+          "mace.modules.models:get_symmetric_displacement": "mace.modules.utils.get_symmetric_displacement",
+          "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm": "torch._inductor.fx_passes.post_grad.should_prefer_unfused_addmm",
+          "torch._inductor.config:post_grad_custom_pre_pass": "None",
+          "mace.cli.convert_e3nn_cueq:run": "mace.cli.convert_e3nn_cueq.run",
+          "mace.calculators.mace:run_e3nn_to_cueq": "mace.cli.convert_e3nn_cueq.run"
+        },
+        "sides": {
+          "2": {
+            "mace.modules.blocks:mask_head": "fastmace.rewrites.engine.capture_safe_mask_head",
+            "mace.modules.utils:compute_forces": "mace.modules.utils.compute_forces",
+            "mace.modules.utils:compute_forces_virials": "mace.modules.utils.compute_forces_virials",
+            "mace.modules.utils:get_symmetric_displacement": "mace.modules.utils.get_symmetric_displacement",
+            "mace.modules.models:get_symmetric_displacement": "mace.modules.utils.get_symmetric_displacement",
+            "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm": "fastmace.rewrites.engine.unfused_full_addmm_rule.<locals>.should_prefer_unfused_addmm",
+            "torch._inductor.config:post_grad_custom_pre_pass": "custom pass fastmace-unfused-full-addmm-v1",
+            "mace.cli.convert_e3nn_cueq:run": "mace.cli.convert_e3nn_cueq.run",
+            "mace.calculators.mace:run_e3nn_to_cueq": "mace.cli.convert_e3nn_cueq.run"
+          },
+          "1b": {
+            "mace.modules.blocks:mask_head": "fastmace_1b.rewrites.engine.capture_safe_mask_head",
+            "mace.modules.utils:compute_forces": "mace.modules.utils.compute_forces",
+            "mace.modules.utils:compute_forces_virials": "mace.modules.utils.compute_forces_virials",
+            "mace.modules.utils:get_symmetric_displacement": "fastmace_1b.rewrites.engine.single_graph_symmetric_displacement",
+            "mace.modules.models:get_symmetric_displacement": "fastmace_1b.rewrites.engine.single_graph_symmetric_displacement",
+            "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm": "fastmace_1b.rewrites.engine.unfused_full_addmm_rule.<locals>.should_prefer_unfused_addmm",
+            "torch._inductor.config:post_grad_custom_pre_pass": "custom pass fastmace_1b-unfused-full-addmm-v1",
+            "mace.cli.convert_e3nn_cueq:run": "mace.cli.convert_e3nn_cueq.run",
+            "mace.calculators.mace:run_e3nn_to_cueq": "mace.cli.convert_e3nn_cueq.run"
+          }
+        }
+      },
+      "other_gpu_processes": []
+    }
+  },
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "torch": "2.14.1+cu130",
+  "patches_applied": {
+    "2": [
+      "PatchRecord(name='oeq_runtime', value='/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:CXX', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+      "PatchRecord(name='capture_safe_mask_head', value=True, targets=('mace.modules.blocks:mask_head',), detail='multi-head readout mask without indexed assignment (CUDA graph capture)')",
+      "PatchRecord(name='unfuse_full_addmm', value=True, targets=('torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm', 'torch._inductor.config:post_grad_custom_pre_pass'), detail='mm + full-matrix add unfused on the GPU; cache key fastmace-unfused-full-addmm-v1')"
+    ],
+    "1b": [
+      "PatchRecord(name='oeq_runtime', value='/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:CXX', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13 (shared from fastmace._patches)')",
+      "PatchRecord(name='capture_safe_mask_head', value=True, targets=('mace.modules.blocks:mask_head',), detail='multi-head readout mask without indexed assignment (CUDA graph capture)')",
+      "PatchRecord(name='unfuse_full_addmm', value=True, targets=('torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm', 'torch._inductor.config:post_grad_custom_pre_pass'), detail='mm + full-matrix add unfused on the GPU; cache key fastmace_1b-unfused-full-addmm-v1')",
+      "PatchRecord(name='single_graph_strain', value=True, targets=('mace.modules.utils:get_symmetric_displacement', 'mace.modules.models:get_symmetric_displacement'), detail='MACE PR 1498: one-graph strain without per-edge cell gathers')"
+    ]
+  },
+  "finished_utc": "2026-10-21T03:21:57.027132+00:00"
+}

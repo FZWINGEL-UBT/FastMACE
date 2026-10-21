@@ -38,6 +38,40 @@ class ConstantMatmul(torch.autograd.Function):
         return grad @ weight_t, None, None
 
 
+def block_products(module, lefts):
+    """``lefts[k] @ weight_k`` for every product of a BlockLinear or ResidualBlockLinear.
+
+    With ``module.grouped_launch`` (record ``grouped_launch``, OPT-T03 candidate 2) the products the shared
+    shape rule calls small (``tile_rule.uses_triton`` false: too few row tiles for the GPU) and that have the
+    same weight shape run together in one Triton launch, if there are at least two of them. Equal K and N give
+    every tile of the launch, forward and input gradient, the same work: a larger-K product's tiles would run
+    several times longer and set the launch's length, where cuBLAS splits K (OPT-T03b diagnosis). The others,
+    and everything on the CPU or in other dtypes (``module.sms`` None), keep cuBLAS."""
+    count = len(lefts)
+    weights = [getattr(module, f"weight_{k}") for k in range(count)]
+    weights_t = [getattr(module, f"weight_t_{k}") for k in range(count)]
+    parts = [None] * count
+    sms = getattr(module, "sms", None)
+    if getattr(module, "grouped_launch", False) and sms:
+        from fastmace.kernels.triton import tile_rule
+
+        groups = {}
+        for k, x in enumerate(lefts):
+            if not tile_rule.uses_triton(x.shape[0], sms):
+                groups.setdefault(tuple(weights[k].shape), []).append(k)
+        for members in groups.values():
+            if len(members) < 2:
+                continue
+            from fastmace.kernels.triton.grouped_gemm import grouped_products
+
+            done = grouped_products([lefts[k] for k in members], [weights[k] for k in members],
+                                    [weights_t[k] for k in members])
+            for k, part in zip(members, done):
+                parts[k] = part
+    return [part if part is not None else ConstantMatmul.apply(x, w, wt)
+            for part, x, w, wt in zip(parts, lefts, weights, weights_t)]
+
+
 def _group(blocks):
     """(input segments, output segment, stacked weight) per output segment, in first-seen order."""
     grouped = {}
@@ -62,6 +96,8 @@ class BlockLinear(torch.nn.Module):
         self.segments_in = tuple(segments_in)
         self.segments_out = tuple(segments_out)
         self.grouped = bool(grouped)
+        self.grouped_launch = False  # grouped_launch: small products in one Triton launch (block_products)
+        self.sms = None  # grouped_launch: the device's SM count for the shape rule (None: not float32 on CUDA)
         if self.grouped:  # one product per output segment
             blocks = _group(blocks)
             self.block_ends = tuple((i, j) for i, j, _ in blocks)
@@ -82,13 +118,13 @@ class BlockLinear(torch.nn.Module):
         """Per output segment, its rows [n * dim, mul] (None where no product reaches it), from the
         rows of every input segment (in the ir_mul core layout, after ``transpose_in``)."""
         outputs = [None] * len(self.segments_out)
-        for index, (i, j) in enumerate(self.block_ends):
+        lefts = []
+        for i, _ in self.block_ends:
             if isinstance(i, tuple):  # grouped
-                left = rows[i[0]] if len(i) == 1 else torch.cat([rows[k] for k in i], dim=1)
+                lefts.append(rows[i[0]] if len(i) == 1 else torch.cat([rows[k] for k in i], dim=1))
             else:
-                left = rows[i]
-            part = ConstantMatmul.apply(left, getattr(self, f"weight_{index}"),
-                                        getattr(self, f"weight_t_{index}"))
+                lefts.append(rows[i])
+        for (_, j), part in zip(self.block_ends, block_products(self, lefts)):
             outputs[j] = part if outputs[j] is None else outputs[j] + part
         return outputs
 
@@ -135,6 +171,8 @@ class ResidualBlockLinear(torch.nn.Module):
             for i, j, weight in raw_blocks(linear):
                 grouped.setdefault(j, []).append((i + shift, weight))
         self.block_ends = tuple((tuple(i for i, _ in members), j) for j, members in grouped.items())
+        self.grouped_launch = False  # grouped_launch (see block_products)
+        self.sms = None
         for index, members in enumerate(grouped.values()):
             weight = torch.cat([w for _, w in members], dim=0).contiguous()
             self.register_buffer(f"weight_{index}", weight)
@@ -152,10 +190,9 @@ class ResidualBlockLinear(torch.nn.Module):
         rows = ([x[:, o:o + d * m].reshape(n * d, m) for o, m, d in self.segments_in[:self.first_count]]
                 + [y[:, o:o + d * m].reshape(n * d, m) for o, m, d in self.segments_in[self.first_count:]])
         outputs = [None] * len(self.segments_out)
-        for index, (i, j) in enumerate(self.block_ends):
-            left = rows[i[0]] if len(i) == 1 else torch.cat([rows[k] for k in i], dim=1)
-            outputs[j] = ConstantMatmul.apply(left, getattr(self, f"weight_{index}"),
-                                              getattr(self, f"weight_t_{index}"))
+        lefts = [rows[i[0]] if len(i) == 1 else torch.cat([rows[k] for k in i], dim=1) for i, _ in self.block_ends]
+        for (_, j), part in zip(self.block_ends, block_products(self, lefts)):
+            outputs[j] = part
         return outputs, n, x
 
 

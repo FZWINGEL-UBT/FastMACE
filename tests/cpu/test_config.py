@@ -61,6 +61,7 @@ AUTO_RULES = {
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
+    "RewriteConfig.grouped_launch": "never_automatic",
     "RewriteConfig.species_tables": "never_automatic",
     "RewriteConfig.fold_readout_tail": "never_automatic",
     "RewriteConfig.fold_product_linear": "never_automatic",

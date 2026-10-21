@@ -105,6 +105,9 @@ class RewriteConfig:
     # GEMM where the shared shape rule picks it (opt-1 OPT-T02 stage B); auto = on with gated_rows in float32,
     # not reproducible (owner, 20 Oct 2026).
     segment_gemm: Toggle = "auto"
+    # A block linear's small per-l products (too few row tiles for the GPU by the shared shape rule) in one
+    # Triton launch (opt-1 OPT-T03 candidate 2); opt-in until its A/B on both GPUs.
+    grouped_launch: Toggle = "auto"
     # Species-only atom-level products (embeddings, the first interaction's skip_tp and linear_up) as
     # per-species tables gathered each step (opt-1 OPT-T08 C1); opt-in, auto = off.
     species_tables: Toggle = "auto"

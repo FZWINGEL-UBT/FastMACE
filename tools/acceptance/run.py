@@ -156,6 +156,7 @@ def parse_args(argv=None):
     p.add_argument("--gate-structures", nargs="+", help="Gate every label on these structures only (checks)")
     p.add_argument("--research-module", help="workflow: the ResearchModule tree with 1a-T17's main.py")
     p.add_argument("--fastmace", help="The FastMACE checkout the jobs use (default: the machine's)")
+    p.add_argument("--versions", help="Directory of the renamed earlier releases (default: the machine's)")
     p.add_argument("--max-utilization", type=float, default=5.0, help="Idle limit for timing jobs, percent")
     p.add_argument("--dry-run", action="store_true", help="Print the jobs and write nothing")
     return p.parse_args(argv)
@@ -167,6 +168,8 @@ def main(argv=None, execute=None, check=None):
     machine = suites.MACHINES[args.machine]
     if args.fastmace:
         machine = dataclasses.replace(machine, fastmace=args.fastmace)
+    if args.versions:
+        machine = dataclasses.replace(machine, versions=args.versions)
     run_root = suites.check_location(machine, machine.path(machine.root) / args.run_id)
     jobs = build_jobs(machine, run_root, args.suites, args.research_module, args.gate_labels, args.gate_engine,
                       args.gate_structures)

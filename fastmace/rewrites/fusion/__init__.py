@@ -1,6 +1,6 @@
 """The fusion family of optimisation round 1 (``plans/opt-1.md``, OPT-T02; ``docs/design/opt-T02-fusion.md``).
 
-``RECORDS`` holds ``gated_rows`` and ``segment_gemm``:
+``RECORDS`` holds ``gated_rows``, ``segment_gemm`` and ``grouped_launch``:
 
 - ``gated_rows`` (stage A): in every interaction whose forward reads ``gated_rows`` (the folded
   MH-1 forward, ``fastmace.rewrites.mh1.modules.cutoff_folded_forward``) and that has merged
@@ -18,6 +18,12 @@
   before the symmetric contraction and its backward. ``rounding`` (another GEMM), deterministic (no
   atomics). On by default with ``gated_rows`` in float32 plans that are not reproducible (owner decision,
   20 October 2026); float64 and ``reproducible=True`` keep the stock products and join.
+
+- ``grouped_launch`` (OPT-T03 candidate 2, ``docs/design/opt-T03-small-m.md``): in every block linear
+  (``BlockLinear``, ``ResidualBlockLinear``, also inside the ``gated_rows`` chains), the products that the
+  shared shape rule calls small run together in one Triton launch (``fastmace.kernels.triton.grouped_gemm``),
+  forward and input gradient; the others keep cuBLAS. ``rounding`` (another GEMM), deterministic. Opt-in
+  (``RewriteConfig.grouped_launch``).
 
 The self-check compares each chain with the unrewritten interaction's ``linear_2(gate(linear_1(x)
 + linear_res(y)))``, values and both input gradients, in the model's dtype (SPEC §6.4). The gate's
@@ -186,6 +192,72 @@ def _segment_selfcheck(original, rewritten, context):
     return check_tensors(cases, dtype)
 
 
+def _block_modules(model):
+    from fastmace.rewrites.linear.modules import BlockLinear, ResidualBlockLinear
+
+    return [(name, module) for name, module in model.named_modules()
+            if isinstance(module, (BlockLinear, ResidualBlockLinear))]
+
+
+def group_launches(model):
+    """Let every block linear run its small products in one launch; returns the names of the modules."""
+    import torch
+
+    from fastmace.kernels.triton import tile_rule
+
+    names = []
+    for name, module in _block_modules(model):
+        weight = module.weight_0
+        module.grouped_launch = True
+        # Read once at setup: the forward evaluates the shape rule while torch.compile traces it.
+        module.sms = tile_rule.device_sms(weight.device) if weight.dtype == torch.float32 else None
+        names.append(name)
+    return names
+
+
+def _grouped_launch_support(model):
+    """Where block_linear applies (it is asked before block_linear has converted the model)."""
+    from fastmace.rewrites import linear
+
+    return linear.RECORDS["block_linear"].applies_to(model)
+
+
+def _grouped_launch_selfcheck(original, rewritten, context):
+    """Each block linear's products through ``block_products`` with the small ones grouped, against one
+    product at a time, on 7 atoms' rows (every product small), values and input gradients."""
+    import torch
+
+    from fastmace.rewrites.linear.modules import ConstantMatmul, block_products
+
+    generator = torch.Generator().manual_seed(context.seed + 3)
+    cases, dtype = [], None
+    for name, module in _block_modules(rewritten):
+        count = len(module.block_ends)
+        weights = [getattr(module, f"weight_{k}") for k in range(count)]
+        dtype = dtype or weights[0].dtype
+        lefts = [torch.randn((7 * (k + 1), w.shape[0]), generator=generator, dtype=torch.float64)
+                 .to(w).requires_grad_() for k, w in enumerate(weights)]
+        grads = [torch.randn((7 * (k + 1), w.shape[1]), generator=generator, dtype=torch.float64).to(w)
+                 for k, w in enumerate(weights)]
+
+        def single(xs, module=module, weights=weights):
+            return [ConstantMatmul.apply(x, w, getattr(module, f"weight_t_{k}")) for k, (x, w) in
+                    enumerate(zip(xs, weights))]
+
+        with torch.enable_grad():
+            values = []
+            for function in (single, lambda xs, module=module: block_products(module, xs)):
+                outs = function(lefts)
+                total = sum((o * g).sum() for o, g in zip(outs, grads))
+                values.append((*[o.detach() for o in outs], *torch.autograd.grad(total, lefts)))
+        cases += [(f"{name}.grouped_launch", a, b) for a, b in zip(*values)]
+    return check_tensors(cases, dtype)
+
+
+def _apply_grouped_launch(model, context):
+    return group_launches(model)
+
+
 def _apply(model, context):
     return gate_rows(model)
 
@@ -204,6 +276,10 @@ RECORDS = {
         mace_versions=MACE_VERSIONS, source_hashes={RESHAPE_FORWARD: RESHAPE_FORWARD_SHA256}, exactness="rounding",
         default="auto", deterministic=True, workload_constraints=(), apply=_apply_segment,
         selfcheck=_segment_selfcheck),
+    "grouped_launch": Rewrite(
+        name="grouped_launch", applies_to=_grouped_launch_support, requires=("block_linear",), conflicts=(),
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,
+        workload_constraints=(), apply=_apply_grouped_launch, selfcheck=_grouped_launch_selfcheck),
 }
 
 __all__ = ["GATE_FORWARD", "GATE_FORWARD_SHA256", "READS_GATED_ROWS", "RECORDS", "gate_rows", "join_in_place"]

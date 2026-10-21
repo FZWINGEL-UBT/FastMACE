@@ -1,0 +1,49 @@
+{
+ "tool": "runner_statistics",
+ "status": "complete",
+ "case": "runner",
+ "created_utc": "2026-10-20T15:19:58.411773+00:00",
+ "host": "murphy",
+ "python": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+ "fastmace_commit": "37c4014d1c568613dd801fecb20d54ff7a11fcc5",
+ "model": "mh1-r2scan",
+ "structure": "NaCl",
+ "steps": 20000,
+ "every": 20,
+ "seeds": [
+  20261001,
+  20261101
+ ],
+ "targets": [
+  300.0,
+  600.0
+ ],
+ "timestep_fs": 2.0,
+ "runs": {
+  "20261001": {
+   "backend": "cueq",
+   "dtype": "float32",
+   "runner": "in-process",
+   "setup_s": 68.17205680534244,
+   "run_s": 200.2725193183869,
+   "subprocess": null,
+   "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, plain cuEq (fused convolution), float32, 1 rewrites on, 13 off (reasons in run.plan)\nwhy:     plain cuEq, not hybrid: this process already compiled the other backend family (\u00a78.7); run in a fresh process\ngate:    not run (opt-in: check=\"gate\")\nsetup:   68 s (plan 0.0061 s, build 68 s, capture 0.06 s, provenance 8.6e-05 s)\nspeed:   10 ms/step, whole-run mean over steps 1\u201320,000\noutput:  /mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020/runner-statistics-runner/seed-20261001\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+  },
+  "20261101": {
+   "backend": "cueq",
+   "dtype": "float32",
+   "runner": "in-process",
+   "setup_s": 28.07623745314777,
+   "run_s": 131.08849274925888,
+   "subprocess": null,
+   "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, plain cuEq (fused convolution), float32, 1 rewrites on, 13 off (reasons in run.plan)\nwhy:     plain cuEq, not hybrid: this process already compiled the other backend family (\u00a78.7); run in a fresh process\ngate:    not run (opt-in: check=\"gate\")\nsetup:   28 s (plan 0.0057 s, build 28 s, capture 0.057 s, provenance 8.7e-05 s)\nspeed:   6.55 ms/step, whole-run mean over steps 1\u201320,000\noutput:  /mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020/runner-statistics-runner/seed-20261101\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+  }
+ },
+ "first": {
+  "backend": "cueq",
+  "runner": "in-process"
+ },
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "finished_utc": "2026-10-20T15:27:48.764277+00:00"
+}

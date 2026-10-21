@@ -1,0 +1,137 @@
+{
+  "runs": [
+    {
+      "started_utc": "2026-10-20T15:29:01.237234+00:00",
+      "host": "murphy",
+      "machine": "murphy",
+      "suites": [
+        "runner-statistics"
+      ],
+      "run_root": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020-runner2",
+      "environment": {
+        "PYTHONPATH": "/mnt/homes/zwingel/fastmace-2-T23/src-4b35b60",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "FASTMACE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy",
+        "FASTMACE_MODELS": "/mnt/homes/zwingel/ResearchModule/Models",
+        "FASTMACE_STRUCTURES": "/mnt/homes/zwingel/fastmace-baseline/1a-T18",
+        "TORCHINDUCTOR_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/inductor",
+        "TRITON_CACHE_DIR": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/triton",
+        "MACE_COMPILE_CACHE": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/compile",
+        "XDG_CACHE_HOME": "/mnt/homes/zwingel/fastmace-cache/acceptance-murphy/xdg",
+        "TMPDIR": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020-runner2/tmp",
+        "TMP": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020-runner2/tmp",
+        "TEMP": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020-runner2/tmp",
+        "TORCHINDUCTOR_COMPILE_THREADS": "4"
+      },
+      "python": "/usr/bin/python3",
+      "fastmace_commit": "4b35b60bf4c8dccdd07c956b7c705988743b7dee",
+      "baseline_commit": "d2faa9fdca47d7f6f55e59a0d871ce0af2e53ffd",
+      "environments": {
+        "mace_cueq_oeq": "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+        "mace_cueq_latest": "/mnt/homes/zwingel/environments/mace_cueq_latest/bin/python"
+      },
+      "jobs": [
+        {
+          "name": "runner-statistics-fresh",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/fastmace-2-T23/src-4b35b60/tools/runner_statistics.py",
+            "run",
+            "--case",
+            "fresh",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020-runner2/runner-statistics-fresh",
+            "--model",
+            "mh1-r2scan"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020-runner2/runner-statistics-fresh",
+          "timing": false,
+          "note": "hybrid, 1b-T14's measure",
+          "idle_check": {
+            "utc": "2026-10-20T15:29:01.295778+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.30908203125,
+              1.0654296875,
+              6.798828125
+            ],
+            "users": [
+              "song     pts/0        2026-10-20 14:30 (132.180.234.228)",
+              "song     pts/1        2026-10-20 14:39 (132.180.234.228)"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-20T15:29:01.299247+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-20T15:32:27.333830+00:00",
+          "wall_s": 206.0325133651495,
+          "status": "complete"
+        },
+        {
+          "name": "runner-statistics-runner",
+          "argv": [
+            "/mnt/homes/zwingel/environments/mace_cueq_oeq/bin/python",
+            "/mnt/homes/zwingel/fastmace-2-T23/src-4b35b60/tools/runner_statistics.py",
+            "run",
+            "--case",
+            "runner",
+            "--output",
+            "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020-runner2/runner-statistics-runner",
+            "--model",
+            "mh1-r2scan"
+          ],
+          "output": "/mnt/homes/zwingel/fastmace-acceptance/2-T23-murphy-20261020-runner2/runner-statistics-runner",
+          "timing": false,
+          "note": "hybrid, 1b-T14's measure",
+          "idle_check": {
+            "utc": "2026-10-20T15:32:27.375154+00:00",
+            "compute_pids": [],
+            "gpus": [
+              {
+                "name": "NVIDIA RTX 4000 Ada Generation",
+                "driver": "595.58.03",
+                "utilization_percent": 0.0,
+                "memory_used_MiB": 2.0,
+                "memory_total_MiB": 20475.0
+              }
+            ],
+            "windows_gpus": null,
+            "load_average": [
+              0.98974609375,
+              1.03759765625,
+              5.6455078125
+            ],
+            "users": [
+              "song     pts/0        2026-10-20 14:30 (132.180.234.228)",
+              "song     pts/1        2026-10-20 14:39 (132.180.234.228)"
+            ],
+            "idle": true,
+            "reasons": [],
+            "attempts": 1
+          },
+          "started_utc": "2026-10-20T15:32:27.378209+00:00",
+          "exit_code": 0,
+          "finished_utc": "2026-10-20T15:39:31.763862+00:00",
+          "wall_s": 424.3841594494879,
+          "status": "complete"
+        }
+      ],
+      "status": "complete",
+      "stopped": null,
+      "failed": [],
+      "finished_utc": "2026-10-20T15:39:31.765105+00:00"
+    }
+  ]
+}
