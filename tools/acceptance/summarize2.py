@@ -126,8 +126,8 @@ def summarize_run(run_root, machine, allowed=(), one_sided=False):
         else:
             summary["controls"] += control_rows(directory.name, meta)
             controls.append(directory.name)
-    if ab and controls:
-        summary["forces"] = forces_rows(run_root, ab, controls)
+    if ab and controls and all((run_root / name / "forces").is_dir() for name in ab + controls):
+        summary["forces"] = forces_rows(run_root, ab, controls)  # absent in results/ copies (raw files stay put)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     for backend in ("cueq", "hybrid"):
         release, current = run_root / f"trajectory2-{backend}-1b", run_root / f"trajectory2-{backend}-2"
