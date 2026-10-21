@@ -169,3 +169,11 @@ def test_rewrite_overrides():
     for bad in (["nonsense=on"], ["block_linear"], ["polar_uvu=maybe"]):
         with pytest.raises(ValueError):
             tool.rewrite_overrides(bad)
+
+
+def test_cueq_kernel_variants_join_as_one_name():
+    """cuEq's uniform_1d picks segmented_polynomial_algo<N>[_<M>] variants at run time, per process (OPT3-T02)."""
+    assert tool._base_name("segmented_polynomial_algo1_4") == tool._base_name("segmented_polynomial_algo2_2")
+    assert tool._base_name("segmented_polynomial_bwd_algo1_4") == tool._base_name("segmented_polynomial_bwd_algo6")
+    assert tool._base_name("segmented_polynomial_algo1_4") != tool._base_name("segmented_polynomial_bwd_algo1_4")
+    assert tool._base_name("void cutlass::Kernel2<x>(y)") == "kernel2"
