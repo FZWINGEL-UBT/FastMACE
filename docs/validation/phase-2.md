@@ -1,7 +1,99 @@
 # Phase 2 acceptance report
 
-**Status: interim, 20 October 2026, about 17:50 UTC. Accuracy acceptance deferred by the owner.** Plan task
-2-T23, branch `fastmace/2-T23`.
+**Status: combined acceptance run, 21 October 2026, about 07:00 UTC; not passed.** Plan task 2-T23, branch
+`fastmace/2-T23`.
+
+## Combined acceptance of phase 2 and optimisation round 1 (21 October 2026)
+
+Freeze: main **`be92979`** (code identical to `4f90a92`): stages A and B (`gated_rows`, `segment_gemm`) on
+by default, OPT-T06 (model template cache) and OPT-T07 (persistent subprocess worker). Every job imports a
+`git archive` whose `fastmace/` tree equals `be92979`'s: tools `a3eaf89` (the runbook's jobs), `8e35fc4`
+(the OMOL-0 XL pair), and for the local rerun of two tests `a3eaf89` with two test files from `8ec5063`
+and `9f2aca7`. Runbook: [combined-acceptance-runbook.md](combined-acceptance-runbook.md). Runs
+`2-T23-local-20261021-combined` (RTX 5060 Ti) and `2-T23-murphy-20261021-combined` (RTX 4000 Ada), from
+03:08 UTC. Murphy stayed quiet for every timed job: other users' %CPU ≤ 5.3 over the whole run.
+
+**Main finding: a defect in the `fm.Simulation` path** (cause found by 2-T21; fix `fastmace/2-T21d`,
+`5bc12e9`). 2-T15b's `GraphEngine.prepare()` (`d14be8c`) captures the B and ACB graphs before the first
+step without first setting the edge views. Once the compacted edge count grows past the build's (about
+0.2 ps from 0 K, at any timestep), edges beyond it are dropped from the forces: the run heats and, at
+2 fs, reaches NaN. It affects every `Simulation` run with capture on the GPU since `d14be8c`, in-process
+and in subprocess-runner children; the planner's engine stepped directly (item 8's tools) captures lazily
+and is not affected. It explains item 4's failures today and yesterday's "heating transient" (finding 1
+of 20 October), which is withdrawn as physics.
+
+| # | Item | Local RTX 5060 Ti | murphy RTX 4000 Ada | Result |
+| --- | --- | --- | --- | --- |
+| 1 | Unknown MACE version (0.3.15) | gate passed, eager tier after the capture failure; `gated_rows` off (its pinned source does not hash on 0.3.15) | – (local only) | **pass** (eager: no capture, not affected) |
+| 2, 3, 5, 6 | Fallback, gate resources, isolation, reproducible mode | acceptance tier: the tests of these items passed | acceptance tier: passed | **pass**, with the caveat below for capture-on `Simulation` tests |
+| 4 | Subprocess runner | acceptance tier: runner tests passed | acceptance tier: passed; the equilibrated repeat: both cases diverged (NaN) | **not judgeable**: root cause identified (`prepare()` edge-view capture, `d14be8c`); rerun after the fix |
+| 7 | GPU CI | – | – | deferred by the owner (eleventh amendment) |
+| 8 | No regression against `fastmace-1b` | plans: only `gated_rows`, `segment_gemm` differ; trajectories pass; main 3.6–4.0 % (NaCl) and 14.6–14.9 % (NbCl5) faster | plans as local; main 3.7–4.1 % (NaCl, 6 processes) and 13.5–13.6 % (NbCl5) faster | **pass** |
+| Gate | 19 labels, new defaults | 9 of 10 pass; **OMOL-0 XL crashed** in its production build | 5 of 9 judged: MP-0 L, POLAR-1-S/M/L, OFF23-S pass; OFF23-M, OFF23-L, OFF23b-M, OFF24-M not run (GPU taken) | **incomplete**: 14 of 19 pass, OMOL-0 XL fails to build, 4 labels still to run |
+| Tier | Acceptance GPU tier | 31 passed, 2 failed (test-side on WSL; rerun with the fixes pending) | **33 / 33 passed** | see below |
+| – | Round's GPU files outside the tier (`round-tests`) | 9 / 9 passed | – | pass |
+
+**Item 8 in numbers** (main/1b, 12 blocks, all processes valid, the only plan differences are the two
+expected options; the one-sided rule, each machine's own floor):
+
+| Machine | Process | NaCl | NbCl5 |
+| --- | --- | ---: | ---: |
+| RTX 5060 Ti | ABAB 2 first / ABAB 1b first / ABBA | 0.9596 / 0.9643 / 0.9597 | 0.8511 / 0.8541 / 0.8533 |
+| murphy | ABAB 1b first / ABAB 2 first / ABBA | 0.9616 / 0.9591 / 0.9632 | 0.8651 / 0.8645 / 0.8637 |
+| murphy | NaCl only: ABAB 1b first / ABAB 2 first / ABBA 1b first | 0.9633 / 0.9588 / 0.9632 | – |
+
+Controls (one version per process): local NaCl 3.515 → 3.313 ms, NbCl5 26.949 → 23.044 ms; murphy NaCl
+3.509 → 3.366 ms, NbCl5 30.804 → 26.602 ms. Murphy NaCl under the rule written before the run: median of
+the six processes 0.9624 ≤ 1.0016, none above 1.0032, controls not slower: **pass**. Default trajectories
+on the local card: plain cuEq float64 1.35e-13 Å from 1b (repeat of main 4.4e-13 Å; identical plans) and
+hybrid within 3e-5 K and 3.4e-6 meV/atom of 1b (limits 29 K and 3.7 meV/atom).
+
+**Gate in numbers** (worst ratio over the counting structures; production error ≤ max(2 × float32
+yardstick, floor)):
+
+| Label | E | F | S | Machine | Pass |
+| --- | ---: | ---: | ---: | --- | --- |
+| mp0-medium | 2.52* | 1.04 | 1.23 | local | yes |
+| mp0-large | 1.54 | 1.10 | 1.22 | murphy | yes |
+| mp0b3-medium | 1.28 | 1.02 | 1.18 | local | yes |
+| mpa0-medium | 1.97 | 1.12 | 1.26 | local | yes |
+| omat0-medium | 1.48 | 1.13 | 1.24 | local | yes |
+| matpes-pbe | 1.09 | 1.11 | 1.56 | local | yes |
+| matpes-r2scan | 0.95 | 1.15 | 1.64 | local | yes |
+| mh1-omat / mh1-mp / mh1-r2scan | 0.17 / 0.18 / 0.20 | 1.11 / 1.27 / 1.20 | 0.88 / 0.87 / 0.93 | local | yes |
+| polar1-s (NaCl; NbCl5 ×4) | 1.10 / 1.04 | 1.03 / 1.94 | 1.65 / 1.50 | murphy | yes |
+| polar1-m (NaCl, NaNbO3; NbCl5 ×4) | 1.36 / 0.87 | 1.47 / 0.70 | 1.48 / 0.62 | murphy | yes |
+| polar1-l (NaCl, NaNbO3 2×2×2; NbCl5 ×4) | 0.79 / 1.43 | 1.12 / 0.94 | 1.00 / 1.12 | murphy | yes |
+| omol0-xl | – | – | – | local | **build crash** |
+| off23-small | 1.32 | 1.13 | 1.00 | murphy | yes |
+| off23-medium, off23-large, off23b-medium, off24-medium | – | – | – | murphy | **not run** |
+
+\* below the 0.01 meV/atom floor, so it passes (1b: 2.65).
+
+**Failures and open points of the combined run:**
+
+1. **`Simulation` with capture drops edges after the first edge growth** (above). Item 4's repeat on
+   murphy: the fresh case reached NaN at step 11,560 (seed 20261101) and 23,659 K (seed 20261001); the
+   runner case reached NaN in a child at step 13,220 and 1.9e12 K. Stage 0 of the equilibration, at 0.5
+   fs, broke away at step ~420 and reached 897 K against a 300 K target. Results that rely on a capture-on
+   `Simulation` trajectory past ~0.2 ps are suspect until rerun on the fix: item 4, and the tier's runner,
+   worker and reproducible-mode tests, which compare two such runs and can pass with both wrong. Not
+   affected: item 8's tools, the gate (single evaluations at the start positions), item 1 (eager).
+2. **OMOL-0 XL's production build crashed** locally, in both its jobs. After three NaCl configurations,
+   the next build in the same process raised `NameError: name '__compiled_fn_52_…' is not defined` in the
+   float64-energy forward under Dynamo (`gate-omol0-xl/logs/production-fastmace.log`). With OPT-T06's
+   template cache as the suspect, a murphy pair (as frozen, and `--engine-config
+   model_template_cache=false`) was queued but refused because the GPU was taken (point 4).
+3. **Two local acceptance failures, both test-side on WSL** (murphy passed both):
+   `test_a_failed_candidates_memory_is_freed_before_the_next_build` (113 MiB stayed resident: OPT-T06's
+   template; fixed in `fastmace/2-T15d`, `8ec5063`) and `test_a_killed_parent_releases_the_workers_gpu_memory`
+   (cuEquivariance's "GPU information" line on stdout ahead of the JSON; fixed in `fastmace/opt-T07b`,
+   `9f2aca7`). The rerun of just these two with the fixed test files waits for the local reservation.
+4. **The gate on murphy was cut short** at 06:32 UTC when another session's GPU job
+   (`2-T21d/gpu_confirm.py`) started on murphy during it. OFF23-M failed its own idle check, and
+   OFF23-L, OFF23b-M, OFF24-M and the OMOL-0 XL pair did not run.
+
+## The runs of 20 October 2026 (main `85360cc`)
 
 On 20 October 2026 the owner decided: no more large accuracy runs on murphy for now. Phase 2's accuracy
 acceptance moves to after the optimisation round (`plans/opt-1.md`), as one combined acceptance on the
@@ -268,7 +360,9 @@ repeat) and cleared the queue; murphy's GPU was then empty. The partial log and 
 
 ## Findings
 
-1. **A violent heating transient at 2 fs from the 0 K crystal** (MH-1, NaCl 3×3×3, hybrid and plain cuEq
+1. **Withdrawn on 21 October 2026: this was the `Simulation`-path defect, not physics** (see the combined
+   acceptance above; `prepare()` edge-view capture, `d14be8c`). As recorded on 20 October: **a violent
+   heating transient at 2 fs from the 0 K crystal** (MH-1, NaCl 3×3×3, hybrid and plain cuEq
    float32 alike). In the first ~300 steps the potential energy rises 35–100 meV/atom above
    equipartition at 120–240 K, and the temperature of the fresh run spikes to 466 K at step 280. The same
    crystal at 0.5 fs, the production step (`trajectory2`), heats smoothly. Carried into the phase 3 notes
