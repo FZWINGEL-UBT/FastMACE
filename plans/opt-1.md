@@ -220,6 +220,25 @@ code.
     did not start before the freeze, because the worker's permission check
     refused the launch. They follow the acceptance.
 
+**Morning checkpoint, 21 October 2026 (about 07:30 UTC):**
+- **Round result (item 8, measured end to end against `fastmace-1b`):**
+
+  | | NaCl | NbCl5 |
+  | --- | --- | --- |
+  | local | −3.6 to −4.0 % | −14.6 to −14.9 % |
+  | murphy | −3.7 to −4.1 % | −13.5 to −13.6 % |
+
+  The plans differ only in `gated_rows` and `segment_gemm`, and the trajectories pass. The summary is `docs/validation/opt-1.md` (merged from `fastmace/opt-1-report`).
+- **Merged after the freeze, test-side and library fixes found by the acceptance:**
+  - 2-T15d: the fallback memory test counts OPT-T06's resident template;
+  - opt-T07b: the worker tests read past cuEquivariance's stdout line on WSL;
+  - 2-T19b: one rebound strain function per process and choice, which fixes OMOL-0's Dynamo `NameError`.
+- **Merged as opt-in:** opt-T03b (grouped_launch fixed, gains on sm_120 only).
+- **Next:** OPT-T08 (C1–C3).
+  - Its branch must first absorb opt-T03b's switch changes; both add switches.
+  - Then the GPU force gate and A/B on both GPUs, once the 2-T21d bisect frees a GPU. The worker's GPU launch still needs the owner's approval in its session.
+  - The owner decides defaults afterwards.
+
 **Combined acceptance from about 03:00 UTC (2-T23):** both GPUs, the
 runbook's order, including the 19-label gate, the item 4 repeat and item 8
 against `fastmace-1b`. The phase 2 report and a round-1 summary are ready
