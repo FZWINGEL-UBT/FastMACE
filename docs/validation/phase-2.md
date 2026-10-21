@@ -1,7 +1,8 @@
 # Phase 2 acceptance report
 
-**Status: combined acceptance complete, 21 October 2026, 09:25 UTC.** Every item passes on main `f993713`
-(the freeze `be92979` plus the fixes for the two defects it found), except item 7, which the owner deferred. Plan task 2-T23, branch
+**Status: combined acceptance complete, 21 October 2026, 09:25 UTC.** Every item passes except item 7,
+which the owner deferred: on the freeze `be92979`, and for what its two defects touched (item 4, the
+`Simulation`-driven tests, OMOL-0 XL's gate) on main `f993713`, the freeze plus their fixes. Plan task 2-T23, branch
 `fastmace/2-T23`.
 
 ## Combined acceptance of phase 2 and optimisation round 1 (21 October 2026)
