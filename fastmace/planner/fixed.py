@@ -79,6 +79,8 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
+    "RewriteConfig.direct_node_feats": "never_automatic",
+    "RewriteConfig.folded_constants": "never_automatic",
     "RewriteConfig.folded_backward_tiles": "on_with_fused_folded_backward",
     "RewriteConfig.block_linear": "on_for_hybrid_graph_engine",
     "RewriteConfig.grouped_linear": "on_with_block_linear",
@@ -98,7 +100,7 @@ AUTO_RULES = MappingProxyType({
 STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
-    ("folded_backward_tiles", "fold_cutoff"),
+    ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
     ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
@@ -108,7 +110,7 @@ STAGE2_SUPPORT = (
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
-                  "streaming_conv",
+                  "direct_node_feats", "folded_constants", "streaming_conv",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
@@ -559,6 +561,10 @@ class FixedPlanner:
         needs("fused_radial_hidden", r.fused_radial_hidden == "on", v["fold_cutoff"], "fold_cutoff")
         if r.fused_radial_hidden == "auto":
             v["_why"]["fused_radial_hidden"] = "off: only an explicit 'on' enables it (no measured gain)"
+        for name in ("direct_node_feats", "folded_constants"):  # opt-3 OPT3-T05 (exact, opt-in)
+            needs(name, getattr(r, name) == "on", v["fold_cutoff"], "fold_cutoff")
+            if getattr(r, name) == "auto":
+                v["_why"][name] = "off: only an explicit 'on' enables it (OPT3-T05, opt-in)"
         needs("streaming_conv", r.streaming_conv != "off", hybrid and v["fold_cutoff"] and v["sort_receivers"],
               "the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming "
               "kernels on unsorted edges give wrong results)")

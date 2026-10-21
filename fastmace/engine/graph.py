@@ -186,6 +186,15 @@ class GraphEngine(Engine):
         # What stage A produces and stage B changes (Langevin v; BAOAB v, p_eps), saved inside the
         # pipelined and speculative graphs so that a failed step can redo stage B alone.
         self._mids = tuple(torch.zeros_like(tensor) for tensor in integrator.mid_step_tensors(state))
+        # EngineConfig.fused_integrator (OPT3-T03): the AC/ACP stage in Triton kernels where it applies.
+        self._fused = None
+        self.fused_integrator_reason = None
+        if config.fused_integrator:
+            from fastmace.kernels.triton.fused_integrator import FusedIntegrator, applicable
+
+            self.fused_integrator_reason = applicable(self)
+            if self.fused_integrator_reason is None:
+                self._fused = FusedIntegrator(self)
         self.registry = Registry(self._registered_buffers)
         self.registry.entries()  # every buffer has a policy (RegistryError otherwise)
         integrator.start(state)  # LangevinBAOAB.__init__: the cell force of the starting forces
@@ -280,6 +289,8 @@ class GraphEngine(Engine):
 
     def info(self) -> Mapping[str, Any]:
         extra = {"rebuilds_beside": self.rebuilds_beside} if self.config.overlap_rebuild else {}
+        if self.config.fused_integrator:  # True, or why the PyTorch stage was kept
+            extra["fused_integrator"] = self.fused_integrator_reason or True
         return {**extra,
             "engine": "graph", "mode": self.mode, "capture": self.capture, "pad_edges": self.pad_edges,
             "variable_cell": self.variable_cell, "initial_edges": self.initial_edges, "edge_bucket": self.edge_bucket,
@@ -587,12 +598,18 @@ class GraphEngine(Engine):
         self.force_field.compact(self.state.positions)
 
     def _stage_ac(self) -> None:
+        if self._fused is not None:
+            self._fused.stage(pipelined=False)
+            return
         self._stage_a()
         self._stage_c()
         self._flags[0].copy_(self.rebuild_needed)
         self._flags[1].copy_(self.force_field.edge_count)
 
     def _stage_acp(self) -> None:
+        if self._fused is not None:
+            self._fused.stage(pipelined=True)
+            return
         self._stage_ac()
         self._save_mid()
         self._pipe_flags[0].copy_(self.rebuild_needed)

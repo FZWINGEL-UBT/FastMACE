@@ -96,6 +96,12 @@ class RewriteConfig:
     species_skip: Toggle = "auto"
     # Radial hidden block as one Triton kernel pair (FUSED_RADIAL_HIDDEN); opt-in, no measured gain.
     fused_radial_hidden: Toggle = "auto"
+    # Without LAMMPS, the folded MH-1 forward skips the join of node features and attributes for handle_lammps,
+    # whose strided slices the streaming convolution copied (opt-3 OPT3-T05); exact, opt-in, auto = off.
+    direct_node_feats: Toggle = "auto"
+    # The folded last radial layer's [W, b] and its halves built once, not per force call (opt-3 OPT3-T05);
+    # exact, opt-in, auto = off.
+    folded_constants: Toggle = "auto"
     # cuEq Linear layers as per-l products with extracted weights (BLOCK_LINEAR).
     block_linear: Toggle = "auto"
     # Same-irrep input segments of one output segment in one product (GROUPED_BLOCK_LINEAR).
@@ -187,6 +193,11 @@ class EngineConfig:
     # Pipelined steps: one CUDA graph per step (ACP, the flags' copy to the host and an event inside the
     # graph, then B) instead of two replays. Exact: the same kernels in the same order. Opt-in (OPT2-T04).
     step_graph: bool = False
+    # Fixed-cell Langevin on CUDA: the AC/ACP stage (half kick, drift, neighbour checks, compaction, saved
+    # velocities and flags) as four Triton kernels around PyTorch's centre-of-mass sums and cumsum instead of
+    # about 45 PyTorch kernels. Exact: the same float64 operations in the same order, the same noise.
+    # Anything else keeps the PyTorch stage. Opt-in (opt-3 OPT3-T03).
+    fused_integrator: bool = False
 
     def __post_init__(self):
         _check_choices(self)

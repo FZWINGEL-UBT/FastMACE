@@ -88,7 +88,8 @@ class FactoredRadialMLP(torch.nn.Module):
         # Cutoff folded into the last layer: one GEMM over [h c, c], (h W + b) c = [h c, c] [W; b].
         augmented = self.augmented_after_first(hidden, cutoff)
         if self.fused_backward:
-            return folded_linear(augmented, self.folded_weight(), tile_rule=self.folded_tiles)
+            return folded_linear(augmented, self.folded_weight(), tile_rule=self.folded_tiles,
+                                 parts=self.folded_parts)
         return torch.nn.functional.linear(augmented, self.folded_weight())
 
     def augmented(self, inputs, cutoff):
@@ -105,9 +106,26 @@ class FactoredRadialMLP(torch.nn.Module):
         return torch.cat([hidden * cutoff, cutoff], dim=1)
 
     def folded_weight(self):
-        """[W, b] of the last layer, applied to [h c, c]."""
+        """[W, b] of the last layer, applied to [h c, c]; the buffer of ``folded_constants`` where it is set."""
+        constant = getattr(self, "folded_constant", None)
+        if constant is not None:
+            return constant
         last = self.rest[-1]
         return torch.cat([last.weight, last.bias[:, None]], dim=1)
+
+    @property
+    def folded_parts(self):
+        """(W, b) as contiguous buffers for the fused input gradient (``folded_constants``), else None."""
+        main = getattr(self, "folded_main", None)
+        return None if main is None else (main, self.folded_last)
+
+    def hold_folded_constants(self):
+        """``folded_constants`` (OPT3-T05): [W, b] and its two halves as buffers, built once instead of a
+        concatenation and two copies per force call. The weights are constant, so the values are the same."""
+        weight = self.folded_weight().detach().clone().contiguous()
+        self.register_buffer("folded_constant", weight)
+        self.register_buffer("folded_main", weight[:, :-1].contiguous())
+        self.register_buffer("folded_last", weight[:, -1].contiguous())
 
 
 class FirstInteractionReassociation(torch.nn.Module):
@@ -171,11 +189,14 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     node_feats = self.linear_up(node_feats)
     residual_linear = getattr(self, "residual_linear", None)  # merged_residual
     node_feats_res = self.linear_res(node_feats) if residual_linear is None else None
-    node_feats_attrs = torch.cat([node_feats, node_attrs], dim=-1)
-    node_feats_attrs = self.handle_lammps(node_feats_attrs, lammps_class=lammps_class,
-                                          lammps_natoms=lammps_natoms, first_layer=first_layer)
-    node_feats = node_feats_attrs[:, : node_feats.shape[-1]]
-    node_attrs = node_feats_attrs[:, node_feats.shape[-1]:]
+    if lammps_class is None and getattr(self, "direct_node_feats", False):  # direct_node_feats (OPT3-T05)
+        pass  # handle_lammps is the identity without LAMMPS: no join, so no strided slices to copy
+    else:
+        node_feats_attrs = torch.cat([node_feats, node_attrs], dim=-1)
+        node_feats_attrs = self.handle_lammps(node_feats_attrs, lammps_class=lammps_class,
+                                              lammps_natoms=lammps_natoms, first_layer=first_layer)
+        node_feats = node_feats_attrs[:, : node_feats.shape[-1]]
+        node_attrs = node_feats_attrs[:, node_feats.shape[-1]:]
     source_embedding = self.source_embedding(node_attrs)
     target_embedding = self.target_embedding(node_attrs)
     reassociation = getattr(self, "first_reassociation", None)  # reassociate_first

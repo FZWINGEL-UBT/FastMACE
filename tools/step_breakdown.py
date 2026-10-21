@@ -46,6 +46,7 @@ import difflib
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from collections import defaultdict
@@ -462,6 +463,9 @@ def _base_name(name):
     name = name.split("::")[-1].strip()
     if name.startswith("void "):
         name = name[5:]
+    # cuEquivariance's uniform_1d picks its kernel variant at run time (segmented_polynomial_algo1_4,
+    # _algo2_2, _bwd_algo6, ...), and the ncu process often picks another than the profiler's: one name each.
+    name = re.sub(r"^(segmented_polynomial(?:_bwd)?)_algo\d+(?:_\d+)?$", r"\1", name)
     return name.lower()[:80]
 
 

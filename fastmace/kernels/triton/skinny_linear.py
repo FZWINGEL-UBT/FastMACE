@@ -78,27 +78,50 @@ def _triton_kernel():
     return kernel
 
 
-@torch.library.custom_op("fastmace::folded_linear_input_grad", mutates_args=())
-def folded_linear_input_grad(grad: torch.Tensor, weight: torch.Tensor, tile_rule: str = "fixed") -> torch.Tensor:
-    """grad @ weight for grad [E, Q] and weight [Q, P + 1]; ``tile_rule`` picks the tiles (``tile_choice``)."""
-    if not grad.is_cuda or grad.dtype != torch.float32 or weight.shape[1] - 1 > MAX_TRITON_COLUMNS:
-        return grad @ weight
+def _input_grad(grad, main, last, tile_rule):
+    """The Triton input gradient [E, P + 1] from the contiguous halves ``main`` [Q, P] and ``last`` [Q]."""
     import triton
 
     from fastmace.kernels.triton import tile_rule as rules
     grad = grad.contiguous()
     rows, q = grad.shape
-    p = weight.shape[1] - 1
+    p = main.shape[1]
     out = torch.empty((rows, p + 1), dtype=grad.dtype, device=grad.device)
     if rows:
-        main = weight[:, :p].contiguous()
-        last = weight[:, p].contiguous()
         block_m, block_k, warps, stages = tile_choice(rows, rules.device_sms(grad.device), tile_rule)
         _triton_kernel()[(triton.cdiv(rows, block_m),)](
             grad, main, last, out, rows, q, p, BLOCK_M=block_m,
             BLOCK_P=max(16, triton.next_power_of_2(p)), BLOCK_K=block_k,
             num_warps=warps, num_stages=stages)
     return out
+
+
+def _uses_triton(grad, weight):
+    return grad.is_cuda and grad.dtype == torch.float32 and weight.shape[1] - 1 <= MAX_TRITON_COLUMNS
+
+
+@torch.library.custom_op("fastmace::folded_linear_input_grad", mutates_args=())
+def folded_linear_input_grad(grad: torch.Tensor, weight: torch.Tensor, tile_rule: str = "fixed") -> torch.Tensor:
+    """grad @ weight for grad [E, Q] and weight [Q, P + 1]; ``tile_rule`` picks the tiles (``tile_choice``)."""
+    if not _uses_triton(grad, weight):
+        return grad @ weight
+    p = weight.shape[1] - 1
+    return _input_grad(grad, weight[:, :p].contiguous(), weight[:, p].contiguous(), tile_rule)
+
+
+@torch.library.custom_op("fastmace::folded_linear_input_grad_parts", mutates_args=())
+def folded_linear_input_grad_parts(grad: torch.Tensor, weight: torch.Tensor, main: torch.Tensor, last: torch.Tensor,
+                                   tile_rule: str = "fixed") -> torch.Tensor:
+    """``folded_linear_input_grad`` with the contiguous halves of ``weight`` given (``folded_constants``,
+    OPT3-T05): the same kernel on the same values, without slicing the weight on every call."""
+    if not _uses_triton(grad, weight):
+        return grad @ weight
+    return _input_grad(grad, main, last, tile_rule)
+
+
+@folded_linear_input_grad_parts.register_fake
+def _(grad, weight, main, last, tile_rule="fixed"):
+    return grad.new_empty((grad.shape[0], weight.shape[1]))
 
 
 @folded_linear_input_grad.register_fake
@@ -108,8 +131,8 @@ def _(grad, weight, tile_rule="fixed"):
 
 class _FoldedLinear(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, a, weight, contiguous_weight, tile_rule):
-        ctx.save_for_backward(weight)
+    def forward(ctx, a, weight, contiguous_weight, tile_rule, main=None, last=None):
+        ctx.save_for_backward(weight, main, last)
         ctx.tile_rule = tile_rule
         if contiguous_weight:
             # a @ (W^T stored contiguously): cuBLAS's non-transposed kernels, 1.86 -> 1.52 ms for
@@ -119,18 +142,23 @@ class _FoldedLinear(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
-        (weight,) = ctx.saved_tensors
-        return folded_linear_input_grad(grad, weight, ctx.tile_rule), None, None, None
+        weight, main, last = ctx.saved_tensors
+        if main is not None:
+            return folded_linear_input_grad_parts(grad, weight, main, last, ctx.tile_rule), None, None, None, None, None
+        return folded_linear_input_grad(grad, weight, ctx.tile_rule), None, None, None, None, None
 
 
-def folded_linear(a, weight, contiguous_weight=False, tile_rule="fixed"):
+def folded_linear(a, weight, contiguous_weight=False, tile_rule="fixed", parts=None):
     """a @ weight.T with the fused input gradient; the weight must not require a gradient.
 
     contiguous_weight=True multiplies by a contiguous copy of weight.T (same products); ``tile_rule``
-    ("fixed" or "waves", ``tile_choice``) picks the input gradient's tiles, with the same results.
+    ("fixed" or "waves", ``tile_choice``) picks the input gradient's tiles, with the same results; ``parts``
+    (``folded_constants``) are weight's contiguous halves (W [Q, P], b [Q]) for the input gradient, so that it
+    does not slice them out of weight on every call.
     """
     if tile_rule not in TILE_RULES:
         raise ValueError(f"tile_rule must be one of {TILE_RULES}, got {tile_rule!r}")
     if weight.requires_grad:
         return torch.nn.functional.linear(a, weight)
-    return _FoldedLinear.apply(a, weight, bool(contiguous_weight), tile_rule)
+    main, last = parts if parts is not None else (None, None)
+    return _FoldedLinear.apply(a, weight, bool(contiguous_weight), tile_rule, main, last)

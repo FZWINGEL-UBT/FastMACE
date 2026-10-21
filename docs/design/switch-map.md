@@ -43,6 +43,8 @@ How to read the tables:
 | `--species-skip`; `GENERIC_SPECIES_SKIP` | `RewriteConfig.species_skip` | `"auto"` (global `False`) | `on_with_graph_engine_if_model_supports` | §6.2 `generic_species_skip` |
 | — (FastMACE only: optimisation round 2, OPT2-T03) | `RewriteConfig.folded_backward_tiles` | `"auto"` | `on_with_fused_folded_backward` | `kernels/triton/skinny_linear.py` (`tile_choice`); exact; default on by owner decision, 21 October 2026 (OPT-DEF-2) |
 | `--fused-radial-hidden`; `FUSED_RADIAL_HIDDEN` | `RewriteConfig.fused_radial_hidden` | `"auto"` (global `False`) | `never_automatic` | §6.2 opt-in "fused radial hidden (no gain)" |
+| — (FastMACE only: optimisation round 3, OPT3-T05) | `RewriteConfig.direct_node_feats` | `"auto"` | `never_automatic` | `docs/design/opt3-T05-layout-audit.md`; exact, opt-in, needs `fold_cutoff` |
+| — (FastMACE only: optimisation round 3, OPT3-T05) | `RewriteConfig.folded_constants` | `"auto"` | `never_automatic` | `docs/design/opt3-T05-layout-audit.md`; exact, opt-in, needs `fold_cutoff` |
 | `--block-linear`; `BLOCK_LINEAR` | `RewriteConfig.block_linear` | `"auto"` (global `False`) | `on_for_hybrid_graph_engine` | §6.2 `block_linear` |
 | `--grouped-linear`; `GROUPED_BLOCK_LINEAR` | `RewriteConfig.grouped_linear` | `"auto"` (global `False`) | `on_with_block_linear` | §6.2 `grouped_linear` |
 | `--merged-residual`; `MERGED_RESIDUAL_LINEAR` | `RewriteConfig.merged_residual` | `"auto"` (global `False`) | `on_with_block_linear` | §6.2 `merged_residual` |
@@ -81,6 +83,7 @@ How to read the tables:
 | none: the research engine loads and converts once per process (new in the library, opt-1 OPT-T06) | `EngineConfig.model_template_cache` | `True` | — | planner (`ForceField.execution_model`: later plans copy a converted template; CUDA cuEq and hybrid only) |
 | none: the research engine's early rebuild waits for the force call in flight (new in the library, opt-2 OPT2-T04) | `EngineConfig.overlap_rebuild` | `True` | — | engine (`GraphEngine._rebuild(beside=True)`: a pipelined fixed-cell CUDA step's early rebuild runs on a side stream; exact) |
 | none: the research engine replays ACP and B as two graphs (new in the library, opt-2 OPT2-T04) | `EngineConfig.step_graph` | `False` | — | engine (`GraphEngine._step_pipelined`: one `("ACPB", edges)` graph per step with the flags' copy and an external event inside; exact) |
+| none: the research engine runs the integrator stage as PyTorch operations (new in the library, opt-3 OPT3-T03) | `EngineConfig.fused_integrator` | `False` | — | engine (`GraphEngine._stage_ac`/`_stage_acp`: fixed-cell CUDA Langevin's half kick, drift, neighbour checks, compaction and flags in four Triton kernels; exact) |
 
 ## 3. Precision → `PrecisionConfig`
 
@@ -244,7 +247,7 @@ tier 1, §8.1); "hybrid" the resolved backend. Support keys are those of
 | `on_with_reassociate_first_and_sort_receivers` | Stage 1: on when `reassociate_first` and `sort_receivers` are on. Stage 2: off unless support `reassociate_first`. | `RewriteConfig.segmented_first_sum` |
 | `on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports` | Stage 1: on with the hybrid backend, `fold_cutoff` (stage 1) and `sort_receivers`. Stage 2: off unless support `streaming_conv` (folded MH-1 class or a `GENERIC_INTERACTIONS` model). | `RewriteConfig.streaming_conv` |
 | `on_with_graph_engine_if_model_supports` | Stage 1: on with the graph engine, **any backend**. Stage 2: off unless support `species_skip` (a `GENERIC_INTERACTIONS` model). | `RewriteConfig.species_skip` |
-| `never_automatic` | Off; only `"on"` enables it (`fused_radial_hidden` requires `fold_cutoff`, `grouped_launch` requires `block_linear`, `combo_kernels` requires nothing). | `RewriteConfig.fused_radial_hidden`, `RewriteConfig.grouped_launch`, `RewriteConfig.combo_kernels` |
+| `never_automatic` | Off; only `"on"` enables it (`fused_radial_hidden`, `direct_node_feats` and `folded_constants` require `fold_cutoff`, `grouped_launch` requires `block_linear`, `combo_kernels` requires nothing). | `RewriteConfig.fused_radial_hidden`, `RewriteConfig.direct_node_feats`, `RewriteConfig.folded_constants`, `RewriteConfig.grouped_launch`, `RewriteConfig.combo_kernels` |
 | `on_with_fused_folded_backward` | On when `fused_folded_backward` is on; stage 2: off unless the model supports `fold_cutoff` (the MH-1 class; the generic families' fused backward is another record). Bitwise the same products (owner decision, 21 October 2026). | `RewriteConfig.folded_backward_tiles` |
 | `on_float32_unless_reproducible_if_model_supports` | On in stage 1; stage 2: off unless the model takes it (`rewrite_support["species_tables"]`: ScaleShiftMACE with a factored first interaction and species-only first inputs, i.e. the MH-1 labels); then off in float64 and `reproducible=True` plans (its tables round differently from per-atom products on the GPU). An explicit `"on"` is kept (owner decision, 21 October 2026). | `RewriteConfig.species_tables` |
 | `on_with_block_linear_float32_unless_reproducible_if_model_supports` | On when `block_linear` is on; stage 2: off unless the model takes it (`rewrite_support["fold_readout_tail"]`: ScaleShiftMACE with a factored last interaction, i.e. the MH-1 labels and OMOL-0); off in float64 and `reproducible=True` plans (rounding class). | `RewriteConfig.fold_readout_tail` |
@@ -292,6 +295,7 @@ model is an error with a reason, never a silent downgrade.
   71 in all. It does not come from the research engine, which loaded once per process.
 - Optimisation round 2 (plan task OPT2-T04) added `EngineConfig.overlap_rebuild` and
   `EngineConfig.step_graph`, 73 in all (both opt-in).
+- Optimisation round 3 (plan task OPT3-T03) added `EngineConfig.fused_integrator`, 74 in all (opt-in).
 
 ## Open questions for the conductor
 
