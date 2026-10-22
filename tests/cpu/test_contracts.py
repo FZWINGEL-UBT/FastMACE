@@ -119,7 +119,7 @@ def test_workload_normalises_collections():
     from fastmace.planner.workload import Workload
 
     workload = Workload(max_temperature_K=300, needs_per_atom=["energies"], mc_moves=["displace"],
-                        min_mc_temperature_K=300)
+                        min_mc_temperature_K=300, max_displacement_A=0.2)  # required with "displace" (3-T05)
     assert workload.needs_per_atom == frozenset({"energies"})
     assert workload.mc_moves == ("displace",)
 
@@ -167,7 +167,7 @@ def test_workload_has_no_copies_of_other_owners_facts():
     names = {field.name for field in dataclasses.fields(Workload)}
     assert names == {"max_temperature_K", "species_changes", "atom_count_changes", "min_mc_temperature_K",
                      "host_callbacks_every", "needs_per_atom", "mc_moves", "reproducible",
-                     "mc_energy_precision"}
+                     "mc_energy_precision", "max_displacement_A"}  # max_displacement_A: 3-T05
 
 
 # --------------------------------------------------------------------------- Output (§7.2, §10.6)

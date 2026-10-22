@@ -4,8 +4,8 @@ Status: **in progress**, 22 October 2026. The owner accepted the
 recommendations for D1–D6 the same day ("Accept the recommendations for
 D1-D6 and prestart all phase 3 workers"). They are SPEC §18 decisions 31–36,
 and all workers were prestarted. Merged so far: 3-T01 (8dfd9f0), 3-T08
-(d73e8b7), 3-T02 (344d221), 3-T04 (623238d), 3-T06 (5a98a51) and 3-T03
-(467123b). The binding answers to the prestart reports are in "Conductor answers to the
+(d73e8b7), 3-T02 (344d221), 3-T04 (623238d), 3-T06 (5a98a51), 3-T03
+(467123b), 3-T13 (77c8403) and 3-T17 (2c0c63b); in ResearchModule 3-T16a (90a1e7b1). The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
 - §8.1: overflow before commit, the re-capture policy, the energy-only graph;
@@ -185,7 +185,11 @@ These are phase 2's principles, unchanged where they still apply:
     is never retried in another form or run from another session; it waits
     for the owner;
   - `--quiet` (a quiet machine for timing) is for timing slots the conductor
-    schedules, not for workers.
+    schedules, not for workers;
+  - a chain of reservations (an A/B series) waits 60 s between them, so
+    other workers' queued jobs can get in: the queue is not first come,
+    first served, and an immediate re-reserve wins every time (3-T07 waited
+    behind 3-T05's chain on 22 October 2026).
 - **Workstations:**
   - none from Thursday 22 October 2026 evening until the owner says they're
     back (power outage on Friday 23 October);
@@ -888,6 +892,14 @@ Wave 4   T20 benchmarks (T09 T10 T11)   T21 acceptance
   1 fs production rests on the October 1 fs checks of the research engine
   and on the fixed FastMACE path.
 
+- **Rule 11 for MD-only runs is not proposed as a default** (22 October
+  2026). 3-T05 measured, at 1 fs and 1000 K or 1500 K on NaCl and NbCl5,
+  local and on the L4: rebuilds drop 2.2–2.7×, but the step time stays
+  within noise, because `overlap_rebuild` already runs rebuilds on a side
+  stream. MD-only plans keep 0.3 Å. The rule serves MC and species-change
+  workloads, displacement trials and plans without `overlap_rebuild`
+  (`docs/validation/3-T05.md`).
+
 ## Conductor answers to the prestart reports (22 October 2026)
 
 These answers bind every phase 3 worker. When an answer adds a public name,
@@ -1336,6 +1348,52 @@ idle.
 
 That is at most $12.50. This month $3.65 is metered so far (22 October), so
 the total stays inside the $27 limit.
+
+## Open findings from merged tasks (for 3-T21's report)
+
+Recorded by the conductor at each merge; 3-T21 carries the ones still open into
+`docs/validation/phase-3.md`.
+
+- **3-T02, 3-T06: GPU parts not run yet.** The capture test of the refresh
+  functions, the superset cost, and the compiled-versus-graph and rule-9
+  timing. The workers' permission checks refused the launches; they wait for
+  the owner.
+- **3-T03:**
+  - The friction refreshes copy host floats to the device, so they are not
+    capturable. This is harmless: a friction event drops the graphs anyway.
+  - The events' GPU fast tier used the Lennard-Jones force field. The hybrid
+    "within the gate" case and a reproducible-mode MACE run belong to
+    acceptance item 4 (3-T21).
+- **3-T08:** resume restores the composition, but total charge and spin are
+  checked, not restored. 3-T09 restores them when it registers the total
+  charge.
+- **3-T13:**
+  1. Observer charge changes can only be refused today. No model in the code
+     base takes per-atom charges (`Committed.charges` is always `None`), so
+     the code that applies them has never run in a test.
+  2. An observer attached after the first `run` doesn't change the plan's
+     `host_callbacks_every`.
+  3. Frames after a species change made directly through `dyn.simulation`
+     keep the old species until the next observer call. 3-T15 owns
+     per-frame species (`io/trajectory.py`).
+- **3-T12:**
+  - With the tiny model the enumeration uses kT ≈ 0.6–6 K, so MC must run
+    at any positive temperature (3-T09).
+  - The transmutation χ² is GPU and acceptance tier only. The 60 s CPU tier
+    rests on replaying each decision exactly. The thresholds fixed in advance
+    stay (conductor).
+- **3-T16a (ResearchModule):**
+  - An NbCl5 anneal at 1 fs on the L4 takes about 192 min, more than the 3 h
+    job limit, so it needs an A100 and a measured step time.
+  - Study scripts that call `workflow.parse_args` now get 1 fs by default.
+    They are historical and were not changed.
+  - From FastMACE `8a32b25` until ResearchModule `90a1e7b1`,
+    `main.py --engine fastmace` failed in `prepare()`. No results came from
+    it.
+- **Tooling (conductor):** `local_gpu.py` kept GPU reservations waiting for
+  CPU-only suites and for `timeout`-prefixed queued jobs (fixed in fc1af61
+  and b6a45f6). The Modal guard's import failed every job at container
+  start, and its ledger was per checkout (fixed in d42fa82).
 
 ## Checkpoints for the owner
 

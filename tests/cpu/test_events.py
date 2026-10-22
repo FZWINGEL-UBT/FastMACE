@@ -182,6 +182,7 @@ def test_first_step_after_an_accepted_friction_event_equals_a_fresh_construction
         assert engine._graphs
     assert Transaction(engine, [Event("friction", values=0.035)]).run() == "accepted"
     assert engine.integrator.config.friction == 0.035
+    assert "friction event" in engine.invalidations[-1]["reason"]  # a recorded re-capture (3-T04's log)
     if engine.capture:
         assert not engine._graphs  # c1, c2 (and BAOAB's gamma) are baked into the captured stages
         captured = len(engine.captures)
