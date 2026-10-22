@@ -191,6 +191,15 @@ def _edges(neighbours) -> set | None:
     return set(zip(index[0].tolist(), index[1].tolist(), map(tuple, _bits(shifts).tolist()), strict=True))
 
 
+def _neighbour_list(field):
+    """The force field's skin list: ``field.neighbours``, else the one attribute with ``edges`` and ``count``."""
+    found = getattr(field, "neighbours", None)
+    if found is not None:
+        return found
+    lists = [value for value in vars(field).values() if hasattr(value, "edges") and hasattr(value, "count")]
+    return lists[0] if len(lists) == 1 else None
+
+
 def _storage(tensor):
     try:
         return tensor.device, tensor.untyped_storage().data_ptr()
@@ -216,7 +225,7 @@ def check_against(engine: Any, fresh: Any) -> list[str]:
     for name in ("species", "masses", "charges", "total_charge", "spin_multiplicity"):
         if not _same(getattr(engine.state, name), getattr(fresh.state, name)):
             out.append(f"state.{name}")
-    lists = [getattr(getattr(one, "force_field", None), "neighbours", None) for one in (engine, fresh)]
+    lists = [_neighbour_list(one.force_field) for one in (engine, fresh)]
     if _edges(lists[0]) != _edges(lists[1]):
         out.append("force_field.neighbours (compacted edges)")
     constants, expected = _host_constants(engine.integrator), _host_constants(fresh.integrator)
