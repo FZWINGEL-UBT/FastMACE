@@ -4,7 +4,8 @@ Status: **in progress**, 22 October 2026. The owner accepted the
 recommendations for D1–D6 the same day ("Accept the recommendations for
 D1-D6 and prestart all phase 3 workers"). They are SPEC §18 decisions 31–36,
 and all workers were prestarted. Merged so far: 3-T01 (8dfd9f0), 3-T08
-(d73e8b7) and 3-T02 (344d221). The binding answers to the prestart reports are in "Conductor answers to the
+(d73e8b7), 3-T02 (344d221), 3-T04 (623238d), 3-T06 (5a98a51) and 3-T03
+(467123b). The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
 - §8.1: overflow before commit, the re-capture policy, the energy-only graph;
