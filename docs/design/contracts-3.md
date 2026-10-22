@@ -17,6 +17,7 @@ unchanged. `tests/cpu/test_research_surface.py` is unchanged.
 | `EngineConfig.recapture_budget` | `"auto"` | re-captures one run may make before it warns, records and recommends the compiled tier; an int ≥ 0 | T04 (T05's rule) |
 | `EngineConfig.graph_variant_cap` | `64` | captured variants kept at once, at most 64 and at most `dynamo_cache_size_limit` | T04 |
 | `PrecisionConfig.mc_energy` | `"auto"` | the precision of MC energies, the planner's resolution of `Workload.mc_energy_precision` | T07, T11 |
+| `Workload.max_displacement_A` | `None` | the largest displacement δ (Å) any `Displace` may use; required when `"displace"` is in `mc_moves`; rule 11 adds 2δ to the skin, and T10 refuses a larger `delta_A` (`planner/workload.py`) | T05 |
 | `MCConfig.max_attempts_per_block` | `10_000` | attempts of one move per block | T09 |
 | `MCConfig.max_move_sets` | `8` | move records attached at once | T09 |
 
@@ -152,7 +153,7 @@ Since 3-T08 the writer is at `FORMAT_VERSION = NEXT_FORMAT_VERSION = 3`. Version
 | `test_minimal_planner.py::test_d3_superset_beyond_the_structure_is_phase_3` (now `test_superset_beyond_the_structure_is_planned_by_rule_8`) | `superset-beyond-structure` | T02 (flipped) |
 | `test_minimal_planner.py::test_rule_4_inexact_padding_refuses_the_graph_tier` | "compiled MD tier: phase 3" in rule 4 | T06 |
 | `test_minimal_planner.py::test_other_modes_are_refused_with_their_phase` | `mode-compiled` | T06 |
-| `test_minimal_planner.py::test_rule_11_records_max_temperature_and_keeps_the_1a_skin` | the 1a skin, "phase 3" | T05 |
+| `test_minimal_planner.py::test_rule_11_records_max_temperature_and_keeps_the_1a_skin` (now `test_rule_11_md_only_keeps_the_1a_skin_and_records_the_rule`) | the 1a skin, "phase 3" | T05 (flipped) |
 | `test_restart.py::test_the_1b_fields_are_in_the_state` | `FIELDS_ADDED_IN_1B == {"mc"}` | T08 |
 | `test_interfaces.py::test_state_fields_of_phase_1a` (`FIELDS_ADDED_IN_1B`) | the same fact | T08 |
 | `test_ase_md.py::test_forbidden_observer_changes_raise_with_their_reason` (numbers, masses, charges) | "phase 3" | T13 |

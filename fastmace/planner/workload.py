@@ -40,7 +40,10 @@ class Workload:
     - ``mc_moves``: declared move types (``"swap"``, ``"transmute"``, ``"displace"``);
     - ``reproducible``: bitwise within the scope of §9.3; the planner refuses what it cannot
       guarantee (in 1b: everything, "no family qualified");
-    - ``mc_energy_precision``: §10.4; ``"auto"`` = the force precision if the ΔE gate passes.
+    - ``mc_energy_precision``: §10.4; ``"auto"`` = the force precision if the ΔE gate passes;
+    - ``max_displacement_A``: the largest displacement δ, Å, any ``Displace`` move of the run may
+      use (adaptive δ included). Required when ``"displace"`` is in ``mc_moves``; rule 11 adds 2δ
+      to the skin (§10.4), and attaching a ``Displace`` with a larger ``delta_A`` is refused.
     """
 
     max_temperature_K: float
@@ -52,6 +55,7 @@ class Workload:
     mc_moves: tuple[str, ...] = ()
     reproducible: bool = False
     mc_energy_precision: Literal["auto", "float32", "float64"] = "auto"
+    max_displacement_A: float | None = None
 
     def __post_init__(self):
         _check_choices(self)
@@ -77,6 +81,14 @@ class Workload:
         if moves and self.min_mc_temperature_K is None:
             raise ValueError("Workload.min_mc_temperature_K is required when mc_moves is non-empty: it is the "
                              "lowest MC target temperature and sets the ΔE gate threshold (SPEC §9.2, §12.3)")
+        delta = self.max_displacement_A
+        if delta is not None and (isinstance(delta, bool) or not isinstance(delta, (int, float))
+                                  or not math.isfinite(delta) or delta <= 0):
+            raise ValueError(f"Workload.max_displacement_A must be a finite, positive length in Å or None, "
+                             f"got {delta!r}")
+        if "displace" in moves and delta is None:
+            raise ValueError("Workload.max_displacement_A is required when 'displace' is in mc_moves: rule 11 "
+                             "sizes the skin for it (SPEC §9.3, §10.4)")
         needs_species = [move for move in moves if move in SPECIES_MOVES]
         if needs_species and not self.species_changes:
             raise ValueError(f"Workload.mc_moves {needs_species} change species and need species_changes=True "

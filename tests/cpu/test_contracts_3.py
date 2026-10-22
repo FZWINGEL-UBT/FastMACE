@@ -43,6 +43,19 @@ def _raises_naming(task, call):
 # --------------------------------------------------------------------------- config fields
 
 
+def test_workload_max_displacement():  # rule 11's displacement skin (3-T05); T10 refuses a larger delta_A
+    from fastmace.planner.workload import Workload
+
+    assert Workload(max_temperature_K=300.0).max_displacement_A is None
+    moves = dict(mc_moves=("displace",), min_mc_temperature_K=300.0)
+    assert Workload(max_temperature_K=300.0, max_displacement_A=0.2, **moves).max_displacement_A == 0.2
+    with pytest.raises(ValueError, match="max_displacement_A is required"):
+        Workload(max_temperature_K=300.0, **moves)
+    for value in (0.0, -0.1, float("inf"), True, "0.2"):
+        with pytest.raises(ValueError):
+            Workload(max_temperature_K=300.0, max_displacement_A=value, **moves)
+
+
 def test_neighbour_config_admits_auto_skin_and_headroom():  # rule 11 (3-T05)
     neighbours = config.NeighbourConfig()
     assert neighbours.skin == "auto" and neighbours.headroom == "auto"
