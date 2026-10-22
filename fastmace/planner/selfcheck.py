@@ -56,7 +56,9 @@ replay against a direct evaluation of the same force field at the same state, wi
 from __future__ import annotations
 
 import dataclasses
+import functools
 import gc
+import itertools
 import json
 import math
 import os
@@ -132,7 +134,8 @@ class GateRecord:
 
     The report reads ``status``, ``reason``, ``copies`` and the production path's largest error per
     quantity: ``energy_meV_per_atom``, ``force_eV_per_A`` and ``stress_eV_per_A3`` (``None`` where
-    not measured, the stress of an NVT plan included).
+    not measured, the stress of an NVT plan included). An MC plan adds ``move_energy`` and
+    ``mc_energy_precision`` (3-T11); ``passed`` is the energy, force and stress gate's.
     """
 
     status: str
@@ -155,6 +158,11 @@ class GateRecord:
     reduced_cell: tuple[int, int, int] | None = None
     steps: tuple[Mapping[str, Any], ...] = ()
     replay: Mapping[str, Any] | None = None
+    # 3-T11: the move-energy part of an MC plan (``move_gate``; status, precision, threshold, samples, the
+    # worst error per move type, each precision tried) and the MC energy precision it chose. ``status``
+    # stays the energy, force and stress gate's: ``skipped`` under ``check="skip"`` (decision 35).
+    move_energy: Mapping[str, Any] | None = None
+    mc_energy_precision: str | None = None
 
     def __post_init__(self):
         if self.status not in STATUSES:
@@ -720,7 +728,7 @@ def _choose(job, points):
     estimates = []
     for index, candidate in enumerate(job["candidates"]):
         one = estimate_cost(points, candidate, polar=polar)
-        evaluations = len(candidate["copies"]) * len(ROLES)
+        evaluations = len(candidate["copies"]) * len(_roles(job))
         seconds = one["seconds"] * evaluations
         memory = one["bytes"]
         estimate = {"cell": candidate["cell"], "repeat": candidate["repeat"], "atoms": candidate["atoms"],
@@ -816,6 +824,8 @@ def _evaluate_cpu(job):
     finally:
         del reference
         _free("cpu")
+    if "yardstick" not in dict(_roles(job)):  # the move-energy gate needs the float64 reference only
+        return values, info
     reference = _load_reference(job, "float32", entries[0])
     try:
         for index, atoms in enumerate(entries):
@@ -828,12 +838,31 @@ def _evaluate_cpu(job):
     return values, info
 
 
+def _roles(job):
+    """The ``(role, dtype)`` pairs ``job`` evaluates: both of ``ROLES``, or those named in ``job["roles"]``
+    (the move-energy gate's float64 reference alone, 3-T11)."""
+    wanted = job.get("roles")
+    return ROLES if wanted is None else tuple(pair for pair in ROLES if pair[0] in wanted)
+
+
 def evaluate_references(job) -> tuple[list[dict], dict]:
     """The reference and the yardstick on every copy of ``job``: one calculator at a time, freed after use.
 
     A CPU step's job (``cpu_job``) calibrates and chooses first; it returns no values and
-    ``info["declined"]`` when no candidate is within the limits.
+    ``info["declined"]`` when no candidate is within the limits. ``job["roles"]`` limits the roles
+    (``_roles``). MACE's loader sets torch's process-wide default dtype to the model's; it is put back
+    afterwards, so a production engine built later in this process reads the dtype it was given.
     """
+    import torch
+
+    saved = torch.get_default_dtype()
+    try:
+        return _evaluate_references(job)
+    finally:
+        torch.set_default_dtype(saved)
+
+
+def _evaluate_references(job):
     info = {}
     if job.get("backend") == "hybrid":
         from fastmace.model import loading
@@ -845,7 +874,7 @@ def evaluate_references(job) -> tuple[list[dict], dict]:
         return values, info
     entries = [_atoms(entry) for entry in job["copies"]]
     values = [{} for _ in entries]
-    for role, dtype in ROLES:
+    for role, dtype in _roles(job):
         reference = _load_reference(job, dtype, entries[0])
         try:
             for index, atoms in enumerate(entries):
@@ -1440,10 +1469,449 @@ def production(engine, references: References, *, check: str, quantities=None) -
     return record
 
 
-__all__ = ["CHECK_MODES", "FLOORS", "GateCopy", "GateRecord", "ReducedCell", "References", "calibration_boxes",
-           "check_mode", "copy_errors", "cpu_job", "describe_copies", "edge_count", "estimate_cost",
-           "evaluate_references", "heights", "is_out_of_memory", "make_copies", "primitive_repeat", "production",
-           "reduced_cell", "reduced_cells", "references", "run_child", "skipped_record", "verdict"]
+# --------------------------------------------------------------------------- the move-energy gate (3-T11)
+#
+# SPEC §12.3 "move-energy differences", §10.4 "Energy precision", decision 35. An MC plan always runs
+# this part (also under check="skip"); the energy, force and stress parts stay opt-in. The sample moves
+# are drawn before any engine exists, from the structure, the superset and the declared move types: the
+# move records (pairs, transmutable sets) arrive only with run(mc=...), so every pair of the superset and
+# every superset species is sampled, which covers whatever is declared later.
+
+MOVE_FRACTION = 0.01  # of k_B T_min: acceptance probabilities then off by at most about 1 %
+K_B_EV_PER_K = 8.617333262e-5
+# Samples per move type: swaps per pair of superset species, atoms per present species for the
+# transmutations (each to every other superset species), displacements.
+MOVE_SAMPLES = MappingProxyType({"swap": 2, "transmute": 1, "displace": 4})
+MOVE_STATUSES = ("passed", "failed", "unavailable")
+_MOVE_SALT = 0x3711  # the sample moves' generator is neither the copies' nor an MC stream
+
+
+def move_threshold(min_mc_temperature_K: float) -> float:
+    """``0.01 k_B T_min`` in eV (SPEC §12.3)."""
+    return MOVE_FRACTION * K_B_EV_PER_K * float(min_mc_temperature_K)
+
+
+def _symbol(z) -> str:
+    from ase.data import chemical_symbols
+
+    return chemical_symbols[int(z)]
+
+
+@dataclasses.dataclass(frozen=True)
+class MoveConfiguration:
+    """A configuration of the sample moves, as changes from the committed structure: ``species`` as
+    ``(atom, atomic number)`` and ``displacements`` as ``(atom, (dx, dy, dz))`` in Å. Empty: the base."""
+
+    species: tuple[tuple[int, int], ...] = ()
+    displacements: tuple[tuple[int, tuple[float, float, float]], ...] = ()
+
+
+@dataclasses.dataclass(frozen=True)
+class MoveSample:
+    """One sample move: ``ΔE = E(configurations[after]) - E(configurations[before])``. ``species``: the pair
+    of a swap, ``(from, to)`` of a transmutation, empty for a displacement."""
+
+    move: str
+    label: str
+    species: tuple[int, ...]
+    before: int
+    after: int
+
+
+@dataclasses.dataclass(frozen=True)
+class MoveSet:
+    """The sample moves of one structure (``sample_moves``): the configurations (0 is the base), the
+    samples, the pairs that cannot occur (``not_sampleable``) and the threshold."""
+
+    configurations: tuple[MoveConfiguration, ...]
+    samples: tuple[MoveSample, ...]
+    not_sampleable: tuple[str, ...]
+    threshold_eV: float
+    min_mc_temperature_K: float
+    superset: tuple[int, ...]
+    moves: tuple[str, ...]
+    max_displacement_A: float | None = None
+
+
+def configuration_atoms(atoms, configuration: MoveConfiguration):
+    """``atoms`` with ``configuration``'s changes (a copy)."""
+    out = atoms.copy()
+    if configuration.species:
+        numbers = out.numbers.copy()
+        for atom, z in configuration.species:
+            numbers[atom] = z
+        out.numbers = numbers
+    if configuration.displacements:
+        positions = out.positions.copy()
+        for atom, vector in configuration.displacements:
+            positions[atom] += np.asarray(vector, dtype=float)
+        out.positions = positions
+    return out
+
+
+def sample_moves(atoms, superset, workload, seed: int, samples: Mapping[str, int] = MOVE_SAMPLES) -> MoveSet:
+    """The sample moves of every move type in ``workload.mc_moves`` (SPEC §12.3), drawn from ``seed``:
+
+    - **swap:** ``MOVE_SAMPLES["swap"]`` swaps for each unordered pair of superset species. A pair with a
+      species absent from the structure is sampled on a base where another atom was transmuted into it
+      first, if transmutations are declared; otherwise the pair can never occur and is recorded as not
+      sampleable (conductor answer 3-T11 6);
+    - **transmute:** ``MOVE_SAMPLES["transmute"]`` atoms of each present species, each to every other
+      superset species, absent ones included. The charge and spin parity (§10.4) is the planner's
+      check of the declared sets; the gate measures the numbers;
+    - **displace:** ``MOVE_SAMPLES["displace"]`` atoms moved by exactly ``workload.max_displacement_A``
+      in a random direction, the largest trial any ``Displace`` may make.
+
+    ``samples`` replaces ``MOVE_SAMPLES`` (the acceptance-3 measurement draws more).
+    """
+    counts = {**MOVE_SAMPLES, **dict(samples)}
+    numbers = np.asarray(atoms.numbers)
+    superset = tuple(int(z) for z in superset)
+    present = [z for z in superset if bool((numbers == z).any())]
+    moves = tuple(workload.mc_moves)
+    rng = np.random.default_rng([int(seed), _MOVE_SALT])
+    configurations = [MoveConfiguration()]
+    index = {MoveConfiguration(): 0}
+
+    def add(species=None, displacements=()):
+        species = tuple(sorted((int(atom), int(z)) for atom, z in (species or {}).items() if z != numbers[atom]))
+        configuration = MoveConfiguration(species=species, displacements=tuple(displacements))
+        if configuration not in index:
+            index[configuration] = len(configurations)
+            configurations.append(configuration)
+        return index[configuration]
+
+    def pick(candidates):
+        return int(candidates[int(rng.integers(len(candidates)))])
+
+    found, not_sampleable = [], []
+    if "swap" in moves:
+        for a, b in itertools.combinations(superset, 2):
+            absent = [z for z in (a, b) if z not in present]
+            if absent and "transmute" not in moves:
+                not_sampleable.append(
+                    f"swap {_symbol(a)}-{_symbol(b)}: not sampleable, {', '.join(_symbol(z) for z in absent)} absent "
+                    "from the structure and no transmutations declared, so the pair never occurs")
+                continue
+            for _ in range(counts["swap"]):
+                used, base, sites = set(), {}, {}
+                for z in (a, b):
+                    if z in present:
+                        candidates = [i for i in np.flatnonzero(numbers == z) if i not in used]
+                    else:  # an atom of another species becomes z first
+                        candidates = ([i for i in range(len(numbers)) if i not in used and numbers[i] not in (a, b)]
+                                      or [i for i in range(len(numbers)) if i not in used and numbers[i] != b])
+                    site = pick(candidates)
+                    used.add(site)
+                    sites[z] = site
+                    if z not in present:
+                        base[site] = z
+                before = add(base)
+                after = add({**base, sites[a]: b, sites[b]: a})
+                transmuted = "".join(f"; base: atom {site} {_symbol(numbers[site])} -> {_symbol(z)}"
+                                     for site, z in base.items())
+                found.append(MoveSample("swap", f"swap {_symbol(a)}-{_symbol(b)} (atoms {sites[a]}, {sites[b]}"
+                                          f"{transmuted})", (a, b), before, after))
+    if "transmute" in moves:
+        for p in present:
+            sites = np.flatnonzero(numbers == p)
+            for _ in range(counts["transmute"]):
+                site = pick(sites)
+                for z in superset:
+                    if z != p:
+                        found.append(MoveSample("transmute", f"transmute atom {site} {_symbol(p)} -> {_symbol(z)}",
+                                                  (p, z), 0, add({site: z})))
+    if "displace" in moves:
+        delta = float(workload.max_displacement_A)
+        for _ in range(counts["displace"]):
+            site = int(rng.integers(len(numbers)))
+            vector = rng.normal(size=3)
+            vector = tuple(float(x) for x in vector / np.linalg.norm(vector) * delta)
+            found.append(MoveSample("displace", f"displace atom {site} {_symbol(numbers[site])} by {delta:g} Å", (),
+                                      0, add(displacements=((site, vector),))))
+    return MoveSet(configurations=tuple(configurations), samples=tuple(found), not_sampleable=tuple(not_sampleable),
+                   threshold_eV=move_threshold(workload.min_mc_temperature_K),
+                   min_mc_temperature_K=float(workload.min_mc_temperature_K), superset=superset, moves=moves,
+                   max_displacement_A=workload.max_displacement_A)
+
+
+def move_verdict(rows, threshold_eV: float) -> dict[str, Any]:
+    """The move-energy rule: every row's ``error`` (``|ΔE_prod - ΔE_ref|``, eV) at most ``threshold_eV``.
+
+    A non-finite value anywhere fails before any maximum is taken. There is deliberately no ratio term
+    (SPEC §12.3). ``moves`` gives per move type the samples, the worst error (eV and in k_B T_min) and
+    whether it passed.
+    """
+    bad = [row["label"] for row in rows
+           if not all(math.isfinite(float(row[key])) for key in ("production", "reference", "error"))]
+    if bad:
+        return {"passed": False, "nonfinite": bad, "moves": {}}
+    moves = {}
+    for row in rows:
+        entry = moves.setdefault(row["move"], {"samples": 0, "worst_eV": 0.0, "worst_label": None})
+        entry["samples"] += 1
+        if entry["worst_label"] is None or row["error"] > entry["worst_eV"]:
+            entry["worst_eV"], entry["worst_label"] = float(row["error"]), row["label"]
+    for entry in moves.values():
+        entry["worst_k_B_T_min"] = entry["worst_eV"] / threshold_eV * MOVE_FRACTION
+        entry["passed"] = bool(entry["worst_eV"] <= threshold_eV)
+    return {"passed": all(entry["passed"] for entry in moves.values()), "nonfinite": [], "moves": moves}
+
+
+@dataclasses.dataclass
+class MoveReferences:
+    """The float64 reference energies of a ``MoveSet``'s configurations (``move_references``), for
+    ``move_gate``. ``energies[i]`` is configuration ``i``'s; ``unavailable`` the reason when none ran."""
+
+    check: str
+    moves: MoveSet
+    energies: tuple[float, ...] = ()
+    ran: str | None = None
+    device: str | None = None
+    info: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    steps: tuple = ()
+    seconds: float = 0.0
+    unavailable: str | None = None
+
+
+class _MoveLadder(_Ladder):
+    """The move-energy references: the plan's device on the production cell, then the CPU in float64.
+
+    No reduced cell: the sample moves are the production structure's (a reduced cell has other sites
+    and pairs), so after an out-of-memory on both devices the move-energy part is ``unavailable``.
+    """
+
+    def run_moves(self, copies):
+        natoms = len(self.atoms)
+        job = _job(self.plan, self.force_field, copies)
+        job["roles"] = ["reference"]
+        result = self._attempt(job, self.device, "production", None, natoms, child=self.plan_child)
+        if result is not None:
+            return (*result, self.device)
+        if self.gpu and self.gate.cpu_float64_time_limit_s > 0:
+            job = cpu_job(self.plan, self.force_field, [("production", None, self.atoms, copies)], self.atoms,
+                          self.gate)
+            job["roles"] = ["reference"]
+            result = self._attempt(job, "cpu", "production", None, natoms, child=True)
+            if result is not None:
+                return (*result, "cpu")
+        raise _Unavailable(self._summary())
+
+
+def move_references(plan, force_field, atoms, workload, *, seed: int, check: str = "skip", gate=None,
+                    samples: Mapping[str, int] = MOVE_SAMPLES) -> MoveReferences | None:
+    """The move-energy part's first half, before any production engine (as ``references``): the sample
+    moves (``sample_moves``) and the float64 reference energy of each configuration, on the same ladder
+    and in the same child processes as the gate's references. ``None`` without MC moves.
+
+    It runs whatever ``check`` is (decision 35): MC plans always run the move-energy part. A reference
+    that cannot run is recorded (``unavailable``); ``move_gate`` then gives "auto" float64.
+    """
+    if not workload.mc_moves:
+        return None
+    from fastmace.config import GateConfig
+
+    check_mode(check)
+    gate = GateConfig() if gate is None else gate
+    moves = sample_moves(atoms, plan.superset, workload, seed, samples)
+    copies = [GateCopy("move", configuration_atoms(atoms, configuration)) for configuration in moves.configurations]
+    ladder = _MoveLadder(plan, force_field, atoms, None, gate, seed, 1)
+    started = time.perf_counter()
+    ran = "child process" if ladder.plan_child else "in-process"
+    try:
+        values, info, device = ladder.run_moves(copies)
+    except _Unavailable as error:
+        return MoveReferences(check=check, moves=moves, ran=ran, steps=_split_steps(ladder.steps)[0],
+                              seconds=time.perf_counter() - started, unavailable=str(error))
+    energies = tuple(float(value["reference"][0]) for value in values)
+    return MoveReferences(check=check, moves=moves, energies=energies, ran=ran, device=device, info=info,
+                          steps=_split_steps(ladder.steps)[0], seconds=time.perf_counter() - started)
+
+
+def _move_evaluator(engine, precision, plan, force_field):
+    """The MC evaluator in ``precision``: the engine's own force field, or its float64 copy (made once)."""
+    from fastmace.mc.evaluator import MCEvaluator, float64_model, precision_of
+
+    if precision == precision_of(engine.force_field.dtype) or precision in getattr(engine, "energy_fields", {}):
+        return MCEvaluator(engine, precision)
+    return MCEvaluator(engine, precision, model=float64_model(force_field, plan))
+
+
+def _displace(displacements, state):
+    import torch
+
+    for atom, vector in displacements:
+        state.positions[atom] += torch.as_tensor(vector, dtype=state.positions.dtype, device=state.positions.device)
+
+
+def _configuration_energies(engine, evaluator, configurations):
+    """The MC evaluator's energy (eV, float) of each configuration, or None for a displacement whose trial
+    needs a neighbour rebuild. Each configuration is a T03 transaction from the committed state that its
+    evaluation rejects, so the state is restored bit for bit; the edges and the neighbour list's host
+    values are put back afterwards, as ``_replay`` does."""
+    from fastmace.events import Event, Transaction
+
+    _quiescent(engine)
+    field = engine.force_field
+    neighbours = field.neighbours
+    host = _host_attributes(neighbours)
+    edges_before = int(field.data["edge_index"].shape[1])
+    sizes_used = set(engine.edge_sizes_used)
+    snapshot = engine.registry.snapshot()
+    energies = []
+    try:
+        for configuration in configurations:
+            if configuration == MoveConfiguration():
+                energies.append(float(evaluator.evaluate().reshape(-1)[0]))
+                continue
+            events = []
+            if configuration.species:
+                sites, numbers = zip(*configuration.species, strict=True)
+                events.append(Event("species", atoms=tuple(sites), values=tuple(numbers)))
+            result = {}
+
+            def evaluate(engine_, configuration=configuration, result=result):
+                if configuration.displacements:
+                    if bool(neighbours.needs_rebuild(engine_.state.positions)):  # host sync
+                        result["energy"] = None  # a trial rebuild (3-T10); not sampled here
+                        return "rejected"
+                    engine_._run("C")
+                    engine_._use_edges(engine_._padded(int(field.edge_count)))
+                result["energy"] = float(evaluator.evaluate().reshape(-1)[0])
+                return "rejected"
+
+            transaction = Transaction(engine, events, evaluate=evaluate)
+            if configuration.displacements:
+                transaction.host_writes.append(functools.partial(_displace, configuration.displacements))
+                transaction.changed.add("positions")
+            transaction.run()
+            field.use_edges(edges_before)
+            energies.append(result.get("energy"))
+    finally:
+        engine.registry.restore(snapshot)
+        _restore_attributes(neighbours, host)
+        field.use_edges(edges_before)
+        engine.edge_sizes_used.clear()
+        engine.edge_sizes_used.update(sizes_used)
+    return energies
+
+
+def move_rows(engine, evaluator, references: MoveReferences):
+    """``(rows, skipped)``: each sample's production and reference ΔE and their difference, and the samples
+    that need a trial rebuild."""
+    moves = references.moves
+    energies = _configuration_energies(engine, evaluator, moves.configurations)
+    rows, skipped = [], []
+    for sample in moves.samples:
+        before, after = energies[sample.before], energies[sample.after]
+        if before is None or after is None:
+            skipped.append(f"{sample.label}: needs a neighbour rebuild (displacement beyond skin/2), not sampled")
+            continue
+        production = after - before
+        reference = references.energies[sample.after] - references.energies[sample.before]
+        rows.append({"move": sample.move, "label": sample.label, "production": production, "reference": reference,
+                     "error": abs(production - reference)})
+    return rows, skipped
+
+
+def _move_reason(precision, result, threshold_eV, min_temperature_K):
+    if result["nonfinite"]:
+        return f"move-energy differences in {precision}: non-finite values: " + ", ".join(result["nonfinite"])
+    failed = [(move, entry) for move, entry in result["moves"].items() if not entry["passed"]]
+    return f"move-energy differences in {precision}: " + "; ".join(
+        f"{move} error {entry['worst_eV']:.3g} eV = {entry['worst_k_B_T_min']:.3g} k_B T_min above the limit "
+        f"{MOVE_FRACTION:g} k_B T_min ({threshold_eV:.3g} eV at T_min {min_temperature_K:g} K; {entry['worst_label']})"
+        for move, entry in failed)
+
+
+def move_gate(engine, references: MoveReferences | None, *, plan, force_field, record: GateRecord | None = None,
+              requested: str | None = None) -> GateRecord | None:
+    """The move-energy part's second half (SPEC §12.3, §10.4, decision 35), through ``engine``'s MC evaluator
+    in the mode it runs: every sample's ``|ΔE_prod - ΔE_ref| <= 0.01 k_B T_min``.
+
+    ``requested`` (default ``plan.workload.mc_energy_precision``):
+    - ``"auto"``: the force precision is gated first; if it fails, the MC energies move to float64 while
+      MD forces keep their precision, and the check is repeated (§9.4's MC energy precision dimension,
+      ahead of every other); a reference that was ``unavailable`` gives float64 (decision 35);
+    - ``"float32"`` or ``"float64"``: that precision is gated; a failure raises ``GateFailed`` with the
+      measured error (conductor answer 3-T11 4); an unavailable reference keeps it, recorded.
+
+    Returns ``record`` (default the ``skipped`` record) with ``move_energy`` and ``mc_energy_precision``;
+    its ``status`` stays the energy, force and stress gate's. Raises ``GateFailed`` when the last
+    precision tried fails. ``None`` references (no MC moves) return ``record`` unchanged.
+    """
+    record = skipped_record() if record is None else record
+    if references is None:
+        return record
+    from fastmace.mc.evaluator import precision_of
+
+    started = time.perf_counter()
+    moves = references.moves
+    requested = plan.workload.mc_energy_precision if requested is None else requested
+    force = precision_of(engine.force_field.dtype)
+    counts = {}
+    for sample in moves.samples:
+        counts[sample.move] = counts.get(sample.move, 0) + 1
+    part = {"requested": requested, "threshold_eV": moves.threshold_eV,
+            "min_mc_temperature_K": moves.min_mc_temperature_K, "fraction": MOVE_FRACTION,
+            "superset": [_symbol(z) for z in moves.superset], "max_displacement_A": moves.max_displacement_A,
+            "samples": counts, "configurations": len(moves.configurations),
+            "not_sampleable": list(moves.not_sampleable),
+            "references": {"ran": references.ran, "device": references.device, "steps": list(references.steps),
+                           "record_id": (references.info.get("reference") or {}).get("record_id")}}
+    if references.unavailable is not None:
+        chosen = "float64" if requested == "auto" else requested
+        why = ("MC energies in float64 (decision 35)" if requested == "auto" else
+               f"the requested {requested} is kept, ungated")
+        part.update(status="unavailable", precision=chosen, tried=[], moves={}, rows=[],
+                    reason=f"the move-energy reference is unavailable ({references.unavailable}): {why}",
+                    seconds={"references_s": references.seconds, "production_s": time.perf_counter() - started})
+        return dataclasses.replace(record, move_energy=part, mc_energy_precision=chosen)
+    if requested != "auto":
+        order = [requested]
+    elif plan.precision is not None and plan.precision.mc_energy == "float64":
+        order = ["float64"]  # a fallback revision moved the MC energies already (fallback.mc_energy_revision)
+    else:
+        order = [force] + (["float64"] if force == "float32" else [])
+    tried, mode = [], None
+    for precision in order:
+        evaluator = _move_evaluator(engine, precision, plan, force_field)
+        mode = ("captured energy-only graph" if evaluator.info()["captured"] else "eager energy-only evaluation")
+        rows, skipped = move_rows(engine, evaluator, references)
+        result = move_verdict(rows, moves.threshold_eV)
+        worst = max((entry["worst_k_B_T_min"] for entry in result["moves"].values()), default=None)
+        entry = {"precision": precision, "status": "passed" if result["passed"] else "failed",
+                 "worst_k_B_T_min": worst}
+        if not result["passed"]:
+            entry.update(moves=result["moves"], nonfinite=result["nonfinite"],
+                         reason=_move_reason(precision, result, moves.threshold_eV, moves.min_mc_temperature_K))
+        tried.append(entry)
+        if result["passed"]:
+            break
+    part.update(status=tried[-1]["status"], precision=tried[-1]["precision"], tried=tried, moves=result["moves"],
+                nonfinite=result["nonfinite"], rows=rows, mode=mode,
+                not_sampleable=part["not_sampleable"] + skipped,
+                seconds={"references_s": references.seconds, "production_s": time.perf_counter() - started})
+    if result["passed"]:
+        if len(tried) > 1:
+            part["reason"] = (f"{tried[0]['reason']}: the MC energies moved to {tried[-1]['precision']} and passed; "
+                              f"MD forces keep {force} (SPEC §9.4)")
+        return dataclasses.replace(record, move_energy=part, mc_energy_precision=part["precision"])
+    part["reason"] = "; ".join(entry["reason"] for entry in tried)
+    failed = dataclasses.replace(record, move_energy=part, mc_energy_precision=part["precision"],
+                                 reason="; ".join(text for text in (record.reason, part["reason"]) if text))
+    raise GateFailed(f"the move-energy gate on this structure failed: {part['reason']}",
+                     why="an MC energy difference of the production path differs from the float64 reference by "
+                         "more than 0.01 k_B T_min (SPEC §12.3), so acceptance probabilities would be off by more "
+                         "than about 1 % (the §9.4 fallback acts on this error)", gate_record=failed)
+
+
+__all__ = ["CHECK_MODES", "FLOORS", "MOVE_FRACTION", "MOVE_SAMPLES", "GateCopy", "GateRecord", "MoveConfiguration",
+           "MoveReferences", "MoveSample", "MoveSet", "ReducedCell", "References", "calibration_boxes", "check_mode",
+           "configuration_atoms", "copy_errors", "cpu_job", "describe_copies", "edge_count", "estimate_cost",
+           "evaluate_references", "heights", "is_out_of_memory", "make_copies", "move_gate", "move_references",
+           "move_rows", "move_threshold", "move_verdict", "primitive_repeat", "production", "reduced_cell",
+           "reduced_cells", "references", "run_child", "sample_moves", "skipped_record", "verdict"]
 
 
 if __name__ == "__main__":
