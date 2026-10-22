@@ -1460,6 +1460,15 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
     jobs on the machine. Idle leftover sessions are fine (owner, 22 October
     2026; ResearchModule AGENTS.md f375b9d7);
   - 3-T20's L4 job then carries items 2–3 only.
+  - 3-T20's swap-back series on leeloo (4a1dfa8): all 8 runs valid. Rates
+    fixed/events: NaCl 0.946–0.960, NbCl5 0.988–0.990.
+  - **3-T21's Ada leg started early on leeloo** (about 12:00 UTC, main
+    cd43463): the GPU acceptance and slow tiers, item 9's protocol, then the
+    rule-9 timing, until 16:00 UTC.
+    - Why early: the remaining merges don't touch `fastmace/`. At the freeze,
+      3-T21 cites these runs if `git diff cd43463..<freeze> -- fastmace/` is
+      empty, and otherwise reruns them on the L4.
+    - Murphy and leto were busy with other users' GPU jobs.
 - **3-T06's GPU jobs** passed (merged at 10c67ae). The compiled tier equals graph within float32 noise:
   MH-1 hybrid 2.2e-7 Å against a graph repeat of 3.0e-7 Å, and MP-0 2.8e-7 Å against 2.2e-7 Å. The gate
   passes, and nothing recompiles over 37–40 edge counts. The rule-9 timing is owner checkpoint 2c.
