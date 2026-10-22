@@ -9,7 +9,9 @@ and all workers were prestarted. Merged so far: 3-T01 (8dfd9f0), 3-T08
 3-T05 (cda1801), 3-T07 (40ce297), 3-T20's item-1 tools (2a42aa2), 3-T09 (1ad78cb)
 and its review fixes (f582186), 3-T15 (22c1e73), 3-T14 (7b26cc8), 3-T04b (53fbbfb),
 3-T10 (ecdc164), 3-T22 (eb64374), 3-T11 (963f478), 3-T12 (a031b96) and 3-T22b
-(f2f2258); in ResearchModule 3-T16a (90a1e7b1). 3-T11 started with 3-T09, because its gate
+(f2f2258); in ResearchModule 3-T16a (90a1e7b1). Owner checkpoints 2b and 2c were
+decided the same day (SPEC decisions 37 and 38), and their tasks 3-T22c and 3-T06b
+started. 3-T11 started with 3-T09, because its gate
 needs T07's evaluator and T03's transactions, not T09's driver. The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
@@ -823,6 +825,44 @@ The task:
 
 A default change is the owner's decision (checkpoint 2b below). Worker: 3-T03's session.
 
+#### 3-T22c The mass-weighted fixcm projection as the MD default (S–M, CPU, a short GPU check) — owner decision 37, 22 October 2026
+
+- **Planner:** under NVT `fixcm`, `"auto"` resolves to `"mass_weighted"` for MD as well as for MC, with
+  a decision code of its own. An explicit value is kept. NPT and `fixcm` off are unchanged.
+- **Temperature:** under `"mass_weighted"`, every kinetic temperature FastMACE reports counts 3N − 3
+  degrees of freedom: thermo rows, the report, `Simulation`'s outputs and the CLI. Form it in one
+  helper. `"ase"` keeps 3N. The thermostat's target is unchanged.
+- **Resume:** a run keeps the projection its record holds. A record without the field reads as `"ase"`.
+- **Tests:**
+  - every bit-for-bit comparison with ASE's Langevin or with the research engine pins
+    `fixcm_projection="ase"`;
+  - new tests for the MD default, the 3N − 3 temperature and the resume of an older record.
+- **Docs:** `docs/design/fixcm-projection.md`, `docs/design/contracts-3.md`, and a validation note
+  `docs/validation/3-T22c.md`.
+- **GPU:** one short reservation. Run the fused-projection fast tier with the default plan, plus a
+  per-species temperature check on NaCl and Li/Cs under the default: every species at the target, over
+  3N − 3.
+- **ResearchModule:** `main.py` already records the plan's decisions in `run.json`
+  (`langevin/fastmace_engine.py`), so its runs are labelled. When 3-T22c merges, the conductor documents
+  the change there (AGENTS.md, `docs/protocol.md`, `docs/configuration.md`). Research results from
+  before carry ASE's projection.
+
+Worker: 3-T03's session. Merge order: after 3-T06b where both edit the same tests.
+
+#### 3-T06b Rule 9 amended: host callbacks keep the graph tier (S, CPU) — owner decision 38, 22 October 2026
+
+- **Planner** (`planner/minimal.py`): `host_callbacks_every` no longer selects the compiled tier.
+  - With no mode given, the planner keeps graph and records why: rule 9, decision 38 and the measured
+    ratios.
+  - The compiled tier is chosen only under rule 4 or with `mode="compiled"`.
+  - `RULE_9_HOST_CALLBACKS` and the decision code `host-callbacks-compiled` go or change meaning.
+- **Tests:** flip the rule-9 tests. `fastmace.ase` observers keep graph.
+- **Docs:** `docs/validation/3-T06.md`, `docs/design/contracts-3.md`, and every doc that says observers
+  or callbacks choose the compiled tier.
+- **GPU:** none. The timing is 3-T06's, and 3-T21 measures the Ada leg.
+
+Worker: 3-T06's session.
+
 ### Wave 4: acceptance
 
 #### 3-T20 Phase 3 benchmarks (M, GPU: local timing; Ada) — after T09, T10, T11
@@ -1343,6 +1383,9 @@ idle.
      decisions, which resolve to today's values. The T02 table is allowed
      too, if I accept it under T02's answer 3.
    - Trajectories are bitwise on CPU float64 and in reproducible mode.
+   - After decision 37, the A side pins `fixcm_projection="ase"`, because
+     the baseline has ASE's projection. After decision 38, MD with host
+     callbacks plans graph on both sides.
 2. Yes, long reservations with the PC kept quiet. I pause other GPU work.
 3. Up to $4. Reuse T14's and T20's L4 results where `git diff` shows the
    measured paths unchanged.
@@ -1359,8 +1402,8 @@ idle.
 | `simulation.py` | T03, T08, T15, T11 |
 | `report.py` | T06 (one line, if needed), T15, T11 |
 | `engine/subprocess.py` | T03, T08, T15 |
-| `planner/minimal.py` | T02, T06, T05, T09, T11, T17 |
-| `planner/fixed.py` | T01, T04, T06, T05, T11 |
+| `planner/minimal.py` | T02, T06, T05, T09, T11, T17, T22b, T06b, T22c |
+| `planner/fixed.py` | T01, T04, T06, T05, T11, T22b, T22c |
 | `planner/workload.py` | T05 |
 | `io/trajectory.py` | T15 |
 | `tools/bench/mc_cost.py` | T07, T09, T10, T20 |
@@ -1516,6 +1559,8 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
    not a new decision.
 2b. After 3-T22's measurement: whether `fixcm` uses the mass-weighted projection by default. That would
    change thermostat results slightly for crystals with unequal masses, in FastMACE and in `main.py`.
+   **Decided (user, 22 October 2026):** mass-weighted by default, with temperatures over 3N − 3. SPEC
+   decision 37; task 3-T22c.
 2c. After 3-T06's GPU timing (merged at 10c67ae): whether rule 9 is amended. Today a host callback every
    fewer than 10 steps, an `fm.ase` observer included (SPEC §10), makes the planner choose the compiled tier.
    - **Measured:** with MH-1 hybrid float32 on the RTX 5060 Ti, the compiled tier is 4.3–4.7× slower than
@@ -1524,6 +1569,7 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
    - **Proposed:** host callbacks keep the graph tier, and the compiled tier is chosen only where capture
      is not possible (rule 4) or when it is asked for. Until then, `mode="graph"` overrides rule 9.
    - The Ada leg is measured in 3-T21.
+   - **Decided (user, 22 October 2026):** amended as proposed. SPEC decision 38; task 3-T06b.
 3. After T21: the acceptance report, and the tag `fastmace-3`.
 
 ## Owner decisions
