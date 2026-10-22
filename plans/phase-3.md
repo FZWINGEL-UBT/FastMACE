@@ -1381,7 +1381,9 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   - 3-T14: the protocol smoke and the full local run (item 9).
 
   Single runs in other workers' sessions were allowed, so the checks don't
-  agree with one another.
+  agree with one another. The owner then allowed them ("I allow the gpu jobs
+  in their own session", 22 October 2026), and they run in this order: the
+  short jobs (T02, T06, T14's smoke), then T20's series, then T14's full run.
 - **3-T03:**
   - The friction refreshes copy host floats to the device, so they are not
     capturable. This is harmless: a friction event drops the graphs anyway.
