@@ -185,7 +185,11 @@ These are phase 2's principles, unchanged where they still apply:
     is never retried in another form or run from another session; it waits
     for the owner;
   - `--quiet` (a quiet machine for timing) is for timing slots the conductor
-    schedules, not for workers.
+    schedules, not for workers;
+  - a chain of reservations (an A/B series) waits 60 s between them, so
+    other workers' queued jobs can get in: the queue is not first come,
+    first served, and an immediate re-reserve wins every time (3-T07 waited
+    behind 3-T05's chain on 22 October 2026).
 - **Workstations:**
   - none from Thursday 22 October 2026 evening until the owner says they're
     back (power outage on Friday 23 October);
