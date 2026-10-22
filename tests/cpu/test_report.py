@@ -227,7 +227,7 @@ def test_every_refusal_code_has_a_reason(code):
     assert any(line.startswith("refused:") and report.REFUSALS[code] in line for line in lines)
 
 
-COMPILED_CODES = ["mode-compiled-tier", "mode-compiled-rule-4", "mode-compiled-rule-9"]  # 3-T06
+COMPILED_CODES = ["mode-compiled-tier", "mode-compiled-rule-4"]  # 3-T06 (rule 9: decision 38, 3-T06b)
 
 
 @pytest.mark.parametrize("code", BACKEND_CODES + ["host-callbacks-graph-sync", "allow-naive-cueq",

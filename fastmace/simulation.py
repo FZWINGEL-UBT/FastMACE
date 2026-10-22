@@ -98,7 +98,8 @@ class PlannerOptions:
     ``simulation.json`` and used again by ``Simulation.resume``.
 
     - ``mode``: the execution mode (``config.Mode``, §9.3), or ``None`` (the default): the planner picks the
-      graph tier, or the compiled tier by rule 4 or rule 9 (3-T06); ``allow_reference``: rule 1's flag;
+      graph tier, or the compiled tier by rule 4 (3-T06; host callbacks keep graph, decision 38);
+      ``allow_reference``: rule 1's flag;
     - ``fallback``, ``gate``, ``runner``: the safety records of phase 2 (§9.4, §12.3, §8.7);
     - ``engine``, ``neighbours``: the planner-level options; ``None`` keeps the default planner's
       (``planner.minimal.default_planner``: CUDA if available, else the CPU without compilation).
