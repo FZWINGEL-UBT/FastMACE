@@ -175,3 +175,33 @@ def test_fastmace_side_runs_a_simulation_with_d3(tmp_path, monkeypatch):
     assert volumes[-1] != volumes[0]
     assert all(math.isfinite(row[tool.COLUMNS.index("pressure_GPa")]) for row in rows)
     assert "D3" in json.dumps(simulation.metadata(), default=str)
+
+
+def drifting_runs(rng, slopes, n=2000):
+    """Runs whose V grows linearly (slope per ps per engine, seeds scattered by 10 %) plus AR(1) noise."""
+    runs = []
+    for engine, slope, seeds in (("ase", slopes[0], (101, 102, 103)), ("fastmace", slopes[1], (1, 2, 3))):
+        for seed in seeds:
+            time_ps = np.arange(1, n + 1) * 0.01
+            rate = slope * (1 + 0.1 * rng.normal())
+            data = dict(time_ps=time_ps, temperature_K=np.full(n, 600.0),
+                        volume_A3_atom=32.0 + rate * time_ps + ar1(n, 0.9, 0.5, 0.0, rng),
+                        pressure_GPa=ar1(n, 0.5, 0.3, 0.0, rng), potential_eV_atom=ar1(n, 0.7, 0.002, -4.4, rng))
+            runs.append(({"engine": engine, "seed": seed, "temperature_K": 600.0, "equilibration_ps": 0.0}, data))
+    return runs
+
+
+def test_a_drifting_volume_is_judged_on_its_drift():
+    rng = np.random.default_rng(6)
+    entry = tool.analyse(drifting_runs(rng, (0.8, 0.8)))["600K"]
+    assert not entry["stationary"] and entry["judged_on"] == "V drift and windowed V means"
+    assert entry["passed"], entry["drift_comparison"]
+    assert entry["engines"]["ase"]["volume_drift"]["mean"] == pytest.approx(0.8, rel=0.2)
+    assert len(entry["engines"]["ase"]["volume_windows"]) == tool.WINDOWS
+    faster = tool.analyse(drifting_runs(rng, (0.8, 1.6)))["600K"]
+    assert not faster["passed"] and not faster["drift_comparison"]["volume_drift"]["passed"]
+
+
+def test_stationary_runs_are_judged_on_their_means():
+    entry = tool.analyse(synthetic_runs(np.random.default_rng(7)))["300K"]
+    assert entry["stationary"] and entry["judged_on"] == "stationary means"

@@ -20,9 +20,14 @@ with its kinetic part, (2 KE - V Tr sigma) / 3V (the research engine's ``npt_obs
 samples are cut into blocks of at least twice the integrated autocorrelation time of the volume (the
 slowest observable, pooled over runs and engines); the standard error of each mean is that of the block
 means pooled over the seeds, and that of the volume fluctuation (the standard deviation of V) a jackknife
-over the same blocks. An observable passes when |difference| <= 3 combined standard errors. The drift of
-V (slope of a line through each run's production samples) is reported, so a non-stationary 600 K run is
-recorded as such.
+over the same blocks. An observable passes when |difference| <= 3 combined standard errors.
+
+Stationarity: each run's V drift is the slope of a line through its production samples. A temperature is
+**non-stationary** when, for either engine, |mean drift| times the production time exceeds the standard
+deviation of V; its means then depend on the window. The comparison there is the one agreed with the
+conductor: the mean V drift per engine, and the mean V in ``WINDOWS`` consecutive windows of the
+production time, with standard errors from the spread over the seeds (few degrees of freedom: recorded).
+The stationary rule's numbers are still reported for it.
 
     python tools/validation/npt_d3_comparison.py run-ase --temperature-K 300 --seed 101 --output OUT/ase-300K-s101
     python tools/validation/npt_d3_comparison.py analyse OUT/* --output OUT/comparison.json
@@ -51,6 +56,7 @@ COLUMNS = ("step", "time_ps", "temperature_K", "potential_eV_atom", "kinetic_eV_
            "pressure_GPa", "a_A", "b_A", "c_A")
 OBSERVABLES = ("volume_A3_atom", "pressure_GPa", "potential_eV_atom")
 SIGMAS = 3.0  # the pass rule: |difference| <= 3 combined standard errors
+WINDOWS = 4  # non-stationary temperatures: windows of the production time compared
 MIN_BLOCK_TAU = 2.0  # blocks of at least twice the integrated autocorrelation time
 
 
@@ -289,11 +295,38 @@ def drift_per_ps(time_ps, values):
     return float(slope)
 
 
+def seed_mean(values):
+    """The mean over seeds and its standard error from their spread (``nan`` with one seed)."""
+    values = np.asarray(values, dtype=float)
+    se = float(values.std(ddof=1) / math.sqrt(len(values))) if len(values) > 1 else math.nan
+    return float(values.mean()), se
+
+
+def windows_of(data, count=WINDOWS):
+    """Mean V in ``count`` consecutive, equal windows of a run's production samples."""
+    return [float(chunk.mean()) for chunk in np.array_split(np.asarray(data["volume_A3_atom"], dtype=float), count)]
+
+
+def compare(first, second, sigmas):
+    difference = second["mean"] - first["mean"]
+    combined = math.hypot(first["se"], second["se"])
+    return dict(difference=difference, combined_se=combined,
+                sigmas=abs(difference) / combined if combined else math.inf,
+                passed=bool(abs(difference) <= sigmas * combined))
+
+
 def read_run(directory):
     directory = Path(directory)
     record = json.loads((directory / "run.json").read_text())
-    with open(directory / "samples.csv", newline="") as handle:
-        rows = list(csv.DictReader(handle))
+    path = directory / "samples.csv"
+    if not path.exists():  # committed runs keep their samples gzipped
+        import gzip
+
+        with gzip.open(directory / "samples.csv.gz", "rt", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+    else:
+        with open(path, newline="") as handle:
+            rows = list(csv.DictReader(handle))
     data = {name: np.array([float(row[name]) for row in rows]) for name in COLUMNS}
     keep = data["time_ps"] > record["equilibration_ps"] + 1e-9
     return record, {name: values[keep] for name, values in data.items()}
@@ -326,18 +359,29 @@ def analyse(runs, sigmas=SIGMAS, min_block_tau=MIN_BLOCK_TAU):
             stats["temperature_K"] = float(np.mean([data["temperature_K"].mean() for _, data in runs_]))
             stats["volume_drift_A3_atom_per_ps"] = {
                 int(record["seed"]): drift_per_ps(data["time_ps"], data["volume_A3_atom"]) for record, data in runs_}
+            stats["volume_drift"] = dict(zip(("mean", "se"), seed_mean(list(stats["volume_drift_A3_atom_per_ps"]
+                                                                                .values())), strict=True))
+            per_run = np.array([windows_of(data) for _, data in runs_])
+            stats["volume_windows"] = [dict(zip(("mean", "se"), seed_mean(per_run[:, i]), strict=True))
+                                       for i in range(per_run.shape[1])]
+            production = float(np.mean([data["time_ps"][-1] - data["time_ps"][0] for _, data in runs_]))
+            stats["stationary"] = bool(abs(stats["volume_drift"]["mean"]) * production
+                                       <= stats["volume_std"]["mean"])
             entry["engines"][engine] = stats
+        entry["stationary"] = all(stats["stationary"] for stats in entry["engines"].values())
         if len(entry["engines"]) == 2:
             first, second = (entry["engines"][name] for name in sorted(entry["engines"]))
-            comparisons = {}
-            for name in (*OBSERVABLES, "volume_std"):
-                difference = second[name]["mean"] - first[name]["mean"]
-                combined = math.hypot(first[name]["se"], second[name]["se"])
-                comparisons[name] = dict(difference=difference, combined_se=combined,
-                                         sigmas=abs(difference) / combined if combined else math.inf,
-                                         passed=abs(difference) <= sigmas * combined)
+            comparisons = {name: compare(first[name], second[name], sigmas) for name in (*OBSERVABLES, "volume_std")}
+            drift = {"volume_drift": compare(first["volume_drift"], second["volume_drift"], sigmas)}
+            drift.update({f"volume_window_{i + 1}": compare(a, b, sigmas) for i, (a, b) in
+                          enumerate(zip(first["volume_windows"], second["volume_windows"], strict=True))})
             entry["comparison"] = comparisons
-            entry["passed"] = all(item["passed"] for item in comparisons.values())
+            entry["drift_comparison"] = drift
+            # Stationary: the 3-SE rule on the means and the V fluctuation. Not stationary: on the drift and
+            # the windowed V means (the stationary numbers are reported, not judged).
+            judged = comparisons if entry["stationary"] else drift
+            entry["judged_on"] = "stationary means" if entry["stationary"] else "V drift and windowed V means"
+            entry["passed"] = all(item["passed"] for item in judged.values())
         result[f"{temperature:g}K"] = entry
     return result
 
@@ -350,8 +394,10 @@ def command_analyse(args):
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n")
     for temperature, entry in result["temperatures"].items():
-        print(temperature, "passed" if entry.get("passed") else entry.get("error", "failed or one engine only"))
-        for name, item in entry.get("comparison", {}).items():
+        print(temperature, "passed" if entry.get("passed") else entry.get("error", "failed or one engine only"),
+              f"({entry.get('judged_on', 'no comparison')})")
+        judged = entry.get("comparison", {}) if entry.get("stationary") else entry.get("drift_comparison", {})
+        for name, item in judged.items():
             print(f"  {name}: difference {item['difference']:+.4g}, {item['sigmas']:.2f} combined SE")
     return 0 if all(entry.get("passed") for entry in result["temperatures"].values()) else 1
 
