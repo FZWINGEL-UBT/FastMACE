@@ -109,9 +109,9 @@ def test_sinks_are_drained_at_restart_points_in_queue_order(loaded, tmp_path):
     sim.add_sink(lambda step, values: order.append(("sink", step)), 2)
     original_write = sim._write
 
-    def write(step, values, sample, frame):
+    def write(step, values, sample, frame, *rest):  # rest: the MC thermo columns (3-T15)
         order.append(("output", step))
-        original_write(step, values, sample, frame)
+        original_write(step, values, sample, frame, *rest)
 
     sim._write = write
     original_save = sim.save_restart
