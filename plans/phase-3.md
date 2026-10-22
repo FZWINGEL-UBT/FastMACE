@@ -843,9 +843,14 @@ A default change is the owner's decision (checkpoint 2b below). Worker: 3-T03's 
   per-species temperature check on NaCl and Li/Cs under the default: every species at the target, over
   3N − 3.
 - **ResearchModule:** `main.py` already records the plan's decisions in `run.json`
-  (`langevin/fastmace_engine.py`), so its runs are labelled. When 3-T22c merges, the conductor documents
-  the change there (AGENTS.md, `docs/protocol.md`, `docs/configuration.md`). Research results from
-  before carry ASE's projection.
+  (`langevin/fastmace_engine.py`), so its runs are labelled. Research results from before carry ASE's
+  projection. The ResearchModule part goes to 3-T16's session, on branch `fastmace/3-T22c-rm`, and the
+  conductor merges it right after 3-T22c:
+  - a `main.py --fixcm-projection auto|ase|mass_weighted` option. `--engine gpu` and `--engine ase`
+    refuse `mass_weighted`, and engine A/Bs pass `ase`;
+  - `run.json` records the option, and resume keeps it;
+  - CPU tests;
+  - the protocol-change entry in `docs/protocol.md`, plus `docs/configuration.md` and AGENTS.md.
 
 Worker: 3-T03's session. Merge order: after 3-T06b where both edit the same tests.
 
