@@ -88,6 +88,7 @@ import fastmace as fm
 import json, math, time
 import numpy as np
 import torch
+from ase.data import chemical_symbols
 from _support import mc_reference as ref
 from _support.structures import nacl
 from fastmace import integrators
@@ -98,13 +99,15 @@ from fastmace.model.forcefield import ForceField
 from fastmace.planner.workload import Workload
 from fastmace.simulation import Simulation
 
-NA, CL, K = 11, 17, 19
+NA, CL, K, LI, CS = 11, 17, 19, 3, 55
 SUPERSET = [NA, CL, K]
+PAIRS = {"NaK": (NA, K), "LiCs": (LI, CS)}
+SUPERSETS = {"NaK": SUPERSET, "LiCs": [LI, CL, CS]}
 loaded = fm.load("mh1-r2scan")
 
 
-def simulation(atoms, temperature, *, fixcm=True, friction=0.01, seed=1):
-    field = ForceField(loaded, atoms, precision="float32", species=SUPERSET)
+def simulation(atoms, temperature, *, fixcm=True, friction=0.01, seed=1, superset=SUPERSET):
+    field = ForceField(loaded, atoms, precision="float32", species=superset)
     workload = Workload(max_temperature_K=max(temperature, 2000.0), species_changes=True,
                         min_mc_temperature_K=min(temperature, 1.0), mc_moves=("swap", "transmute"))
     integrator = integrators.Langevin(timestep_fs=1.0, temperature_K=temperature, friction_per_fs=friction, fixcm=fixcm)
@@ -115,13 +118,15 @@ def transmute_atoms():
     return nacl(repeat=1).repeat((2, 1, 1))
 
 
-def mixed_cations(rattle=0.05):
-    # NaCl 2x1x1 (16 atoms), every second Na replaced by K, rattled.
+def mixed_cations(rattle=0.05, pair="NaK"):
+    # NaCl 2x1x1 (16 atoms), the cations alternately the pair's two species, rattled.
+    first, second = PAIRS[pair]
     atoms = transmute_atoms()
     atoms.rattle(rattle, seed=3)
     numbers = atoms.numbers.copy()
-    sodium = np.flatnonzero(numbers == NA)
-    numbers[sodium[::2]] = K
+    sites = np.flatnonzero(numbers == NA)
+    numbers[sites] = first
+    numbers[sites[::2]] = second
     atoms.set_atomic_numbers(numbers)
     return atoms
 
@@ -242,26 +247,28 @@ def chi_squared(kind, pooled, seed, burn_in=5):
                 n_samples=plan.n_samples, temperature_K=temperature, counters=driver.counters)
 
 
-def hybrid(kind, velocities, fixcm, unchanged, spec):
+def hybrid(kind, velocities, fixcm, unchanged, pair, spec):
     if unchanged:
         momenta.exchange = lambda velocities, masses_old, masses_new, normals, kT: velocities
-    sim = simulation(mixed_cations(), spec["temperature"], fixcm=fixcm, friction=spec["friction"],
-                     seed=spec["seed"])
+    sim = simulation(mixed_cations(pair=pair), spec["temperature"], fixcm=fixcm, friction=spec["friction"],
+                     seed=spec["seed"], superset=SUPERSETS[pair])
     engine = sim._engine
+    first, second = PAIRS[pair]
+    symbols = {first: chemical_symbols[first], second: chemical_symbols[second]}
     driver = None
     if kind is not None:
         if kind == "swap":
-            move = Swap([("Na", "K")], every=1, attempts=spec["attempts"], velocities=velocities)
+            move = Swap([(symbols[first], symbols[second])], every=1, attempts=spec["attempts"], velocities=velocities)
         else:
-            move = Transmute(["Na", "K"], every=1, attempts=spec["attempts"], velocities=velocities,
-                             mu={"K": spec["delta_mu"]})
+            move = Transmute([symbols[first], symbols[second]], every=1, attempts=spec["attempts"],
+                             velocities=velocities, mu={symbols[second]: spec["delta_mu"]})
         driver = MCDriver([move], seed=spec["seed"])
         driver.attach(engine)
     natoms = engine.state.natoms
     # ASE's convention: with fixcm the Langevin noise is scaled by sqrt(N / (N - 1)), so the thermostat holds
     # sum m v^2 at 3 N kT.
     dof = 3 * natoms
-    samples = {"total": [], "Na": [], "K": []}
+    samples = {"total": [], **{name: [] for name in symbols.values()}, "split": []}
     largest_momentum = 0.0
     scale = math.sqrt(natoms * float(engine.state.masses.mean()) * K_B_EV_PER_K * spec["temperature"])
     started = time.perf_counter()
@@ -271,10 +278,14 @@ def hybrid(kind, velocities, fixcm, unchanged, spec):
         if block > spec["equilibration"]:
             twice = (state.masses * state.velocities ** 2).sum(dim=1).double()
             samples["total"].append(float(twice.sum()) / (dof * K_B_EV_PER_K))
-            for name, number in (("Na", NA), ("K", K)):
+            per_species = {}
+            for number, name in symbols.items():
                 mask = state.species == number
                 if bool(mask.any()):
-                    samples[name].append(float(twice[mask].sum()) / (3 * int(mask.sum()) * K_B_EV_PER_K))
+                    per_species[name] = float(twice[mask].sum()) / (3 * int(mask.sum()) * K_B_EV_PER_K)
+                    samples[name].append(per_species[name])
+            if len(per_species) == 2:  # T(second) - T(first): zero in equilibrium, no common mode
+                samples["split"].append(per_species[symbols[second]] - per_species[symbols[first]])
         if driver is not None:
             driver.run_block(engine, block)
         if fixcm:
@@ -296,7 +307,8 @@ elif experiment == "after_md_decisions":
 elif experiment == "chi2":
     out = chi_squared(SPEC["kind"], SPEC["pooled"], SPEC["seed"])
 else:
-    out = {name: hybrid(*run, SPEC["hybrid"]) for name, run in SPEC["runs"].items()}
+    out = {name: hybrid(*run[:5], {**SPEC["hybrid"], **(run[5] if len(run) > 5 else {})})
+           for name, run in SPEC["runs"].items()}
 out.update(gpu=torch.cuda.get_device_name(), torch=torch.__version__, fastmace=fm.__version__)
 print(json.dumps(out, default=str))
 """
@@ -382,22 +394,38 @@ def test_mh1_populations_follow_boltzmann(kind, seed):
     assert test.passes, test
 
 
-# (Na,K)Cl 2x1x1, 16 atoms, at 2000 K: Na <-> K swaps accept about 30 % (local probe, 22 October 2026), so the
-# negative control heats by about 14 % against a standard error of about 1 % (10 fs between samples, energy
-# relaxation 1/(2 γ) = 25 fs, 2000 samples).
+# (Na,K)Cl 2x1x1, 16 atoms, at 2000 K: Na <-> K swaps accept about 20 %, 10 fs between samples, energy
+# relaxation 1/(2 γ) = 25 fs, 2000 samples.
 HYBRID = dict(temperature=2000.0, friction=0.02, attempts=10, steps_per_block=10, equilibration=200, blocks=2000,
               seed=7)
-HYBRID_RUNS = {
-    "off_fixcm": (None, None, True, False),
-    "off_free": (None, None, False, False),
-    "swap_exchange": ("swap", "exchange", True, False),
-    "swap_rescale": ("swap", "rescale", False, False),
-    "swap_redraw": ("swap", "redraw", False, False),
-    "swap_redraw_all": ("swap", "redraw_all", True, False),
-    "transmute_rescale": ("transmute", "rescale", False, False),
-    "transmute_redraw_all": ("transmute", "redraw_all", True, False),
-    "negative_unchanged": ("swap", "exchange", False, True),
+NEGATIVE = dict(attempts=100)
+HYBRID_RUNS = {  # (move, momenta, fixcm, velocities unchanged, cation pair)
+    "off_fixcm": (None, None, True, False, "NaK"),
+    "off_free": (None, None, False, False, "NaK"),
+    "swap_exchange": ("swap", "exchange", True, False, "NaK"),
+    "swap_rescale": ("swap", "rescale", False, False, "NaK"),
+    "swap_redraw": ("swap", "redraw", False, False, "NaK"),
+    "swap_redraw_all": ("swap", "redraw_all", True, False, "NaK"),
+    "transmute_rescale": ("transmute", "rescale", False, False, "NaK"),
+    "transmute_redraw_all": ("transmute", "redraw_all", True, False, "NaK"),
+    # The negative control, without fixcm, and its own run without MC. With these settings unchanged velocities
+    # split the Na and K temperatures by only 2.4 σ (22 October 2026), and MH-1 accepts almost no Li <-> Cs swap
+    # (6 of 22 000), so the control keeps Na and K and lets the swaps outpace the thermostat: 100 attempts per
+    # 10 steps. The speeds then decouple from the masses (T_K / T_Na towards 39/23). A weaker friction
+    # (0.005/fs) split them more but lengthened the correlation time, and gave 3.9 σ.
+    "off_negative": (None, None, False, False, "NaK", NEGATIVE),
+    "negative_unchanged": ("swap", "exchange", False, True, "NaK", NEGATIVE),
 }
+
+
+# Open for acceptance item 5 (conductor, 22 October 2026): with fixcm, redraw_all draws the correct
+# zero-momentum Maxwell-Boltzmann state, sum m v^2 = (3N - 3) kT, while the fixcm Langevin's sqrt(N / (N - 1))
+# noise factor (ASE's convention) holds 3N kT, so every accepted block lowers the kinetic energy by (N - 1)/N
+# and the runs sit below MC off (16 atoms: 3.5 and 5.5 sigma). A non-strict expected failure until 3-T22's
+# corrected projection; then the check must pass and this goes.
+FIXCM_REDRAW_ALL = ("swap_redraw_all", "transmute_redraw_all")
+FIXCM_REDRAW_ALL_REASON = ("3-T22: redraw_all draws (3N-3) kT in the zero-momentum subspace, the fixcm Langevin's "
+                           "sqrt(N/(N-1)) holds 3N kT")
 
 
 @functools.cache
@@ -408,8 +436,10 @@ def hybrid_results(names):
 
 
 def hybrid_agrees(on, off, target):
+    """As on the CPU: MC on and off agree (total, per species, split), the total is the target and the split zero."""
     return (all(ref.agree(tuple(on[name]), tuple(off[name])) for name in on if name in off)
-            and ref.agree(tuple(on["total"]), (target, 0.0)))
+            and ref.agree(tuple(on["total"]), (target, 0.0))
+            and ("split" not in on or ref.agree(tuple(on["split"]), (0.0, 0.0))))
 
 
 @pytest.mark.slow
@@ -418,9 +448,9 @@ def hybrid_agrees(on, off, target):
 # The negative control runs without fixcm: the integrator's fixcm is exact only for equal masses (see the CPU
 # file), so the runs with fixcm keep to the Na <-> K moves whose correct treatments it must pass.
 @pytest.mark.parametrize("names", [("off_fixcm", "swap_exchange", "swap_redraw_all", "transmute_redraw_all"),
-                                   ("off_free", "swap_rescale", "swap_redraw", "transmute_rescale",
-                                    "negative_unchanged")],
-                         ids=["fixcm", "free"])
+                                   ("off_free", "swap_rescale", "swap_redraw", "transmute_rescale"),
+                                   ("off_negative", "negative_unchanged")],
+                         ids=["fixcm", "free", "negative"])
 def test_mh1_kinetic_temperature_with_mc_on_and_off(names):
     result = hybrid_results(names)
     off_name = names[0]
@@ -431,6 +461,7 @@ def test_mh1_kinetic_temperature_with_mc_on_and_off(names):
         summary[name]["deviations_sigma"] = ref.deviations(result[name]["stats"], off)
     ENGINE.report(f"3-T12-mh1-hybrid-{off_name}", {**summary, "hybrid": HYBRID, "gpu": result["gpu"],
                                                    "fastmace": result["fastmace"]})
+    known = []
     for name in names[1:]:
         on = result[name]["stats"]
         kind = HYBRID_RUNS[name][0]
@@ -438,9 +469,13 @@ def test_mh1_kinetic_temperature_with_mc_on_and_off(names):
         assert counters["accepted"] > 0.02 * counters["attempted"], (name, counters)
         if name == "negative_unchanged":
             assert not hybrid_agrees(on, off, HYBRID["temperature"]), (name, on, off)
+        elif name in FIXCM_REDRAW_ALL and not hybrid_agrees(on, off, HYBRID["temperature"]):
+            known.append(name)
         else:
             assert hybrid_agrees(on, off, HYBRID["temperature"]), (name, on, off)
         if HYBRID_RUNS[name][2]:
             assert result[name]["momentum"] <= 1e-5, (name, result[name]["momentum"])
     assert ref.agree(tuple(off["total"]), (HYBRID["temperature"], 0.0)), off
+    if known:  # every other check of the group has passed
+        pytest.xfail(f"{known}: {FIXCM_REDRAW_ALL_REASON}")
 

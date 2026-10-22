@@ -449,17 +449,24 @@ def hybrid_run(loaded, pair, move, fixcm, *, seed=7):
     # thermostat holds sum m v^2 at 3 N kT, the kinetic temperature over 3 N degrees of freedom.
     dof = 3 * natoms
     names = {number: chemical_symbols[number] for number in PAIRS[pair]}
-    samples = {"total": [], **{name: [] for name in names.values()}}
+    split = tuple(names.values())
+    samples = {"total": [], **{name: [] for name in names.values()}, "split": []}
     for block in range(1, HYBRID_EQUILIBRATION_BLOCKS + HYBRID_BLOCKS + 1):
         sim.run(steps=HYBRID_STEPS_PER_BLOCK)
         if block > HYBRID_EQUILIBRATION_BLOCKS:
             state = engine.state
             twice_kinetic = (state.masses * state.velocities ** 2).sum(dim=1)
             samples["total"].append(float(twice_kinetic.sum()) / (dof * K_B_EV_PER_K))
+            per_species = {}
             for number, name in names.items():
                 mask = state.species == number
                 if bool(mask.any()):  # a transmutation may empty a species for a while
-                    samples[name].append(float(twice_kinetic[mask].sum()) / (3 * int(mask.sum()) * K_B_EV_PER_K))
+                    per_species[name] = float(twice_kinetic[mask].sum()) / (3 * int(mask.sum()) * K_B_EV_PER_K)
+                    samples[name].append(per_species[name])
+            if len(per_species) == 2:
+                # The split T(second) - T(first): zero in equilibrium whatever the masses, without the run's
+                # common-mode temperature fluctuation.
+                samples["split"].append(per_species[split[1]] - per_species[split[0]])
         if driver is not None:
             driver.run_block(engine, block)
     # A species present in fewer than half the samples has no per-species temperature to compare.
@@ -486,9 +493,11 @@ def hybrid_move(kind, velocities, pair, delta_mu):
 
 
 def hybrid_agrees(on, off):
-    """MC on and off agree in total and per-species kinetic temperature, and the total is the target."""
+    """MC on and off agree in the total and per-species kinetic temperatures and their split; the total is the
+    target and the split is zero (equipartition: every species at the same temperature)."""
     return (all(ref.agree(on[name], off[name]) for name in on if name in off)
-            and ref.agree(on["total"], (HYBRID_TEMPERATURE_K, 0.0)))
+            and ref.agree(on["total"], (HYBRID_TEMPERATURE_K, 0.0))
+            and ("split" not in on or ref.agree(on["split"], (0.0, 0.0))))
 
 
 @pytest.mark.slow
