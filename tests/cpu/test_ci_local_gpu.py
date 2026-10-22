@@ -80,6 +80,10 @@ def test_process_table(proc):
     (["python3", "tools/test_budget.py", "junit.xml"], False),
     # a queued reservation wrapper whose command is pytest is not a running pytest (round-2 deadlock)
     (["python3", "/x/tools/ci/local_gpu.py", "run", "--purpose", "p", "--", "python", "-m", "pytest", "t"], False),
+    # ... also behind a prefix such as timeout or env (phase 3 deadlock)
+    (["timeout", "900", "python3", "tools/ci/local_gpu.py", "run", "--", "env", "A=1", "python", "-m", "pytest"],
+     False),
+    (["/home/u/env/bin/python", "-m", "pytest", "tests/cpu/test_ci_local_gpu.py"], True),
 ])
 def test_pytest_processes(proc, argv, is_pytest):
     proc.add(20, argv)

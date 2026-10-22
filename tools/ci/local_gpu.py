@@ -110,8 +110,10 @@ def _is_pytest(argv):
     if not argv:
         return False
     # A queued ``local_gpu.py run -- python -m pytest ...`` wrapper is not a running pytest: counting it
-    # made the holder wait for every queued reservation (deadlock, round 2, 21 October 2026).
-    if any(Path(arg).name == "local_gpu.py" for arg in argv[:2]):
+    # made the holder wait for every queued reservation (deadlock, round 2, 21 October 2026). Prefixes such
+    # as ``timeout 900 python3 local_gpu.py ...`` or ``env ... python3 local_gpu.py ...`` are wrappers too
+    # (phase 3, 22 October 2026: 3-T04's holder waited for 3-T03's ``timeout`` wrapper).
+    if any(Path(arg).name == "local_gpu.py" for arg in argv):
         return False
     if Path(argv[0]).name == "pytest":
         return True
