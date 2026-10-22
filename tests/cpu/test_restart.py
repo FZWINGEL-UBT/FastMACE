@@ -1,4 +1,4 @@
-"""The complete state and the restart format version 2 (plan task 1b-T05; SPEC §10.6, §9.5).
+"""The complete state and the restart format (versions 2 and 3; plan tasks 1b-T05, 3-T08; SPEC §10.6, §9.5).
 
 Format tests on a real ``SimulationState`` with a real integrator's noise layout and barostat state;
 no force field is needed (the committed force results are filled with numbers). The integrator
@@ -105,11 +105,11 @@ def write_full(path, state, integrator):
 # -------------------------------------------------------------------------- SimulationState
 
 def test_the_1b_fields_are_in_the_state():
-    """1b-T05 empties FIELDS_ADDED_IN_1B except the MC state of phase 3."""
-    assert set(FIELDS_ADDED_IN_1B) == {"mc"}
+    """1b-T05 emptied FIELDS_ADDED_IN_1B except the MC state, which 3-T08 adds as ``SimulationState.mc``."""
+    assert FIELDS_ADDED_IN_1B == {}
     fields = {field.name for field in dataclasses.fields(SimulationState)}
     assert {"charges", "total_charge", "spin_multiplicity", "pbc", "constraints", "p_eps", "force_eps",
-            "protocol", "plan_revision", "force_field_identity"} <= fields
+            "protocol", "plan_revision", "force_field_identity", "mc"} <= fields
     atoms = nacl(repeat=1)
     atoms.pbc = (True, True, False)
     state = SimulationState.from_atoms(atoms, "cpu", 0)
@@ -117,7 +117,7 @@ def test_the_1b_fields_are_in_the_state():
     assert state.constraints == () and state.plan_revision == 0
     assert state.charges is None and state.total_charge is None and state.spin_multiplicity is None
     assert state.p_eps is None and state.force_eps is None
-    assert state.protocol is None and state.force_field_identity is None
+    assert state.protocol is None and state.force_field_identity is None and state.mc is None
 
 
 def test_baoab_keeps_the_barostat_in_the_state():
@@ -245,8 +245,8 @@ def test_every_spec_item_is_in_the_file(tmp_path):
     for item, keys in IDENTITY_ITEMS.items():
         for key in (keys,) if isinstance(keys, str) else keys:
             assert key in record, item
-    assert int(stored["fastmace_restart"]) == restart_io.FORMAT_VERSION == 2
-    assert "mc" not in stored  # phase 3
+    assert int(stored["fastmace_restart"]) == restart_io.FORMAT_VERSION == 3
+    assert "mc" not in stored  # only with an attached move set (test_restart_v3.py)
 
 
 # -------------------------------------------------------------------------- round trips
@@ -301,7 +301,7 @@ def test_records_are_read_back(tmp_path):
     path = tmp_path / restart_io.RESTART_NAME
     write_full(path, state, integrator)
     stored = restart_io.read_restart(path)
-    assert restart_io.format_version(stored) == 2
+    assert restart_io.format_version(stored) == 3
     assert restart_io.stored_identity(stored) == identity()
     assert restart_io.plan_record(stored) == plan_record()
     assert restart_io.protocol_record(stored) == state.protocol.to_restart()
@@ -365,8 +365,8 @@ def test_a_newer_format_is_refused(tmp_path):
     path = tmp_path / restart_io.RESTART_NAME
     write_full(path, state, integrator)
     stored = dict(restart_io.read_restart(path))
-    stored["fastmace_restart"] = np.asarray(3)
-    with pytest.raises(ValueError, match="format version 3"):
+    stored["fastmace_restart"] = np.asarray(4)
+    with pytest.raises(ValueError, match="format version 4"):
         restart_io.load_state(stored, *make_state(steps=1))
 
 
@@ -397,13 +397,13 @@ def test_check_identity(tmp_path):
         restart_io.check_identity(stored, identity(head="omol", species=(11, 17, 35)))
 
 
-def test_main_py_files_are_version_2_without_identity(tmp_path):
+def test_main_py_files_have_no_identity(tmp_path):
     """main.py's adapter writes state_arrays without identity or plan; Simulation.resume refuses them."""
     state, integrator = make_state()
     state.force_field_identity = None
     state.protocol = None
     arrays = restart_io.state_arrays(state, "fastmace", integrator.state_dict(), variable_cell=True)
-    assert int(arrays["fastmace_restart"]) == 2
+    assert int(arrays["fastmace_restart"]) == restart_io.FORMAT_VERSION
     assert not {"identity", "identity_digest", "plan", "protocol", "output_chunk"} & set(arrays)
     for key in ("p_eps", "force_eps", "cell_state", "stress", "noise", "noise_next", "rng_state"):
         assert key in arrays, key  # research-engine keys, as main.py's adapter returns them

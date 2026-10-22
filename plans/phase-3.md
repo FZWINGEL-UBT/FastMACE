@@ -3,8 +3,8 @@
 Status: **in progress**, 22 October 2026. The owner accepted the
 recommendations for D1–D6 the same day ("Accept the recommendations for
 D1-D6 and prestart all phase 3 workers"). They are SPEC §18 decisions 31–36,
-and all workers were prestarted. 3-T01 is merged (main 8dfd9f0). The
-binding answers to the prestart reports are in "Conductor answers to the
+and all workers were prestarted. Merged so far: 3-T01 (8dfd9f0), 3-T08
+(d73e8b7) and 3-T02 (344d221). The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
 - §8.1: overflow before commit, the re-capture policy, the energy-only graph;
@@ -171,9 +171,20 @@ These are phase 2's principles, unchanged where they still apply:
     available;
   - workers run only targeted test files at `-n 2`, niced; full suites are
     the conductor's (trial merges);
-  - the GPU goes through `tools/ci/local_gpu.py` reservations of at most
-    15 minutes (the queue deadlock is fixed in a780878);
-  - launch detached (`setsid -f`).
+  - CPU pytest runs with `CUDA_VISIBLE_DEVICES=` after
+    `local_gpu.py check --cpu-only --min-available-gib 6`, so it doesn't
+    hold up GPU reservations (fc1af61);
+  - the GPU goes through the worktree's own `tools/ci/local_gpu.py`
+    (synced with main), in reservations of at most 15 minutes. The queue
+    deadlocks are fixed in a780878 and b6a45f6;
+  - **workers launch GPU jobs as a background task of their own session,
+    never with `setsid` or `nohup`.** On 22 October 2026 the permission
+    checks of 3-T02 and 3-T06 refused detached launches ("Interfere With
+    Workloads"), and then any retry ("Auto-Mode Bypass"). A refused launch
+    is never retried in another form or run from another session; it waits
+    for the owner;
+  - `--quiet` (a quiet machine for timing) is for timing slots the conductor
+    schedules, not for workers.
 - **Workstations:**
   - none from Thursday 22 October 2026 evening until the owner says they're
     back (power outage on Friday 23 October);

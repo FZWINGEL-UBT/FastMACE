@@ -1360,7 +1360,7 @@ def _reduced_outputs(references: References, engine, stress: bool):
             loaded, copies[0].atoms, rewrites=engine.force_field.resolution,
             engine=dataclasses.replace(plan.engine, compile_mode="none"), neighbours=plan.neighbours,
             polar=plan.polar or PolarConfig(), compute_stress=stress, check=False,
-            float64_energy=plan.precision.float64_energy)
+            float64_energy=plan.precision.float64_energy, species=getattr(engine.force_field, "superset", None))
         return [reduced.evaluate(copy.atoms, stress=stress) for copy in copies]
     finally:
         del reduced, loaded

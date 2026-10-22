@@ -329,6 +329,20 @@ def test_transaction_stub():
     _raises_naming("3-T03", lambda: Transaction(None, [Event("masses", values=(1.0,))]))
 
 
+def test_force_field_superset_contract():  # §8.5 species superset (3-T02)
+    from fastmace.model.forces import MACEForceField
+    from fastmace.rewrites import registry as reg
+
+    assert "species" in _keyword_only(MACEForceField)
+    assert _parameters(MACEForceField.check_species) == ["self", "numbers"]
+    assert _parameters(MACEForceField.register_derived) == ["self", "registry", "state", "prefix"]
+    assert _parameters(MACEForceField.use_sources) == ["self", "species", "charges"]
+    assert _parameters(MACEForceField.set_total_charge) == ["self", "total_charge"]
+    assert _parameters(MACEForceField.derived_buffers) == ["self"]
+    assert _parameters(reg.structure_inputs) == ["batch", "species_columns"]
+    assert reg.JOINT_FEATURES == ("total_charge", "total_spin")
+
+
 # --------------------------------------------------------------------------- Simulation mutation API
 
 
@@ -399,11 +413,11 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     pytest.importorskip("torch")
     from fastmace.io import restart
 
-    assert restart.FORMAT_VERSION == 2  # 3-T08 switches the writer to NEXT_FORMAT_VERSION
+    assert restart.FORMAT_VERSION == 3  # 3-T08 switched the writer to NEXT_FORMAT_VERSION
     assert restart.NEXT_FORMAT_VERSION == 3
     assert restart.V3_KEYS == ("mc",)
     assert restart.COMPOSITION_KEYS == ("species", "masses", "charges", "physical")
     assert restart.MC_RECORD_KEYS == ("moves", "cycle_position", "counters", "streams", "delta_A")
     assert restart.MC_COUNTER_KEYS == ("attempted", "impossible", "accepted")
     assert restart.MC_STREAM_KEYS == ("seed", "offset")
-    _raises_naming("3-T08", lambda: restart.mc_record({}))
+    assert restart.mc_record({}) is None  # 3-T08: no move set attached

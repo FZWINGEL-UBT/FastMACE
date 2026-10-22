@@ -307,13 +307,14 @@ class MinimalPlanner:
             book.refuse(f"species {_symbols(missing)} of the structure are not in the ForceField's declared superset "
                         f"({_symbols(superset)}) (SPEC §8.5, §9.3 rule 2)", "species-not-in-superset", 2)
         extra = sorted(set(superset) - set(structure))
-        if extra:
-            book.refuse(f"species superset beyond the structure ({_symbols(extra)} absent): phase 3 (§8.5); in 1b "
-                        "species= equals the structure's species (owner decision D3)", "superset-beyond-structure",
-                        8)
-        book.decide("superset", _symbols(superset), Reason(
-            "the structure's species" if species is None else "declared (species=), equal to the structure's",
-            code="superset"))
+        if extra:  # rule 8: graph mode stays; species-dependent rewrites are built for the superset (3-T02)
+            why = Reason(f"declared (species=), beyond the structure ({_symbols(extra)} absent): graph mode, "
+                         "species-dependent rewrites and tables built for the superset (SPEC §8.5, §9.3 rule 8)",
+                         rule=8, code="superset")
+        else:
+            why = Reason("the structure's species" if species is None else "declared (species=), equal to the "
+                         "structure's", code="superset")
+        book.decide("superset", _symbols(superset), why)
         effective, promoted = versions.effective_precision(precision, polar_model=traits.polar,
                                                            float64_energy=self.precision.float64_energy)
         book.decide("force_precision", effective, promoted or "the ForceField's precision (SPEC §7.1, §9.2)")
@@ -775,7 +776,8 @@ class MinimalPlanner:
         resolution = inner.rewrite_resolution(plan, model.model, registry)
         return MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,
                               polar=plan.polar or PolarConfig(), compute_stress=True, compile_cache=compile_cache,
-                              registry=registry, check=check, float64_energy=plan.precision.float64_energy)
+                              registry=registry, check=check, float64_energy=plan.precision.float64_energy,
+                              species=plan.superset or None)
 
 
 __all__ = ("MODES", "MinimalPlanner", "SoftwareTraits", "default_planner", "detect_software", "species_numbers")

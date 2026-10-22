@@ -76,12 +76,14 @@ def _prepare(interaction, kind):
 
 
 def _columns(context, name):
-    import torch
+    """The superset's node_attrs columns (``Context.inputs["species_columns"]``, SPEC §8.5), else the
+    columns of the species in the structure's one-hot node attributes."""
+    from fastmace.rewrites.mh1 import superset_columns
 
     node_attrs = context.inputs.get(NODE_ATTRS)
     if node_attrs is None:
         raise ValueError(f"{name} needs the structure's one-hot node attributes in Context.inputs[{NODE_ATTRS!r}]")
-    return torch.nonzero(node_attrs.sum(dim=0) > 0).flatten()
+    return superset_columns(node_attrs, context.inputs.get("species_columns"))
 
 
 def _device(module):
@@ -118,6 +120,7 @@ def apply_species_skip(model, context):
 
 def apply_reassociate(model, context):
     """Reassociate the first interaction if it is generic and its inputs are species-only; returns the names."""
+    from fastmace.rewrites.mh1 import species_table
     from fastmace.rewrites.mh1.modules import FirstInteractionReassociation, probe_first_tensor_product
 
     columns = _columns(context, "generic_reassociate")
@@ -130,8 +133,10 @@ def apply_reassociate(model, context):
     _prepare(interaction, kind)
     interaction.radial_hidden, interaction.radial_last = gm.fc_split(interaction.conv_tp_weights)
     channels, ls, gammas, ir_mul = probe_first_tensor_product(interaction)
+    table = species_table(model, interaction, columns, len(context.inputs[NODE_ATTRS]),
+                          context.inputs.get("joint_features"))
     interaction.first_reassociation = FirstInteractionReassociation(
-        columns.to(_device(interaction)), channels, ls, gammas, ir_mul)
+        columns.to(_device(interaction)), channels, ls, gammas, ir_mul, species_feats=table)
     return ["interactions.0"]
 
 
@@ -256,11 +261,19 @@ def _probe_inputs(module, columns, generator, species_only):
 def _run(module, probe, with_cutoff, cotangents, generator):
     import torch
 
+    reassociation = getattr(module, "first_reassociation", None)
+    own = None if reassociation is None else reassociation.species_feats
     with torch.enable_grad():
         feats = probe["node_attrs"] @ probe["table"] if probe["table"] is not None else probe["node_feats"]
         cutoff = probe["cutoff"] if with_cutoff else None
-        outputs = [out for out in module(probe["node_attrs"], feats, probe["edge_attrs"], probe["edge_feats"],
-                                         probe["edge_index"], cutoff=cutoff) if out is not None]
+        if reassociation is not None:  # the probe's species table in place of the structure's (this check only)
+            reassociation.bind(module.linear_up(probe["table"][reassociation.columns]))
+        try:
+            outputs = [out for out in module(probe["node_attrs"], feats, probe["edge_attrs"], probe["edge_feats"],
+                                             probe["edge_index"], cutoff=cutoff) if out is not None]
+        finally:
+            if reassociation is not None:
+                reassociation.bind(own)
         if not cotangents:
             cotangents.extend(torch.randn(out.shape, generator=generator, dtype=torch.float64).to(out)
                               for out in outputs)
@@ -284,7 +297,7 @@ def _check_interactions(original, rewritten, context, selected):
         name = f"interactions.{index}"
         reference = original.get_submodule(name)
         if node_attrs is not None:
-            columns = torch.nonzero(node_attrs.sum(dim=0) > 0).flatten()
+            columns = _columns(context, name)
         else:
             from e3nn import o3
             columns = torch.arange(o3.Irreps(str(interaction.node_attrs_irreps)).dim)
