@@ -215,17 +215,21 @@ class _Constant(d3.DispersionTerm):
                                    forces=torch.zeros_like(positions),
                                    virial=torch.zeros(3, 3, dtype=torch.float64) if virial else None)
 
+    def evaluate_energy(self, positions, cell):
+        return torch.tensor(-1.0, dtype=torch.float64)
+
 
 def test_dispersion_term_is_abstract():
     with pytest.raises(TypeError):
         d3.DispersionTerm(D3(functional="r2scan"), torch.tensor([11, 17]))
+    assert d3.DispersionTerm.__abstractmethods__ == {"_build", "needs_rebuild", "evaluate", "evaluate_energy"}
 
 
 def test_dispersion_term_counts_builds():
     numbers = torch.tensor([11, 17])
     term = _Constant(D3(functional="r2scan"), numbers)
     assert term.record == D3(functional="r2scan") and term.numbers is numbers
-    assert term.counters() == {"builds": 0, "rebuilds": 0, "build_seconds": 0.0}
+    assert term.counters() == {"builds": 0, "rebuilds": 0, "regrowths": 0, "build_seconds": 0.0}
     positions, cell = torch.zeros(2, 3, dtype=torch.float64), torch.eye(3, dtype=torch.float64) * 5
     step = torch.tensor([1.0, 0.0, 0.0], dtype=torch.float64)
     assert term.build(positions, cell) is True
@@ -233,10 +237,12 @@ def test_dispersion_term_counts_builds():
     assert bool(term.needs_rebuild(positions + 0.6 * step, cell))
     assert term.build(positions + 0.6 * step, cell) is False
     counters = term.counters()
-    assert (counters["builds"], counters["rebuilds"]) == (2, 1) and counters["build_seconds"] >= 0.0
+    assert (counters["builds"], counters["rebuilds"], counters["regrowths"]) == (2, 1, 1)
+    assert counters["build_seconds"] >= 0.0
     result = term.evaluate(positions, cell)
     assert result.energy.dtype == torch.float64 and result.forces.shape == (2, 3) and result.virial.shape == (3, 3)
     assert term.evaluate(positions, cell, virial=False).virial is None
+    assert term.evaluate_energy(positions, cell).dtype == torch.float64
     term.species_changed()  # the default has no per-species tables to refresh
 
 

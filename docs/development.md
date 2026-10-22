@@ -20,6 +20,14 @@ python3.10 -m venv ~/environments/fastmace_cpu
 ~/environments/fastmace_cpu/bin/python -m pip freeze > ~/environments/fastmace_cpu.requirements.txt
 ```
 
+The D3 cross-check tests (`tests/cpu/test_d3_references.py`) need the
+`d3-reference` extra and are skipped without it; `fastmace_cpu` has it since
+22 October 2026 (3b-T01):
+
+```bash
+~/environments/fastmace_cpu/bin/python -m pip install -e "/mnt/d/Margraf/FastMACE[dev,d3-reference]"
+```
+
 Torch comes from the PyTorch CPU index first, so the editable install keeps
 it and does not pull a CUDA build from PyPI. The installed versions are
 listed in `~/environments/fastmace_cpu.requirements.txt`.

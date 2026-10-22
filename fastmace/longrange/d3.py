@@ -203,17 +203,21 @@ class DispersionTerm(abc.ABC):
     (the owner then calls ``species_changed``). Positions and cells are float64 device tensors in Å.
 
     - ``build(positions, cell)``: (re)build the pair list around ``positions`` and ``cell``. Host
-      side: it may synchronise and grow buffers. True when buffer addresses changed, so captured
-      graphs must be captured again. ``counters()`` counts and times it;
-    - ``needs_rebuild(positions, cell)``: a device bool tensor, capturable (no host synchronisation,
-      no data-dependent shapes): has an atom moved or the cell strained beyond what the list's skin
-      covers since the last build;
+      side: it may synchronise and grow buffers. True when the capacity grew or buffer addresses
+      otherwise changed, so the engine must capture its graphs again (counted as ``regrowths``).
+      ``counters()`` counts and times it;
+    - ``needs_rebuild(positions, cell)``: a device bool tensor with no host synchronisation and no
+      data-dependent shapes, so it is capturable and can be OR-ed into the fused stage's rebuild
+      flag like the MACE list's: has an atom moved or the cell strained beyond what the list's
+      skin covers since the last build;
     - ``evaluate(positions, cell, *, virial=True)``: a ``DispersionResult``; capturable in the GPU
       implementations (masks with ``where``, fixed shapes);
+    - ``evaluate_energy(positions, cell)``: the energy alone, a 0-d float64 tensor, with no force or
+      virial writes (MC energy evaluations); capturable likewise;
     - ``species_changed()``: refresh per-species derived state (C6 tables, radii) after ``numbers``
       changed in place (conductor's choice 5).
 
-    Subclasses implement ``_build``, ``needs_rebuild`` and ``evaluate``.
+    Subclasses implement ``_build``, ``needs_rebuild``, ``evaluate`` and ``evaluate_energy``.
     """
 
     def __init__(self, record: D3, numbers):
@@ -222,6 +226,7 @@ class DispersionTerm(abc.ABC):
         self.record = record
         self.numbers = numbers
         self.builds = 0
+        self.regrowths = 0
         self.build_seconds = 0.0
 
     @property
@@ -230,16 +235,22 @@ class DispersionTerm(abc.ABC):
         return max(self.builds - 1, 0)
 
     def build(self, positions, cell) -> bool:
-        """Build the list (class docstring); counts the build and its host wall time."""
+        """Build the list (class docstring); counts the build, a regrowth and its host wall time.
+
+        True when buffer addresses changed (the capacity grew): captured graphs must be captured again.
+        """
         start = time.perf_counter()
         moved = bool(self._build(positions, cell))
         self.build_seconds += time.perf_counter() - start
         self.builds += 1
+        self.regrowths += moved
         return moved
 
     def counters(self) -> dict:
-        """The runtime counters (§9.6, §13): ``builds``, ``rebuilds`` and ``build_seconds``."""
-        return {"builds": self.builds, "rebuilds": self.rebuilds, "build_seconds": self.build_seconds}
+        """The runtime counters (§9.6, §13): ``builds``, ``rebuilds``, ``regrowths`` (builds that moved
+        buffers, the first included) and ``build_seconds``."""
+        return {"builds": self.builds, "rebuilds": self.rebuilds, "regrowths": self.regrowths,
+                "build_seconds": self.build_seconds}
 
     def species_changed(self) -> None:
         """Refresh per-species derived state after ``numbers`` changed in place; none by default."""
@@ -255,3 +266,7 @@ class DispersionTerm(abc.ABC):
     @abc.abstractmethod
     def evaluate(self, positions, cell, *, virial: bool = True) -> DispersionResult:
         """Energy, forces and, if asked for, the virial of the D3 term."""
+
+    @abc.abstractmethod
+    def evaluate_energy(self, positions, cell):
+        """The energy alone (0-d float64, eV), with no force or virial writes. Capturable."""

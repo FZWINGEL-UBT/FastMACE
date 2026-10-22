@@ -46,6 +46,8 @@ oeq = ["openequivariance>=0.7"]
 # graph-longrange is pinned per MACE version; MACE 0.3.16 calls the 0.4.0 interface.
 polar = ["graph-longrange==0.4.0"]
 d3 = ["torch-dftd==0.5.1"]
+# The D3 references of the cross-check tests (3b-T01): torch-dftd and simple-dftd3; not in [full].
+d3-reference = ["torch-dftd==0.5.1", "dftd3==1.6.0"]
 # Union of [oeq], [polar] and [d3]; no packages of its own (SPEC §14).
 full = [
     "openequivariance>=0.7",
