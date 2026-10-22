@@ -1,7 +1,7 @@
 """3-T14: O <-> Cl swap statistics of a protocol run, per 100 K target bin and ramp.
 
     python results/3-T14-protocol/swap_statistics.py RUN_DIR OUT.json [--frames-per-bin 4]
-        [--swaps-per-frame 50] [--seed 1] [--bin-K 100] [--min-K 250]
+        [--swaps-per-frame 50] [--seed 1] [--bin-K 100] [--min-K 250] [--no-energies]
 
 - **Acceptance** from the thermo file's cumulative ``mc_swap_attempted`` / ``mc_swap_accepted``
   columns: the attempts and acceptances between consecutive rows, by the row's target and phase.
@@ -88,6 +88,7 @@ def main(argv=None):
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--bin-K", type=float, default=100.0)
     parser.add_argument("--min-K", type=float, default=250.0)
+    parser.add_argument("--no-energies", action="store_true", help="acceptance only: no model, no GPU")
     args = parser.parse_args(argv)
     run = Path(args.run)
     simulation = json.loads((run / "simulation.json").read_text(encoding="utf-8"))
@@ -113,14 +114,14 @@ def main(argv=None):
     chosen = {}
     for name, entry in bins.items():
         frames = entry["frames"]
-        count = min(args.frames_per_bin, len(frames))
+        count = 0 if args.no_energies else min(args.frames_per_bin, len(frames))
         picks = [frames[round((j + 0.5) * len(frames) / count - 0.5)] for j in range(count)] if count else []
         entry["picked"] = picks
         for row in picks:
             chosen[row["step"] // frame_every] = row
-    atoms_at, _ = read_frames_at(run, sorted(chosen))
+    atoms_at = read_frames_at(run, sorted(chosen))[0] if chosen else {}
     model = simulation["model"]
-    calculator = calc(model["label"], head=model["head"], sha256=model["sha256"])
+    calculator = None if args.no_energies else calc(model["label"], head=model["head"], sha256=model["sha256"])
     rng = np.random.default_rng(args.seed)
 
     report = {"run": str(run), "frames_per_bin": args.frames_per_bin, "swaps_per_frame": args.swaps_per_frame,
