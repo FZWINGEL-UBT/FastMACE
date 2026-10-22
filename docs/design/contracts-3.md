@@ -310,6 +310,25 @@ Since 3-T08 the writer is at `FORMAT_VERSION = NEXT_FORMAT_VERSION = 3`. Version
 - **`mc_record(restart)`**: stub, T08.
 - **Restart writes** happen only at committed steps: never inside an MC block, never from an overflowed step.
 
+## Protocol runs (`fastmace/protocols/`; owner T14)
+
+Added by 3-T14 under the conductor's answers (`plans/phase-3.md`, "3-T14 swap-MC annealing protocol").
+
+| Name | Signature | Meaning |
+| --- | --- | --- |
+| `protocols.quench.relax` | `relax(atoms, calc, fmax, max_steps=5000, logfile=None, optimizer="LBFGS") -> (Atoms, summary)` | ASE LBFGS or BFGS at fixed cell (`langevin/quench.py:relax`) |
+| `protocols.quench.select_frames` | `select_frames(frames, min_K, bin_K, per_bin, peak_K)` | the research function, unchanged |
+| `protocols.quench.picks` | `picks(resolved, frame_every, settings)` | `select_frames` over a run's frames (step 0, every `frame_every`), then the final frame |
+| `protocols.quench.quench_run` | `quench_run(directory, calc, resolved, frame_every, timestep_fs, settings, *, log=print) -> summary` | `<run>/quench/`: `captured.traj`, `quenched.traj`, `quench.csv` (per frame; an interrupted quench continues), `quench.json` (last) |
+| `protocols.runner.start` | `start(structure, options, *, relax=None, quench=None, steps=None, source=None, log=print) -> record` | relaxation, then `fm.md` for at most `steps` steps, a restart, and the quench once the schedule is done |
+| `protocols.runner.resume` | `resume(directory, *, steps=None, log=print) -> record` | `Simulation.resume`, at most `steps` more steps with the move set attached as `fm.md` attaches it, a restart, the quench at the end |
+| `protocols.runner.split_stages` | `split_stages(data) -> ({"relax", "quench"}, rest)` | the `[relax]` (`RELAX_KEYS = ("fmax", "optimizer", "max_steps")`) and `[quench]` (`profiles.QUENCH_KEYS`) tables of a protocol |
+| `protocols.runner.protocol_names`, `protocol_file`, `DATA` | | the shipped protocols: `fastmace/protocols/data/*.toml`, by stem |
+| `fastmace run` | `fastmace run [CONFIG \| NAME] [--steps N] [--output DIR]`, `fastmace run --resume RUN_DIR [--steps N]` | a file with `[relax]`/`[quench]`, or `--steps`, is a protocol run; otherwise `fm.md` as before |
+
+- `protocol.json` (`PROTOCOL_RECORD_VERSION = 1`) in the run directory: source, structure, repeat, atoms, stages, relaxation summary, move records, `min_mc_temperature_K`, pieces (`first_step`, `last_step`, `wall_s`), status (`relax`, `md`, `quench`, `complete`) and the quench summary.
+- `fm.md` with `steps=` and a schedule sizes `max_temperature_K` by the whole schedule (SPEC §7.7), so the rest of the schedule runs later on the same plan (3-T14; before, by the steps of the call).
+
 ## The ten refusal-pinning tests and the task that flips each
 
 | Test | Pins | Flipped by |
