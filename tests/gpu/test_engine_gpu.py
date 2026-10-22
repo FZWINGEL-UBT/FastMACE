@@ -557,8 +557,22 @@ def kernel_sequence(kinds):
     return out
 
 
-def same_kernels(ours, theirs):
-    """Per graph key: (our node count, theirs, equal kernel sequences after kernel_sequence)."""
+# The integrator stage's graphs. With EngineConfig.fused_integrator (OPT3-T03; the default since ab09b51, before
+# phase 3) NVT runs them as FastMACE's own Triton kernels, which the research engine does not have (8 nodes
+# against its 64 for AC, 8 against 73 for ACP, at phase 3's acceptance): their kernel sequences are not compared.
+# The trajectories, which they produce, still are.
+INTEGRATOR_KEYS = ("AC", "ACP")
+
+
+def fused_integrator_keys(info):
+    """The graph keys left out of the kernel comparison for a run whose ``info()`` is ``info``."""
+    return INTEGRATOR_KEYS if info.get("fused_integrator") else ()
+
+
+def same_kernels(ours, theirs, skip=()):
+    """Per graph key: (our node count, theirs, equal kernel sequences after kernel_sequence); ``skip`` keys left out."""
+    ours = {key: kinds for key, kinds in ours.items() if key not in skip}
+    theirs = {key: kinds for key, kinds in theirs.items() if key not in skip}
     out = {key: (len(kinds), len(theirs[key]) if key in theirs else None,
                  key in theirs and kernel_sequence(kinds) == kernel_sequence(theirs[key]))
            for key, kinds in ours.items()}
@@ -597,7 +611,9 @@ def test_mh1_plain_cueq_float64_against_the_research_engine():
         "speculative_vs_pipelined_200": deviation(modes["speculative"]["positions"], pipelined["positions"], 4),
         "baseline_checked_500": deviation(checked["positions"], base["checked"]["positions"]),
         "baseline_pipelined_500": deviation(pipelined["positions"], base["pipelined"]["positions"]),
-        "kernels": {mode: same_kernels(modes[mode]["kinds"], base[mode]["kinds"]) for mode in ("checked", "pipelined")},
+        "kernels": {mode: same_kernels(modes[mode]["kinds"], base[mode]["kinds"],
+                                       skip=fused_integrator_keys(modes[mode]["info"]))
+                    for mode in ("checked", "pipelined")},
         "ms_per_step": {mode: {"fastmace": modes[mode]["ms_per_step"], "baseline": base[mode]["ms_per_step"]}
                         for mode in ("checked", "pipelined")},
         "info": {mode: out["info"] for mode, out in modes.items()},
@@ -628,7 +644,8 @@ def test_mh1_plain_cueq_float64_npt_against_the_research_engine():
     theirs = baseline_run(options)
     modes, base = ours["modes"], theirs["modes"]
     summary = {mode: {"baseline_500": deviation(modes[mode]["positions"], base[mode]["positions"]),
-                      "kernels": same_kernels(modes[mode]["kinds"], base[mode]["kinds"]),
+                      "kernels": same_kernels(modes[mode]["kinds"], base[mode]["kinds"],
+                                              skip=fused_integrator_keys(modes[mode]["info"])),
                       "ms_per_step": [modes[mode]["ms_per_step"], base[mode]["ms_per_step"]],
                       "builds": [modes[mode]["info"]["neighbour_rebuilds"] + 1, base[mode]["rebuilds"]],
                       "edge_sizes": [modes[mode]["info"]["edge_sizes_used"], base[mode]["edge_sizes_used"]]}
@@ -665,7 +682,8 @@ def test_mh1_hybrid_float32_against_the_research_engine():
         "baseline_scatter_per_record": [deviation([a], [b]) for a, b in
                                         zip(second["modes"]["checked"]["positions"], reference)],
         "fastmace_per_record": [deviation([a], [b]) for a, b in zip(modes["checked"]["positions"], reference)],
-        "kernels": same_kernels(modes["checked"]["kinds"], first["modes"]["checked"]["kinds"]),
+        "kernels": same_kernels(modes["checked"]["kinds"], first["modes"]["checked"]["kinds"],
+                                skip=fused_integrator_keys(modes["checked"]["info"])),
         "ms_per_step": {"fastmace": {mode: out["ms_per_step"] for mode, out in modes.items()},
                         "baseline": [first["modes"]["checked"]["ms_per_step"],
                                      second["modes"]["checked"]["ms_per_step"]]},
