@@ -210,7 +210,8 @@ def test_init_with_flags_writes_only_those(tmp_path):
                              "--repeat", "2", "2", "2", "--trusted", "--dispersion", "d3bj", "--d3-functional",
                              "pbe"]))
     assert data == {"model": "x.model", "structure": "a.xyz", "temperature_K": 500.0, "repeat": [2, 2, 2],
-                    "trusted": True, "dispersion": {"functional": "pbe"}}
+                    "trusted": True,  # 3b-T01: the record carries its Becke-Johnson numbers
+                    "dispersion": {"functional": "pbe", "s6": 1.0, "s8": 0.7875, "a1": 0.4289, "a2": 4.4407}}
 
 
 def test_init_flags_and_md_flags_give_equal_arguments():

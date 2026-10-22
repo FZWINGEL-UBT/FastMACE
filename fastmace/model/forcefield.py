@@ -28,11 +28,18 @@ class ForceField:
     - ``species``: the declared superset (§8.5), symbols or atomic numbers, compared as a set; a
       species without an embedding raises ``ModelElementError``. It may be larger than the
       structure's species (phase 3, rule 8): every species-indexed table is built for it, so an atom
-      can become any superset species in place (3-T02).
+      can become any superset species in place (3-T02);
+    - ``dispersion``: ``None``, ``"d3bj"`` or an ``fm.D3`` (SPEC §7.7, §11.2). ``"d3bj"`` expands
+      from the model's training functional (``fastmace.longrange.d3.expand``: ``ValueError`` when it
+      is unknown or already contains dispersion); an explicit record whose functional differs from
+      the training one is kept with a warning in ``dispersion_warnings``. The complete record is
+      ``dispersion`` and part of the identity. Refused (``PlanRefused``): the ATM term
+      (``d3-three-body``) and PolarMACE (``d3-polar``, decision 41). Plans with D3 are refused
+      until plan task 3b-T04 (``d3-phase-3b``).
     """
 
     def __init__(self, model: Any, atoms: Any = None, *, precision: Literal["float32", "float64"] = "float32",
-                 rewrites: Any = "auto", species: Any = None):
+                 rewrites: Any = "auto", species: Any = None, dispersion: Any = None):
         from fastmace.config import RewriteConfig
 
         if isinstance(model, str):
@@ -51,6 +58,7 @@ class ForceField:
         self.model = model
         self.precision = precision
         self.rewrites = rewrites
+        self.dispersion, self.dispersion_warnings = _dispersion(dispersion, model)
         self._traits = None
         self._evaluations = {}
         self.species = None
@@ -120,10 +128,14 @@ class ForceField:
         from fastmace.state import ForceFieldIdentity
 
         model = self.model
+        physics = {"charge": model.charge, "spin_multiplicity": model.spin_multiplicity}
+        if self.dispersion is not None:  # absent without D3, so D3-free identities keep their digests
+            from fastmace.longrange import d3
+
+            physics["dispersion"] = d3.identity_entry(self.dispersion)
         return ForceFieldIdentity(
             checkpoint_sha256=model.sha256, head=model.head or None, species=self.species,
-            force_precision=self.effective_precision()[0],
-            physics={"charge": model.charge, "spin_multiplicity": model.spin_multiplicity},
+            force_precision=self.effective_precision()[0], physics=physics,
             mace_version=_mace_version() or "unknown", fastmace_version=fastmace.__version__)
 
     # ------------------------------------------------------------------ for the planner
@@ -206,6 +218,38 @@ class ForceField:
                 f"periodic boundaries in all three directions (3D PBC) are required, got pbc={tuple(atoms.pbc)} "
                 "(SPEC §4.4)", rule=1, code="non-3d-pbc")])
         return self._evaluator(atoms)[1].evaluate(atoms, stress=stress)
+
+
+def _dispersion(dispersion, model):
+    """``(record, warnings)`` of ``ForceField(dispersion=...)``; refuses what no D3 term implements."""
+    if dispersion is None:
+        return None, ()
+    from fastmace.errors import PlanRefused, Reason
+    from fastmace.longrange import d3, polar
+
+    record, warnings = d3.expand(dispersion, functional=model.functional,
+                                 model=model.label or str(getattr(model, "path", "the model")))
+    reasons = []
+    if record.three_body:
+        reasons.append(Reason(f"the D3 three-body (ATM) term is not implemented; got {d3.describe(record)} "
+                              "(SPEC §11.2)", code="d3-three-body"))
+    if polar.is_polar(model.model):
+        reasons.append(Reason("PolarMACE with D3 is refused in phase 3b: PolarMACE NPT is not qualified "
+                              "(SPEC §18 decision 41)", code="d3-polar"))
+    if reasons:
+        raise PlanRefused.from_reasons(reasons)
+    return record, tuple(warnings)
+
+
+def refuse_until_integrated(force_field):
+    """``PlanRefused`` (``d3-phase-3b``) for a force field with D3: no plan runs it until 3b-T04."""
+    record = getattr(force_field, "dispersion", None)
+    if record is not None:
+        from fastmace.errors import PlanRefused, Reason
+        from fastmace.longrange import d3
+
+        raise PlanRefused.from_reasons([Reason(f"D3: phase 3b; the record is {d3.describe(record)} (SPEC §11.2)",
+                                               code="d3-phase-3b")])
 
 
 def _is_label(name):

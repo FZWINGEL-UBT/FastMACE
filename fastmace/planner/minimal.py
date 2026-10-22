@@ -499,6 +499,9 @@ class MinimalPlanner:
         ``ProcessConstraintError``; nothing is loaded onto the GPU or compiled. A reproducible plan that
         runs here prepares the process (``planner.reproducible.prepare_process``).
         """
+        from fastmace.model.forcefield import refuse_until_integrated
+
+        refuse_until_integrated(force_field)  # D3 until 3b-T04
         superset = force_field.superset_for(atoms)
         if (workload.reproducible and str(self.engine.device).startswith("cuda") and not _cuda_initialised()
                 and getattr(self.process, "reproducible", None) is not False):
@@ -746,6 +749,9 @@ class MinimalPlanner:
     def plan_evaluation(self, force_field, atoms, hardware: Hardware | None = None, *,
                         allow_naive_cueq: bool = False) -> Plan:
         """The one-off evaluation plan (``fm.ForceField.evaluate``, ``fm.calc``): compiled, with stress, no workload."""
+        from fastmace.model.forcefield import refuse_until_integrated
+
+        refuse_until_integrated(force_field)  # D3 until 3b-T04
         superset = force_field.superset_for(atoms)
         return self.plan_evaluation_traits(force_field.traits, atoms, hardware or self.hardware(),
                                            precision=force_field.precision, rewrites=force_field.rewrites,
