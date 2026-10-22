@@ -114,7 +114,9 @@ class MCDriver:
             superset = sorted(set(state.species.tolist()))
         charge_inputs = moves_module.charge_inputs(field)
         fixcm = bool(getattr(engine.integrator.config, "fixcm", False))
-        self.decisions = check_mc_moves(self.moves, superset=superset, charge_inputs=charge_inputs, fixcm=fixcm)
+        projection = getattr(engine.integrator.config, "fixcm_projection", "ase")
+        self.decisions = check_mc_moves(self.moves, superset=superset, charge_inputs=charge_inputs, fixcm=fixcm,
+                                        projection=projection)
         # A new attach has new tensors: drop the graphs of an earlier attach (they read the old ones) and take a
         # fresh id, so no key of this attach can find an old graph (3-T09 follow-up, review item 1).
         self.detach()

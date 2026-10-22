@@ -191,7 +191,8 @@ def species_numbers(species) -> tuple[int, ...]:
     return tuple(sorted(out))
 
 
-def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool) -> tuple[tuple[str, str, str], ...]:
+def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool,
+                   projection: str = "mass_weighted") -> tuple[tuple[str, str, str], ...]:
     """Check swap and transmutation records against the force field and the integrator (SPEC §10.4; 3-T09).
 
     - Every species once: a swap's two species and a transmutable set's members differ as atomic numbers
@@ -199,7 +200,10 @@ def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool) -> tupl
     - Rule 2: every species a move names is in ``superset`` (atomic numbers), code
       ``species-not-in-superset`` (``SpeciesNotInSuperset``).
     - ``fixcm`` (the integrator removes the centre-of-mass noise): the single-atom ``rescale`` and ``redraw``
-      would change the total momentum behind its back, so they are refused (code ``mc-velocities-fixcm``).
+      would change the total momentum behind its back, so they are refused (code ``mc-velocities-fixcm``);
+      ``redraw_all`` draws (3N - 3) kT, so it needs the integrator's ``projection`` (``fixcm_projection``) to
+      be ``"mass_weighted"``: with ``"ase"`` (or ``"auto"`` outside a plan, which reads as ``"ase"``) it is
+      refused (code ``mc-redraw-all-ase-projection``; 3-T22b).
     - Charge and spin, only when the model or head takes charge or spin inputs (``charge_inputs``): every
       pair of a transmutable set needs ΔZ − Δq even (code ``transmute-charge-parity``,
       ``ChargeParityRefused``); otherwise the decision records "parity: not applicable".
@@ -232,6 +236,12 @@ def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool) -> tupl
                 f"the {kind} move's velocities={velocities!r} change the total momentum, and the integrator fixes "
                 "the centre of mass (fixcm); use 'redraw_all' (or 'exchange' for swaps) (SPEC §10.4 \"Centre of "
                 "mass\")", code="mc-velocities-fixcm"))
+        if fixcm and velocities == "redraw_all" and projection != "mass_weighted":
+            reasons.append(Reason(
+                f"the {kind} move's velocities='redraw_all' draw (3N - 3) kT at zero momentum, and the integrator's "
+                f"fixcm_projection={projection!r} holds 3N kT, so every accepted block would take 1/N of the kinetic "
+                "energy; use fixcm_projection='mass_weighted' (the plan's choice for MC under fixcm) or 'exchange' "
+                "for swaps (docs/design/fixcm-projection.md)", code="mc-redraw-all-ase-projection"))
         if kind == "transmute" and charge_inputs:
             charges = {species_number(species): value for species, value in move.formal_charges}
             for index, first in enumerate(named):

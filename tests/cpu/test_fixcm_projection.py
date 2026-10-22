@@ -17,7 +17,6 @@ motion: 3N - 3 degrees of freedom at the target, per species too. The bias of ``
 
 from __future__ import annotations
 
-import dataclasses
 from types import SimpleNamespace
 
 import numpy as np
@@ -89,7 +88,7 @@ def run(state, dyn, network, steps):
 
 
 def test_the_option_and_its_default():
-    assert IntegratorConfig().fixcm_projection == "ase"
+    assert IntegratorConfig().fixcm_projection == "auto"  # the planner's rule (3-T22b)
     assert IntegratorConfig(fixcm_projection="mass_weighted").fixcm_projection == "mass_weighted"
     with pytest.raises(ValueError, match="fixcm_projection"):
         IntegratorConfig(fixcm_projection="plain")
@@ -100,12 +99,13 @@ def test_ase_projection_is_unchanged_bitwise():
     atoms = licscl()
     network = bond_network(atoms)
     results = []
-    for options in ({}, {"fixcm_projection": "ase"}):
+    for options in ({}, {"fixcm_projection": "ase"}, {"fixcm_projection": "auto"}):  # "auto" reads as "ase"
         state, dyn = integrator(atoms.copy(), **options)
         run(state, dyn, network, 25)
         results.append((state.positions.clone(), state.velocities.clone()))
-    for a, b in zip(*results, strict=True):
-        assert torch.equal(a, b)
+    for other in results[1:]:
+        for a, b in zip(results[0], other, strict=True):
+            assert torch.equal(a, b)
 
 
 def test_mass_weighted_noise_has_no_centre_of_mass_part():
@@ -154,19 +154,17 @@ def test_equal_masses_differ_from_ase_by_its_scale_factor_only():
         torch.testing.assert_close(a, b * (n / (n - 1.0)) ** 0.5, rtol=1e-13, atol=1e-18)
 
 
-def test_the_fused_stage_keeps_the_ase_projection_only():
+def test_the_fused_stage_takes_both_projections():
+    """3-T22b: the fused Triton stage implements the mass-weighted means too (bitwise against the PyTorch
+    stage: tests/gpu/test_fused_projection_gpu.py, and on the CPU through Triton's interpreter,
+    tests/cpu/test_fused_projection_interpreter.py)."""
     from fastmace.kernels.triton import fused_integrator
 
     atoms = licscl()
     state, dyn = integrator(atoms, fixcm_projection="mass_weighted")
     engine = SimpleNamespace(cuda=True, variable_cell=False, integrator=dyn, state=state,
                              force_field=SimpleNamespace(neighbours=None), _mids=(state.velocities,))
-    reason = fused_integrator.applicable(engine)
-    assert reason is not None and "fixcm_projection" in reason
-    without = dataclasses.replace(dyn.config, fixcm=False, fixcm_projection="mass_weighted")
-    dyn.config = without
-    dyn.fix_com = False
-    assert "fixcm_projection" not in (fused_integrator.applicable(engine) or "")
+    assert fused_integrator.applicable(engine) == "no skin neighbour list"  # not the projection
 
 
 def test_redraw_all_and_the_mass_weighted_thermostat_share_one_convention():
@@ -187,3 +185,84 @@ def test_redraw_all_and_the_mass_weighted_thermostat_share_one_convention():
     velocities = torch.sqrt(kT / masses) * normals[0]
     projected = velocities - (velocities * masses).sum(dim=0) / masses.sum()
     torch.testing.assert_close(momenta.redraw_all(masses, normals[0], kT), projected, rtol=0, atol=1e-15)
+
+
+# --------------------------------------------------------------------------- the planner's rule (3-T22b)
+
+
+@pytest.fixture(scope="module")
+def loaded(tmp_path_factory):
+    pytest.importorskip("cuequivariance_torch")
+    from _support.mc_fixtures import tiny_loaded
+
+    return tiny_loaded(tmp_path_factory.mktemp("models"), (11, 17, 19))
+
+
+@pytest.fixture
+def planner(monkeypatch):
+    from _support.mc_fixtures import cpu_planner
+
+    return cpu_planner(monkeypatch)
+
+
+def plan_simulation(loaded, *, mc=True, ensemble="nvt", **record):
+    from _support.mc_fixtures import MC_WORKLOAD, mc_simulation
+    from _support.structures import nacl
+    from fastmace import integrators
+    from fastmace.planner.workload import Workload
+
+    if ensemble == "nvt":
+        integrator = integrators.Langevin(timestep_fs=1.0, temperature_K=600.0, friction_per_fs=0.02, **record)
+    else:
+        integrator = integrators.LangevinBAOAB(timestep_fs=1.0, temperature_K=600.0, friction_per_fs=0.02)
+    workload = Workload(**MC_WORKLOAD) if mc else Workload(max_temperature_K=600.0)
+    return mc_simulation(loaded, nacl(repeat=1, rattle=0.05, seed=3), (11, 17, 19), integrator=integrator,
+                         workload=workload)
+
+
+def decision(sim):
+    found = [entry for entry in sim.plan.decisions if entry[0] == "IntegratorConfig.fixcm_projection"]
+    assert len(found) == 1, sim.plan.decisions
+    return found[0][1], getattr(found[0][2], "code", None)
+
+
+@pytest.mark.parametrize(("options", "expected"), [
+    (dict(mc=True), ("mass_weighted", "fixcm-projection-mc")),
+    (dict(mc=False), ("ase", "fixcm-projection-ase")),
+    (dict(mc=True, fixcm=False), ("ase", "fixcm-projection-ase")),
+    (dict(mc=True, ensemble="npt"), ("ase", "fixcm-projection-ase")),
+    (dict(mc=True, fixcm_projection="ase"), ("ase", "fixcm-projection-given")),
+    (dict(mc=False, fixcm_projection="mass_weighted"), ("mass_weighted", "fixcm-projection-given")),
+])
+def test_the_plan_resolves_auto_with_a_decision(loaded, planner, options, expected):
+    sim = plan_simulation(loaded, **options)
+    assert decision(sim) == expected
+    assert sim.plan.integrator.fixcm_projection == expected[0]
+    assert sim._engine.integrator.config.fixcm_projection == expected[0]
+    assert getattr(sim._engine.integrator, "mass_weighted_com", False) == (expected[0] == "mass_weighted")
+
+
+def test_md_plans_stay_bitwise(loaded, planner):
+    """"auto" without MC is ASE's projection: the same trajectory as an explicit "ase"."""
+    runs = []
+    for record in ({}, {"fixcm_projection": "ase"}):
+        sim = plan_simulation(loaded, mc=False, **record)
+        sim.run(steps=5)
+        runs.append(sim.committed())
+    np.testing.assert_array_equal(runs[0].positions, runs[1].positions)
+    np.testing.assert_array_equal(runs[0].momenta, runs[1].momenta)
+
+
+def test_redraw_all_with_an_explicit_ase_projection_is_refused(loaded, planner):
+    from fastmace.errors import PlanRefused
+    from fastmace.mc import Swap, Transmute
+
+    sim = plan_simulation(loaded, mc=True, fixcm_projection="ase")
+    with pytest.raises(PlanRefused, match="redraw_all") as raised:
+        sim.run(steps=2, mc=[Transmute(["Na", "K"], every=2, attempts=1)])  # redraw_all: the fixcm default
+    assert "mc-redraw-all-ase-projection" in [reason.code for reason in raised.value.reasons]
+    with pytest.raises(PlanRefused, match="redraw_all"):
+        sim.run(steps=2, mc=[Swap([("Na", "K")], every=2, attempts=1, velocities="redraw_all")])
+    sim.run(steps=2, mc=[Swap([("Na", "K")], every=2, attempts=1)])  # exchange keeps the momentum: allowed
+    auto = plan_simulation(loaded, mc=True)  # the plan's mass_weighted: allowed
+    auto.run(steps=2, mc=[Transmute(["Na", "K"], every=2, attempts=1)])

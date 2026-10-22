@@ -10,7 +10,25 @@ Langevin noise. There are two choices:
 - `"mass_weighted"` is the projection derived below.
 
 Whether the default changes is the owner's decision (plan checkpoint 2b). The fused Triton stage
-implements only `"ase"`, so `"mass_weighted"` runs the PyTorch stage.
+implements both projections bit for bit against the PyTorch stage (3-T22b). For `"mass_weighted"`:
+- the noise kernel also stores rnd_pos·m;
+- the two centre-of-mass sums stay PyTorch reductions in `Langevin.first_half`'s order;
+- the drift kernel subtracts sum/M, one float64 division each, with M the registered derived buffer
+  `fused.total_mass`.
+
+The public `fm.integrators.Langevin` record takes `fixcm_projection` too (3-T22b).
+
+**`"auto"` (the default since 3-T22b, the conductor's decision for MC plans).** The planner resolves it in
+every plan and records the decision `IntegratorConfig.fixcm_projection`:
+- `"mass_weighted"` under NVT `fixcm` when the workload declares MC moves (code `fixcm-projection-mc`).
+  `redraw_all` (a swap's option, and the only fixcm treatment of a transmutation) draws (3N − 3) kT, which
+  only this projection holds. `"exchange"` keeps the momentum, so the projection is right for every MC plan;
+- otherwise `"ase"` (code `fixcm-projection-ase`), so MD plans stay bit for bit. The owner's MD decision
+  (checkpoint 2b) is a change to this rule only.
+
+An explicit value is kept (`fixcm-projection-given`). Outside a plan, `"auto"` reads as `"ase"`.
+`MCDriver.attach` refuses `redraw_all` under `fixcm` with any other projection (code
+`mc-redraw-all-ase-projection`).
 
 ## The scheme
 
