@@ -289,10 +289,14 @@ class MCDriver:
                             for stream in MC_STREAMS},
                 "delta_A": {}}
 
-    def load_state_dict(self, record: Mapping[str, Any]) -> None:
-        """Restore the move set's position, counters, stream positions and δ from a restart record."""
+    def load_state_dict(self, record: Mapping[str, Any], *, other_moves: bool = False) -> None:
+        """Restore the move set's position, counters, stream positions and δ from a restart record.
+
+        The record's moves must be the driver's, unless ``other_moves=True``: a new move set attached after
+        another (``run(mc=...)`` again, or after ``mc=None``) continues the streams (same seeds), the
+        cumulative counters per move type and the cycle position of the previous record (3-T15)."""
         moves = tuple(move_from_record(entry) for entry in record["moves"])
-        if moves != self.moves:
+        if moves != self.moves and not other_moves:
             raise ValueError(f"the restart's MC moves {moves} differ from the driver's {self.moves}")
         for stream in MC_STREAMS:
             entry = record["streams"][stream]

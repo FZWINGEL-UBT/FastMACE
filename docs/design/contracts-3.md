@@ -248,9 +248,11 @@ compatibility promise: a restart record's (seed, offset) must give the same numb
   `baseline_eV`, `energy_eV` (the baseline after the last acceptance), `accepted`, `device_ms` (CUDA events;
   `None` on the CPU). `None` when no move is due.
 - `counters` (cumulative, per move type, `MC_COUNTER_KEYS`) and `offsets` (per stream): host values,
-  updated once per block. `state_dict()` is the restart's `mc` record (`MC_RECORD_KEYS`; `cycle_position`
-  is the step of the last block, `delta_A` empty for swaps and transmutations); `load_state_dict` restores
-  it. `attach` and `run_block` also put it into `engine.state.mc`.
+  updated once per block. `state_dict()` is the restart's `mc` record (moves as `{"move", **fields}`, tuples as lists;
+  `driver.move_from_record` reads an entry back) (`MC_RECORD_KEYS`; `cycle_position`
+  is the step of the last block, `delta_A` empty for swaps and transmutations); `load_state_dict(record, *, other_moves=False)`
+  restores it; `other_moves=True` lets another move set continue a record's streams, counters and cycle
+  position (a re-attach). `attach` and `run_block` also put it into `engine.state.mc`.
 - **Checks** (`planner.minimal.check_mc_moves(moves, *, superset, charge_inputs, fixcm)`, called by
   `attach`; raises `PlanRefused` with every reason):
   - rule 2: a species outside the superset (`species-not-in-superset`, `SpeciesNotInSuperset`);

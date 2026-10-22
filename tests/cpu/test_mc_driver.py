@@ -321,6 +321,13 @@ def test_the_restart_record_resumes_the_chain(loaded):
     torch.testing.assert_close(runs[0][2], runs[1][2], rtol=0, atol=0)
     with pytest.raises(ValueError, match="moves"):
         MCDriver([Swap([("Na", "Cl")], every=2, attempts=1)], seed=3).load_state_dict(runs[0][0])
+    # Another move set attached after this one continues the streams and the cumulative counters.
+    other = MCDriver([Swap([("Na", "Cl")], every=2, attempts=1)], seed=3)
+    other.load_state_dict(runs[0][0], other_moves=True)
+    assert other.offsets == {stream: entry["offset"] for stream, entry in runs[0][0]["streams"].items()}
+    assert other.counters == runs[0][0]["counters"] and other.cycle_position == runs[0][0]["cycle_position"]
+    assert other.state_dict()["moves"] == [{"move": "swap", "pairs": [["Na", "Cl"]], "every": 2, "attempts": 1,
+                                            "velocities": "exchange"}]
     with pytest.raises(ValueError, match="seed"):
         MCDriver(moves_, seed=4).load_state_dict(runs[0][0])
 
