@@ -1456,7 +1456,9 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
     restart files and resumes when the workstations are back;
   - files only under `/mnt/homes/zwingel`, with source snapshots in
     `fastmace-t20-*` and `fastmace-t14-*`, never the NAS checkout;
-  - the GPU must be empty before each run;
+  - the GPU must be empty before each run, and no other user may have active
+    jobs on the machine. Idle leftover sessions are fine (owner, 22 October
+    2026; ResearchModule AGENTS.md f375b9d7);
   - 3-T20's L4 job then carries items 2–3 only.
 - **3-T06's GPU jobs** passed (merged at 10c67ae). The compiled tier equals graph within float32 noise:
   MH-1 hybrid 2.2e-7 Å against a graph repeat of 3.0e-7 Å, and MP-0 2.8e-7 Å against 2.2e-7 Å. The gate
