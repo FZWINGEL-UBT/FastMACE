@@ -297,6 +297,14 @@ timing run alike. Every local CPU suite checks it first.
 - **Reserve** creates the marker `~/.fastmace-local-gpu` atomically (`mkdir`), with `holder.json`:
   owner, purpose, pid, the pid's start time and the time of the reservation. While another live holder
   has it, reserve waits.
+- **First come, first served:** every waiting `run` or `reserve` first puts a ticket into the queue
+  next to the marker, `~/.fastmace-local-gpu-queue/` (one JSON file per waiter: owner, purpose, pid,
+  the waiting process and its start time, and the arrival time; written to a temp file and renamed). It
+  takes the marker only when the marker is free and its ticket is the oldest live one. Before the
+  queue, waiters raced for the marker at each release, and on 22 October 2026 one worker's
+  back-to-back jobs kept four short test runs waiting 37 minutes. A ticket whose waiting process is
+  gone (or whose pid now belongs to another process) is stale: the next waiter reports and drops it. A
+  waiter that gives up after `--wait-minutes` removes its own ticket.
 - **Then wait:** holding the marker, it waits until no other `pytest` process that can use the GPU
   runs and at least 10 GiB of RAM are available. Then the run starts. A pytest process whose
   environment sets `CUDA_VISIBLE_DEVICES` empty (or `-1`) cannot use the GPU, so it does not count
@@ -322,12 +330,13 @@ python3 tools/ci/local_gpu.py run --quiet --purpose "3-Tnn timing" -- <the timin
 python3 tools/ci/local_gpu.py reserve --quiet --purpose "3-Tnn timing" --pid $$ && trap 'python3 tools/ci/local_gpu.py release --pid $$' EXIT
 # Before every local CPU suite: CPU only, no quiet reservation, and 6 GB available
 python3 tools/ci/local_gpu.py check --cpu-only --min-available-gib 6 && CUDA_VISIBLE_DEVICES= <the CPU suite command>
-# Who holds it
+# Who holds it, and who waits in which order (with purposes and waiting times)
 python3 tools/ci/local_gpu.py status
 ```
 
 The local runner sets `FASTMACE_LOCAL_GPU_MARKER` to the same marker by its absolute path, because
-`keepalive.sh` moves its `HOME`.
+`keepalive.sh` moves its `HOME`. The queue follows the marker: it is the marker's path with `-queue`
+appended.
 
 ### Keeping the runners up without root
 
