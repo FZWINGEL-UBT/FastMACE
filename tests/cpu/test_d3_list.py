@@ -158,6 +158,7 @@ def test_rebuild_test_fires():
     moved[5, 0] += 0.51 * SKIN
     assert bool(fixed.needs_rebuild(moved))
     assert not bool(fixed.needs_rebuild(moved, fraction=1.1))
+    assert fixed.needs_rebuild(moved).dtype == torch.bool and fixed.needs_rebuild(moved).dim() == 0
 
     variable = D3PairList(atoms.cell.array, D3_CUTOFF, SKIN, "cpu", variable_cell=True)
     variable.build(atoms.positions)
@@ -167,8 +168,7 @@ def test_rebuild_test_fires():
     eps_bad = 1.1 * SKIN / (D3_CUTOFF + SKIN) / math.sqrt(3)
     for eps, fires in ((eps_ok, False), (eps_bad, True)):
         scale = 1 + eps
-        variable.set_cell(torch.tensor(atoms.cell.array * scale))
-        assert bool(variable.needs_rebuild(x * scale)) is fires
+        assert bool(variable.needs_rebuild(x * scale, torch.tensor(atoms.cell.array * scale))) is fires
 
 
 def test_variable_cell_rebuild_follows_the_cell():
@@ -207,6 +207,30 @@ def test_counters_capacity_and_canonical_rebuild():
         nl.set_capacity(nl.num_pairs - 1)
     assert nl.set_capacity(nl.capacity + 1024)
     assert (nl.image == nl.images.shape[0] - 1).all()  # padding until the next build
+
+
+def test_trial_list_save_and_restore():
+    """An MC displacement trial: build around the trial geometry in place, restore the committed list."""
+    atoms = nbcl5(rattle=0.05, seed=13)
+    nl = D3PairList(atoms.cell.array, D3_CUTOFF, SKIN, "cpu")
+    nl.build(atoms.positions)
+    committed = {name: tensor.clone() for name, tensor in nl.buffers().items()}
+    pairs = nl.num_pairs
+    saved = nl.save_list()
+    trial = atoms.positions.copy()
+    trial[3] += [0.9, -0.4, 0.3]
+    assert not nl.build(trial)  # in place
+    assert listed(nl) == brute_force(trial, atoms.cell.array, D3_CUTOFF + SKIN)
+    nl.restore_list(saved)
+    assert nl.num_pairs == pairs
+    for name, tensor in nl.buffers().items():
+        assert torch.equal(tensor, committed[name]), name
+    assert nl.save_list(saved) is saved
+    nl.set_capacity(nl.capacity + 1024)
+    with pytest.raises(RuntimeError, match="moved"):
+        nl.restore_list(saved)
+    with pytest.raises(RuntimeError, match="fixed-cell"):
+        D3PairList(atoms.cell.array, D3_CUTOFF, SKIN, "cpu", variable_cell=True).save_list()
 
 
 def test_set_cell_needs_variable_cell():

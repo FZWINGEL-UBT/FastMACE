@@ -72,7 +72,7 @@ def test_device_stages_replay_in_a_cuda_graph(variable_cell):
     def stage():
         if variable_cell:
             nl.set_cell(cell)
-        flag.copy_(nl.needs_rebuild(x))
+        flag.copy_(nl.needs_rebuild(x, cell if variable_cell else None))
         nl.prepare(x)
 
     stream = torch.cuda.Stream()

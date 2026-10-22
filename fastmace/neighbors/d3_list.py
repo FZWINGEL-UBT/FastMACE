@@ -274,6 +274,40 @@ class D3PairList:
             out["cell"] = self.cell_t
         return out
 
+    # ------------------------------------------------------------------ trial lists (MC displacements)
+
+    def save_list(self, into: dict | None = None) -> dict:
+        """Copy the list (``buffers()``, pair count, capacity) for a trial build that may be rejected.
+
+        As ``SkinNeighbourList.save_list`` (SPEC §8.5 step 4): the trial build happens in place at the
+        buffers' addresses; ``into``, a dict an earlier call returned, is reused when its shapes still match.
+        Fixed cell only.
+        """
+        if self.variable_cell:
+            raise RuntimeError("trial lists are for fixed-cell runs (displacements under a variable cell are refused)")
+        saved = {} if into is None else into
+        with torch.no_grad():
+            for name, tensor in self.buffers().items():
+                copy = saved.get(name)
+                if copy is None or copy.shape != tensor.shape or copy.dtype != tensor.dtype:
+                    saved[name] = tensor.detach().clone()
+                else:
+                    copy.copy_(tensor)
+        saved["num_pairs"] = self.num_pairs
+        saved["capacity"] = self.capacity
+        saved["num_images"] = self.num_images
+        return saved
+
+    def restore_list(self, saved: dict) -> None:
+        """Copy a ``save_list`` copy back in place; refused once a buffer moved since (rebuild instead)."""
+        if saved.get("capacity") != self.capacity or saved.get("num_images") != self.num_images:
+            raise RuntimeError(f"the D3 list's buffers moved since it was saved (capacity {saved.get('capacity')} -> "
+                               f"{self.capacity}); rebuild at the committed positions instead")
+        with torch.no_grad():
+            for name, tensor in self.buffers().items():
+                tensor.copy_(saved[name])
+        self.num_pairs = saved["num_pairs"]
+
     # ------------------------------------------------------------------ graph-capturable
 
     def set_cell(self, cell: torch.Tensor) -> None:
@@ -290,12 +324,16 @@ class D3PairList:
         else:
             self.shifted_positions.copy_(positions - times_3x3(self.atom_offsets, self.build_cell))
 
-    def needs_rebuild(self, positions: torch.Tensor, fraction: float = 1.0) -> torch.Tensor:
+    def needs_rebuild(self, positions: torch.Tensor, cell: torch.Tensor | None = None,
+                      fraction: float = 1.0) -> torch.Tensor:
         """Device bool: can a pair beyond ``cutoff + skin`` at the build have come within the cutoff?
 
         The displacement test (fixed cell) or the deformation-aware test (variable cell) of the module
-        docstring, with ``fraction`` scaling the allowed displacement.
+        docstring, with ``fraction`` scaling the allowed displacement. ``cell`` (variable cell): the current
+        cell, copied in as ``set_cell`` does. No host synchronisation; capturable.
         """
+        if cell is not None and self.variable_cell:
+            self.set_cell(cell)
         if not self.variable_cell:
             squared = ((positions - self.reference_positions) ** 2).sum(dim=1)
             return squared.max() > (fraction * self.skin / 2) ** 2
