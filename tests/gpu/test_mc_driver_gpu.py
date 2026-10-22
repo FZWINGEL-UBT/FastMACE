@@ -9,7 +9,9 @@ fresh process. The attempts of a swap and a transmutation are captured (keys ``(
   same counters and stream offsets;
 - with the Metropolis rule at a high temperature, the counters add up, a swap keeps the composition,
   and a first capture leaves no trace (the twin's counters after the same blocks are equal);
-- the block's device time is measured (CUDA events).
+- the block's device time is measured (CUDA events);
+- the same driver detached and attached again captures new attempts and drops the old graphs (a re-attach
+  replayed the old graphs, which read the old tensors, before the 3-T09 follow-up).
 """
 
 import importlib.util
@@ -107,6 +109,18 @@ second = MCDriver([Swap([("Na", "Cl")], every=1, attempts=5)], seed=8)
 second.attach(sim._engine)
 sim.run(steps=1)
 out["second"] = second.run_block(sim._engine, 9)["moves"]
+# The same driver attached again (run(mc=None), then run(mc=...)): new tensors, so new graphs; the old ones go.
+again = MCDriver([Swap([("Na", "Cl")], every=1, attempts=3)], seed=9)
+again.attach(sim._engine)
+sim.run(steps=1)
+first = again.run_block(sim._engine, 10)["moves"]
+old_keys = list(again._replays)
+again.detach()
+again.attach(sim._engine)
+sim.run(steps=1)
+second_block = again.run_block(sim._engine, 11)["moves"]
+out["reattach"] = [first, second_block, again.offsets["acceptance"],
+                   sum(key in sim._engine._graphs for key in old_keys), len(again._replays)]
 print(json.dumps(out, default=str))
 """
 
@@ -127,4 +141,8 @@ def test_captured_attempts_tiny_plain_cueq():
     assert counters["swap"]["attempted"] == 16 and counters["transmute"]["attempted"] == 12
     assert counters["swap"]["impossible"] == 0
     assert out["chlorine"] == [32, 32, 32, 32]
-    assert out["second"][0]["attempted"] == 5  # swaps and Na <-> K keep the chlorine count
+    assert out["second"][0]["attempted"] == 5
+    first, second, acceptance, old_graphs, new_graphs = out["reattach"]
+    assert first[0]["attempted"] == 3 and second[0]["attempted"] == 3
+    assert acceptance == 6  # the driver's host offsets carry over a re-attach
+    assert old_graphs == 0 and new_graphs == 1  # swaps and Na <-> K keep the chlorine count

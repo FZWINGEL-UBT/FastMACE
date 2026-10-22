@@ -231,7 +231,7 @@ def test_configurational_mu():  # §10.4: Δμ_conf = Δμ_full + (3/2) k_B T ln
     from fastmace.mc import configurational_mu
 
     assert _parameters(configurational_mu) == ["mu_full", "temperature_K", "reference", "masses"]
-    k_b = 8.617333262e-5
+    from ase.units import kB as k_b  # the thermostat's constant (3-T09 follow-up)
     result = configurational_mu({"B": 0.5}, 300.0, reference="A", masses={"A": 1.0, "B": 4.0})
     assert result == {"B": pytest.approx(0.5 + 1.5 * k_b * 300.0 * math.log(4.0))}
     # Equal masses: unchanged; the reference itself is 0 by definition.
@@ -248,10 +248,9 @@ def test_configurational_mu():  # §10.4: Δμ_conf = Δμ_full + (3/2) k_B T ln
 def test_configurational_mu_uses_ase_masses_by_default():
     pytest.importorskip("ase")
     from ase.data import atomic_masses, atomic_numbers
+    from ase.units import kB as k_b  # the thermostat's constant (3-T09 follow-up)
 
     from fastmace.mc import configurational_mu
-
-    k_b = 8.617333262e-5
     expected = 1.5 * k_b * 500.0 * math.log(atomic_masses[atomic_numbers["Cl"]] / atomic_masses[8])
     assert configurational_mu({"Cl": 0.0}, 500.0, reference="O") == {"Cl": pytest.approx(expected)}
     assert configurational_mu({17: 0.0}, 500.0, reference=8) == {17: pytest.approx(expected)}
