@@ -125,7 +125,8 @@ def run(args):
                                    backend=args.backend, ensemble="nvt", cell_mode="hydrostatic", seed=None,
                                    temperature_K=args.targets[0], max_temperature_K=max(args.targets),
                                    integrator_options=dict(ab_fastmace.RELEASE_INTEGRATOR_PINS.get(against, {})),
-                                   reproducible=getattr(args, "reproducible", False))
+                                   reproducible=getattr(args, "reproducible", False),
+                                   device=getattr(args, "device", "cuda"))
     meta = dict(tool="trajectory_versions", status="running", created_utc=datetime.now(timezone.utc).isoformat(),
                 host=os.uname().nodename, python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(),
                 side=args.side, against=against, device=getattr(args, "device", "cuda"),

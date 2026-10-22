@@ -93,5 +93,23 @@ case "$job" in
         --checkpoint "$checkpoint" --structures NaCl NbCl5 NaNbO3 --output "$root/de-$head"
     done
     ;;
+  trajectories-cpu)  # item 10: CPU float64, both versions, one process each; compare --bitwise (no GPU)
+    for side in p3b 3; do
+      run traj-cpu-$side env CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=4 "$hybrid" tools/trajectory_versions.py run \
+        --against p3b --side $side --renamed "$versions" --device cpu --backend auto --output "$root/traj-cpu-$side" \
+        --checkpoint "$checkpoint" --structure NaCl --steps 200 --every 20 --seeds 20261022 --positions
+    done
+    run traj-cpu-compare "$hybrid" tools/trajectory_versions.py compare --release "$root/traj-cpu-p3b" \
+      --current "$root/traj-cpu-3" --bitwise
+    ;;
+  trajectories-reproducible)  # item 10: the reproducible plan (plain cuEq float64) on the GPU; compare --bitwise
+    for side in p3b 3; do
+      run traj-repro-$side "$latest" tools/trajectory_versions.py run --against p3b --side $side --renamed "$versions" \
+        --reproducible --backend cueq --output "$root/traj-repro-$side" --checkpoint "$checkpoint" --structure NaCl \
+        --steps 500 --every 50 --seeds 20261022 --positions
+    done
+    run traj-repro-compare "$latest" tools/trajectory_versions.py compare --release "$root/traj-repro-p3b" \
+      --current "$root/traj-repro-3" --bitwise
+    ;;
   *) echo "unknown job $job" >&2; exit 2 ;;
 esac

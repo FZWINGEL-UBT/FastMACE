@@ -114,3 +114,32 @@ def test_compare_bitwise(tmp_path):
     assert result["passed"] and result["bitwise"] == {"1": True} and result["positions_max_A"] == {"1": 0.0}
     for other in (moved, energy, unrecorded):
         assert not trajectory_versions.compare(release, other, exact=True)["passed"]
+
+
+def test_a_cpu_run_plans_both_versions_on_the_cpu(tmp_path, monkeypatch):
+    """--device cpu reaches EngineConfig.device on both sides (its default is cuda:0)."""
+    seen = []
+
+    class Config:
+        @staticmethod
+        def EngineConfig(**kwargs):  # noqa: N802 (stands in for the class)
+            seen.append(kwargs)
+            return kwargs
+
+    class Planner:
+        def __init__(self, engine):
+            self.engine = engine
+
+        def hardware(self):
+            return None
+
+    class Minimal:
+        MinimalPlanner = Planner
+
+    for side, device in (("3", "cpu"), ("p3b", "cpu"), ("3", None)):
+        args = ab_fastmace.parse_args(_args(tmp_path, "--release", "p3b"))
+        args.device = device
+        version = ab_fastmace.Version(side, args, None)
+        monkeypatch.setattr(version, "module", lambda name: Config if name == "config" else Minimal)
+        version.prepare()
+    assert [kwargs.get("device") for kwargs in seen] == ["cpu", "cpu", None]

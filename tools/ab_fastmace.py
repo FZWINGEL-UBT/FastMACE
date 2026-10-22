@@ -220,7 +220,9 @@ class Version:
     def prepare(self):
         """The planner and its allocator rule, before the first CUDA allocation."""
         config = self.module("config")
-        options = getattr(self.args, "engine_options", {}) if self.side == self.args.current else {}
+        options = dict(getattr(self.args, "engine_options", {})) if self.side == self.args.current else {}
+        if getattr(self.args, "device", None) == "cpu":  # tools/trajectory_versions.py --device cpu, both sides
+            options["device"] = "cpu"
         engine = config.EngineConfig(backend=self.args.backend, **options)
         if self.minimal:
             self.planner = self.module("planner.minimal").MinimalPlanner(engine=engine)
