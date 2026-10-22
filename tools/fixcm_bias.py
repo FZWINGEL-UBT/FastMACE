@@ -181,6 +181,75 @@ def run_tiny_mace(atoms, temperature_K, projection, steps, equilibration, direct
                    time.perf_counter() - started, state)
 
 
+def run_mc_check(temperature_K, projection, mc, steps, equilibration, directory, friction_per_fs=0.02, seed=11):
+    """``redraw_all`` against the thermostat (3-T12's addendum): (Na,K)Cl 2×1×1, a tiny MACE model with the
+    superset (Na, Cl, K), Na↔K swaps every 10 fs with ``redraw_all`` and real Metropolis decisions (``mc``), or
+    none. Through a ``Simulation``'s engine and ``fastmace.mc.MCDriver``, as ``tests/cpu/test_mc_driver.py``.
+
+    The public ``fm.integrators.Langevin`` record has no ``fixcm_projection`` (the default is the owner's
+    decision), so ``"mass_weighted"`` is set on the built engine's integrator here, before the first step."""
+    import dataclasses
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
+    from _support.mc_fixtures import mc_simulation, tiny_loaded
+    from _support.structures import nacl
+    from fastmace import integrators
+    from fastmace.config import EngineConfig
+    from fastmace.engine import constraints
+    from fastmace.mc import MCDriver, Swap
+    from fastmace.planner import minimal
+
+    planner = minimal.MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"), environ={},
+                                     process=constraints.ProcessRecord())
+    minimal.default_planner = lambda force_field: planner
+    atoms = nacl(repeat=1).repeat((2, 1, 1))
+    numbers = atoms.numbers.copy()
+    numbers[np.flatnonzero(numbers == 11)[1::2]] = 19
+    atoms.set_atomic_numbers(numbers)
+    atoms.rattle(0.02, seed=seed)
+    MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K, rng=np.random.default_rng(seed))
+    Stationary(atoms)
+    loaded = tiny_loaded(Path(directory), (11, 17, 19))
+    record = integrators.Langevin(timestep_fs=1.0, temperature_K=temperature_K, friction_per_fs=friction_per_fs)
+    sim = mc_simulation(loaded, atoms, (11, 17, 19), integrator=record, seed=seed)
+    engine = sim._engine
+    dyn = engine.integrator
+    if projection == "mass_weighted":
+        dyn.config = dataclasses.replace(dyn.config, fixcm_projection="mass_weighted")
+        dyn.mass_weighted_com = True
+    driver = None
+    if mc:
+        driver = MCDriver([Swap([("Na", "K")], every=10, attempts=4, velocities="redraw_all")], seed=seed)
+        driver.attach(engine)
+    state = engine.state
+    species = sorted(set(numbers.tolist()))
+    masks = torch.stack([torch.tensor(numbers == z) for z in species]).to(torch.float64)
+    masses = state.masses[:, 0]
+    sums = torch.zeros((BATCHES, len(species)), dtype=torch.float64)
+    per_batch = steps // BATCHES
+    accepted = attempted = 0
+    started = time.perf_counter()
+    for index in range(equilibration + per_batch * BATCHES):
+        engine.step()
+        step = int(state.step)
+        if driver is not None:
+            block = driver.run_block(engine, step)
+            for move in (block or {}).get("moves", ()):
+                accepted += move["accepted"]
+                attempted += move["attempted"]
+        if index >= equilibration:
+            # The species move with the swaps: the masks follow the committed species.
+            masks = torch.stack([(state.species == z) for z in species]).to(torch.float64)
+            masses = state.masses[:, 0]
+            sums[(index - equilibration) // per_batch] += masks @ (masses * (state.velocities ** 2).sum(dim=1))
+    group_mass = (masks * masses).sum(dim=1)
+    result = _result(atoms, sums / per_batch / units.kB, species, masks.sum(dim=1), group_mass, float(masses.sum()),
+                     steps, equilibration, time.perf_counter() - started, state)
+    result["mc"] = {"accepted": accepted, "attempted": attempted} if mc else None
+    return result
+
+
 def _result(atoms, batches, species, counts, group_mass, total_mass, steps, equilibration, seconds, state):
     numbers = atoms.numbers
     result = {"natoms": len(atoms), "steps": steps // BATCHES * BATCHES, "equilibration": equilibration,
@@ -215,6 +284,8 @@ def main(argv=None):
     parser.add_argument("--scale", type=float, default=1.0)
     parser.add_argument("--nanbocl4", default=DEFAULT_NANBOCL4)
     parser.add_argument("--mace-steps", type=int, default=60_000, help="steps of a '<case>-mace' run")
+    parser.add_argument("--mc-check", action="store_true",
+                        help="run_mc_check instead: (Na,K)Cl 16, redraw_all swaps on and off, both projections")
     args = parser.parse_args(argv)
     torch.set_num_threads(2)
     out = Path(args.out)
@@ -222,6 +293,21 @@ def main(argv=None):
     record = json.loads(out.read_text()) if out.exists() else {"runs": {}}
     record.update({"integrator": "fastmace.integrators.langevin.Langevin", "timestep_fs": 1.0,
                    "friction_per_fs": 0.05, "force_field": "harmonic springs, k = 1 eV/A^2", "batches": BATCHES})
+    if args.mc_check:
+        for temperature in (float(t) for t in args.temperatures.split(",")):
+            for projection in ("ase", "mass_weighted"):
+                for mc in (False, True):
+                    key = f"NaK-16-mace-mc/{temperature:g}K/{projection}/mc-{'on' if mc else 'off'}"
+                    if key in record["runs"]:
+                        continue
+                    result = run_mc_check(temperature, projection, mc, args.mace_steps, 2000, out.parent)
+                    result.update({"case": "NaK-16-mace-mc", "temperature_K": temperature, "projection": projection})
+                    record["runs"][key] = result
+                    out.write_text(json.dumps(record, indent=1))
+                    print(f"{key}: total(3N) {result['total']['T_3N'][0]:.1f} ± {result['total']['T_3N'][1]:.1f}, "
+                          f"(3N-3) {result['total']['T_3N_minus_3'][0]:.1f} K; mc {result['mc']}; "
+                          f"{result['seconds']:.0f} s", flush=True)
+        return
     for case in args.cases.split(","):
         mace = case.endswith("-mace")
         atoms, cutoff = structure(case.removesuffix("-mace"), args.nanbocl4)

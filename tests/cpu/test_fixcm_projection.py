@@ -167,3 +167,23 @@ def test_the_fused_stage_keeps_the_ase_projection_only():
     dyn.config = without
     dyn.fix_com = False
     assert "fixcm_projection" not in (fused_integrator.applicable(engine) or "")
+
+
+def test_redraw_all_and_the_mass_weighted_thermostat_share_one_convention():
+    """``redraw_all`` (3-T09) draws Σ m v² = (3N − 3) kT at zero momentum, which is what ``"mass_weighted"``
+    holds (above: it is the run without fixcm minus its centre of mass). ASE's projection holds 3N kT, so
+    with it every accepted ``redraw_all`` block lowers the kinetic energy by (N − 1)/N (3-T12's addendum;
+    measured in docs/validation/3-T22-fixcm.md)."""
+    from fastmace.mc import momenta
+
+    atoms = licscl()
+    masses = torch.tensor(atoms.get_masses())[:, None]
+    n, kT, draws = len(atoms), 0.05, 20_000
+    generator = torch.Generator().manual_seed(3)
+    normals = torch.randn((draws, n, 3), generator=generator, dtype=torch.float64)
+    twice_kinetic = torch.stack([(masses * momenta.redraw_all(masses, z, kT) ** 2).sum() for z in normals]) / kT
+    assert abs(float(twice_kinetic.mean()) - (3 * n - 3)) < 4 * (2 * (3 * n - 3) / draws) ** 0.5
+    # The same projector as the thermostat's mass-weighted noise.
+    velocities = torch.sqrt(kT / masses) * normals[0]
+    projected = velocities - (velocities * masses).sum(dim=0) / masses.sum()
+    torch.testing.assert_close(momenta.redraw_all(masses, normals[0], kT), projected, rtol=0, atol=1e-15)
