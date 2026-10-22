@@ -901,6 +901,10 @@ Files: `tools/` and `bench/` (new entry points), and `docs/validation/3-T20.md`.
     - item 10's tiny-model CPU bitwise check.
     The full local tier was stopped at about 41 %, and its partial results
     count as extra coverage.
+  - The GPU slow tier took about 2.5 h, not 40 min. The owner chose report
+    first: the slow tier pauses, the report comes after items 9, 3 and 10's
+    tiny check, the fixed_costs rerun and the B-graph diagnosis, and the
+    slow tier finishes tonight as an appendix before the `fastmace-3` tag.
   - Timing items repeat only as much as the size of the effect needs: item 1
     uses the 4 main swap-back runs, items 2 and rule 9 one block per case.
 - **The no-regression A/B** against main at the freeze.
