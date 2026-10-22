@@ -1,0 +1,34 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for '3-T21 MC after-MD diagnosis (untimed, <10 min)' (pid 707)
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/3-T21/inductor, triton /home/fzwin/fastmace-cache/3-T21/triton
+rootdir: /home/fzwin/fastmace-3-T21/diag-mc
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 8 items / 7 deselected / 1 selected
+
+tests/gpu/test_mc_statistics_gpu.py T21ROW after_md forced -118.60441446304321 -118.60441446304321 0.0 1 -118.60441732172312 -118.53991141457094
+T21ROW after_md forced -118.55542874336243 -118.55542874336243 0.0 1 -118.55542987656787 -118.64519672114079
+T21ROW after_md forced -118.66923928260803 -118.66923928260803 0.0 1 -118.66924436884179 -118.60984429006166
+T21ROW after_md forced -118.64431619644165 -118.64431643486023 2.384185791015625e-07 1 -118.64432070126836 -118.75575714779195
+T21ROW after_md forced -118.78011012077332 -118.78011012077332 0.0 1 -118.78011402087702 -118.77894944088256
+T21ROW after_md forced -118.76843214035034 -118.7684326171875 4.76837158203125e-07 1 -118.76843327992248 -118.71058959594455
+F
+
+=================================== FAILURES ===================================
+_________________________ test_t21_diag_after_md_rows __________________________
+
+    @needs_mh1
+    def test_t21_diag_after_md_rows():  # 3-T21 diagnosis only (scratch copy, never committed)
+        for experiment in ("after_md", "after_md_decisions"):
+            out = run_mc({"experiment": experiment})
+            for name, result in out.items():
+>               for row in result["rows"]:
+E               TypeError: string indices must be integers
+
+tests/gpu/test_mc_statistics_gpu.py:493: TypeError
+=========================== short test summary info ============================
+FAILED tests/gpu/test_mc_statistics_gpu.py::test_t21_diag_after_md_rows - Typ...
+================== 1 failed, 7 deselected in 86.28s (0:01:26) ==================

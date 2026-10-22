@@ -1,6 +1,6 @@
 # Phase 3 acceptance report
 
-**Status: acceptance runs complete, 22 October 2026; the GPU slow tier is paused (appendix to follow).** Plan
+**Status: complete, 22 October 2026, with the GPU slow tier as the appendix.** Plan
 task 3-T21, branch `fastmace/3-T21`. Every item passes on the frozen code, with test corrections that are
 listed below and leave `fastmace/` unchanged. Two clauses miss as written: item 10's cross-process NbCl5
 control (the same-process A/Bs pass), and item 3's OMOL-0 XL row (3-T11's open finding, not rerun). The
@@ -225,6 +225,9 @@ ran it after the change it missed.
 | `test_engine_gpu.py`: the B graph | B's kernel sequence equal after cuEq's variant normalisation | the named known differences taken out (`known_b_differences`), nothing else | plain cuEq float64 (NVT, NPT): Inductor orders one group of three fused pointwise kernels and two cutlass float64 GEMMs differently, already at 156ab76 (before phase 3); MH-1 hybrid: 3-T02 (f045a3e) replaced the research engine's "first atom of each species" gather (an argmax reduction and an index) with the superset's identity basis (SPEC §8.5), intended | e8e1317 |
 | `test_mc_statistics_gpu.py::test_mh1_kinetic_temperature_with_mc_on_and_off[fixcm]` | 3N degrees of freedom; redraw_all a non-strict xfail | 3N − 3 in total and 3n_s − 3M_s/M per species under the plan's `fixcm_projection="mass_weighted"`; 3N otherwise; tolerances unchanged; redraw_all strict | decision 37 (3-T22c): the mass-weighted projection holds the zero-momentum subspace | bdcc312, 08b8bd9 |
 | `test_fixed_costs_gpu.py` | the default plan rebuilds on the step's stream (`beside` None) | the default rebuilds beside the step; a new `no_overlap` case keeps the other path; all five cases bitwise equal to the default | OPT-DEF-2 (953aa72, before phase 3) made `overlap_rebuild` the default | 57d924b |
+| `test_planner_gpu.py::test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal` | the planned MH-1 hybrid records equal `HYBRID_REWRITES` | `HYBRID_REWRITES` plus the named `ROUND_DEFAULTS`; `same_plan` and the trajectory limits unchanged | the optimisation rounds' defaults, all `"auto"` before phase 3: `gated_rows` and `segment_gemm` (opt-1), `species_tables`, `fold_readout_tail`, `fold_product_linear` and `folded_backward_tiles` (OPT-DEF-2, 953aa72) | da1f05a |
+| `test_mc_statistics_gpu.py::test_mh1_first_attempt_after_md` (helper) | its helper builds a float64 reference evaluator with a model | it uses the engine's float64 energy field when there is one | 3-T07's evaluator allows one energy field per precision, and the test's workload (`min_mc_temperature_K=1`) makes the move-energy gate pick float64 MC energies (decision 35), so the engine already holds one | da1f05a |
+| `test_mc_statistics_gpu.py::test_mh1_first_attempt_after_md` (baseline) | the block baseline equals a fresh MC-evaluator energy bitwise | within 1e-5 eV (2e-4 kT at 600 K, a tenth of the gate's 0.01 kT) | the test reads "fresh" right after MD and the driver its baseline after quiescing; after an accepted block (a canonical rebuild) the per-atom float32 energies can be summed in another order. Measured: 2.4e-7 and 4.8e-7 eV on −118.6 eV in 2 of 6 forced blocks, every one of them accepted (scratch diagnostic, `results/3-T21-local-20261022/diag-mc.log`). This check first ran at the freeze once the helper was fixed | 2093be8 |
 
 Evidence:
 - **Fallback:** leeloo at cd43463 and local at 676a8a3 both activate the compiled tier after eager passes the
@@ -295,10 +298,11 @@ targeted run of the corrected tests). A "fail" on leeloo is a stale expectation;
 Totals: leeloo 19 passed, 7 failed (all seven on stale expectations, corrected above); coraline 13 / 13;
 the corrected tests locally: fallback 3 / 3, [fixcm] 1 / 1, `test_engine_gpu` 3 / 3 after the B-graph correction (e8e1317).
 
-## GPU slow tier (paused; appendix to follow)
+## Appendix: GPU slow tier
 
-Run locally from 676a8a3, `pytest tests/gpu -m "slow and not acceptance"` (acceptance tests are also slow and
-are not run twice). Paused by SIGINT at 17:39 CEST (15:39 UTC) on the owner's word; junit kept.
+`pytest tests/gpu -m "slow and not acceptance"` on the local RTX 5060 Ti (acceptance tests are also slow and are
+not run twice), in two parts: from 676a8a3 until the owner's pause by SIGINT at 17:39 CEST (15:39 UTC), then the
+remaining files from 25f6dd3, 19:05–19:58 CEST. Both copies' `fastmace/` equals the freeze's.
 
 | File | Result |
 | --- | --- |
@@ -308,15 +312,26 @@ are not run twice). Paused by SIGINT at 17:39 CEST (15:39 UTC) on the owner's wo
 | `test_compiled_gpu.py` | 2 / 2 (item 8) |
 | `test_eager_gpu.py` | 2 / 2 |
 | `test_engine_gpu.py` (slow, not acceptance) | 2 / 2 |
-| `test_fixed_costs_gpu.py` | failed on a stale expectation; corrected, rerun: 1 / 1 |
+| `test_fixed_costs_gpu.py` | stale expectation; corrected (57d924b), rerun 1 / 1 |
 | `test_forces_gpu.py` | 3 / 3 |
-| `test_fused_integrator_gpu.py` | 3 of 4 when paused (to be rerun whole) |
+| `test_fused_integrator_gpu.py` | 4 / 4 (second part, whole file) |
+| `test_loading_gpu.py` | 21 / 21 |
+| `test_mc_displace_gpu.py` | 1 / 1 |
+| `test_mc_statistics_gpu.py` (slow part) | 1 / 2: `test_mh1_first_attempt_after_md` stale; corrected (da1f05a, 2093be8), rerun 1 / 1 |
+| `test_move_energy_gate_gpu.py` | 1 / 1 |
+| `test_planner_gpu.py` (slow part) | 1 / 2: the hybrid three-engine test stale; corrected (da1f05a), rerun 1 / 1 with `same_plan` and the trajectory limits (hand-built 9.0e-8 Å, minimal 8.8e-8 Å, limit 1e-6) |
+| `test_polar_gpu.py` | 3 / 3 |
+| `test_reference_tier_gpu.py` | 1 / 1 |
+| `test_registry_gpu.py` | 4 / 4 |
+| `test_rewrites_generic_gpu.py` | 6 / 6 |
+| `test_rewrites_mh1_gpu.py` | 3 / 3 |
+| `test_selfcheck_gpu.py` (slow part) | 5 / 5 |
+| `test_simulation_gpu.py` | 2 / 2 |
+| `test_template_cache_gpu.py` | 2 / 2 |
 
-Remaining files, to run tonight as the appendix: `test_fused_integrator_gpu.py`, `test_loading_gpu.py`,
-`test_mc_displace_gpu.py`, `test_mc_statistics_gpu.py` (slow part), `test_move_energy_gate_gpu.py`,
-`test_planner_gpu.py` (slow part), `test_polar_gpu.py`, `test_reference_tier_gpu.py`, `test_registry_gpu.py`,
-`test_rewrites_generic_gpu.py`, `test_rewrites_mh1_gpu.py`, `test_selfcheck_gpu.py` (slow part),
-`test_simulation_gpu.py`, `test_template_cache_gpu.py`.
+In all: 68 of the 71 slow tests passed as frozen; the three failures were stale test expectations from before phase 3 or
+from a contract the test predates, listed under "Test corrections at acceptance", and their corrected versions
+pass. Results: `results/3-T21-local-20261022/slow-tier`, `slow-tier-2`, `fixed-costs` and `slow-rerun`.
 
 ## Decision 38: rule 9 on this card
 
