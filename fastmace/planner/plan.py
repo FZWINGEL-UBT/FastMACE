@@ -276,7 +276,10 @@ class Plan:
                 return None
             cls_ = getattr(configs, class_name)
             fields = {f.name: f for f in dataclasses.fields(cls_)}
-            return cls_(**{key: _from_json(value) for key, value in values.items() if key in fields})
+            values = {key: _from_json(value) for key, value in values.items() if key in fields}
+            if class_name == "IntegratorConfig":  # a plan from before the option ran ASE's projection (3-T22c)
+                values.setdefault("fixcm_projection", "ase")
+            return cls_(**values)
 
         def decision(entry):
             key, choice, reason, code, rule = entry

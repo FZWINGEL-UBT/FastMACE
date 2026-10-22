@@ -65,7 +65,8 @@ def target(step):
 def config():
     from fastmace.config import IntegratorConfig
     if SPEC["integrator"] == "langevin":
-        return IntegratorConfig(ensemble="nvt", seed=SPEC["seed"])
+        # ASE's noise stream: ASE's projection (3-T22c)
+        return IntegratorConfig(ensemble="nvt", seed=SPEC["seed"], fixcm_projection="ase")
     return IntegratorConfig(ensemble="npt", seed=SPEC["seed"], cell_mode="full", pressure_GPa=SPEC["pressure"],
                             ase_trace_drag_all_elements=SPEC["trace_all"])
 

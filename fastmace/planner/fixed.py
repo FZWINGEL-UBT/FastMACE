@@ -73,7 +73,7 @@ AUTO_RULES = MappingProxyType({
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
     "NeighbourConfig.skin": "rule_11_skin_from_workload",
     "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
-    "IntegratorConfig.fixcm_projection": "mass_weighted_for_mc_under_fixcm_else_ase",
+    "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
@@ -238,30 +238,31 @@ def _why(request, rule, explanation):
     return f"requested {request!r}: {explanation}"
 
 
-
 def _fixcm_projection(book, integrator, *, npt, mc_moves):
-    """Resolve ``IntegratorConfig.fixcm_projection`` (3-T22b; docs/design/fixcm-projection.md) and record it.
+    """Resolve ``IntegratorConfig.fixcm_projection`` and record it (3-T22b, 3-T22c; SPEC §10.4, decision 37;
+    docs/design/fixcm-projection.md).
 
-    "auto": "mass_weighted" for NVT ``fixcm`` plans that declare MC moves. Their ``redraw_all`` (a swap's
-    option, the transmutation default under ``fixcm``) draws sum m v^2 = (3N - 3) kT at zero momentum, which is
-    what the mass-weighted projection holds; ASE's holds 3N kT, so every accepted block would take 1/N of the
-    kinetic energy (3-T12, 3-T22). Otherwise "ase", so MD plans stay bit for bit (the MD default is the
-    owner's checkpoint 2b). An explicit value is kept."""
+    "auto" is "mass_weighted" under NVT ``fixcm``, for MD (code ``fixcm-projection-md``) as for MC
+    (``fixcm-projection-mc``): every species holds the target, and the reported temperature counts 3N - 3
+    degrees of freedom; MC's ``redraw_all`` draws (3N - 3) kT too. NPT (``LangevinBAOAB`` has no ``fixcm``)
+    and ``fixcm`` off resolve to "ase" (``fixcm-projection-ase``), unchanged. An explicit value is kept:
+    "ase" for ASE noise-stream equivalence and A/Bs against the research engine."""
     rule = AUTO_RULES["IntegratorConfig.fixcm_projection"]
     requested = integrator.fixcm_projection
     if requested != "auto":
         choice, why = requested, Reason(_why(requested, rule, "kept as given"), code="fixcm-projection-given")
-    elif not npt and integrator.fixcm and mc_moves:
+    elif not npt and integrator.fixcm:
+        what = "MC moves under fixcm: redraw_all draws (3N - 3) kT, " if mc_moves else "MD under fixcm: "
         choice, why = "mass_weighted", Reason(_why("auto", rule, (
-            "MC moves under fixcm: redraw_all draws (3N - 3) kT at zero momentum, as the mass-weighted projection "
-            "holds; ASE's holds 3N kT (3-T22)")), code="fixcm-projection-mc")
+            f"{what}the mass-weighted projection holds every species at the target, temperatures over 3N - 3 "
+            "degrees of freedom (decision 37)")), code="fixcm-projection-mc" if mc_moves else "fixcm-projection-md")
     else:
-        context = ("NPT (LangevinBAOAB has no fixcm)" if npt else
-                   "fixcm off" if not integrator.fixcm else "no MC moves")
-        choice, why = "ase", Reason(_why("auto", rule, f"ASE's projection, {context}; MD plans unchanged (the MD "
-                                         "default is the owner's checkpoint 2b)"), code="fixcm-projection-ase")
+        context = "NPT (LangevinBAOAB has no fixcm)" if npt else "fixcm off"
+        choice, why = "ase", Reason(_why("auto", rule, f"{context}: no projection to choose"),
+                                    code="fixcm-projection-ase")
     book.decide("IntegratorConfig.fixcm_projection", choice, why)
     return dataclasses.replace(integrator, fixcm_projection=choice)
+
 
 class FixedPlanner:
     """The fixed plan of phase 1a: what ``main.py`` runs, from the caller's (possibly "auto") configs.

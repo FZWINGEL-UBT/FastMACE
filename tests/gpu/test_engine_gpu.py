@@ -386,7 +386,9 @@ def build(mode):
         dyn = LangevinBAOAB(state, IntegratorConfig(ensemble="npt", timestep_fs=0.5, friction=0.02),
                             temperature_K=SPEC["temperature"])
     else:
-        dyn = Langevin(state, IntegratorConfig(timestep_fs=0.5, friction=0.02), temperature_K=SPEC["temperature"])
+        # The research engine runs ASE's projection (3-T22c).
+        dyn = Langevin(state, IntegratorConfig(timestep_fs=0.5, friction=0.02, fixcm_projection="ase"),
+                       temperature_K=SPEC["temperature"])
     config = EngineConfig(compile_mode="default", pipelined="on" if mode == "pipelined" else "off",
                           speculative_graph=mode == "speculative")
     return GraphEngine(config, field, dyn, state, capture=mode != "eager", pad_edges=True)

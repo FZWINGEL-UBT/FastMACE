@@ -139,7 +139,8 @@ from fastmace.model.forces import MACEForceField
 from fastmace.rewrites import registry as reg
 from fastmace.state import SimulationState
 
-integrator = IntegratorConfig(timestep_fs=0.5, friction=0.02, seed=SPEC["seed"])
+# 1a-T13's hand-built engine runs ASE's projection (3-T22c pins it in the plan too)
+integrator = IntegratorConfig(timestep_fs=0.5, friction=0.02, seed=SPEC["seed"], fixcm_projection="ase")
 temperature = SPEC["temperature"]
 cache = fc.CompiledModelCache()
 plan = planner.plan(loaded, structure(temperature), integrator, hardware)

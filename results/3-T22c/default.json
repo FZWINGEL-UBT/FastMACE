@@ -1,0 +1,167 @@
+{
+ "torch": "2.14.1+cu130",
+ "model": "mh1-r2scan",
+ "temperature_K": 600.0,
+ "friction_per_fs": 0.05,
+ "timestep_fs": 1.0,
+ "runs": {
+  "NaCl-216": {
+   "natoms": 216,
+   "steps": 15000,
+   "seconds": 109.85358643000654,
+   "decision": [
+    "IntegratorConfig.fixcm_projection",
+    "mass_weighted",
+    "auto (mass_weighted_under_nvt_fixcm_else_ase): MD under fixcm: the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37)"
+   ],
+   "degrees_of_freedom": 645,
+   "species": {
+    "Na": {
+     "count": 108,
+     "T_fixed_com": [
+      601.6190837283855,
+      1.9317514789684365
+     ],
+     "T_3N": [
+      599.4276720661504,
+      1.92471502877255
+     ]
+    },
+    "Cl": {
+     "count": 108,
+     "T_fixed_com": [
+      598.916984439272,
+      1.4386008448937626
+     ],
+     "T_3N": [
+      595.5530260075977,
+      1.4305206041129404
+     ]
+    }
+   },
+   "total": {
+    "T_3N_minus_3": [
+     600.2693739161152,
+     1.2590471576059323
+    ],
+    "T_3N": [
+     597.490349036874,
+     1.253218235579981
+    ]
+   }
+  },
+  "LiCs-216": {
+   "natoms": 216,
+   "steps": 15000,
+   "seconds": 110.21434635699552,
+   "decision": [
+    "IntegratorConfig.fixcm_projection",
+    "mass_weighted",
+    "auto (mass_weighted_under_nvt_fixcm_else_ase): MD under fixcm: the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37)"
+   ],
+   "degrees_of_freedom": 645,
+   "species": {
+    "Li": {
+     "count": 54,
+     "T_fixed_com": [
+      602.451993674441,
+      3.5571711534384427
+     ],
+     "T_3N": [
+      602.0846014627207,
+      3.5550018901755585
+     ]
+    },
+    "Cl": {
+     "count": 108,
+     "T_fixed_com": [
+      599.3388113723804,
+      1.3968131731222762
+     ],
+     "T_3N": [
+      597.4718442462106,
+      1.3924620377942478
+     ]
+    },
+    "Cs": {
+     "count": 54,
+     "T_fixed_com": [
+      599.5004409394521,
+      2.642552947938603
+     ],
+     "T_3N": [
+      592.4991144126577,
+      2.6116916260955896
+     ]
+    }
+   },
+   "total": {
+    "T_3N_minus_3": [
+     600.160371329587,
+     1.3608807893093995
+    ],
+    "T_3N": [
+     597.38185109195,
+     1.354580415284817
+    ]
+   }
+  },
+  "LiCs-16": {
+   "natoms": 16,
+   "steps": 15000,
+   "seconds": 59.2015465029981,
+   "decision": [
+    "IntegratorConfig.fixcm_projection",
+    "mass_weighted",
+    "auto (mass_weighted_under_nvt_fixcm_else_ase): MD under fixcm: the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37)"
+   ],
+   "degrees_of_freedom": 45,
+   "species": {
+    "Li": {
+     "count": 4,
+     "T_fixed_com": [
+      614.7077288547762,
+      8.451196093523071
+     ],
+     "T_3N": [
+      609.6470364429396,
+      8.381620095152083
+     ]
+    },
+    "Cl": {
+     "count": 8,
+     "T_fixed_com": [
+      598.5505335371538,
+      6.835095270316306
+     ],
+     "T_3N": [
+      573.3796268621196,
+      6.547658311322403
+     ]
+    },
+    "Cs": {
+     "count": 4,
+     "T_fixed_com": [
+      596.8624546769603,
+      8.682494837807052
+     ],
+     "T_3N": [
+      502.7604544213953,
+      7.313603018521036
+     ]
+    }
+   },
+   "total": {
+    "T_3N_minus_3": [
+     602.4444652236198,
+     5.071956677230293
+    ],
+    "T_3N": [
+     564.7916861471435,
+     4.754959384903398
+    ]
+   }
+  }
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti"
+}

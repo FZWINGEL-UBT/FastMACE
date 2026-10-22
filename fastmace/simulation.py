@@ -990,7 +990,18 @@ class Simulation:
         directory = Path(self.output.directory)
         directory.mkdir(parents=True, exist_ok=True)
         header = THERMO_HEADER + (NPT_COLUMNS if self._npt else ()) + mc_columns(self.workload)
-        self._writer = ChunkedOutput(directory, self._atoms.copy(), header, resume_from=resume_from)
+        self._writer = ChunkedOutput(directory, self._atoms.copy(), header, resume_from=resume_from,
+                                     degrees=self.degrees_of_freedom)
+
+    @property
+    def degrees_of_freedom(self) -> int:
+        """The degrees of freedom of this run's reported temperatures: 3N - 3 under the ``"mass_weighted"``
+        ``fixcm`` projection, else 3N (``io.trajectory.degrees_of_freedom``; SPEC §10.4, decision 37)."""
+        from fastmace.io.trajectory import degrees_of_freedom
+
+        plan = getattr(self, "_plan", None)
+        integrator = getattr(plan, "integrator", None) or self._config
+        return degrees_of_freedom(len(self._atoms), integrator)
 
     def _sample(self, step):
         position = self._schedule
@@ -1206,7 +1217,8 @@ class Simulation:
         previous = fallback.stored_fallback_plan(restart.plan_record(stored))
         if previous is not None:  # a fallback revision is rebuilt as it is, never searched again (2-T15)
             sim._resume_plan = previous
-        sim.__init__(_restart_atoms(record["structure"], stored), ff, integrator=_integrator(record["integrator"]),
+        integrator = _kept_projection(_integrator(record["integrator"]), restart.plan_record(stored))
+        sim.__init__(_restart_atoms(record["structure"], stored), ff, integrator=integrator,
                      workload=_workload(record["workload"]), output=None, seed=record["seed"], check=check,
                      allow_naive_cueq=record["allow_naive_cueq"], mode=options.mode,
                      allow_reference=options.allow_reference, fallback=options.fallback, gate=options.gate,
@@ -1587,9 +1599,26 @@ def _integrator(record):
     if record["class"] not in classes:
         raise ValueError(f"unknown integrator record {record['class']!r}; this FastMACE has {sorted(classes)}")
     fields = dict(record["fields"])
+    if record["class"] == "Langevin":  # a record from before the option ran ASE's projection (3-T22c)
+        fields.setdefault("fixcm_projection", "ase")
     if isinstance(fields.get("external_stress_GPa"), list):
         fields["external_stress_GPa"] = tuple(fields["external_stress_GPa"])
     return classes[record["class"]](**fields)
+
+
+def _kept_projection(integrator, plan_record):
+    """A resumed run keeps the fixcm projection it ran with (SPEC §10.4, decision 37): an ``"auto"`` record
+    takes the projection its stored plan resolved, which is ``"ase"`` for a plan from before the option, and
+    for an ``"auto"`` that 3-T22b resolved to ``"ase"`` for MD."""
+    import dataclasses
+
+    if getattr(integrator, "fixcm_projection", None) != "auto" or not plan_record:
+        return integrator
+    values = plan_record.get("integrator") or {}
+    if values.get("fixcm_projection", "ase") == "ase" and integrator.fixcm:
+        # "auto" now resolves to "mass_weighted" under NVT fixcm; this run ran ASE's projection, so it keeps it.
+        return dataclasses.replace(integrator, fixcm_projection="ase")
+    return integrator  # what "auto" resolves to now is what it ran with: the record stays as it is
 
 
 def _workload(record):
