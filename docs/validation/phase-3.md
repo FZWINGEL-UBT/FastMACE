@@ -21,7 +21,7 @@ runbook and pass rules were written before the timed results: [phase-3-runbook.m
 - **Scope, cut by the owner on 22 October 2026 in three steps:**
   1. "leeloo's acceptance tier is the one Ada spot check (no L4 runs), item 9 as the short protocol at the
      freeze citing 3-T14's full runs, and fewer timing repeats where the effect is large."
-  2. The workstations stopped at 14:40 UTC for Friday's power outage; coraline (RTX A4000) took the
+  2. The workstations stopped at 16:40 CEST (14:40 UTC) for Friday's power outage; coraline (RTX A4000) took the
      acceptance files leeloo could not reach by then.
   3. "Yes: stop the full local tier and run only the 7 corrected tests, the GPU slow tier, item 9's short
      protocol, item 3 and item 10's tiny-model bitwise check." All 39 acceptance tests had then run on
@@ -52,12 +52,12 @@ The test files behind items 4–8 are listed under "Coverage"; the ones that nee
 
 | Run ID | Machine | GPU | Environment | FastMACE | What |
 | --- | --- | --- | --- | --- | --- |
-| `3-T21-local-20261022` | PC, WSL | RTX 5060 Ti (Blackwell, sm_120), driver 610.88 | `~/environments/mace_cueq_oeq` (hybrid), `mace_cueq_latest` (plain cuEq, pytest) | copies above | timed: items 10, 1, 2 and rule 9, 12:30–13:12 UTC, PC quiet; then the stopped acceptance tier, the corrected tests, the paused slow tier, items 3 and 9, the B-graph diagnosis, item 10 on the CPU |
-| `3-T21-leeloo-20261022` | leeloo | RTX 4000 Ada (sm_89), driver 595.84 | NAS `mace_cueq_latest` (pytest), `mace_cueq_oeq` (hybrid children) | cd43463 | acceptance tier, 11:57–14:12 UTC, stopped by SIGINT after `test_mc_statistics_gpu.py` |
-| `3-T21-coraline-20261022` | coraline | RTX A4000 (Ampere, sm_86), driver 595.84 | as leeloo | cd43463 | the 5 acceptance files leeloo did not reach, 13:41–14:25 UTC |
+| `3-T21-local-20261022` | PC, WSL | RTX 5060 Ti (Blackwell, sm_120), driver 610.88 | `~/environments/mace_cueq_oeq` (hybrid), `mace_cueq_latest` (plain cuEq, pytest) | copies above | timed: items 10, 1, 2 and rule 9, 14:30–15:12 CEST (12:30–13:12 UTC), PC quiet; then the stopped acceptance tier, the corrected tests, the paused slow tier, items 3 and 9, the B-graph diagnosis, item 10 on the CPU |
+| `3-T21-leeloo-20261022` | leeloo | RTX 4000 Ada (sm_89), driver 595.84 | NAS `mace_cueq_latest` (pytest), `mace_cueq_oeq` (hybrid children) | cd43463 | acceptance tier, 13:57–16:12 CEST (11:57–14:12 UTC), stopped by SIGINT after `test_mc_statistics_gpu.py` |
+| `3-T21-coraline-20261022` | coraline | RTX A4000 (Ampere, sm_86), driver 595.84 | as leeloo | cd43463 | the 5 acceptance files leeloo did not reach, 15:41–16:25 CEST (13:41–14:25 UTC) |
 
 - Every workstation job ran after an idle check (no compute process on the GPU, no other user's active job),
-  as a background task of this session, under a `timeout` ending before the 14:40 UTC shutdown. Both GPUs were
+  as a background task of this session, under a `timeout` ending before the 16:40 CEST (14:40 UTC) shutdown. Both GPUs were
   empty afterwards. Files only under `/mnt/homes/zwingel`.
 - Every local GPU job went through `tools/ci/local_gpu.py`. The conductor kept the PC quiet for the timed
   stretch.
@@ -233,7 +233,7 @@ Evidence:
   156ab76 (`results/3-T21-local-20261022/diag*/results/kinds-*.json`). NVT and NPT differ identically at both
   commits; the hybrid B graph equals the research engine's at 156ab76 and differs at the freeze only by the
   gather. The new comparison passes every dump and fails a negative case (one kernel dropped). The three tests'
-  GPU rerun with it was running when this report was pushed; its result follows in the next commit.
+  GPU rerun with it at e8e1317: **3 passed** (local, 18:52–19:05 CEST).
 - **Kernel sequences:** C equal everywhere; trajectories within their limits (local: cuEq float64 2.5e-13 Å
   against a repeat of 3.9e-13 Å, NPT 7e-15 Å, hybrid 9.7e-8 Å against a research-engine scatter of 8.5e-8 Å).
 - **[fixcm]:** leeloo, with 3N: MC off 1881 ± 12.5 K and swap_exchange 1894 ± 17.6 K against 2000 × 45/48 =
@@ -293,12 +293,12 @@ targeted run of the corrected tests). A "fail" on leeloo is a stale expectation;
 | `test_subprocess_runner_gpu::test_hybrid_after_a_plain_cueq_runs_in_a_child` | – | pass | – | – |
 
 Totals: leeloo 19 passed, 7 failed (all seven on stale expectations, corrected above); coraline 13 / 13;
-the corrected tests locally: fallback 3 / 3, [fixcm] 1 / 1, `test_engine_gpu` 3 (rerun after the B-graph correction: result in the next commit).
+the corrected tests locally: fallback 3 / 3, [fixcm] 1 / 1, `test_engine_gpu` 3 3 / 3 after the B-graph correction (e8e1317).
 
 ## GPU slow tier (paused; appendix to follow)
 
 Run locally from 676a8a3, `pytest tests/gpu -m "slow and not acceptance"` (acceptance tests are also slow and
-are not run twice). Paused by SIGINT at 15:39 UTC on the owner's word; junit kept.
+are not run twice). Paused by SIGINT at 17:39 CEST (15:39 UTC) on the owner's word; junit kept.
 
 | File | Result |
 | --- | --- |
@@ -346,7 +346,9 @@ run (the workstations stopped).
 4. **OMOL-0 XL's ΔE precision** is still unmeasured (3-T11: its float64 references did not finish locally or on
    a Modal A100; its move-energy gate is far slower than §12.3's "seconds to a minute").
 5. **MH-1 on the CPU with Inductor** takes over 15 min for 4 steps of NaCl 3×3×3 (`compile_mode="default"`, the
-   EngineConfig default, on `device="cpu"`). The CPU tests avoid it with `compile_mode="none"`.
+   EngineConfig default, on `device="cpu"`). The CPU tests avoid it with `compile_mode="none"`. Whether
+   `compile_mode="none"` becomes the CPU default is a question for phase 4: a performance default, so the owner's
+   call.
 6. Carried from the merged tasks (plans/phase-3.md, "Open findings"):
    - 3-T03: the friction refreshes copy host floats, so they are not capturable (a friction event drops the
      graphs anyway);
