@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "status": "running",
+  "tool": "move_energy_precision",
+  "created_utc": "2026-10-22T05:59:38.543540+00:00",
+  "host": "modal",
+  "python": "/usr/local/bin/python",
+  "fastmace_commit": "ef42b6b27ee058f988c723395c20692d20e5c6fb",
+  "compile_mode": "none",
+  "model": "omol0-xl",
+  "head": null,
+  "checkpoint": "/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/models/MACE-omol-0-extra-large-1024.model",
+  "checkpoint_sha256": "9b64b4fd5153ca578c694abc57806d8111050de6ff652e695c9b525bc4d36469",
+  "backend": "cueq",
+  "dtype": "float32",
+  "superset": [
+    "Na",
+    "Nb",
+    "O",
+    "Cl"
+  ],
+  "temperatures_K": [
+    300.0,
+    1500.0
+  ],
+  "md_steps": 1000,
+  "timestep_fs": 1.0,
+  "min_mc_temperature_K": 250.0,
+  "threshold_eV": 0.00021543333155000003,
+  "max_displacement_A": 0.15,
+  "samples": {
+    "swap": 4,
+    "transmute": 2,
+    "displace": 8
+  },
+  "seed": 1,
+  "oeq_runtime": null,
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "torch": "2.14.1+cu130",
+  "runs": {
+    "NaCl": {
+      "stage": "build",
+      "plan_backend": "cueq"
+    }
+  },
+  "model_charge_spin": [
+    null,
+    null
+  ]
+}
