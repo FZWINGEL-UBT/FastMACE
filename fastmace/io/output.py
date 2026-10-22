@@ -189,12 +189,13 @@ class ChunkedOutput:
     ``resume_from`` is ``io.restart.output_indices`` of the restart file a resumed run starts from;
     ``None`` starts a new run, which refuses a directory that already holds chunks
     (``FileExistsError``). ``write`` takes ``OutputWriter.write``'s arguments, so ``AsyncOutput``
-    works on either writer.
+    works on either writer. ``degrees`` is the temperature's degrees of freedom (``OutputWriter``).
     """
 
     def __init__(self, directory: str | Path, atoms: Atoms, header: Sequence[str], *,
-                 resume_from: Mapping[str, int] | None = None):
+                 resume_from: Mapping[str, int] | None = None, degrees: int | None = None):
         self.directory = Path(directory)
+        self.degrees = degrees
         self.atoms = atoms
         self.header = list(header)
         self._writer = None
@@ -216,7 +217,7 @@ class ChunkedOutput:
         from fastmace.io.trajectory import OutputWriter
         thermo, trajectory = chunk_paths(self.directory, self.chunk)
         self._writer = OutputWriter(self.directory, self.atoms, self.header, thermo_name=thermo.name,
-                                    trajectory_name=trajectory.name)
+                                    trajectory_name=trajectory.name, degrees=self.degrees)
 
     def write(self, values: Mapping[str, Any], sample: Sequence[Any] | None = None,
               frame: bool = False, *, tail: Sequence[Any] = ()) -> tuple[Any, ...] | None:

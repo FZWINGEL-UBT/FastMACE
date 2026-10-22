@@ -75,18 +75,43 @@ def _host(value: Any) -> np.ndarray:
     return np.asarray(value)
 
 
-def observables(values: Mapping[str, Any], natoms: int, variable_cell: bool = False) -> tuple[float, ...]:
+def degrees_of_freedom(natoms: int, integrator: Any = None) -> int:
+    """The kinetic degrees of freedom a reported temperature counts (SPEC §10.4, decision 37; 3-T22c).
+
+    3N - 3 when ``integrator`` (an ``IntegratorConfig``) is NVT with ``fixcm`` and the ``"mass_weighted"``
+    projection, which holds sum m v^2 = (3N - 3) kT at zero total momentum; 3N otherwise. That covers ASE's
+    projection, which holds 3N kT as ``Atoms.get_temperature`` counts it, ``fixcm`` off, NPT, and no
+    integrator."""
+    if integrator is None or getattr(integrator, "ensemble", "nvt") != "nvt" or not getattr(integrator, "fixcm", False):
+        return 3 * natoms
+    if getattr(integrator, "fixcm_projection", "ase") == "mass_weighted":
+        return 3 * natoms - 3
+    return 3 * natoms
+
+
+def kinetic_temperature(kinetic_eV: float, degrees: int) -> float:
+    """The kinetic temperature in K of ``kinetic_eV`` over ``degrees`` (``degrees_of_freedom``): 2 E_kin / (f k_B).
+    Every temperature FastMACE reports is formed here."""
+    from ase import units
+
+    return 2 * kinetic_eV / (degrees * units.kB)
+
+
+def observables(values: Mapping[str, Any], natoms: int, variable_cell: bool = False,
+                degrees: int | None = None) -> tuple[float, ...]:
     """Temperature (K), potential and kinetic energy per atom (eV); variable cell: volume per atom
     (Å³) and the instantaneous pressure with its kinetic part (GPa).
 
-    ``values`` are host output values. Degrees of freedom 3N, as ``Atoms.get_temperature`` without
-    constraints; the volume is ``ase.cell.Cell.volume`` of the snapshot cell.
+    ``values`` are host output values. The temperature counts ``degrees`` degrees of freedom
+    (``degrees_of_freedom``; ``None``: 3N, as ``Atoms.get_temperature`` without constraints); the volume is
+    ``ase.cell.Cell.volume`` of the snapshot cell.
     """
     from ase import units
     from ase.cell import Cell
     kinetic = float(_host(values["kinetic"])[0])
     energy = float(_host(values["energy"])[0])
-    result = (2 * kinetic / (3 * natoms * units.kB), energy / natoms, kinetic / natoms)
+    temperature = kinetic_temperature(kinetic, 3 * natoms if degrees is None else degrees)
+    result = (temperature, energy / natoms, kinetic / natoms)
     if variable_cell:
         volume = float(Cell(_host(values["cell"])).volume)
         stress = _host(values["stress"])
@@ -103,12 +128,14 @@ class OutputWriter:
     writes it, as the research engine does. ``header`` is written first unless ``append`` (a
     resumed run, after ``truncate_outputs``). ``thermo_name`` and ``trajectory_name`` are the 1a
     files by default; ``io.output.ChunkedOutput`` opens one writer per chunk with the chunk's names.
+    ``degrees`` is the temperature's degrees of freedom (``degrees_of_freedom``; ``None``: 3N).
     """
 
     def __init__(self, directory: str | Path, atoms: Atoms, header: Sequence[str], append: bool = False, *,
-                 thermo_name: str = THERMO_NAME, trajectory_name: str = TRAJECTORY_NAME):
+                 thermo_name: str = THERMO_NAME, trajectory_name: str = TRAJECTORY_NAME, degrees: int | None = None):
         from ase.io.trajectory import Trajectory
         directory = Path(directory)
+        self.degrees = degrees
         mode = "a" if append else "w"
         self.atoms = atoms
         self._trajectory = Trajectory(str(directory / trajectory_name), mode, atoms)
@@ -133,7 +160,7 @@ class OutputWriter:
         variable_cell = "cell" in values and "stress" in values
         row = None
         if sample is not None:
-            result = observables(values, len(self.atoms), variable_cell)
+            result = observables(values, len(self.atoms), variable_cell, degrees=self.degrees)
             if not np.isfinite(result).all():
                 raise RuntimeError(f"Nonfinite MD observables at step {sample[0]}")
             temperature, epot, ekin = result[:3]

@@ -160,6 +160,7 @@ class _Dynamics:
         self._frame.calc = None
         self._clock = _Clock(timestep)
         self._logger = None
+        self._log_frame = None  # the logged frame under the mass-weighted projection (3-T22c)
         if logfile:
             from ase.md.logger import MDLogger
 
@@ -283,6 +284,15 @@ class _Dynamics:
         output = Output(self.output, trajectory_every=None)
         self._sim = sim = simulation.Simulation(self.atoms, self._model, integrator=self.integrator, seed=self.seed,
                                                 workload=self._workload(), output=output, check=self.check)
+        if sim.degrees_of_freedom == 3 * len(self.atoms) - 3 and self._logger is not None:
+            # The mass-weighted fixcm projection (decision 37): the log reads a copy of each frame with ASE's
+            # FixCom, so Atoms.get_temperature, and with it MDLogger, counts 3N - 3 as FastMACE's thermo rows
+            # do. The trajectory keeps the bare frame (a stored FixCom would change the momenta read back).
+            from ase.constraints import FixCom
+
+            self._log_frame = self._frame.copy()
+            self._log_frame.set_constraint(FixCom())
+            self._logger.atoms = self._log_frame
         if self._has_files():
             sim.add_sink(self._write_frame, self.loginterval)  # in the step loop, behind the GPU
         report = sim.report
@@ -502,7 +512,23 @@ class _Dynamics:
             self._last_frame_step = int(step)
         if self._logger is not None:
             self._clock.step = int(step)
+            if self._log_frame is not None:
+                self._copy_to_log_frame(frame, values, extra)
             self._logger()
+
+    def _copy_to_log_frame(self, frame, values, extra):
+        """The logged copy of ``frame`` with FixCom (3N - 3 degrees of freedom): the same values, unprojected."""
+        import numpy as np
+        from ase.calculators.singlepoint import SinglePointCalculator
+
+        log = self._log_frame
+        log.set_cell(frame.cell)
+        if not np.array_equal(log.numbers, frame.numbers):
+            log.numbers = frame.numbers
+        log.set_masses(frame.get_masses())
+        log.set_positions(frame.positions, apply_constraint=False)
+        log.set_momenta(frame.get_momenta(), apply_constraint=False)
+        log.calc = SinglePointCalculator(log, energy=float(values["energy"][0]), forces=values["forces"], **extra)
 
 
 class Langevin(_Dynamics):
@@ -510,10 +536,14 @@ class Langevin(_Dynamics):
 
     ``Langevin(atoms, timestep, temperature=None, friction=None, fixcm=True, *, temperature_K=None,
     trajectory=None, logfile=None, loginterval=1, append_trajectory=False, model=None,
-    force_field=None, head=None, seed=None, output=None, check="skip", dispersion=None)``: ASE's
-    arguments and units (``timestep`` and ``1/friction`` in ASE time units, ``temperature`` in eV,
-    deprecated as in ASE); ``rng``, a non-default ``comm``/``communicator`` and ``master`` are
-    refused. The additions are those of ``fm.md``.
+    force_field=None, head=None, seed=None, output=None, check="skip", dispersion=None,
+    fixcm_projection="auto")``: ASE's arguments and units (``timestep`` and ``1/friction`` in ASE time
+    units, ``temperature`` in eV, deprecated as in ASE); ``rng``, a non-default
+    ``comm``/``communicator`` and ``master`` are refused. The additions are those of ``fm.md``, and
+    ``fixcm_projection`` (``fm.integrators.Langevin``'s; decision 37). With ``fixcm``, ``"auto"`` resolves
+    to the mass-weighted projection: the log then reads its frames with ASE's ``FixCom``, so its
+    temperature counts 3N - 3 (the trajectory frames stay unconstrained). ``fixcm_projection="ase"`` is
+    ASE's ``Langevin`` exactly (its noise stream, 3N).
     """
 
     SUPPORTED = ("atoms", "timestep", "temperature", "friction", "fixcm", "temperature_K", "trajectory", "logfile",
@@ -522,7 +552,8 @@ class Langevin(_Dynamics):
 
     def __init__(self, atoms, timestep, temperature=None, friction=None, fixcm=True, *, temperature_K=None,
                  trajectory=None, logfile=None, loginterval=1, append_trajectory=False, model=None, force_field=None,
-                 head=None, seed=None, output=None, check="skip", dispersion=None, **kwargs):
+                 head=None, seed=None, output=None, check="skip", dispersion=None, fixcm_projection="auto",
+                 **kwargs):
         from ase import units
         from ase.md.md import process_temperature
 
@@ -536,7 +567,8 @@ class Langevin(_Dynamics):
         self.fr = friction
         self.fix_com = fixcm
         record = integrators.Langevin(timestep_fs=float(timestep) / units.fs, temperature_K=float(kelvin),
-                                      friction_per_fs=float(friction) * units.fs, fixcm=bool(fixcm))
+                                      friction_per_fs=float(friction) * units.fs, fixcm=bool(fixcm),
+                                      fixcm_projection=fixcm_projection)
         self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
                     append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
                     output=output, check=check, dispersion=dispersion)

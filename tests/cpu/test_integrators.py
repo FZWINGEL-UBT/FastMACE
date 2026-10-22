@@ -50,7 +50,8 @@ def lj_calculator():
 
 
 def nvt_config(**options):
-    return IntegratorConfig(ensemble="nvt", timestep_fs=2.0, friction=0.02, **options)
+    # ASE's noise stream: ASE's projection, explicitly (an IntegratorConfig outside a plan reads "auto" so; 3-T22c)
+    return IntegratorConfig(ensemble="nvt", timestep_fs=2.0, friction=0.02, **{"fixcm_projection": "ase", **options})
 
 
 def npt_config(hydrostatic, **options):

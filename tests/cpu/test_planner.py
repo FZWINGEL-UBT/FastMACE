@@ -276,7 +276,7 @@ def test_default_plans_equal_main_py(label, backend):
     # The research engine's MD defaults: no auto left anywhere.
     for part in (plan.rewrites, plan.engine, plan.precision, plan.neighbours, plan.integrator):
         assert "auto" not in dataclasses.astuple(part), part
-    assert plan.integrator == IntegratorConfig(fixcm_projection="ase")  # "auto" for MD: ASE's (3-T22b)
+    assert plan.integrator == IntegratorConfig(fixcm_projection="mass_weighted")  # MD under fixcm (decision 37)
     assert plan.polar.kspace_headroom == 0.0 if polar else plan.polar is None
 
 

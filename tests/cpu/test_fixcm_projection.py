@@ -228,7 +228,7 @@ def decision(sim):
 
 @pytest.mark.parametrize(("options", "expected"), [
     (dict(mc=True), ("mass_weighted", "fixcm-projection-mc")),
-    (dict(mc=False), ("ase", "fixcm-projection-ase")),
+    (dict(mc=False), ("mass_weighted", "fixcm-projection-md")),  # decision 37 (3-T22c)
     (dict(mc=True, fixcm=False), ("ase", "fixcm-projection-ase")),
     (dict(mc=True, ensemble="npt"), ("ase", "fixcm-projection-ase")),
     (dict(mc=True, fixcm_projection="ase"), ("ase", "fixcm-projection-given")),
@@ -242,15 +242,120 @@ def test_the_plan_resolves_auto_with_a_decision(loaded, planner, options, expect
     assert getattr(sim._engine.integrator, "mass_weighted_com", False) == (expected[0] == "mass_weighted")
 
 
-def test_md_plans_stay_bitwise(loaded, planner):
-    """"auto" without MC is ASE's projection: the same trajectory as an explicit "ase"."""
-    runs = []
-    for record in ({}, {"fixcm_projection": "ase"}):
+def test_md_auto_is_the_mass_weighted_projection_and_ase_stays_available(loaded, planner):
+    """Decision 37: "auto" for MD under fixcm is "mass_weighted", the same trajectory as asking for it;
+    an explicit "ase" runs ASE's projection, a different trajectory."""
+    runs = {}
+    for name, record in (("auto", {}), ("mass_weighted", {"fixcm_projection": "mass_weighted"}),
+                         ("ase", {"fixcm_projection": "ase"})):
         sim = plan_simulation(loaded, mc=False, **record)
         sim.run(steps=5)
-        runs.append(sim.committed())
-    np.testing.assert_array_equal(runs[0].positions, runs[1].positions)
-    np.testing.assert_array_equal(runs[0].momenta, runs[1].momenta)
+        runs[name] = sim.committed()
+    np.testing.assert_array_equal(runs["auto"].positions, runs["mass_weighted"].positions)
+    np.testing.assert_array_equal(runs["auto"].momenta, runs["mass_weighted"].momenta)
+    assert not np.array_equal(runs["auto"].momenta, runs["ase"].momenta)
+    momentum = (runs["auto"].momenta).sum(axis=0)
+    np.testing.assert_allclose(momentum, 0.0, atol=1e-12)
+
+
+# --------------------------------------------------------------------------- reported temperatures (3-T22c)
+
+
+def test_degrees_of_freedom_follow_the_projection():
+    from fastmace.io.trajectory import degrees_of_freedom, kinetic_temperature
+
+    nvt = IntegratorConfig()
+    assert degrees_of_freedom(10, IntegratorConfig(fixcm_projection="mass_weighted")) == 27
+    assert degrees_of_freedom(10, IntegratorConfig(fixcm_projection="ase")) == 30
+    assert degrees_of_freedom(10, nvt) == 30  # "auto" outside a plan reads as "ase"
+    assert degrees_of_freedom(10, IntegratorConfig(fixcm=False, fixcm_projection="mass_weighted")) == 30
+    assert degrees_of_freedom(10, IntegratorConfig(ensemble="npt", fixcm_projection="mass_weighted")) == 30
+    assert degrees_of_freedom(10, None) == 30
+    from ase import units
+
+    assert kinetic_temperature(0.5 * 27 * units.kB * 600.0, 27) == pytest.approx(600.0, rel=1e-15)
+
+
+@pytest.mark.parametrize(("record", "degrees"), [({}, "3N-3"), ({"fixcm_projection": "ase"}, "3N")])
+def test_thermo_rows_count_the_projections_degrees_of_freedom(loaded, planner, tmp_path, record, degrees):
+    from ase import units
+
+    from fastmace.io import output as output_io
+
+    sim = plan_simulation_with_output(loaded, tmp_path / "out", record)
+    natoms = len(sim._atoms)
+    expected = 3 * natoms - 3 if degrees == "3N-3" else 3 * natoms
+    assert sim.degrees_of_freedom == expected
+    sim.run(steps=4)
+    sim.flush_output()
+    header, rows = output_io.read_thermo(tmp_path / "out")
+    temperature = float(rows[-1][header.index("temperature_K")])
+    kinetic = float(rows[-1][header.index("kinetic_eV_atom")]) * natoms
+    assert temperature == pytest.approx(2 * kinetic / (expected * units.kB), rel=1e-12)
+    sim.close()
+
+
+def plan_simulation_with_output(loaded, directory, record):
+    from _support.structures import nacl
+    from fastmace import integrators
+    from fastmace.io.output import Output
+    from fastmace.model.forcefield import ForceField
+    from fastmace.planner.workload import Workload
+    from fastmace.simulation import Simulation
+
+    atoms = nacl(repeat=1, rattle=0.05, seed=3)
+    integrator = integrators.Langevin(timestep_fs=1.0, temperature_K=600.0, friction_per_fs=0.02, **record)
+    return Simulation(atoms, ForceField(loaded, atoms, precision="float64", species=[11, 17, 19]),
+                      integrator=integrator, workload=Workload(max_temperature_K=600.0), seed=1,
+                      output=Output(directory, thermo_every=1, trajectory_every=2, restart_every=None))
+
+
+# --------------------------------------------------------------------------- resume (3-T22c)
+
+
+@pytest.mark.parametrize("stored", ["missing", "auto"])
+def test_a_resume_keeps_the_projection_its_record_holds(loaded, planner, tmp_path, stored):
+    """A run that ran ASE's projection resumes with it: a record from before the option (no field), and an
+    "auto" record that 3-T22b resolved to "ase" for MD (its stored plan says so)."""
+    import json
+
+    from fastmace.simulation import SIMULATION_NAME, Simulation
+
+    sim = plan_simulation_with_output(loaded, tmp_path / "run", {"fixcm_projection": "ase"})
+    sim.run(steps=3)
+    sim.save_restart(tmp_path / "run")
+    want = sim.committed()
+    sim.run(steps=2)
+    after = sim.committed()
+    sim.close()
+    path = tmp_path / "run" / SIMULATION_NAME
+    record = json.loads(path.read_text())
+    fields = record["integrator"]["fields"]
+    if stored == "missing":
+        del fields["fixcm_projection"]
+    else:
+        fields["fixcm_projection"] = "auto"
+    path.write_text(json.dumps(record))
+    resumed = Simulation.resume(tmp_path / "run")
+    assert resumed._engine.integrator.config.fixcm_projection == "ase"
+    assert resumed.degrees_of_freedom == 3 * len(resumed._atoms)
+    np.testing.assert_array_equal(resumed.committed().positions, want.positions)
+    resumed.run(steps=2)
+    np.testing.assert_array_equal(resumed.committed().positions, after.positions)
+    resumed.close()
+
+
+def test_plan_records_without_the_field_read_as_ase():
+    from fastmace.simulation import _integrator, _kept_projection
+
+    old = {"class": "Langevin", "fields": {"timestep_fs": 1.0, "temperature_K": 300.0, "friction_per_fs": 0.02,
+                                          "fixcm": True}}
+    assert _integrator(old).fixcm_projection == "ase"
+    auto = _integrator({**old, "fields": {**old["fields"], "fixcm_projection": "auto"}})
+    assert _kept_projection(auto, {"integrator": {"fixcm": True}}).fixcm_projection == "ase"
+    # What "auto" resolves to now is what it ran with: the record stays "auto" (save, load, save: same files).
+    assert _kept_projection(auto, {"integrator": {"fixcm_projection": "mass_weighted"}}).fixcm_projection == "auto"
+    assert _kept_projection(auto, None).fixcm_projection == "auto"  # nothing stored: the plan decides
 
 
 def test_redraw_all_with_an_explicit_ase_projection_is_refused(loaded, planner):
