@@ -1486,8 +1486,17 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   can't read TOML in the NAS hybrid environment.
   - 3-T14 used YAML; its branch makes `fastmace run` read `.yaml`/`.yml`
     with `safe_load`.
-  - The conductor installs `tomli` there after the leeloo runs of
-    22 October, under the package rule of 14 October.
+  - **Done** (22 October 2026, after the leeloo runs): `tomli==2.5.0` is
+    installed in the NAS `mace_cueq_oeq`. The dry run changed nothing else,
+    and `pip check` is clean. ResearchModule's AGENTS.md (15ada866) records
+    it.
+- **3-T14's full runs** are complete on both GPUs, with every stage passing.
+  - Local: 8.97–9.27 ms/step.
+  - leeloo (RTX 4000 Ada): 10.7 ms/step; gate 0.00061 and 0.0016 kT.
+  - Both runs accepted 0 of 132,550 swaps, and the quench converged 21 of
+    21 frames.
+  - Final energies: −10.241204 eV/atom (local) and −10.240948 eV/atom
+    (leeloo).
 - **3-T03:**
   - The friction refreshes copy host floats to the device, so they are not
     capturable. This is harmless: a friction event drops the graphs anyway.
