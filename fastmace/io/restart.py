@@ -278,7 +278,19 @@ def resume_engine(restart: Mapping[str, Any], engine: Any) -> None:
     Build the engine from the restart's positions and cell first. ``load_state`` replaces the build's
     forces with the stored ones; then the force field takes the stored cell and the engine the plan
     record's edge bucket and neighbour capacity, and canonicalises (``restore_restart_point``).
+
+    A total charge the file records and the state does not have (an accepted transmutation with formal
+    charges, or a host total-charge event, moved it) is restored first through the force field's
+    ``set_total_charge`` and the ``charges`` refresh (3-T09). The spin multiplicity is still checked:
+    no move changes it (the parity rule, SPEC §10.4).
     """
+    physical = physical_record(restart) or {}
+    total = physical.get("total_charge")
+    state, field = engine.state, engine.force_field
+    if total is not None and total != state.total_charge and callable(getattr(field, "set_total_charge", None)):
+        field.set_total_charge(total)
+        engine.derived.refresh(("charges",))
+        state.total_charge = total
     load_state(restart, engine.state, engine.integrator)
     if engine.variable_cell:
         engine.force_field.set_cell(engine.state.cell)

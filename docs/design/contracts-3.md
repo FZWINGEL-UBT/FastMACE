@@ -190,6 +190,74 @@ Added by 3-T02 under the conductor's answers (`plans/phase-3.md`, "3-T02 species
   - `tag()` uses `GraphEngine.state_version`. An engine without one uses `("step", state.step)`.
 - `tools/bench/mc_cost.py`: energy-only cost as a fraction of one MD step. T09, T10 and T20 add their rows as further sides.
 
+### MC streams and the driver (T09)
+
+**Streams** (`fastmace/mc/streams.py`; conductor answer 2 of 3-T09). The layout below is a restart
+compatibility promise: a restart record's (seed, offset) must give the same numbers in a later version.
+- Counter-based Philox4x32-10 (Random123's `philox4x32_10`). Number `n` of a stream with seed `s`
+  (`config.mc_stream_seeds(seed)[stream]`) is `Philox(counter=(n mod 2³², n >> 32, 0, 0), key=(s mod 2³², s >> 32))
+  = (x0, x1, x2, x3)`.
+  - A **uniform** in [0, 1): `((x0 >> 5)·2²⁶ + (x1 >> 6)) / 2⁵³`.
+  - A **normal**: `sqrt(−2 ln(1 − u))·cos(2π v)`, with `u` from (x0, x1) and `v` from (x2, x3) as above.
+  - The same numbers on CPU and GPU (uniforms bit for bit). Plain int64 PyTorch, capturable.
+- A stream's state is its seed and its **offset**, the position of its next number (`io.restart.MC_STREAM_KEYS`).
+- **Fixed counts per attempt** (`streams.attempt_counts(move, velocities, N)`), whatever the outcome:
+
+  | Stream | Swap | Transmute |
+  | --- | --- | --- |
+  | proposal | 2N + 1 | N + 1 |
+  | acceptance | 1 | 1 |
+  | velocity | 6 with `redraw`, else 0 | 3 with `redraw`, else 0 |
+
+  `redraw_all` draws 3N velocity numbers once per block per move, after the move's attempts
+  (`streams.block_velocity_count`), used only after an acceptance in them.
+- **Attempt `k` of a move** in a block reads, per stream, the numbers `base + k·count … base + (k+1)·count − 1`.
+  `base` is the stream's offset when the move's attempts began. `k` is a device counter (the attempt index)
+  that advances only when an attempt completes; the host reads it with the block counters and advances each
+  offset by `k·count` (plus 3N for `redraw_all`). Moves due at the same step run in attached order.
+- **Decoding** (`streams.decode_swap`, `streams.decode_transmute`):
+  - swap: proposal number 0 picks the pair type `p = min(⌊u·P⌋, P − 1)` of `Swap.pairs` (in record order);
+    numbers 1…N are the keys of the first species' atoms (atom order), N+1…2N those of the second's.
+  - transmute: numbers 1…N are the keys of atoms whose species is in S; number 0 picks the new species,
+    `r = min(⌊u·(|S| − 1)⌋, |S| − 2)`, then `S[r + (r ≥ c)]` with `c` the current species' index in S
+    (`Transmute.species` order).
+  - Selection: keys of other atoms are +∞, `argmin` (the first minimum) picks the atom, and a minimum of +∞
+    marks the attempt impossible. An impossible attempt changes nothing and consumes its counts.
+  - Acceptance: with `u` the acceptance number, accept iff `ln u < −(ΔE − Δμ)/kT`, where ΔE = E_trial −
+    E_baseline (float64, the MC evaluator's), Δμ = μ[new] − μ[old] for a transmutation (0 for swaps; absent
+    species have μ = 0) and kT = k_B·T with T the integrator's target at the block. `u = 0` accepts.
+  - Velocities (`fastmace/mc/momenta.py`, named functions): `redraw` writes `sqrt(kT/m_new)·z` with the
+    velocity numbers of the attempt, atom i's x, y, z then atom j's; `redraw_all` writes `sqrt(kT/m)·z` for
+    atom a, component c from number `base + 3a + c`, then removes the centre-of-mass velocity.
+
+**Driver** (`fastmace/mc/driver.py`). T15 wires it into `Simulation.run(mc=…)`.
+- `MCDriver(moves, *, seed, config=None)`; `attach(engine, *, evaluator=None)`: the checks below, the device
+  tables, counters and captured attempts on a built engine. `evaluator=None` is
+  `MCEvaluator(engine)` (the force precision); pass a float64 `MCEvaluator` for float64 MC energies.
+- `due(step)`: the moves whose `every` divides `step` (step > 0). `run_block(engine, step)`: quiesce, the
+  baseline (a fresh MC-evaluator energy), every due move's attempts as captured replays (key
+  `("mc.<move>", driver id, index, precision, edges)`), one host read of counters, attempt indices and the overflow
+  word, then, after an acceptance, `redraw_all` where chosen, the mass and momentum refreshes and
+  `canonicalise(reevaluate=True)` (forces once, `integrator.start`). Returns the block record, also in
+  `last_block`: `step`, `moves` (per due move: `move`, `attempts`, `attempted`, `impossible`, `accepted`),
+  `baseline_eV`, `energy_eV` (the baseline after the last acceptance), `accepted`, `device_ms` (CUDA events;
+  `None` on the CPU). `None` when no move is due.
+- `counters` (cumulative, per move type, `MC_COUNTER_KEYS`) and `offsets` (per stream): host values,
+  updated once per block. `state_dict()` is the restart's `mc` record (moves as `{"move", **fields}`, tuples as lists;
+  `driver.move_from_record` reads an entry back) (`MC_RECORD_KEYS`; `cycle_position`
+  is the step of the last block, `delta_A` empty for swaps and transmutations); `load_state_dict(record, *, other_moves=False)`
+  restores it; `other_moves=True` lets another move set continue a record's streams, counters and cycle
+  position (a re-attach). `attach` and `run_block` also put it into `engine.state.mc`.
+- **Checks** (`planner.minimal.check_mc_moves(moves, *, superset, charge_inputs, fixcm)`, called by
+  `attach`; raises `PlanRefused` with every reason):
+  - rule 2: a species outside the superset (`species-not-in-superset`, `SpeciesNotInSuperset`);
+  - `fixcm`: `rescale` and `redraw` refused (`mc-velocities-fixcm`); `exchange` is for swaps only (records);
+  - parity, only for models or heads with charge or spin inputs: every pair of S needs ΔZ − Δq even
+    (`transmute-charge-parity`, `ChargeParityRefused`); otherwise the decision is "parity: not applicable".
+- Transmuted atoms take ASE's standard masses. A swap exchanges species, masses and per-atom charges. A
+  transmutation with formal charges moves the force field's total charge by Δq inside the graph; after a block
+  with an acceptance the host records the new total in `state.total_charge`.
+
 ### Overflow before commit (T04)
 
 - **The device word** `GraphEngine.overflow` (int64 scalar, registered as `engine.overflow`, sticky, reset at a canonical point) holds the bits `EDGE_OVERFLOW = 1` and `KVECTOR_OVERFLOW = 2`.
