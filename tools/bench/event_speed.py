@@ -187,7 +187,8 @@ def main(argv=None):
                 created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, checkpoint_sha256=sha,
-                precision="float32", backend="hybrid", cuda_allocator=allocator, integrator=dataclasses.asdict(integrator),
+                precision="float32", backend="hybrid", cuda_allocator=allocator,
+                integrator=dataclasses.asdict(integrator),
                 superset=args.superset, every=args.every, seed=args.seed,
                 protocol=dict(warmup_steps=args.warmup, block_steps=args.block, blocks=args.blocks),
                 pattern=args.pattern, order=order, load=list(os.getloadavg()), structures={})
