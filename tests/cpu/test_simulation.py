@@ -915,3 +915,52 @@ def test_host_writes_refuse_wrong_shapes_and_non_finite_values(loaded, bad):
     with pytest.raises(ValueError):
         sim.set_momenta(bad)
     np.testing.assert_array_equal(_positions(sim), before)
+
+
+def test_the_speed_line_leaves_the_mc_blocks_out(loaded, drivers, monkeypatch, tmp_path):
+    """3-T15 follow-up: the speed line is the MD step time; the MC cost has its own line, and the blocks'
+    total time stays in simulation.json."""
+    import time
+
+    from fastmace.mc import driver as mc_driver
+
+    run_block = mc_driver.MCDriver.run_block
+
+    def slow(self, engine, step):
+        time.sleep(0.25)
+        return run_block(self, engine, step)
+
+    monkeypatch.setattr(mc_driver.MCDriver, "run_block", slow)
+    directory = tmp_path / "run"
+    sim = _simulation(loaded, workload=_mc_workload(), output=Output(str(directory), trajectory_every=None,
+                                                                    thermo_every=2, restart_every=None))
+    sim.run(steps=4, mc=Swap(pairs=(("Na", "Cl"),)))  # blocks at 2 and 4: at least 0.5 s
+    assert sim._loop_s >= 0.5
+    assert sim.report.speed["seconds_per_step"] * 4 <= sim._loop_s - 0.5
+    assert "MD only; MC blocks: see mc" in sim.report.text()
+    sim.save_restart(directory)
+    record = json.loads((directory / "simulation.json").read_text(encoding="utf-8"))
+    assert record["mc"]["block_s"] >= 0.5
+    sim.close()
+
+
+def test_md_only_speed_line_has_no_mc_note(loaded):
+    sim = _simulation(loaded)
+    sim.run(steps=2)
+    assert "MC blocks" not in sim.report.text()
+
+
+def test_a_resumed_run_reports_its_output(loaded, tmp_path):
+    """3-T15 follow-up: the resumed report names the output directory it writes into."""
+    from fastmace.simulation import Simulation
+
+    directory = tmp_path / "run"
+    sim = _simulation(loaded, output=Output(str(directory), trajectory_every=None, thermo_every=2,
+                                            restart_every=None))
+    sim.run(steps=2)
+    sim.save_restart(directory)
+    sim.close()
+    resumed = Simulation.resume(directory)
+    line = next(line for line in resumed.report.text().splitlines() if line.startswith("output:"))
+    assert str(directory) in line
+    resumed.close()
