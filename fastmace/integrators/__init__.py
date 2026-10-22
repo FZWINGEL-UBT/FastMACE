@@ -44,12 +44,17 @@ class Langevin:
 
     ``fm.integrators.Langevin(timestep_fs=0.5, temperature_K=300, friction_per_fs=0.02)``.
     ``temperature_K`` is the starting target; a schedule (``Simulation.run(schedule=…)``) moves it.
+    ``fixcm_projection`` is how ``fixcm`` projects the noise (``IntegratorConfig.fixcm_projection``;
+    docs/design/fixcm-projection.md): ``"ase"``, ASE's, ``"mass_weighted"``, canonical at a fixed centre
+    of mass for unequal masses too, or ``"auto"``, the planner's choice (``"mass_weighted"`` for MC plans
+    under ``fixcm``, else ``"ase"``).
     """
 
     timestep_fs: float = 0.5
     temperature_K: float
     friction_per_fs: float
     fixcm: bool = True
+    fixcm_projection: Literal["auto", "ase", "mass_weighted"] = "auto"
 
     def __post_init__(self):
         _validate(self)
@@ -58,7 +63,7 @@ class Langevin:
         """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s)."""
         return IntegratorConfig(ensemble="nvt", timestep_fs=float(self.timestep_fs),
                                 friction=_friction(self.friction_per_fs), seed=seed, fixcm=self.fixcm,
-                                temperature_K=float(self.temperature_K))
+                                fixcm_projection=self.fixcm_projection, temperature_K=float(self.temperature_K))
 
 
 @dataclass(frozen=True, kw_only=True)

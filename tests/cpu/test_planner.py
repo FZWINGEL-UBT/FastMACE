@@ -274,9 +274,9 @@ def test_default_plans_equal_main_py(label, backend):
     assert got["cueq_conv_fusion"] == (True if backend == "cueq" else None)
     assert got["polar_uvu"] == "on" and plan.tier == "graph"
     # The research engine's MD defaults: no auto left anywhere.
-    for part in (plan.rewrites, plan.engine, plan.precision, plan.neighbours):
+    for part in (plan.rewrites, plan.engine, plan.precision, plan.neighbours, plan.integrator):
         assert "auto" not in dataclasses.astuple(part), part
-    assert plan.integrator == IntegratorConfig()
+    assert plan.integrator == IntegratorConfig(fixcm_projection="ase")  # "auto" for MD: ASE's (3-T22b)
     assert plan.polar.kspace_headroom == 0.0 if polar else plan.polar is None
 
 
@@ -473,7 +473,7 @@ def test_follow_up_inplace_block_linear_is_refused():
 def test_follow_up_npt_keywords_follow_baoab_settings():
     integrator = IntegratorConfig(ensemble="npt", pressure_GPa=1.5, cell_mode="full")
     plan = plan_for("mh1-r2scan", integrator=integrator)
-    assert plan.integrator == integrator
+    assert plan.integrator == dataclasses.replace(integrator, fixcm_projection="ase")  # resolved (3-T22b)
     keywords = fixed.integrator_keywords(plan.integrator)
     assert keywords == {"externalstress": -1.5 * units.GPa, "disable_cell_langevin": False}
     assert fixed.integrator_keywords(IntegratorConfig()) == {}

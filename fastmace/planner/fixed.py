@@ -73,6 +73,7 @@ AUTO_RULES = MappingProxyType({
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
     "NeighbourConfig.skin": "rule_11_skin_from_workload",
     "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
+    "IntegratorConfig.fixcm_projection": "mass_weighted_for_mc_under_fixcm_else_ase",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
@@ -237,6 +238,31 @@ def _why(request, rule, explanation):
     return f"requested {request!r}: {explanation}"
 
 
+
+def _fixcm_projection(book, integrator, *, npt, mc_moves):
+    """Resolve ``IntegratorConfig.fixcm_projection`` (3-T22b; docs/design/fixcm-projection.md) and record it.
+
+    "auto": "mass_weighted" for NVT ``fixcm`` plans that declare MC moves. Their ``redraw_all`` (a swap's
+    option, the transmutation default under ``fixcm``) draws sum m v^2 = (3N - 3) kT at zero momentum, which is
+    what the mass-weighted projection holds; ASE's holds 3N kT, so every accepted block would take 1/N of the
+    kinetic energy (3-T12, 3-T22). Otherwise "ase", so MD plans stay bit for bit (the MD default is the
+    owner's checkpoint 2b). An explicit value is kept."""
+    rule = AUTO_RULES["IntegratorConfig.fixcm_projection"]
+    requested = integrator.fixcm_projection
+    if requested != "auto":
+        choice, why = requested, Reason(_why(requested, rule, "kept as given"), code="fixcm-projection-given")
+    elif not npt and integrator.fixcm and mc_moves:
+        choice, why = "mass_weighted", Reason(_why("auto", rule, (
+            "MC moves under fixcm: redraw_all draws (3N - 3) kT at zero momentum, as the mass-weighted projection "
+            "holds; ASE's holds 3N kT (3-T22)")), code="fixcm-projection-mc")
+    else:
+        context = ("NPT (LangevinBAOAB has no fixcm)" if npt else
+                   "fixcm off" if not integrator.fixcm else "no MC moves")
+        choice, why = "ase", Reason(_why("auto", rule, f"ASE's projection, {context}; MD plans unchanged (the MD "
+                                         "default is the owner's checkpoint 2b)"), code="fixcm-projection-ase")
+    book.decide("IntegratorConfig.fixcm_projection", choice, why)
+    return dataclasses.replace(integrator, fixcm_projection=choice)
+
 class FixedPlanner:
     """The fixed plan of phase 1a: what ``main.py`` runs, from the caller's (possibly "auto") configs.
 
@@ -382,14 +408,15 @@ class FixedPlanner:
         return Plan(**parts, reason="fixed plan of phase 1a (main.py)")
 
     def _resolve(self, book, traits, atoms, integrator, hardware, *, backend_choice=None, evaluation=False,
-                 texts=None, reproducible=False, rule_11=None):
+                 texts=None, reproducible=False, rule_11=None, mc_moves=False):
         """The plan's parts (``Plan`` keywords except the reason), decisions and refusals in ``book``.
 
         Shared with the minimal planner (1b-T12): ``backend_choice`` is its backend rule;
         ``evaluation`` plans a one-off compiled evaluation with stress (no integrator, no graph
         tier, so exact padding is not required); ``texts`` maps a refusal code to a function that
         rewrites its text; ``reproducible`` (minimal planner, rule 5) takes the unfused convolution;
-        ``rule_11`` (minimal planner, 3-T05) is ``(applies, neighbors.adaptive.Rule11)`` for the workload.
+        ``rule_11`` (minimal planner, 3-T05) is ``(applies, neighbors.adaptive.Rule11)`` for the workload;
+        ``mc_moves`` (minimal planner, 3-T22b) whether the workload declares MC moves.
         """
         from fastmace.longrange import polar as longrange
         from fastmace.model.capabilities import ModelTraits, model_traits
@@ -504,6 +531,7 @@ class FixedPlanner:
                 book.decide("integrator", "Langevin", f"NVT, fixcm={integrator.fixcm} (workflow.GPUEngine)")
             book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
                         "fixed cell: the graph engine computes no stress")
+            integrator = _fixcm_projection(book, integrator, npt=npt, mc_moves=mc_moves)
 
         phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
                                        evaluation=evaluation)
