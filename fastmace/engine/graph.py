@@ -268,6 +268,8 @@ class GraphEngine(Engine):
         self._dropped = {}  # key -> why it was dropped (its next capture is a re-capture)
         self._kinds_seen = set()  # key families captured at least once in this engine
         self._external = {}  # captured(key, fn): other modules' stage functions
+        self.trial_rebuilds = 0  # MC displacement trials built around their geometry (trial_rebuild, 3-T10)
+        self._external_keep = {}  # captured(key, fn, keep=...): the caller's tensors restored after warm-ups
         # The energy-only graph (3-T07): the force field per MC energy precision (the engine's own in its
         # precision, a float64 copy beside it, add_energy_field) and each precision's output buffer.
         self._energy_fields = {_precision(force_field): force_field}
@@ -472,7 +474,7 @@ class GraphEngine(Engine):
 
         return stage
 
-    def captured(self, key: str, fn: Callable[[], Any]) -> Callable[[], None]:
+    def captured(self, key: str, fn: Callable[[], Any], *, keep: Iterable[torch.Tensor] = ()) -> Callable[[], None]:
         """Capture ``fn`` (no arguments, fixed shapes and addresses) as a CUDA graph under ``key`` with the
         engine's warm-up, registry restore and re-capture policy (variant cap, budget, log), and return
         its replay. For other modules' graphs (the MC attempt, 3-T09); ``ENGINE_KEYS`` are refused.
@@ -480,6 +482,8 @@ class GraphEngine(Engine):
         The graph is captured at the first replay and again after an invalidation or an eviction, so the
         replay stays valid for the engine's life. Without capture (CPU, eager) the replay calls ``fn``.
         A tuple key's first element is its family: ``("mc.swap", bucket)`` keys are variants of one key.
+        ``keep``: the caller's own tensors that ``fn`` writes (an MC attempt's index, counters and baseline);
+        they are restored after the warm-up runs as the registered state is, so a capture leaves no trace.
         """
         if _kind(key) in ENGINE_KEYS:
             raise ValueError(f"{key!r} is an engine stage key ({', '.join(ENGINE_KEYS)}); other modules' graphs "
@@ -487,6 +491,7 @@ class GraphEngine(Engine):
         if not callable(fn):
             raise TypeError(f"captured({key!r}, fn): fn must be callable, got {type(fn).__name__}")
         self._external[key] = fn
+        self._external_keep[key] = tuple(keep)
 
         def replay() -> None:
             self._run(key)
@@ -585,6 +590,47 @@ class GraphEngine(Engine):
         finally:
             self._redoing = False
             del saved
+
+    # ------------------------------------------------------------------ MC trial lists (3-T10)
+
+    def trial_rebuild(self) -> bool:
+        """Rebuild the neighbour list around the current (trial) positions, eagerly, between replays: a
+        displacement beyond the skin test (SPEC §8.5 step 4, §10.4 "Graph capture"). The GPU build reads
+        its pair count on the host and may reallocate, which is why it runs outside the captured attempt.
+
+        The list is built in place, so the captured graphs that read it stay valid. The caller saved the
+        committed list first (``SkinNeighbourList.save_list``) and restores it on a rejection. Returns True
+        if the capacity grew: the buffers moved and the captured graphs are dropped, and the caller
+        restores the attempt and redoes it with the same numbers (an overflow, not an outcome).
+        """
+        self.trial_rebuilds += 1
+        grew = bool(self.force_field.rebuild(self.state.positions))
+        if grew:
+            self.invalidate_graphs("a trial neighbour build grew the capacity")
+        return grew
+
+    def use_trial_edges(self) -> int:
+        """Compact at the current positions and let the model read the padded edge count (one host sync, between
+        replays); returns the padded size, which an MC attempt's graph key names."""
+        field = self.force_field
+        field.compact(self.state.positions)
+        edges = self._padded(int(field.edge_count))  # host sync
+        self._use_edges(edges)
+        return edges
+
+    def adopt_trial_list(self) -> None:
+        """An accepted displacement keeps the list built around its geometry: the pipeline's padded sizes follow
+        it as after a rebuild (its floor is dropped). The block still ends at a canonical point."""
+        edges = self._padded(int(self.force_field.edge_count))  # host sync
+        self._pipe_floor = 0
+        self._pipe_edges = edges
+        self._spec_edges = edges
+
+    def record_mc_overflow(self, word: int) -> None:
+        """An MC attempt overflowed (``word``) and its caller redoes it with the same numbers after growing what
+        overflowed: count it (``overflows_redone``, the log) and clear the flags."""
+        self._record_overflow(int(word), int(self.state.step), "mc")
+        self.clear_overflow()
 
     @property
     def recapture_warning(self) -> str | None:
@@ -1115,10 +1161,20 @@ class GraphEngine(Engine):
     def _warm_up(self, key) -> None:
         """The warm-up runs of a capture without the capture: run ``key`` eagerly, then restore the state."""
         stage = self._stage(key)
-        saved = self.registry.snapshot()
+        saved, kept = self.registry.snapshot(), self._keep_snapshot(key)
         for _ in range(WARMUP_RUNS):
             stage()
         self.registry.restore(saved)
+        self._keep_restore(key, kept)
+
+    def _keep_snapshot(self, key) -> list[torch.Tensor]:
+        """Copies of the caller's ``keep`` tensors of an external key (``captured``), for after its warm-ups."""
+        return [tensor.detach().clone() for tensor in self._external_keep.get(key, ())]
+
+    def _keep_restore(self, key, kept) -> None:
+        with torch.no_grad():
+            for tensor, value in zip(self._external_keep.get(key, ()), kept, strict=True):
+                tensor.copy_(value)
 
     def _capture(self, key) -> None:
         """Capture one stage as a CUDA graph without changing the MD state."""
@@ -1128,7 +1184,7 @@ class GraphEngine(Engine):
             raise RuntimeError("CUDA graphs need a CUDA device")
         _patches.set_capture_safe_mask_head(True)
         stage = self._stage(key)
-        saved = self.registry.snapshot()
+        saved, kept = self.registry.snapshot(), self._keep_snapshot(key)
         if self._side_stream is None:  # one stream: library workspaces are made once
             self._side_stream = torch.cuda.Stream()
         side = self._side_stream
@@ -1170,7 +1226,8 @@ class GraphEngine(Engine):
             self.invalidate_graphs(POOL_RESET)
             self.pool_resets += 1
         self.registry.restore(saved)
-        del saved
+        self._keep_restore(key, kept)
+        del saved, kept
         if self.config.empty_cache_before_capture:
             # The capture allocates in the graph pool and cannot reuse blocks cached by the warm-up,
             # so otherwise both count towards the peak.

@@ -440,7 +440,8 @@ def test_graph_engine_energy_and_captured_names():  # §8.1 energy-only graph (3
     assert {"ACP", "B", "C", "E"} <= set(ENGINE_KEYS)
     assert _parameters(GraphEngine.energy) == ["self", "precision"]
     assert _keyword_only(GraphEngine.energy) == ["precision"]
-    assert _parameters(GraphEngine.captured) == ["self", "key", "fn"]
+    assert _parameters(GraphEngine.captured) == ["self", "key", "fn", "keep"]
+    assert _keyword_only(GraphEngine.captured) == ["keep"]  # 3-T10: the caller's tensors restored after warm-ups
     assert _parameters(GraphEngine.add_energy_field) == ["self", "field"]  # the float64 MC copy (3-T07)
     assert isinstance(GraphEngine.energy_fields, property)
     assert _parameters(GraphEngine.energy_stage) == ["self", "precision"]
@@ -496,3 +497,25 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     assert restart.MC_COUNTER_KEYS == ("attempted", "impossible", "accepted")
     assert restart.MC_STREAM_KEYS == ("seed", "offset")
     assert restart.mc_record({}) is None  # 3-T08: no move set attached
+
+
+def test_displacement_names():  # §10.4 displacements (3-T10)
+    from fastmace.engine.graph import GraphEngine
+    from fastmace.io.restart import MC_COUNTER_KEYS
+    from fastmace.mc import displace
+    from fastmace.neighbors.skin import SkinNeighbourList
+
+    assert displace.PROPOSAL_COUNT == 5 and displace.ACCEPTANCE_COUNT == 1
+    assert displace.COUNTER_KEYS == (*MC_COUNTER_KEYS, "trial_rebuilds")
+    assert (displace.VARIABLE_CELL_CODE, displace.BEYOND_MAX_CODE) == (
+        "displace-variable-cell", "displace-beyond-max-displacement")
+    assert _parameters(displace.DisplaceAttempts) == ["move", "engine", "evaluator", "seeds", "max_displacement_A",
+                                                     "index", "offsets"]
+    assert _keyword_only(displace.DisplaceAttempts) == ["seeds", "max_displacement_A", "index", "offsets"]
+    assert _keyword_only(displace.DisplaceAttempts.run) == ["temperature_K", "baseline"]
+    assert _keyword_only(displace.check_displace) == ["max_displacement_A", "variable_cell"]
+    assert _parameters(SkinNeighbourList.save_list) == ["self", "into"]
+    assert _parameters(SkinNeighbourList.restore_list) == ["self", "saved"]
+    for name in ("trial_rebuild", "use_trial_edges", "adopt_trial_list"):
+        assert _parameters(getattr(GraphEngine, name)) == ["self"]
+    assert _parameters(GraphEngine.record_mc_overflow) == ["self", "word"]

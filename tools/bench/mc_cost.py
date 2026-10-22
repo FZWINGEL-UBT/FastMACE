@@ -15,6 +15,18 @@ backend, and the energies of both precisions against the MD energy.
 Hybrid float32 by default. Use an otherwise idle GPU. Output: <output>/metadata.json. Later tasks add
 their rows (swap and transmutation attempts: 3-T09; displacements with and without a trial rebuild:
 3-T10) as further sides.
+
+3-T10's rows (``--displace-delta-A``): the plan is made for a displacement workload
+(``Workload(mc_moves=("displace",), max_displacement_A=delta)``, so rule 11 sizes the skin for it, and the
+MD and energy rows are at that skin). Two displacement sides then time blocks of
+``--displace-attempts`` attempts against a baseline far below every trial, so that every attempt is
+rejected and the state stays the MD side's:
+- ``displace_graph``: δ as given, the captured attempt (no trial rebuild unless the MD drift and δ pass
+  skin/2);
+- ``displace_trial``: δ equal to the skin, so that most attempts move an atom beyond skin/2 and take the
+  host path (a trial build around the trial geometry, then the captured energy graph).
+Recorded per side: the time per attempt, its ratio to an MD step, and the fraction of attempts that took
+a trial rebuild; ``trial_rebuild_ms`` estimates one host-path attempt from the two sides.
 """
 
 from __future__ import annotations
@@ -53,6 +65,9 @@ def parse_args(argv=None):
     p.add_argument("--block", type=int, default=100)
     p.add_argument("--rounds", type=int, default=12)
     p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--displace-delta-A", type=float, default=None,
+                   help="add the displacement rows (3-T10), planned for this Workload.max_displacement_A")
+    p.add_argument("--displace-attempts", type=int, default=10, help="attempts per timed displacement call")
     return p.parse_args(argv)
 
 
@@ -67,6 +82,31 @@ class EnergySide:
 
     def prepare_block(self):
         pass
+
+    def finish_block(self):
+        pass
+
+    def synchronize(self):
+        self.torch.cuda.synchronize()
+
+
+class DisplaceSide:
+    """A ``fastmace.mc.displace.DisplaceAttempts`` as a timed engine: one "step" is one block of ``attempts``
+    attempts, all rejected (a baseline 1000 eV below the state), so the MD side's state is unchanged."""
+
+    def __init__(self, attempts, evaluator, count, temperature_K, torch):
+        self.attempts, self.evaluator, self.count, self.temperature_K = attempts, evaluator, count, temperature_K
+        self.torch = torch
+        self.baseline = None
+        self.trial_rebuilds = self.attempted = 0
+
+    def prepare_block(self):
+        self.baseline = self.evaluator.baseline() - 1e3  # the state after the MD side's last block
+
+    def step(self):
+        record = self.attempts.run(self.count, temperature_K=self.temperature_K, baseline=self.baseline)
+        self.trial_rebuilds += record["trial_rebuilds"]
+        self.attempted += record["attempted"]
 
     def finish_block(self):
         pass
@@ -132,7 +172,12 @@ def main(argv=None):
         meta.update(structure=name, natoms=len(base))
         force_field = ForceField(loaded, base, precision=precision)
         integrator = config.IntegratorConfig(seed=args.seed, temperature_K=args.temperature_K)
-        plan = planner.plan(force_field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
+        if args.displace_delta_A is None:
+            workload = Workload(max_temperature_K=args.temperature_K)
+        else:
+            workload = Workload(max_temperature_K=args.temperature_K, mc_moves=("displace",),
+                                min_mc_temperature_K=args.temperature_K, max_displacement_A=args.displace_delta_A)
+        plan = planner.plan(force_field, base, integrator, workload, hardware)
         started = time.perf_counter()
         engine = planner.build(plan, force_field, base.copy(), temperature_K=args.temperature_K)
         md = ab_step_time.FastMACESide(engine, torch)
@@ -177,12 +222,45 @@ def main(argv=None):
                 raise RuntimeError(f"no float64 copy: {errors}")
 
             add("energy_float64", copy)
+        if args.displace_delta_A is not None:
+            from fastmace.config import mc_stream_seeds
+            from fastmace.mc import Displace
+            from fastmace.mc.displace import DisplaceAttempts
+
+            skin = float(engine.force_field.neighbours.skin)
+            meta["displace"] = dict(skin_A=skin, attempts_per_call=args.displace_attempts,
+                                    max_displacement_A=args.displace_delta_A)
+            own = evaluators["energy_" + precision]
+            for index, (side, delta) in enumerate((("displace_graph", args.displace_delta_A),
+                                                   ("displace_trial", skin))):
+                move = Displace(delta_A=delta, every=1, attempts=args.displace_attempts)
+                # The trial side's delta is the skin, beyond the workload's maximum on purpose (to force builds).
+                attempts = DisplaceAttempts(move, engine, own, seeds=mc_stream_seeds(args.seed + index),
+                                            max_displacement_A=max(delta, args.displace_delta_A), index=index)
+                sides[side] = DisplaceSide(attempts, own, args.displace_attempts, args.temperature_K, torch)
+                step_time.warm_up(sides[side], 3)
+                meta["sides"][side] = dict(delta_A=delta)
         names = tuple(sides)
         blocks = {name: [] for name in names}
         for index in range(args.rounds):
             for name in round_order(names, index):
                 blocks[name].append(step_time.time_block(sides[name], args.block))
         meta["timing"] = summarise(blocks, names)
+        displaced = [name for name in names if name.startswith("displace_")]
+        for name in displaced:
+            side, timing = sides[name], meta["timing"][name]
+            per_attempt = timing["median_ms"] / args.displace_attempts
+            timing.update(per_attempt_ms=per_attempt,
+                          per_attempt_over_md=per_attempt / meta["timing"]["md"]["median_ms"],
+                          trial_rebuild_fraction=side.trial_rebuilds / max(side.attempted, 1))
+        if len(displaced) == 2:
+            # Per attempt t = (1 - f) t_graph + f t_host on both sides: solve for the two costs.
+            (t1, f1), (t2, f2) = ((meta["timing"][name]["per_attempt_ms"],
+                                   meta["timing"][name]["trial_rebuild_fraction"]) for name in displaced)
+            if f2 > f1:
+                extra = (t2 - t1) / (f2 - f1)
+                meta["timing"]["graph_attempt_ms"] = t1 - f1 * extra
+                meta["timing"]["trial_rebuild_ms"] = t1 - f1 * extra + extra
         md.finish_block()
         md_energy = float(engine.state.energy[0])
         meta["energies_after_md"] = {"md_eV": md_energy, **{
@@ -193,7 +271,10 @@ def main(argv=None):
         raise
     finally:
         save()
-    print(json.dumps({side: dict(ms=value["median_ms"], over_md=value.get("over_md_median"))
+    print(json.dumps({side: dict(ms=value["median_ms"], over_md=value.get("over_md_median"),
+                                 per_attempt_ms=value.get("per_attempt_ms"),
+                                 trial_rebuild_fraction=value.get("trial_rebuild_fraction"))
+                      if isinstance(value, dict) else value
                       for side, value in meta.get("timing", {}).items()}, indent=1))
 
 

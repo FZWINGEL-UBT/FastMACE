@@ -167,7 +167,7 @@ Added by 3-T02 under the conductor's answers (`plans/phase-3.md`, "3-T02 species
   - `GraphEngine.energy(*, precision=None)`: the energy-only graph. It returns a fixed-address float64 `[1]` buffer that the next call overwrites. Its key is `(ENERGY_KEY, precision, edges)`: one variant per edge size, captured at the first call. It reads the current positions and active edges, and sets `EDGE_OVERFLOW` when the count passes them. Without capture it runs directly. Complete (T07);
   - `GraphEngine.add_energy_field(field)`: the energy-only graph's force field in another precision, the float64 MC copy that follows the engine's force field. Its derived buffers join `GraphEngine.derived` as `energy.<precision>.*`. One per precision. `GraphEngine.energy_fields`: `{precision: force field}`. Complete (T07);
   - `GraphEngine.energy_stage(*, precision=None) -> (stage, out)`: the same evaluation as a plain function, for T09's attempt graph, which captures it with its own key, one per edge size. Complete (T07);
-  - `GraphEngine.captured(key, fn) -> replay`: captures `fn`, which takes no arguments and has fixed shapes and addresses, with the engine's warm-up, registry restore and re-capture policy (variant cap, budget, log). It refuses `ENGINE_KEYS`, which are the engine's own, and tuple keys whose first element is one. The graph is captured at the first replay and again after an invalidation or eviction; without capture the replay calls `fn`. A tuple key's first element is its family, so `("mc.swap", bucket)` keys are variants of one key. Complete (T04), for T09's attempt graph.
+  - `GraphEngine.captured(key, fn) -> replay`: captures `fn`, which takes no arguments and has fixed shapes and addresses, with the engine's warm-up, registry restore and re-capture policy (variant cap, budget, log). It refuses `ENGINE_KEYS`, which are the engine's own, and tuple keys whose first element is one. The graph is captured at the first replay and again after an invalidation or eviction; without capture the replay calls `fn`. A tuple key's first element is its family, so `("mc.swap", bucket)` keys are variants of one key. Complete (T04), for T09's attempt graph. `keep=` (3-T10): the caller's own tensors that `fn` writes (an attempt's index, counters, baseline), restored after the warm-up runs as the registered state is.
   - `GraphEngine.invalidate_graphs(reason, keys=None)`: drops the captured graphs (all of them, which also retires the pool, or those of `keys`) and logs the reason. The next capture of a dropped key counts as a re-capture. T03 calls it for friction events. Complete (T04).
   - `GraphEngine.uncommitted() -> bool`: true while a pipelined or speculative step is unvalidated, or an overflowed evaluation is being redone. T08's restart write guard reads it. Complete (T04).
 
@@ -287,6 +287,40 @@ compatibility promise: a restart record's (seed, offset) must give the same numb
   - The run never downgrades mid-run (phase 5, §9.6).
 - **The budget's `"auto"` rule** (`FixedPlanner._phase_3_fields`, `recapture_budget_from_workload`): the variant cap. A run that has re-captured as many graphs as it may hold at once has cycled through its whole working set, so the compiled tier is the better plan. An engine built without a plan reads `"auto"` the same way.
 - `provenance` takes `counters.recaptures` from the engine info when the caller gives none. The full record stays in `counters.engine`.
+
+### Displacements (T10)
+
+`fastmace/mc/displace.py` (owner T10, second editor of `fastmace/mc/` after T09):
+- **Numbers per attempt** (a restart compatibility promise like the swap's): `PROPOSAL_COUNT = 5` proposal numbers
+  from `base + 5k` (number 0 as a uniform: the atom `min(⌊u·N⌋, N − 1)`; numbers 1–3 as normals: the direction;
+  number 4 as a uniform: the radius `δ·u^(1/3)`), one acceptance number at `base + k`, no velocity number
+  (`attempt_counts(N)`). Acceptance as for swaps: `ln u < −ΔE/kT`, `u = 0` accepts. `decode_displace(u, g, N, delta)`.
+- **`check_displace(move, *, max_displacement_A, variable_cell)`**: `PlanRefused` with every reason, codes
+  `displace-variable-cell` (answer 3) and `displace-beyond-max-displacement` (`delta_A` above
+  `Workload.max_displacement_A`, or none declared).
+- **`DisplaceAttempts(move, engine, evaluator, *, seeds, max_displacement_A, index=0, offsets=None)`**: `run(attempts,
+  *, temperature_K, baseline) -> record` (attempted, impossible = 0, accepted, trial_rebuilds, overflows_redone,
+  delta_A, and `adapted_delta_A` with `adaptive`); `baseline` (device, the block's after its acceptances),
+  `trial_energy`, `offsets` (host, per stream), `counters` (`COUNTER_KEYS` = `MC_COUNTER_KEYS` + `trial_rebuilds`,
+  answer 4), `delta_A`, `delta_history`, `set_delta`, `state_dict()` / `load_state_dict()`. T09's driver calls it
+  for `Displace` moves; a block with an acceptance ends at the driver's canonical point.
+- **Paths:** the captured attempt (key `("mc.displace", index, precision, edges)`) is valid only when the rebuild
+  test passes and the count fits the active edges; otherwise it restores itself, leaves the attempt index and sets
+  `halted`, the later replays do nothing, and the host runs that attempt again with the same numbers: the committed
+  list saved, a trial build around the trial geometry when needed, edges sized for the trial, the captured energy
+  graph, then accept (keep the trial list) or reject (restore the position and the list). One host read per block,
+  plus one per halted attempt (answer 1).
+- **Adaptive δ** (answer 2): at the end of each block, δ ← δ·clamp(acc/0.3, 0.5, 2), at most `delta_A` and
+  `Workload.max_displacement_A`; every value in `delta_history`.
+
+Beside it:
+- `SkinNeighbourList.save_list(into=None) -> dict` and `restore_list(saved)`: copies of `buffers()` and the candidate
+  count, kept by the caller (not reachable from the engine, so `check_against` is unaffected); `restore_list` refuses
+  once the capacity moved. Fixed cell only.
+- `GraphEngine.trial_rebuild() -> grew` (in place at the trial positions; a growth drops the graphs and is redone
+  as an overflow), `use_trial_edges() -> edges` (compact, one host sync, the padded count), `adopt_trial_list()`
+  (the pipeline's padded sizes follow an accepted trial list), `record_mc_overflow(word)` (counts in
+  `overflows_redone`, clears the flags); `GraphEngine.trial_rebuilds` counts the trial builds.
 
 ## Restart version 3 (`io/restart.py`; owner T08)
 
