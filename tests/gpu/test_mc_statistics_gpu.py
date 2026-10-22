@@ -364,6 +364,9 @@ def test_mh1_decisions_replay_the_exact_chain():
         assert result[kind]["mc_graphs"] >= 1  # the attempts ran as captured graphs
 
 
+BASELINE_FRESH_EV = 1e-5
+
+
 @pytest.mark.slow
 @needs_mh1
 def test_mh1_first_attempt_after_md():
@@ -382,8 +385,11 @@ def test_mh1_first_attempt_after_md():
     ENGINE.report("3-T12-mh1-after-md", {"delta_error_kT": errors, "decided": decided, "agreements": agreements,
                                          "reference_backend": forced["reference_backend"], "backend": forced["backend"],
                                          "baselines_fresh": [row["baseline"] == row["fresh"] for row in rows]})
-    # The baseline is a fresh evaluation with the MC evaluator, not the MD energy.
-    assert all(row["baseline"] == row["fresh"] for row in rows + decisions["rows"])
+    # The baseline is a fresh evaluation with the MC evaluator, not the MD energy. The test reads "fresh" right after
+    # MD and the driver its baseline after quiescing, so after an accepted block (a canonical rebuild) the two can sum
+    # the per-atom float32 energies in a different order: 2.4e-7 and 4.8e-7 eV of -118.6 eV in 2 of 6 forced blocks
+    # (3-T21, RTX 5060 Ti), against 1e-5 eV here (2e-4 kT at 600 K; a tenth of the gate's 0.01 kT).
+    assert all(abs(row["baseline"] - row["fresh"]) <= BASELINE_FRESH_EV for row in rows + decisions["rows"])
     assert max(errors) <= GATE_KT
     assert decided >= 4 and all(agreements)
 
