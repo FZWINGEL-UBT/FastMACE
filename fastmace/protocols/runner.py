@@ -18,9 +18,10 @@ The stages, in the run's output directory:
 
 Every piece ends with a restart at its last step, so a long protocol runs as pieces of bounded
 wall time. ``protocol.json`` records the stages, the pieces, the relaxation and the quench summary,
-and the engine counters of ``PIECE_COUNTERS`` per piece (each piece builds a new engine) with their
-sums over the run in ``counters``; ``metadata.json`` is the run's, with the plan, gate and
-``counters.mc``.
+and the counters of ``PIECE_COUNTERS`` per piece (each piece builds a new engine and force field) with
+their sums over the run in ``counters``. With D3 (``dispersion=``) the relaxation and the quench use
+MACE plus the run's D3 record, and the quench relaxes each frame at its own cell (NPT's).
+``metadata.json`` is the run's, with the plan, gate and ``counters.mc``.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+from fastmace.longrange import d3
 from fastmace.protocols import quench as quench_stage
 from fastmace.protocols.profiles import OPTIMIZERS, _quench
 
@@ -43,9 +45,11 @@ RELAX_KEYS = ("fmax", "optimizer", "max_steps")
 STAGES = ("relax", "quench")
 RELAXATION_LOG, RELAXED = "relaxation.log", "relaxed.extxyz"
 _LOAD_KEYS = ("head", "sha256", "trusted", "charge", "spin_multiplicity")
-# The engine counters (``Engine.info()``) a protocol run sums over its pieces: the MACE neighbour list's
-# rebuilds (3b-T06's cost cross-check reads them from the full ramp).
-PIECE_COUNTERS = ("neighbour_rebuilds",)
+# The counters a protocol run sums over its pieces: the MACE neighbour list's rebuilds (``Engine.info()``)
+# and D3's builds, rebuilds and build time (the D3 term's ``counters()``, in the force field's ``info()``);
+# 3b-T06's cost cross-check reads them from the full ramp. ``None`` without D3.
+PIECE_COUNTERS = ("neighbour_rebuilds", "d3_builds", "d3_rebuilds", "d3_build_s")
+_D3_COUNTERS = {"d3_builds": "builds", "d3_rebuilds": "rebuilds", "d3_build_s": "build_seconds"}
 
 
 def protocol_names() -> tuple[str, ...]:
@@ -169,11 +173,12 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
               "repeat": list(repeat), "atoms": len(atoms), "timestep_fs": timestep_fs, "relax": relax,
               "relaxation": None, "quench": quench, "quench_result": None,
               "mc": None if mc is None else [move_record(move) for move in mc],
-              "min_mc_temperature_K": options.get("min_mc_temperature_K"), "pieces": [], "counters": None,
+              "min_mc_temperature_K": options.get("min_mc_temperature_K"), "dispersion": None, "pieces": [],
+              "counters": None,
               "status": "relax"}
     _write(directory, record)
     if relax is not None:
-        calc = FastMACECalculator(model)
+        calc = FastMACECalculator(model, dispersion=options.get("dispersion"))
         atoms, summary = quench_stage.relax(atoms, calc, relax["fmax"], relax["max_steps"],
                                             logfile=directory / RELAXATION_LOG, optimizer=relax["optimizer"])
         del calc
@@ -196,6 +201,8 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
     log(result.summary)
     sim = result.simulation
     sim.report.repeat = repeat
+    dispersion = sim.force_field.dispersion
+    record["dispersion"] = None if dispersion is None else d3.describe(dispersion)
     return _end_piece(sim, directory, record, 0, started, log)
 
 
@@ -251,7 +258,7 @@ def _end_piece(sim, directory, record, first, started, log):
         return record
     resolved = None if position is None else position.resolved
     frame_every = sim.output.trajectory_every
-    model, precision = sim.force_field.model, sim.force_field.precision
+    model, precision, dispersion = sim.force_field.model, sim.force_field.precision, sim.force_field.dispersion
     sim.close()
     _log_counters(directory, log)
     if record["quench"] is not None:
@@ -261,7 +268,7 @@ def _end_piece(sim, directory, record, first, started, log):
         _release_device_memory()
         from fastmace.ase.calculator import FastMACECalculator
 
-        calc = FastMACECalculator(model, precision=precision)
+        calc = FastMACECalculator(model, precision=precision, dispersion=dispersion)
         result = quench_stage.quench_run(directory, calc, resolved, frame_every, record["timestep_fs"],
                                          record["quench"], log=log)
         record["quench_result"] = result
@@ -273,9 +280,12 @@ def _end_piece(sim, directory, record, first, started, log):
 
 
 def _piece_counters(sim):
-    """``PIECE_COUNTERS`` of this piece's engine (``None`` where the engine does not report one)."""
-    info = (sim.metadata().get("counters") or {}).get("engine") or {}
-    return {key: info.get(key) for key in PIECE_COUNTERS}
+    """``PIECE_COUNTERS`` of this piece's engine and force field (``None`` where it does not report one)."""
+    metadata = sim.metadata()
+    engine = (metadata.get("counters") or {}).get("engine") or {}
+    dispersion = (metadata.get("force_field") or {}).get("d3") or {}
+    return {"neighbour_rebuilds": engine.get("neighbour_rebuilds"),
+            **{key: dispersion.get(name) for key, name in _D3_COUNTERS.items()}}
 
 
 def _sum_counters(pieces):
