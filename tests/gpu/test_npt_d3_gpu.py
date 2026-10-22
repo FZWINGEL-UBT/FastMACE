@@ -107,6 +107,7 @@ def test_npt_with_d3_follows_ase(tmp_path):
     path = tmp_path / "tiny-mh1-11-17.model"
     torch.save(tiny_mace_model([11, 17], **FAMILIES["mh1"]), path)
     out = ENGINE.run_fresh(f"SPEC = {{'path': {str(path)!r}, 'steps': {STEPS}}}\n" + CHILD)
+    ENGINE.report("3b-T05-npt-d3-vs-ase", out)
     assert out["ase"]["mass_ratio"] == pytest.approx(1.0, rel=1e-12)
     assert abs(out["volume_change"]) > 1e-4  # the barostat moved the cell
     for mode, result in out["modes"].items():
