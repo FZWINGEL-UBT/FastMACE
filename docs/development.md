@@ -281,32 +281,39 @@ Each runner's `.env` file holds its paths and limits (`tools/ci/runner/env.murph
 
 ### The local GPU reservation
 
-WSL on the PC has 15 GB of RAM for every session. A GPU suite started while sibling CPU suites ran
-crashed WSL on 19 October 2026. WSL's `nvidia-smi` does not show who is on the GPU. So every local GPU
+A GPU suite started while sibling CPU suites ran crashed WSL on 19 October 2026, when WSL had 15 GB of
+RAM (40 GB since 21 October). WSL's `nvidia-smi` does not show who is on the GPU. So every local GPU
 run holds one reservation, `tools/ci/local_gpu.py`: the GPU CI runner, a worker's GPU suite and a
 timing run alike. Every local CPU suite checks it first.
 
 - **Reserve** creates the marker `~/.fastmace-local-gpu` atomically (`mkdir`), with `holder.json`:
   owner, purpose, pid, the pid's start time and the time of the reservation. While another live holder
   has it, reserve waits.
-- **Then wait:** holding the marker, it waits until no other `pytest` process runs and at least 10 GiB
-  of RAM are available. Then the run starts. New CPU suites do not start meanwhile, because they check
-  the marker. If either wait takes longer than `--wait-minutes` (default 60), it releases the marker
-  and exits with status 75.
+- **Then wait:** holding the marker, it waits until no other `pytest` process that can use the GPU
+  runs and at least 10 GiB of RAM are available. Then the run starts. A pytest process whose
+  environment sets `CUDA_VISIBLE_DEVICES` empty (or `-1`) cannot use the GPU, so it does not count
+  (22 October 2026: with five phase 3 workers, CPU suites kept GPU reservations waiting). If either
+  wait takes longer than `--wait-minutes` (default 60), it releases the marker and exits with status 75.
+- **Timing runs** pass `--quiet`. They wait until no other pytest runs at all, and their reservation
+  blocks CPU-only suites too.
 - **Release** removes the marker, only for the pid that holds it.
 - **A stale marker** is reported and removed by the next reserve or check. It is stale when its holder
   process is gone, or when its pid now belongs to another process.
-- **Check** exits 1 while a live marker exists.
+- **Check** exits 1 while a live marker exists. `check --cpu-only`, for a CPU suite run with
+  `CUDA_VISIBLE_DEVICES=`, exits 1 only while a quiet reservation is live.
 
-Worker commands on the PC, from the checkout (`python3` is WSL's system Python):
+Worker commands on the PC (`python3` is WSL's system Python). The conductor's main checkout,
+`/mnt/d/Margraf/FastMACE`, always has the current tool:
 
 ```bash
-# A local GPU suite or timing run: reserve, run, release (on any exit; the command's status is returned)
-python3 tools/ci/local_gpu.py run --purpose "2-Tnn fast tier" -- <the GPU command>
+# A local GPU suite: reserve, run, release (on any exit; the command's status is returned)
+python3 tools/ci/local_gpu.py run --purpose "3-Tnn fast tier" -- <the GPU command>
+# A timing run: the machine quiet, and CPU-only suites wait meanwhile
+python3 tools/ci/local_gpu.py run --quiet --purpose "3-Tnn timing" -- <the timing command>
 # The same in a shell script that runs several commands
-python3 tools/ci/local_gpu.py reserve --purpose "2-Tnn timing" --pid $$ && trap 'python3 tools/ci/local_gpu.py release --pid $$' EXIT
-# Before every local CPU suite: no reservation, and 6 GB available
-python3 tools/ci/local_gpu.py check --min-available-gib 6 && <the CPU suite command>
+python3 tools/ci/local_gpu.py reserve --quiet --purpose "3-Tnn timing" --pid $$ && trap 'python3 tools/ci/local_gpu.py release --pid $$' EXIT
+# Before every local CPU suite: CPU only, no quiet reservation, and 6 GB available
+python3 tools/ci/local_gpu.py check --cpu-only --min-available-gib 6 && CUDA_VISIBLE_DEVICES= <the CPU suite command>
 # Who holds it
 python3 tools/ci/local_gpu.py status
 ```

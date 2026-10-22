@@ -32,10 +32,12 @@ class FakeProc:
         kib = int(available_gib * 1024**2)
         (self.root / "meminfo").write_text(f"MemTotal:       16000000 kB\nMemAvailable:   {kib} kB\n")
 
-    def add(self, pid, argv, ppid=1, start=1000):
+    def add(self, pid, argv, ppid=1, start=1000, env=None):
         directory = self.root / str(pid)
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "cmdline").write_bytes(b"\0".join(arg.encode() for arg in argv) + b"\0")
+        if env is not None:
+            (directory / "environ").write_bytes(b"".join(f"{k}={v}".encode() + b"\0" for k, v in env.items()))
         fields = ["S", str(ppid)] + ["0"] * 17 + [str(start)] + ["0"] * 10
         (directory / "stat").write_text(f"{pid} ({Path(argv[0]).name}) " + " ".join(fields) + "\n")
         return pid
@@ -82,6 +84,35 @@ def test_process_table(proc):
 def test_pytest_processes(proc, argv, is_pytest):
     proc.add(20, argv)
     assert (lg.pytest_processes(proc.root, own_pid=1) == [20]) is is_pytest
+
+
+def test_cpu_only_pytest_processes_count_only_for_quiet_runs(proc):
+    proc.add(60, ["python", "-m", "pytest", "tests/cpu"], env={"HOME": "/h", "CUDA_VISIBLE_DEVICES": ""})
+    proc.add(61, ["python", "-m", "pytest", "tests/cpu"], env={"CUDA_VISIBLE_DEVICES": "-1"})
+    proc.add(62, ["python", "-m", "pytest", "tests/gpu"], env={"CUDA_VISIBLE_DEVICES": "0"})
+    proc.add(63, ["python", "-m", "pytest", "tests/gpu"])  # no readable environment: it counts
+    assert lg.pytest_processes(proc.root, own_pid=1) == [60, 61, 62, 63]
+    assert lg.pytest_processes(proc.root, own_pid=1, gpu_only=True) == [62, 63]
+    reasons = lg.machine_reasons(proc.root, own_pid=1)
+    assert "can use the GPU" in reasons[0] and "[62, 63]" in reasons[0]
+    proc.remove(62)
+    proc.remove(63)
+    assert lg.machine_reasons(proc.root, own_pid=1) == []  # CPU-only suites do not block a GPU run
+    assert "[60, 61]" in lg.machine_reasons(proc.root, own_pid=1, quiet=True)[0]  # but a timing run waits
+
+
+def test_a_cpu_only_check_is_blocked_only_by_a_quiet_reservation(proc, tmp_path):
+    marker = tmp_path / "gpu"
+    proc.add(40, ["bash"])
+    lg.reserve(marker, "3-Tnn fast tier", pid=40, proc_root=proc.root)
+    assert "quiet" not in json.loads((marker / "holder.json").read_text())
+    assert lg.check(marker, proc.root, cpu_only=True) == (True, [])
+    assert not lg.check(marker, proc.root)[0]
+    assert lg.release(marker, pid=40)
+    ok, holder = lg.reserve(marker, "3-Tnn timing", pid=40, proc_root=proc.root, quiet=True)
+    assert ok and holder["quiet"] is True and json.loads((marker / "holder.json").read_text())["quiet"] is True
+    free, reasons = lg.check(marker, proc.root, cpu_only=True)
+    assert not free and "3-Tnn timing" in reasons[0] and "(quiet)" in reasons[0]
 
 
 def test_own_ancestors_are_not_counted(proc):
@@ -234,6 +265,21 @@ def test_run_reports_busy_with_status_75(tmp_path, monkeypatch, capsys):
     assert status == lg.BUSY == 75
     assert "pytest" in capsys.readouterr().err
     assert not marker.exists()
+
+
+def test_the_quiet_and_cpu_only_flags(tmp_path, monkeypatch):
+    marker = tmp_path / "gpu"
+    seen = {}
+
+    def wait(*args, **kwargs):
+        seen.update(kwargs)
+        return True, []
+
+    monkeypatch.setattr(lg, "wait_for_machine", wait)
+    status = lg.main(["run", "--marker", str(marker), "--purpose", "timing", "--quiet", "--wait-minutes", "0",
+                      "--", sys.executable, "-c", "pass"])
+    assert status == 0 and seen["quiet"] is True and not marker.exists()
+    assert lg.main(["check", "--cpu-only", "--marker", str(marker)]) == 0
 
 
 def test_check_command_status(tmp_path):
