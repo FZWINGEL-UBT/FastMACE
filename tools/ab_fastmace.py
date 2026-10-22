@@ -18,9 +18,16 @@ one for a control or an alternating-process run):
   --release 2:
     3   this checkout, as above
     2   the release at tag ``fastmace-2`` (e52c482), exported as ``fastmace_2``, through its minimal planner
+  --release p3b (3-T21, phase 3 item 10):
+    3   this checkout, as above, with ``fixcm_projection="ase"`` (decision 37 made the mass-weighted
+        projection the NVT default; the baseline has ASE's)
+    p3b main before phase 3 (tag ``phase-3-baseline``, 156ab76), exported as ``fastmace_p3b``, through its
+        minimal planner
 
 ``--engine-option FIELD=VALUE`` (repeatable) sets an ``EngineConfig`` field on this checkout's side only
 (``fused_integrator=on``: an option the release does not have); ``on``/``off`` read as booleans.
+``--integrator-option FIELD=VALUE`` does the same for ``IntegratorConfig`` (release p3b pins
+``fixcm_projection=ase`` unless given).
 
 Both are FastMACE, so they patch the same process-wide objects (fastmace.bench.versions): this tool
 gives each side its own patches (``ProcessPatches``) before its load, build, warm-up and every timed
@@ -76,7 +83,10 @@ RELEASES = {
     "1a": Release("fastmace-1a", "bb35363", versions.DEFAULT_NAME, "fixed", "1b"),
     "1b": Release("fastmace-1b", "673a8a1", "fastmace_1b", "minimal", "2"),
     "2": Release("fastmace-2", "e52c482", "fastmace_2", "minimal", "3"),
+    "p3b": Release("phase-3-baseline", "156ab76", "fastmace_p3b", "minimal", "3"),
 }
+# IntegratorConfig fields this checkout's side pins against a release unless --integrator-option sets them.
+RELEASE_INTEGRATOR_PINS = {"p3b": {"fixcm_projection": "ase"}}
 SIDES = ("1a", "1b")
 FASTMACE_1A_TAG = RELEASES["1a"].tag
 FASTMACE_1A_COMMIT = RELEASES["1a"].commit
@@ -96,13 +106,16 @@ def parse_args(argv=None):
     p.add_argument("--output", required=True, type=Path, help="Fresh directory")
     p.add_argument("--release", choices=sorted(RELEASES), default="1a",
                    help="The earlier release timed against this checkout (1a: sides 1a and 1b; 1b: sides 1b and 2)")
-    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3"),
+    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b"),
                    help="Build order; two sides for an A/B process, one for a control (default: release, checkout)")
     p.add_argument("--renamed", type=Path, help="Directory holding the release's exported renamed package")
     p.add_argument("--expected-commit", help="Commit (prefix) the release's copy must be (default: the release's)")
     p.add_argument("--planner-1b", choices=("minimal", "fixed"), default="minimal")
     p.add_argument("--engine-option", action="append", default=[], metavar="FIELD=VALUE",
                    help="EngineConfig field for this checkout's side only (on/off read as booleans)")
+    p.add_argument("--integrator-option", action="append", default=[], metavar="FIELD=VALUE",
+                   help="IntegratorConfig field for this checkout's side only (release p3b: fixcm_projection=ase "
+                        "unless given)")
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--checkpoint", required=True, type=Path)
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5"],
@@ -129,6 +142,12 @@ def parse_args(argv=None):
         if not sep or not field:
             p.error(f"--engine-option {item!r}: expected FIELD=VALUE")
         args.engine_options[field] = {"on": True, "off": False}.get(value, value)
+    args.integrator_options = dict(RELEASE_INTEGRATOR_PINS.get(args.release, {}))
+    for item in args.integrator_option:
+        field, sep, value = item.partition("=")
+        if not sep or not field:
+            p.error(f"--integrator-option {item!r}: expected FIELD=VALUE")
+        args.integrator_options[field] = {"on": True, "off": False}.get(value, value)
     release = RELEASES[args.release]
     args.current = release.current
     if args.sides is None:
@@ -194,6 +213,10 @@ class Version:
         import importlib
         return importlib.import_module(f"{self.package.__name__}.{name}")
 
+    def integrator_options(self):
+        """The IntegratorConfig fields this side sets beyond the protocol's (this checkout's side only)."""
+        return dict(getattr(self.args, "integrator_options", {})) if self.side == self.args.current else {}
+
     def prepare(self):
         """The planner and its allocator rule, before the first CUDA allocation."""
         config = self.module("config")
@@ -219,7 +242,7 @@ class Version:
     def build(self, base):
         config = self.module("config")
         integrator = config.IntegratorConfig(ensemble=self.args.ensemble, cell_mode=self.args.cell_mode,
-                                             seed=self.args.seed)
+                                             seed=self.args.seed, **self.integrator_options())
         fixed = self.module("planner.fixed")
         if self.minimal:
             ForceField = self.module("model.forcefield").ForceField
