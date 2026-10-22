@@ -1,0 +1,97 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for '3-T20 event breakdown probe NaCl+NbCl5 (<15 min)' (pid 157770)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/d/Margraf/FastMACE/.claude/worktrees/3-t20-56ed1f/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/FastMACE/.claude/worktrees/3-t20-56ed1f/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/FastMACE/.claude/worktrees/3-t20-56ed1f/fastmace/model/loading.py:748: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/d/Margraf/FastMACE/.claude/worktrees/3-t20-56ed1f/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+NaCl step 3.030 ms, event 15.31 ms (5.1 steps), post-event penalty -0.52 ms
+  event                          17.512 ms  (1.0 calls)
+  update                         16.614 ms  (1.0 calls)
+  Transaction.resume             13.758 ms  (1.0 calls)
+  canonicalise                   13.725 ms  (1.0 calls)
+  _force_stage                   11.427 ms  (1.0 calls)
+  rebuild                         1.629 ms  (1.0 calls)
+  Transaction.snapshot            0.955 ms  (1.0 calls)
+  Transaction.apply               0.942 ms  (1.0 calls)
+  committed                       0.793 ms  (1.0 calls)
+  registry.snapshot               0.792 ms  (1.0 calls)
+  derived.refresh                 0.558 ms  (2.0 calls)
+  Transaction.refresh             0.556 ms  (1.0 calls)
+  compact                         0.396 ms  (1.0 calls)
+  update rest                     0.380 ms  (0.0 calls)
+  canonicalise rest               0.251 ms  (0.0 calls)
+  event rest                      0.105 ms  (0.0 calls)
+  Transaction.quiesce             0.017 ms  (1.0 calls)
+  flush                           0.016 ms  (3.0 calls)
+  integrator.start                0.006 ms  (1.0 calls)
+  Transaction.accept              0.006 ms  (1.0 calls)
+  Transaction.resume rest        -0.526 ms  (0.0 calls)
+/mnt/d/Margraf/FastMACE/.claude/worktrees/3-t20-56ed1f/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+W1022 04:47:07.083000 158048 torch/_inductor/utils.py:1806] [0/2_1] Not enough SMs to use max_autotune_gemm mode
+NbCl5 step 21.471 ms, event 31.32 ms (1.5 steps), post-event penalty 0.01 ms
+  event                          32.394 ms  (1.0 calls)
+  update                         30.960 ms  (1.0 calls)
+  Transaction.resume             26.710 ms  (1.0 calls)
+  canonicalise                   26.670 ms  (1.0 calls)
+  _force_stage                   23.566 ms  (1.0 calls)
+  rebuild                         2.284 ms  (1.0 calls)
+  committed                       1.311 ms  (1.0 calls)
+  Transaction.apply               1.236 ms  (1.0 calls)
+  update rest                     1.223 ms  (0.0 calls)
+  Transaction.snapshot            1.151 ms  (1.0 calls)
+  registry.snapshot               0.987 ms  (1.0 calls)
+  derived.refresh                 0.624 ms  (2.0 calls)
+  Transaction.refresh             0.615 ms  (1.0 calls)
+  compact                         0.416 ms  (1.0 calls)
+  canonicalise rest               0.377 ms  (0.0 calls)
+  event rest                      0.123 ms  (0.0 calls)
+  Transaction.quiesce             0.020 ms  (1.0 calls)
+  flush                           0.019 ms  (3.0 calls)
+  integrator.start                0.008 ms  (1.0 calls)
+  Transaction.accept              0.006 ms  (1.0 calls)
+  Transaction.resume rest        -0.584 ms  (0.0 calls)
