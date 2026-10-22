@@ -892,6 +892,14 @@ Wave 4   T20 benchmarks (T09 T10 T11)   T21 acceptance
   1 fs production rests on the October 1 fs checks of the research engine
   and on the fixed FastMACE path.
 
+- **Rule 11 for MD-only runs is not proposed as a default** (22 October
+  2026). 3-T05 measured, at 1 fs and 1000 K or 1500 K on NaCl and NbCl5,
+  local and on the L4: rebuilds drop 2.2–2.7×, but the step time stays
+  within noise, because `overlap_rebuild` already runs rebuilds on a side
+  stream. MD-only plans keep 0.3 Å. The rule serves MC and species-change
+  workloads, displacement trials and plans without `overlap_rebuild`
+  (`docs/validation/3-T05.md`).
+
 ## Conductor answers to the prestart reports (22 October 2026)
 
 These answers bind every phase 3 worker. When an answer adds a public name,
