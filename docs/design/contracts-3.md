@@ -295,6 +295,50 @@ compatibility promise: a restart record's (seed, offset) must give the same numb
 - **The budget's `"auto"` rule** (`FixedPlanner._phase_3_fields`, `recapture_budget_from_workload`): the variant cap. A run that has re-captured as many graphs as it may hold at once has cycled through its whole working set, so the compiled tier is the better plan. An engine built without a plan reads `"auto"` the same way.
 - `provenance` takes `counters.recaptures` from the engine info when the caller gives none. The full record stays in `counters.engine`.
 
+### Displacements (T10)
+
+`fastmace/mc/displace.py` (owner T10, second editor of `fastmace/mc/` after T09):
+- **Numbers per attempt** (a restart compatibility promise like the swap's): `PROPOSAL_COUNT = 5` proposal numbers
+  from `base + 5k` (number 0 as a uniform: the atom `min(⌊u·N⌋, N − 1)`; numbers 1–3 as normals: the direction;
+  number 4 as a uniform: the radius `δ·u^(1/3)`), one acceptance number at `base + k`, no velocity number
+  (`attempt_counts(N)`). Acceptance as for swaps: `ln u < −ΔE/kT`, `u = 0` accepts. `decode_displace(u, g, N, delta)`.
+- **`check_displace(move, *, max_displacement_A, variable_cell)`**: `PlanRefused` with every reason, codes
+  `displace-variable-cell` (answer 3) and `displace-beyond-max-displacement` (`delta_A` above
+  `Workload.max_displacement_A`, or none declared).
+- **`DisplaceAttempt(move, engine, evaluator, block_streams)`**, built by `moves.build_attempt` for a `Displace`: the
+  shape of T09's `Attempt` (`bound(stage, trial)`, `run()`, `tensors()`, `counters` `[3]`, `accepted`, `counts`,
+  `block_velocity_count = 0`, `velocities = None`; `accept` binds `moves.metropolis` when built), plus `halted`,
+  `trial_energy`, `delta` (device), `poll() -> (index, halted)`, `host_attempt() -> rebuilt`, `set_delta(delta_A, *,
+  record=True)`, `adapt(accepted, attempted)`, `delta_A`, `delta_history`, `trial_rebuilds` (host, cumulative) and
+  `max_displacement_A`.
+- **Paths:** the captured attempt (key `("mc.displace", driver id, index, precision, edges)`, T09's scheme) is valid
+  only when the rebuild test passes and the count fits the active edges; otherwise it restores itself, leaves the
+  attempt index and sets `halted`, the later replays do nothing, and the host runs that attempt again with the same
+  numbers: the committed list saved, a trial build around the trial geometry when needed, edges sized for the trial,
+  the captured energy graph, then accept (keep the trial list) or reject (restore the position and the list).
+- **In `MCDriver`:**
+  - `attach(engine, *, evaluator=None, max_displacement_A=None)`: `check_displace` for every `Displace`, with the
+    workload's maximum (T15 passes `Workload.max_displacement_A`) and the engine's `variable_cell`.
+  - `run_block`: after a displacement move's replays, `_finish_displacements(index)` reads its attempt index and
+    `halted` (one host read), runs a halted attempt on the host and replays the rest; one more read per halted
+    attempt (answer 1). Moves due in the block still run in attached order.
+  - The block record's displacement entry adds `trial_rebuilds` (answer 4; a run counter, not restart state, since
+    the restart's counters are exactly `MC_COUNTER_KEYS`), `delta_A` (the δ the block used) and, with `adaptive`,
+    `adapted_delta_A`.
+  - Adaptive δ (answer 2) at the end of each block: δ ← δ·clamp(acc/0.3, 0.5, 2), at most `delta_A` and
+    `Workload.max_displacement_A`. The restart's `delta_A` holds each displacement move's current δ by
+    `"displace:<index>"`; `load_state_dict` restores it before or after attach. `info()["displacements"]` gives
+    δ, its history and the trial builds per move.
+
+Beside it:
+- `SkinNeighbourList.save_list(into=None) -> dict` and `restore_list(saved)`: copies of `buffers()` and the candidate
+  count, kept by the caller (not reachable from the engine, so `check_against` is unaffected); `restore_list` refuses
+  once the capacity moved. Fixed cell only.
+- `GraphEngine.trial_rebuild() -> grew` (in place at the trial positions; a growth drops the graphs and is redone
+  as an overflow), `use_trial_edges() -> edges` (compact, one host sync, the padded count), `adopt_trial_list()`
+  (the pipeline's padded sizes follow an accepted trial list), `record_mc_overflow(word)` (counts in
+  `overflows_redone`, clears the flags); `GraphEngine.trial_rebuilds` counts the trial builds.
+
 ## Restart version 3 (`io/restart.py`; owner T08)
 
 Since 3-T08 the writer is at `FORMAT_VERSION = NEXT_FORMAT_VERSION = 3`. Version 0, 1 and 2 files keep loading.

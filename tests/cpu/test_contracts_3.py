@@ -263,19 +263,20 @@ def test_mc_driver_contract():  # filled by 3-T09
     assert _keyword_only(MCDriver) == ["seed", "config"]
     for name in ("attach", "run_block", "state_dict", "load_state_dict", "due"):
         assert callable(getattr(MCDriver, name))
-    assert _parameters(MCDriver.attach) == ["self", "engine", "evaluator"]
-    assert _keyword_only(MCDriver.attach) == ["evaluator"]
+    assert _parameters(MCDriver.attach) == ["self", "engine", "evaluator", "max_displacement_A"]
+    assert _keyword_only(MCDriver.attach) == ["evaluator", "max_displacement_A"]  # 3-T10
     assert _parameters(MCDriver.run_block) == ["self", "engine", "step"]
     driver = MCDriver((Swap([("Na", "Cl")], 10, 5),), seed=1)
     assert driver.last_block is None and driver.offsets == dict.fromkeys(config.MC_STREAMS, 0)
 
 
-def test_attempt_contract():  # filled by 3-T09; displacements stay 3-T10's
+def test_attempt_contract():  # filled by 3-T09; displacements by 3-T10
     from fastmace.mc import Displace, moves
 
     assert _parameters(moves.build_attempt) == ["move", "engine", "evaluator", "streams", "fixcm"]
     assert _keyword_only(moves.build_attempt) == ["fixcm"]
-    _raises_naming("3-T10", lambda: moves.build_attempt(Displace(0.1, 10, 5), None, None, None))
+    with pytest.raises(TypeError, match="graph engine"):  # a DisplaceAttempt, which needs a graph engine
+        moves.build_attempt(Displace(0.1, 10, 5), None, None, None)
 
 
 # --------------------------------------------------------------------------- events
@@ -498,6 +499,27 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     assert restart.MC_COUNTER_KEYS == ("attempted", "impossible", "accepted")
     assert restart.MC_STREAM_KEYS == ("seed", "offset")
     assert restart.mc_record({}) is None  # 3-T08: no move set attached
+
+
+def test_displacement_names():  # §10.4 displacements (3-T10)
+    from fastmace.engine.graph import GraphEngine
+    from fastmace.io.restart import MC_COUNTER_KEYS
+    from fastmace.mc import displace
+    from fastmace.neighbors.skin import SkinNeighbourList
+
+    assert displace.PROPOSAL_COUNT == 5 and displace.ACCEPTANCE_COUNT == 1
+    assert displace.COUNTER_KEYS == (*MC_COUNTER_KEYS, "trial_rebuilds")
+    assert (displace.VARIABLE_CELL_CODE, displace.BEYOND_MAX_CODE) == (
+        "displace-variable-cell", "displace-beyond-max-displacement")
+    assert _parameters(displace.DisplaceAttempt) == ["move", "engine", "evaluator", "block_streams"]
+    for name in ("bound", "run", "tensors", "poll", "host_attempt", "set_delta", "adapt"):
+        assert callable(getattr(displace.DisplaceAttempt, name))
+    assert _keyword_only(displace.check_displace) == ["max_displacement_A", "variable_cell"]
+    assert _parameters(SkinNeighbourList.save_list) == ["self", "into"]
+    assert _parameters(SkinNeighbourList.restore_list) == ["self", "saved"]
+    for name in ("trial_rebuild", "use_trial_edges", "adopt_trial_list"):
+        assert _parameters(getattr(GraphEngine, name)) == ["self"]
+    assert _parameters(GraphEngine.record_mc_overflow) == ["self", "word"]
 
 
 # --------------------------------------------------------------------------- protocol runs

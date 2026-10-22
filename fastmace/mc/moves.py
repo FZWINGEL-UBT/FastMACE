@@ -4,7 +4,7 @@
 loaded, so this module imports neither torch nor MACE nor ASE. They are checked against the
 workload and the superset by ``Simulation.run(mc=...)`` (§7.6). Species stay as given (symbols
 or atomic numbers); the driver maps them to atomic numbers. ``build_attempt`` builds the captured
-attempt of a move: 3-T09 (swaps, transmutations), 3-T10 (displacements).
+attempt of a move: 3-T09 (swaps, transmutations), 3-T10 (displacements, ``fastmace.mc.displace``).
 """
 
 from __future__ import annotations
@@ -392,13 +392,16 @@ class Attempt:
 
 
 def build_attempt(move: Swap | Transmute | Displace, engine: Any, evaluator: Any, streams: Any, *,
-                  fixcm: bool = False) -> Attempt:
+                  fixcm: bool = False) -> Any:
     """The attempt of ``move`` (propose → apply → refresh → energy → accept mask → restore, §10.4 "Graph
     capture") on ``engine``, with the MC ``evaluator`` (3-T07) and the block's device ``streams``
     (``streams.BlockStreams``); ``Attempt.run`` is what the driver captures. ``fixcm``: the integrator
-    fixes the centre of mass, which sets a transmutation's default treatment. Imports torch."""
+    fixes the centre of mass, which sets a transmutation's default treatment. A ``Displace`` gives a
+    ``fastmace.mc.displace.DisplaceAttempt`` (3-T10), which moves no momentum. Imports torch."""
     if isinstance(move, Displace):
-        raise NotImplementedError("MC attempts of Displace: plan task 3-T10")
+        from fastmace.mc.displace import DisplaceAttempt
+
+        return DisplaceAttempt(move, engine, evaluator, streams)
     if not isinstance(move, (Swap, Transmute)):
-        raise TypeError(f"build_attempt takes a Swap or a Transmute, got {type(move).__name__}")
+        raise TypeError(f"build_attempt takes a Swap, a Transmute or a Displace, got {type(move).__name__}")
     return Attempt(move, engine, evaluator, streams, fixcm=fixcm)
