@@ -94,10 +94,18 @@ case "$job" in
     done
     ;;
   trajectories-cpu)  # item 10: CPU float64, both versions, one process each; compare --bitwise (no GPU)
+    # The tests' tiny MH-1-class model on NaCl 2x2x2 (conductor, decision 39: size the test to the risk; the GPU
+    # reproducible check carries MH-1). tests/_support/tiny_models.py is unchanged since phase-3-baseline.
+    tiny=$root/tiny-mh1-11-17.model
+    [ -f "$tiny" ] || (cd "$src" && env CUDA_VISIBLE_DEVICES= PYTHONPATH="$src:$src/tests" "$hybrid" -c "
+import sys, torch
+from _support.tiny_models import FAMILIES, tiny_mace_model
+torch.save(tiny_mace_model([11, 17], **FAMILIES['mh1']), sys.argv[1])" "$tiny")
     for side in p3b 3; do
       run traj-cpu-$side env CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=4 "$hybrid" tools/trajectory_versions.py run \
         --against p3b --side $side --renamed "$versions" --device cpu --backend auto --output "$root/traj-cpu-$side" \
-        --checkpoint "$checkpoint" --structure NaCl --steps 200 --every 20 --seeds 20261022 --positions
+        --model "$tiny" --checkpoint "$tiny" --structure NaCl@2x2x2 --steps 100 --every 10 --seeds 20261022 \
+        --positions
     done
     run traj-cpu-compare "$hybrid" tools/trajectory_versions.py compare --release "$root/traj-cpu-p3b" \
       --current "$root/traj-cpu-3" --bitwise

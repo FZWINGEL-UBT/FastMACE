@@ -143,3 +143,4 @@ def test_a_cpu_run_plans_both_versions_on_the_cpu(tmp_path, monkeypatch):
         monkeypatch.setattr(version, "module", lambda name: Config if name == "config" else Minimal)
         version.prepare()
     assert [kwargs.get("device") for kwargs in seen] == ["cpu", "cpu", None]
+    assert [kwargs.get("compile_mode") for kwargs in seen] == ["none", "none", None]
