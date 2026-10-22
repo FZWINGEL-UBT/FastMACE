@@ -101,6 +101,7 @@ T04 registers them and adds anything its version-counter test finds. The table i
 | `engine.flags`, `pipe_flags`, `spec_flags`, `rebuild_needed` | reset (quiesce) | capture, **sticky** (overflow bits) |
 | `engine.mid.*`, pipeline floor and next bucket (`_pipe_floor`, `_pipe_edges`) | reset (quiesce) | capture |
 | `engine.flags_host`, `pipe_flags_host`, `spec_flags_host` (host mirrors, T04) | derived (overwritten before read) | no capture |
+| `derived.*`: the derived-state registry's buffers not registered under another name (3-T03; Langevin `c3_unit`/`c4_unit`/`c5_unit`, BAOAB `inv_sqrt_masses`, the fused `coefficients`) | derived (`DerivedStateRegistry.refresh`) | capture |
 
 `sqrt_kT` is read by the engine from the integrator (it is not in 1a's `Integrator.buffers`).
 `p_eps` and `force_eps` are registered as `state.p_eps` and `state.force_eps` (T05 moved them into

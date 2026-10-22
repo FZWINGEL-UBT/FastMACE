@@ -73,6 +73,7 @@ REQUEST_NAME = "request.json"
 RESULT_NAME = "result.json"
 START_NAME = "start.traj"  # the parent's Atoms for the setup child (ASE trajectory: exact float64)
 COMMITTED_NAME = "committed.npz"  # the committed step's output values (Engine.sync)
+COMPOSITION_PREFIX = "composition."  # beside them in that file: species, masses, charges (Committed, 3-T03)
 HEARTBEAT_NAME = "heartbeat"  # a fresh child's default: in its stage
 CHILD_NAME = "child-{:04d}"  # per child process under the hand-off directory: .log and .heartbeat
 SINKS_NAME = "sinks"
@@ -147,6 +148,7 @@ class SubprocessRunner:
         self._decision = None  # the parent plan's "runner" decision, kept on the child's plans
         self._stages = 0
         self._values: dict[str, Any] | None = None
+        self._composition: dict[str, Any] | None = None  # species, masses, charges of the committed step
         self._step = 0
         self._metadata: dict[str, Any] | None = None
         self._host_writes: list[tuple[str, Any]] = []
@@ -208,7 +210,9 @@ class SubprocessRunner:
         self._run_child(simulation, steps=steps, schedule=schedule, check="skip", gate=False)
 
     def host_write(self, simulation: Any, kind: str, values: Any) -> None:
-        """Queue a host write of positions or momenta; the next child applies it after its resume."""
+        """Queue a host write; the next child applies it after its resume. ``kind`` is ``"positions"`` or
+        ``"momenta"`` (an ``(N, 3)`` array), or ``"update"``: ``Simulation.update``'s fields as a dict, applied
+        as one ``update`` (3-T03; only the persistent worker, restart version 3 is 3-T08's)."""
         from fastmace.simulation import HOST_WRITE_WARNING
 
         self._host_writes.append((kind, values))
@@ -217,14 +221,15 @@ class SubprocessRunner:
 
     def committed(self, simulation: Any) -> Any:
         """The committed step of the last hand-off (after any pending host write)."""
-        from fastmace.simulation import Committed, _frozen
+        from fastmace.simulation import Committed, _frozen, committed_composition
 
         self._apply_host_writes(simulation)
         values = self._values
         stress = values.get("stress")
         return Committed(step=self._step, positions=_frozen(values["positions"]), momenta=_frozen(values["momenta"]),
                          cell=_frozen(values["cell"]), energy=float(values["energy"][0]),
-                         forces=_frozen(values["forces"]), stress=None if stress is None else _frozen(stress))
+                         forces=_frozen(values["forces"]), stress=None if stress is None else _frozen(stress),
+                         **committed_composition(self._composition))
 
     def submit_frame(self, simulation: Any, sink: Any) -> None:
         simulation._queue.submit(_HostSnapshot(self._step, self._values), sink)
@@ -319,8 +324,12 @@ class SubprocessRunner:
         stage = self._stage()
         writes = []
         for index, (kind, values) in enumerate(self._host_writes):
-            name = f"host-{index}-{kind}.npy"
-            np.save(stage / name, np.asarray(values, dtype=np.float64))
+            if isinstance(values, dict):  # an update: its fields in one file
+                name = f"host-{index}-{kind}.npz"
+                np.savez(stage / name, **{key: np.asarray(value) for key, value in values.items()})
+            else:
+                name = f"host-{index}-{kind}.npy"
+                np.save(stage / name, np.asarray(values, dtype=np.float64))
             writes.append([kind, name])
         request = {"action": "run", "source": str(self.current), "steps": steps,
                    "schedule": None if schedule is None else schedule.to_restart(), "started": sim._started,
@@ -506,7 +515,10 @@ class SubprocessRunner:
         from fastmace.protocols import ScheduleState
 
         with np.load(stage / COMMITTED_NAME, allow_pickle=False) as stored:
-            self._values = {key: stored[key] for key in stored.files}
+            values = {key: stored[key] for key in stored.files}
+        self._composition = {key[len(COMPOSITION_PREFIX):]: values.pop(key) for key in list(values)
+                             if key.startswith(COMPOSITION_PREFIX)}
+        self._values = values  # the output values, as the sinks and frames get them
         self._step = int(result["step"])
         if result["saved"]:
             previous, self.current = self.current, stage
@@ -921,6 +933,10 @@ def _child(directory, request, heartbeat, worker=None):
             sim.set_positions(values)
         elif kind == "momenta":
             sim.set_momenta(values)
+        elif kind == "update":  # one transaction (3-T03); scalars come back as 0-d arrays
+            with values:
+                fields = {key: values[key] for key in values.files}
+            sim.update(**{key: value.item() if value.ndim == 0 else value for key, value in fields.items()})
         else:
             raise ValueError(f"unknown host write {kind!r}")
     sinks = directory / SINKS_NAME
@@ -954,6 +970,8 @@ def _child(directory, request, heartbeat, worker=None):
     values = dict(engine.sync())
     if "cell" not in values:
         values["cell"] = engine.state.cell.detach().cpu().numpy()
+    values.update({COMPOSITION_PREFIX + key: value
+                   for key, value in simulations.composition_values(engine.state).items()})
     np.savez(directory / COMMITTED_NAME, **values)
     report = sim.report.to_metadata()
     return {

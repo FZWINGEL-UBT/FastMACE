@@ -58,10 +58,12 @@ ASE (tested in a fresh interpreter).
 | `fm.mc.configurational_mu` | `configurational_mu(mu_full, temperature_K, reference, masses=None) -> dict` | complete |
 | `fm.mc.MCDriver` | `MCDriver(moves, *, seed, config=None)`; `attach(engine)`, `run_block(engine, step)`, `state_dict()`, `load_state_dict(record)` | stub, T09 |
 | `fm.mc.moves.build_attempt` | `build_attempt(move, engine, evaluator, streams)` | stub, T09 (T10 for `Displace`) |
-| `Simulation.set_species` | `set_species(species)`: atomic numbers or symbols, `(N,)` | stub, T03 (superset check T02) |
-| `Simulation.set_masses` | `set_masses(masses)`: amu, `(N,)` | stub, T03 |
-| `Simulation.set_charges` | `set_charges(charges, *, total_charge=None)` | stub, T03 |
-| `Simulation.set_friction` | `set_friction(friction_per_fs)`: 1/fs, as the public integrator records | stub, T03 |
+| `Simulation.update` | `update(*, species=None, masses=None, charges=None, total_charge=None, friction_per_fs=None, positions=None, momenta=None)`: any combination as one transaction with one force evaluation; nothing given, nothing happens | complete, T03 (conductor answer) |
+| `Simulation.set_species` | `set_species(species)`: atomic numbers or symbols, `(N,)`; `update(species=)` | complete, T03; needs T02's `check_species`, refused without it |
+| `Simulation.set_masses` | `set_masses(masses)`: amu, `(N,)`; the momenta stay (ASE): v' = v·m_old/m_new | complete, T03 |
+| `Simulation.set_charges` | `set_charges(charges, *, total_charge=None)`: per-atom charges and/or the total | complete, T03; refused for models that take none, and until T02 registers a buffer that reads them |
+| `Simulation.set_friction` | `set_friction(friction_per_fs)`: 1/fs, as the public integrator records | complete, T03 |
+| `Committed.species`, `.masses`, `.charges` | atomic numbers `(N,)`, amu `(N,)`, charges `(N,)` or `None`; read-only arrays, in the subprocess runner's `committed()` too | complete, T03 |
 
 Notes on the records:
 - **Species stay as given:** symbols or atomic numbers ≥ 1. The driver maps them to atomic numbers.
@@ -99,11 +101,26 @@ Notes on the records:
 - **`DerivedStateRegistry.register(name, buffer, refresh, depends_on)` → `DerivedBuffer`**:
   - `depends_on` names some of `DEPENDENCIES`: species, masses, charges, friction, barostat, positions, cell, momenta, forces, stress;
   - one entry per name;
-  - `names()`, `affected(changed)`, `in` and `len` are complete;
-  - `refresh(changed)` and `check_against(fresh)` (the CI registry check) are T03's.
-- **`Transaction(engine, events, *, evaluate=None, registry=None)`**: `run()`, `quiesce()`, `snapshot()`, `apply()`, `refresh()`, `accept()`, `reject()` and `resume()`. Stub, T03.
+  - `names()`, `affected(changed)`, `in` and `len`;
+  - `refresh(changed)` runs the affected entries in registration order and returns their names. An owner registers a buffer after the buffers it reads;
+  - `check_against(fresh)`: the names whose buffers differ bit for bit from a fresh registry (or engine), or that only one side has.
+- **Where the registry lives (T03):** `GraphEngine.derived`, built after the state, force field and integrator. The engine calls `register_derived(registry, state)` on the force field (if it has one; T02's `MACEForceField.register_derived`), then on the integrator, then on the fused integrator. Every derived tensor is also in the runtime-state registry, under its owner's name or as `derived.<name>` (policy `derived.*`: restart "derived", captured).
+- **Refresh functions** take no arguments and read the committed inputs from the state: `state.species` (int64 atomic numbers), `state.masses` `(N, 1)`, `state.charges`, `state.total_charge`. They write in place at fixed addresses. Those that depend on species, masses or charges are capturable (no host sync, no new buffer; temporaries inside a graph are fine), tested in `tests/gpu/test_events_gpu.py`. A friction refresh may copy host floats: a friction event drops the graphs anyway.
+- **Registered by T03:** Langevin `integrator.c3_unit`, `c4_unit`, `c5_unit` (masses, friction); BAOAB `integrator.inv_sqrt_masses` (masses) and `integrator.force_eps` (masses, momenta, forces, stress, cell); the fused integrator's `fused.coefficients` (friction).
+- **`Transaction(engine, events, *, evaluate=None, registry=None)`**: `run()`, `quiesce()`, `snapshot()`, `apply()`, `refresh()`, `accept()`, `reject()` and `resume()`; `host_writes` (callables `write(state)` run after the events: `Simulation.update`'s positions and momenta); `changed` and `outcome`.
+  - It validates every event when it is made, before anything is written. The host kinds are species, masses, charges and friction; `swap` and `transmute` raise `NotImplementedError` naming 3-T09, `displace` 3-T10, `barostat` (no host API in phase 3).
+  - Values: `masses` amu and `species` atomic numbers or symbols, one per atom of `atoms`; `charges` an array or `{"charges", "total_charge"}`; `friction` in inverse ASE time units.
+  - A mass change keeps the momenta, only where the mass changes. A species change sets the standard masses the same way; a masses event after it wins.
+  - Accepted: `engine.transactions_committed` counts it; the resume is `canonicalise(reevaluate=True)`, then a refresh of what depends on forces and stress.
+  - Rejected, impossible, redo: the runtime-state registry snapshot is restored in place, with the noise generator and cursor and the integrator's host constants.
+  - A friction event calls T04's `GraphEngine.invalidate_graphs(reason)` (until T04 merges: `_clear_graphs()`), again on a rejection that captured meanwhile. With the default barostat τ it also changes `barostat` (`P_tau`, the barostat mass); an explicit `barostat_tau_fs` stays.
+- **`events.check_against(engine, fresh)`**: the CI registry check of SPEC §12.2. It compares the derived registries, the state's composition, the neighbour list as the set of compacted edges, the integrator's host constants (the floats a stage bakes in, its config) and every other tensor reachable from the force field and integrator that the runtime-state registry does not hold. So a buffer left out of the registry fails it (`tests/cpu/test_events.py` has the negative controls).
+- **`events.species_numbers(values, count)`**: atomic numbers from numbers or symbols, validated.
 
 ## Engines
+
+- `GraphEngine.derived` (T03): the derived-state registry above. `GraphEngine.quiesce()`: an event's quiesce (`flush`).
+- `GraphEngine.transactions_committed` (int) and `GraphEngine.state_version == (state.step, transactions_committed)` (T03): T07 tags its energy cache with it. Not restart state.
 
 - `engine/compiled.py`: `MODE = "compiled"`; `CompiledEngine(config, force_field, integrator, state, neighbours=None, constraints=None, dynamic_edges=True)`. Stub, T06. Only the planner builds it.
 - `engine/graph.py`:

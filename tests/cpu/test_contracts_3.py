@@ -315,18 +315,20 @@ def test_derived_state_registry_register():
         registry.register("y", buffer, lambda: None, depends_on=())
     with pytest.raises(TypeError):
         registry.register("z", buffer, "not callable", depends_on=("masses",))
-    _raises_naming("3-T03", lambda: registry.refresh(("masses",)))
-    _raises_naming("3-T03", lambda: registry.check_against(None))
+    # 3-T03: refresh and the CI registry check.
+    assert _parameters(DerivedStateRegistry.refresh) == ["self", "changed"]
+    assert _parameters(DerivedStateRegistry.check_against) == ["self", "fresh"]
+    assert registry.refresh(("masses",)) == ("integrator.c3_unit",)
+    assert registry.check_against(registry) == []
 
 
-def test_transaction_stub():
-    from fastmace.events import Event, Transaction
+def test_transaction_signature():
+    from fastmace.events import Transaction
 
     assert _parameters(Transaction) == ["engine", "events", "evaluate", "registry"]
     assert _keyword_only(Transaction) == ["evaluate", "registry"]
     for name in ("run", "quiesce", "snapshot", "apply", "refresh", "accept", "reject", "resume"):
         assert callable(getattr(Transaction, name))
-    _raises_naming("3-T03", lambda: Transaction(None, [Event("masses", values=(1.0,))]))
 
 
 # --------------------------------------------------------------------------- Simulation mutation API
@@ -337,16 +339,42 @@ def test_simulation_mutation_api(name):
     from fastmace.simulation import Simulation
 
     method = getattr(Simulation, name)
-    assert _parameters(method)[:2] == ["self", {"set_species": "species", "set_masses": "masses",
-                                                "set_charges": "charges", "set_friction": "friction_per_fs"}[name]]
-    stub = object.__new__(Simulation)
-    _raises_naming("3-T03", lambda: method(stub, None))
+    assert _parameters(method) == ["self", {"set_species": "species", "set_masses": "masses",
+                                            "set_charges": "charges", "set_friction": "friction_per_fs"}[name],
+                                   *(["total_charge"] if name == "set_charges" else [])]
 
 
 def test_set_charges_takes_the_total():
     from fastmace.simulation import Simulation
 
     assert _keyword_only(Simulation.set_charges) == ["total_charge"]
+
+
+def test_simulation_update_is_one_transaction():  # 3-T03 (conductor answer; T13 applies an observer's change)
+    from fastmace.simulation import Simulation
+
+    fields = ["species", "masses", "charges", "total_charge", "friction_per_fs", "positions", "momenta"]
+    assert _parameters(Simulation.update) == ["self", *fields]
+    assert _keyword_only(Simulation.update) == fields
+    for name in fields:
+        assert inspect.signature(Simulation.update).parameters[name].default is None
+
+
+def test_committed_carries_the_composition():  # 3-T03
+    from fastmace.simulation import Committed
+
+    assert [field.name for field in dataclasses.fields(Committed)] == [
+        "step", "positions", "momenta", "cell", "energy", "forces", "stress", "species", "masses", "charges"]
+
+
+def test_graph_engine_state_version():  # 3-T03, for 3-T07's energy cache; not restart state
+    pytest.importorskip("torch")
+    from fastmace.engine.graph import GraphEngine
+
+    stub = object.__new__(GraphEngine)
+    stub.state = type("State", (), {"step": 4})()
+    stub.transactions_committed = 2
+    assert stub.state_version == (4, 2)
 
 
 # --------------------------------------------------------------------------- engines

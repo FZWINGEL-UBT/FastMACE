@@ -327,6 +327,43 @@ def _wrapper(tmp_path, body, **config):
     return RunnerConfig(python=str(python), **config)
 
 
+def _drive_update(sim):
+    sim.run(steps=2)
+    masses = sim.committed().masses * np.where(np.arange(8) % 2 == 0, 1.5, 0.8)
+    sim.update(masses=masses, friction_per_fs=0.02)
+    sim.run(steps=2)
+    return masses
+
+
+@POSIX
+def test_mutations_through_the_persistent_worker(loaded, tmp_path, runner_plans_later):
+    """``Simulation.update`` reaches the persistent worker as one host write (3-T03); ``committed()`` carries
+    the composition."""
+    whole = _simulation(loaded)
+    masses = _drive_update(whole)
+    want = _state(whole)
+
+    runner_plans_later()
+    sim = _simulation(loaded)
+    assert sim.plan.runner == "subprocess" and sim.runner.persistent
+    _drive_update(sim)
+    _assert_same_state(_state(sim), want)
+    committed = sim.committed()
+    np.testing.assert_array_equal(committed.masses, masses)
+    np.testing.assert_array_equal(committed.species, whole.committed().species)
+    assert committed.charges is None
+    assert sim.integrator.friction_per_fs == 0.02
+    sim.close()
+
+
+def test_mutations_without_a_persistent_worker_wait_for_restart_v3(loaded, runner_plans):
+    sim = _simulation(loaded, runner=RunnerConfig(persistent=False))
+    with pytest.raises(NotImplementedError, match="3-T08"):
+        sim.set_masses(np.ones(8))
+    sim.set_positions(sim.committed().positions + 0.01)  # positions and momenta stay host writes
+    sim.close()
+
+
 @POSIX
 def test_a_failing_child_raises_with_its_message(loaded, tmp_path, runner_plans):
     runner = _wrapper(tmp_path, 'raise RuntimeError("injected failure in the child")')

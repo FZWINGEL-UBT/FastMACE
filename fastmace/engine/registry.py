@@ -126,6 +126,10 @@ POLICIES = (
     # Host mirrors of the flags: overwritten by the copy behind every step before the host reads them.
     *(_policy(f"engine.{name}", "engine", "derived", capture=False)
       for name in ("flags_host", "pipe_flags_host", "spec_flags_host")),
+    # The derived-state registry's buffers (SPEC §8.5, 3-T03; fastmace.events): recomputed from the species,
+    # masses, charges, friction and the force results by their refresh functions. Captured, so that a
+    # warm-up of a graph that refreshes them (3-T09's attempts) leaves no trace.
+    _policy("derived.*", "derived", "derived", "fastmace.events.DerivedStateRegistry.refresh"),
 )
 
 

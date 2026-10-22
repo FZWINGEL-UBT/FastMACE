@@ -9,6 +9,7 @@ is bitwise the baseline's and the captured graphs hold the same kernels.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
@@ -71,7 +72,6 @@ class Langevin(Integrator):
         check_ensemble(config, "nvt", "Langevin")
         self.config = config
         self.dt = config.timestep_fs * units.fs
-        self.fr = config.friction
         self.fix_com = config.fixcm
         self.natoms = state.natoms
         self.noise_batch = config.noise_batch
@@ -86,15 +86,42 @@ class Langevin(Integrator):
         # ASE coefficients (Langevin.updatevars). c1, c2 do not depend on T;
         # c3, c4, c5 are proportional to sigma = sqrt(2 kT fr / m), so they are
         # stored for kT = 1 eV and scaled by sqrt(kT) on the device.
-        dt, fr = self.dt, self.fr
-        sigma_unit = torch.sqrt(2 * fr / masses)
-        self.c1 = dt / 2.0 - dt * dt * fr / 8.0
-        self.c2 = dt * fr / 2 - dt * dt * fr * fr / 8.0
-        self.c3_unit = math.sqrt(dt) * sigma_unit / 2.0 - dt ** 1.5 * fr * sigma_unit / 8.0
-        self.c5_unit = dt ** 1.5 * sigma_unit / (2 * math.sqrt(3))
-        self.c4_unit = fr / 2.0 * self.c5_unit
+        self._friction_constants()
+        self.c3_unit, self.c4_unit, self.c5_unit = self._noise_coefficients(masses)
         self.sqrt_kT = torch.zeros((), dtype=torch.float64, device=state.positions.device)
         self.set_temperature(temperature_K)
+
+    def _friction_constants(self) -> None:
+        """``fr``, ``c1`` and ``c2`` from the config: host floats, baked into the captured stages."""
+        dt, fr = self.dt, self.config.friction
+        self.fr = fr
+        self.c1 = dt / 2.0 - dt * dt * fr / 8.0
+        self.c2 = dt * fr / 2 - dt * dt * fr * fr / 8.0
+
+    def _noise_coefficients(self, masses):
+        """``c3_unit``, ``c4_unit``, ``c5_unit`` from the masses and the friction: new tensors, the same
+        expressions at construction and in a refresh, so both give the same bits."""
+        dt, fr = self.dt, self.fr
+        sigma_unit = torch.sqrt(2 * fr / masses)
+        c3 = math.sqrt(dt) * sigma_unit / 2.0 - dt ** 1.5 * fr * sigma_unit / 8.0
+        c5 = dt ** 1.5 * sigma_unit / (2 * math.sqrt(3))
+        return c3, fr / 2.0 * c5, c5
+
+    def register_derived(self, registry: Any, state: SimulationState) -> None:
+        """The mass- and friction-dependent noise coefficients (SPEC §8.5), refreshed in place."""
+        for index, name in enumerate(("c3_unit", "c4_unit", "c5_unit")):
+            buffer = getattr(self, name)
+
+            def refresh(buffer=buffer, index=index):
+                buffer.copy_(self._noise_coefficients(state.masses)[index])
+
+            registry.register(f"integrator.{name}", buffer, refresh, depends_on=("masses", "friction"))
+
+    def set_friction(self, friction: float) -> None:
+        """A friction event's host part (inverse ASE time units): the config, ``fr``, ``c1`` and ``c2``. The
+        derived-state registry refreshes the noise coefficients; the captured stages are dropped."""
+        self.config = dataclasses.replace(self.config, friction=float(friction))
+        self._friction_constants()
 
     @property
     def variable_cell(self) -> bool:

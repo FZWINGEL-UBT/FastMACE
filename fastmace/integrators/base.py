@@ -103,6 +103,14 @@ class Integrator(abc.ABC):
         """
         raise NotImplementedError
 
+    def register_derived(self, registry: Any, state: SimulationState) -> None:
+        """Register every buffer derived from masses, friction or other event-changed state in ``registry``
+        (``fastmace.events.DerivedStateRegistry``, SPEC §8.5); the engine calls it once. Default: none."""
+
+    def set_friction(self, friction: float) -> None:
+        """The host part of a friction event (inverse ASE time units); the engine refreshes the rest."""
+        raise NotImplementedError(f"{type(self).__name__} has no friction to change")
+
     @abc.abstractmethod
     def buffers(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
         """Every tensor a half step writes, by name: the state fields it changes and its own
