@@ -78,17 +78,21 @@ Phase 3's partial local tier lost its junit when stopping the chain's shell ende
 - **A per-test result log:** a small plugin (`tools/acceptance/resultlog.py`, loaded with `-p`) appends one
   JSON line per finished test (node id, outcome, duration, time) and flushes it, so even a killed run keeps
   every finished test.
-- **junit on SIGINT:** every pytest job runs pytest as a child with its PID recorded in the job log; the job
-  script traps INT, TERM and HUP, forwards SIGINT to pytest, and waits up to 120 s for it to write
-  `junit.xml`. A stop is `kill -INT <pytest pid>`, never a kill of the shell or the reservation first.
-  `timeout` wrappers use `--signal=INT --kill-after=120`.
-- **A CPU test** of both: a dummy suite stopped by SIGINT mid-run leaves a junit file and the JSON lines of
-  the finished tests.
+- **junit on SIGINT:** `tools/acceptance/stoppable_pytest.sh OUTDIR PYTHON ARGS` runs pytest as a child with
+  the plugin, `OUTDIR/results.jsonl` and `OUTDIR/junit.xml`, and writes its PID to `OUTDIR/pytest.pid`. It
+  traps INT, TERM and HUP, forwards SIGINT to pytest, and waits up to 120 s for it to write `junit.xml`. The
+  plugin re-arms SIGINT, which a non-interactive bash leaves ignored in background jobs, and turns TERM and
+  HUP into `KeyboardInterrupt` too. A stop is `kill -INT "$(cat OUTDIR/pytest.pid)"`, never a kill of the
+  shell or the reservation first. `timeout` wrappers use `--signal=INT --kill-after=180`.
+- **CPU tests** (`tests/cpu/test_acceptance_3b.py`): a dummy suite stopped by SIGINT, SIGTERM or SIGHUP
+  mid-run, through the script and with SIGINT ignored at start, leaves a junit file and the JSON lines of the
+  finished tests.
 
 ## Jobs
 
 Local RTX 5060 Ti, run ID `3b-T10-local-<date>`, through `tools/ci/local_gpu.py run` and
-`tools/acceptance/phase3b_local.sh <copy> <job>` (tool-side, modelled on `phase3_local.sh`); outputs in
+`FASTMACE_3_COMMIT=<sha> tools/acceptance/phase3b_local.sh <copy> <job>` (tool-side, modelled on
+`phase3_local.sh`; the jobs of items 1–4 get their commands at the freeze, from 3b-T03 to T07's tools); outputs in
 `~/fastmace-acceptance/3b-T10-local-<date>/`. The timed jobs run first, alone, on a quiet PC (no other GPU
 or heavy CPU job; checked and recorded at the start of each).
 
