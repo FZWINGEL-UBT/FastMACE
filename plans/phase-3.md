@@ -1318,6 +1318,15 @@ idle.
 1. Judge the host path: `Simulation.update` swapping two atoms' species, one
    event every 100 steps. Add the captured path as a second row only if T09
    has one.
+   - **Amended by the conductor** (22 October 2026), after 3-T20's first
+     runs: the item-1 row uses `event_speed.py --swap-back`. On odd events
+     the previous pair swaps back.
+   - **Why:** random swaps that are always accepted drift the configuration
+     (NaCl at 1500 K: +0.25–0.29 eV/atom, padded edge sizes of 9216 that
+     the fixed side never reaches). That mixes the event's cost with a
+     changing system, and it puts first-visit captures into timed blocks.
+   - The random-swap rows stay as a labelled second row.
+   - The swap-back Ada leg runs in 3-T21 at the freeze.
 2. Yes, plus the canonical rebuild.
 3. Yes, add a {Na, Nb, O, Cl} row.
 4. Yes.
