@@ -64,7 +64,7 @@ def stacked(label, backend, dtype):
             parameter.requires_grad_(False)
     registry = reg.Registry(list(generic.RECORDS.values()))
     resolution = registry.resolve(rewritten.model, strict=False)
-    context = reg.Context(inputs={generic.NODE_ATTRS: data["node_attrs"]})
+    context = reg.Context(inputs=reg.structure_inputs(data))
     applied = registry.apply(rewritten.model, resolution, context, original=original.model)
     edges = int(data["edge_index"].shape[1])
     for interaction in rewritten.model.interactions:
@@ -252,7 +252,7 @@ def test_tiny_models_on_cuda(family, dtype, fused):
     registry = reg.Registry(list(generic.RECORDS.values()))
     rewritten = private_copy(model)
     resolution = registry.resolve(rewritten, {name: "on" if name in names else "off" for name in registry.names()})
-    applied = registry.apply(rewritten, resolution, reg.Context(inputs={generic.NODE_ATTRS: data["node_attrs"]}),
+    applied = registry.apply(rewritten, resolution, reg.Context(inputs=reg.structure_inputs(data)),
                              original=model)
     threshold = reg.threshold_for(dtype)
     assert [entry.name for entry in applied] == names

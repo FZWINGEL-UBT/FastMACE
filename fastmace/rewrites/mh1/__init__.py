@@ -282,17 +282,47 @@ def streaming_convolutions(model):
     return names
 
 
-def reassociate_first_interaction(model, node_attrs):
+def superset_columns(node_attrs, species_columns=None):
+    """The node_attrs columns of the species superset: ``species_columns`` when given (the force
+    field's, SPEC §8.5), else the columns of the species in ``node_attrs``."""
+    import torch
+
+    if species_columns is not None:
+        return torch.as_tensor(tuple(species_columns), dtype=torch.int64)
+    return torch.nonzero(torch.as_tensor(node_attrs).sum(dim=0) > 0).flatten().cpu()
+
+
+def species_table(model, interaction, columns, rows, joint_features=None):
+    """The reassociation's [S, C] table for ``columns`` from the identity basis (``identity_species_feats``),
+    for a structure of ``rows`` atoms whose per-graph joint-embedding features are ``joint_features``."""
+    import torch
+
+    m = _modules()
+    if hasattr(model, "joint_embedding") and joint_features is None:
+        raise RewriteError("the reassociated first interaction of a model with a joint embedding needs the "
+                           "structure's per-graph features (Context.inputs['joint_features'], e.g. total charge "
+                           "and spin as in the batch)")
+    parameter = next(interaction.parameters())
+    attrs = m.identity_attrs(columns, interaction.node_attrs_irreps.dim, rows, parameter.dtype, parameter.device)
+    joint = None
+    if joint_features is not None and hasattr(model, "joint_embedding"):
+        batch = torch.zeros(attrs.shape[0], dtype=torch.int64, device=parameter.device)
+        joint = (batch, {name: joint_features[name] for name in model.embedding_specs})
+    return m.identity_species_feats(model, interaction, attrs, len(columns), joint)
+
+
+def reassociate_first_interaction(model, node_attrs, species_columns=None, joint_features=None):
     """Attach the reassociated first interaction to a folded model; returns the species columns.
 
     Requires species-only first-interaction inputs (first_inputs_species_only):
     a linear node embedding of the one-hot species, plus at most per-graph
     joint embeddings (one structure per evaluation). ``node_attrs`` are
-    the structure's one-hot species; atoms may change places later, but not
-    to species absent at setup.
+    the structure's one-hot species; ``species_columns`` the superset's columns (default the
+    species present). Every superset species gets its row of the sender-feature table from the
+    identity basis (SPEC §8.5), so atoms may later change to any superset species.
+    ``joint_features``: the structure's per-graph joint-embedding inputs (OMOL-0's total charge
+    and spin), as in the batch.
     """
-    import torch
-
     m = _modules()
     interactions = getattr(model, "interactions", ())
     interaction = interactions[0] if len(interactions) else None
@@ -303,9 +333,10 @@ def reassociate_first_interaction(model, node_attrs):
     if node_attrs is None:
         raise RewriteError("reassociate_first needs the structure's one-hot species (Context.inputs['node_attrs'])")
     channels, ls, gammas, ir_mul = m.probe_first_tensor_product(interaction)
-    columns = torch.nonzero(torch.as_tensor(node_attrs).sum(dim=0) > 0).flatten()
+    columns = superset_columns(node_attrs, species_columns)
+    table = species_table(model, interaction, columns, len(node_attrs), joint_features)
     interaction.first_reassociation = m.FirstInteractionReassociation(
-        columns.to(next(interaction.parameters()).device), channels, ls, gammas, ir_mul)
+        columns.to(next(interaction.parameters()).device), channels, ls, gammas, ir_mul, species_feats=table)
     return tuple(int(c) for c in columns)
 
 
@@ -421,15 +452,18 @@ def _graph(model, interaction, context, generator):
         return torch.randn(shape, generator=generator, dtype=torch.float64)
 
     elements = interaction.node_attrs_irreps.dim
-    node_attrs = context.inputs.get("node_attrs") if context.inputs else None
-    columns = (torch.nonzero(torch.as_tensor(node_attrs).sum(dim=0) > 0).flatten().cpu() if node_attrs is not None
-               else torch.arange(elements))
+    inputs = context.inputs or {}
+    node_attrs = inputs.get("node_attrs")
+    columns = (superset_columns(node_attrs, inputs.get("species_columns"))
+               if node_attrs is not None or inputs.get("species_columns") is not None else torch.arange(elements))
     order = torch.randperm(_NODES, generator=generator)
     species = columns[torch.arange(_NODES) % len(columns)][order]
     onehot = torch.nn.functional.one_hot(species, elements).to(torch.float64)
     width = interaction.node_feats_irreps.dim
+    table = None
     if getattr(interaction, "first_reassociation", None) is not None:
-        node_feats = randn(elements, width)[species]  # species-only, as the node embedding gives
+        table = randn(elements, width)
+        node_feats = table[species]  # species-only, as the node embedding gives
     else:
         node_feats = randn(_NODES, width)
     receivers = torch.sort(torch.randint(0, _NODES, (_EDGES,), generator=generator)).values
@@ -442,7 +476,19 @@ def _graph(model, interaction, context, generator):
         "cutoff": (torch.rand((_EDGES, 1), generator=generator, dtype=torch.float64)
                    if radial_cutoff_passed(model) else None),
     }
-    return inputs
+    return inputs, table
+
+
+def _bound_table(interaction, table, device, dtype):
+    """The reassociated interaction's table for the self-check's species-only ``table`` of node features
+    (``linear_up`` of its superset rows), or None for any other interaction."""
+    import torch
+
+    reassociation = getattr(interaction, "first_reassociation", None)
+    if reassociation is None or table is None:
+        return None
+    with torch.no_grad():
+        return interaction.linear_up(table.to(device=device, dtype=dtype)[reassociation.columns.cpu()])
 
 
 def _evaluate(interaction, inputs, grads, differentiate):
@@ -470,9 +516,10 @@ def _check_interactions(original, rewritten, context):
         reference = original.get_submodule(f"interactions.{index}")
         parameter = next(interaction.parameters())
         device, dtype = parameter.device, dtype or parameter.dtype
-        inputs = _graph(rewritten, interaction, context, generator)
+        inputs, table = _graph(rewritten, interaction, context, generator)
         inputs = {name: (value.to(device=device, dtype=parameter.dtype) if value.is_floating_point()
                          else value.to(device)) if value is not None else None for name, value in inputs.items()}
+        bound = _bound_table(interaction, table, device, parameter.dtype)
         differentiate = [name for name in ("edge_attrs", "edge_feats", "cutoff") if inputs[name] is not None]
         if getattr(interaction, "first_reassociation", None) is None:
             differentiate.append("node_feats")
@@ -481,7 +528,16 @@ def _check_interactions(original, rewritten, context):
         grads = [torch.randn(shape, generator=generator, dtype=torch.float64).to(device=device, dtype=parameter.dtype)
                  for shape in shapes]
         expected = _evaluate(reference, inputs, grads, differentiate)
-        got = _evaluate(interaction, inputs, grads, differentiate)
+        if bound is None:
+            got = _evaluate(interaction, inputs, grads, differentiate)
+        else:  # the random graph's species table in place of the structure's, for this check only
+            reassociation = interaction.first_reassociation
+            own = reassociation.species_feats
+            reassociation.bind(bound)
+            try:
+                got = _evaluate(interaction, inputs, grads, differentiate)
+            finally:
+                reassociation.bind(own)
         cases += [(f"interactions.{index}", a, b) for a, b in zip(expected, got)]
     return check_tensors(cases, dtype)
 
@@ -502,7 +558,9 @@ def _apply(function):
 
 
 def _apply_reassociate(model, context):
-    return reassociate_first_interaction(model, (context.inputs or {}).get("node_attrs"))
+    inputs = context.inputs or {}
+    return reassociate_first_interaction(model, inputs.get("node_attrs"), inputs.get("species_columns"),
+                                         inputs.get("joint_features"))
 
 
 def _record(name, applies_to, apply, requires=(), exactness="rounding", default="auto", constraints=(),
@@ -554,5 +612,6 @@ __all__ = [
     "direct_node_feats", "factor_species_radial", "fold_radial_cutoff", "folded_backward_tiles", "folded_constants",
     "fuse_radial_hidden",
     "fused_folded_backward",
-    "joint_radial_input", "reassociate_first_interaction", "segment_first_sum", "streaming_convolutions",
+    "joint_radial_input", "reassociate_first_interaction", "segment_first_sum", "species_table",
+    "streaming_convolutions", "superset_columns",
 ]

@@ -193,11 +193,14 @@ def test_superset_violation_is_species_not_in_superset_with_every_reason():
     assert "Na" in str(caught.value)
 
 
-def test_d3_superset_beyond_the_structure_is_phase_3():
-    with pytest.raises(PlanRefused) as caught:
-        plan_label("mh1-r2scan", species=["Na", "Cl", "O"])
-    assert codes(caught.value) == ["superset-beyond-structure"]
-    assert "phase 3 (§8.5)" in caught.value.reasons[0]
+def test_superset_beyond_the_structure_is_planned_by_rule_8():
+    """Phase 3 (3-T02): graph mode stays allowed; species-dependent rewrites are built for the superset."""
+    plan = plan_label("mh1-r2scan", species=["Na", "Cl", "O"])
+    assert plan.superset == (8, 11, 17) and plan.tier == "graph"
+    _, choice, reason = plan.decision("superset")
+    assert choice == "O Na Cl"
+    assert reason.code == "superset" and reason.rule == 8
+    assert "O absent" in reason and "rule 8" in reason
     # Sets, not sequences.
     assert plan_label("mh1-r2scan", species=["Cl", "Na", "Na"]).superset == NA_CL
     assert plan_label("mh1-r2scan", species=[17, 11]).superset == NA_CL

@@ -26,8 +26,9 @@ class ForceField:
     - ``precision``: the force precision, ``"float32"`` or ``"float64"`` (§7.3);
     - ``rewrites``: ``"auto"`` or a ``RewriteConfig``; resolved per plan;
     - ``species``: the declared superset (§8.5), symbols or atomic numbers, compared as a set; a
-      species without an embedding raises ``ModelElementError``. In 1b it must equal the
-      structure's species (owner decision D3; the planner refuses a larger one).
+      species without an embedding raises ``ModelElementError``. It may be larger than the
+      structure's species (phase 3, rule 8): every species-indexed table is built for it, so an atom
+      can become any superset species in place (3-T02).
     """
 
     def __init__(self, model: Any, atoms: Any = None, *, precision: Literal["float32", "float64"] = "float32",
