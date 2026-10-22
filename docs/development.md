@@ -522,9 +522,13 @@ anything:
 - **Lower limits:** `--limit-usd 10` or `FASTMACE_MODAL_LIMIT_USD=10`.
 - **Higher limits:** need `--owner-override "<who>: <why>"`, and the ledger records it. Use it only on the
   owner's word.
-- **Jobs still running:** `results/modal-in-flight.json` holds the worst case of each job until it returns,
-  or until its worst case has expired. Parallel launches therefore cannot each fit alone and overrun together.
-- **Ledger:** after every launch (also a failed one), `results/modal-ledger.csv` gets a row:
+- **Jobs still running:** `~/.fastmace-modal/modal-in-flight.json` holds the worst case of each job until it
+  returns, or until its worst case has expired. Parallel launches therefore cannot each fit alone and overrun
+  together. The directory (`FASTMACE_MODAL_STATE`) is shared by every checkout and worktree on the machine;
+  until 22 October 2026 each checkout had its own `results/` files, so jobs from different worktrees did not
+  see each other.
+- **Ledger:** after every launch (also a failed one), `~/.fastmace-modal/modal-ledger.csv` gets a row (the
+  conductor commits copies to `results/modal-ledger.csv`):
   - the date, commit and GPU;
   - the timeout and wall time;
   - the estimated cost at the container limits, and the worst case;
