@@ -111,9 +111,21 @@ def _original(module, attribute):
 
 def _put(module, attribute, value):
     _original(module, attribute)
+    old = getattr(module, attribute)
     setattr(module, attribute, value)
     _INSTALLED[f"{module.__name__}:{attribute}"] = value
+    _follow(f"{module.__name__}:{attribute}", old, value)
     return f"{module.__name__}:{attribute}"
+
+
+def _follow(target, old, new):
+    """Tell the per-model strain path's copied globals (``rewrites.engine.follow_patch``) about a replacement.
+
+    Only when that module is loaded: it has no copies otherwise, and this module never imports MACE.
+    """
+    engine = sys.modules.get("fastmace.rewrites.engine")
+    if engine is not None and old is not new:
+        engine.follow_patch(target, old, new)
 
 
 def original_if_patched(target, current):
@@ -295,7 +307,10 @@ def restore(name):
         raise RuntimeError("the OEq runtime environment cannot be undone in a running process")
     for target in record.targets:
         module_name, attribute = target.split(":", 1)
-        setattr(importlib.import_module(module_name), attribute, _ORIGINALS[target])
+        module = importlib.import_module(module_name)
+        old = getattr(module, attribute)
+        setattr(module, attribute, _ORIGINALS[target])
+        _follow(target, old, _ORIGINALS[target])
     del _RECORDS[name]
     return True
 
