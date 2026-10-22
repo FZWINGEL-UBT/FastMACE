@@ -338,22 +338,124 @@ class Case:
     plan: Plan
 
 
-def swap_case(atoms, species, calculator, sites=None) -> Case:
-    """Swaps of species (A, B) over ``sites`` (default all atoms) with the atoms' own A and B counts."""
+def swap_case(atoms, species, calculator, sites=None, energies=None) -> Case:
+    """Swaps of species (A, B) over ``sites`` (default all atoms) with the atoms' own A and B counts.
+    ``energies``: the reference energies of the configurations, computed elsewhere (then ``calculator``
+    is not used)."""
     sites = np.arange(len(atoms)) if sites is None else np.asarray(sites)
     n_b = int(np.count_nonzero(atoms.numbers[sites] == species[1]))
     configs = swap_configurations(len(sites), n_b)
-    energies = reference_energies(atoms, sites, species, configs, calculator)
+    energies = (reference_energies(atoms, sites, species, configs, calculator) if energies is None
+                else np.asarray(energies, dtype=np.float64))
     return Case("swap", sites, tuple(species), configs, energies, 0.0,
                 plan(effective_energies(energies, configs), proposals(configs, "swap")))
 
 
-def transmute_case(atoms, sites, species, calculator, delta_mu: float | None = None) -> Case:
+def transmute_case(atoms, sites, species, calculator, delta_mu: float | None = None, energies=None) -> Case:
     """Transmutations between species (A, B) on ``sites``; Δμ_B (configurational, relative to A) by
-    ``fitted_delta_mu`` unless given."""
+    ``fitted_delta_mu`` unless given. ``energies`` as for ``swap_case``."""
     sites = np.asarray(sites)
     configs = transmute_configurations(len(sites))
-    energies = reference_energies(atoms, sites, species, configs, calculator)
+    energies = (reference_energies(atoms, sites, species, configs, calculator) if energies is None
+                else np.asarray(energies, dtype=np.float64))
     delta_mu = fitted_delta_mu(energies, configs) if delta_mu is None else float(delta_mu)
     return Case("transmute", sites, tuple(species), configs, energies, delta_mu,
                 plan(effective_energies(energies, configs, delta_mu), proposals(configs, "transmute")))
+
+
+# --------------------------------------------------------------------------- hybrid MD/MC statistics
+
+# Kinetic temperatures agree when they differ by at most HYBRID_SIGMAS combined standard errors; the
+# errors come from the means of HYBRID_BATCHES consecutive batches, each much longer than the
+# thermostat's energy relaxation time 1/(2 γ).
+HYBRID_SIGMAS = 4.0
+HYBRID_BATCHES = 10
+
+
+def batch_mean(values, n_batches: int = HYBRID_BATCHES) -> tuple[float, float]:
+    """(mean, standard error) of a correlated series from the means of ``n_batches`` equal batches
+    (a remainder at the end is dropped)."""
+    values = np.asarray(values, dtype=np.float64)
+    size = len(values) // n_batches
+    if size < 1:
+        raise ValueError(f"batch_mean: {len(values)} values for {n_batches} batches")
+    means = values[:size * n_batches].reshape(n_batches, size).mean(axis=1)
+    return float(means.mean()), float(means.std(ddof=1) / math.sqrt(n_batches))
+
+
+def agree(a: tuple[float, float], b: tuple[float, float], sigmas: float = HYBRID_SIGMAS) -> bool:
+    """Whether two (mean, standard error) estimates differ by at most ``sigmas`` combined errors; ``b`` may be
+    an exact value (error 0)."""
+    return abs(a[0] - b[0]) <= sigmas * math.hypot(a[1], b[1])
+
+
+def energy(atoms, calculator) -> float:
+    """The float64 reference energy (eV) of ``atoms`` as they are."""
+    atoms = atoms.copy()
+    atoms.calc = calculator
+    return float(atoms.get_potential_energy())
+
+
+# --------------------------------------------------------------------------- the driver's decisions
+
+
+class StreamPredictor:
+    """The driver's decisions predicted from its streams (contracts-3.md "MC streams and the driver") and the
+    reference energies of the enumeration ``case``: the driver's first move, which must be a ``Swap`` or a
+    ``Transmute``. ``margin``: the near-tie width in units of kT. Imports torch and ``fastmace.mc``."""
+
+    def __init__(self, case, driver, natoms, kT, margin):
+        import torch
+
+        from fastmace.config import mc_stream_seeds
+        from fastmace.mc import Swap, moves, streams
+
+        self.torch, self.streams, self.Swap = torch, streams, Swap
+        self.case, self.kT, self.margin = case, kT, margin
+        self.move = driver.moves[0]
+        self.seeds = mc_stream_seeds(driver.seed)
+        self.counts = streams.attempt_counts(self.move.move, moves.resolved_velocities(self.move, True), natoms)
+        if isinstance(self.move, self.Swap):
+            self.pairs = torch.tensor([[moves.species_number(a), moves.species_number(b)]
+                                       for a, b in self.move.pairs])
+        else:
+            numbers = [moves.species_number(s) for s in self.move.species]
+            self.set = torch.tensor(numbers)
+            self.members = torch.zeros(moves.TABLE_SIZE, dtype=torch.bool)
+            self.members[self.set] = True
+            self.position = torch.zeros(moves.TABLE_SIZE, dtype=torch.int64)
+            self.position[self.set] = torch.arange(len(numbers))
+
+    def index(self, species):
+        """The configuration of ``species`` (int64 tensor of atomic numbers)."""
+        labels = (species[self.case.sites] == self.case.species[1]).cpu().numpy().astype(np.int8)
+        return index_of(self.case.configs, labels)
+
+    def numbers(self, stream, offset, count):
+        return self.streams.uniforms(self.seeds[stream], self.torch.arange(offset, offset + count))
+
+    def block(self, species, offsets, attempts):
+        """(species after, accepted count, near ties) of a block of ``attempts`` from stream ``offsets``."""
+        streams = self.streams
+        species = species.cpu().clone()
+        accepted = ties = 0
+        for k in range(attempts):
+            u = self.numbers("proposal", offsets["proposal"] + k * self.counts["proposal"], self.counts["proposal"])
+            u_accept = float(self.numbers("acceptance", offsets["acceptance"] + k * self.counts["acceptance"], 1)[0])
+            if isinstance(self.move, self.Swap):
+                atoms, possible = streams.decode_swap(u, species, self.pairs)
+                trial = species.clone()
+                trial[atoms] = species[atoms].flip(0)
+            else:
+                atom, proposed, possible = streams.decode_transmute(u, species, self.set, self.members,
+                                                                    self.position)
+                trial = species.clone()
+                trial[atom] = proposed
+            assert bool(possible)  # the enumeration cells never lack a species
+            c, d = self.index(species), self.index(trial)
+            log_u = -math.inf if u_accept == 0.0 else math.log(u_accept)
+            accept, tie = metropolis_decision(self.case.plan.x, self.kT, c, d, log_u, self.margin)
+            ties += tie
+            if accept:
+                species, accepted = trial, accepted + 1
+        return species, accepted, ties
