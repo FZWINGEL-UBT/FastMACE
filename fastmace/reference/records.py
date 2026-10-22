@@ -9,8 +9,9 @@ entries of §12.1, and a fifth list for the numerical treatment of the yardstick
   ``cuda:0``) and MACE PR 1498's one-graph strain, the stress formula of the production path;
 - ``upstream_fixes``: defects upstream fixed after the pinned version, each with its independent
   validation. Today one: the PolarMACE stress (MACE issue 1642, PR 1718), validated by finite
-  differences of the reference energy on NaCl 3x3x3. It is required for every PolarMACE record
-  on MACE 0.3.16, and retired by the record of a MACE that contains it;
+  differences of the reference energy with the k-set frozen, on the run's own structure. It is
+  required for every PolarMACE record on MACE 0.3.16, and retired by the record of a MACE that
+  contains it;
 - ``optional_physics``: opt-in model changes, applied to the reference too and labelling the
   results non-stock. PR 1762 (Fukui regularisation, dipole cap) and D3 (MACE plus torch-dftd on the
   ``fm.D3`` record's numbers, 3b-T04) are accepted;
@@ -74,16 +75,16 @@ POLAR_STRESS_FIX = {
                       "active (no instance forward stored)",
     "validation": {
         "method": "central finite differences of the reference energy",
-        "structure": "NaCl 3x3x3",
+        "structure": "the run's own structure",
+        "kset": "frozen at the unstrained cell's included set (fastmace.longrange.polar.frozen_kset): the hard "
+                "k-space cutoff steps the energy when a k-vector crosses it, 4.4e-4 eV/A^3 live against 8.3e-9 "
+                "frozen on NbCl5 3x3x3 at h = 1e-4 (3b-T08)",
         "strain": 1e-4,
         "tolerance_eV_per_A3": 1e-6,
-        "result": "corrected reference <= 8.1e-9 eV/A^3, MACE 0.3.16's own stress 2e-5 eV/A^3 off (1a-T19)",
+        "result": "corrected reference <= 8.1e-9 eV/A^3 on NaCl 3x3x3, MACE 0.3.16's own stress 2e-5 eV/A^3 off "
+                  "(1a-T19); 8.3e-9 on NbCl5 3x3x3 with the k-set frozen (3b-T08)",
         "probe": "ResearchModule studies/other_models/probes/polar_stress_probe.py",
     },
-    "open_findings": [
-        "NbCl5 3x3x3: the corrected float64 POLAR-1-S stress differs from finite differences by 4.4e-4 eV/A^3 "
-        "(about 3%); validated on NaCl 3x3x3 only, to be resolved in phase 3b before PolarMACE NPT is recommended",
-    ],
     "retire_when": "the pinned MACE contains PR 1718; the record then states plain stock equivalence",
 }
 

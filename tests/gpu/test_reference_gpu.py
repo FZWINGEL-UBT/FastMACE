@@ -21,8 +21,6 @@ import pytest
 
 RUN = os.environ.get("FASTMACE_1A_T19_POLAR1S")
 
-pytestmark = pytest.mark.skipif(not RUN, reason="FASTMACE_1A_T19_POLAR1S is not set (1a-T19's gate-polar1-s run)")
-
 
 def _configurations(path):
     from ase import Atoms
@@ -44,6 +42,7 @@ def _values(path, structure):
                 for key in keys if key.startswith(f"{structure}/")}
 
 
+@pytest.mark.skipif(not RUN, reason="FASTMACE_1A_T19_POLAR1S is not set (1a-T19's gate-polar1-s run)")
 def test_polar1s_reference_equals_1a_t19():
     from fastmace.reference import calculators, records
 
@@ -70,3 +69,39 @@ def test_polar1s_reference_equals_1a_t19():
     assert worst["forces"] <= 1e-12, worst
     assert worst["stress"] <= 1e-12, worst
     assert check["passed"]
+
+
+STRUCTURES = os.environ.get("FASTMACE_STRUCTURES")
+
+
+def _polar1s_checkpoint():
+    from fastmace.model import labels
+
+    models = os.environ.get("FASTMACE_MODELS")
+    return bool(models) and (Path(models) / labels.LABELS["polar1-s"].checkpoint.file_name).is_file()
+
+
+@pytest.mark.skipif(not (STRUCTURES and _polar1s_checkpoint()),
+                    reason="FASTMACE_STRUCTURES (r2SCAN CIFs) and POLAR-1-S in FASTMACE_MODELS are needed")
+@pytest.mark.slow  # 13 float64 evaluations of NbCl5 3x3x3, about 5 s each (3b-T08)
+@pytest.mark.parametrize("structure", ["NbCl5", "NaCl"])
+def test_polar1s_stress_check_passes_on_the_gate_configuration(structure):
+    """4-T11: the self-test holds the unstrained cell's k-set. On 3b-T08's NbCl5 3x3x3 gate configuration a
+    Bragg pair sits 2.8e-5 outside the k-space cutoff and enters at e_xx = +1e-4; the live finite differences
+    were 4.36e-4 eV/A^3 off, the frozen ones 8.3e-9 (docs/validation/3b-T08.md). NaCl 3x3x3, where nothing
+    crosses, stays as 1a-T19 measured it (<= 8.1e-9)."""
+    import importlib.util
+
+    from fastmace.reference import calculators
+
+    spec = importlib.util.spec_from_file_location("_tool_polar_stress_fd",
+                                                  Path(__file__).resolve().parents[2] / "tools" / "polar_stress_fd.py")
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    atoms = tool.configurations(structure, (3, 3, 3), ("gate",))["gate"]
+    reference = calculators.load("polar1-s", atoms, dtype="float64", device="cuda:0")
+    check = reference.check_stress_fix(atoms, h=1e-4)
+    print(json.dumps({"structure": structure, "natoms": len(atoms),
+                      **{key: check[key] for key in ("max_abs", "strain", "kset", "k_vectors_included")}}))
+    assert check["passed"] and check["kset"] == "frozen"
+    assert check["max_abs"] <= 1e-7, check["max_abs"]
