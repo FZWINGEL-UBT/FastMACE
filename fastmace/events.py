@@ -347,7 +347,7 @@ class Transaction:
                     raise ValueError("this model takes no per-atom charges")
                 charges = self._array(charges, "charges", count)
             if total is not None:
-                if state.total_charge is None:
+                if getattr(self.engine.force_field, "set_total_charge", None) is None:
                     raise ValueError("this model takes no total charge")
                 total = float(total)
                 if not np.isfinite(total):
@@ -453,6 +453,11 @@ class Transaction:
             state.charges[self._rows(event)] = torch.as_tensor(charges, dtype=state.charges.dtype,
                                                                device=state.charges.device)
         if total is not None:
+            # The force field's device total is base + (sum of charges - their sum at the base), so that 3-T09's
+            # transmutations change it inside a graph through state.charges; a host total moves the base (3-T02).
+            field = self.engine.force_field
+            self._snapshot.setdefault("total_charge", getattr(field, "charge", state.total_charge))
+            field.set_total_charge(total)
             state.total_charge = total
         self.changed.add("charges")
 
@@ -490,6 +495,8 @@ class Transaction:
         if self._snapshot is None:
             return
         engine, state = self.engine, self.engine.state
+        if "total_charge" in self._snapshot:  # the force field's host base, before its buffers come back
+            engine.force_field.set_total_charge(self._snapshot["total_charge"])
         engine.registry.restore(self._snapshot["buffers"])
         state.rng.generator, state.rng.cursor = self._snapshot["rng"]
         for name, value in self._snapshot["state"].items():
