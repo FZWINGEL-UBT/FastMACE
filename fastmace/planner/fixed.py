@@ -44,6 +44,7 @@ from types import MappingProxyType
 from typing import Any
 
 from fastmace.config import (
+    DEFAULT_SKIN_A,
     EngineConfig,
     IntegratorConfig,
     NeighbourConfig,
@@ -69,6 +70,10 @@ AUTO_RULES = MappingProxyType({
     "PrecisionConfig.dtype": "float32_for_hybrid_float64_for_cueq",
     "NeighbourConfig.sort_receivers": "on_for_hybrid_graph_engine",
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
+    "NeighbourConfig.skin": "rule_11_skin_from_workload",
+    "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
+    "EngineConfig.recapture_budget": "recapture_budget_from_workload",
+    "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
     "RewriteConfig.fold_cutoff": "on_with_factor_species_if_model_supports",
     "RewriteConfig.density_first": "on_with_fold_cutoff_if_model_supports",
@@ -498,21 +503,47 @@ class FixedPlanner:
             book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
                         "fixed cell: the graph engine computes no stress")
 
+        phase_3 = self._phase_3_fields(book, dtype)
         return dict(
             tier="compiled" if evaluation else TIER,
             rewrites=dataclasses.replace(rewrites, **rewrite_values),
             engine=dataclasses.replace(engine, backend=backend, pipelined=_toggle(pipelined),
                                        async_output=_toggle(async_output), cueq_conv_fusion=_toggle(bool(fusion)),
-                                       expandable_segments=expandable),
-            precision=dataclasses.replace(self.precision, dtype=dtype),
+                                       expandable_segments=expandable, **phase_3["engine"]),
+            precision=dataclasses.replace(self.precision, dtype=dtype, **phase_3["precision"]),
             neighbours=dataclasses.replace(self.neighbours, sort_receivers=_toggle(values["sort_receivers"]),
-                                           gpu_neighbour_list=_toggle(values["gpu_neighbour_list"])),
+                                           gpu_neighbour_list=_toggle(values["gpu_neighbour_list"]),
+                                           **phase_3["neighbours"]),
             polar=polar,
             integrator=None if evaluation else integrator,
             decisions=tuple(book.decisions),
             requested=requested,
             auto_options_off=tuple(values["_auto_off"].items()),
         )
+
+    def _phase_3_fields(self, book, dtype):
+        """The phase 3 "auto" fields (plan task 3-T01), resolved to today's behaviour until their tasks give
+        the rules: rule 11's skin and headroom (3-T05), the re-capture budget (3-T04) and the MC energy
+        precision (3-T11, which changes it only for MC plans)."""
+        n, e, p = self.neighbours, self.engine, self.precision
+        skin = DEFAULT_SKIN_A if n.skin == "auto" else n.skin
+        book.decide("NeighbourConfig.skin", f"{skin:g} A", _why(
+            "auto" if n.skin == "auto" else n.skin, AUTO_RULES["NeighbourConfig.skin"],
+            "phase 1a's skin until rule 11 (3-T05)"))
+        headroom = "fixed" if n.headroom == "auto" else n.headroom
+        book.decide("NeighbourConfig.headroom", headroom, _why(
+            n.headroom, AUTO_RULES["NeighbourConfig.headroom"],
+            "capacity_headroom and edge_bucket_fraction as given until rule 11 (3-T05)"))
+        budget = e.graph_variant_cap if e.recapture_budget == "auto" else e.recapture_budget
+        book.decide("EngineConfig.recapture_budget", str(budget), _why(
+            "auto" if e.recapture_budget == "auto" else e.recapture_budget, AUTO_RULES["EngineConfig.recapture_budget"],
+            "the graph variant cap until the workload rule (3-T04)"))
+        mc_energy = dtype if p.mc_energy == "auto" else p.mc_energy
+        book.decide("PrecisionConfig.mc_energy", mc_energy, _why(
+            p.mc_energy, AUTO_RULES["PrecisionConfig.mc_energy"],
+            "the force precision: no MC energies before the move-energy gate (3-T11)"))
+        return {"neighbours": {"skin": skin, "headroom": headroom}, "engine": {"recapture_budget": budget},
+                "precision": {"mc_energy": mc_energy}}
 
     def _requested(self):
         """(item, value) of every option the caller did not leave at "auto" or its default."""

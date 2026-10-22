@@ -35,7 +35,15 @@ from ase import units
 
 from _support.structures import nacl
 from _support.tiny_models import FAMILIES, tiny_mace_model
-from fastmace.config import EngineConfig, IntegratorConfig, NeighbourConfig, PolarConfig, PrecisionConfig, RewriteConfig
+from fastmace.config import (
+    DEFAULT_SKIN_A,
+    EngineConfig,
+    IntegratorConfig,
+    NeighbourConfig,
+    PolarConfig,
+    PrecisionConfig,
+    RewriteConfig,
+)
 from fastmace.engine import constraints
 from fastmace.model import capabilities, labels
 from fastmace.planner import fixed
@@ -783,3 +791,14 @@ def test_build_refuses_a_model_loaded_with_other_settings(tiny_checkpoint, quiet
         p.build(unresolved, loaded, nacl(), constraints=constraints.ProcessRecord())
     with pytest.raises(ValueError, match="tier"):
         p.build(Plan(tier="eager"), loaded, nacl())
+
+
+def test_phase_3_auto_fields_resolve_to_todays_values():  # 3-T01: until 3-T04, 3-T05 and 3-T11 give the rules
+    plan = plan_for("mh1-r2scan")
+    assert plan.neighbours.skin == DEFAULT_SKIN_A and plan.neighbours.headroom == "fixed"
+    assert plan.engine.recapture_budget == plan.engine.graph_variant_cap == 64
+    assert plan.precision.mc_energy == plan.precision.dtype
+    decided = {item: why for item, _, why in plan.decisions}
+    for item in ("NeighbourConfig.skin", "NeighbourConfig.headroom", "EngineConfig.recapture_budget",
+                 "PrecisionConfig.mc_energy"):
+        assert f"auto ({fixed.AUTO_RULES[item]})" in decided[item]

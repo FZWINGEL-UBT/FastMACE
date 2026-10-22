@@ -13,7 +13,7 @@ from collections.abc import Mapping
 import numpy as np
 import torch
 
-from ..config import NeighbourConfig
+from ..config import DEFAULT_SKIN_A, NeighbourConfig
 from .buckets import edge_capacity
 from .pair_search import candidate_pairs
 
@@ -87,7 +87,8 @@ class SkinNeighbourList:
         self.config = config
         self.cell = np.asarray(cell, dtype=float)
         self.cutoff = float(cutoff)
-        self.skin = float(config.skin)
+        # A planned config has a number; "auto" here (a list built without a plan) is rule 11's floor.
+        self.skin = DEFAULT_SKIN_A if config.skin == "auto" else float(config.skin)
         self.device = torch.device(device)
         self.float_dtype = float_dtype
         self.edge_multiple = config.edge_multiple

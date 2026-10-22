@@ -14,12 +14,17 @@ model or the plan cannot take it; ``"off"`` disables it.
 Phase 2 (plan task 2-T01) adds the records of the safety layer: ``FallbackConfig`` (§9.4),
 ``GateConfig`` (§12.3 "Resources") and ``RunnerConfig`` (§8.7), and the ``Mode`` of the planner.
 
+Phase 3 (plan task 3-T01, ``docs/design/contracts-3.md``) adds rule 11's skin and headroom
+(``NeighbourConfig``), the re-capture policy (``EngineConfig``), the MC energy precision
+(``PrecisionConfig``), the MC driver's options (``MCConfig``) and the MC streams' seeds.
+
 This module holds no state: no caches, no registries, no switches.
 """
 
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import math
 import sys
 import typing
@@ -30,6 +35,16 @@ Toggle = Literal["on", "off", "auto"]
 # Execution modes, the tiers of SPEC §8 (§9.3 "execution mode"): the planner's ``mode=``.
 Mode = Literal["graph", "compiled", "eager", "reference"]
 MODES = typing.get_args(Mode)
+# MC energy precision (SPEC §10.4): "auto" = the force precision if the move-energy gate passes, else float64.
+MCEnergyPrecision = Literal["auto", "float32", "float64"]
+MC_ENERGY_PRECISIONS = typing.get_args(MCEnergyPrecision)
+# The skin of phase 1a and today's default, Angstrom; rule 11's lower bound (3-T05).
+DEFAULT_SKIN_A = 0.3
+# The three seeded device streams of the MC driver (SPEC §8.5 "Random numbers per outcome").
+MC_STREAMS = ("proposal", "acceptance", "velocity")
+# Momentum treatments of moves that change masses (SPEC §10.4): exchange is for swaps only.
+SWAP_VELOCITIES = ("exchange", "rescale", "redraw", "redraw_all")
+TRANSMUTE_VELOCITIES = ("rescale", "redraw", "redraw_all")
 
 
 def _check_choices(instance):
@@ -51,6 +66,12 @@ def _positive(instance, *names):
         value = getattr(instance, name)
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
             raise ValueError(f"{type(instance).__name__}.{name} must be positive and finite, got {value!r}")
+
+
+def _count(instance, name, minimum=0):
+    value = getattr(instance, name)
+    if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+        raise ValueError(f"{type(instance).__name__}.{name} must be an int of at least {minimum}, got {value!r}")
 
 
 def _nonnegative(instance, *names):
@@ -199,6 +220,12 @@ class EngineConfig:
     # stays on in reproducible plans. Anything else (NPT, CPU, no Triton) keeps the PyTorch stage. On by
     # default (owner decision, 21 October 2026; OPT3-T03).
     fused_integrator: bool = True
+    # Re-captures of the graphs one run may make (bucket growth, overflow redos, events that drop graphs)
+    # before the run warns, records it and the report recommends the compiled tier (SPEC §8.1; no mid-run
+    # downgrade, phase 3 conductor decision). "auto": a rule from the workload (3-T04, 3-T05); 0: none.
+    recapture_budget: int | Literal["auto"] = "auto"
+    # Captured graph variants kept at once, oldest dropped first (SPEC §8.1: dynamo's limit, at most 64).
+    graph_variant_cap: int = 64
 
     def __post_init__(self):
         _check_choices(self)
@@ -212,6 +239,12 @@ class EngineConfig:
         if not isinstance(self.dynamo_cache_size_limit, int):
             raise ValueError(f"EngineConfig.dynamo_cache_size_limit must be an int, "
                              f"got {self.dynamo_cache_size_limit!r}")
+        if self.recapture_budget != "auto":
+            _count(self, "recapture_budget")
+        _count(self, "graph_variant_cap", minimum=1)
+        if self.graph_variant_cap > min(64, self.dynamo_cache_size_limit):
+            raise ValueError(f"EngineConfig.graph_variant_cap must be at most 64 and at most dynamo_cache_size_limit "
+                             f"({self.dynamo_cache_size_limit}), got {self.graph_variant_cap!r}")
 
 
 @dataclass(frozen=True)
@@ -225,6 +258,10 @@ class PrecisionConfig:
     # Potential energy accumulated in float64 (SPEC §7.3; a reference treatment, not a rewrite).
     # False reproduces phase 1a's float32 sum, for A/B against the research engine only (1b-T03).
     float64_energy: bool = True
+    # Precision of MC energy evaluations (SPEC §10.4): the planner's resolution of
+    # Workload.mc_energy_precision, which is what users set. "auto": the force precision if the
+    # move-energy gate passes, float64 otherwise (3-T11); MD forces keep `dtype`.
+    mc_energy: MCEnergyPrecision = "auto"
 
     def __post_init__(self):
         _check_choices(self)
@@ -234,8 +271,9 @@ class PrecisionConfig:
 class NeighbourConfig:
     """Skin neighbour list and padded edge buckets (SPEC §8.1; fastmace.neighbors)."""
 
-    # Neighbour-list skin in Angstrom (--skin).
-    skin: float = 0.3
+    # Neighbour-list skin in Angstrom (--skin). "auto": rule 11 from the workload (3-T05; until then
+    # DEFAULT_SKIN_A, phase 1a's 0.3).
+    skin: float | Literal["auto"] = "auto"
     # Order candidate edges by receiver at every rebuild (sort_by_receiver; --sort-receivers).
     sort_receivers: Toggle = "auto"
     # Build the list on the GPU instead of with matscipy (GPU_NEIGHBOUR_LIST).
@@ -246,10 +284,15 @@ class NeighbourConfig:
     edge_bucket_fraction: float = 0.05
     # Pair-buffer capacity relative to the first build (SkinNeighbourList headroom).
     capacity_headroom: float = 1.15
+    # "fixed": capacity_headroom and edge_bucket_fraction as given; "auto": rule 11 sizes them from the
+    # workload (3-T05; until then "fixed").
+    headroom: Literal["auto", "fixed"] = "auto"
 
     def __post_init__(self):
         _check_choices(self)
-        _positive(self, "skin", "edge_multiple", "capacity_headroom")
+        if self.skin != "auto":
+            _positive(self, "skin")
+        _positive(self, "edge_multiple", "capacity_headroom")
         _nonnegative(self, "edge_bucket_fraction")
         if not isinstance(self.edge_multiple, int):
             raise ValueError(f"NeighbourConfig.edge_multiple must be an int, got {self.edge_multiple!r}")
@@ -438,6 +481,33 @@ class RunnerConfig:
     def resolved_python(self) -> str:
         """The child's interpreter: ``python``, else this process's ``sys.executable``."""
         return self.python if self.python is not None else sys.executable
+
+
+@dataclass(frozen=True)
+class MCConfig:
+    """Limits of the MC driver (SPEC §10.4; 3-T09). The moves themselves are ``fm.mc`` records, and the
+    streams' seeds derive from the simulation's ``seed`` (``mc_stream_seeds``)."""
+
+    # Attempts of one move in one block; the captured attempt graph is replayed this often at most.
+    max_attempts_per_block: int = 10_000
+    # Move records attached at once (run(mc=(...)) with several moves).
+    max_move_sets: int = 8
+
+    def __post_init__(self):
+        _count(self, "max_attempts_per_block", minimum=1)
+        _count(self, "max_move_sets", minimum=1)
+
+
+def mc_stream_seeds(seed: int) -> dict[str, int]:
+    """The seeds of the MC streams (``MC_STREAMS``) for a simulation ``seed``: fixed 63-bit values from
+    SHA-256, the same in every process and on every machine, and distinct from the integrator's ``seed``."""
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        raise ValueError(f"the MC streams need a nonnegative int seed, got {seed!r}")
+    seeds = {}
+    for stream in MC_STREAMS:
+        digest = hashlib.sha256(f"fastmace-mc:{seed}:{stream}".encode()).digest()
+        seeds[stream] = int.from_bytes(digest[:8], "little") >> 1
+    return seeds
 
 
 def external_stress(value, name="external_stress_GPa"):

@@ -50,7 +50,7 @@ step's flags is in ``_step_checked``, ``_validate_pipelined`` and ``_validate_ol
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import torch
@@ -68,6 +68,10 @@ SPECULATIVE_SLOTS = 1
 WARMUP_RUNS = 3
 # The ``fastmace_stage`` tag of an error raised while capturing (planner.fallback.stage_of; 2-T15b).
 CAPTURE_STAGE = "capture"
+# The energy-only graph's key (SPEC §8.1, 3-T07), and the stage keys the engine itself captures, which
+# captured(key, fn) refuses for other modules' graphs (3-T04).
+ENERGY_KEY = "E"
+ENGINE_KEYS = ("A", "AC", "ACB", "ACP", "ACPB", "B", "C", ENERGY_KEY)
 
 
 def _device(name: str) -> torch.device:
@@ -286,6 +290,18 @@ class GraphEngine(Engine):
     def potential_energy(self) -> float:
         self.flush()
         return float(self.state.energy[0])
+
+    def energy(self, *, precision: str | None = None) -> torch.Tensor:
+        """The potential energy of the committed state from the forward-only energy graph (key ``ENERGY_KEY``,
+        under ``torch.no_grad()``, float64 accumulation; SPEC §8.1), in ``precision`` (``"float32"``,
+        ``"float64"``; ``None``: the force precision). A device scalar; no forces, no ``grad_fn``."""
+        raise NotImplementedError("the energy-only graph: plan task 3-T07")
+
+    def captured(self, key: str, fn: Callable[[], Any]) -> Callable[[], None]:
+        """Capture ``fn`` (no arguments, fixed shapes and addresses) as a CUDA graph under ``key`` with the
+        engine's warm-up, registry restore and re-capture policy (variant cap, budget, log), and return
+        its replay. For other modules' graphs (the MC attempt, 3-T09); ``ENGINE_KEYS`` are refused."""
+        raise NotImplementedError("GraphEngine.captured: plan task 3-T04")
 
     def info(self) -> Mapping[str, Any]:
         extra = {"rebuilds_beside": self.rebuilds_beside} if self.config.overlap_rebuild else {}
