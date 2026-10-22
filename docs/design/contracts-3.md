@@ -131,7 +131,7 @@ Notes on the records:
   - A mass change keeps the momenta, only where the mass changes. A species change sets the standard masses the same way; a masses event after it wins.
   - Accepted: `engine.transactions_committed` counts it; the resume is `canonicalise(reevaluate=True)`, then a refresh of what depends on forces and stress.
   - Rejected, impossible, redo: the runtime-state registry snapshot is restored in place, with the noise generator and cursor and the integrator's host constants.
-  - A friction event calls T04's `GraphEngine.invalidate_graphs(reason)` (until T04 merges: `_clear_graphs()`), again on a rejection that captured meanwhile. With the default barostat τ it also changes `barostat` (`P_tau`, the barostat mass); an explicit `barostat_tau_fs` stays.
+  - A friction event calls T04's `GraphEngine.invalidate_graphs(reason)`, again on a rejection that captured meanwhile. With the default barostat τ it also changes `barostat` (`P_tau`, the barostat mass); an explicit `barostat_tau_fs` stays.
 - **`events.check_against(engine, fresh)`**: the CI registry check of SPEC §12.2. It compares the derived registries, the state's composition, the neighbour list as the set of compacted edges, the integrator's host constants (the floats a stage bakes in, its config) and every other tensor reachable from the force field and integrator that the runtime-state registry does not hold. So a buffer left out of the registry fails it (`tests/cpu/test_events.py` has the negative controls).
 - **`events.species_numbers(values, count)`**: atomic numbers from numbers or symbols, validated.
 

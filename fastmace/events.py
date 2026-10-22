@@ -487,12 +487,7 @@ class Transaction:
         self._drop_graphs("friction event: c1, c2 and the thermostat constants are baked into the captured stages")
 
     def _drop_graphs(self, reason: str) -> None:
-        engine = self.engine
-        invalidate = getattr(engine, "invalidate_graphs", None)  # 3-T04: logged; the next capture is a re-capture
-        if invalidate is not None:
-            invalidate(reason)
-        else:
-            engine._clear_graphs()
+        self.engine.invalidate_graphs(reason)  # logged; the next capture is a re-capture (3-T04)
         self._dropped_graphs = True
 
     def refresh(self) -> None:
