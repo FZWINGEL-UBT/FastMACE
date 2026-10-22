@@ -195,7 +195,58 @@ def stream_seeds(seed: int) -> dict[str, int]:
     return mc_stream_seeds(seed)
 
 
-__all__ = ["ACCEPTANCE_COUNT", "PHILOX_ROUNDS", "attempt_counts", "block_velocity_count", "decode_swap",
+class BlockStreams:
+    """The device side of the three streams for the attempts of one block (the ``streams`` argument of
+    ``moves.build_attempt``), with the block's shared device scalars.
+
+    - ``base``: int64 ``[3]``, the offset of each stream (``config.MC_STREAMS`` order) when the current
+      move's attempts began; ``index``: int64 ``[1]``, the attempt index ``k`` within them, advanced by the
+      attempt itself when it completes. The host sets both before a move's attempts (``start``) and
+      reads ``index`` with the block counters.
+    - ``kT``: float64 ``[1]``, k_B T in eV at the block; ``baseline``: float64 ``[1]``, the MC evaluator's
+      energy of the committed state, replaced by an accepted trial's energy.
+    """
+
+    def __init__(self, seeds, device):
+        import torch
+
+        from fastmace.config import MC_STREAMS
+
+        self.seeds = {stream: int(seeds[stream]) for stream in MC_STREAMS}
+        self.base = torch.zeros(len(MC_STREAMS), dtype=torch.int64, device=device)
+        self.index = torch.zeros(1, dtype=torch.int64, device=device)
+        self.kT = torch.zeros(1, dtype=torch.float64, device=device)
+        self.baseline = torch.zeros(1, dtype=torch.float64, device=device)
+
+    def start(self, offsets) -> None:
+        """Host, between replays: the streams' offsets (a mapping by stream) as the base; attempt index 0."""
+        import torch
+
+        from fastmace.config import MC_STREAMS
+
+        values = torch.tensor([int(offsets[stream]) for stream in MC_STREAMS], dtype=torch.int64)
+        self.base.copy_(values)
+        self.index.zero_()
+
+    def offsets(self, stream: str, count: int):
+        """The offsets of the current attempt's ``count`` numbers of ``stream``: ``base + index * count + j``."""
+        from fastmace.config import MC_STREAMS
+
+        start = self.base[MC_STREAMS.index(stream)] + self.index * count
+        return positions(start, count)
+
+    def uniforms(self, stream: str, count: int):
+        return uniforms(self.seeds[stream], self.offsets(stream, count))
+
+    def normals(self, stream: str, count: int):
+        return normals(self.seeds[stream], self.offsets(stream, count))
+
+    def tensors(self):
+        """The mutable device tensors (for snapshots around a capture or a redo)."""
+        return (self.base, self.index, self.kT, self.baseline)
+
+
+__all__ = ["ACCEPTANCE_COUNT", "BlockStreams", "PHILOX_ROUNDS", "attempt_counts", "block_velocity_count", "decode_swap",
            "decode_transmute", "normals", "philox4x32", "positions", "proposal_count", "select",
            "stream_seeds", "uniforms", "velocity_count"]
 
