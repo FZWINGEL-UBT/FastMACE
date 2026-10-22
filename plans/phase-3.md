@@ -805,6 +805,22 @@ closed pool", into `plan.reason` and the report line. Files:
 
 This is 2-T22, carried over.
 
+#### 3-T22 The Langevin fixcm projection with unequal masses (S–M, CPU) — added by the conductor, 22 October 2026
+
+Found by 3-T12's hybrid MD/MC tests without MC (`side-session-notes/…/3-T12-finding-fixcm-unequal-masses.md`):
+- `integrators/langevin.py` (ASE's Langevin, copied for its noise stream) removes the centre-of-mass part of
+  the random velocities as P/(N·m_i) per atom and scales by √(N/(N−1)). That is right only for equal masses.
+- On Li/Cs NaCl 2×1×1 at 600 K the light species ran hot: Li 860 K, Cs 567 K, total 666 K. Without `fixcm`,
+  or with Na/K, there was no bias.
+
+The task:
+- measure the bias at production sizes (NaCl, NbCl5, NaNbOCl4 at 3×3×3) on the CPU;
+- prepare the mass-weighted projection behind an option, with ASE's behaviour kept bit for bit for the
+  noise-stream equivalence;
+- check the research engine read-only.
+
+A default change is the owner's decision (checkpoint 2b below). Worker: 3-T03's session.
+
 ### Wave 4: acceptance
 
 #### 3-T20 Phase 3 benchmarks (M, GPU: local timing; Ada) — after T09, T10, T11
@@ -1430,6 +1446,8 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
 2. After T11's measurement: whether float32 MC energies are accepted where
    the ΔE gate passes. That is SPEC's rule; the checkpoint is information,
    not a new decision.
+2b. After 3-T22's measurement: whether `fixcm` uses the mass-weighted projection by default. That would
+   change thermostat results slightly for crystals with unequal masses, in FastMACE and in `main.py`.
 3. After T21: the acceptance report, and the tag `fastmace-3`.
 
 ## Owner decisions
