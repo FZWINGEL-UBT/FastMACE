@@ -138,14 +138,20 @@ above, with the result log and junit.
   check reached pass on sm_89.
 
 **Item 2: GPU NPT + D3 against ASE** (§11.2, choice 7).
-- NbCl5 1×1×3 (216 atoms), MH-1 `matpes_r2scan` + D3-BJ, 0 GPa hydrostatic, 300 K and 600 K, 1 fs, the
-  library's barostat defaults on both engines, 3 seeds per engine; duration and discarded equilibration as
-  3b-T05 fixes them before its runs, the same on both sides.
-- ASE side: `LangevinBAOAB` + MACE + torch-dftd (float64). Its runs come from 3b-T05 and are cited, not rerun,
-  if the ASE script, its environment and its settings are unchanged; the FastMACE side reruns at the freeze.
+- NbCl5 1×1×3 (216 atoms), MH-1 `matpes_r2scan` + D3-BJ, 0 GPa hydrostatic, 300 K and 600 K, 1 fs,
+  3 seeds per engine; duration and discarded equilibration as 3b-T05 fixes them before its runs, the same on
+  both sides.
+- **Barostat (test setting, conductor 22 October 2026):** P_tau = 2 ps, mass factor 1, friction 0.02, on both
+  engines, recorded with the results. Not the library defaults: the stationary V distribution doesn't depend
+  on P_tau, and 2 ps gives about 5× the independent samples. Item 4 keeps the defaults (decision 40).
+- ASE side: `LangevinBAOAB` + MACE in float32 (cuEq) + torch-dftd in float64 (about 4 h instead of 6.5 h;
+  float32 round-off is far below the error bars). Its runs come from 3b-T05 and are cited, not rerun, if the
+  ASE script, its environment and its settings are unchanged; the FastMACE side reruns at the freeze.
 - **Per temperature and observable** (mean V, V fluctuation as the standard deviation of V, mean P, mean PE
-  per atom): |FastMACE − ASE| ≤ 3 √(SE_F² + SE_A²). SE of each engine: the standard error over its seeds of
-  the per-seed block-averaged value.
+  per atom): |FastMACE − ASE| ≤ 3 √(SE_F² + SE_A²).
+- **SE of each engine:** block averages over blocks of at least twice the observable's decorrelation time,
+  pooled over the seeds (not the spread of 3 seed means, which has 2 degrees of freedom). For the V
+  fluctuation, a jackknife over the same blocks. The report gives the decorrelation times and block counts.
 - **One pre-declared extension:** if a comparison misses, 3 more seeds per engine run for that temperature,
   and the 6-seed comparison decides. Still missing: the item fails and goes to the conductor.
 - Not judged: whether NbCl5 stays solid at 600 K (decision 6).
