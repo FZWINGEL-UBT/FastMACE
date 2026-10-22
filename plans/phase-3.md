@@ -1418,6 +1418,13 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   - The full run takes about 1 h. The full run's report gives the acceptance
     per 100 K bin and the attempted ΔE in kT, so the owner can judge D3 if
     acceptance stays near zero.
+  - **Early D3 finding** (smoke frames, `swap_statistics.py`): an unrelaxed
+    O↔Cl swap costs about 9–11 eV, at least 107 kT in every bin from 250 to
+    1000 K, because Cl lands about 1.9 Å from Nb. Acceptance stays at zero,
+    and the swap block costs about 10 min per run without sampling any anion
+    disorder.
+  - The conductor asked for the same estimate for D3's option (b), Nb↔Ta in
+    a 50/50 Na(Nb,Ta)Cl6. Both tables go to the owner for a D3 review.
 - **The NAS `mace_cueq_oeq` has no `tomli`.** FastMACE declares it for
   Python 3.10, but runs from a checkout on `PYTHONPATH` install nothing.
   The NAS `mace_cueq_latest` has it only through pytest. So `fastmace run`
