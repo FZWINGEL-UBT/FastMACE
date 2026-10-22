@@ -1,9 +1,10 @@
-"""The restart file: the complete simulation state, format version 2 (SPEC §10.6, §9.5).
+"""The restart file: the complete simulation state, format version 3 (SPEC §10.6, §9.5).
 
 One ``.npz`` per run directory (plain arrays and JSON text, no pickles), written durably and
 atomically (``io.durable``: fsynced temporary file, rename, directory fsync) at committed steps
 after the output queue has been drained, its chunks fsynced, and the engine flushed.
-Version 2 (plan task 1b-T05) holds every §10.6 item except the MC state (phase 3):
+Version 2 (plan task 1b-T05) holds every §10.6 item except the MC state; version 3 (plan task
+3-T08) adds it and makes the composition the resumed state:
 
 - the research engine's keys (``workflow.write_restart`` with ``GPUEngine.state``), so either side
   reads the other's files: ``step``, ``engine`` (checked on resume), ``positions``, ``momenta``,
@@ -20,10 +21,16 @@ Version 2 (plan task 1b-T05) holds every §10.6 item except the MC state (phase 
   (``state.protocol.to_restart()``), ``plan`` (a JSON mapping until plan task 1b-T12's
   ``Plan.to_restart()``; it includes ``edge_bucket`` and ``neighbour_capacity``) and ``identity``
   (the ``ForceFieldIdentity``) with ``identity_digest``; ``output_chunk``, ``output_rows`` and
-  ``output_frames`` (the output chunk indices at the restart point, plan task 1b-T06).
+  ``output_frames`` (the output chunk indices at the restart point, plan task 1b-T06);
+- version 3's: ``mc``, the JSON record of the attached move set (``MC_RECORD_KEYS``; only with one).
+  The composition keys (``COMPOSITION_KEYS``: per-atom ``species`` and ``masses``, ``charges``, and
+  total charge and spin in ``physical``) are the run's *current* composition, after any accepted
+  swap, transmutation or host change: ``Simulation.resume`` builds the engine from them
+  (``composition``), not from the initial structure in ``simulation.json``. Version 2 files hold
+  the same keys and resume the same way.
 
-``main.py``'s adapter writes ``state_arrays`` without identity and plan: such files are version 2
-without ``identity``. ``check_identity`` (``Simulation.resume``) refuses them, as it refuses 1a
+``main.py``'s adapter writes ``state_arrays`` without identity and plan: such files have no
+``identity``. ``check_identity`` (``Simulation.resume``) refuses them, as it refuses 1a
 (version 1) and research-engine (no version) files, which ``load_state`` still reads.
 
 The writer makes the same bytes from the same state: entries in name order, a fixed zip time stamp
@@ -57,11 +64,11 @@ if TYPE_CHECKING:
     from fastmace.state import SimulationState
 
 RESTART_NAME = "restart.npz"
-FORMAT_VERSION = 2
 # Version 3 (SPEC §10.6; contracts: plan task 3-T01, writer and resume: 3-T08). The composition keys,
-# already written since versions 1 and 2, become the resumed state (today resume rebuilds the Atoms from
-# the initial structure); the JSON record "mc" holds the attached move set's state (3-T09, 3-T10).
+# already written since versions 1 and 2, are the resumed state (before 3-T08 resume rebuilt the Atoms
+# from the initial structure); the JSON record "mc" holds the attached move set's state (3-T09, 3-T10).
 NEXT_FORMAT_VERSION = 3
+FORMAT_VERSION = NEXT_FORMAT_VERSION
 V3_KEYS = ("mc",)
 COMPOSITION_KEYS = ("species", "masses", "charges", "physical")
 # The "mc" record: the move records, the step within the MD/MC cycle, counters per move type, each
@@ -81,7 +88,7 @@ _RECORDS = ("physical", "integrator", "protocol", "plan", "identity")
 _STATE_KEYS = frozenset({
     "step", "engine", "positions", "momenta", "velocities", "masses", "species", "cell", "cell_state",
     "rng_state", "noise", "noise_next", "forces", "energy", "stress", "integrator_keys", "fastmace_restart",
-    "charges", "plan_revision", "identity_digest", *_RECORDS, *OUTPUT_KEYS,
+    "charges", "plan_revision", "identity_digest", *_RECORDS, *OUTPUT_KEYS, *V3_KEYS,
 })
 _ZIP_TIME = (1980, 1, 1, 0, 0, 0)  # the earliest zip time stamp: the bytes do not depend on when they are written
 
@@ -113,6 +120,41 @@ def _plan_json(plan: Mapping[str, Any]) -> str:
     return _json(dict(plan), "plan")
 
 
+def _mc_checked(record: Any) -> dict[str, Any]:
+    """The MC record, checked against ``MC_RECORD_KEYS`` and its parts: a JSON-safe copy, or ``ValueError``."""
+    from fastmace.config import MC_STREAMS
+    from fastmace.planner.workload import MC_MOVES
+
+    def mapping(value: Any, name: str, keys: tuple[str, ...] | None = None) -> Mapping[str, Any]:
+        if not isinstance(value, Mapping):
+            raise ValueError(f"restart mc {name} must be a mapping, got {type(value).__name__}")
+        if keys is not None and set(value) != set(keys):
+            raise ValueError(f"restart mc {name} must have exactly the keys {keys}, got {sorted(value)}")
+        return value
+
+    mapping(record, "record", MC_RECORD_KEYS)
+    moves = record["moves"]
+    if not isinstance(moves, (list, tuple)) or not moves:
+        raise ValueError(f"restart mc moves must be a nonempty list of move records, got {moves!r}")
+    for move in moves:
+        if mapping(move, "moves entry").get("move") not in MC_MOVES:
+            raise ValueError(f"restart mc moves entry needs a 'move' in {MC_MOVES}, got {move!r}")
+    _count(record["cycle_position"], "mc cycle_position")
+    for move, counters in mapping(record["counters"], "counters").items():
+        if move not in MC_MOVES:
+            raise ValueError(f"restart mc counters: unknown move type {move!r}; known: {MC_MOVES}")
+        for key, value in mapping(counters, f"counters[{move!r}]", MC_COUNTER_KEYS).items():
+            _count(value, f"mc counters[{move!r}] {key}")
+    for stream, position in mapping(record["streams"], "streams", MC_STREAMS).items():
+        for key, value in mapping(position, f"streams[{stream!r}]", MC_STREAM_KEYS).items():
+            _count(value, f"mc streams[{stream!r}] {key}")
+    for move, delta in mapping(record["delta_A"], "delta_A").items():
+        if isinstance(delta, bool) or not isinstance(delta, (int, float)) or not 0.0 < delta < float("inf"):
+            raise ValueError(f"restart mc delta_A[{move!r}] must be a positive finite step in Å, "
+                             f"got {delta!r}")
+    return json.loads(_json(dict(record), "mc"))
+
+
 def _integrator_json(integrator: Any) -> str:
     return _json({"class": type(integrator).__name__, "config": dataclasses.asdict(integrator.config),
                   "temperature_K": getattr(integrator, "temperature_K", None)}, "integrator")
@@ -126,8 +168,9 @@ def state_arrays(state: SimulationState, engine: str, integrator_state: Mapping[
     ``integrator_state`` is ``Integrator.state_dict()``, taken from ``integrator`` if only that is
     given; ``integrator`` adds its class, config and target (the §10.6 integrator parameters).
     ``plan`` is the plan record (a JSON mapping with ``PLAN_BUCKET_KEYS``), ``outputs`` the output
-    chunk indices (exactly ``OUTPUT_KEYS``). The identity, protocol and plan revision come from the
-    state. ``main.py``'s adapter passes only the first four arguments.
+    chunk indices (exactly ``OUTPUT_KEYS``). The identity, protocol, plan revision and MC record
+    (``state.mc``, checked by ``_mc_checked``) come from the state. ``main.py``'s adapter passes
+    only the first four arguments.
     """
     if integrator_state is None and integrator is not None:
         integrator_state = integrator.state_dict()
@@ -174,6 +217,8 @@ def state_arrays(state: SimulationState, engine: str, integrator_state: Mapping[
     if state.force_field_identity is not None:
         arrays["identity"] = _json(state.force_field_identity.to_dict(), "identity")
         arrays["identity_digest"] = state.force_field_identity.digest
+    if state.mc is not None:
+        arrays["mc"] = _json(_mc_checked(state.mc), "mc")
     if outputs is not None:
         if set(outputs) != set(OUTPUT_KEYS):
             raise ValueError(f"restart outputs must hold exactly {OUTPUT_KEYS}, got {sorted(outputs)}")
@@ -257,7 +302,7 @@ def read_restart(path: str | Path, engine: str | None = None) -> dict[str, np.nd
 # -- the records of a file read by read_restart --
 
 def format_version(restart: Mapping[str, Any]) -> int:
-    """The FastMACE format version: 2, 1 (phase 1a) or 0 (a research-engine file)."""
+    """The FastMACE format version: 3, 2 (fastmace-2), 1 (phase 1a) or 0 (a research-engine file)."""
     return int(restart["fastmace_restart"]) if "fastmace_restart" in restart else 0
 
 
@@ -266,8 +311,30 @@ def _record(restart: Mapping[str, Any], name: str) -> Any:
 
 
 def mc_record(restart: Mapping[str, Any]) -> dict[str, Any] | None:
-    """The MC record (``MC_RECORD_KEYS``) of a version 3 file, or ``None`` without an attached move set."""
-    raise NotImplementedError("the restart's MC record: plan task 3-T08")
+    """The MC record (``MC_RECORD_KEYS``) of a version 3 file, or ``None`` without an attached move set
+    (and in older files). A malformed record is refused (``ValueError``)."""
+    record = _record(restart, "mc")
+    return None if record is None else _mc_checked(record)
+
+
+def composition(restart: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The run's composition at the restart step (``COMPOSITION_KEYS``), or ``None`` without ``species``
+    (research-engine files).
+
+    ``species`` (atomic numbers) and ``masses`` (amu) per atom; ``charges`` per atom or ``None``;
+    ``total_charge`` and ``spin_multiplicity`` from the physical record (``None`` before version 2 or
+    when the model takes none). ``Simulation.resume`` builds its ``Atoms`` from it: after an accepted
+    swap or transmutation it differs from the initial structure.
+    """
+    if "species" not in restart:
+        return None
+    physical = physical_record(restart) or {}
+    masses = np.asarray(restart["masses"]).reshape(-1) if "masses" in restart else None
+    charges = np.asarray(restart["charges"]).reshape(-1) if "charges" in restart else None
+    return {"species": [int(z) for z in np.asarray(restart["species"]).reshape(-1)],
+            "masses": None if masses is None else [float(m) for m in masses],
+            "charges": None if charges is None else [float(q) for q in charges],
+            "total_charge": physical.get("total_charge"), "spin_multiplicity": physical.get("spin_multiplicity")}
 
 
 def physical_record(restart: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -368,9 +435,11 @@ def load_state(restart: Mapping[str, Any], state: SimulationState, integrator: A
     forces, energy and stress, the barostat (``p_eps``, ``force_eps``), the noise generator with its
     drawn batch and cursor, the step and the plan revision; the protocol through
     ``type(state.protocol).from_restart`` if the state has one (else the caller builds it from
-    ``protocol_record``); then ``integrator.load_state_dict`` with what is left of the stored
-    integrator state, if an integrator is given. Refuses another structure (species, masses, atom
-    count, PBC, total charge, spin, constraints) and a newer format. The force-field identity is not
+    ``protocol_record``); the MC record (``state.mc``, ``None`` without one); then
+    ``integrator.load_state_dict`` with what is left of the stored integrator state, if an integrator
+    is given. Refuses another structure (species, masses, atom count, PBC, total charge, spin,
+    constraints) and a newer format: the state must be built with the file's composition
+    (``composition``), because the engine's species-dependent tables are built with it. The force-field identity is not
     restored: it is the force field's, and ``check_identity`` compares it. As in the research
     engine's resume, call it after the engine is built: building evaluates the forces, and the
     stored ones replace them. A variable-cell force field then needs ``set_cell(state.cell)``.
@@ -380,10 +449,13 @@ def load_state(restart: Mapping[str, Any], state: SimulationState, integrator: A
         raise ValueError(f"the restart file has format version {version}; this FastMACE reads up to "
                          f"{FORMAT_VERSION}")
     if "species" in restart and not np.array_equal(restart["species"], _numpy(state.species)):
-        raise ValueError("the restart file is for other species than the state")
+        raise ValueError("the restart file is for other species than the state: build the state from the "
+                         "file's composition (io.restart.composition), as Simulation.resume does")
     if "masses" in restart and not np.array_equal(restart["masses"], _numpy(state.masses)):
-        raise ValueError("the restart file has other masses than the state")
+        raise ValueError("the restart file has other masses than the state: build the state from the "
+                         "file's composition (io.restart.composition), as Simulation.resume does")
     _check_physical(restart, state)
+    mc = mc_record(restart)
     stored_integrator = integrator_state(restart)
     for name in BAROSTAT_KEYS:  # into the state; 1a files list them as integrator state
         if name not in restart:
@@ -421,6 +493,7 @@ def load_state(restart: Mapping[str, Any], state: SimulationState, integrator: A
     state.step = int(restart["step"])
     if "plan_revision" in restart:
         state.plan_revision = int(restart["plan_revision"])
+    state.mc = mc
     protocol = protocol_record(restart)
     if protocol is not None and state.protocol is not None:
         state.protocol = type(state.protocol).from_restart(protocol)

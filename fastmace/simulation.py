@@ -256,6 +256,9 @@ class Simulation:
       ``neighbours`` the default planner's.
     """
 
+    # True while an MC block runs (T15's block hook sets it): restart writes are refused then (§10.6).
+    _mc_block_active: bool = False
+
     def __init__(self, atoms: Any, force_field: Any, *, species: Any = None, integrator: Any,
                  workload: Workload | None = None, output: Output | None = None, seed: int,
                  check: Check = "skip", allow_naive_cueq: bool = False, mode: Mode = "graph",
@@ -817,7 +820,11 @@ class Simulation:
         integrator record, workload, ``Output``, seed, ``allow_naive_cueq``, the planner options,
         species, masses and PBC. A plan that runs in a child copies the child's last hand-off, a
         canonical restart point at the committed step (2-T07).
+
+        Only at a committed step: refused (``RuntimeError``) inside an MC block and while the engine
+        holds an uncommitted (overflowed) step, before anything is written (§10.6, 3-T08).
         """
+        self._check_restart_point()
         path = Path(path)
         if path.suffix != ".npz":
             path = path / RESTART_NAME
@@ -839,6 +846,17 @@ class Simulation:
                 self._restart_points.append(point)
         _write_json(path.parent / SIMULATION_NAME, self._simulation_record(path.parent))
         self._write_metadata()
+
+    def _check_restart_point(self):
+        """Restart writes happen only at committed steps: never inside an MC block, never from an overflowed
+        step (SPEC §10.6). ``GraphEngine.uncommitted`` is plan task 3-T04's; an engine without it has none."""
+        if self._mc_block_active:
+            raise RuntimeError("a restart write inside an MC block: restart files are written only at committed "
+                               "steps, between MC blocks (SPEC §10.6)")
+        uncommitted = getattr(self._engine, "uncommitted", None)
+        if uncommitted is not None and uncommitted():
+            raise RuntimeError("a restart write while the engine holds an uncommitted (overflowed) step: restart "
+                               "files are written only at committed steps (SPEC §10.6)")
 
     def _simulation_record(self, directory):
         import dataclasses
@@ -885,7 +903,8 @@ class Simulation:
         constructor.
 
         The model is loaded again from ``simulation.json``'s file, checked against its SHA-256; the
-        engine is built at the restart's positions and cell through the planner, then takes the
+        engine is built at the restart's positions, cell and composition (species and masses at the
+        restart step, not the initial structure's; 3-T08) through the planner, then takes the
         restart's state, edge bucket and neighbour capacity (``io.restart.resume_engine``). Output
         chunks after the restart point are deleted and new ones opened; nothing is rewritten.
         """
@@ -1081,13 +1100,10 @@ class Simulation:
         if not fields:
             return
         writes = {"positions", "momenta"}
-        if self._runner is not None:
-            if set(fields) - writes and not self._runner.persistent:
-                raise NotImplementedError(
-                    "species, masses, charges and friction changes through a non-persistent subprocess child: "
-                    "each child resumes from a restart file, which carries them from restart version 3 (plan task "
-                    "3-T08)")
-            self._runner.host_write(self, "update", fields)
+        if self._runner is not None:  # the next child applies them in this order (HOST_WRITE_KINDS)
+            for name in ("species", "masses", "charges", "total_charge", "friction_per_fs", "positions", "momenta"):
+                if name in fields:
+                    self._runner.host_write(self, "friction" if name == "friction_per_fs" else name, fields[name])
             self._record_friction(fields.get("friction_per_fs"))
             return
 
@@ -1265,12 +1281,19 @@ def _record_force_field(record):
 
 
 def _restart_atoms(structure, stored):
-    """The run's ``Atoms`` at the restart's positions and cell (species, masses and PBC from the record)."""
+    """The run's ``Atoms`` at the restart's positions and cell, with its composition at the restart step
+    (species and masses from the restart file, ``io.restart.composition``; SPEC §10.6), not the initial
+    structure's: an accepted swap or transmutation changed them since. PBC from the record."""
     from ase import Atoms
 
+    from fastmace.io import restart
+
+    composition = restart.composition(stored) or {}
+    numbers = composition.get("species") or structure["numbers"]
+    masses = composition.get("masses") or structure["masses"]
     cell = stored["cell_state"] if "cell_state" in stored else stored["cell"]
-    atoms = Atoms(numbers=structure["numbers"], positions=stored["positions"], cell=cell, pbc=structure["pbc"])
-    atoms.set_masses(structure["masses"])
+    atoms = Atoms(numbers=numbers, positions=stored["positions"], cell=cell, pbc=structure["pbc"])
+    atoms.set_masses(masses)
     return atoms
 
 

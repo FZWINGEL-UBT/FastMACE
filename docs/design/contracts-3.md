@@ -63,6 +63,7 @@ ASE (tested in a fresh interpreter).
 | `Simulation.set_masses` | `set_masses(masses)`: amu, `(N,)`; the momenta stay (ASE): v' = v·m_old/m_new | complete, T03 |
 | `Simulation.set_charges` | `set_charges(charges, *, total_charge=None)`: per-atom charges and/or the total | complete, T03; refused for models that take none, and until T02 registers a buffer that reads them |
 | `Simulation.set_friction` | `set_friction(friction_per_fs)`: 1/fs, as the public integrator records | complete, T03 |
+| `engine.subprocess.HOST_WRITE_KINDS` | `("positions", "momenta", "species", "masses", "charges", "total_charge", "friction")`: through the subprocess runner, `update` queues one host write per field in its transaction's order; the child applies each by `set_<kind>` (`total_charge` by `set_charges(None, total_charge=)`), and its hand-off restart holds the result (T08) | complete, T08 and T03 |
 | `Committed.species`, `.masses`, `.charges` | atomic numbers `(N,)`, amu `(N,)`, charges `(N,)` or `None`; read-only arrays, in the subprocess runner's `committed()` too | complete, T03 |
 
 Notes on the records:
@@ -131,7 +132,7 @@ Notes on the records:
 
 ## Restart version 3 (`io/restart.py`; owner T08)
 
-The writer stays at `FORMAT_VERSION = 2` until T08 switches it to `NEXT_FORMAT_VERSION = 3`. Version 2 files keep loading.
+Since 3-T08 the writer is at `FORMAT_VERSION = NEXT_FORMAT_VERSION = 3`. Version 0, 1 and 2 files keep loading.
 - **`COMPOSITION_KEYS`**: `species`, `masses`, `charges` and `physical` (total charge, spin).
   - These are already written. In version 3 they are the resumed state; today resume rebuilds the `Atoms` from the initial structure.
 - **`V3_KEYS = ("mc",)`**: one JSON record, present when a move set is attached. Its keys (`MC_RECORD_KEYS`):

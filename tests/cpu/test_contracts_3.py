@@ -410,11 +410,11 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     pytest.importorskip("torch")
     from fastmace.io import restart
 
-    assert restart.FORMAT_VERSION == 2  # 3-T08 switches the writer to NEXT_FORMAT_VERSION
+    assert restart.FORMAT_VERSION == 3  # 3-T08 switched the writer to NEXT_FORMAT_VERSION
     assert restart.NEXT_FORMAT_VERSION == 3
     assert restart.V3_KEYS == ("mc",)
     assert restart.COMPOSITION_KEYS == ("species", "masses", "charges", "physical")
     assert restart.MC_RECORD_KEYS == ("moves", "cycle_position", "counters", "streams", "delta_A")
     assert restart.MC_COUNTER_KEYS == ("attempted", "impossible", "accepted")
     assert restart.MC_STREAM_KEYS == ("seed", "offset")
-    _raises_naming("3-T08", lambda: restart.mc_record({}))
+    assert restart.mc_record({}) is None  # 3-T08: no move set attached

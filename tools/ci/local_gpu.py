@@ -1,27 +1,31 @@
 """The local GPU reservation on the PC (plan task 2-T18; docs/development.md, "The local GPU reservation").
 
-    python3 tools/ci/local_gpu.py run --purpose TEXT [--wait-minutes 60] -- COMMAND ...
-    python3 tools/ci/local_gpu.py reserve --purpose TEXT --pid PID [--wait-minutes 60]
+    python3 tools/ci/local_gpu.py run --purpose TEXT [--quiet] [--wait-minutes 60] -- COMMAND ...
+    python3 tools/ci/local_gpu.py reserve --purpose TEXT --pid PID [--quiet] [--wait-minutes 60]
     python3 tools/ci/local_gpu.py release --pid PID
-    python3 tools/ci/local_gpu.py check [--min-available-gib 6]
+    python3 tools/ci/local_gpu.py check [--cpu-only] [--min-available-gib 6]
     python3 tools/ci/local_gpu.py status
 
-WSL has 15 GB of RAM for every session on the PC. A GPU suite started while sibling CPU suites ran has
-crashed WSL (19 October 2026), and WSL's nvidia-smi does not show who is on the GPU. So every local GPU run
-(the GPU CI runner, a worker's GPU suite, a timing run) holds this reservation, and every local CPU suite
-checks it first:
+A GPU suite started while sibling CPU suites ran has crashed WSL (19 October 2026, when WSL had 15 GB of
+RAM; it has 40 GB since 21 October), and WSL's nvidia-smi does not show who is on the GPU. So every local
+GPU run (the GPU CI runner, a worker's GPU suite, a timing run) holds this reservation, and every local CPU
+suite checks it first:
 
 - **reserve** creates the marker directory atomically (``mkdir``; default ``~/.fastmace-local-gpu``, or
   ``$FASTMACE_LOCAL_GPU_MARKER``) with ``holder.json``: owner, purpose, pid, the pid's start time and the
   start of the reservation. While another live holder has it, reserve waits, up to ``--wait-minutes``.
-- Holding it, reserve **waits for the machine**: until no other ``pytest`` process runs and at least
-  ``--min-available-gib`` (default 10) GiB of RAM are available. If that does not happen in time, it
-  releases the marker again and fails with status 75 (busy).
+- Holding it, reserve **waits for the machine**: until no other ``pytest`` process that can use the GPU
+  runs, and at least ``--min-available-gib`` (default 10) GiB of RAM are available. A pytest process whose
+  environment sets ``CUDA_VISIBLE_DEVICES`` empty (or ``-1``) cannot use the GPU and does not count
+  (phase 3, 22 October 2026: five workers' CPU suites kept GPU reservations waiting). With ``--quiet``
+  (timing runs) every other pytest process counts, and the reservation is marked quiet. If the machine is
+  not free in time, reserve releases the marker again and fails with status 75 (busy).
 - **release** removes the marker, only for its own pid.
 - A marker whose holder process is gone (or whose pid now belongs to another process) is **stale**: it is
   reported and removed by the next reserve or check.
 - **check** exits 1 while a live marker exists, or with ``--min-available-gib`` while less RAM is
-  available. Workers run it before every local CPU suite.
+  available. Workers run it before every local CPU suite. ``check --cpu-only`` is for a suite run with
+  ``CUDA_VISIBLE_DEVICES=``: only a quiet (timing) reservation blocks it.
 - **run** reserves for itself, runs the command, releases on any exit and returns the command's status
   (75 if it could not reserve in time).
 
@@ -106,16 +110,31 @@ def _is_pytest(argv):
     if not argv:
         return False
     # A queued ``local_gpu.py run -- python -m pytest ...`` wrapper is not a running pytest: counting it
-    # made the holder wait for every queued reservation (deadlock, round 2, 21 October 2026).
-    if any(Path(arg).name == "local_gpu.py" for arg in argv[:2]):
+    # made the holder wait for every queued reservation (deadlock, round 2, 21 October 2026). Prefixes such
+    # as ``timeout 900 python3 local_gpu.py ...`` or ``env ... python3 local_gpu.py ...`` are wrappers too
+    # (phase 3, 22 October 2026: 3-T04's holder waited for 3-T03's ``timeout`` wrapper).
+    if any(Path(arg).name == "local_gpu.py" for arg in argv):
         return False
     if Path(argv[0]).name == "pytest":
         return True
     return any(argv[i] == "-m" and argv[i + 1] == "pytest" for i in range(len(argv) - 1))
 
 
-def pytest_processes(proc_root="/proc", own_pid=None):
-    """Pids of pytest processes other than this one and its ancestors."""
+def _cpu_only(pid, proc_root):
+    """True if the process's environment hides every GPU (``CUDA_VISIBLE_DEVICES`` empty or ``-1``)."""
+    try:
+        environ = (Path(proc_root) / str(pid) / "environ").read_bytes().split(b"\0")
+    except OSError:
+        return False
+    for entry in environ:
+        if entry.startswith(b"CUDA_VISIBLE_DEVICES="):
+            return entry.split(b"=", 1)[1].strip() in (b"", b"-1")
+    return False
+
+
+def pytest_processes(proc_root="/proc", own_pid=None, gpu_only=False):
+    """Pids of pytest processes other than this one and its ancestors; with ``gpu_only`` only those that
+    can use the GPU (not ``_cpu_only``)."""
     own = _ancestors(own_pid if own_pid is not None else os.getpid(), proc_root)
     pids = []
     try:
@@ -129,7 +148,7 @@ def pytest_processes(proc_root="/proc", own_pid=None):
             argv = [arg for arg in entry.joinpath("cmdline").read_bytes().decode(errors="replace").split("\0") if arg]
         except OSError:
             continue
-        if _is_pytest(argv):
+        if _is_pytest(argv) and not (gpu_only and _cpu_only(int(entry.name), proc_root)):
             pids.append(int(entry.name))
     return sorted(pids)
 
@@ -162,7 +181,8 @@ def live_holder(marker, proc_root="/proc", now=None):
 
 
 def describe(holder):
-    return (f"local GPU reserved by {holder.get('owner')} for {holder.get('purpose')!r} "
+    quiet = " (quiet)" if holder.get("quiet") else ""
+    return (f"local GPU reserved by {holder.get('owner')} for {holder.get('purpose')!r}{quiet} "
             f"(pid {holder.get('pid')}, since {holder.get('started')})")
 
 
@@ -175,8 +195,9 @@ def remove_stale(marker, proc_root="/proc"):
         shutil.rmtree(marker, ignore_errors=True)
 
 
-def reserve(marker, purpose, pid, proc_root="/proc", user=None, now=None):
-    """(True, holder) if this call created the marker; (False, live holder) if someone else holds it."""
+def reserve(marker, purpose, pid, proc_root="/proc", user=None, now=None, quiet=False):
+    """(True, holder) if this call created the marker; (False, live holder) if someone else holds it.
+    ``quiet`` (a timing run) is recorded in the holder; it then blocks CPU-only suites too."""
     marker = Path(marker)
     for _ in range(2):
         try:
@@ -189,6 +210,8 @@ def reserve(marker, purpose, pid, proc_root="/proc", user=None, now=None):
             continue
         holder = dict(owner=user or getpass.getuser(), purpose=purpose, pid=pid,
                       start_ticks=start_ticks(pid, proc_root), started=now or _now())
+        if quiet:
+            holder["quiet"] = True
         partial = marker / (HOLDER + ".partial")
         partial.write_text(json.dumps(holder) + "\n")
         partial.replace(marker / HOLDER)
@@ -206,11 +229,14 @@ def release(marker, pid):
     return True
 
 
-def machine_reasons(proc_root="/proc", own_pid=None, min_available_gib=None):
+def machine_reasons(proc_root="/proc", own_pid=None, min_available_gib=None, quiet=False):
+    """Why the machine is not free: other pytest processes (only those that can use the GPU, unless
+    ``quiet``), and less RAM than ``min_available_gib``."""
     reasons = []
-    others = pytest_processes(proc_root, own_pid)
+    others = pytest_processes(proc_root, own_pid, gpu_only=not quiet)
     if others:
-        reasons.append(f"{len(others)} other pytest process(es) run: pids {others}")
+        kind = "other pytest process(es)" if quiet else "other pytest process(es) that can use the GPU"
+        reasons.append(f"{len(others)} {kind} run: pids {others}")
     if min_available_gib is not None:
         available = available_gib(proc_root)
         if available is None or available < min_available_gib:
@@ -220,11 +246,12 @@ def machine_reasons(proc_root="/proc", own_pid=None, min_available_gib=None):
 
 
 def wait_for_machine(proc_root="/proc", own_pid=None, min_available_gib=10.0, wait_s=3600.0, interval_s=30.0,
-                     clock=time.monotonic, sleep=time.sleep):
-    """Wait until no other pytest runs and enough RAM is available. (ok, the last reasons)."""
+                     clock=time.monotonic, sleep=time.sleep, quiet=False):
+    """Wait until no other pytest runs (that can use the GPU, unless ``quiet``) and enough RAM is
+    available. (ok, the last reasons)."""
     start = clock()
     while True:
-        reasons = machine_reasons(proc_root, own_pid, min_available_gib)
+        reasons = machine_reasons(proc_root, own_pid, min_available_gib, quiet)
         waited = clock() - start
         if not reasons or waited >= wait_s:
             return not reasons, reasons
@@ -232,11 +259,11 @@ def wait_for_machine(proc_root="/proc", own_pid=None, min_available_gib=10.0, wa
 
 
 def acquire(marker, purpose, pid, proc_root="/proc", wait_s=3600.0, interval_s=30.0, min_available_gib=10.0,
-            clock=time.monotonic, sleep=time.sleep):
+            clock=time.monotonic, sleep=time.sleep, quiet=False):
     """Reserve (waiting for another holder), then wait for the machine; release again on failure."""
     start = clock()
     while True:
-        ok, holder = reserve(marker, purpose, pid, proc_root)
+        ok, holder = reserve(marker, purpose, pid, proc_root, quiet=quiet)
         if ok:
             break
         waited = clock() - start
@@ -244,18 +271,19 @@ def acquire(marker, purpose, pid, proc_root="/proc", wait_s=3600.0, interval_s=3
             return False, [describe(holder)]
         sleep(min(interval_s, wait_s - waited))
     left = max(0.0, wait_s - (clock() - start))
-    ok, reasons = wait_for_machine(proc_root, pid, min_available_gib, left, interval_s, clock, sleep)
+    ok, reasons = wait_for_machine(proc_root, pid, min_available_gib, left, interval_s, clock, sleep, quiet=quiet)
     if not ok:
         release(marker, pid)
     return ok, reasons
 
 
-def check(marker, proc_root="/proc", min_available_gib=None):
-    """(free, reasons): no live reservation (a stale one is removed), and enough RAM if asked."""
+def check(marker, proc_root="/proc", min_available_gib=None, cpu_only=False):
+    """(free, reasons): no live reservation (a stale one is removed), and enough RAM if asked. With
+    ``cpu_only`` (a suite run with ``CUDA_VISIBLE_DEVICES=``) only a quiet reservation blocks."""
     remove_stale(marker, proc_root)
     reasons = []
     holder = live_holder(marker, proc_root)
-    if holder is not None:
+    if holder is not None and (not cpu_only or holder.get("quiet")):
         reasons.append(describe(holder))
     if min_available_gib is not None:
         available = available_gib(proc_root)
@@ -301,12 +329,16 @@ def main(argv=None):
         sub.add_argument("--wait-minutes", type=float, default=60.0)
         sub.add_argument("--min-available-gib", type=float, default=10.0)
         sub.add_argument("--interval-seconds", type=float, default=30.0)
+        sub.add_argument("--quiet", action="store_true",
+                         help="a timing run: wait until no other pytest runs at all, and block CPU-only suites")
     reserve_cmd.add_argument("--pid", type=int, required=True, help="the holder, usually the calling shell ($$)")
     run.add_argument("cmd", nargs=argparse.REMAINDER, help="-- COMMAND ...")
     release_cmd = commands.add_parser("release", help="remove the marker held by PID")
     release_cmd.add_argument("--pid", type=int, required=True)
     check_cmd = commands.add_parser("check", help="exit 1 while the local GPU is reserved (or RAM is short)")
     check_cmd.add_argument("--min-available-gib", type=float, default=None)
+    check_cmd.add_argument("--cpu-only", action="store_true",
+                           help="for a suite run with CUDA_VISIBLE_DEVICES=: only a quiet reservation blocks it")
     commands.add_parser("status", help="print the holder, if any")
     # Accept --marker after the subcommand as well.
     for sub in (run, reserve_cmd, release_cmd, check_cmd):
@@ -319,7 +351,7 @@ def main(argv=None):
         print(describe(holder) if holder else "local GPU free")
         return 0
     if args.command == "check":
-        free, reasons = check(marker, min_available_gib=args.min_available_gib)
+        free, reasons = check(marker, min_available_gib=args.min_available_gib, cpu_only=args.cpu_only)
         for reason in reasons:
             print(f"local_gpu: {reason}", file=sys.stderr)
         return 0 if free else 1
@@ -329,7 +361,8 @@ def main(argv=None):
         return 0
     pid = os.getpid() if args.command == "run" else args.pid
     ok, reasons = acquire(marker, args.purpose, pid, wait_s=args.wait_minutes * 60.0,
-                          interval_s=args.interval_seconds, min_available_gib=args.min_available_gib)
+                          interval_s=args.interval_seconds, min_available_gib=args.min_available_gib,
+                          quiet=args.quiet)
     if not ok:
         print("local_gpu: not reserved in time: " + "; ".join(reasons), file=sys.stderr)
         return BUSY

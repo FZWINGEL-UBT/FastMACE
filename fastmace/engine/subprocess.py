@@ -77,6 +77,11 @@ COMPOSITION_PREFIX = "composition."  # beside them in that file: species, masses
 HEARTBEAT_NAME = "heartbeat"  # a fresh child's default: in its stage
 CHILD_NAME = "child-{:04d}"  # per child process under the hand-off directory: .log and .heartbeat
 SINKS_NAME = "sinks"
+# The host writes a child applies after its resume, by ``Simulation.set_<kind>``: positions and momenta
+# (owner decision D4), and species, masses, charges, the total charge (``set_charges(None, total_charge=)``)
+# and the friction (3-T03 events; the next hand-off restart holds them, 3-T08). ``Simulation.update`` queues
+# one write per field, in the order of its transaction.
+HOST_WRITE_KINDS = ("positions", "momenta", "species", "masses", "charges", "total_charge", "friction")
 REQUEST_VERSION = 1
 POLL_S = 0.2  # how often the parent looks at the child
 LOG_TAIL_LINES = 30  # the child's message when it left no result
@@ -210,11 +215,11 @@ class SubprocessRunner:
         self._run_child(simulation, steps=steps, schedule=schedule, check="skip", gate=False)
 
     def host_write(self, simulation: Any, kind: str, values: Any) -> None:
-        """Queue a host write; the next child applies it after its resume. ``kind`` is ``"positions"`` or
-        ``"momenta"`` (an ``(N, 3)`` array), or ``"update"``: ``Simulation.update``'s fields as a dict, applied
-        as one ``update`` (3-T03; only the persistent worker, restart version 3 is 3-T08's)."""
+        """Queue a host write (``HOST_WRITE_KINDS``); the next child applies it after its resume."""
         from fastmace.simulation import HOST_WRITE_WARNING
 
+        if kind not in HOST_WRITE_KINDS:
+            raise ValueError(f"unknown host write {kind!r}; known: {HOST_WRITE_KINDS}")
         self._host_writes.append((kind, values))
         if HOST_WRITE_WARNING not in simulation._report.extra_warnings:
             simulation._report.add_warning(HOST_WRITE_WARNING)
@@ -324,12 +329,8 @@ class SubprocessRunner:
         stage = self._stage()
         writes = []
         for index, (kind, values) in enumerate(self._host_writes):
-            if isinstance(values, dict):  # an update: its fields in one file
-                name = f"host-{index}-{kind}.npz"
-                np.savez(stage / name, **{key: np.asarray(value) for key, value in values.items()})
-            else:
-                name = f"host-{index}-{kind}.npy"
-                np.save(stage / name, np.asarray(values, dtype=np.float64))
+            name = f"host-{index}-{kind}.npy"
+            np.save(stage / name, np.asarray(values, dtype=np.float64))
             writes.append([kind, name])
         request = {"action": "run", "source": str(self.current), "steps": steps,
                    "schedule": None if schedule is None else schedule.to_restart(), "started": sim._started,
@@ -929,16 +930,16 @@ def _child(directory, request, heartbeat, worker=None):
         sim._started = False  # the step-0 output belongs to the first run(), as in process
     for kind, name in request.get("host_writes", ()):
         values = np.load(directory / name, allow_pickle=False)
-        if kind == "positions":
-            sim.set_positions(values)
-        elif kind == "momenta":
-            sim.set_momenta(values)
-        elif kind == "update":  # one transaction (3-T03); scalars come back as 0-d arrays
-            with values:
-                fields = {key: values[key] for key in values.files}
-            sim.update(**{key: value.item() if value.ndim == 0 else value for key, value in fields.items()})
-        else:
+        if kind not in HOST_WRITE_KINDS:
             raise ValueError(f"unknown host write {kind!r}")
+        if kind == "species":  # stored as float64 like every host write; atomic numbers are exact there
+            values = values.astype(np.int64)
+        elif values.ndim == 0:  # a scalar: the friction or the total charge
+            values = values.item()
+        if kind == "total_charge":
+            sim.set_charges(None, total_charge=values)
+        else:
+            getattr(sim, f"set_{kind}")(values)  # a composition change ends at a canonical point (3-T03)
     sinks = directory / SINKS_NAME
     written = set()
 

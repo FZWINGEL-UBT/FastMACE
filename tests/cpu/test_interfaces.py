@@ -143,12 +143,12 @@ def test_state_fields_of_phase_1a():
     assert {"positions", "velocities", "masses", "cell", "species", "forces", "energy", "stress",
             "rng", "step"} <= fields
     assert {"generator", "batch", "cursor"} <= {f.name for f in dataclasses.fields(RandomStream)}
-    # 1b-T05 added the §10.6 fields; only the MC state of phase 3 is still listed as missing.
+    # 1b-T05 added the §10.6 fields and 3-T08 the MC state: nothing is listed as missing.
     import fastmace.state as state
 
     assert {"charges", "total_charge", "spin_multiplicity", "pbc", "constraints", "p_eps", "force_eps",
             "protocol", "plan_revision", "force_field_identity"} <= fields
-    assert set(state.FIELDS_ADDED_IN_1B) == {"mc"}
+    assert state.FIELDS_ADDED_IN_1B == {} and "mc" in fields  # 3-T08: SimulationState.mc
 
 
 def test_force_field_protocol_is_structural():
