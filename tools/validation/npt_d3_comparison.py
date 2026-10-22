@@ -212,7 +212,6 @@ def command_run(args):
                   equilibration_ps=args.equilibration_ps, production_ps=args.production_ps,
                   sample_every=args.sample_every, settings=SETTINGS, natoms=len(atoms),
                   checkpoint=str(args.checkpoint), machine=args.machine or platform.node(),
-                  gpu=torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
                   python=sys.executable, versions=_versions(),
                   fastmace_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"),
                   created_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"))
@@ -236,6 +235,8 @@ def command_run(args):
                                        args.sample_every, sink)
             record["simulation"] = json.loads(json.dumps(simulation.metadata(), default=str))
     record["wall_s"] = time.perf_counter() - started
+    # Only now: touching CUDA before the plan would fix the allocator before FastMACE configures it.
+    record["gpu"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else None
     record["s_per_step"] = record["wall_s"] / max(steps, 1)
     if steady and steps > steady["step"]:
         record["steady_s_per_step"] = (started + record["wall_s"] - steady["time"]) / (steps - steady["step"])
