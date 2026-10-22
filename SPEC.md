@@ -2439,6 +2439,13 @@ Open decisions for the owner:
      difference between those runs and the freeze.
    - Timing items repeat only as often as the effect's size needs. A 4×
      difference needs one block; a 1 % one needs the full alternating design.
+   - Later the same day (user): "Yes: stop the full local tier and run only
+     the 7 corrected tests, the GPU slow tier, item 9's short protocol, item 3
+     and item 10's tiny-model bitwise check". When the GPU acceptance tier
+     has passed on workstation GPUs at the freeze, the local leg reruns only:
+     - the tests corrected at acceptance;
+     - the GPU slow tier;
+     - the items' own runs.
 
 ---
 

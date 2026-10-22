@@ -892,6 +892,15 @@ Files: `tools/` and `bench/` (new entry points), and `docs/validation/3-T20.md`.
   GPU acceptance tier on leeloo (owner, 22 October 2026, SPEC decision 39). No
   L4 runs.
   - Item 9 is the short protocol at the freeze, citing 3-T14's full runs.
+  - The GPU acceptance tier ran on workstation GPUs at the freeze: leeloo ran
+    26 tests and coraline 13. So the local leg reruns only (owner, later the
+    same day; SPEC decision 39):
+    - the 7 tests corrected at acceptance;
+    - the GPU slow tier;
+    - items 9 and 3;
+    - item 10's tiny-model CPU bitwise check.
+    The full local tier was stopped at about 41 %, and its partial results
+    count as extra coverage.
   - Timing items repeat only as much as the size of the effect needs: item 1
     uses the 4 main swap-back runs, items 2 and rule 9 one block per case.
 - **The no-regression A/B** against main at the freeze.
