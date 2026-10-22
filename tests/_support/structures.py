@@ -29,6 +29,24 @@ _NBCL5_CL = [
 ]
 
 
+# NaNbCl6, 32 atoms (Na4Nb4Cl24): the PBE benchmark structure of ResearchModule
+# (Structures/Benchmark/PBE/NaNbCl6.cif), fractional coordinates rounded to four digits.
+_NANBCL6_CELLPAR = (7.0777, 6.6566, 19.9267, 89.4949, 90.0, 90.0)
+_NANBCL6 = [
+    ("Na", (0.8112, 0.2112, 0.7475)), ("Na", (0.3112, 0.7888, 0.7525)), ("Na", (0.1888, 0.7888, 0.2525)),
+    ("Na", (0.6888, 0.2112, 0.2475)), ("Nb", (0.7171, 0.7429, 0.6166)), ("Nb", (0.2171, 0.2571, 0.8834)),
+    ("Nb", (0.2829, 0.2571, 0.3834)), ("Nb", (0.7829, 0.7429, 0.1166)), ("Cl", (0.8204, 0.6139, 0.2345)),
+    ("Cl", (0.3204, 0.3861, 0.2655)), ("Cl", (0.1796, 0.3861, 0.7655)), ("Cl", (0.6796, 0.6139, 0.7345)),
+    ("Cl", (0.6028, 0.4597, 0.0942)), ("Cl", (0.1028, 0.5403, 0.4058)), ("Cl", (0.3972, 0.5403, 0.9058)),
+    ("Cl", (0.8972, 0.4597, 0.5942)), ("Cl", (0.5023, 0.9176, 0.1578)), ("Cl", (0.0023, 0.0824, 0.3422)),
+    ("Cl", (0.4977, 0.0824, 0.8422)), ("Cl", (0.9977, 0.9176, 0.6578)), ("Cl", (0.7467, 0.8864, 0.0120)),
+    ("Cl", (0.2467, 0.1136, 0.4880)), ("Cl", (0.2533, 0.1136, 0.9880)), ("Cl", (0.7533, 0.8864, 0.5120)),
+    ("Cl", (0.9590, 0.0346, 0.1582)), ("Cl", (0.4590, 0.9654, 0.3418)), ("Cl", (0.0410, 0.9654, 0.8418)),
+    ("Cl", (0.5410, 0.0346, 0.6582)), ("Cl", (0.0704, 0.5926, 0.0911)), ("Cl", (0.5704, 0.4074, 0.4089)),
+    ("Cl", (0.9296, 0.4074, 0.9089)), ("Cl", (0.4296, 0.5926, 0.5911)),
+]
+
+
 def _rattled(atoms, rattle, seed):
     if rattle:
         atoms.rattle(rattle, seed=seed)
@@ -57,4 +75,11 @@ def nbcl5(repeat=1, rattle=0.0, seed=0):
     return _rattled(atoms.repeat((repeat,) * 3), rattle, seed)
 
 
-STRUCTURES = {"NaCl": nacl, "NaNbO3": nanbo3, "NbCl5": nbcl5}
+def nanbcl6(repeat=1, rattle=0.0, seed=0):
+    """NaNbCl6 (32-atom near-orthorhombic cell) repeated ``repeat`` times."""
+    atoms = Atoms(symbols=[symbol for symbol, _ in _NANBCL6], cell=_NANBCL6_CELLPAR, pbc=True,
+                  scaled_positions=[position for _, position in _NANBCL6])
+    return _rattled(atoms.repeat((repeat,) * 3), rattle, seed)
+
+
+STRUCTURES = {"NaCl": nacl, "NaNbO3": nanbo3, "NbCl5": nbcl5}  # nanbcl6 is for the D3 tests only

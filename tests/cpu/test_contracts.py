@@ -392,7 +392,8 @@ def test_force_field_signature():
     signature = inspect.signature(ForceField)
     assert list(signature.parameters)[:2] == ["model", "atoms"]
     assert signature.parameters["atoms"].default is None
-    assert _keyword_only(signature) == ["precision", "rewrites", "species"]
+    assert _keyword_only(signature) == ["precision", "rewrites", "species", "dispersion"]  # 3b-T01: dispersion
+    assert signature.parameters["dispersion"].default is None
     assert signature.parameters["precision"].default == "float32"
     assert signature.parameters["rewrites"].default == "auto"
     evaluate = inspect.signature(ForceField.evaluate)
