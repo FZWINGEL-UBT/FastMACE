@@ -72,14 +72,16 @@ def _langevin(loaded, atoms=None, **options):
     return Langevin(atoms, DT, temperature_K=300, friction=FRICTION, model=loaded, **options)
 
 
-def _simulation(loaded, atoms=None, integrator=None, seed=1, output=None):
+def _simulation(loaded, atoms=None, integrator=None, seed=1, output=None, host_callbacks_every=None):
     from fastmace.model.forcefield import ForceField
+    from fastmace.planner.workload import Workload
     from fastmace.simulation import Simulation
 
     atoms = _atoms() if atoms is None else atoms
     integrator = integrator or integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.01)
+    workload = Workload(max_temperature_K=float(integrator.temperature_K), host_callbacks_every=host_callbacks_every)
     return Simulation(atoms, ForceField(loaded, atoms, precision="float32"), integrator=integrator, seed=seed,
-                      output=output)
+                      output=output, workload=workload)
 
 
 # --------------------------------------------------------------------------- arguments
@@ -382,7 +384,7 @@ def test_run_advances_like_the_simulation_and_writes_atoms(loaded):
     dyn.attach(lambda: None, interval=3)
     dyn.run(5)
     dyn.run(2)
-    sim = _simulation(loaded)
+    sim = _simulation(loaded, host_callbacks_every=3)
     sim.run(steps=7)
     committed = sim.committed()
     np.testing.assert_array_equal(dyn.simulation.committed().positions, committed.positions)
@@ -458,7 +460,7 @@ def test_an_observer_that_moves_atoms_equals_simulation_set_positions(loaded):
 
     dyn.attach(shift, interval=3)
     dyn.run(5)
-    sim = _simulation(loaded)
+    sim = _simulation(loaded, host_callbacks_every=3)
     sim.run(steps=3)
     sim.set_positions(sim.committed().positions + 0.01)
     sim.run(steps=2)
@@ -477,7 +479,7 @@ def test_an_observer_that_changes_momenta_equals_simulation_set_momenta(loaded):
 
     dyn.attach(kick, interval=2)
     dyn.run(4)
-    sim = _simulation(loaded)
+    sim = _simulation(loaded, host_callbacks_every=2)
     sim.run(steps=2)
     sim.set_momenta(sim.committed().momenta * 0.5)
     sim.run(steps=2)
@@ -485,16 +487,184 @@ def test_an_observer_that_changes_momenta_equals_simulation_set_momenta(loaded):
     np.testing.assert_array_equal(dyn.simulation.committed().momenta, sim.committed().momenta)
 
 
-def _numbers(atoms):
+# --------------------------------------------------------------------------- composition changes (3-T13)
+
+
+def _observe(loaded, atoms, change, at=2, interval=2, steps=4):
+    """A Langevin run whose observer applies ``change(atoms)`` at step ``at``."""
+    dyn = _langevin(loaded, atoms=atoms)
+    dyn.attach(lambda: change(atoms) if dyn.nsteps == at else None, interval=interval)
+    dyn.run(steps)
+    return dyn
+
+
+def _assert_same_state(dyn, sim):
+    ours, theirs = dyn.simulation.committed(), sim.committed()
+    assert ours.step == theirs.step
+    for name in ("species", "masses", "positions", "momenta", "forces"):
+        np.testing.assert_array_equal(getattr(ours, name), getattr(theirs, name), err_msg=name)
+    assert ours.energy == theirs.energy
+
+
+def _swap(atoms):
     atoms.numbers[[0, 1]] = atoms.numbers[[1, 0]]
 
 
-def _masses(atoms):
-    atoms.set_masses(atoms.get_masses() * 1.1)
+def test_an_observer_species_swap_equals_simulation_set_species(loaded):
+    atoms = _atoms()
+    assert not atoms.has("masses")  # implicit masses: ASE lets them follow the species
+    dyn = _observe(loaded, atoms, _swap)
+    sim = _simulation(loaded, host_callbacks_every=2)
+    sim.run(steps=2)
+    swapped = sim.committed().species.copy()
+    swapped[[0, 1]] = swapped[[1, 0]]
+    sim.set_species(swapped)  # the masses follow the standard masses, as ASE's implicit ones
+    sim.run(steps=2)
+    _assert_same_state(dyn, sim)
+    np.testing.assert_array_equal(atoms.numbers, swapped)
+    assert not atoms.has("masses")  # written back only where the engine changed them
 
 
-def _charges(atoms):
-    atoms.set_initial_charges(np.full(len(atoms), 0.1))
+def test_an_observer_transmutation_equals_simulation_set_species(loaded):
+    def transmute(atoms):
+        atoms.numbers[0] = 17 if atoms.numbers[0] == 11 else 11
+
+    atoms = _atoms()
+    dyn = _observe(loaded, atoms, transmute)
+    sim = _simulation(loaded, host_callbacks_every=2)
+    sim.run(steps=2)
+    species = sim.committed().species.copy()
+    species[0] = 17 if species[0] == 11 else 11
+    sim.set_species(species)
+    sim.run(steps=2)
+    _assert_same_state(dyn, sim)
+    assert atoms.get_masses()[0] == sim.committed().masses[0]
+
+
+def test_explicit_masses_stay_through_an_observer_species_swap(loaded):
+    masses = np.linspace(20.0, 40.0, len(_atoms()))
+    atoms = _atoms()
+    atoms.set_masses(masses)
+    dyn = _observe(loaded, atoms, _swap)
+    reference = _atoms()
+    reference.set_masses(masses)
+    sim = _simulation(loaded, atoms=reference, host_callbacks_every=2)
+    sim.run(steps=2)
+    committed = sim.committed()
+    swapped = committed.species.copy()
+    swapped[[0, 1]] = swapped[[1, 0]]
+    sim.update(species=swapped, masses=committed.masses)
+    sim.run(steps=2)
+    _assert_same_state(dyn, sim)
+    np.testing.assert_array_equal(dyn.simulation.committed().masses, masses)
+
+
+def test_an_observer_mass_change_equals_simulation_set_masses(loaded):
+    def heavier(atoms):
+        atoms.set_masses(atoms.get_masses() * 1.1)
+
+    dyn = _observe(loaded, _atoms(), heavier)
+    sim = _simulation(loaded, host_callbacks_every=2)
+    sim.run(steps=2)
+    sim.set_masses(sim.committed().masses * 1.1)  # the momenta stay, as in ASE
+    sim.run(steps=2)
+    _assert_same_state(dyn, sim)
+
+
+def test_an_observer_composition_and_motion_change_is_one_event(loaded, monkeypatch):
+    from fastmace.simulation import Simulation
+
+    calls = []
+    update = Simulation.update
+
+    def counted(self, **fields):
+        calls.append(sorted(name for name, value in fields.items() if value is not None))
+        return update(self, **fields)
+
+    monkeypatch.setattr(Simulation, "update", counted)
+
+    def change(atoms):
+        _swap(atoms)
+        atoms.positions += 0.01
+        atoms.set_momenta(atoms.get_momenta() * 0.5)
+
+    dyn = _observe(loaded, _atoms(), change)
+    assert calls == [["masses", "momenta", "positions", "species"]]
+    sim = _simulation(loaded, host_callbacks_every=2)
+    sim.run(steps=2)
+    committed = sim.committed()
+    reference = _atoms()
+    reference.numbers = committed.species.copy()
+    _swap(reference)
+    sim.update(species=reference.numbers, masses=reference.get_masses(), positions=committed.positions + 0.01,
+               momenta=committed.momenta * 0.5)
+    sim.run(steps=2)
+    _assert_same_state(dyn, sim)
+
+
+def test_an_observer_species_outside_the_superset_raises_before_anything_is_applied(loaded):
+    def lithium(atoms):
+        atoms.numbers[0] = 3
+        atoms.positions += 0.01
+
+    atoms = _atoms()
+    dyn = _langevin(loaded, atoms=atoms)
+    dyn.attach(lambda: lithium(atoms) if dyn.nsteps == 2 else None, interval=2)
+    with pytest.raises(PlanRefused, match="superset") as raised:
+        dyn.run(4)
+    assert "observer-species" in raised.value.codes
+    committed = dyn.simulation.committed()
+    assert committed.step == 2
+    np.testing.assert_array_equal(committed.species, _atoms().numbers)
+    sim = _simulation(loaded, host_callbacks_every=2)
+    sim.run(steps=2)
+    np.testing.assert_array_equal(committed.positions, sim.committed().positions)
+
+
+def test_an_observer_charge_change_needs_a_model_that_takes_charges(loaded):
+    """The tiny MH-1 model takes no per-atom charges: the change is refused, as through ``Simulation``,
+    before anything is applied."""
+    atoms = _atoms()
+    dyn = _langevin(loaded, atoms=atoms)
+    dyn.attach(lambda: atoms.set_initial_charges(np.full(len(atoms), 0.1)) if dyn.nsteps == 2 else None,
+               interval=2)
+    with pytest.raises(PlanRefused, match="charges") as raised:
+        dyn.run(4)
+    assert "observer-charges" in raised.value.codes
+    assert dyn.simulation.committed().step == 2
+    assert dyn.simulation.committed().charges is None
+    with pytest.raises(ValueError, match="charges"):
+        _simulation(loaded).set_charges(np.full(len(atoms), 0.1))
+
+
+def test_observers_declare_the_shortest_interval_as_host_callbacks(loaded):
+    dyn = _langevin(loaded)
+    dyn.attach(lambda: None, interval=5)
+    dyn.attach(lambda: None, interval=3)
+    dyn.attach(lambda: None, interval=-2)  # once, at step 2: not a cadence
+    dyn.run(1)
+    assert dyn.simulation.workload.host_callbacks_every == 3
+    _plans_equal(dyn.plan, _simulation(loaded, host_callbacks_every=3).plan)
+    plain = _langevin(loaded, output="plain")
+    plain.run(1)
+    assert plain.simulation.workload.host_callbacks_every is None
+
+
+def test_frames_after_an_observer_species_change_carry_the_new_species(loaded):
+    from ase.io import read
+
+    atoms = _atoms()
+    dyn = _langevin(loaded, atoms=atoms, trajectory="run.traj", loginterval=2)
+    dyn.attach(lambda: _swap(atoms) if dyn.nsteps == 2 else None, interval=2)
+    dyn.run(4)
+    dyn.close()
+    frames = read("run.traj", index=":")
+    original = _atoms().numbers
+    swapped = original.copy()
+    swapped[[0, 1]] = swapped[[1, 0]]
+    np.testing.assert_array_equal(frames[1].numbers, original)  # step 2 was written before the change
+    np.testing.assert_array_equal(frames[2].numbers, swapped)
+    np.testing.assert_array_equal(frames[2].get_masses(), dyn.simulation.committed().masses)
 
 
 def _count(atoms):
@@ -524,8 +694,8 @@ def _calc(atoms):
 
 
 @pytest.mark.parametrize("change, reason", [
-    (_numbers, "phase 3"), (_masses, "phase 3"), (_charges, "phase 3"), (_count, "atom count"), (_cell, "cell"),
-    (_pbc, "PBC"), (_constraint, "constraints"), (_info, "info"), (_calc, "atoms.calc")])
+    (_count, "atom count"), (_cell, "cell"), (_pbc, "PBC"), (_constraint, "constraints"), (_info, "info"),
+    (_calc, "atoms.calc")])
 def test_forbidden_observer_changes_raise_with_their_reason(loaded, change, reason):
     atoms = _atoms()
     dyn = _langevin(loaded, atoms=atoms)
