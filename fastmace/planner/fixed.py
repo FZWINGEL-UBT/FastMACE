@@ -766,7 +766,8 @@ class FixedPlanner:
         npt = plan.integrator.ensemble == "npt"
         field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,
                                polar=plan.polar or PolarConfig(), compute_stress=npt, compile_cache=compile_cache,
-                               registry=registry, check=check, float64_energy=plan.precision.float64_energy)
+                               registry=registry, check=check, float64_energy=plan.precision.float64_energy,
+                               species=plan.superset or None)
         state = SimulationState.from_atoms(atoms, field.device, plan.integrator.seed, compute_stress=npt)
         if npt:
             integrator = LangevinBAOAB(state, plan.integrator, temperature_K=temperature_K,

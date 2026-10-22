@@ -88,7 +88,7 @@ def relative(got, expected):
 
 
 def context(batch):
-    return reg.Context(inputs={"node_attrs": batch["node_attrs"]})
+    return reg.Context(inputs=reg.structure_inputs(batch))
 
 
 def apply(model, batch, requested, families=None):
