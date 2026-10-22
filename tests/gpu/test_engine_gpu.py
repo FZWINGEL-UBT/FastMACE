@@ -569,12 +569,65 @@ def fused_integrator_keys(info):
     return INTEGRATOR_KEYS if info.get("fused_integrator") else ()
 
 
+# The known differences of the force graph B from the research engine's (phase 3 acceptance, 3-T21; the kernel
+# names of both engines are in results/3-T21-local-20261022/diag*/results/kinds-*.json). Each is named here; no
+# other difference passes.
+# - Inductor numbers its generated Triton kernels in the order it emits them (``triton_poi_fused_..._37``), so a
+#   kernel's number is not part of its identity.
+# - Plain cuEq float64, NVT and NPT: Inductor emits three fused pointwise kernels and two cutlass float64 GEMMs of
+#   the same group in a different order in the two engines. The same kernels, in the same place; present at
+#   phase-3-baseline 156ab76 already (before phase 3), on the RTX 5060 Ti and the RTX 4000 Ada.
+# - MH-1 hybrid: the first interaction's reassociation takes its species rows from the superset's identity basis
+#   (3-T02, f045a3e; SPEC §8.5), where the research engine gathers "the first atom of each species": an argmax
+#   reduction and an index gather fused into the next kernel. Without them, that next kernel can run earlier.
+INDUCTOR_COUNTER = re.compile(r"(triton_(?:poi|per|red)_fused_\w+?)_\d+")
+CUEQ_FLOAT64_REORDERED = re.compile(
+    r"triton_poi_fused_(?:_unsafe_view_)?add_cat_(?:clone_)?div_mul_slice(?:_view)?"
+    r"|_ZN7cutlass7Kernel2I49cutlass_80_tensorop_d884gemm_64x32_16x4_nn_align1EEvNT_6ParamsE")
+FIRST_ATOM_GATHER = {"triton_red_fused_argmax_index_slice": None,
+                     "triton_poi_fused_cat_clone_index_mul_slice_t_unsqueeze":
+                         "triton_poi_fused_cat_clone_mul_slice_t_unsqueeze"}
+
+
+def known_b_differences(sequence, research):
+    """A B graph's kernel_sequence with the known differences above taken out (``research``: the research engine's)."""
+    out, run, moved = [], [], []
+    for name in sequence:
+        match = INDUCTOR_COUNTER.fullmatch(name)
+        name = match.group(1) if match else name
+        if research and name in FIRST_ATOM_GATHER:
+            name = FIRST_ATOM_GATHER[name]
+            if name is None:
+                continue
+        if name in FIRST_ATOM_GATHER.values():  # its place moves with the gather: compared by count
+            moved.append(name)
+            continue
+        if CUEQ_FLOAT64_REORDERED.fullmatch(name):
+            run.append(name)
+            continue
+        if run:
+            out.append(tuple(sorted(run)))
+            run = []
+        out.append(name)
+    if run:
+        out.append(tuple(sorted(run)))
+    return out + sorted(moved)
+
+
+def _equal_kernels(key, ours, theirs):
+    if key.startswith("('B'"):
+        return known_b_differences(kernel_sequence(ours), False) == known_b_differences(kernel_sequence(theirs), True)
+    return kernel_sequence(ours) == kernel_sequence(theirs)
+
+
 def same_kernels(ours, theirs, skip=()):
-    """Per graph key: (our node count, theirs, equal kernel sequences after kernel_sequence); ``skip`` keys left out."""
+    """Per graph key: (our node count, theirs, equal kernel sequences after kernel_sequence); ``skip`` keys left out.
+
+    The B graph is compared with its known differences taken out (``known_b_differences``)."""
     ours = {key: kinds for key, kinds in ours.items() if key not in skip}
     theirs = {key: kinds for key, kinds in theirs.items() if key not in skip}
     out = {key: (len(kinds), len(theirs[key]) if key in theirs else None,
-                 key in theirs and kernel_sequence(kinds) == kernel_sequence(theirs[key]))
+                 key in theirs and _equal_kernels(key, kinds, theirs[key]))
            for key, kinds in ours.items()}
     out.update({key: (None, len(kinds), False) for key, kinds in theirs.items() if key not in ours})
     return out
