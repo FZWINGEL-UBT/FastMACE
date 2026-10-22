@@ -91,15 +91,17 @@ def test_prepare_captures_the_first_steps_stages(pristine, monkeypatch):
 
 
 @pytest.mark.parametrize("check", ["skip", "gate"])
-def test_a_capture_failure_before_the_first_step_falls_back_to_eager(pristine, broken_capture, check):
+def test_a_capture_failure_before_the_first_step_falls_back_to_compiled(pristine, broken_capture, check):
+    """3-T06: the mode dimension is graph -> compiled -> eager; the compiled tier captures nothing."""
     sim = simulation(pristine, check=check)
     plan = sim.plan
     assert broken_capture, "the capture was not tried before the first step"
-    assert plan.tier == "eager" and plan.revision == 1 and plan.predecessor.tier == "graph"
-    assert plan.reason.startswith("fallback: mode eager: ") and "cudaErrorStreamCaptureUnsupported" in plan.reason
+    assert plan.tier == "compiled" and plan.revision == 1 and plan.predecessor.tier == "graph"
+    assert plan.reason.startswith("fallback: mode compiled: ")
+    assert "cudaErrorStreamCaptureUnsupported" in plan.reason
     assert [t.outcome for t in plan.fallbacks] == ["passed", "activated"]
     assert sim.gate.status == ("passed" if check == "gate" else "skipped")
-    assert "plan revision 1 (fallback): mode eager" in sim.report.text()
+    assert "plan revision 1 (fallback): mode compiled" in sim.report.text()
     sim.run(steps=3)
     sim.close()
 
@@ -116,7 +118,7 @@ def test_a_capture_failure_in_the_gates_replay_is_a_capture_failure(pristine, br
 
     monkeypatch.setattr(fallback.Fallback, "run", run)
     sim = simulation(pristine, check="gate")
-    assert stages == ["capture"] and sim.plan.tier == "eager" and sim.gate.status == "passed"
+    assert stages == ["capture"] and sim.plan.tier == "compiled" and sim.gate.status == "passed"
     sim.close()
 
 

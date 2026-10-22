@@ -59,6 +59,7 @@ from .plan import Hardware, Plan
 
 TIER = "graph"
 EAGER_TIER = "eager"  # the graph engine without capture or compilation (SPEC §8.3, 2-T02)
+COMPILED_TIER = "compiled"  # the compiled model without capture, exact edge counts (SPEC §8.2, 3-T06)
 
 # The switch map's rule for every field that admits "auto" (tests/cpu/test_config.py AUTO_RULES).
 AUTO_RULES = MappingProxyType({
@@ -726,7 +727,8 @@ class FixedPlanner:
         ``compile_cache`` (``fastmace.model.compile.CompiledModelCache``) is shared by the engines of
         one run, as the research engine shares its compiled models between crystals; ``constraints``
         is the process record (default the process's). ``capture`` is the engine's (default: captured
-        graphs on CUDA); the eager tier (2-T02) passes False and builds a plan of tier ``"eager"``.
+        graphs on CUDA); the eager tier (2-T02) passes False and builds a plan of tier ``"eager"``, and
+        the compiled tier (3-T06) passes False and gets a ``CompiledEngine`` on exact edge counts.
         """
         from fastmace.engine.graph import GraphEngine
         from fastmace.integrators.baoab import LangevinBAOAB
@@ -734,10 +736,11 @@ class FixedPlanner:
         from fastmace.model.forces import MACEForceField
         from fastmace.state import SimulationState
 
-        if plan.tier not in (TIER, EAGER_TIER):
-            raise ValueError(f"FixedPlanner builds tier {TIER!r} and {EAGER_TIER!r} plans, not {plan.tier!r}")
-        if plan.tier == EAGER_TIER and capture is not False:
-            raise ValueError(f"a tier {EAGER_TIER!r} plan runs without CUDA graphs: pass capture=False")
+        if plan.tier not in (TIER, EAGER_TIER, COMPILED_TIER):
+            raise ValueError(f"FixedPlanner builds tier {TIER!r}, {EAGER_TIER!r} and {COMPILED_TIER!r} plans, "
+                             f"not {plan.tier!r}")
+        if plan.tier in (EAGER_TIER, COMPILED_TIER) and capture is not False:
+            raise ValueError(f"a tier {plan.tier!r} plan runs without CUDA graphs: pass capture=False")
         for part in (plan.rewrites, plan.engine, plan.precision, plan.neighbours, plan.polar):
             if part is not None and "auto" in dataclasses.astuple(part):
                 raise ValueError(f"{type(part).__name__} still has 'auto' values; build takes a plan from plan()")
@@ -770,6 +773,11 @@ class FixedPlanner:
                                        **integrator_keywords(plan.integrator))
         else:
             integrator = Langevin(state, plan.integrator, temperature_K=temperature_K)
+        if plan.tier == COMPILED_TIER:
+            from fastmace.engine.compiled import CompiledEngine
+
+            return CompiledEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours,
+                                  constraints=constraints, dynamic_edges=True)
         return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
                            capture=capture)
 
@@ -787,7 +795,8 @@ def enabled_options(plan: Plan) -> tuple[str, ...]:
 
 
 __all__ = (
-    "AUTO_RULES", "EAGER_TIER", "FixedPlanner", "ModelSettings", "PlanRefused", "STAGE2_SUPPORT", "TIER",
+    "AUTO_RULES", "COMPILED_TIER", "EAGER_TIER", "FixedPlanner", "ModelSettings", "PlanRefused", "STAGE2_SUPPORT",
+    "TIER",
     "WORKLOAD_CONSTRAINTS", "auto_options_off", "detect_hardware", "enabled_options", "integrator_keywords",
     "workload_problems",
 )

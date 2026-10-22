@@ -31,6 +31,22 @@ Constants and functions:
 `mode="compiled"` is already one of `config.MODES`. 3-T06 lifts the planner's `mode-compiled`
 refusal.
 
+**`mode` defaults to `None`** (3-T06, conductor answer 1) in `Simulation`, `fm.md`, `PlannerOptions`,
+`planner_options` and `MinimalPlanner.plan`/`plan_traits`; `simulation.json` records `None`. Without a
+mode the planner picks the graph tier, or the compiled tier where:
+- rule 4: `padding_is_exact` is false (decision code `mode-compiled-rule-4`);
+- rule 9: `host_callbacks_every < minimal.RULE_9_HOST_CALLBACKS` (10), unless `reproducible=True`,
+  whose qualified tiers are graph and eager (code `mode-compiled-rule-9`).
+
+An explicit mode is the user's (code `mode-compiled-tier` for `"compiled"`). An explicit `"graph"` keeps
+the graph tier under rule 9 (`host-callbacks-graph-sync`, the reason says the override), and is refused
+under rule 4 (`inexact-padding`, the reason names `mode="compiled"`). The compiled tier's decisions:
+`capture` off ("compiled tier: no CUDA graphs" and why), `EngineConfig.speculative_graph` off,
+`EngineConfig.dynamic_edges` on when `compile_mode` is not `"none"`, `padding` "exact edge counts"
+(`compiled-exact-edges`) for an inexact model, and `workload.host_callbacks_every`
+`host-callbacks-compiled`. `planner.fixed.COMPILED_TIER = "compiled"`; `FixedPlanner.build` builds it
+with `capture=False`.
+
 Every plan resolves the four new `"auto"` fields, each with a decision `auto (<rule>)`
 (`FixedPlanner._phase_3_fields`, `fixed.AUTO_RULES`). Until the tasks named below give the
 rules, they resolve to today's behaviour:
@@ -105,7 +121,8 @@ Notes on the records:
 
 ## Engines
 
-- `engine/compiled.py`: `MODE = "compiled"`; `CompiledEngine(config, force_field, integrator, state, neighbours=None, constraints=None, dynamic_edges=True)`. Stub, T06. Only the planner builds it.
+- `engine/compiled.py`: `MODE = "compiled"`; `CompiledEngine(config, force_field, integrator, state, neighbours=None, constraints=None, dynamic_edges=True)`, a `GraphEngine` subclass that never captures; `dynamic_edges` steps on exact edge counts (`False`: bucket padding). Its `info()` adds `tier`, `dynamic_edges` and `compile_mode`; restart files keep the engine name `graph`. Only the planner builds it (T06).
+- The fallback's mode dimension (`planner/fallback.py`, T06): when eager passes the reduced gate, a graph plan tries compiled first, then eager (§9.4 step 2). The terminal sequence is unchanged.
 - `engine/graph.py`:
   - `ENERGY_KEY = "E"` and `ENGINE_KEYS = ("A", "AC", "ACB", "ACP", "ACPB", "B", "C", "E")`;
   - `GraphEngine.energy(*, precision=None)`: the energy-only graph. Stub, T07;

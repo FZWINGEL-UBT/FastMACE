@@ -223,7 +223,7 @@ def test_simulation_takes_the_planner_inputs():
 
     signature = inspect.signature(Simulation)
     assert _keyword_only(signature)[-len(PLANNER_OPTIONS):] == PLANNER_OPTIONS
-    assert signature.parameters["mode"].default == "graph"
+    assert signature.parameters["mode"].default is None  # 3-T06: the planner picks the tier
     assert signature.parameters["allow_reference"].default is False
     for name in ("fallback", "gate", "runner", "engine", "neighbours"):
         assert signature.parameters[name].default is None
@@ -234,7 +234,7 @@ def test_md_takes_the_planner_inputs():
 
     signature = inspect.signature(md)
     assert set(PLANNER_OPTIONS) <= set(_keyword_only(signature))
-    assert signature.parameters["mode"].default == "graph"
+    assert signature.parameters["mode"].default is None  # 3-T06
 
 
 @pytest.mark.parametrize("kwargs, message", [

@@ -352,13 +352,29 @@ def test_set_charges_takes_the_total():
 # --------------------------------------------------------------------------- engines
 
 
-def test_compiled_engine_stub():  # §8.2 (3-T06)
+def test_compiled_engine():  # §8.2 (3-T06)
+    pytest.importorskip("torch")
     from fastmace.engine import compiled
+    from fastmace.engine.graph import GraphEngine
 
     assert compiled.MODE == "compiled"
     assert _parameters(compiled.CompiledEngine) == ["config", "force_field", "integrator", "state", "neighbours",
                                                    "constraints", "dynamic_edges"]
-    _raises_naming("3-T06", lambda: compiled.CompiledEngine(None, None, None, None))
+    assert issubclass(compiled.CompiledEngine, GraphEngine)
+
+
+def test_mode_defaults_to_none():  # §9.3: the planner picks graph, or compiled by rules 4 and 9 (3-T06)
+    import inspect
+
+    import fastmace as fm
+    from fastmace.planner import minimal
+    from fastmace.simulation import PlannerOptions, Simulation
+
+    assert PlannerOptions().mode is None
+    assert inspect.signature(Simulation).parameters["mode"].default is None
+    assert inspect.signature(fm.md).parameters["mode"].default is None
+    assert inspect.signature(minimal.MinimalPlanner.plan).parameters["mode"].default is None
+    assert minimal.RULE_9_HOST_CALLBACKS == 10
 
 
 def test_graph_engine_energy_and_captured_stubs():  # §8.1 energy-only graph (3-T07), captured (3-T04)

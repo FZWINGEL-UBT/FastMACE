@@ -227,11 +227,16 @@ def test_every_refusal_code_has_a_reason(code):
     assert any(line.startswith("refused:") and report.REFUSALS[code] in line for line in lines)
 
 
+COMPILED_CODES = ["mode-compiled-tier", "mode-compiled-rule-4", "mode-compiled-rule-9"]  # 3-T06
+
+
 @pytest.mark.parametrize("code", BACKEND_CODES + ["host-callbacks-graph-sync", "allow-naive-cueq",
-                                                  "reproducible-qualified"])
+                                                  "reproducible-qualified"] + COMPILED_CODES)
 def test_every_downgrade_code_has_a_reason(code):
     if code.startswith("backend-cueq"):
         plan = make_plan(backend="cueq", backend_code=code)
+    elif code in COMPILED_CODES:
+        plan = make_plan(extra=(("mode", "compiled", Reason("x", code=code)),))
     elif code == "host-callbacks-graph-sync":
         plan = make_plan(extra=(("workload.host_callbacks_every", "graph, host sync every 5 steps",
                                  Reason("x", code=code)),))
@@ -239,6 +244,8 @@ def test_every_downgrade_code_has_a_reason(code):
         plan = make_plan(extra=(("allow_naive_cueq", "on", Reason("x", code=code)),))
     lines = make_report(plan).setup_text().splitlines()
     assert any(line.startswith("why:") and report.DOWNGRADES[code] in line for line in lines), lines
+    if code in COMPILED_CODES:
+        assert "compiled tier: no CUDA graphs" in report.DOWNGRADES[code]
 
 
 def test_hybrid_plan_has_no_downgrade_line():

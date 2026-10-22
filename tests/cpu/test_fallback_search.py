@@ -7,10 +7,11 @@
   fails and the empty rewrite set passes, ``None`` when the reduced gate cannot locate the fault;
 - ``terminal_sequence`` is the same mode with every rewrite off, eager with every rewrite off, and
   the reference tier if ``reference_last`` allows it, without duplicates;
-- ``Fallback.run`` on a tiny CPU model: a broken rewrite, a broken pair, a broken capture, a spent
-  budget (the terminal sequence in order), exhaustion (``FallbackExhausted`` with the record),
-  rule 13 on a self-check failure; a failing candidate is never activated, every candidate is built
-  from the pristine model, and the budget counts reduced and full gate runs apart.
+- ``Fallback.run`` on a tiny CPU model: a broken rewrite, a broken pair, a broken capture (graph,
+  then compiled, then eager; 3-T06), a spent budget (the terminal sequence in order), exhaustion
+  (``FallbackExhausted`` with the record), rule 13 on a self-check failure; a failing candidate is
+  never activated, every candidate is built from the pristine model, and the budget counts reduced
+  and full gate runs apart.
 
 Faults are injected here only (monkeypatched builds and gates), never through a hook in the library.
 The gate's numbers are stubbed in this file; ``test_fallback_simulation.py`` runs the real gate.
@@ -293,17 +294,41 @@ def test_a_culprit_required_by_others_takes_them_along(pristine, monkeypatch):
 
 
 def test_a_broken_capture_drops_the_graph_mode(pristine, monkeypatch):
+    """3-T06: the mode dimension is graph -> compiled -> eager (§9.4 step 2): compiled first."""
     planner, ff, atoms, plan = setup_case(pristine)
     faults = Faults(monkeypatch, bad_modes={"graph"})
     error = RuntimeError("CUDA graph capture of stage B failed (injected)")
     _, result = run_fallback(planner, ff, atoms, fallback.Failure(plan=plan, stage="capture", error=error))
     active = result.plan
-    assert active.tier == "eager" and active.revision == plan.revision + 1
-    assert active.reason.startswith("fallback: mode eager: ")
+    assert active.tier == "compiled" and active.revision == plan.revision + 1
+    assert active.reason.startswith("fallback: mode compiled: ") and fallback.MODE_WHY in active.reason
     assert active.rewrites == plan.rewrites
     assert [t.dimension for t in active.fallbacks] == ["mode", "mode"]
     assert [t.outcome for t in active.fallbacks] == ["passed", "activated"]
     assert result.budget.reduced_gate_runs == 1 and result.budget.full_gate_runs == 1
+    assert [p.tier for p in faults.built] == ["eager", "compiled"]
+
+
+def test_a_broken_compilation_drops_to_eager_after_compiled(pristine, monkeypatch):
+    planner, ff, atoms, plan = setup_case(pristine)
+    faults = Faults(monkeypatch, bad_modes={"graph", "compiled"})
+    error = RuntimeError("CUDA graph capture of stage B failed (injected)")
+    _, result = run_fallback(planner, ff, atoms, fallback.Failure(plan=plan, stage="capture", error=error))
+    active = result.plan
+    assert active.tier == "eager" and active.reason.startswith("fallback: mode eager: ")
+    assert [p.tier for p in faults.built] == ["eager", "compiled", "eager"]
+    assert [(t.dimension, t.outcome) for t in active.fallbacks] == [
+        ("mode", "passed"), ("mode", "failed"), ("mode", "activated")]
+    assert result.budget.reduced_gate_runs == 1
+
+
+def test_a_failing_compiled_plan_drops_to_eager(pristine, monkeypatch):
+    planner, ff, atoms, _ = setup_case(pristine)
+    plan = planner.plan(ff, atoms, INTEGRATOR, tmp.WORKLOAD, minimal_hardware(), mode="compiled")
+    faults = Faults(monkeypatch, bad_modes={"compiled"})
+    error = RuntimeError("BackendCompilerFailed: backend='inductor' raised (injected)")
+    _, result = run_fallback(planner, ff, atoms, fallback.Failure(plan=plan, stage="compile", error=error))
+    assert result.plan.tier == "eager"
     assert [p.tier for p in faults.built] == ["eager", "eager"]
 
 
@@ -369,9 +394,9 @@ def test_a_failing_candidate_is_never_activated(pristine, monkeypatch):
     monkeypatch.setattr(fallback, "activate", spy)
     _, result = run_fallback(planner, ff, atoms, gate_failure(plan))
     # ddmin's candidate (graph, block_linear and its dependants off) fails at capture and is never
-    # activated; the next round finds eager passing
+    # activated; the next round finds eager passing and activates compiled first (3-T06)
     assert [a.activated for a in calls] == [False, True]
-    assert calls[0].engine is None and calls[0].tried.stage == "build" and result.plan.tier == "eager"
+    assert calls[0].engine is None and calls[0].tried.stage == "build" and result.plan.tier == "compiled"
     assert {"block_linear", "grouped_linear", "merged_residual"} <= off_fields(result.plan)
     assert result.plan.revision == calls[-1].plan.revision and result.engine is calls[-1].engine
 
@@ -436,7 +461,7 @@ def test_under_check_skip_the_references_are_computed_once(pristine, monkeypatch
     error = RuntimeError("CUDA graph capture of stage B failed (injected)")
     _, result = run_fallback(planner, ff, atoms, fallback.Failure(plan=plan, stage="capture", error=error),
                              references=selfcheck.References(check="skip"))
-    assert result.plan.tier == "eager"
+    assert result.plan.tier == "compiled"
     assert skip_references == [("gate", 1)]
 
 
