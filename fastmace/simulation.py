@@ -1030,6 +1030,29 @@ class Simulation:
 
         self._host_write(write)
 
+    # Host mutations of composition and coefficients (SPEC §8.5, §7.6): each one event under the transaction
+    # contract of fastmace.events, at a committed step. 3-T03 fills them; 3-T02 adds the superset checks.
+
+    def set_species(self, species: Any) -> None:
+        """Set every atom's species (atomic numbers or symbols, shape ``(N,)``), one event. Each must be in
+        the ``ForceField``'s superset (``SpeciesNotInSuperset``); masses follow the new species' standard
+        masses unless ``set_masses`` follows."""
+        raise NotImplementedError("Simulation.set_species: plan task 3-T03")
+
+    def set_masses(self, masses: Any) -> None:
+        """Set every atom's mass in amu, shape ``(N,)``, one event; velocities stay (momenta change)."""
+        raise NotImplementedError("Simulation.set_masses: plan task 3-T03")
+
+    def set_charges(self, charges: Any, *, total_charge: float | None = None) -> None:
+        """Set the per-atom charges (models that take them), shape ``(N,)``, and optionally the total charge,
+        one event."""
+        raise NotImplementedError("Simulation.set_charges: plan task 3-T03")
+
+    def set_friction(self, friction_per_fs: float) -> None:
+        """Set the Langevin friction in 1/fs, one event; it drops the graphs that bake ``c1``/``c2`` in (a
+        recorded re-capture)."""
+        raise NotImplementedError("Simulation.set_friction: plan task 3-T03")
+
 
 # What a resume compares to decide whether the plan changed (§10.6: "another GPU or rewrite set"), and
 # the rest of the record a revision carries over from the new plan.

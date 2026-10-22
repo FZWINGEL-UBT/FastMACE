@@ -84,6 +84,8 @@ How to read the tables:
 | none: the research engine's early rebuild waits for the force call in flight (new in the library, opt-2 OPT2-T04) | `EngineConfig.overlap_rebuild` | `True` | — | engine (`GraphEngine._rebuild(beside=True)`: a pipelined fixed-cell CUDA step's early rebuild runs on a side stream; exact) |
 | none: the research engine replays ACP and B as two graphs (new in the library, opt-2 OPT2-T04) | `EngineConfig.step_graph` | `False` | — | engine (`GraphEngine._step_pipelined`: one `("ACPB", edges)` graph per step with the flags' copy and an external event inside; exact) |
 | none: the research engine runs the integrator stage as PyTorch operations (new in the library, opt-3 OPT3-T03) | `EngineConfig.fused_integrator` | `True` | — | engine (`GraphEngine._stage_ac`/`_stage_acp`: fixed-cell CUDA Langevin's half kick, drift, neighbour checks, compaction and flags in four Triton kernels; exact, also in reproducible plans; default on by owner decision, 21 October 2026; NPT, CPU and no Triton keep the PyTorch stage) |
+| none: the research engine re-captures without a budget (new in the library, SPEC §8.1; 3-T01) | `EngineConfig.recapture_budget` | `"auto"` | `recapture_budget_from_workload` | engine (re-capture policy, 3-T04: past the budget the run warns, records and the report recommends the compiled tier; `0`: none) |
+| `DYNAMO_CACHE_SIZE_LIMIT` (the same limit, per graph key; new as a cap in the library, SPEC §8.1; 3-T01) | `EngineConfig.graph_variant_cap` | `64` | — | engine (captured variants kept at once, at most 64 and at most `dynamo_cache_size_limit`; 3-T04) |
 
 ## 3. Precision → `PrecisionConfig`
 
@@ -92,17 +94,19 @@ How to read the tables:
 | `--dtype` | `PrecisionConfig.dtype` | `"auto"` | `float32_for_hybrid_float64_for_cueq` | precision |
 | TF32 off (`Benchmark_MACE_GPU_OPTIMIZATIONS/scripts/common.py:575`, `allow_tf32 = False`; `main.py` banner "TF32 off") | `PrecisionConfig.tf32` | `False` | — | precision (§1.2: never default) |
 | none: the research engine sums the energy in float32 (new in the library, SPEC §6.2, §7.3; 1b-T01) | `PrecisionConfig.float64_energy` | `True` | — | precision (reference treatment, §12.1; `False` only for A/B against the research engine, 1b-T03) |
+| none (new in the library, SPEC §10.4; 3-T01) | `PrecisionConfig.mc_energy` | `"auto"` | `force_precision_if_move_energy_gate_passes_else_float64` | precision (MC energies; the planner's resolution of `Workload.mc_energy_precision`, 3-T07 and 3-T11) |
 
 ## 4. Neighbour list → `NeighbourConfig`
 
 | Research engine | FastMACE field | Default | `auto` rule | Kind |
 | --- | --- | --- | --- | --- |
-| `--skin` | `NeighbourConfig.skin` | `0.3` | — | neighbour list |
+| `--skin` | `NeighbourConfig.skin` | `"auto"` (`main.py` 0.3) | `rule_11_skin_from_workload` | neighbour list (`"auto"` resolves to 0.3 Å, `DEFAULT_SKIN_A`, until rule 11 in 3-T05; an explicit float is kept) |
 | `--sort-receivers` (`MACEForces(sort_by_receiver=...)`) | `NeighbourConfig.sort_receivers` | `"auto"` | `on_for_hybrid_graph_engine` | §6.2 `sort_receivers` |
 | `--gpu-neighbour-list`; `GPU_NEIGHBOUR_LIST` | `NeighbourConfig.gpu_neighbour_list` | `"auto"` (global `False`) | `on_with_graph_engine` | §6.2 `gpu_neighbour_list` |
 | `EDGE_MULTIPLE` | `NeighbourConfig.edge_multiple` | `256` | — | neighbour list (buckets) |
 | `EDGE_BUCKET_FRACTION` (also `GPULangevin(edge_bucket_fraction=...)`) | `NeighbourConfig.edge_bucket_fraction` | `0.05` | — | neighbour list (buckets) |
 | `SkinNeighbourList(headroom=1.15)` (constructor default, not a global) | `NeighbourConfig.capacity_headroom` | `1.15` | — | neighbour list (buckets) |
+| none (new in the library, SPEC §9.3 rule 11; 3-T01) | `NeighbourConfig.headroom` | `"auto"` | `rule_11_headroom_from_workload` | neighbour list (buckets; `"fixed"`: `capacity_headroom` and `edge_bucket_fraction` as given; `"auto"` resolves to `"fixed"` until 3-T05) |
 
 ## 5. PolarMACE → `PolarConfig`
 
@@ -208,6 +212,10 @@ reach the planner through `Simulation(fallback=, gate=, runner=)` and `fm.md`
 | none (new, SPEC §9.4 step 5) | `FallbackConfig.reference_last` | `True` | — | fallback |
 | none (new, SPEC §12.3 "Resources") | `GateConfig.cpu_float64_time_limit_s` | `300.0` | — | gate resources |
 | none (new, SPEC §12.3 "Resources") | `GateConfig.reduced_cell` | `"auto"` | `largest_smaller_supercell_at_least_min_height` | gate resources (2-T05) |
+| `rule_11_skin_from_workload` | Rule 11 (3-T05): the skin from `max_temperature_K`, the lightest mass and the timestep (the expected displacement per rebuild interval), at least 2δ plus the MD drift for displacement workloads; no tables. Until 3-T05: `DEFAULT_SKIN_A` (0.3 Å). | `NeighbourConfig.skin` |
+| `rule_11_headroom_from_workload` | Rule 11 (3-T05): pair-buffer and edge-bucket headroom from the same expected displacement. Until 3-T05: `"fixed"`. | `NeighbourConfig.headroom` |
+| `recapture_budget_from_workload` | The re-capture budget of a run (3-T04 with 3-T05's rule 11): a general rule from the workload's expected rebuilds and bucket growth. Until 3-T04: `graph_variant_cap`. | `EngineConfig.recapture_budget` |
+| `force_precision_if_move_energy_gate_passes_else_float64` | MC energies in the force precision if the move-energy gate (SPEC §12.3; always run for MC plans, decision 35) passes, float64 otherwise or when the reference is unavailable (3-T11). Plans without MC: the force precision. | `PrecisionConfig.mc_energy` |
 | none (new, SPEC §12.3 "Resources") | `GateConfig.reduced_cell_min_height_cutoffs` | `2.0` | — | gate resources |
 | none (new, SPEC §8.7) | `RunnerConfig.python` | `None` | — | subprocess runner (`None`: `sys.executable`) |
 | none (new, SPEC §8.7) | `RunnerConfig.environment` | `()` | — | subprocess runner |
@@ -215,6 +223,17 @@ reach the planner through `Simulation(fallback=, gate=, runner=)` and `fm.md`
 | none (new, SPEC §8.7) | `RunnerConfig.timeout_s` | `None` | — | subprocess runner |
 | none (new, SPEC §8.7) | `RunnerConfig.stall_timeout_s` | `1800.0` | — | subprocess runner |
 | none (new, OPT-T07) | `RunnerConfig.persistent` | `True` | — | subprocess runner: one worker child per `Simulation` (`False`: a fresh child per `run()`) |
+
+## 11. MC driver of phase 3 → `MCConfig`
+
+New in the library (plan task 3-T01); the research engine has no MC. The move records
+are `fm.mc.Swap`, `Transmute` and `Displace` (`docs/design/contracts-3.md`), and the
+three MC streams' seeds derive from the simulation's `seed` (`config.mc_stream_seeds`).
+
+| Research engine | FastMACE field | Default | `auto` rule | Kind |
+| --- | --- | --- | --- | --- |
+| none (new, SPEC §10.4) | `MCConfig.max_attempts_per_block` | `10_000` | — | MC driver (3-T09) |
+| none (new, SPEC §10.4) | `MCConfig.max_move_sets` | `8` | — | MC driver (3-T09) |
 
 ## Auto resolution rules
 
@@ -297,6 +316,11 @@ model is an error with a reason, never a silent downgrade.
   `EngineConfig.step_graph`, 73 in all (both opt-in).
 - Optimisation round 3 (plan task OPT3-T03) added `EngineConfig.fused_integrator`, 74 in all; on by default
   since the owner's decision of 21 October 2026.
+- Phase 3 (plan task 3-T01) added four fields to existing records (`EngineConfig.recapture_budget` and
+  `graph_variant_cap`, `PrecisionConfig.mc_energy`, `NeighbourConfig.headroom`) and let
+  `NeighbourConfig.skin` admit `"auto"`, plus the record `MCConfig` with 2 fields (section 11), 80 in
+  all. Four more fields admit `"auto"` (`skin`, `headroom`, `recapture_budget`, `mc_energy`). None
+  comes from the research engine.
 
 ## Open questions for the conductor
 

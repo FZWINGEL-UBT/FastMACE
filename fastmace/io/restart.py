@@ -58,6 +58,17 @@ if TYPE_CHECKING:
 
 RESTART_NAME = "restart.npz"
 FORMAT_VERSION = 2
+# Version 3 (SPEC §10.6; contracts: plan task 3-T01, writer and resume: 3-T08). The composition keys,
+# already written since versions 1 and 2, become the resumed state (today resume rebuilds the Atoms from
+# the initial structure); the JSON record "mc" holds the attached move set's state (3-T09, 3-T10).
+NEXT_FORMAT_VERSION = 3
+V3_KEYS = ("mc",)
+COMPOSITION_KEYS = ("species", "masses", "charges", "physical")
+# The "mc" record: the move records, the step within the MD/MC cycle, counters per move type, each
+# stream's seed and offset (config.MC_STREAMS), and adaptive displacement step sizes in Angstrom.
+MC_RECORD_KEYS = ("moves", "cycle_position", "counters", "streams", "delta_A")
+MC_COUNTER_KEYS = ("attempted", "impossible", "accepted")
+MC_STREAM_KEYS = ("seed", "offset")
 # The barostat's keys: SimulationState fields since 1b; integrator state in 1a files and in
 # research-engine files (which have no "integrator_keys" entry, GPUEngine.state).
 BAROSTAT_KEYS = ("p_eps", "force_eps")
@@ -252,6 +263,11 @@ def format_version(restart: Mapping[str, Any]) -> int:
 
 def _record(restart: Mapping[str, Any], name: str) -> Any:
     return json.loads(str(restart[name])) if name in restart else None
+
+
+def mc_record(restart: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The MC record (``MC_RECORD_KEYS``) of a version 3 file, or ``None`` without an attached move set."""
+    raise NotImplementedError("the restart's MC record: plan task 3-T08")
 
 
 def physical_record(restart: Mapping[str, Any]) -> dict[str, Any] | None:

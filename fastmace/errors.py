@@ -122,6 +122,22 @@ class SpeciesNotInSuperset(PlanRefused):
                          "and fix the other reasons listed.")
 
 
+# The reason code of a transmutable set whose electron-count change is odd (SPEC §10.4, 3-T09).
+CHARGE_PARITY_CODE = "transmute-charge-parity"
+
+
+class ChargeParityRefused(PlanRefused):
+    """A transmutable set violates the charge and spin rule of SPEC §10.4: a move needs ΔZ − Δq even.
+
+    Raised by the planner through ``ChargeParityRefused.from_reasons`` with a reason coded
+    ``CHARGE_PARITY_CODE`` (3-T09); every other reason of the refusal comes with it.
+    """
+
+    default_next_step = ("Give each species of the transmutable set a formal charge "
+                         "(fm.mc.Transmute(formal_charges=...)) so that every move changes Z − q by an even "
+                         "number, or choose an isovalent set.")
+
+
 class ProcessConstraintError(FastMACEError, RuntimeError):
     """An engine would break a process-wide constraint (SPEC §8.7)."""
 

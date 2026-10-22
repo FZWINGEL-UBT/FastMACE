@@ -44,6 +44,7 @@ _PUBLIC = {
     "md": ("fastmace.quick", "md"),
     "calc": ("fastmace.ase.calculator", "calc"),
     "D3": ("fastmace.longrange.d3", "D3"),
+    "mc": ("fastmace.mc", None),  # phase 3 (docs/design/contracts-3.md)
 }
 
 __all__ = ["RuntimeInfo", "__version__", "runtime_info", *_PUBLIC]

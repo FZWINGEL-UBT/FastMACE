@@ -31,6 +31,7 @@ CLASSES = (
     config.FallbackConfig,
     config.GateConfig,
     config.RunnerConfig,
+    config.MCConfig,
 )
 
 # Every field that can be "auto", with the named rule that resolves it. 1a-T15 implements
@@ -46,6 +47,10 @@ AUTO_RULES = {
     "PrecisionConfig.dtype": "float32_for_hybrid_float64_for_cueq",
     "NeighbourConfig.sort_receivers": "on_for_hybrid_graph_engine",
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
+    "NeighbourConfig.skin": "rule_11_skin_from_workload",
+    "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
+    "EngineConfig.recapture_budget": "recapture_budget_from_workload",
+    "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
     "RewriteConfig.fold_cutoff": "on_with_factor_species_if_model_supports",
     "RewriteConfig.density_first": "on_with_fold_cutoff_if_model_supports",

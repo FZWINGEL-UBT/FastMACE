@@ -26,7 +26,7 @@ from ase.constraints import FixAtoms
 
 from _support.structures import nacl
 from _support.tiny_models import FAMILIES, tiny_mace_model
-from fastmace.config import EngineConfig, IntegratorConfig, NeighbourConfig, PrecisionConfig, RewriteConfig
+from fastmace.config import DEFAULT_SKIN_A, EngineConfig, IntegratorConfig, PrecisionConfig, RewriteConfig
 from fastmace.engine import constraints
 from fastmace.errors import ModelElementError, PlanRefused, ProcessConstraintError, Reason, SpeciesNotInSuperset
 from fastmace.planner import fixed
@@ -246,7 +246,7 @@ def test_rule_10_stress_and_headroom_follow_the_integrator():
 def test_rule_11_records_max_temperature_and_keeps_the_1a_skin():
     plan = plan_label("mh1-r2scan", workload=Workload(max_temperature_K=2500.0))
     assert plan.workload.max_temperature_K == 2500.0
-    assert plan.neighbours.skin == NeighbourConfig().skin
+    assert plan.neighbours.skin == DEFAULT_SKIN_A  # NeighbourConfig().skin is "auto" since 3-T01
     assert "phase 3" in plan.decision("workload.max_temperature_K")[2]
 
 

@@ -33,7 +33,7 @@ import numpy as np
 import pytest
 import torch
 
-from fastmace.config import EngineConfig, NeighbourConfig, RewriteConfig
+from fastmace.config import DEFAULT_SKIN_A, EngineConfig, NeighbourConfig, RewriteConfig
 from fastmace.model import compile as fc
 from fastmace.model.forces import ForceField, ForceOutput, MACEForceField
 from fastmace.neighbors.buckets import edge_bucket, round_up_edges
@@ -133,7 +133,7 @@ def test_defaults_mirror_maceforces():
     field = MACEForceField(calc, atoms)
     assert field.info()["compile_mode"] == "none" and field.info()["rewrites"] == []
     assert field.resolution.enabled == () and field.model is calc.models[0]
-    assert field.neighbours.skin == NeighbourConfig().skin
+    assert NeighbourConfig().skin == "auto" and field.neighbours.skin == DEFAULT_SKIN_A
     assert not field.neighbours.sort_receivers and not field.neighbours.gpu_build
 
 
