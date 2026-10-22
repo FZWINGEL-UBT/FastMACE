@@ -19,7 +19,8 @@ their rows (displacements with and without a trial rebuild: 3-T10) as further si
 (propose, apply, refresh, energy, accept mask, restore; ``fastmace.mc.MCDriver``) per evaluator precision,
 timed like the others. The decisions are forced to reject while timing (the same kernels run; the state
 stays). Afterwards one real block of ``--block-attempts`` swaps per precision at the run's temperature
-records its device time (CUDA events) and counters.
+records its device time (CUDA events) and counters. ``--transmute A-B`` adds B to the superset (so the MD
+plan is the MC plan, not the default one) and runs two real transmutation blocks per precision.
 """
 
 from __future__ import annotations
@@ -60,6 +61,8 @@ def parse_args(argv=None):
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--swap", default=None, help="swap pair A-B (symbols); default the two lightest species")
     p.add_argument("--block-attempts", type=int, default=50)
+    p.add_argument("--transmute", default=None,
+                   help="A-B: also run real transmutation blocks A <-> B (B joins the superset; the MD plan changes)")
     return p.parse_args(argv)
 
 
@@ -178,9 +181,19 @@ def main(argv=None):
         loaded = loading.load_pristine(args.model, checkpoint=str(checkpoint), sha256=meta["checkpoint_sha256"])
         name, base = ab_step_time.read_structure(args.structure, None)
         meta.update(structure=name, natoms=len(base))
-        force_field = ForceField(loaded, base, precision=precision)
+        superset = None
+        if args.transmute:
+            from ase.data import atomic_numbers
+
+            superset = sorted(set(int(z) for z in base.numbers) | {atomic_numbers[name]
+                                                                     for name in args.transmute.split("-")})
+            meta["superset"] = superset
+        force_field = ForceField(loaded, base, precision=precision, species=superset)
         integrator = config.IntegratorConfig(seed=args.seed, temperature_K=args.temperature_K)
-        plan = planner.plan(force_field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
+        workload = (Workload(max_temperature_K=args.temperature_K) if not args.transmute else
+                    Workload(max_temperature_K=args.temperature_K, species_changes=True,
+                             min_mc_temperature_K=args.temperature_K, mc_moves=("swap", "transmute")))
+        plan = planner.plan(force_field, base, integrator, workload, hardware)
         started = time.perf_counter()
         engine = planner.build(plan, force_field, base.copy(), temperature_K=args.temperature_K)
         md = ab_step_time.FastMACESide(engine, torch)
@@ -270,6 +283,24 @@ def main(argv=None):
             meta["swap_blocks"][name] = dict(record, md_step_ms=meta["timing"]["md"]["median_ms"],
                                              per_attempt_ms=record["device_ms"] / args.block_attempts)
             save()
+        if args.transmute:  # real transmutation blocks per precision (the captured attempt on this plan)
+            from fastmace.mc import Transmute
+
+            meta["transmute_blocks"] = {}
+            for index, (name, timed) in enumerate(drivers.items()):
+                # A seed per precision: with one seed the second driver re-proposes the first one's atoms.
+                driver = MCDriver([Transmute(args.transmute.split("-"), every=1, attempts=args.block_attempts)],
+                                  seed=args.seed + 2 + index)
+                driver.attach(engine, evaluator=timed.evaluator)
+                records = []
+                for _ in range(2):  # the first block captures, the second replays
+                    engine.step()
+                    records.append(driver.run_block(engine, max(1, int(engine.state.step))))
+                meta["transmute_blocks"][name.replace("swap", "transmute")] = dict(
+                    records[-1], first_block_device_ms=records[0]["device_ms"], info=driver.info(),
+                    per_attempt_ms=records[-1]["device_ms"] / args.block_attempts,
+                    graphs=[str(key) for key in engine._graphs if str(key).startswith("('mc.transmute")])
+                save()
         meta["status"] = "done"
     except BaseException as error:
         meta.update(status="failed", error=repr(error))
