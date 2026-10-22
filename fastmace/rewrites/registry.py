@@ -127,6 +127,27 @@ class Context:
     seed: int = 0  # self-check inputs come from a torch.Generator with this seed
 
 
+# Per-graph joint-embedding inputs of MACE's batch (OMOL-0), which the reassociated first
+# interaction's identity-basis table includes (SPEC §8.5).
+JOINT_FEATURES = ("total_charge", "total_spin")
+
+
+def structure_inputs(batch, species_columns=None):
+    """``Context.inputs`` for one structure from its MACE batch dict: the one-hot ``node_attrs``, its
+    per-graph ``joint_features`` and, when given, the superset's ``species_columns`` (SPEC §8.5)."""
+    def get(name):  # a dict, or a MACE (torch_geometric) Batch
+        try:
+            return batch[name]
+        except (KeyError, AttributeError):
+            return None
+
+    inputs = {"node_attrs": batch["node_attrs"],
+              "joint_features": {name: get(name) for name in JOINT_FEATURES if get(name) is not None}}
+    if species_columns is not None:
+        inputs["species_columns"] = tuple(species_columns)
+    return inputs
+
+
 def _specifier_set(value):
     from packaging.specifiers import SpecifierSet
 
@@ -706,5 +727,5 @@ __all__ = [
     "AppliedRewrite", "Candidate", "CheckResult", "Context", "DEFAULTS", "Decision", "EXACTNESS", "RECORD_SOURCES",
     "Reaction", "Registry", "Resolution", "Rewrite", "RewriteError", "RewriteRefusedError", "SelfCheckError",
     "Support", "THRESHOLDS", "check_tensors", "default_registry", "installed_mace_version", "qualify",
-    "relative_error", "selfcheck_records", "source_sha256", "threshold_for",
+    "JOINT_FEATURES", "relative_error", "selfcheck_records", "source_sha256", "structure_inputs", "threshold_for",
 ]

@@ -119,6 +119,26 @@ Notes on the records:
 - **`events.check_against(engine, fresh)`**: the CI registry check of SPEC §12.2. It compares the derived registries, the state's composition, the neighbour list as the set of compacted edges, the integrator's host constants (the floats a stage bakes in, its config) and every other tensor reachable from the force field and integrator that the runtime-state registry does not hold. So a buffer left out of the registry fails it (`tests/cpu/test_events.py` has the negative controls).
 - **`events.species_numbers(values, count)`**: atomic numbers from numbers or symbols, validated.
 
+## Species superset in the force field (3-T02)
+
+Added by 3-T02 under the conductor's answers (`plans/phase-3.md`, "3-T02 species superset").
+
+| Name | Signature | Meaning |
+| --- | --- | --- |
+| `MACEForceField(..., species=None)` | keyword | the superset, atomic numbers; default the structure's species. The planner passes `Plan.superset`. A superset species without an embedding raises `ModelElementError`, a structure species outside it `SpeciesNotInSuperset` |
+| `MACEForceField.superset`, `.species_columns` | tuples | the superset (by model column) and its `node_attrs` columns; the compile key of species-dependent rewrites |
+| `MACEForceField.atomic_numbers`, `.charges` | device tensors, (N,) int64 and float64 | what a transaction writes (3-T03); every derived buffer below is refreshed from them |
+| `MACEForceField.check_species(numbers)` | host | raises `SpeciesNotInSuperset` (rule 2, code `species-not-in-superset`) before anything is written; a wrong length raises `ValueError` |
+| `MACEForceField.register_derived(registry, state=None, prefix="force_field")` | → list of `DerivedBuffer`; with `state` (the engine's, 3-T03) the refreshes read `state.species` and `state.charges` (`use_sources`) | registers `node_attrs`, `node_e0`, `sender_groups` (species), `total_charge`, `total_spin` and `species_feats.interactions.<i>` (charges), in that order. Each refresh runs on the device, in place, at fixed addresses, without host synchronisation |
+| `MACEForceField.use_sources(species, charges=None)` | device tensors | alias the species and per-atom charge sources; their values must be the current ones |
+| `MACEForceField.set_total_charge(total_charge)` | host, between replays | a host total-charge event: the next `total_charge` refresh gives exactly this value; transmutations change only the per-atom charges, and the device refresh follows them |
+| `MACEForceField.derived_buffers()` | → `{name: tensor}` | the same buffers without the prefix |
+| `fastmace.rewrites.registry.structure_inputs(batch, species_columns=None)` | → `Context.inputs` | `node_attrs`, the per-graph `joint_features` (`JOINT_FEATURES = ("total_charge", "total_spin")`) and the superset columns |
+
+- **Identity basis.** The reassociated first interaction reads `FirstInteractionReassociation.species_feats`, an `[S, C]` table: `linear_up(node_embedding(I_S) + joint_embedding)` (`rewrites.mh1.modules.identity_species_feats`). It is evaluated in a batch of the structure's row count, so a present species' row is bitwise the row its atoms have. The force field binds its own table before each call, as it binds the streaming count.
+- **Sender groups.** `SkinNeighbourList(..., sender_groups=<tensor>, group_count=S)` reads the tensor at every build. The count is fixed at the superset size.
+- **Rule 8.** A superset beyond the structure plans graph mode. The `superset` decision is coded `superset`, rule 8.
+
 ## Engines
 
 - `GraphEngine.derived` (T03): the derived-state registry above. `GraphEngine.quiesce()`: an event's quiesce (`flush`).
@@ -148,7 +168,7 @@ Since 3-T08 the writer is at `FORMAT_VERSION = NEXT_FORMAT_VERSION = 3`. Version
 
 | Test | Pins | Flipped by |
 | --- | --- | --- |
-| `test_minimal_planner.py::test_d3_superset_beyond_the_structure_is_phase_3` | `superset-beyond-structure` | T02 |
+| `test_minimal_planner.py::test_d3_superset_beyond_the_structure_is_phase_3` (now `test_superset_beyond_the_structure_is_planned_by_rule_8`) | `superset-beyond-structure` | T02 (flipped) |
 | `test_minimal_planner.py::test_rule_4_inexact_padding_refuses_the_graph_tier` | "compiled MD tier: phase 3" in rule 4 | T06 |
 | `test_minimal_planner.py::test_other_modes_are_refused_with_their_phase` | `mode-compiled` | T06 |
 | `test_minimal_planner.py::test_rule_11_records_max_temperature_and_keeps_the_1a_skin` | the 1a skin, "phase 3" | T05 |

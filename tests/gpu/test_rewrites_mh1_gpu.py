@@ -99,7 +99,7 @@ def test_package_on_cueq_gpu_models(family, device, dtype):
     assert all(hasattr(i, "conv_fusion") for i in model.interactions) is (device == "cuda")
     regs = registry()
     resolution = regs.resolve(model, {"fused_radial_hidden": "on"}, strict=False)
-    context = reg.Context(inputs={"node_attrs": data["node_attrs"]})
+    context = reg.Context(inputs=reg.structure_inputs(data))
     applied = regs.apply(model, resolution, context, original=original)
     names = [entry.name for entry in applied]
     threshold = reg.threshold_for(dtype)
@@ -167,7 +167,7 @@ for family in (mh1, linear):
     for record in family.RECORDS.values():
         regs.register(record)
 resolution = regs.resolve(loaded.model, strict=False)
-applied = regs.apply(loaded.model, resolution, reg.Context(inputs={{"node_attrs": data["node_attrs"]}}),
+applied = regs.apply(loaded.model, resolution, reg.Context(inputs=reg.structure_inputs(data)),
                      original=original.model)
 
 def run(model):
@@ -256,7 +256,7 @@ def test_mh1_float64_package_agrees_with_the_unrewritten_model(mace_conv_fusion_
             parameter.requires_grad_(False)
     regs = registry()
     resolution = regs.resolve(loaded.model, strict=False)
-    applied = regs.apply(loaded.model, resolution, reg.Context(inputs={"node_attrs": data["node_attrs"]}),
+    applied = regs.apply(loaded.model, resolution, reg.Context(inputs=reg.structure_inputs(data)),
                          original=original.model)
     assert [e.name for e in applied][:5] == list(MH1) and [e.name for e in applied][-3:] == list(LINEAR)
     for entry in applied:

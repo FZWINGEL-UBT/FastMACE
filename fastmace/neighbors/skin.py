@@ -82,7 +82,7 @@ class SkinNeighbourList:
 
     def __init__(self, cell, cutoff, device, float_dtype, config: NeighbourConfig | None = None, *,
                  sort_receivers: bool | None = None, gpu_build: bool | None = None, sender_groups=None,
-                 variable_cell: bool = False):
+                 group_count: int | None = None, variable_cell: bool = False):
         config = NeighbourConfig() if config is None else config
         self.config = config
         self.cell = np.asarray(cell, dtype=float)
@@ -95,8 +95,14 @@ class SkinNeighbourList:
         self.headroom = config.capacity_headroom
         self.sort_receivers = _resolved(sort_receivers, config.sort_receivers, "sort_receivers")
         self.gpu_build = _resolved(gpu_build, config.gpu_neighbour_list, "gpu_neighbour_list")
-        # Optional per-atom group (sender species, segmented first sum): secondary sort key.
-        self.sender_groups = None if sender_groups is None else np.asarray(sender_groups, dtype=np.int64)
+        # Optional per-atom group (sender species, segmented first sum): secondary sort key. A device
+        # tensor at a fixed address that its owner refreshes in place (a derived buffer of the species,
+        # SPEC §8.5), read on every build; ``group_count`` is fixed (the superset size), max() + 1 if
+        # not given.
+        self.sender_groups = (None if sender_groups is None else
+                              torch.as_tensor(sender_groups, dtype=torch.int64, device=self.device))
+        self.group_count = (1 if self.sender_groups is None else
+                            int(group_count) if group_count is not None else int(self.sender_groups.max()) + 1)
         self.capacity = 0
         self.num_candidates = 0
         self.rebuilds = 0
@@ -201,7 +207,7 @@ class SkinNeighbourList:
         # this permutation.
         if self.sort_receivers and len(receiver) > 1:
             if self.sender_groups is not None:  # by receiver, then sender group (stable)
-                order = np.lexsort((self.sender_groups[sender], receiver))
+                order = np.lexsort((self.sender_groups.cpu().numpy()[sender], receiver))
             else:
                 order = np.argsort(receiver, kind="stable")
             sender = sender[order]
@@ -245,9 +251,8 @@ class SkinNeighbourList:
         pad_unit = torch.as_tensor(self._pad_unit_shift, dtype=torch.float64, device=device)
         self._device_constants = {
             "images": images,
-            "groups": (None if self.sender_groups is None else
-                       torch.as_tensor(self.sender_groups, dtype=torch.int64, device=device)),
-            "group_count": 1 if self.sender_groups is None else int(self.sender_groups.max()) + 1,
+            "groups": None if self.sender_groups is None else self.sender_groups.to(device),
+            "group_count": self.group_count,
             "cell": cell,
             "inverse": torch.as_tensor(np.linalg.inv(self.cell), dtype=torch.float64, device=device),
             "image_vectors": times_3x3(images, cell),

@@ -137,22 +137,35 @@ class FirstInteractionReassociation(torch.nn.Module):
         m[i, l, m, u] = gamma_l sum_z x[z, u] sum_k W[path(l) C + u, k] S[i, z, k, (l, m)],
         S[i, z, k, (l, m)] = sum over edges j -> i with species(j) = z of a[e, k] Y[e, (l, m)].
     gamma_l and the output layout are measured from the model's own convolution.
-    ``columns`` are the node_attrs columns of the structure's species.
+    ``columns`` are the node_attrs columns of the species superset (SPEC §8.5), present or not.
+    ``species_feats`` is x: the [S, C] table of the first interaction's sender features after
+    ``linear_up``, one row per superset column, from the identity basis (``identity_species_feats``),
+    never from the atoms present. A force field binds its own table before every call (a model may
+    be shared); the forward does not read ``node_feats``.
     """
 
-    def __init__(self, columns, channels, ls, gammas, ir_mul, segmented=False):
+    def __init__(self, columns, channels, ls, gammas, ir_mul, segmented=False, species_feats=None):
         super().__init__()
         self.register_buffer("columns", columns)
+        self.register_buffer("species_feats", species_feats, persistent=False)
         self.segmented = bool(segmented)  # segmented_first_sum
         self.channels = int(channels)
         self.ls = tuple(int(l) for l in ls)  # noqa: E741
         self.gammas = tuple(float(g) for g in gammas)
         self.ir_mul = bool(ir_mul)
 
+    def bind(self, species_feats):
+        """Point the forward at ``species_feats`` (a host-side pointer swap; captured graphs keep their address)."""
+        if self._buffers.get("species_feats") is not species_feats:
+            self.register_buffer("species_feats", species_feats, persistent=False)
+
     def forward(self, node_feats, node_attrs, edge_attrs, augmented, edge_index, weight):
         onehot = node_attrs[:, self.columns]
         species = onehot.argmax(dim=1)
-        x = node_feats[onehot.argmax(dim=0)]  # first atom of each species
+        x = self.species_feats  # identity basis of the superset (SPEC §8.5), not the first atom of each species
+        if x is None:
+            raise RuntimeError("FirstInteractionReassociation has no species_feats table: bind one "
+                               "(identity_species_feats) before calling it")
         nodes, slots = onehot.shape
         width, dim = augmented.shape[1], edge_attrs.shape[1]
         key = edge_index[1] * slots + species[edge_index[0]]
@@ -173,6 +186,37 @@ class FirstInteractionReassociation(torch.nn.Module):
             blocks.append(block.reshape(nodes, size * c))
             start += size
         return torch.cat(blocks, dim=1)
+
+
+def identity_attrs(columns, width, rows, dtype, device):
+    """The identity basis of the superset ``columns`` as one-hot node attributes, [max(rows, S), width].
+
+    Row s < S is the one-hot row of column ``columns[s]``; the rest are zero. ``rows`` is the
+    structure's atom count: ``identity_species_feats`` evaluates the basis in a batch of the model's own
+    row count (see there).
+    """
+    columns = torch.as_tensor(columns, dtype=torch.int64).cpu()
+    attrs = torch.zeros((max(int(rows), len(columns)), int(width)), dtype=dtype)
+    attrs[torch.arange(len(columns)), columns] = 1
+    return attrs.to(device)
+
+
+def identity_species_feats(model, interaction, attrs, count, joint=None):
+    """x of ``FirstInteractionReassociation``: [count, C] sender features of the superset species.
+
+    ``model.node_embedding`` of the identity basis ``attrs`` (``identity_attrs``), plus the per-graph
+    joint embedding when the model has one (OMOL-0: ``joint`` is ``(batch, features)``, the zero graph
+    index of every row and the structure's total charge and spin), then the first interaction's
+    ``linear_up``; the first ``count`` rows. The batch has the row count of the model's own call: the
+    GEMMs' row values depend on the row count but not on a row's position, so a present species gets
+    bitwise the features its atoms have in the model (CPU float64, plan task 3-T02). No gradient: in the
+    model these features are the species embedding, which does not depend on the positions.
+    """
+    with torch.no_grad():
+        feats = model.node_embedding(attrs)
+        if joint is not None and hasattr(model, "joint_embedding"):
+            feats = feats + model.joint_embedding(*joint)  # MACE: node_feats += joint_embedding(...)
+        return interaction.linear_up(feats)[:count]
 
 
 def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, edge_index,
@@ -362,5 +406,6 @@ def probe_first_tensor_product(interaction):
 
 __all__ = [
     "FactoredRadialMLP", "FirstInteractionReassociation", "ProjectedEmbedding", "attach_streaming_kernels",
-    "cutoff_folded_forward", "probe_first_tensor_product", "streaming_message",
+    "cutoff_folded_forward", "identity_attrs", "identity_species_feats", "probe_first_tensor_product",
+    "streaming_message",
 ]
