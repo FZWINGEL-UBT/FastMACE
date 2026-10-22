@@ -22,10 +22,38 @@ fastmace() {
     "$python" -m fastmace.cli "$@" 2>&1 | tee -a "$log"
 }
 
+# The config fastmace run reads: the TOML itself where $python reads TOML (tomllib, tomli), else the same
+# mapping as YAML (JSON is YAML; fastmace run reads .yaml with safe_load), converted by a Python >= 3.11.
+# A shipped protocol name becomes its file; its relative structure path is a file shipped with it.
+config_for() {
+    local source="$1" out="$2" data="$checkout/fastmace/protocols/data"
+    [ -f "$source" ] || source="$data/$source.toml"
+    if "$python" -c "import tomllib" 2>/dev/null || "$python" -c "import tomli" 2>/dev/null; then
+        if [ "$(dirname "$(realpath "$source")")" = "$(realpath "$data")" ]; then
+            echo "$(basename "$source" .toml)"
+        else
+            echo "$source"
+        fi
+        return
+    fi
+    python3 - "$source" "$out.yaml" "$data" <<'PY'
+import json, os, sys, tomllib
+source, out, data = sys.argv[1:]
+with open(source, "rb") as handle:
+    config = tomllib.load(handle)
+shipped = os.path.realpath(os.path.dirname(source)) == os.path.realpath(data)
+if shipped and "structure" in config and not os.path.isabs(config["structure"]):
+    config["structure"] = os.path.join(data, config["structure"])
+with open(out, "w") as handle:
+    json.dump(config, handle, indent=1)
+PY
+    echo "$out.yaml"
+}
+
 case "$1" in
     start)
         mkdir -p "$(dirname "$2")"
-        fastmace "$2.pieces.log" run "$3" --output "$2" --steps "$4"
+        fastmace "$2.pieces.log" run "$(config_for "$3" "$2.protocol")" --output "$2" --steps "$4"
         ;;
     resume)
         fastmace "$2.pieces.log" run --resume "$2" --steps "$3"
@@ -34,7 +62,7 @@ case "$1" in
         config="$2.smoke.toml"
         mkdir -p "$(dirname "$2")"
         { echo "structure = \"$checkout/fastmace/protocols/data/NaNbOCl4_I4m_Ma2026.cif\""; cat "$here/smoke.toml"; } >"$config"
-        fastmace "$2.pieces.log" run "$config" --output "$2" --steps 3000
+        fastmace "$2.pieces.log" run "$(config_for "$config" "$2.smoke")" --output "$2" --steps 3000
         fastmace "$2.pieces.log" run --resume "$2"
         ;;
     *)
