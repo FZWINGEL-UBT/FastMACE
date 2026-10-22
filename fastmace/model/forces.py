@@ -756,10 +756,19 @@ class MACEForceField:
         force path's (SPEC §7.3). A copy that follows another force field (``follow``) first reads
         that force field's compacted edges and cell.
         """
+        import contextlib
+
         import torch
 
+        from fastmace.rewrites import engine as engine_rewrites
+
         self._bind_streaming_count()
-        with torch.no_grad():
+        # A copy in another precision runs under its own default dtype: MACE (and the capture-safe
+        # mask_head) make tensors in torch's process-wide default dtype, which the force field it
+        # follows set when its model was loaded (host side only; captured graphs do not read it).
+        scope = (engine_rewrites._default_dtype(self._dtype)
+                 if self._leader is not None and torch.get_default_dtype() != self._dtype else contextlib.nullcontext())
+        with torch.no_grad(), scope:
             if self._leader is not None:
                 self._read_leader()
             self.positions.copy_(positions)

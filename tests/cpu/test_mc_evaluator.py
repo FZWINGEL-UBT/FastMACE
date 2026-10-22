@@ -441,3 +441,49 @@ def test_evaluator_on_the_compiled_tier_equals_eager():
     expected = field(calculator(model64("mh1")), moved).energy_only(positions_of(moved))
     assert not evaluator.info()["captured"]
     np.testing.assert_allclose(evaluator.baseline().numpy(), expected.numpy(), rtol=1e-12, atol=0)
+
+
+def test_float64_model_keeps_the_process_default_dtype():
+    """MACE's calculator sets torch's default dtype to the loaded model's; the engine's float32 model reads it
+    in its recompiles (found by the 3-T07 timing run: an Inductor recompile mixed double and float)."""
+    from fastmace.config import EngineConfig, PrecisionConfig
+    from fastmace.mc.evaluator import float64_model
+
+    class Loader:
+        def execution_model(self, plan):
+            torch.set_default_dtype(torch.float64)  # as MACECalculator(default_dtype="float64")
+            return plan
+
+    @dataclasses.dataclass(frozen=True)
+    class Plan:
+        engine: EngineConfig
+        precision: PrecisionConfig
+
+    plan = Plan(EngineConfig(backend="cueq"), PrecisionConfig(dtype="float32"))
+    saved = torch.get_default_dtype()
+    try:
+        torch.set_default_dtype(torch.float32)
+        got = float64_model(Loader(), plan, backend="hybrid")
+        assert torch.get_default_dtype() == torch.float32
+        assert got.precision.dtype == "float64" and got.engine.backend == "hybrid"
+    finally:
+        torch.set_default_dtype(saved)
+
+
+def test_float64_copy_evaluates_under_its_own_default_dtype():
+    from fastmace.mc.evaluator import float64_copy
+
+    atoms = structure("mh1")
+    positions = positions_of(atoms)
+    saved = torch.get_default_dtype()
+    try:
+        torch.set_default_dtype(torch.float64)
+        reference = field(calculator(model64("mh1")), atoms).energy_only(positions)
+        leader = float32_field("mh1", atoms)
+        copy64 = float64_copy(leader, calculator(model64("mh1")))
+        torch.set_default_dtype(torch.float32)  # the float32 engine's process default
+        got = copy64.energy_only(positions)
+        assert torch.get_default_dtype() == torch.float32
+    finally:
+        torch.set_default_dtype(saved)
+    np.testing.assert_allclose(got.numpy(), reference.numpy(), rtol=1e-13, atol=0)

@@ -38,9 +38,17 @@ def float64_model(force_field, plan, backend=None):
     """
     import dataclasses
 
+    import torch
+
     engine = plan.engine if backend is None else dataclasses.replace(plan.engine, backend=backend)
-    return force_field.execution_model(dataclasses.replace(
-        plan, engine=engine, precision=dataclasses.replace(plan.precision, dtype="float64")))
+    # MACE's calculator sets torch's process-wide default dtype to the model's; the engine's force
+    # field keeps reading the one it was loaded with (its recompiles and mask_head use it).
+    saved = torch.get_default_dtype()
+    try:
+        return force_field.execution_model(dataclasses.replace(
+            plan, engine=engine, precision=dataclasses.replace(plan.precision, dtype="float64")))
+    finally:
+        torch.set_default_dtype(saved)
 
 
 def float64_copy(force_field, model, *, neighbours=None, polar=None, check=True):
