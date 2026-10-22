@@ -481,6 +481,13 @@ class _Dynamics:
 
             frame.set_cell(values["cell"])
             extra["stress"] = full_3x3_to_voigt_6_stress(values["stress"])
+        if "numbers" in values:  # the frame's species and masses, after a composition change (3-T15)
+            import numpy as np
+
+            if not np.array_equal(frame.numbers, values["numbers"]):
+                frame.numbers = values["numbers"]
+            if not np.array_equal(frame.get_masses(), values["masses"]):
+                frame.set_masses(values["masses"])
         frame.set_positions(values["positions"])
         frame.set_momenta(values["momenta"])
         frame.calc = SinglePointCalculator(frame, energy=float(values["energy"][0]), forces=values["forces"],

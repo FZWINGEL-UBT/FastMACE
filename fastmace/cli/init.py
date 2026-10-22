@@ -45,8 +45,8 @@ SCALARS = (
     ("cell_mode", "", '"hydrostatic"'),
     ("timestep_fs", "Timestep in fs.", "0.5"),
     ("steps", "Number of steps; optional with a schedule (then the whole schedule).", "1000000"),
-    ("min_mc_temperature_K", "MC (phase 3; checked, then refused): the lowest MC temperature, required with a "
-                             "schedule.", "300.0"),
+    ("min_mc_temperature_K", "MC: the lowest MC temperature, required with a schedule (MC runs only at or "
+                             "above it).", "300.0"),
     ("repeat", "Supercell repeats; the cell is never expanded silently.", "[1, 1, 1]"),
     ("dispersion", "\"d3bj\": the D3(BJ) record of the head's training functional, refused until phase 3b;\n"
                    "# a full record is the [dispersion] table below.", '"d3bj"'),
@@ -70,8 +70,9 @@ TABLES = (
     ("A full D3 record (the fields of fm.D3); its functional should be the model's training functional.",
      ("[dispersion]", 'functional = "r2scan"', "pair_cutoff_bohr = 40.0", "cn_cutoff_bohr = 40.0",
       "three_body = false")),
-    ("MC moves, one [[mc]] table each: phase 3 (fm.md checks them, then refuses).",
-     ("[[mc]]", 'move = "swap"')),
+    ("MC moves, one [[mc]] table each (the fields of fm.mc.Swap, Transmute or Displace; experimental).",
+     ("[[mc]]", 'move = "swap"', 'pairs = [["Na", "Cl"]]', "every = 100", "attempts = 50",
+      'velocities = "exchange"')),
     ("Output with its intervals (the fields of fm.Output).",
      ("[output]", 'directory = "run/"', "trajectory_every = 20", "thermo_every = 20", "restart_every = 10000")),
     ("Planner options (the fields of fastmace.config.EngineConfig and NeighbourConfig); without them the\n"

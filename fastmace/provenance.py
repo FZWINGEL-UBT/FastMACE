@@ -484,12 +484,15 @@ CHECKPOINT_KEYS = ("path", "sha256", "head", "licence", "label", "trust")
 # persistent worker serves many calls), ``persistent`` is ``RunnerConfig.persistent``.
 SUBPROCESS_KEYS = ("python", "reason", "directory", "children", "calls", "persistent", "seconds", "failed", "last")
 SUBPROCESS_CHILD_KEYS = ("action", "stage", "pid", "exit_code", "seconds", "steps")
-# Counters the caller fills, and those a later phase fills (tier switches: phase 5, §9.6; MC: phase 3).
-COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone")
+# Counters the caller fills, and those a later phase fills (tier switches: phase 5, §9.6).
+COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone", "mc")
 # Counters the engine's info() carries (the graph engine's re-capture policy and overflow redos, 3-T04),
 # taken from it when the caller gives none.
 ENGINE_COUNTER_KEYS = ("recaptures", "overflows_redone")
-LATER_COUNTER_KEYS = ("tier_switches", "mc")
+LATER_COUNTER_KEYS = ("tier_switches",)
+# counters.mc (3-T15): per move type the driver's cumulative counts (io.restart.MC_COUNTER_KEYS), and for
+# displacements also the trial neighbour-list rebuilds (3-T10); null when no move set was ever attached.
+MC_TRIAL_REBUILDS = "trial_rebuilds"
 # A restart point: its step and the output chunk indices of io.restart.OUTPUT_KEYS (1b-T06).
 RESTART_POINT_KEYS = ("step", "output_chunk", "output_rows", "output_frames")
 # Arrays up to this size (a 3x3 tensor) go in as lists; anything larger is a state or a batch.
@@ -759,15 +762,36 @@ def _counters(counters, engine_info):
     given = dict(counters or {})
     for key in given:
         if key in LATER_COUNTER_KEYS:
-            raise ValueError(f"counters: {key!r} is filled by a later phase (tier switches: phase 5, MC: phase 3)")
+            raise ValueError(f"counters: {key!r} is filled by a later phase (tier switches: phase 5)")
         if key not in COUNTER_KEYS:
-            raise ValueError(f"counters: unknown key {key!r}; 1b records {COUNTER_KEYS}")
+            raise ValueError(f"counters: unknown key {key!r}; this FastMACE records {COUNTER_KEYS}")
+    if given.get("mc") is not None:
+        given["mc"] = _mc_counters(given["mc"])
     for key in ENGINE_COUNTER_KEYS:
         if given.get(key) is None and isinstance(engine_info, Mapping) and engine_info.get(key) is not None:
             given[key] = engine_info[key]
     out = {key: _plain(given.get(key), f"counters.{key}") for key in COUNTER_KEYS}
     out.update(dict.fromkeys(LATER_COUNTER_KEYS))
     out["engine"] = None if engine_info is None else _plain(engine_info, "counters.engine")
+    return out
+
+
+def _mc_counters(counters):
+    """``counters.mc``: ``{move: {attempted, impossible, accepted}}``, plus ``trial_rebuilds`` for displacements."""
+    from fastmace.io.restart import MC_COUNTER_KEYS
+    from fastmace.planner.workload import MC_MOVES
+
+    if not isinstance(counters, Mapping):
+        raise ValueError(f"counters.mc must be a mapping move type -> counts, got {type(counters).__name__}")
+    out = {}
+    for move, counts in counters.items():
+        if move not in MC_MOVES:
+            raise ValueError(f"counters.mc: unknown move type {move!r}; known: {MC_MOVES}")
+        keys = MC_COUNTER_KEYS + ((MC_TRIAL_REBUILDS,) if move == "displace" else ())
+        if not isinstance(counts, Mapping) or set(counts) - set(keys) or set(MC_COUNTER_KEYS) - set(counts):
+            raise ValueError(f"counters.mc[{move!r}] must have the keys {keys} ({MC_TRIAL_REBUILDS} for displacements "
+                             f"only), got {counts!r}")
+        out[move] = {key: int(counts[key]) for key in keys if key in counts}
     return out
 
 

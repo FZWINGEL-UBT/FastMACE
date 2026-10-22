@@ -11,8 +11,9 @@ records in Python are TOML values or tables:
 - ``integrator``: a table with ``type = "Langevin"`` or ``"LangevinBAOAB"`` and the record's
   fields (``fm.integrators``); ``friction_per_fs`` defaults to ``fm.md``'s friction;
 - ``dispersion``: ``"none"``, ``"d3bj"`` or a ``[dispersion]`` table of ``fm.D3`` fields;
-- ``mc``: one ``[mc]`` table or ``[[mc]]`` tables, each with ``move`` (checked, then refused
-  until phase 3);
+- ``mc``: one ``[mc]`` table or ``[[mc]]`` tables, each an ``fm.mc`` record: ``move`` (``"swap"``,
+  ``"transmute"`` or ``"displace"``) and that record's fields (``pairs``, ``species``, ``delta_A``,
+  ``every``, ``attempts``, ``velocities``, ``mu``, ``formal_charges``, ``adaptive``);
 - ``output``: a directory or an ``[output]`` table of ``fm.Output`` fields;
 - ``repeat``: an array of three ints.
 """
@@ -20,7 +21,6 @@ records in Python are TOML values or tables:
 import dataclasses
 import inspect
 import sys
-import types
 from pathlib import Path
 
 from fastmace.cli.md import run_md, usage_error
@@ -107,10 +107,12 @@ def _mc(value):
     blocks = [value] if isinstance(value, dict) else value
     if not isinstance(blocks, list) or not all(isinstance(block, dict) for block in blocks):
         raise ValueError(f"mc must be [mc] or [[mc]] tables, got {value!r}")
+    from fastmace.simulation import move_from_record
+
     for block in blocks:
         if "move" not in block:
             raise ValueError(f"every mc table needs move = ..., got {block!r}")
-    return tuple(types.SimpleNamespace(**block) for block in blocks)
+    return tuple(move_from_record(block) for block in blocks)
 
 
 def _output(value):
