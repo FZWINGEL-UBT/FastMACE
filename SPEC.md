@@ -199,7 +199,8 @@ rewrites it cannot verify.
 | ASE | 3.27.0 | ≥ 3.23 |
 | graph-longrange | 0.4.0 (MACE 0.3.16 calls this interface) | extra `[polar]`, pinned per MACE version |
 | Triton | as shipped with torch | as shipped with torch |
-| torch-dftd | 0.5.1 | extra `[d3]`: the `torch-dftd` reference (§12.1) and the ASE front end; not needed by the native GPU D3 path (§11.2) |
+| torch-dftd | 0.5.1 | extra `[d3]`: the `torch-dftd` reference (§12.1) and the ASE front end; not needed by the native GPU D3 path (§11.2), which ships the same reference tables (§14) |
+| simple-dftd3 (`dftd3`) | 1.6.0 | extra `[d3-reference]`, with `torch-dftd`: the second D3 reference of the cross-check tests (§11.2); not in `[full]` |
 | OEq host toolchain (fallback build only) | GCC 11.4, ninja, CUDA runtime header wheels (`cuda.h`, `nvrtc.h`, CCCL) | not needed with the prebuilt extension wheels of §14; documented for the fallback build |
 
 ### 4.2 Hardware
@@ -1864,8 +1865,14 @@ the ASE path. Implement D3 inside the force field:
   hard-codes `d3_autoang = 0.52917726` and `d3_autoev = 27.21138505`, which
   differ from ASE's `Bohr` and `Hartree` by about 1e-7 relative. The
   constants are recorded with the parameters. (`mace_mp` passes
-  `cutoff = 40 * ase.units.Bohr`, which `torch-dftd` converts back with its
-  own constant: 39.9999963 bohr.)
+  `cutoff = 40 * ase.units.Bohr` in Å. `torch-dftd` selects its pairs in Å,
+  so they stop at 39.9999963 bohr in its own units, while its masks convert
+  the cutoffs with ASE's `Bohr`, exactly 40. FastMACE's reference wrappers
+  pass 40 × `d3_autoang` Å, so pairs and coordination numbers both stop at
+  exactly 40 bohr (3b-T01). simple-dftd3 1.6.0 agrees with `torch-dftd` on
+  the same numbers to 2.2e-8 relative in energy, 4.2e-10 eV/Å in forces
+  (r2scan; 2.6e-9 with pbe) and 1.5e-10 eV/Å³ in stress; tad-dftd3 0.7.0 has no periodic boundaries and
+  is not a reference.)
 - **Stress** included; the D3 list's build state follows the canonical
   restart points (§10.6).
 
@@ -2111,11 +2118,14 @@ This is today's provenance block, made complete and schema-versioned.
   release; the import name and CLI follow.
 - **Licence:** MIT (compatible with MACE; owner decision 4, 17 October
   2026). Vendored OEq kernels keep their
-  BSD-3 licence and notice. The cuEquivariance ops wheels are NVIDIA-licensed:
+  BSD-3 licence and notice. The native D3 path's reference tables
+  (`dftd3_params.npz`, byte-identical to `torch-dftd` 0.5.1's, whose sha256
+  the identity records) keep `torch-dftd`'s MIT licence and notice; whether
+  the release may ship them is checked in phase 6. The cuEquivariance ops wheels are NVIDIA-licensed:
   depend on them, do not vendor them. Model weights are never redistributed;
   `fm.load` downloads from official sources and shows the model licence.
 - **Extras:** `fastmace[oeq]`, `fastmace[polar]` (graph-longrange pinned per
-  MACE version), `fastmace[d3]` (the `torch-dftd` reference and the ASE front end; the native D3 path does not need it), `fastmace[dev]`,
+  MACE version), `fastmace[d3]` (the `torch-dftd` reference and the ASE front end; the native D3 path does not need it), `fastmace[d3-reference]` (`torch-dftd` and simple-dftd3 for the D3 cross-check tests; not in `[full]`), `fastmace[dev]`,
   and `fastmace[full]`, the union of `[oeq]`, `[polar]` and `[d3]` (no
   packages of its own). The quick start uses `pip install "fastmace[full]"`
   then `fastmace doctor`. Until the prebuilt OEq wheels exist (phase 6),

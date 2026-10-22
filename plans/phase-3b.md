@@ -99,7 +99,9 @@ follow in the next section.
    Grimme's maintained program and satisfies §11.2's "the `dftd3` program".
    - If its wheel doesn't install cleanly, it is built with cmake and
      gfortran (both installed in WSL).
-   - `tad-dftd3` 0.7.0 (pip) is an optional third cross-check.
+   - `tad-dftd3` 0.7.0 (pip) was meant as an optional third cross-check,
+     but it has no periodic boundaries. It is installed and not used
+     (3b-T01).
    - All three go into local `mace_cueq_latest`, under the local package
      rule.
 2. **Explicit numbers in `fm.D3`:** s6 = 1, s8 = 0.7898, a1 = 0.4948,
@@ -302,9 +304,11 @@ Merge orders where files overlap:
   - One Triton program per atom over a CSR, with float64 register sums and
     no atomics. It is deterministic, and the sums over atoms use a fixed
     order.
-  - The tables come from torch-dftd's `dftd3_params.npz` (the `[d3]`
-    extra), with their sha256 in the identity. Vendoring them is a
-    phase 6 licence question.
+  - The tables ship with FastMACE as package data, byte-identical to
+    torch-dftd 0.5.1's `dftd3_params.npz` (sha256 in the identity), with
+    torch-dftd's MIT notice. So the native path needs no `[d3]` extra
+    (SPEC §4.1, §14). Whether the release may ship them is checked in
+    phase 6.
   - Tolerances follow the 3b-T10 runbook's item 1.
   - New: a torch CPU tier (float64) for CPU devices and the CPU suite, which
     also serves as the kernel's oracle.
