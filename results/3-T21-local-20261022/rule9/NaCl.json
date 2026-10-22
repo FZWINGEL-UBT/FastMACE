@@ -1,0 +1,93 @@
+{
+ "task": "3-T06",
+ "tool": "tools/ab_host_callbacks.py",
+ "date": "2026-10-22T13:10:36.406614+00:00",
+ "label": "mh1-r2scan",
+ "structure": "NaCl",
+ "repeat": [
+  3,
+  3,
+  3
+ ],
+ "atoms": 216,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "tiers": {
+  "graph": "graph",
+  "compiled": "compiled"
+ },
+ "setup_s": {
+  "graph": 35.05019158399955,
+  "compiled": 25.13286513800267
+ },
+ "timestep_fs": 1.0,
+ "temperature_K": 300.0,
+ "rows": [
+  {
+   "every": 1,
+   "steps_per_block": 100,
+   "ms_per_step": {
+    "graph": 3.7278458700166084,
+    "compiled": 15.801205900061177
+   },
+   "relative_spread": {
+    "graph": 0.0,
+    "compiled": 0.0
+   },
+   "compiled_over_graph": 4.238696140082309,
+   "blocks": {
+    "graph": [
+     3.7278458700166084
+    ],
+    "compiled": [
+     15.801205900061177
+    ]
+   }
+  },
+  {
+   "every": 5,
+   "steps_per_block": 100,
+   "ms_per_step": {
+    "graph": 3.009094360022573,
+    "compiled": 15.939843130036024
+   },
+   "relative_spread": {
+    "graph": 0.0,
+    "compiled": 0.0
+   },
+   "compiled_over_graph": 5.297222759713142,
+   "blocks": {
+    "graph": [
+     3.009094360022573
+    ],
+    "compiled": [
+     15.939843130036024
+    ]
+   }
+  },
+  {
+   "every": 10,
+   "steps_per_block": 100,
+   "ms_per_step": {
+    "graph": 2.9376980300003197,
+    "compiled": 15.214568369992776
+   },
+   "relative_spread": {
+    "graph": 0.0,
+    "compiled": 0.0
+   },
+   "compiled_over_graph": 5.17907838539522,
+   "blocks": {
+    "graph": [
+     2.9376980300003197
+    ],
+    "compiled": [
+     15.214568369992776
+    ]
+   }
+  }
+ ]
+}

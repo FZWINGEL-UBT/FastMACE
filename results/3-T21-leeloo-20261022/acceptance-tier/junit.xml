@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="7" skipped="0" tests="26" time="8099.926" timestamp="2026-10-22T13:57:53.448343+02:00" hostname="leeloo"><testcase classname="tests.gpu.test_ase_equivalence_gpu" name="test_langevin_reproduces_ase_in_every_50_K_bin" time="929.748" /><testcase classname="tests.gpu.test_ase_equivalence_gpu" name="test_baoab_variants_reproduce_their_references" time="976.974" /><testcase classname="tests.gpu.test_canonical_restart_gpu" name="test_mh1_hybrid_resumes_statistically" time="364.819" /><testcase classname="tests.gpu.test_engine_gpu" name="test_mh1_plain_cueq_float64_against_the_research_engine" time="413.844"><failure message="AssertionError: {'C': (23, 23, True), 'AC': (8, 64, False), &quot;('B', 7168)&quot;: (235, 234, False)}&#10;assert False&#10; +  where False = all(&lt;generator object test_mh1_plain_cueq_float64_against_the_research_engine.&lt;locals&gt;.&lt;genexpr&gt; at 0x74e1b11069d0&gt;)">@pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_mh1_baseline
+    def test_mh1_plain_cueq_float64_against_the_research_engine():
+        ours = fastmace_run(spec("cueq", modes=[("eager", 200), ("checked", 500), ("repeat", 500), ("pipelined", 500),
+                                                ("speculative", 200)], warmups=True))
+        theirs = baseline_run(spec("cueq", modes=[("checked", 500), ("repeat", 500), ("pipelined", 500)]))
+        modes, base = ours["modes"], theirs["modes"]
+        checked, pipelined = modes["checked"], modes["pipelined"]
+        summary = {
+            "replay_vs_eager_200": deviation(checked["positions"], modes["eager"]["positions"], 4),
+            "fastmace_repeat_500": deviation(modes["repeat"]["positions"], checked["positions"]),
+            "baseline_repeat_500": deviation(base["repeat"]["positions"], base["checked"]["positions"]),
+            "pipelined_vs_checked_500": deviation(pipelined["positions"], checked["positions"]),
+            "speculative_vs_pipelined_200": deviation(modes["speculative"]["positions"], pipelined["positions"], 4),
+            "baseline_checked_500": deviation(checked["positions"], base["checked"]["positions"]),
+            "baseline_pipelined_500": deviation(pipelined["positions"], base["pipelined"]["positions"]),
+            "kernels": {mode: same_kernels(modes[mode]["kinds"], base[mode]["kinds"]) for mode in ("checked", "pipelined")},
+            "ms_per_step": {mode: {"fastmace": modes[mode]["ms_per_step"], "baseline": base[mode]["ms_per_step"]}
+                            for mode in ("checked", "pipelined")},
+            "info": {mode: out["info"] for mode, out in modes.items()},
+            "baseline_edge_sizes": {mode: out["edge_sizes_used"] for mode, out in base.items()},
+            "baseline_builds": {mode: out["rebuilds"] for mode, out in base.items()},
+            "warmups": ours["warmups"], "allocator": [ours["allocator"], theirs["allocator"]], "torch": ours["torch"],
+        }
+        report("1a-T13-mh1-cueq-float64-nvt", summary)
+        assert checked["info"]["neighbour_rebuilds"] &gt;= 1
+        for name in ("replay_vs_eager_200", "fastmace_repeat_500", "pipelined_vs_checked_500",
+                     "speculative_vs_pipelined_200", "baseline_checked_500", "baseline_pipelined_500"):
+            assert summary[name] &lt;= FLOAT64_LIMIT, (name, summary[name])
+        assert all(out["async_equal"] for out in modes.values())
+        assert not any(ours["warmups"].values()), ours["warmups"]
+        for mode in ("checked", "pipelined"):
+            assert modes[mode]["info"]["edge_sizes_used"] == base[mode]["edge_sizes_used"]
+            # The baseline counts the force field's first build too.
+            assert modes[mode]["info"]["neighbour_rebuilds"] + 1 == base[mode]["rebuilds"]
+&gt;           assert all(equal for _, _, equal in summary["kernels"][mode].values()), summary["kernels"][mode]
+E           AssertionError: {'C': (23, 23, True), 'AC': (8, 64, False), "('B', 7168)": (235, 234, False)}
+E           assert False
+E            +  where False = all(&lt;generator object test_mh1_plain_cueq_float64_against_the_research_engine.&lt;locals&gt;.&lt;genexpr&gt; at 0x74e1b11069d0&gt;)
+
+tests/gpu/test_engine_gpu.py:619: AssertionError</failure></testcase><testcase classname="tests.gpu.test_engine_gpu" name="test_mh1_plain_cueq_float64_npt_against_the_research_engine" time="308.962"><failure message="AssertionError: {'C': (28, 28, True), 'AC': (229, 229, True), &quot;('B', 7168)&quot;: (293, 292, False)}&#10;assert False&#10; +  where False = all(&lt;generator object test_mh1_plain_cueq_float64_npt_against_the_research_engine.&lt;locals&gt;.&lt;genexpr&gt; at 0x74e0f1e97140&gt;)">@pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_mh1_baseline
+    def test_mh1_plain_cueq_float64_npt_against_the_research_engine():
+        options = spec("cueq", ensemble="npt", modes=[("checked", 500), ("pipelined", 500)])
+        ours = fastmace_run(options)
+        theirs = baseline_run(options)
+        modes, base = ours["modes"], theirs["modes"]
+        summary = {mode: {"baseline_500": deviation(modes[mode]["positions"], base[mode]["positions"]),
+                          "kernels": same_kernels(modes[mode]["kinds"], base[mode]["kinds"]),
+                          "ms_per_step": [modes[mode]["ms_per_step"], base[mode]["ms_per_step"]],
+                          "builds": [modes[mode]["info"]["neighbour_rebuilds"] + 1, base[mode]["rebuilds"]],
+                          "edge_sizes": [modes[mode]["info"]["edge_sizes_used"], base[mode]["edge_sizes_used"]]}
+                   for mode in ("checked", "pipelined")}
+        summary["pipelined_vs_checked_500"] = deviation(modes["pipelined"]["positions"], modes["checked"]["positions"])
+        report("1a-T13-mh1-cueq-float64-npt", summary)
+        assert all(out["async_equal"] for out in modes.values())
+        assert summary["pipelined_vs_checked_500"] &lt;= FLOAT64_LIMIT
+        for mode in ("checked", "pipelined"):
+            assert summary[mode]["baseline_500"] &lt;= FLOAT64_LIMIT, (mode, summary[mode])
+&gt;           assert all(equal for _, _, equal in summary[mode]["kernels"].values()), summary[mode]["kernels"]
+E           AssertionError: {'C': (28, 28, True), 'AC': (229, 229, True), "('B', 7168)": (293, 292, False)}
+E           assert False
+E            +  where False = all(&lt;generator object test_mh1_plain_cueq_float64_npt_against_the_research_engine.&lt;locals&gt;.&lt;genexpr&gt; at 0x74e0f1e97140&gt;)
+
+tests/gpu/test_engine_gpu.py:642: AssertionError</failure></testcase><testcase classname="tests.gpu.test_engine_gpu" name="test_mh1_hybrid_float32_against_the_research_engine" time="234.516"><failure message="AssertionError: {'C': (23, 23, True), 'AC': (8, 64, False), &quot;('B', 7168)&quot;: (292, 293, False)}&#10;assert False&#10; +  where False = all(&lt;generator object test_mh1_hybrid_float32_against_the_research_engine.&lt;locals&gt;.&lt;genexpr&gt; at 0x74e0f1c1f8b0&gt;)">@pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_oeq
+    @needs_mh1_baseline
+    def test_mh1_hybrid_float32_against_the_research_engine():
+        ours = fastmace_run(spec("hybrid", modes=[("eager", 200), ("checked", 500), ("repeat", 500), ("pipelined", 500),
+                                                  ("speculative", 200)], warmups=True), python=HYBRID_PYTHON)
+        first = baseline_run(spec("hybrid", modes=[("checked", 500)]), python=HYBRID_PYTHON)
+        second = baseline_run(spec("hybrid", modes=[("checked", 500)]), python=HYBRID_PYTHON)
+        modes = ours["modes"]
+        reference = first["modes"]["checked"]["positions"]
+        scatter = deviation(second["modes"]["checked"]["positions"], reference)
+        summary = {
+            "replay_vs_eager_200": deviation(modes["checked"]["positions"], modes["eager"]["positions"], 4),
+            "fastmace_repeat_500": deviation(modes["repeat"]["positions"], modes["checked"]["positions"]),
+            "pipelined_vs_checked_500": deviation(modes["pipelined"]["positions"], modes["checked"]["positions"]),
+            "speculative_vs_pipelined_200": deviation(modes["speculative"]["positions"], modes["pipelined"]["positions"],
+                                                      4),
+            "baseline_scatter_500": scatter,
+            "baseline_checked_500": deviation(modes["checked"]["positions"], reference),
+            "baseline_scatter_per_record": [deviation([a], [b]) for a, b in
+                                            zip(second["modes"]["checked"]["positions"], reference)],
+            "fastmace_per_record": [deviation([a], [b]) for a, b in zip(modes["checked"]["positions"], reference)],
+            "kernels": same_kernels(modes["checked"]["kinds"], first["modes"]["checked"]["kinds"]),
+            "ms_per_step": {"fastmace": {mode: out["ms_per_step"] for mode, out in modes.items()},
+                            "baseline": [first["modes"]["checked"]["ms_per_step"],
+                                         second["modes"]["checked"]["ms_per_step"]]},
+            "info": {mode: out["info"] for mode, out in modes.items()},
+            "baseline_builds": [first["modes"]["checked"]["rebuilds"], second["modes"]["checked"]["rebuilds"]],
+            "streaming": modes["checked"]["force_field"]["streaming_interactions"], "warmups": ours["warmups"],
+        }
+        report("1a-T13-mh1-hybrid-float32-nvt", summary)
+        assert summary["streaming"] &gt; 0 and modes["checked"]["info"]["neighbour_rebuilds"] &gt;= 1
+        assert all(out["async_equal"] for out in modes.values())
+        assert not any(ours["warmups"].values()), ours["warmups"]
+        # Statistical: float32 rounding differs between eager and compiled-graph kernels and between runs;
+        # trajectories from one seed stay within the run-to-run scatter of the research engine.
+        limit = max(3 * scatter, 1e-6)
+        for name in ("replay_vs_eager_200", "fastmace_repeat_500", "pipelined_vs_checked_500",
+                     "speculative_vs_pipelined_200", "baseline_checked_500"):
+            assert summary[name] &lt;= limit, (name, summary[name], limit)
+&gt;       assert all(equal for _, _, equal in summary["kernels"].values()), summary["kernels"]
+E       AssertionError: {'C': (23, 23, True), 'AC': (8, 64, False), "('B', 7168)": (292, 293, False)}
+E       assert False
+E        +  where False = all(&lt;generator object test_mh1_hybrid_float32_against_the_research_engine.&lt;locals&gt;.&lt;genexpr&gt; at 0x74e0f1c1f8b0&gt;)
+
+tests/gpu/test_engine_gpu.py:686: AssertionError</failure></testcase><testcase classname="tests.gpu.test_fallback_gpu" name="test_ddmin_finds_the_broken_rewrites[rewrite]" time="146.321" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_ddmin_finds_the_broken_rewrites[pair]" time="152.026" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_a_broken_capture_drops_the_graph_mode" time="94.824"><failure message="AssertionError: assert ('compiled' == 'eager'&#10;  &#10;  - eager&#10;  + compiled)">def test_a_broken_capture_drops_the_graph_mode():
+        out = _run("capture")
+        _common(out)
+&gt;       assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
+E       AssertionError: assert ('compiled' == 'eager'
+E         
+E         - eager
+E         + compiled)
+
+tests/gpu/test_fallback_gpu.py:215: AssertionError</failure></testcase><testcase classname="tests.gpu.test_fallback_gpu" name="test_a_capture_error_before_the_first_step_falls_back_to_eager[skip]" time="73.986"><failure message="AssertionError: assert ('compiled' == 'eager'&#10;  &#10;  - eager&#10;  + compiled)">check = 'skip'
+
+    @pytest.mark.parametrize("check", ["skip", "gate"])
+    def test_a_capture_error_before_the_first_step_falls_back_to_eager(check):
+        """A host sync inside the capture (``torch.nonzero``, as an unhashed MACE block does; 2-T15b): the
+        first step's graphs are captured before it, so the fallback takes the plan to eager."""
+        out = _run("capture_error", check=check)
+        _common(out)
+&gt;       assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
+E       AssertionError: assert ('compiled' == 'eager'
+E         
+E         - eager
+E         + compiled)
+
+tests/gpu/test_fallback_gpu.py:225: AssertionError</failure></testcase><testcase classname="tests.gpu.test_fallback_gpu" name="test_a_capture_error_before_the_first_step_falls_back_to_eager[gate]" time="73.004"><failure message="AssertionError: assert ('compiled' == 'eager'&#10;  &#10;  - eager&#10;  + compiled)">check = 'gate'
+
+    @pytest.mark.parametrize("check", ["skip", "gate"])
+    def test_a_capture_error_before_the_first_step_falls_back_to_eager(check):
+        """A host sync inside the capture (``torch.nonzero``, as an unhashed MACE block does; 2-T15b): the
+        first step's graphs are captured before it, so the fallback takes the plan to eager."""
+        out = _run("capture_error", check=check)
+        _common(out)
+&gt;       assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
+E       AssertionError: assert ('compiled' == 'eager'
+E         
+E         - eager
+E         + compiled)
+
+tests/gpu/test_fallback_gpu.py:225: AssertionError</failure></testcase><testcase classname="tests.gpu.test_fallback_gpu" name="test_prepare_leaves_the_default_trajectory_unchanged" time="91.024" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_prepared_graphs_keep_every_edge_after_the_edge_count_grows" time="87.955" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_a_failed_candidates_memory_is_freed_before_the_next_build" time="200.153" /><testcase classname="tests.gpu.test_forces_gpu" name="test_mh1_agrees_with_maceforces[cueq-float64-compiled-production]" time="157.610" /><testcase classname="tests.gpu.test_forces_gpu" name="test_mh1_agrees_with_maceforces[hybrid-float32-compiled-production]" time="166.301" /><testcase classname="tests.gpu.test_gate_resources_gpu" name="test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[polar1-l]" time="445.313" /><testcase classname="tests.gpu.test_gate_resources_gpu" name="test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[omol0-xl]" time="140.217" /><testcase classname="tests.gpu.test_isolation_gpu" name="test_a_b_a_equals_fresh_instances[mh1-plain-cueq]" time="222.754" /><testcase classname="tests.gpu.test_isolation_gpu" name="test_a_b_a_equals_fresh_instances[mh1-hybrid]" time="206.331" /><testcase classname="tests.gpu.test_isolation_gpu" name="test_a_b_a_equals_fresh_instances[polar1-s-hybrid]" time="448.725" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_populations_follow_boltzmann[swap-20261022]" time="216.583" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_populations_follow_boltzmann[transmute-20261023]" time="675.919" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_kinetic_temperature_with_mc_on_and_off[fixcm]" time="471.733"><failure message="AssertionError: ('swap_exchange', {'total': [1894.2806058503215, 17.64583339854379], 'Na': [1982.1241820948671, 44.817171396980925], '...52, 40.43279423330897], 'K': [1872.268416554877, 37.92923763070532], 'split': [-25.383318127418004, 67.5226144568094]})&#10;assert False&#10; +  where False = hybrid_agrees({'total': [1894.2806058503215, 17.64583339854379], 'Na': [1982.1241820948671, 44.817171396980925], 'K': [1851.9890942499726, 33.577414475638804], 'split': [-130.13508784489443, 57.69553441161899]}, {'total': [1880.875671524865, 12.519553447930567], 'Na': [1897.6517346822952, 40.43279423330897], 'K': [1872.268416554877, 37.92923763070532], 'split': [-25.383318127418004, 67.5226144568094]}, 2000.0)">names = ('off_fixcm', 'swap_exchange', 'swap_redraw_all', 'transmute_redraw_all')
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_mh1
+    # The negative control runs without fixcm: the integrator's fixcm is exact only for equal masses (see the CPU
+    # file), so the runs with fixcm keep to the Na &lt;-&gt; K moves whose correct treatments it must pass.
+    @pytest.mark.parametrize("names", [("off_fixcm", "swap_exchange", "swap_redraw_all", "transmute_redraw_all"),
+                                       ("off_free", "swap_rescale", "swap_redraw", "transmute_rescale"),
+                                       ("off_negative", "negative_unchanged")],
+                             ids=["fixcm", "free", "negative"])
+    def test_mh1_kinetic_temperature_with_mc_on_and_off(names):
+        result = hybrid_results(names)
+        off_name = names[0]
+        off = result[off_name]["stats"]
+        summary = {name: {key: result[name][key] for key in ("stats", "counters", "momentum", "seconds")}
+                   for name in names}
+        for name in names[1:]:
+            summary[name]["deviations_sigma"] = ref.deviations(result[name]["stats"], off)
+        ENGINE.report(f"3-T12-mh1-hybrid-{off_name}", {**summary, "hybrid": HYBRID, "gpu": result["gpu"],
+                                                       "fastmace": result["fastmace"]})
+        known = []
+        for name in names[1:]:
+            on = result[name]["stats"]
+            kind = HYBRID_RUNS[name][0]
+            counters = result[name]["counters"][kind]
+            assert counters["accepted"] &gt; 0.02 * counters["attempted"], (name, counters)
+            if name == "negative_unchanged":
+                assert not hybrid_agrees(on, off, HYBRID["temperature"]), (name, on, off)
+            elif name in FIXCM_REDRAW_ALL and not hybrid_agrees(on, off, HYBRID["temperature"]):
+                known.append(name)
+            else:
+&gt;               assert hybrid_agrees(on, off, HYBRID["temperature"]), (name, on, off)
+E               AssertionError: ('swap_exchange', {'total': [1894.2806058503215, 17.64583339854379], 'Na': [1982.1241820948671, 44.817171396980925], '...52, 40.43279423330897], 'K': [1872.268416554877, 37.92923763070532], 'split': [-25.383318127418004, 67.5226144568094]})
+E               assert False
+E                +  where False = hybrid_agrees({'total': [1894.2806058503215, 17.64583339854379], 'Na': [1982.1241820948671, 44.817171396980925], 'K': [1851.9890942499726, 33.577414475638804], 'split': [-130.13508784489443, 57.69553441161899]}, {'total': [1880.875671524865, 12.519553447930567], 'Na': [1897.6517346822952, 40.43279423330897], 'K': [1872.268416554877, 37.92923763070532], 'split': [-25.383318127418004, 67.5226144568094]}, 2000.0)
+
+tests/gpu/test_mc_statistics_gpu.py:475: AssertionError</failure></testcase><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_kinetic_temperature_with_mc_on_and_off[free]" time="413.643" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_kinetic_temperature_with_mc_on_and_off[negative]" time="374.461" /><testcase time="0.001" /></testsuite></testsuites>

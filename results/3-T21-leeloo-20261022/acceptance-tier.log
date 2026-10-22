@@ -1,0 +1,1936 @@
+== acceptance-tier leeloo NVIDIA RTX 4000 Ada Generation, 595.84 source cd43463 2026-10-22T11:57:49Z
+== deadline in 14411s
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /mnt/homes/zwingel/fastmace-cache/3-T21-leeloo/inductor, triton /mnt/homes/zwingel/fastmace-cache/3-T21-leeloo/triton
+rootdir: /mnt/homes/zwingel/fastmace-t21-cd43463
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+collected 340 items / 301 deselected / 39 selected
+
+tests/gpu/test_ase_equivalence_gpu.py ..                                 [  5%]
+tests/gpu/test_canonical_restart_gpu.py .                                [  7%]
+tests/gpu/test_engine_gpu.py FFF                                         [ 15%]
+tests/gpu/test_fallback_gpu.py ..FFF...                                  [ 35%]
+tests/gpu/test_forces_gpu.py ..                                          [ 41%]
+tests/gpu/test_gate_resources_gpu.py ..                                  [ 46%]
+tests/gpu/test_isolation_gpu.py ...                                      [ 53%]
+tests/gpu/test_mc_statistics_gpu.py ..F..                                [ 66%]
+tests/gpu/test_planner_gpu.py 
+
+=================================== FAILURES ===================================
+___________ test_mh1_plain_cueq_float64_against_the_research_engine ____________
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_mh1_baseline
+    def test_mh1_plain_cueq_float64_against_the_research_engine():
+        ours = fastmace_run(spec("cueq", modes=[("eager", 200), ("checked", 500), ("repeat", 500), ("pipelined", 500),
+                                                ("speculative", 200)], warmups=True))
+        theirs = baseline_run(spec("cueq", modes=[("checked", 500), ("repeat", 500), ("pipelined", 500)]))
+        modes, base = ours["modes"], theirs["modes"]
+        checked, pipelined = modes["checked"], modes["pipelined"]
+        summary = {
+            "replay_vs_eager_200": deviation(checked["positions"], modes["eager"]["positions"], 4),
+            "fastmace_repeat_500": deviation(modes["repeat"]["positions"], checked["positions"]),
+            "baseline_repeat_500": deviation(base["repeat"]["positions"], base["checked"]["positions"]),
+            "pipelined_vs_checked_500": deviation(pipelined["positions"], checked["positions"]),
+            "speculative_vs_pipelined_200": deviation(modes["speculative"]["positions"], pipelined["positions"], 4),
+            "baseline_checked_500": deviation(checked["positions"], base["checked"]["positions"]),
+            "baseline_pipelined_500": deviation(pipelined["positions"], base["pipelined"]["positions"]),
+            "kernels": {mode: same_kernels(modes[mode]["kinds"], base[mode]["kinds"]) for mode in ("checked", "pipelined")},
+            "ms_per_step": {mode: {"fastmace": modes[mode]["ms_per_step"], "baseline": base[mode]["ms_per_step"]}
+                            for mode in ("checked", "pipelined")},
+            "info": {mode: out["info"] for mode, out in modes.items()},
+            "baseline_edge_sizes": {mode: out["edge_sizes_used"] for mode, out in base.items()},
+            "baseline_builds": {mode: out["rebuilds"] for mode, out in base.items()},
+            "warmups": ours["warmups"], "allocator": [ours["allocator"], theirs["allocator"]], "torch": ours["torch"],
+        }
+        report("1a-T13-mh1-cueq-float64-nvt", summary)
+        assert checked["info"]["neighbour_rebuilds"] >= 1
+        for name in ("replay_vs_eager_200", "fastmace_repeat_500", "pipelined_vs_checked_500",
+                     "speculative_vs_pipelined_200", "baseline_checked_500", "baseline_pipelined_500"):
+            assert summary[name] <= FLOAT64_LIMIT, (name, summary[name])
+        assert all(out["async_equal"] for out in modes.values())
+        assert not any(ours["warmups"].values()), ours["warmups"]
+        for mode in ("checked", "pipelined"):
+            assert modes[mode]["info"]["edge_sizes_used"] == base[mode]["edge_sizes_used"]
+            # The baseline counts the force field's first build too.
+            assert modes[mode]["info"]["neighbour_rebuilds"] + 1 == base[mode]["rebuilds"]
+>           assert all(equal for _, _, equal in summary["kernels"][mode].values()), summary["kernels"][mode]
+E           AssertionError: {'C': (23, 23, True), 'AC': (8, 64, False), "('B', 7168)": (235, 234, False)}
+E           assert False
+E            +  where False = all(<generator object test_mh1_plain_cueq_float64_against_the_research_engine.<locals>.<genexpr> at 0x74e1b11069d0>)
+
+tests/gpu/test_engine_gpu.py:619: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-cueq-float64-nvt: {
+ "replay_vs_eager_200": 7.105427357601002e-14,
+ "fastmace_repeat_500": 2.540190280342358e-13,
+ "baseline_repeat_500": 2.4868995751603507e-13,
+ "pipelined_vs_checked_500": 2.877698079828406e-13,
+ "speculative_vs_pipelined_200": 7.105427357601002e-14,
+ "baseline_checked_500": 1.9895196601282805e-13,
+ "baseline_pipelined_500": 3.232969447708456e-13,
+ "kernels": {
+  "checked": {
+   "C": [
+    23,
+    23,
+    true
+   ],
+   "AC": [
+    8,
+    64,
+    false
+   ],
+   "('B', 7168)": [
+    235,
+    234,
+    false
+   ]
+  },
+  "pipelined": {
+   "ACP": [
+    8,
+    73,
+    false
+   ],
+   "('B', 7168)": [
+    235,
+    234,
+    false
+   ]
+  }
+ },
+ "ms_per_step": {
+  "checked": {
+   "fastmace": 72.76445738971233,
+   "baseline": 72.83791011199355
+  },
+  "pipelined": {
+   "fastmace": 72.72567884065211,
+   "baseline": 72.82723753713071
+  }
+ },
+ "info": {
+  "eager": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": false,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 0,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 0
+    }
+   ]
+  },
+  "checked": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "repeat": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "pipelined": {
+   "rebuilds_beside": 18,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 18,
+   "graphs": [
+    "ACP",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 18,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "ACP",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 19,
+     "key": "ACP",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 19,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 19,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "speculative": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "speculative",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "('ACB', 7168, 0)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 200,
+   "speculative_rollbacks": 5,
+   "speculative_rebuild_rollbacks": 5,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 1,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "('ACB', 7168, 0)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 25,
+     "key": "('ACB', 7168, 0)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 1
+    }
+   ]
+  }
+ },
+ "baseline_edge_sizes": {
+  "checked": [
+   7168
+  ],
+  "repeat": [
+   7168
+  ],
+  "pipelined": [
+   7168
+  ]
+ },
+ "baseline_builds": {
+  "checked": 15,
+  "repeat": 15,
+  "pipelined": 19
+ },
+ "warmups": {
+  "checked": [],
+  "pipelined": [],
+  "speculative": []
+ },
+ "allocator": [
+  "expandable_segments:True",
+  "expandable_segments:True"
+ ],
+ "torch": "2.14.1+cu130"
+}
+_________ test_mh1_plain_cueq_float64_npt_against_the_research_engine __________
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_mh1_baseline
+    def test_mh1_plain_cueq_float64_npt_against_the_research_engine():
+        options = spec("cueq", ensemble="npt", modes=[("checked", 500), ("pipelined", 500)])
+        ours = fastmace_run(options)
+        theirs = baseline_run(options)
+        modes, base = ours["modes"], theirs["modes"]
+        summary = {mode: {"baseline_500": deviation(modes[mode]["positions"], base[mode]["positions"]),
+                          "kernels": same_kernels(modes[mode]["kinds"], base[mode]["kinds"]),
+                          "ms_per_step": [modes[mode]["ms_per_step"], base[mode]["ms_per_step"]],
+                          "builds": [modes[mode]["info"]["neighbour_rebuilds"] + 1, base[mode]["rebuilds"]],
+                          "edge_sizes": [modes[mode]["info"]["edge_sizes_used"], base[mode]["edge_sizes_used"]]}
+                   for mode in ("checked", "pipelined")}
+        summary["pipelined_vs_checked_500"] = deviation(modes["pipelined"]["positions"], modes["checked"]["positions"])
+        report("1a-T13-mh1-cueq-float64-npt", summary)
+        assert all(out["async_equal"] for out in modes.values())
+        assert summary["pipelined_vs_checked_500"] <= FLOAT64_LIMIT
+        for mode in ("checked", "pipelined"):
+            assert summary[mode]["baseline_500"] <= FLOAT64_LIMIT, (mode, summary[mode])
+>           assert all(equal for _, _, equal in summary[mode]["kernels"].values()), summary[mode]["kernels"]
+E           AssertionError: {'C': (28, 28, True), 'AC': (229, 229, True), "('B', 7168)": (293, 292, False)}
+E           assert False
+E            +  where False = all(<generator object test_mh1_plain_cueq_float64_npt_against_the_research_engine.<locals>.<genexpr> at 0x74e0f1e97140>)
+
+tests/gpu/test_engine_gpu.py:642: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-cueq-float64-npt: {
+ "checked": {
+  "baseline_500": 5.329070518200751e-15,
+  "kernels": {
+   "C": [
+    28,
+    28,
+    true
+   ],
+   "AC": [
+    229,
+    229,
+    true
+   ],
+   "('B', 7168)": [
+    293,
+    292,
+    false
+   ]
+  },
+  "ms_per_step": [
+   73.54659980162978,
+   73.69927587918937
+  ],
+  "builds": [
+   15,
+   15
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined": {
+  "baseline_500": 8.881784197001252e-15,
+  "kernels": {
+   "ACP": [
+    354,
+    354,
+    true
+   ],
+   "('B', 7168)": [
+    293,
+    292,
+    false
+   ]
+  },
+  "ms_per_step": [
+   73.66427996195853,
+   73.8464877102524
+  ],
+  "builds": [
+   18,
+   18
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined_vs_checked_500": 5.329070518200751e-15
+}
+_____________ test_mh1_hybrid_float32_against_the_research_engine ______________
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_oeq
+    @needs_mh1_baseline
+    def test_mh1_hybrid_float32_against_the_research_engine():
+        ours = fastmace_run(spec("hybrid", modes=[("eager", 200), ("checked", 500), ("repeat", 500), ("pipelined", 500),
+                                                  ("speculative", 200)], warmups=True), python=HYBRID_PYTHON)
+        first = baseline_run(spec("hybrid", modes=[("checked", 500)]), python=HYBRID_PYTHON)
+        second = baseline_run(spec("hybrid", modes=[("checked", 500)]), python=HYBRID_PYTHON)
+        modes = ours["modes"]
+        reference = first["modes"]["checked"]["positions"]
+        scatter = deviation(second["modes"]["checked"]["positions"], reference)
+        summary = {
+            "replay_vs_eager_200": deviation(modes["checked"]["positions"], modes["eager"]["positions"], 4),
+            "fastmace_repeat_500": deviation(modes["repeat"]["positions"], modes["checked"]["positions"]),
+            "pipelined_vs_checked_500": deviation(modes["pipelined"]["positions"], modes["checked"]["positions"]),
+            "speculative_vs_pipelined_200": deviation(modes["speculative"]["positions"], modes["pipelined"]["positions"],
+                                                      4),
+            "baseline_scatter_500": scatter,
+            "baseline_checked_500": deviation(modes["checked"]["positions"], reference),
+            "baseline_scatter_per_record": [deviation([a], [b]) for a, b in
+                                            zip(second["modes"]["checked"]["positions"], reference)],
+            "fastmace_per_record": [deviation([a], [b]) for a, b in zip(modes["checked"]["positions"], reference)],
+            "kernels": same_kernels(modes["checked"]["kinds"], first["modes"]["checked"]["kinds"]),
+            "ms_per_step": {"fastmace": {mode: out["ms_per_step"] for mode, out in modes.items()},
+                            "baseline": [first["modes"]["checked"]["ms_per_step"],
+                                         second["modes"]["checked"]["ms_per_step"]]},
+            "info": {mode: out["info"] for mode, out in modes.items()},
+            "baseline_builds": [first["modes"]["checked"]["rebuilds"], second["modes"]["checked"]["rebuilds"]],
+            "streaming": modes["checked"]["force_field"]["streaming_interactions"], "warmups": ours["warmups"],
+        }
+        report("1a-T13-mh1-hybrid-float32-nvt", summary)
+        assert summary["streaming"] > 0 and modes["checked"]["info"]["neighbour_rebuilds"] >= 1
+        assert all(out["async_equal"] for out in modes.values())
+        assert not any(ours["warmups"].values()), ours["warmups"]
+        # Statistical: float32 rounding differs between eager and compiled-graph kernels and between runs;
+        # trajectories from one seed stay within the run-to-run scatter of the research engine.
+        limit = max(3 * scatter, 1e-6)
+        for name in ("replay_vs_eager_200", "fastmace_repeat_500", "pipelined_vs_checked_500",
+                     "speculative_vs_pipelined_200", "baseline_checked_500"):
+            assert summary[name] <= limit, (name, summary[name], limit)
+>       assert all(equal for _, _, equal in summary["kernels"].values()), summary["kernels"]
+E       AssertionError: {'C': (23, 23, True), 'AC': (8, 64, False), "('B', 7168)": (292, 293, False)}
+E       assert False
+E        +  where False = all(<generator object test_mh1_hybrid_float32_against_the_research_engine.<locals>.<genexpr> at 0x74e0f1c1f8b0>)
+
+tests/gpu/test_engine_gpu.py:686: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-hybrid-float32-nvt: {
+ "replay_vs_eager_200": 3.1772676933883304e-08,
+ "fastmace_repeat_500": 1.1672087651959373e-07,
+ "pipelined_vs_checked_500": 1.1795654764057417e-07,
+ "speculative_vs_pipelined_200": 5.144925374622744e-08,
+ "baseline_scatter_500": 1.0318404086717692e-07,
+ "baseline_checked_500": 1.2984035535623661e-07,
+ "baseline_scatter_per_record": [
+  6.215849168711429e-09,
+  1.4985570118142277e-08,
+  2.7793687351618246e-08,
+  3.853271657305868e-08,
+  4.757494576068666e-08,
+  6.796948603948749e-08,
+  8.21088317337626e-08,
+  1.0318404086717692e-07,
+  9.130067901708117e-08,
+  8.73898482467439e-08
+ ],
+ "fastmace_per_record": [
+  7.078617247913144e-09,
+  1.6676308334240275e-08,
+  3.6813503356825095e-08,
+  4.005328868572633e-08,
+  6.301769595040696e-08,
+  5.0258618600196314e-08,
+  5.807033964799757e-08,
+  9.00539607329165e-08,
+  1.2375175550971562e-07,
+  1.2984035535623661e-07
+ ],
+ "kernels": {
+  "C": [
+   23,
+   23,
+   true
+  ],
+  "AC": [
+   8,
+   64,
+   false
+  ],
+  "('B', 7168)": [
+   292,
+   293,
+   false
+  ]
+ },
+ "ms_per_step": {
+  "fastmace": {
+   "eager": 10.412033861503005,
+   "checked": 3.4327850863337517,
+   "repeat": 3.432522164657712,
+   "pipelined": 3.4072595927864313,
+   "speculative": 3.5299701429903507
+  },
+  "baseline": [
+   3.481188490986824,
+   3.4320512879639864
+  ]
+ },
+ "info": {
+  "eager": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": false,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 0,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 0
+    }
+   ]
+  },
+  "checked": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "repeat": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "pipelined": {
+   "rebuilds_beside": 18,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 18,
+   "graphs": [
+    "ACP",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 18,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "ACP",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 19,
+     "key": "ACP",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 19,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 19,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "speculative": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "speculative",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "('ACB', 7168, 0)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 200,
+   "speculative_rollbacks": 5,
+   "speculative_rebuild_rollbacks": 5,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 1,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "('ACB', 7168, 0)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 25,
+     "key": "('ACB', 7168, 0)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 1
+    }
+   ]
+  }
+ },
+ "baseline_builds": [
+  15,
+  15
+ ],
+ "streaming": 2,
+ "warmups": {
+  "checked": [],
+  "pipelined": [],
+  "speculative": []
+ }
+}
+__________________ test_a_broken_capture_drops_the_graph_mode __________________
+
+    def test_a_broken_capture_drops_the_graph_mode():
+        out = _run("capture")
+        _common(out)
+>       assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
+E       AssertionError: assert ('compiled' == 'eager'
+E         
+E         - eager
+E         + compiled)
+
+tests/gpu/test_fallback_gpu.py:215: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+2-T15-fallback-capture-mh1-nacl: {
+ "case": "capture",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "tier": "compiled",
+ "revision": 1,
+ "reason": "fallback: mode compiled: eager passes the reduced gate: the fault is in capture or compilation; compiled first (GateFailed: the gate on this structure failed: force error 0.000649 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.62e-06, floor 1e-05))",
+ "chain": [
+  "minimal plan (phase 1b)"
+ ],
+ "initial_on": [
+  "factor_species",
+  "fold_cutoff",
+  "density_first",
+  "reassociate_first",
+  "joint_radial_input",
+  "fused_folded_backward",
+  "folded_backward_tiles",
+  "segmented_first_sum",
+  "streaming_conv",
+  "block_linear",
+  "grouped_linear",
+  "merged_residual",
+  "gated_rows",
+  "segment_gemm",
+  "species_tables",
+  "fold_readout_tail",
+  "fold_product_linear",
+  "single_graph_strain",
+  "polar_uvu"
+ ],
+ "off": [
+  "combo_kernels",
+  "direct_node_feats",
+  "folded_constants",
+  "fused_radial_hidden",
+  "grouped_launch",
+  "inplace_block_linear",
+  "species_skip"
+ ],
+ "gate": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 0.00010471182189643582,
+  "force_eV_per_A": 3.0540213705743113e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 0.00010471182189643582,
+    "yardstick": 3.674250171604433e-05,
+    "ratio": 2.849882751742823,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 3.0540213705743113e-06,
+    "yardstick": 2.623330811774016e-06,
+    "ratio": 1.1641769908954192,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "eager stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+   "oeq_runtime": "prepared",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 21.648872622288764,
+   "production_s": 0.024761663749814034,
+   "step_1_s": 21.64376460853964
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null,
+  "move_energy": null,
+  "mc_energy_precision": null
+ },
+ "setup_s": 85.57216461375356,
+ "tried": [
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, force_eV_per_A) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "mode",
+   "change": "mode compiled",
+   "outcome": "activated",
+   "reason": "eager passes the reduced gate: the fault is in capture or compilation; compiled first (GateFailed: the gate on this structure failed: force error 0.000649 eV/\u00c5 above the limit 1e-05 (2 x float32 yardstick 2.62e-06, floor 1e-05))",
+   "stage": null,
+   "revision": 1,
+   "reduced_gate_runs": 0,
+   "full_gate_runs": 1
+  }
+ ],
+ "reduced_gate_runs": 1,
+ "full_gate_runs": 1,
+ "finite": true,
+ "check": "gate",
+ "memory": []
+}
+FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1×1×1), 3D PBC, NVT Langevin 2 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    compiled, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)
+         plan revision 1 (fallback): mode compiled, reason eager passes the reduced gate: the fault is in capture or compilation; compiled first (GateFailed: the gate on this structure failed: force error 0.000649 eV/Å above the limit 1e-05 (2 x float32 yardstick 2.62e-06, floor 1e-05))
+why:     compiled tier: no CUDA graphs (mode='compiled', SPEC §8.2); correct but slower
+gate:    passed (2 rattled (0.05 Å); 0.0001 meV/atom, 3.1e-06 eV/Å; floors §12.3)
+setup:   85 s (plan 0.019 s, build 23 s, capture 10 s, gate 22 s, fallback 30 s, provenance 0.012 s)
+speed:   15.1 ms/step, whole-run mean over steps 1–20
+output:  none
+licence: ASL (non-commercial), from the label table (§4.3)
+warn:    none
+_____ test_a_capture_error_before_the_first_step_falls_back_to_eager[skip] _____
+
+check = 'skip'
+
+    @pytest.mark.parametrize("check", ["skip", "gate"])
+    def test_a_capture_error_before_the_first_step_falls_back_to_eager(check):
+        """A host sync inside the capture (``torch.nonzero``, as an unhashed MACE block does; 2-T15b): the
+        first step's graphs are captured before it, so the fallback takes the plan to eager."""
+        out = _run("capture_error", check=check)
+        _common(out)
+>       assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
+E       AssertionError: assert ('compiled' == 'eager'
+E         
+E         - eager
+E         + compiled)
+
+tests/gpu/test_fallback_gpu.py:225: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+2-T15-fallback-capture_error-check-skip-mh1-nacl: {
+ "case": "capture_error",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "tier": "compiled",
+ "revision": 1,
+ "reason": "fallback: mode compiled: eager passes the reduced gate: the fault is in capture or compilation; compiled first (AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing)",
+ "chain": [
+  "minimal plan (phase 1b)"
+ ],
+ "initial_on": [
+  "factor_species",
+  "fold_cutoff",
+  "density_first",
+  "reassociate_first",
+  "joint_radial_input",
+  "fused_folded_backward",
+  "folded_backward_tiles",
+  "segmented_first_sum",
+  "streaming_conv",
+  "block_linear",
+  "grouped_linear",
+  "merged_residual",
+  "gated_rows",
+  "segment_gemm",
+  "species_tables",
+  "fold_readout_tail",
+  "fold_product_linear",
+  "single_graph_strain",
+  "polar_uvu"
+ ],
+ "off": [
+  "combo_kernels",
+  "direct_node_feats",
+  "folded_constants",
+  "fused_radial_hidden",
+  "grouped_launch",
+  "inplace_block_linear",
+  "species_skip"
+ ],
+ "gate": {
+  "status": "skipped",
+  "check": "skip",
+  "reason": "opt-in: check=\"gate\"",
+  "copies": null,
+  "energy_meV_per_atom": null,
+  "force_eV_per_A": null,
+  "stress_eV_per_A3": null,
+  "quantities": {},
+  "nonfinite": [],
+  "mode": null,
+  "references": null,
+  "seconds": {},
+  "notes": [],
+  "device": null,
+  "reduced_cell": null,
+  "steps": [],
+  "replay": null,
+  "move_energy": null,
+  "mc_energy_precision": null
+ },
+ "setup_s": 66.49009544216096,
+ "tried": [
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A, stress_eV_per_A3) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "mode",
+   "change": "mode compiled",
+   "outcome": "activated",
+   "reason": "eager passes the reduced gate: the fault is in capture or compilation; compiled first (AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing)",
+   "stage": null,
+   "revision": 1,
+   "reduced_gate_runs": 0,
+   "full_gate_runs": 1
+  }
+ ],
+ "reduced_gate_runs": 1,
+ "full_gate_runs": 1,
+ "finite": true,
+ "check": "skip",
+ "memory": []
+}
+FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1×1×1), 3D PBC, NVT Langevin 2 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    compiled, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)
+         plan revision 1 (fallback): mode compiled, reason eager passes the reduced gate: the fault is in capture or compilation; compiled first (AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing)
+why:     compiled tier: no CUDA graphs (mode='compiled', SPEC §8.2); correct but slower
+gate:    not run (opt-in: check="gate")
+setup:   65 s (plan 0.019 s, build 24 s, fallback 41 s, provenance 0.012 s)
+speed:   13.3 ms/step, whole-run mean over steps 1–20
+output:  none
+licence: ASL (non-commercial), from the label table (§4.3)
+warn:    none
+_____ test_a_capture_error_before_the_first_step_falls_back_to_eager[gate] _____
+
+check = 'gate'
+
+    @pytest.mark.parametrize("check", ["skip", "gate"])
+    def test_a_capture_error_before_the_first_step_falls_back_to_eager(check):
+        """A host sync inside the capture (``torch.nonzero``, as an unhashed MACE block does; 2-T15b): the
+        first step's graphs are captured before it, so the fallback takes the plan to eager."""
+        out = _run("capture_error", check=check)
+        _common(out)
+>       assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
+E       AssertionError: assert ('compiled' == 'eager'
+E         
+E         - eager
+E         + compiled)
+
+tests/gpu/test_fallback_gpu.py:225: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+2-T15-fallback-capture_error-check-gate-mh1-nacl: {
+ "case": "capture_error",
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "tier": "compiled",
+ "revision": 1,
+ "reason": "fallback: mode compiled: eager passes the reduced gate: the fault is in capture or compilation; compiled first (AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing)",
+ "chain": [
+  "minimal plan (phase 1b)"
+ ],
+ "initial_on": [
+  "factor_species",
+  "fold_cutoff",
+  "density_first",
+  "reassociate_first",
+  "joint_radial_input",
+  "fused_folded_backward",
+  "folded_backward_tiles",
+  "segmented_first_sum",
+  "streaming_conv",
+  "block_linear",
+  "grouped_linear",
+  "merged_residual",
+  "gated_rows",
+  "segment_gemm",
+  "species_tables",
+  "fold_readout_tail",
+  "fold_product_linear",
+  "single_graph_strain",
+  "polar_uvu"
+ ],
+ "off": [
+  "combo_kernels",
+  "direct_node_feats",
+  "folded_constants",
+  "fused_radial_hidden",
+  "grouped_launch",
+  "inplace_block_linear",
+  "species_skip"
+ ],
+ "gate": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 0.00010471182400174763,
+  "force_eV_per_A": 2.9683396934876427e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 0.00010471182400174763,
+    "yardstick": 4.115766058829548e-05,
+    "ratio": 2.5441636503393936,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 2.9683396934876427e-06,
+    "yardstick": 2.56372616697087e-06,
+    "ratio": 1.1578224428683184,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "eager stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+   "oeq_runtime": "prepared",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 21.45886206906289,
+   "production_s": 0.020972521044313908,
+   "step_1_s": 21.454268231987953
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null,
+  "move_energy": null,
+  "mc_energy_precision": null
+ },
+ "setup_s": 65.61569513380527,
+ "tried": [
+  {
+   "dimension": "mode",
+   "change": "mode eager",
+   "outcome": "passed",
+   "reason": "diagnosis: reduced gate (one rattled copy, energy_meV_per_atom, force_eV_per_A, stress_eV_per_A3) passed",
+   "stage": null,
+   "revision": null,
+   "reduced_gate_runs": 1,
+   "full_gate_runs": 0
+  },
+  {
+   "dimension": "mode",
+   "change": "mode compiled",
+   "outcome": "activated",
+   "reason": "eager passes the reduced gate: the fault is in capture or compilation; compiled first (AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing)",
+   "stage": null,
+   "revision": 1,
+   "reduced_gate_runs": 0,
+   "full_gate_runs": 1
+  }
+ ],
+ "reduced_gate_runs": 1,
+ "full_gate_runs": 1,
+ "finite": true,
+ "check": "gate",
+ "memory": []
+}
+FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1×1×1), 3D PBC, NVT Langevin 2 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    compiled, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)
+         plan revision 1 (fallback): mode compiled, reason eager passes the reduced gate: the fault is in capture or compilation; compiled first (AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing)
+why:     compiled tier: no CUDA graphs (mode='compiled', SPEC §8.2); correct but slower
+gate:    passed (2 rattled (0.05 Å); 0.0001 meV/atom, 3e-06 eV/Å; floors §12.3)
+setup:   65 s (plan 0.019 s, build 24 s, gate 21 s, fallback 20 s, provenance 0.011 s)
+speed:   11.7 ms/step, whole-run mean over steps 1–20
+output:  none
+licence: ASL (non-commercial), from the label table (§4.3)
+warn:    none
+____________ test_mh1_kinetic_temperature_with_mc_on_and_off[fixcm] ____________
+
+names = ('off_fixcm', 'swap_exchange', 'swap_redraw_all', 'transmute_redraw_all')
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_mh1
+    # The negative control runs without fixcm: the integrator's fixcm is exact only for equal masses (see the CPU
+    # file), so the runs with fixcm keep to the Na <-> K moves whose correct treatments it must pass.
+    @pytest.mark.parametrize("names", [("off_fixcm", "swap_exchange", "swap_redraw_all", "transmute_redraw_all"),
+                                       ("off_free", "swap_rescale", "swap_redraw", "transmute_rescale"),
+                                       ("off_negative", "negative_unchanged")],
+                             ids=["fixcm", "free", "negative"])
+    def test_mh1_kinetic_temperature_with_mc_on_and_off(names):
+        result = hybrid_results(names)
+        off_name = names[0]
+        off = result[off_name]["stats"]
+        summary = {name: {key: result[name][key] for key in ("stats", "counters", "momentum", "seconds")}
+                   for name in names}
+        for name in names[1:]:
+            summary[name]["deviations_sigma"] = ref.deviations(result[name]["stats"], off)
+        ENGINE.report(f"3-T12-mh1-hybrid-{off_name}", {**summary, "hybrid": HYBRID, "gpu": result["gpu"],
+                                                       "fastmace": result["fastmace"]})
+        known = []
+        for name in names[1:]:
+            on = result[name]["stats"]
+            kind = HYBRID_RUNS[name][0]
+            counters = result[name]["counters"][kind]
+            assert counters["accepted"] > 0.02 * counters["attempted"], (name, counters)
+            if name == "negative_unchanged":
+                assert not hybrid_agrees(on, off, HYBRID["temperature"]), (name, on, off)
+            elif name in FIXCM_REDRAW_ALL and not hybrid_agrees(on, off, HYBRID["temperature"]):
+                known.append(name)
+            else:
+>               assert hybrid_agrees(on, off, HYBRID["temperature"]), (name, on, off)
+E               AssertionError: ('swap_exchange', {'total': [1894.2806058503215, 17.64583339854379], 'Na': [1982.1241820948671, 44.817171396980925], '...52, 40.43279423330897], 'K': [1872.268416554877, 37.92923763070532], 'split': [-25.383318127418004, 67.5226144568094]})
+E               assert False
+E                +  where False = hybrid_agrees({'total': [1894.2806058503215, 17.64583339854379], 'Na': [1982.1241820948671, 44.817171396980925], 'K': [1851.9890942499726, 33.577414475638804], 'split': [-130.13508784489443, 57.69553441161899]}, {'total': [1880.875671524865, 12.519553447930567], 'Na': [1897.6517346822952, 40.43279423330897], 'K': [1872.268416554877, 37.92923763070532], 'split': [-25.383318127418004, 67.5226144568094]}, 2000.0)
+
+tests/gpu/test_mc_statistics_gpu.py:475: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+3-T12-mh1-hybrid-off_fixcm: {
+ "off_fixcm": {
+  "stats": {
+   "total": [
+    1880.875671524865,
+    12.519553447930567
+   ],
+   "Na": [
+    1897.6517346822952,
+    40.43279423330897
+   ],
+   "K": [
+    1872.268416554877,
+    37.92923763070532
+   ],
+   "split": [
+    -25.383318127418004,
+    67.5226144568094
+   ]
+  },
+  "counters": null,
+  "momentum": 6.765741311137811e-08,
+  "seconds": 47.92769940569997
+ },
+ "swap_exchange": {
+  "stats": {
+   "total": [
+    1894.2806058503215,
+    17.64583339854379
+   ],
+   "Na": [
+    1982.1241820948671,
+    44.817171396980925
+   ],
+   "K": [
+    1851.9890942499726,
+    33.577414475638804
+   ],
+   "split": [
+    -130.13508784489443,
+    57.69553441161899
+   ]
+  },
+  "counters": {
+   "swap": {
+    "attempted": 22000,
+    "impossible": 0,
+    "accepted": 4323
+   }
+  },
+  "momentum": 7.793292711049505e-08,
+  "seconds": 56.827638536691666,
+  "deviations_sigma": {
+   "total": 0.6195674194310882,
+   "Na": 1.3994657170117863,
+   "K": 0.4003309824271119,
+   "split": 1.1794397660844278
+  }
+ },
+ "swap_redraw_all": {
+  "stats": {
+   "total": [
+    1871.0945909770053,
+    11.130130219149262
+   ],
+   "Na": [
+    1914.8994868159741,
+    17.551680733536504
+   ],
+   "K": [
+    1869.5469197668117,
+    26.021773204415233
+   ],
+   "split": [
+    -45.35256704916214,
+    31.1358038851712
+   ]
+  },
+  "counters": {
+   "swap": {
+    "attempted": 22000,
+    "impossible": 0,
+    "accepted": 4389
+   }
+  },
+  "momentum": 5.033750737729274e-08,
+  "seconds": 59.59287590999156,
+  "deviations_sigma": {
+   "total": 0.5838863005180768,
+   "Na": 0.391300469461007,
+   "K": 0.05916633264137728,
+   "split": 0.26856448351607776
+  }
+ },
+ "transmute_redraw_all": {
+  "stats": {
+   "total": [
+    1874.7956389663236,
+    12.217020421949323
+   ],
+   "Na": [
+    1920.5104801067052,
+    15.694325463416693
+   ],
+   "K": [
+    1875.3207379106484,
+    31.428000689621793
+   ],
+   "split": [
+    -44.11337414542783,
+    29.52889978143372
+   ]
+  },
+  "counters": {
+   "transmute": {
+    "attempted": 22000,
+    "impossible": 0,
+    "accepted": 8008
+   }
+  },
+  "momentum": 5.092532674196855e-08,
+  "seconds": 64.35361639969051,
+  "deviations_sigma": {
+   "total": 0.3475752766969631,
+   "Na": 0.5270403048814621,
+   "K": 0.06196605711168664,
+   "split": 0.25414923344282664
+  }
+ },
+ "hybrid": {
+  "temperature": 2000.0,
+  "friction": 0.02,
+  "attempts": 10,
+  "steps_per_block": 10,
+  "equilibration": 200,
+  "blocks": 2000,
+  "seed": 7
+ },
+ "gpu": "NVIDIA RTX 4000 Ada Generation",
+ "fastmace": "0.0.1.dev0"
+}
+=============================== warnings summary ===============================
+../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /mnt/homes/zwingel/fastmace-runs/3-T21-leeloo-20261022/acceptance-tier/junit.xml -
+============================= slowest 60 durations =============================
+976.97s call     tests/gpu/test_ase_equivalence_gpu.py::test_baoab_variants_reproduce_their_references
+929.74s call     tests/gpu/test_ase_equivalence_gpu.py::test_langevin_reproduces_ase_in_every_50_K_bin
+675.92s call     tests/gpu/test_mc_statistics_gpu.py::test_mh1_populations_follow_boltzmann[transmute-20261023]
+471.73s call     tests/gpu/test_mc_statistics_gpu.py::test_mh1_kinetic_temperature_with_mc_on_and_off[fixcm]
+448.72s call     tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[polar1-s-hybrid]
+445.31s call     tests/gpu/test_gate_resources_gpu.py::test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[polar1-l]
+413.84s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+413.64s call     tests/gpu/test_mc_statistics_gpu.py::test_mh1_kinetic_temperature_with_mc_on_and_off[free]
+374.46s call     tests/gpu/test_mc_statistics_gpu.py::test_mh1_kinetic_temperature_with_mc_on_and_off[negative]
+364.81s call     tests/gpu/test_canonical_restart_gpu.py::test_mh1_hybrid_resumes_statistically
+308.96s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+234.51s call     tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+222.75s call     tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[mh1-plain-cueq]
+216.58s call     tests/gpu/test_mc_statistics_gpu.py::test_mh1_populations_follow_boltzmann[swap-20261022]
+206.33s call     tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[mh1-hybrid]
+200.15s call     tests/gpu/test_fallback_gpu.py::test_a_failed_candidates_memory_is_freed_before_the_next_build
+166.30s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[hybrid-float32-compiled-production]
+157.61s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[cueq-float64-compiled-production]
+152.02s call     tests/gpu/test_fallback_gpu.py::test_ddmin_finds_the_broken_rewrites[pair]
+146.32s call     tests/gpu/test_fallback_gpu.py::test_ddmin_finds_the_broken_rewrites[rewrite]
+140.21s call     tests/gpu/test_gate_resources_gpu.py::test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[omol0-xl]
+94.82s call     tests/gpu/test_fallback_gpu.py::test_a_broken_capture_drops_the_graph_mode
+91.02s call     tests/gpu/test_fallback_gpu.py::test_prepare_leaves_the_default_trajectory_unchanged
+87.95s call     tests/gpu/test_fallback_gpu.py::test_prepared_graphs_keep_every_edge_after_the_edge_count_grows
+73.98s call     tests/gpu/test_fallback_gpu.py::test_a_capture_error_before_the_first_step_falls_back_to_eager[skip]
+73.00s call     tests/gpu/test_fallback_gpu.py::test_a_capture_error_before_the_first_step_falls_back_to_eager[gate]
+
+(34 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+FAILED tests/gpu/test_fallback_gpu.py::test_a_broken_capture_drops_the_graph_mode
+FAILED tests/gpu/test_fallback_gpu.py::test_a_capture_error_before_the_first_step_falls_back_to_eager[skip]
+FAILED tests/gpu/test_fallback_gpu.py::test_a_capture_error_before_the_first_step_falls_back_to_eager[gate]
+FAILED tests/gpu/test_mc_statistics_gpu.py::test_mh1_kinetic_temperature_with_mc_on_and_off[fixcm]
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/usr/lib/python3.10/selectors.py:416: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+===== 7 failed, 19 passed, 301 deselected, 1 warning in 8099.93s (2:14:59) =====
+== exit 2 2026-10-22T14:12:54Z
