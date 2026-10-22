@@ -415,3 +415,29 @@ def test_float64_baseline_follows_a_species_transaction(mace_engine):
     np.testing.assert_allclose(evaluator.baseline().cpu().numpy(), fresh_energy(mace_engine, engine).numpy(),
                                rtol=1e-12, atol=0)
     np.testing.assert_allclose(single.baseline().cpu().numpy(), evaluator.current().cpu().numpy(), rtol=1e-5)
+
+
+@pytest.mark.slow
+def test_evaluator_on_the_compiled_tier_equals_eager():
+    """The compiled tier (3-T06, no capture, exact edge counts): the same energies as an eager evaluation."""
+    from fastmace.engine import constraints
+    from fastmace.engine.compiled import CompiledEngine
+    from fastmace.integrators.langevin import Langevin
+    from fastmace.mc.evaluator import MCEvaluator
+    from fastmace.state import SimulationState
+
+    atoms = structure("mh1")
+    calc = calculator(model64("mh1"))
+    config = EngineConfig(device="cpu", compile_mode="default", dynamic_edges=True, pipelined="off")
+    ff = field(calc, atoms, engine=config)
+    state = SimulationState.from_atoms(atoms, "cpu", 5)
+    engine = CompiledEngine(config, ff, Langevin(state, IntegratorConfig(noise_batch=7), temperature_K=600.0),
+                            state, neighbours=NEIGHBOURS, constraints=constraints.ProcessRecord())
+    evaluator = MCEvaluator(engine)
+    for _ in range(4):
+        engine.step()
+    moved = atoms.copy()
+    moved.positions = engine.state.positions.detach().numpy()
+    expected = field(calculator(model64("mh1")), moved).energy_only(positions_of(moved))
+    assert not evaluator.info()["captured"]
+    np.testing.assert_allclose(evaluator.baseline().numpy(), expected.numpy(), rtol=1e-12, atol=0)
