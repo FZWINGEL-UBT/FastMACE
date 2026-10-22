@@ -1,0 +1,50 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for '3-T21 after-MD test rerun (untimed, <10 min)' (pid 3310)
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/3-T21/inductor, triton /home/fzwin/fastmace-cache/3-T21/triton
+rootdir: /home/fzwin/fastmace-3-T21/src-2093be8
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 1 item
+
+tests/gpu/test_mc_statistics_gpu.py .                                    [100%]
+
+==================================== PASSES ====================================
+_______________________ test_mh1_first_attempt_after_md ________________________
+----------------------------- Captured stdout call -----------------------------
+
+3-T12-mh1-after-md: {
+ "delta_error_kT": [
+  1.560376164790567e-05,
+  4.4106347688775144e-05,
+  4.5669988058125005e-06,
+  6.139961822320712e-06,
+  4.425613065527501e-05,
+  2.3117343614429576e-05
+ ],
+ "decided": 6,
+ "agreements": [
+  true,
+  true,
+  true,
+  true,
+  true,
+  true
+ ],
+ "reference_backend": "engine's float64 field",
+ "backend": "hybrid",
+ "baselines_fresh": [
+  true,
+  false,
+  true,
+  true,
+  true,
+  true
+ ]
+}
+- generated xml file: /home/fzwin/fastmace-acceptance/3-T21-local-20261022/slow-rerun2/junit.xml -
+=========================== short test summary info ============================
+PASSED tests/gpu/test_mc_statistics_gpu.py::test_mh1_first_attempt_after_md
+======================== 1 passed in 128.50s (0:02:08) =========================

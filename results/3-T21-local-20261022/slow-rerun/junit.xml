@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="2" time="231.803" timestamp="2026-10-22T20:24:12.673702+02:00" hostname="Fabi-PC"><testcase classname="tests.gpu.test_planner_gpu" name="test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal" time="93.842" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_first_attempt_after_md" time="137.238"><failure message="assert False&#10; +  where False = all(&lt;generator object test_mh1_first_attempt_after_md.&lt;locals&gt;.&lt;genexpr&gt; at 0x78985ecef060&gt;)">@pytest.mark.slow
+    @needs_mh1
+    def test_mh1_first_attempt_after_md():
+        forced = run_mc({"experiment": "after_md"})["forced"]
+        decisions = run_mc({"experiment": "after_md_decisions"})["decisions"]
+        rows = forced["rows"]
+        errors = [abs((row["energy"] - row["baseline"]) - (row["after64"] - row["before64"])) / row["kT"] for row in rows]
+        decided, agreements = 0, []
+        for row in decisions["rows"]:
+            exponent = (row["trial64"] - row["before64"]) / row["kT"]
+            log_u = math.log(row["u"]) if row["u"] &gt; 0 else -math.inf
+            if abs(log_u + exponent) &lt; NEAR_TIE:
+                continue
+            decided += 1
+            agreements.append(row["accepted"] == int(log_u &lt; -exponent))
+        ENGINE.report("3-T12-mh1-after-md", {"delta_error_kT": errors, "decided": decided, "agreements": agreements,
+                                             "reference_backend": forced["reference_backend"], "backend": forced["backend"],
+                                             "baselines_fresh": [row["baseline"] == row["fresh"] for row in rows]})
+        # The baseline is a fresh evaluation with the MC evaluator, not the MD energy.
+&gt;       assert all(row["baseline"] == row["fresh"] for row in rows + decisions["rows"])
+E       assert False
+E        +  where False = all(&lt;generator object test_mh1_first_attempt_after_md.&lt;locals&gt;.&lt;genexpr&gt; at 0x78985ecef060&gt;)
+
+tests/gpu/test_mc_statistics_gpu.py:386: AssertionError</failure></testcase></testsuite></testsuites>
