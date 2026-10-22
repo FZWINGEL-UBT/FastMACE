@@ -498,3 +498,9 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     assert restart.MC_COUNTER_KEYS == ("attempted", "impossible", "accepted")
     assert restart.MC_STREAM_KEYS == ("seed", "offset")
     assert restart.mc_record({}) is None  # 3-T08: no move set attached
+
+
+def test_fixcm_projection_field():  # 3-T22 (docs/design/fixcm-projection.md); the default is checkpoint 2b
+    assert config.IntegratorConfig().fixcm_projection == "ase"
+    assert typing.get_args(typing.get_type_hints(config.IntegratorConfig)["fixcm_projection"]) == (
+        "ase", "mass_weighted")
