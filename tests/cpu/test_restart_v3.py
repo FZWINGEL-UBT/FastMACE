@@ -281,12 +281,17 @@ def test_no_restart_write_from_an_overflowed_step(loaded, tmp_path, monkeypatch)
     assert (tmp_path / restart_io.RESTART_NAME).exists()
 
 
-def test_the_mc_record_crosses_a_simulation_restart(loaded, tmp_path):
-    from fastmace.simulation import Simulation
+def test_the_mc_record_crosses_a_simulation_restart(loaded, tmp_path, monkeypatch):
+    from _support import fake_mc
+    from fastmace.simulation import Simulation, move_record
 
+    drivers = fake_mc.install(monkeypatch)  # T09's driver API, on the host (3-T15)
     sim = _simulation(loaded, nacl(repeat=1, rattle=0.05, seed=3))
     sim.run(steps=2)
     sim._engine.state.mc = mc_state()  # T09's driver writes its state_dict here before a restart write
     sim.save_restart(tmp_path)
     resumed = Simulation.resume(tmp_path)
-    assert resumed._engine.state.mc == mc_state()
+    (driver,) = drivers  # the resume re-attaches the restart's move set (3-T15) and loads its record
+    assert driver.loaded == [mc_state()]
+    assert [move_record(move) for move in driver.moves] == mc_state()["moves"]
+    assert resumed._engine.state.mc == driver.state_dict()

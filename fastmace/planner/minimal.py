@@ -670,8 +670,8 @@ class MinimalPlanner:
                 code="host-callbacks-graph-sync"))
         moves = ", ".join(workload.mc_moves) or "none"
         book.decide("workload.mc_moves", moves, Reason(
-            "no MC" if not workload.mc_moves else "MC: phase 3; Simulation.run refuses mc= blocks",
-            code="no-mc" if not workload.mc_moves else "mc-phase-3"))
+            "no MC" if not workload.mc_moves else "MC moves are attached through Simulation.run(mc=...) (SPEC §7.6)",
+            code="no-mc" if not workload.mc_moves else "mc-moves"))
         book.decide("workload.species_changes", "on" if workload.species_changes else "off",
                     "rule 8 is not in 1b: species-dependent rewrites are built for the structure's species")
         book.decide("workload.needs_per_atom", ", ".join(sorted(workload.needs_per_atom)) or "none", "recorded")

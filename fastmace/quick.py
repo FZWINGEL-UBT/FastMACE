@@ -11,16 +11,21 @@ What ``md`` decides itself, before anything is loaded:
   ``LangevinBAOAB``, ``"NVE"`` is refused (phase 4). An explicit ``integrator=`` wins; a
   conflicting non-default ``ensemble`` or argument raises ``ValueError``;
 - what it can infer from the whole run (an explicit argument always wins): the start target and
-  ``max_temperature_K`` from ``temperature_K`` or the schedule, the MC moves, species changes and
-  ``min_mc_temperature_K`` from ``mc=``;
+  ``max_temperature_K`` from ``temperature_K`` or the schedule, the MC moves, species changes,
+  ``min_mc_temperature_K`` and the species superset (the structure's plus every species ``mc=``
+  names) from ``mc=``;
 - the dispersion record: ``"d3bj"`` expands from the head's training functional in the label table
   (``longrange.d3.expand``);
 - the defaults: friction 0.02 per ASE time unit (``main.py``'s ``--friction``, about
   0.001965/fs), a drawn and recorded seed, the output directory ``./<structure stem>.fastmace/``
   (``./fastmace-run/`` for an in-memory ``Atoms``), and ``repeat=(1, 1, 1)``.
 
-Then the refusals of 1b, every reason at once in one ``PlanRefused``: NVE (phase 4), a complete D3
-record (phase 3b, the record shown) and MC after its §7.7 checks (phase 3).
+Then the refusals, every reason at once in one ``PlanRefused``: NVE (phase 4) and a complete D3
+record (phase 3b, the record shown).
+
+MC (3-T15): with a schedule, the move set is attached only over the step ranges whose target is at
+or above ``min_mc_temperature_K`` (``mc_ranges``), through ``Simulation.run(mc=…)`` and
+``run(mc=None)``; the ranges are in the report and its ``metadata.json`` block.
 """
 
 from __future__ import annotations
@@ -84,7 +89,8 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
       ``cell_mode``); ``"NVE"`` is refused (phase 4). ``integrator=`` chooses one explicitly;
     - ``temperature_K`` or ``schedule`` (an ``fm.protocols`` schedule); ``steps`` (optional with a
       schedule: the whole schedule);
-    - ``mc`` and ``min_mc_temperature_K``: checked as §7.7 says, then refused (phase 3);
+    - ``mc`` and ``min_mc_temperature_K``: one ``fm.mc`` record or a sequence of them, checked as §7.7
+      says, attached where the target is at or above ``min_mc_temperature_K``;
     - ``dispersion``: ``None``, ``"d3bj"`` or an ``fm.D3``; a complete record is refused until
       phase 3b, with the record shown;
     - ``repeat``: the supercell, ``(1, 1, 1)`` by default (never expanded silently);
@@ -103,7 +109,7 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     from fastmace.model.loading import LoadedModel
     from fastmace.planner.workload import SPECIES_MOVES, Workload
     from fastmace.protocols import Schedule, ScheduleState
-    from fastmace.simulation import Simulation, _steps, check_mode, planner_options
+    from fastmace.simulation import Simulation, _steps, check_mode, mc_moves, planner_options
 
     check_mode(check)
     planner_inputs = planner_options(mode=mode, allow_reference=allow_reference, fallback=fallback, gate=gate,
@@ -180,6 +186,7 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     # The workload: the highest target, and what mc= declares.
     workload_fields = {"max_temperature_K": highest, "min_mc_temperature_K": min_mc_temperature_K}
     if mc is not None:
+        mc = mc_moves(mc)
         moves = _mc_moves(mc)
         if min_mc_temperature_K is None:
             if schedule is not None:
@@ -204,8 +211,6 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
         if d3_warnings:
             text += f" ({'; '.join(d3_warnings)})"
         reasons.append(Reason(text + " (SPEC §11.2)", code="d3-phase-3b"))
-    if mc is not None:
-        reasons.append(Reason("MC: phase 3; fm.md in 1b runs MD only (SPEC §16)", code="mc-phase-3"))
     if reasons:
         raise PlanRefused.from_reasons(reasons)
 
@@ -232,10 +237,23 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
 
         model = load_pristine(name, head, sha256=sha256, trusted=trusted, charge=charge,
                               spin_multiplicity=spin_multiplicity)
-    sim = Simulation(atoms, model, integrator=integrator, workload=workload, output=output, seed=seed, check=check,
+    species = None
+    if mc is not None:  # the superset: the structure's species and every species the move set names
+        species = sorted({int(z) for z in atoms.numbers} | mc_species(mc))
+    sim = Simulation(atoms, model, species=species, integrator=integrator, workload=workload, output=output,
+                     seed=seed, check=check,
                      **{field.name: getattr(planner_inputs, field.name) for field in fields(planner_inputs)})
     sim.report.repeat = repeat
-    sim.run(steps=steps, schedule=schedule)
+    if mc is None:
+        sim.run(steps=steps, schedule=schedule)
+    elif schedule is None:
+        sim.run(steps=steps, mc=mc)
+    else:
+        given = schedule
+        for piece, attached in mc_ranges(ScheduleState(schedule, timestep_fs), count,
+                                         workload.min_mc_temperature_K):
+            sim.run(steps=piece, schedule=given, mc=mc if attached else None)
+            given = None
     sim.flush_output()
     import json
 
@@ -253,14 +271,40 @@ def _repeat(repeat):
 
 
 def _mc_moves(mc):
-    """The move types an ``mc=`` block declares (duck-typed, as ``Simulation.run``)."""
-    blocks = tuple(mc) if isinstance(mc, (list, tuple)) else (mc,)
+    """The move types a move set declares, in order, each once."""
     moves = []
-    for block in blocks:
-        move = str(getattr(block, "move", None) or getattr(block, "kind", None) or type(block).__name__.lower())
-        if move not in moves:
-            moves.append(move)
+    for block in mc:
+        if block.move not in moves:
+            moves.append(block.move)
     return tuple(moves)
+
+
+def mc_species(mc: Any) -> set[int]:
+    """The atomic numbers a move set names (swap pairs, transmutable sets)."""
+    from fastmace.events import species_numbers
+    from fastmace.simulation import mc_moves
+
+    named = set()
+    for block in mc_moves(mc):
+        for attribute in ("pairs", "species"):
+            for item in getattr(block, attribute, None) or ():
+                items = list(item) if isinstance(item, (list, tuple)) else [item]
+                named.update(int(z) for z in species_numbers(items, len(items)))
+    return named
+
+
+def mc_ranges(position: Any, count: int, min_mc_temperature_K: float) -> list[tuple[int, bool]]:
+    """The next ``count`` steps of a schedule position as runs ``(steps, attached)``: attached where the step's
+    target is at or above ``min_mc_temperature_K`` (SPEC §7.7), in order, adjacent runs merged."""
+    resolved, first = position.resolved, position.step + 1
+    runs = []
+    for step in range(first, first + count):
+        attached = resolved.target(step) >= min_mc_temperature_K
+        if runs and runs[-1][1] == attached:
+            runs[-1][0] += 1
+        else:
+            runs.append([1, attached])
+    return [(steps, attached) for steps, attached in runs]
 
 
 def _structure(structure):

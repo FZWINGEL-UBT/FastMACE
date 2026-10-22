@@ -3,14 +3,14 @@
 A tiny MH-1-class model, NaCl, the minimal planner on the CPU without compilation (as
 ``test_simulation.py``). ``fm.md`` builds a ``Simulation`` and nothing else, so its plan and gate
 equal the equivalent ``Simulation``'s; its inferences lose to explicit arguments; every
-``ValueError`` of §7.7 comes before anything is loaded; NVE, D3 and MC are refused with their
-phase; ``summary`` is the run report (1b-T15) and ``metadata`` the ``metadata.json`` record.
+``ValueError`` of §7.7 comes before anything is loaded; NVE and D3 are refused with their
+phase, and MC runs (T09's driver faked); ``summary`` is the run report (1b-T15) and ``metadata``
+the ``metadata.json`` record.
 """
 
 from __future__ import annotations
 
 import json
-import types
 from pathlib import Path
 
 import pytest
@@ -23,12 +23,14 @@ from fastmace.config import EngineConfig
 from fastmace.engine import constraints
 from fastmace.errors import PlanRefused
 from fastmace.io.output import Output
+from fastmace.mc import Swap
 from fastmace.planner import minimal
 from fastmace.protocols import hold, ramp
 
 pytestmark = [pytest.mark.filterwarnings("ignore::UserWarning")]
 
 NA_CL = (11, 17)
+SWAP = Swap(pairs=[("Na", "Cl")], every=2, attempts=5)
 
 
 @pytest.fixture(scope="module")
@@ -254,10 +256,10 @@ def test_explicit_baoab_with_default_ensemble(model_path, tmp_path):
     ({"steps": None}, "steps"),
     ({"repeat": (0, 1, 1)}, "repeat"),
     ({"repeat": (1, 1)}, "repeat"),
-    ({"mc": types.SimpleNamespace(move="swap", pairs=[("Na", "Cl")]), "temperature_K": 0.0}, "temperature_K=0"),
-    ({"mc": types.SimpleNamespace(move="swap", pairs=[("Na", "Cl")]), "temperature_K": None,
+    ({"mc": SWAP, "temperature_K": 0.0}, "temperature_K=0"),
+    ({"mc": SWAP, "temperature_K": None,
       "schedule": hold(300.0, ps=0.001), "steps": None}, "min_mc_temperature_K"),
-    ({"mc": types.SimpleNamespace(move="swap", pairs=[("Na", "Cl")]), "min_mc_temperature_K": 0.0},
+    ({"mc": SWAP, "min_mc_temperature_K": 0.0},
      "min_mc_temperature_K"),
     ({"check": "always"}, "check"),
     ({"dispersion": "d3"}, "d3bj"),
@@ -336,21 +338,86 @@ def test_explicit_d3_with_another_functional_names_the_warning(tmp_path):
     assert "differs from the training functional" in str(raised.value)
 
 
-def test_mc_is_checked_then_refused_phase_3(tmp_path):
+@pytest.fixture
+def drivers(monkeypatch):
+    """T09's MCDriver replaced by tests/_support/fake_mc.py's host stand-in; the drivers made, in order."""
+    from _support import fake_mc
+
+    return fake_mc.install(monkeypatch)
+
+
+def _swap(every=2, attempts=5):
+    from fastmace import mc
+
+    return mc.Swap(pairs=[("Na", "Cl")], every=every, attempts=attempts)
+
+
+def test_mc_runs_at_a_constant_temperature(model_path, tmp_path, drivers):
+    run = _md(model_path, tmp_path, mc=_swap(), steps=4)
+    (driver,) = drivers
+    assert [step for step, _ in driver.blocks] == [2, 4]
+    workload = run.simulation.workload
+    assert workload.mc_moves == ("swap",) and workload.species_changes
+    assert workload.min_mc_temperature_K == pytest.approx(300.0)
+    assert run.metadata["counters"]["mc"]["swap"]["attempted"] == 10
+    assert "swap Na-Cl every 2, 5 attempts" in run.summary
+    assert run.metadata["report"]["mc"]["ranges"] == [[0, 4]]
+
+
+def test_mc_with_a_schedule_attaches_only_at_or_above_the_minimum(model_path, tmp_path, drivers):
+    # 0.5 fs steps: the ramp targets 175, 250, 325, 400 K, then 400, 400 K; blocks every step.
+    schedule = ramp(100.0, 400.0, ps=0.002) + hold(400.0, ps=0.001)
+    run = _md(model_path, tmp_path, schedule=schedule, steps=None, mc=_swap(every=1, attempts=1),
+              min_mc_temperature_K=250.0)
+    assert run.simulation.schedule.finished
+    assert [step for driver in drivers for step, _ in driver.blocks] == [2, 3, 4, 5, 6]
+    assert run.metadata["report"]["mc"]["ranges"] == [[1, 6]]  # steps 2-6 run with MC: attached from step 1
+    assert run.simulation.workload.min_mc_temperature_K == 250.0
+
+
+def test_mc_ranges_split_a_schedule(model_path):
+    from fastmace.protocols import ScheduleState
+    from fastmace.quick import mc_ranges
+
+    schedule = ramp(300.0, 200.0, ps=0.002) + ramp(200.0, 300.0, ps=0.002)  # 275 250 225 200 225 250 275 300
+    position = ScheduleState(schedule, 0.5)
+    assert [position.resolved.target(k) for k in range(1, 9)] == pytest.approx([275, 250, 225, 200, 225, 250, 275,
+                                                                                300])
+    assert mc_ranges(position, 8, 250.0) == [(2, True), (3, False), (3, True)]
+    assert mc_ranges(position, 8, 100.0) == [(8, True)]
+    assert mc_ranges(position, 8, 400.0) == [(8, False)]
+
+
+def test_mc_species_join_the_superset(model_path, tmp_path, drivers, monkeypatch):
+    from fastmace import mc, quick
+
+    assert quick.mc_species(mc.Transmute(species=["Na", "K"], every=1, attempts=1)) == {11, 19}
+    assert quick.mc_species([_swap(), mc.Swap(pairs=[(11, "Br")], every=1, attempts=1)]) == {11, 17, 35}
+    run = _md(model_path, tmp_path, mc=_swap(), steps=2)
+    assert set(run.simulation.force_field.species) == {11, 17}
+
+
+def test_mc_with_a_schedule_needs_min_mc_temperature(tmp_path):
     from fastmace.quick import md
 
-    swap = types.SimpleNamespace(move="swap", pairs=[("Na", "Cl")])
-    with pytest.raises(PlanRefused, match="MC: phase 3") as raised:
-        md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, mc=swap, temperature_K=300.0, steps=3,
+    with pytest.raises(ValueError, match="min_mc_temperature_K"):
+        md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, mc=_swap(),
+           schedule=hold(300.0, ps=0.001), seed=1)
+
+
+def test_mc_is_no_longer_refused(tmp_path):
+    from fastmace.quick import md
+
+    with pytest.raises(Exception) as raised:  # the absent model, not a phase refusal
+        md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, mc=_swap(), temperature_K=300.0, steps=3,
            seed=1)
-    assert "mc-phase-3" in raised.value.codes
+    assert not isinstance(raised.value, PlanRefused)
 
 
 def test_every_refusal_at_once(tmp_path):
     from fastmace.quick import md
 
-    swap = types.SimpleNamespace(move="swap", pairs=[("Na", "Cl")])
     with pytest.raises(PlanRefused) as raised:
-        md(_atoms(), model="mh1-r2scan", ensemble="NVE", dispersion="d3bj", mc=swap, temperature_K=300.0, steps=3,
+        md(_atoms(), model="mh1-r2scan", ensemble="NVE", dispersion="d3bj", mc=_swap(), temperature_K=300.0, steps=3,
            seed=1)
-    assert set(raised.value.codes) == {"nve-phase-4", "d3-phase-3b", "mc-phase-3"}
+    assert set(raised.value.codes) == {"nve-phase-4", "d3-phase-3b"}

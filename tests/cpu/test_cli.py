@@ -13,7 +13,6 @@ import inspect
 import io
 import json
 import re
-import types
 
 import pytest
 
@@ -299,16 +298,31 @@ def test_run_reads_dispersion_and_output_tables():
                                   "dispersion": {"functional": "pbe", "cutof": 1.0}})
 
 
-def test_run_mc_is_checked_then_refused(tmp_path, capsys):
-    config = tmp_path / "mc.toml"
-    config.write_text('structure = "a.xyz"\nmodel = "mh1"\nhead = "matpes_r2scan"\ntemperature_K = 300.0\n'
-                      'steps = 10\n[[mc]]\nmove = "swap"\n', encoding="utf-8")
-    assert cli.main(["run", str(config)]) == 1
-    assert "MC: phase 3" in capsys.readouterr().err
-    _, options = run_command.md_arguments(_toml(config.read_text(encoding="utf-8")))
-    assert options["mc"] == (types.SimpleNamespace(move="swap"),)
+def test_run_mc_tables_become_move_records():
+    from fastmace import mc
+
+    _, options = run_command.md_arguments(_toml(
+        'structure = "a.xyz"\nmodel = "mh1"\n[[mc]]\nmove = "swap"\npairs = [["Na", "Cl"]]\nevery = 100\n'
+        'attempts = 50\n[[mc]]\nmove = "transmute"\nspecies = ["Na", "K"]\nevery = 10\nattempts = 1\n'
+        'mu = {Na = 0.0, K = -0.2}\n'))
+    assert options["mc"] == (mc.Swap(pairs=[("Na", "Cl")], every=100, attempts=50),
+                             mc.Transmute(species=["Na", "K"], every=10, attempts=1, mu={"Na": 0.0, "K": -0.2}))
+    _, options = run_command.md_arguments(_toml(
+        'structure = "a.xyz"\nmodel = "mh1"\n[mc]\nmove = "displace"\ndelta_A = 0.1\nevery = 5\nattempts = 2\n'))
+    assert options["mc"] == (mc.Displace(delta_A=0.1, every=5, attempts=2),)
     with pytest.raises(ValueError, match="move"):
         run_command.md_arguments({"structure": "a.xyz", "model": "mh1", "mc": {"kind": "swap"}})
+    with pytest.raises(ValueError, match="hop"):
+        run_command.md_arguments({"structure": "a.xyz", "model": "mh1", "mc": {"move": "hop"}})
+    with pytest.raises(ValueError, match="atempts"):
+        run_command.md_arguments({"structure": "a.xyz", "model": "mh1",
+                                  "mc": {"move": "swap", "pairs": [["Na", "Cl"]], "every": 1, "atempts": 1}})
+
+
+def test_init_documents_mc_without_a_phase_refusal():
+    text = _init_text()
+    assert "phase 3" not in text.replace("phase 3b", "")
+    assert "[[mc]]" in text and 'move = "swap"' in text
 
 
 def test_run_reads_standard_input(monkeypatch, capsys):
@@ -409,3 +423,23 @@ def test_init_then_run_equals_md(model_path, cpu_planner, tmp_path, monkeypatch,
     differing = _differences(_without_times(first), _without_times(second))
     assert not differing
     assert first.get("plan") == second.get("plan")
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_run_with_mc_tables_runs_mc(model_path, cpu_planner, tmp_path, monkeypatch, capsys):
+    from _support import fake_mc
+    from _support.structures import nacl
+
+    drivers = fake_mc.install(monkeypatch)
+    structure = tmp_path / "nacl.extxyz"
+    nacl(repeat=1, rattle=0.05, seed=3).write(structure)
+    config = tmp_path / "mc.toml"
+    config.write_text(f'structure = "{structure.as_posix()}"\nmodel = "{model_path.replace(chr(92), "/")}"\n'
+                      'trusted = true\ntemperature_K = 300.0\nsteps = 4\nseed = 5\n'
+                      f'output = "{(tmp_path / "run").as_posix()}"\n'
+                      '[[mc]]\nmove = "swap"\npairs = [["Na", "Cl"]]\nevery = 2\nattempts = 3\n', encoding="utf-8")
+    assert cli.main(["run", str(config)]) == 0
+    assert "swap Na-Cl every 2, 3 attempts" in capsys.readouterr().out
+    assert [step for step, _ in drivers[0].blocks] == [2, 4]
+    metadata = json.loads((tmp_path / "run" / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["counters"]["mc"]["swap"]["attempted"] == 6

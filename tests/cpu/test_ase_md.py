@@ -899,3 +899,21 @@ def test_step_advances_one_step_and_returns_forces(loaded):
     forces = dyn.step()
     assert dyn.simulation.committed().step == 1
     np.testing.assert_array_equal(forces, atoms.get_forces())
+
+
+def test_frames_follow_a_species_change_made_through_the_simulation(loaded, tmp_path):
+    """3-T13's finding, fixed in 3-T15: the trajectory takes each frame's species from the snapshot."""
+    from ase.io import read
+
+    path = tmp_path / "md.traj"
+    dyn = _langevin(loaded, trajectory=str(path), loginterval=1)
+    dyn.run(1)
+    swapped = dyn.simulation.committed().species.copy()
+    swapped[[0, 1]] = swapped[[1, 0]]
+    dyn.simulation.set_species(swapped)  # directly, not through an observer
+    dyn.run(1)
+    dyn.close()
+    frames = read(str(path), index=":")
+    np.testing.assert_array_equal(frames[-1].numbers, swapped)
+    np.testing.assert_array_equal(frames[-1].get_masses(), dyn.simulation.committed().masses)
+    assert not np.array_equal(frames[0].numbers, swapped)

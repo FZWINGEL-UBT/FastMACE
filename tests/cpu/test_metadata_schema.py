@@ -115,8 +115,8 @@ PHASE_2 = (
     ("compiled with dynamic edges (2-T13)", "plan.engine.dynamic_edges"),
     ("reproducible mode (2-T16)", "plan.workload.reproducible"),
 )
-# Filled by a later phase: an explicit null in phase 2 (tier switches: phase 5, §9.6; MC: phase 3).
-LATER_PHASES = ("counters.tier_switches", "counters.mc")
+# Filled by a later phase: an explicit null until then (tier switches: phase 5, §9.6). MC counters: 3-T15.
+LATER_PHASES = ("counters.tier_switches",)
 
 IDENTITY = ForceFieldIdentity(checkpoint_sha256="b" * 64, head="matpes_r2scan", species=(11, 17),
                               force_precision="float64", physics={"charge": None, "spin": None},
@@ -291,6 +291,20 @@ def test_gate_report_counters_and_engine_info():
     assert counters["engine"]["edge_bucket"] == 4096
     gate = _full_record(gate={"status": "unavailable", "reason": "no reference"})["gate"]
     assert gate["selfchecks"] == []  # the plan's (2-T04): this plan was never built
+
+
+def test_mc_counters_are_null_without_mc_and_per_move_type_with_it():  # 3-T15
+    assert provenance.metadata_record()["counters"]["mc"] is None
+    assert _full_record()["counters"]["mc"] is None
+    mc = {"swap": {"attempted": 50, "impossible": 1, "accepted": 7},
+          "displace": {"attempted": 20, "impossible": 0, "accepted": 6, "trial_rebuilds": 2}}
+    assert _full_record(counters={"mc": mc})["counters"]["mc"] == mc
+    with pytest.raises(ValueError, match="hop"):
+        _full_record(counters={"mc": {"hop": {"attempted": 1, "impossible": 0, "accepted": 0}}})
+    with pytest.raises(ValueError, match="accepted"):
+        _full_record(counters={"mc": {"swap": {"attempted": 1, "impossible": 0}}})
+    with pytest.raises(ValueError, match="trial_rebuilds"):
+        _full_record(counters={"mc": {"swap": {"attempted": 1, "impossible": 0, "accepted": 0, "trial_rebuilds": 0}}})
 
 
 def test_unknown_counter_and_gate_without_status_are_refused():
