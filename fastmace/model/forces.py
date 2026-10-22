@@ -24,6 +24,8 @@ import functools
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, runtime_checkable
 
+from fastmace.errors import ModelElementError, Reason, SpeciesNotInSuperset
+
 if TYPE_CHECKING:
     import numpy as np
     import torch
@@ -168,6 +170,21 @@ SEGMENTED_RECORDS = ("segmented_first_sum", "generic_segmented_first_sum")  # ed
 SPECIES_DEPENDENT = "fixed_species_superset"
 
 
+def _numbers(species):
+    """Symbols or atomic numbers as distinct atomic numbers (a set, sorted)."""
+    from ase.data import atomic_numbers
+
+    if isinstance(species, (str, int)):
+        species = [species]
+    return tuple(sorted({atomic_numbers[item] if isinstance(item, str) else int(item) for item in species}))
+
+
+def _symbols(numbers):
+    from ase.data import chemical_symbols
+
+    return " ".join(chemical_symbols[z] if 0 < z < len(chemical_symbols) else str(z) for z in sorted(numbers))
+
+
 def _backend(model, calc):
     """"hybrid", "cueq" or "e3nn" from the calculator's flags and the model's modules."""
     modules = [type(module).__module__ for module in model.modules()]
@@ -222,7 +239,7 @@ class MACEForceField:
 
     def __init__(self, model, atoms, *, rewrites=None, engine=None, neighbours=None, polar=None,
                  compute_stress=False, compile_cache=None, registry=None, charge=None, spin_multiplicity=None,
-                 check=True, float64_energy=True, atomic_energies=None):
+                 check=True, float64_energy=True, atomic_energies=None, species=None):
         import torch
 
         from fastmace import _patches
@@ -304,9 +321,22 @@ class MACEForceField:
         if spin_multiplicity is not None:
             atoms.info[info_keys.get("total_spin", "spin")] = spin_multiplicity
         self.numbers = atoms.numbers.copy()
+        # The species superset (SPEC §8.5): every species-indexed buffer and rewrite is built for it
+        # from the identity basis, never from the species present, so an atom can become any of them.
+        z_table = [int(z) for z in calc.z_table.zs]
+        unknown = sorted(set(_numbers(species)) - set(z_table)) if species is not None else []
+        if unknown:
+            raise ModelElementError(f"species {_symbols(unknown)} have no embedding in the model (it has "
+                                    f"{_symbols(z_table)})", why="the model was not trained on them (SPEC §8.5)")
+        wanted = set(_numbers(species) if species is not None else (int(z) for z in atoms.numbers))
+        self.species_columns = tuple(sorted(z_table.index(z) for z in wanted if z in z_table))
+        self.superset = tuple(z_table[column] for column in self.species_columns)
+        self.check_species(atoms.numbers)
         batch = calc._atoms_to_batch(atoms).to_dict()
         node_attrs = batch["node_attrs"].to(self._device)
-        self.species_columns = tuple(torch.nonzero(node_attrs.sum(dim=0) > 0).flatten().tolist())
+        if not bool((node_attrs[:, list(self.species_columns)].sum(dim=1) == 1).all()):
+            raise SpeciesNotInSuperset([Reason("a one-hot species row of the structure does not sum to 1 over the "
+                                               "superset's columns", rule=2, code="species-not-in-superset")])
 
         # Rewrites: resolved once, applied to a private copy (or inside the compiled copy).
         registry = registry or reg.default_registry()
@@ -321,8 +351,11 @@ class MACEForceField:
                              "'on'); in any other order the streaming kernels give wrong results")
         species_dependent = any(SPECIES_DEPENDENT in registry[name].workload_constraints
                                 for name in enabled if name in registry)
+        specs = getattr(source, "embedding_specs", None) or {}
+        joint_features = {name: batch[name].to(self._device, self._dtype) for name in specs if name in batch} or None
         context = reg.Context(config=rewrites if isinstance(rewrites, RewriteConfig) else RewriteConfig(),
-                              inputs={"node_attrs": node_attrs})
+                              inputs={"node_attrs": node_attrs, "species_columns": self.species_columns,
+                                      "joint_features": joint_features})
         model_records = [name for name in enabled if name not in engine_rewrites.RECORDS]
         # The strain path, bound per model (2-T08b, docs/design/strain-per-model.md): the one-graph
         # function with the record on, else MACE's own, so that neither another instance nor the
@@ -420,12 +453,14 @@ class MACEForceField:
             self.atomic_energies = atomic_energies
             head = int(batch["head"].reshape(-1)[0]) if "head" in batch else 0
             self.data[energy64.NODE_E0_KEY] = energy64.node_e0_float64(atomic_energies, node_attrs, head)
+            self._e0_row = torch.atleast_2d(atomic_energies)[head].to(self._device)
+        self._setup_species(atoms, z_table)
         segmented = any(name in SEGMENTED_RECORDS for name in enabled)
         self.neighbours = SkinNeighbourList(
             cell, calc.r_max, self._device, self._dtype, neighbours,
-            sender_groups=(node_attrs[:, list(self.species_columns)].argmax(dim=1).cpu().numpy()
-                           if segmented and sort_receivers else None),
-            variable_cell=self._compute_stress)
+            sender_groups=self._sender_groups if segmented and sort_receivers else None,
+            group_count=len(self.superset), variable_cell=self._compute_stress)
+        self._setup_tables()
         if self._compute_stress:
             # Fixed-address cell that MACE's stress path reads (set_cell refills it).
             self.data["cell"] = torch.tensor(cell, dtype=self._dtype, device=self._device)
@@ -469,19 +504,171 @@ class MACEForceField:
     def edge_capacity(self):
         return self.neighbours.capacity
 
+    # ------------------------------------------------------------------ species superset (SPEC §8.5)
+
+    def _setup_species(self, atoms, z_table):
+        """The species and charge buffers an event writes, and the derived buffers built from them.
+
+        ``atomic_numbers`` (int64, (N,)) and ``charges`` (float64, (N,), the per-atom formal charges)
+        are what a transaction writes (3-T03); every other species- or charge-indexed buffer is
+        derived from them by a refresh function (``register_derived``). The lookup tables cover every
+        atomic number, so a refresh is a few device gathers at fixed addresses.
+        """
+        import torch
+
+        device, n = self._device, len(atoms)
+        size = max(119, max(z_table) + 1)
+        column_of = torch.zeros(size, dtype=torch.int64)
+        group_of = torch.zeros(size, dtype=torch.int64)
+        for group, column in enumerate(self.species_columns):
+            column_of[z_table[column]] = column
+            group_of[z_table[column]] = group
+        self._column_of, self._group_of = column_of.to(device), group_of.to(device)
+        self.atomic_numbers = torch.as_tensor(atoms.numbers, dtype=torch.int64).to(device)
+        self.charges = torch.as_tensor(atoms.get_initial_charges(), dtype=torch.float64).to(device)
+        self._species_index = torch.zeros(n, dtype=torch.int64, device=device)  # scratch: node_attrs column
+        self._ones = torch.ones((n, 1), dtype=self.data["node_attrs"].dtype, device=device)
+        self._sender_groups = torch.index_select(self._group_of, 0, self.atomic_numbers)
+        # Total charge = its value at construction + the change of the summed per-atom charges, so
+        # that it is exactly the given total until a charge changes.
+        self._charge_sum = torch.zeros(1, dtype=torch.float64, device=device)
+        torch.sum(self.charges, dim=0, keepdim=True, out=self._charge_sum)
+        self._charge_sum0 = self._charge_sum.clone()
+        self._charge_base = {name: self.data[name].detach().to(torch.float64).clone()
+                             for name in ("total_charge", "total_spin") if torch.is_tensor(self.data.get(name))}
+        self._tables = []  # (FirstInteractionReassociation, its [S, C] table, its refresh)
+
+    def _setup_tables(self):
+        """Each reassociated interaction's sender-feature table, from the identity basis of the superset."""
+        import torch
+
+        from fastmace.rewrites.mh1 import modules as m
+
+        model = getattr(self.model, "_orig_mod", self.model)
+        reassociated = [(index, interaction) for index, interaction in enumerate(getattr(model, "interactions", ()))
+                        if getattr(interaction, "first_reassociation", None) is not None]
+        if not reassociated:
+            return
+        parameter = next(model.parameters())
+        n = len(self.numbers)
+        attrs = m.identity_attrs(self.species_columns, self.data["node_attrs"].shape[1], n, parameter.dtype,
+                                 parameter.device)
+        joint = None
+        if hasattr(model, "joint_embedding"):
+            batch = torch.zeros(attrs.shape[0], dtype=torch.int64, device=parameter.device)
+            joint = (batch, {name: self.data[name] for name in model.embedding_specs})
+        count = len(self.species_columns)
+        for index, interaction in reassociated:
+            table = m.identity_species_feats(model, interaction, attrs, count, joint).detach().clone()
+
+            def refresh(interaction=interaction, table=table):
+                table.copy_(m.identity_species_feats(model, interaction, attrs, count, joint))
+
+            self._tables.append((index, interaction.first_reassociation, table, refresh))
+        self._bind_streaming_count()
+
+    def check_species(self, numbers):
+        """Raise ``SpeciesNotInSuperset`` unless every atomic number of ``numbers`` ((N,)) is in the superset.
+
+        Host only, nothing is written: a transaction calls it before it applies a species change
+        (SPEC §8.5 "membership is checked explicitly at setup and on every host-side mutation").
+        """
+        import numpy as np
+
+        numbers = np.asarray(numbers)
+        if numbers.shape != (len(self.numbers),):
+            raise ValueError(f"species of {len(self.numbers)} atoms expected, got shape {numbers.shape}")
+        outside = sorted({int(z) for z in numbers} - set(self.superset))
+        if outside:
+            raise SpeciesNotInSuperset([Reason(
+                f"species {_symbols(outside)} are not in the ForceField's declared superset ({_symbols(self.superset)})"
+                " (SPEC §8.5, §9.3 rule 2)", rule=2, code="species-not-in-superset")])
+
+    def _refresh_node_attrs(self):
+        import torch
+
+        torch.index_select(self._column_of, 0, self.atomic_numbers, out=self._species_index)
+        node_attrs = self.data["node_attrs"]
+        node_attrs.zero_()
+        node_attrs.scatter_(1, self._species_index.unsqueeze(1), self._ones)
+
+    def _refresh_node_e0(self):
+        import torch
+
+        from fastmace.model import energy as energy64
+
+        # One table entry per atom: exactly the one-hot product of node_e0_float64.
+        torch.index_select(self._column_of, 0, self.atomic_numbers, out=self._species_index)
+        torch.index_select(self._e0_row, 0, self._species_index, out=self.data[energy64.NODE_E0_KEY])
+
+    def _refresh_sender_groups(self):
+        import torch
+
+        torch.index_select(self._group_of, 0, self.atomic_numbers, out=self._sender_groups)
+
+    def _refresh_total_charge(self):
+        import torch
+
+        torch.sum(self.charges, dim=0, keepdim=True, out=self._charge_sum)
+        self._charge_sum.sub_(self._charge_sum0).add_(self._charge_base["total_charge"].reshape(1))
+        self.data["total_charge"].copy_(self._charge_sum.reshape(self.data["total_charge"].shape))
+
+    def _refresh_total_spin(self):
+        # The spin multiplicity stays: a transmutation is allowed only with ΔZ − Δq even (SPEC §10.4).
+        self.data["total_spin"].copy_(self._charge_base["total_spin"].reshape(self.data["total_spin"].shape))
+
+    def _derived(self):
+        """(name, buffer, refresh, depends_on) of every derived buffer, dependencies first."""
+        from fastmace.model import energy as energy64
+
+        out = [("node_attrs", self.data["node_attrs"], self._refresh_node_attrs, ("species",))]
+        if energy64.NODE_E0_KEY in self.data:
+            out.append(("node_e0", self.data[energy64.NODE_E0_KEY], self._refresh_node_e0, ("species",)))
+        if self.neighbours.sender_groups is not None:
+            out.append(("sender_groups", self._sender_groups, self._refresh_sender_groups, ("species",)))
+        if "total_charge" in self._charge_base:
+            out.append(("total_charge", self.data["total_charge"], self._refresh_total_charge, ("charges",)))
+        if "total_spin" in self._charge_base:
+            out.append(("total_spin", self.data["total_spin"], self._refresh_total_spin, ("charges",)))
+        out += [(f"species_feats.interactions.{index}", table, refresh, ("charges",))
+                for index, _, table, refresh in self._tables]
+        return out
+
+    def derived_buffers(self):
+        """The derived device buffers by name (without the ``force_field.`` prefix of ``register_derived``)."""
+        return {name: buffer for name, buffer, _, _ in self._derived()}
+
+    def register_derived(self, registry, prefix="force_field"):
+        """Register every derived buffer with its refresh function in ``registry`` (a
+        ``fastmace.events.DerivedStateRegistry``) as ``<prefix>.<name>``.
+
+        The refresh functions recompute their buffer in place on the device from ``atomic_numbers``
+        and ``charges`` (fixed addresses, no host synchronisation; CUDA-graph capturable):
+        ``node_attrs`` (one-hot), ``node_e0`` (float64 per-atom E0), ``sender_groups`` (the
+        segmented first sum's sender species, a fixed count of superset-size groups), the total
+        charge and spin, and each reassociated interaction's sender-feature table (identity basis;
+        OMOL-0's joint embedding reads the total charge and spin, so it follows them). The
+        neighbour list reads the sender groups at its next build.
+        """
+        return [registry.register(f"{prefix}.{name}", buffer, refresh, depends)
+                for name, buffer, refresh, depends in self._derived()]
+
     # ------------------------------------------------------------------ graph level
 
     def _bind_streaming_count(self):
-        """Point the streaming interactions at this force field's edge count (a host-side pointer swap).
+        """Point the streaming interactions at this force field's edge count, and the reassociated
+        first interaction at its sender-feature table (host-side pointer swaps).
 
         The model may be shared with other force fields (one compiled model per cache key), so each
-        call binds its own counter before the model runs; a captured graph keeps the address it was
-        captured with. Nothing outside the force field ever rebinds.
+        call binds its own counter and table before the model runs; a captured graph keeps the
+        address it was captured with. Nothing outside the force field ever rebinds.
         """
         count = self.neighbours.count
         for module in self._streaming:
             if module._buffers.get("streaming_count") is not count:
                 module.register_buffer("streaming_count", count, persistent=False)
+        for _, reassociation, table, _ in self._tables:
+            reassociation.bind(table)
 
     def __call__(self, positions):
         """Energy [1], forces [N, 3] (and stress [3, 3]) at float64 ``positions`` on the current edges.
@@ -590,8 +777,10 @@ class MACEForceField:
         import numpy as np
         import torch
 
-        if len(atoms) != len(self.numbers) or not np.array_equal(atoms.numbers, self.numbers):
-            raise ValueError("evaluate needs the force field's species in the same order (the input batch is fixed)")
+        current = self.atomic_numbers.cpu().numpy()  # after any species event
+        if len(atoms) != len(current) or not np.array_equal(atoms.numbers, current):
+            raise ValueError("evaluate needs the force field's current species in the same order (the input batch "
+                             "changes only through events)")
         if not all(atoms.pbc):
             raise ValueError("Periodic boundaries in all three directions are required")
         cell = np.asarray(atoms.cell.array, dtype=np.float64)
@@ -691,7 +880,7 @@ class MACEForceField:
             "streaming_interactions": len(self._streaming), "sort_receivers": self.neighbours.sort_receivers,
             "gpu_neighbour_list": self.neighbours.gpu_build, "neighbour_rebuilds": self.neighbours.rebuilds,
             "edge_capacity": self.neighbours.capacity, "candidates": self.neighbours.num_candidates,
-            "species_columns": list(self.species_columns), "charge": self.charge,
+            "species_columns": list(self.species_columns), "superset": list(self.superset), "charge": self.charge,
             "spin_multiplicity": self.spin_multiplicity, "dynamo_reset": self.dynamo_reset,
             "polar": None if state is None else state.info(), "float64_energy": self.float64_energy,
             "energy_treatment": self.energy_treatment, "strain_path": self.strain_path,

@@ -87,7 +87,7 @@ def evaluate(model, batch):
 
 
 def context(batch, seed=0):
-    return reg.Context(inputs={generic.NODE_ATTRS: batch["node_attrs"]}, seed=seed)
+    return reg.Context(inputs=reg.structure_inputs(batch), seed=seed)
 
 
 def rewrite(model, batch, names):
