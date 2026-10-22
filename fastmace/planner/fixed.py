@@ -408,7 +408,7 @@ class FixedPlanner:
         return Plan(**parts, reason="fixed plan of phase 1a (main.py)")
 
     def _resolve(self, book, traits, atoms, integrator, hardware, *, backend_choice=None, evaluation=False,
-                 texts=None, reproducible=False, rule_11=None, mc_moves=False):
+                 texts=None, reproducible=False, rule_11=None, mc=None):
         """The plan's parts (``Plan`` keywords except the reason), decisions and refusals in ``book``.
 
         Shared with the minimal planner (1b-T12): ``backend_choice`` is its backend rule;
@@ -416,7 +416,8 @@ class FixedPlanner:
         tier, so exact padding is not required); ``texts`` maps a refusal code to a function that
         rewrites its text; ``reproducible`` (minimal planner, rule 5) takes the unfused convolution;
         ``rule_11`` (minimal planner, 3-T05) is ``(applies, neighbors.adaptive.Rule11)`` for the workload;
-        ``mc_moves`` (minimal planner, 3-T22b) whether the workload declares MC moves.
+        ``mc`` (minimal planner, 3-T11) is ``(mc_moves, Workload.mc_energy_precision)``; its moves also
+        choose the fixcm projection (3-T22b).
         """
         from fastmace.longrange import polar as longrange
         from fastmace.model.capabilities import ModelTraits, model_traits
@@ -531,10 +532,10 @@ class FixedPlanner:
                 book.decide("integrator", "Langevin", f"NVT, fixcm={integrator.fixcm} (workflow.GPUEngine)")
             book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
                         "fixed cell: the graph engine computes no stress")
-            integrator = _fixcm_projection(book, integrator, npt=npt, mc_moves=mc_moves)
+            integrator = _fixcm_projection(book, integrator, npt=npt, mc_moves=bool(mc and mc[0]))
 
         phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
-                                       evaluation=evaluation)
+                                       evaluation=evaluation, mc=mc)
         return dict(
             tier="compiled" if evaluation else TIER,
             rewrites=dataclasses.replace(rewrites, **rewrite_values),
@@ -552,7 +553,7 @@ class FixedPlanner:
             auto_options_off=tuple(values["_auto_off"].items()),
         )
 
-    def _phase_3_fields(self, book, dtype, rule_11=None, *, polar=False, npt=False, evaluation=False):
+    def _phase_3_fields(self, book, dtype, rule_11=None, *, polar=False, npt=False, evaluation=False, mc=None):
         """The phase 3 "auto" fields (plan task 3-T01): rule 11's skin and headroom (3-T05), the re-capture
         budget (3-T04) and the MC energy precision (3-T11, which changes it only for MC plans).
 
@@ -566,7 +567,13 @@ class FixedPlanner:
         hold at once has cycled through its whole working set of edge sizes and stages, so its variants do
         not fit, and the compiled tier (no graphs) is the better plan for it. The rule needs no run length,
         GPU or structure. With PolarMACE and a variable cell the plan also records the per-step k-vector
-        check, one host sync after every force stage (3-T04, conductor answer 1)."""
+        check, one host sync after every force stage (3-T04, conductor answer 1).
+
+        The MC energy precision (3-T11; SPEC §10.4, decision 35): ``mc`` is ``(mc_moves,
+        Workload.mc_energy_precision)``. Without MC moves it is the force precision, which nothing reads.
+        For an MC plan, "auto" is the force precision pending the move-energy gate, which keeps it if the
+        gate passes and revises the plan to float64 otherwise (``fallback.mc_energy_revision``); an
+        explicit precision is gated as it is, and float32 below a float64 force precision is refused."""
         n, e, p = self.neighbours, self.engine, self.precision
         applies, sized = rule_11 if rule_11 is not None else (False, None)
         neighbours = {}
@@ -607,10 +614,27 @@ class FixedPlanner:
         if polar and npt and not evaluation:
             book.decide("overflow check", "per step", "PolarMACE with a variable cell: the k-vector flag is read "
                         "after every force stage, one host sync per step (3-T04)")
-        mc_energy = dtype if p.mc_energy == "auto" else p.mc_energy
-        book.decide("PrecisionConfig.mc_energy", mc_energy, _why(
-            p.mc_energy, AUTO_RULES["PrecisionConfig.mc_energy"],
-            "the force precision: no MC energies before the move-energy gate (3-T11)"))
+        moves, requested = mc if mc is not None else ((), "auto")
+        rule = AUTO_RULES["PrecisionConfig.mc_energy"]
+        if p.mc_energy != "auto":
+            mc_energy, why = p.mc_energy, _why(p.mc_energy, rule, "kept as given")
+        elif not moves:
+            mc_energy, why = dtype, Reason(_why("auto", rule, "the force precision: no MC moves, no MC energies"),
+                                           code="mc-energy-no-mc")
+        elif requested == "auto":
+            mc_energy = dtype
+            why = Reason(_why("auto", rule, f"pending the move-energy gate: the force precision {dtype} if it passes, "
+                              "float64 otherwise, while MD forces keep theirs (SPEC §10.4, §12.3, decision 35)"),
+                         code="mc-energy-gate-pending")
+        else:
+            mc_energy = requested
+            why = Reason(f"Workload.mc_energy_precision={requested!r}, checked by the move-energy gate (SPEC §10.4)",
+                         code="mc-energy-requested")
+            if requested == "float32" and dtype == "float64":
+                book.refuse("Workload.mc_energy_precision='float32' is below the float64 force precision: MC energies "
+                            "are never evaluated below the force precision (SPEC §10.4); use 'auto' or 'float64'",
+                            "mc-energy-below-force-precision")
+        book.decide("PrecisionConfig.mc_energy", mc_energy, why)
         return {"neighbours": neighbours, "engine": {"recapture_budget": budget},
                 "precision": {"mc_energy": mc_energy}}
 

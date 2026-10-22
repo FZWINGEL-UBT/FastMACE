@@ -53,8 +53,9 @@ from typing import Any
 
 TASK_CANDIDATES = "plan task 2-T06"
 TASK_SEARCH = "plan task 2-T15"
-# The dimensions a phase 2 fallback changes (SPEC §9.3): precision is not one (conductor answers).
-DIMENSIONS = ("mode", "rewrites", "backend")
+# The dimensions a fallback changes (SPEC §9.3): the MC energy precision first (3-T11, §9.4 step 2), then
+# phase 2's. The force precision is not one (conductor answers): it is the physics the user chose.
+DIMENSIONS = ("mc_energy", "mode", "rewrites", "backend")
 # "passed": a diagnosis run that passed the reduced gate (never activated; 2-T15).
 OUTCOMES = ("activated", "passed", "failed", "skipped")
 # Where a failure was raised; the fallback classifies by stage, never by exception type alone.
@@ -234,6 +235,9 @@ def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: An
 
     ``changes`` holds ``"reason"`` (why the candidate is tried) and exactly one of:
 
+    - ``"mc_energy"``: ``"float64"``, the MC energy path in float64 while MD forces keep their
+      precision (3-T11; nothing is re-planned);
+
     - ``"rewrites"``: a ``RewriteConfig`` or a mapping of its fields to ``"on"``/``"off"`` (``bool``
       for a ``bool`` field), applied to the plan's resolved rewrite set;
     - ``"mode"``: one of ``minimal.MODES``, re-planned through ``planner``;
@@ -254,7 +258,7 @@ def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: An
     unknown = sorted(set(changes) - set(DIMENSIONS))
     if unknown:
         raise ValueError(f"candidate changes {unknown} are not fallback dimensions; they are one of {DIMENSIONS} "
-                         "(precision is not one in phase 2, and the physics never changes)")
+                         "(the force precision is not one, and the physics never changes)")
     if runner is not None and (dimensions != ["backend"] or runner != "subprocess"):
         raise ValueError("changes['runner'] is only 'subprocess', with a backend change (SPEC §9.4 step 3)")
     if len(dimensions) != 1:
@@ -263,6 +267,15 @@ def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: An
         raise ValueError("a candidate needs changes['reason']: why it is tried")
     dimension = dimensions[0]
     value = changes[dimension]
+    if dimension == "mc_energy":
+        # The MC energy path only (3-T11): MD forces keep their precision, so the force path is unchanged.
+        if value != "float64":
+            raise ValueError(f"changes['mc_energy'] is 'float64' (MC energies move up, never below the force "
+                             f"precision), got {value!r}")
+        if plan.precision.mc_energy == value:
+            raise ValueError("changes['mc_energy'] changes nothing: the plan's MC energies are float64 already")
+        return plan.revise(f"{PREFIX}mc_energy {value}: {why}", 0, selfchecks=(),
+                           precision=dataclasses.replace(plan.precision, mc_energy=value))
     if dimension == "rewrites":
         change, fields = _rewrite_candidate(plan, value, why)
     else:
@@ -440,7 +453,7 @@ def _text(error) -> str:
 
 def activate(candidate: Any, planner: Any, force_field: Any, atoms: Any, *, references: Any, reduced: bool = False,
              quantities: Sequence[str] | None = None, budget: Budget | None = None, compile_cache: Any = None,
-             temperature_K: float | None = None) -> Activation:
+             temperature_K: float | None = None, moves: Any = None) -> Activation:
     """Run the self-checks and the gate on ``candidate`` in the mode it will run in, and only then
     make it active; a failing candidate is recorded and never activated (§9.4 step 4).
 
@@ -450,7 +463,10 @@ def activate(candidate: Any, planner: Any, force_field: Any, atoms: Any, *, refe
     - ``reduced``: these references are the reduced gate's (one rattled copy), so the run counts as a
       reduced-gate run, else as a full one; ``quantities`` go to ``selfcheck.production`` (the failing
       quantity of the reduced gate);
-    - ``budget``: counted, when given.
+    - ``budget``: counted, when given;
+    - ``moves``: an MC plan's move-energy references (``selfcheck.move_references``); the candidate then
+      passes the move-energy gate too (``selfcheck.move_gate``), and its MC energy precision is the one
+      the gate chose (``mc_energy_revision``, 3-T11).
 
     Only a gate record that passed (``passed``, ``passed-reduced``) validates; ``unavailable`` does not.
     A ``runner="subprocess"`` candidate cannot be built here: ``ProcessConstraintError``, which 2-T15
@@ -510,12 +526,18 @@ def activate(candidate: Any, planner: Any, force_field: Any, atoms: Any, *, refe
     if not gate.passed:
         del engine
         return failed("gate", RuntimeError(f"gate {gate.status}: {gate.reason}"), gate=gate, runs=1)
+    if moves is not None:
+        try:
+            gate = selfcheck.move_gate(engine, moves, plan=candidate, force_field=force_field, record=gate)
+        except GateFailed as error:
+            del engine
+            return failed("gate", error, gate=error.gate_record, runs=0)
 
     tried = TriedCandidate(dimension=dimension, change=change, outcome="activated", reason=why,
                            revision=candidate.revision, reduced_gate_runs=1 if reduced else 0,
                            full_gate_runs=0 if reduced else 1)
     built = getattr(engine, "plan", None) or candidate
-    active = dataclasses.replace(built, fallbacks=(*candidate.fallbacks, tried))
+    active = mc_energy_revision(dataclasses.replace(built, fallbacks=(*candidate.fallbacks, tried)), gate)
     engine.plan = active
     return Activation(activated=True, plan=active, candidate=candidate, tried=tried, engine=engine, gate=gate)
 
@@ -558,6 +580,36 @@ class Failure:
         failing = tuple(q for q in selfcheck.QUANTITIES
                         if not (getattr(record, "quantities", None) or {}).get(q, {}).get("passed", True))
         return failing or selfcheck.QUANTITIES
+
+
+def move_energy_only(failure: Failure) -> bool:
+    """Did only the move-energy part of the gate fail (SPEC §9.4 step 2; 3-T11)? The energy, force and
+    stress gate passed or was skipped, and ``move_energy.status`` is ``failed``."""
+    record = failure.gate
+    part = getattr(record, "move_energy", None) or {}
+    return (failure.stage == "gate" and part.get("status") == "failed"
+            and getattr(record, "status", None) in ("passed", "passed-reduced", "skipped"))
+
+
+MC_ENERGY_WHY = "the move-energy gate"
+
+
+def mc_energy_revision(plan: Any, record: Any) -> Any:
+    """``plan`` with the MC energy precision the move-energy gate chose (``record.mc_energy_precision``), as a
+    fallback revision in the ``mc_energy`` dimension with its ``TriedCandidate`` (3-T11; SPEC §9.4 step 2,
+    decision 35). The plan itself when the gate kept the plan's precision or did not run.
+
+    The engine is the same: MD forces keep their precision, and only the MC evaluator reads the field.
+    """
+    chosen = getattr(record, "mc_energy_precision", None)
+    if chosen is None or plan.precision is None or chosen == plan.precision.mc_energy:
+        return plan
+    part = getattr(record, "move_energy", None) or {}
+    why = part.get("reason") or MC_ENERGY_WHY
+    revised = candidate(plan, {"mc_energy": chosen, "reason": why}, None, None)
+    tried = TriedCandidate(dimension="mc_energy", change=f"mc_energy {chosen}", outcome="activated", reason=why,
+                           stage=None, revision=revised.revision)
+    return dataclasses.replace(revised, fallbacks=(*plan.fallbacks, tried))
 
 
 @dataclass(frozen=True)
@@ -772,7 +824,7 @@ class Fallback:
     """
 
     def __init__(self, planner: Any, force_field: Any, atoms: Any, integrator: Any, references: Any,
-                 config: Any = None, *, seed: int = 0, gate: Any = None):
+                 config: Any = None, *, seed: int = 0, gate: Any = None, moves: Any = None):
         from fastmace.config import FallbackConfig
 
         self.planner = planner
@@ -783,6 +835,7 @@ class Fallback:
         self.config = FallbackConfig() if config is None else config
         self.seed = seed
         self.gate = gate
+        self.moves = moves  # an MC plan's move-energy references: every run and candidate passes them too (3-T11)
         self.budget = Budget(limit=self.config.diagnosis_budget)
         self.tried: list[TriedCandidate] = []
         self.revisions: list[Any] = []
@@ -872,6 +925,12 @@ class Fallback:
                 raise
             _release(engine)
             return False, stage_of(error, "gate"), detach(error)
+        if record.passed and self.moves is not None:
+            try:
+                selfcheck.move_gate(engine, self.moves, plan=plan, force_field=self.force_field, record=record)
+            except GateFailed as error:
+                _release(engine)
+                return False, "gate", detach(error)
         _release(engine)
         if not record.passed:
             return False, "gate", RuntimeError(f"gate {record.status}: {record.reason}")
@@ -956,7 +1015,7 @@ class Fallback:
         self.revisions.append(plan)
         try:
             activation = activate(plan, self.planner, self.force_field, self.atoms,
-                                  references=self._validation_references(), budget=self.budget)
+                                  references=self._validation_references(), budget=self.budget, moves=self.moves)
         except ProcessConstraintError:
             if plan.runner != "subprocess":
                 raise
@@ -993,6 +1052,9 @@ class Fallback:
         self.failed = failure.plan
         self.first = failure
         self.quantities = failure.quantities()
+        first = self._mc_energy_first(failure)
+        if first is not None:
+            return first
         mode, off, last = self.failed.tier, set(), failure
         rounds = len(_switches(self.failed.rewrites)) + 4 if self.failed.rewrites is not None else 4
         try:
@@ -1014,6 +1076,22 @@ class Fallback:
         except DiagnosisBudgetSpent:
             pass
         return self._terminal()
+
+    def _mc_energy_first(self, failure):
+        """The MC energy precision dimension, before any other (SPEC §9.4 step 2; 3-T11): when only the
+        move-energy part failed, "auto" was asked and the MC energies are not float64 yet, the candidate
+        with float64 MC energies is validated first. ``None`` when that does not apply or it failed."""
+        plan = self.failed
+        if (self.moves is None or not move_energy_only(failure) or plan.workload is None
+                or plan.workload.mc_energy_precision != "auto" or plan.precision.mc_energy == "float64"):
+            return None
+        why = f"{MC_ENERGY_WHY}: only the move-energy part failed ({_text(failure.error)})"
+        revised = candidate(plan, {"mc_energy": "float64", "reason": why}, self.force_field, self.atoms)
+        self.revisions.append(revised)
+        activation = activate(revised, self.planner, self.force_field, self.atoms,
+                              references=self._validation_references(), budget=self.budget, moves=self.moves)
+        self.tried.append(activation.tried)
+        return self._result(activation) if activation.activated else None
 
     def _round(self, mode, off, last):
         """One reaction to ``last``: ``(mode, off, activation)``, or ``None`` when the diagnosis is done."""

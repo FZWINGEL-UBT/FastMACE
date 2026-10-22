@@ -258,6 +258,32 @@ def gate_line(gate) -> str:
 
 
 
+def move_energy_line(gate) -> str | None:
+    """The report's MC energy line from a gate record's move-energy part (3-T11; SPEC §12.3, §10.4, decision 35):
+    the MC energy precision and why, the worst ΔE error per move type in k_B T_min against 0.01. ``None``
+    without an MC plan."""
+    gate = _mapping(gate)
+    part = None if gate is None else gate.get("move_energy")
+    if not part:
+        return None
+    precision, status = part.get("precision"), part.get("status")
+    limit = f"limit {part.get('fraction', 0.01):g} k_B T_min at T_min {part.get('min_mc_temperature_K', 0):g} K"
+    if status == "unavailable":
+        return f"{precision}; move-energy gate unavailable ({part.get('reason')})"
+    moves = part.get("moves") or {}
+    worst = ", ".join(f"{move} {entry['worst_k_B_T_min']:.2g}" for move, entry in moves.items())
+    text = f"{precision}; move-energy gate {status} (worst ΔE error in k_B T_min: {worst or 'none'}; {limit}"
+    text += f"; {part.get('configurations', 0)} configurations"
+    if part.get("not_sampleable"):
+        text += f"; {len(part['not_sampleable'])} not sampleable"
+    text += ")"
+    tried = part.get("tried") or ()
+    if len(tried) > 1:
+        steps = ", ".join(f"{entry['precision']} {entry['status']}" for entry in tried)
+        text += f"; {steps} (MD forces keep their precision)"
+    return text
+
+
 def revision_lines(plan) -> list[str]:
     """One line per fallback revision of ``plan``'s chain, oldest first (SPEC §9.4, §9.5; 2-T15):
     ``plan revision 1 (fallback): rewrites X, Y off, reason …``. Empty when nothing fell back."""
@@ -480,7 +506,10 @@ class Report:
         fields = [("", self._header()), ("physics", self._physics()), ("plan", self._plan())]
         fields += [(None, line) for line in revision_lines(self.plan)]
         fields += self._why()
-        fields += [("gate", self._gate())] + ([("mc", self._mc())] if self.mc else [])
+        fields += [("gate", self._gate())]
+        mc_energy = move_energy_line(self.gate)
+        fields += [("mc ΔE", mc_energy)] if mc_energy else []
+        fields += [("mc", self._mc())] if self.mc else []
         fields += [("setup", self._setup()), ("speed", self._speed()),
                    ("output", ", ".join(self.outputs) or "none"), ("licence", self.licence_line)]
         warnings = self.warnings() or ["none"]
@@ -538,6 +567,9 @@ class Report:
             "setup_total_s": float(sum(self.setup_s.values())),
             "licence": {"licence": self.licence, "source": "label table" if self.licence else None},
             "gate_status": "skipped" if self.gate is None else self.gate.get("status", "skipped"),
+            "move_energy_status": None if not (self.gate or {}).get("move_energy") else
+            self.gate["move_energy"].get("status"),
+            "mc_energy_precision": None if self.gate is None else self.gate.get("mc_energy_precision"),
             "reasons": [{"kind": kind, "text": text} for kind, text in why],
             "warnings": self.warnings(),
             "mc": None if not self.mc else {

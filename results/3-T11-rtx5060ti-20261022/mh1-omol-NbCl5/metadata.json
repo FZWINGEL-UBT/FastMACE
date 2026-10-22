@@ -1,0 +1,1511 @@
+{
+  "schema_version": 1,
+  "status": "done",
+  "tool": "move_energy_precision",
+  "created_utc": "2026-10-22T04:38:50.290005+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": null,
+  "model": "mh1",
+  "head": "omol",
+  "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "superset": [
+    "Na",
+    "Nb",
+    "O",
+    "Cl"
+  ],
+  "temperatures_K": [
+    300.0,
+    1500.0
+  ],
+  "md_steps": 2000,
+  "timestep_fs": 1.0,
+  "min_mc_temperature_K": 250.0,
+  "threshold_eV": 0.00021543333155000003,
+  "max_displacement_A": 0.15,
+  "samples": {
+    "swap": 4,
+    "transmute": 2,
+    "displace": 8
+  },
+  "seed": 1,
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/home/fzwin/.cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "runs": {
+    "NbCl5@300K": {
+      "structure": "NbCl5",
+      "natoms": 1944,
+      "temperature_K": 300.0,
+      "build_s": 24.815708280999388,
+      "plan_backend": "hybrid",
+      "describe": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = O Na Cl Nb  (declared (species=), beyond the structure (O Na absent): graph mode, species-dependent rewrites and tables built for the superset (SPEC \u00a78.5, \u00a79.3 rule 8))\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1500 K  (rule 11 sizes the skin and headroom: skin 1.49 A, headroom 1.3 (fastest of 1944 atoms at 1500 K, lightest mass 15.999 u, 1 fs: 0.0371 A per step, 16 steps per rebuild; plus 2 x 0.15 A for displacement moves))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = swap, transmute, displace  (MC: phase 3; Simulation.run refuses mc= blocks)\n  workload.species_changes = on  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (1944 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  NeighbourConfig.skin = 1.49 A  (auto (rule_11_skin_from_workload): skin 1.49 A, headroom 1.3 (fastest of 1944 atoms at 1500 K, lightest mass 15.999 u, 1 fs: 0.0371 A per step, 16 steps per rebuild; plus 2 x 0.15 A for displacement moves))\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.3 from the skin, edge_bucket_fraction as given)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04); rule 11 expects at most 13 padded edge buckets inside the capacity)\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): pending the move-energy gate: the force precision float32 if it passes, float64 otherwise, while MD forces keep theirs (SPEC \u00a710.4, \u00a712.3, decision 35))\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+      "md_s": 52.7711313960026,
+      "references_s": 87.08846678700502,
+      "references": {
+        "ran": "child process",
+        "device": "cuda:0",
+        "steps": [
+          {
+            "device": "cuda:0",
+            "cell": "production",
+            "repeat": null,
+            "atoms": 1944,
+            "outcome": "ran",
+            "reason": null,
+            "process": "child",
+            "gpu_free_bytes": 13207863296
+          }
+        ],
+        "unavailable": null
+      },
+      "configurations": 65,
+      "not_sampleable": [],
+      "float32": {
+        "seconds": 5.325066823002999,
+        "info": {
+          "precision": "float32",
+          "force_precision": "float32",
+          "backend": "hybrid",
+          "copy": false,
+          "compile_mode": "default",
+          "captured": true,
+          "memory_bytes": 0,
+          "evaluations": 65
+        },
+        "skipped": [],
+        "rows": [
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1866, 1464; base: atom 1866 Cl -> O; base: atom 1464 Cl -> Na)",
+            "production": -0.19530701637268066,
+            "reference": -0.19531768187880516,
+            "error": 1.066550612449646e-05
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 65, 1743; base: atom 65 Cl -> O; base: atom 1743 Cl -> Na)",
+            "production": 0.23604953289031982,
+            "reference": 0.2360512763261795,
+            "error": 1.7434358596801758e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1345, 1012; base: atom 1345 Cl -> O; base: atom 1012 Nb -> Na)",
+            "production": 3.947439730167389,
+            "reference": 3.9474538415670395,
+            "error": 1.411139965057373e-05
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1930, 1619; base: atom 1930 Cl -> O; base: atom 1619 Cl -> Na)",
+            "production": -0.31548190116882324,
+            "reference": -0.31550566852092743,
+            "error": 2.3767352104187012e-05
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 1235, 1475; base: atom 1235 Nb -> O)",
+            "production": 0.900240421295166,
+            "reference": 0.9002343751490116,
+            "error": 6.0461461544036865e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 720, 923; base: atom 720 Nb -> O)",
+            "production": 1.3352400064468384,
+            "reference": 1.335243720561266,
+            "error": 3.7141144275665283e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 371, 1258; base: atom 371 Nb -> O)",
+            "production": 0.7085151076316833,
+            "reference": 0.7085153944790363,
+            "error": 2.868473529815674e-07
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 149, 709; base: atom 149 Nb -> O)",
+            "production": 0.84291672706604,
+            "reference": 0.8429124876856804,
+            "error": 4.239380359649658e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1939, 298; base: atom 1939 Cl -> O)",
+            "production": 17.255720853805542,
+            "reference": 17.25572783872485,
+            "error": 6.984919309616089e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1291, 1234; base: atom 1291 Cl -> O)",
+            "production": 17.624439597129822,
+            "reference": 17.62444096803665,
+            "error": 1.3709068298339844e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1223, 1375; base: atom 1223 Cl -> O)",
+            "production": 17.318787813186646,
+            "reference": 17.318785563111305,
+            "error": 2.250075340270996e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1323, 1666; base: atom 1323 Cl -> O)",
+            "production": 17.005704522132874,
+            "reference": 17.00571347773075,
+            "error": 8.955597877502441e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 1298, 1567; base: atom 1298 Nb -> Na)",
+            "production": 4.3878912925720215,
+            "reference": 4.38788889721036,
+            "error": 2.3953616619110107e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 1300, 665; base: atom 1300 Nb -> Na)",
+            "production": 4.9698198437690735,
+            "reference": 4.96982754021883,
+            "error": 7.696449756622314e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 515, 1772; base: atom 515 Nb -> Na)",
+            "production": 4.834905743598938,
+            "reference": 4.834913149476051,
+            "error": 7.405877113342285e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 79, 212; base: atom 79 Nb -> Na)",
+            "production": 5.2956936955451965,
+            "reference": 5.295706633478403,
+            "error": 1.2937933206558228e-05
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 855, 942; base: atom 855 Cl -> Na)",
+            "production": 13.218500256538391,
+            "reference": 13.218498326838017,
+            "error": 1.9297003746032715e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 1471, 367; base: atom 1471 Cl -> Na)",
+            "production": 13.417656183242798,
+            "reference": 13.41764385998249,
+            "error": 1.2323260307312012e-05
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 28, 1302; base: atom 28 Cl -> Na)",
+            "production": 14.303558766841888,
+            "reference": 14.303539719432592,
+            "error": 1.9047409296035767e-05
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 706, 1520; base: atom 706 Cl -> Na)",
+            "production": 13.21711015701294,
+            "reference": 13.217104453593493,
+            "error": 5.7034194469451904e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 1321, 1374)",
+            "production": 18.354453563690186,
+            "reference": 18.354450922459364,
+            "error": 2.641230821609497e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 274, 1666)",
+            "production": 17.96172869205475,
+            "reference": 17.961737733334303,
+            "error": 9.041279554367065e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 993, 729)",
+            "production": 18.076884984970093,
+            "reference": 18.076888877898455,
+            "error": 3.8929283618927e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 1601, 367)",
+            "production": 18.316293716430664,
+            "reference": 18.316311214119196,
+            "error": 1.749768853187561e-05
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> O",
+            "production": 10479.121391892433,
+            "reference": 10479.121389370412,
+            "error": 2.522021532058716e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> Na",
+            "production": 8108.729517817497,
+            "reference": 8108.729523509741,
+            "error": 5.692243576049805e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> Nb",
+            "production": 10978.972312688828,
+            "reference": 10978.972314216197,
+            "error": 1.5273690223693848e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> O",
+            "production": 10479.099182844162,
+            "reference": 10479.09918711707,
+            "error": 4.2729079723358154e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> Na",
+            "production": 8108.999407052994,
+            "reference": 8108.999416045845,
+            "error": 8.99285078048706e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> Nb",
+            "production": 10979.36331152916,
+            "reference": 10979.36332244426,
+            "error": 1.0915100574493408e-05
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> O",
+            "production": -482.62850689888,
+            "reference": -482.62850051000714,
+            "error": 6.388872861862183e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> Na",
+            "production": -2857.0467165112495,
+            "reference": -2857.04671600461,
+            "error": 5.066394805908203e-07
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> Cl",
+            "production": -10961.077287197113,
+            "reference": -10961.077281799167,
+            "error": 5.3979456424713135e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> O",
+            "production": -482.541876077652,
+            "reference": -482.5418610498309,
+            "error": 1.5027821063995361e-05
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> Na",
+            "production": -2857.157261133194,
+            "reference": -2857.1572578959167,
+            "error": 3.2372772693634033e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> Cl",
+            "production": -10960.821509242058,
+            "reference": -10960.821500144899,
+            "error": 9.097158908843994e-06
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1710 Cl by 0.15 \u00c5",
+            "production": 0.13583755493164062,
+            "reference": 0.13583610951900482,
+            "error": 1.4454126358032227e-06
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 850 Cl by 0.15 \u00c5",
+            "production": 0.054987430572509766,
+            "reference": 0.05499333515763283,
+            "error": 5.904585123062134e-06
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 876 Cl by 0.15 \u00c5",
+            "production": -0.035608530044555664,
+            "reference": -0.035612720996141434,
+            "error": 4.190951585769653e-06
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 13 Cl by 0.15 \u00c5",
+            "production": 0.05303192138671875,
+            "reference": 0.0530257448554039,
+            "error": 6.1765313148498535e-06
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 753 Cl by 0.15 \u00c5",
+            "production": 0.028061389923095703,
+            "reference": 0.028052974492311478,
+            "error": 8.415430784225464e-06
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1340 Cl by 0.15 \u00c5",
+            "production": 0.011182308197021484,
+            "reference": 0.011169306933879852,
+            "error": 1.300126314163208e-05
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1228 Nb by 0.15 \u00c5",
+            "production": -0.03528761863708496,
+            "reference": -0.03530237451195717,
+            "error": 1.4755874872207642e-05
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1412 Cl by 0.15 \u00c5",
+            "production": 0.023003816604614258,
+            "reference": 0.02299528941512108,
+            "error": 8.527189493179321e-06
+          }
+        ],
+        "passed": true,
+        "nonfinite": [],
+        "moves": {
+          "swap": {
+            "samples": 24,
+            "worst_eV": 2.3767352104187012e-05,
+            "worst_label": "swap O-Na (atoms 1930, 1619; base: atom 1930 Cl -> O; base: atom 1619 Cl -> Na)",
+            "worst_k_B_T_min": 0.0011032346727957848,
+            "passed": true,
+            "median_abs_dE_ref_eV": 13.217104453593493
+          },
+          "transmute": {
+            "samples": 12,
+            "worst_eV": 1.5027821063995361e-05,
+            "worst_label": "transmute atom 1586 Nb -> O",
+            "worst_k_B_T_min": 0.0006975624874699367,
+            "passed": true,
+            "median_abs_dE_ref_eV": 10479.09918711707
+          },
+          "displace": {
+            "samples": 8,
+            "worst_eV": 1.4755874872207642e-05,
+            "worst_label": "displace atom 1228 Nb by 0.15 \u00c5",
+            "worst_k_B_T_min": 0.0006849392694269756,
+            "passed": true,
+            "median_abs_dE_ref_eV": 0.035612720996141434
+          }
+        }
+      },
+      "float64": {
+        "seconds": 29.225823325999954,
+        "info": {
+          "precision": "float64",
+          "force_precision": "float32",
+          "backend": "hybrid",
+          "copy": true,
+          "compile_mode": "none",
+          "captured": true,
+          "memory_bytes": 122239395,
+          "evaluations": 65
+        },
+        "skipped": [],
+        "rows": [
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1866, 1464; base: atom 1866 Cl -> O; base: atom 1464 Cl -> Na)",
+            "production": -0.19531767442822456,
+            "reference": -0.19531768187880516,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 65, 1743; base: atom 65 Cl -> O; base: atom 1743 Cl -> Na)",
+            "production": 0.2360512651503086,
+            "reference": 0.2360512763261795,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1345, 1012; base: atom 1345 Cl -> O; base: atom 1012 Nb -> Na)",
+            "production": 3.947453834116459,
+            "reference": 3.9474538415670395,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1930, 1619; base: atom 1930 Cl -> O; base: atom 1619 Cl -> Na)",
+            "production": -0.3155056722462177,
+            "reference": -0.31550566852092743,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 1235, 1475; base: atom 1235 Nb -> O)",
+            "production": 0.9002343714237213,
+            "reference": 0.9002343751490116,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 720, 923; base: atom 720 Nb -> O)",
+            "production": 1.3352437131106853,
+            "reference": 1.335243720561266,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 371, 1258; base: atom 371 Nb -> O)",
+            "production": 0.7085154019296169,
+            "reference": 0.7085153944790363,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 149, 709; base: atom 149 Nb -> O)",
+            "production": 0.8429125137627125,
+            "reference": 0.8429124876856804,
+            "error": 2.60770320892334e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1939, 298; base: atom 1939 Cl -> O)",
+            "production": 17.255727842450142,
+            "reference": 17.25572783872485,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1291, 1234; base: atom 1291 Cl -> O)",
+            "production": 17.624440990388393,
+            "reference": 17.62444096803665,
+            "error": 2.2351741790771484e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1223, 1375; base: atom 1223 Cl -> O)",
+            "production": 17.318785533308983,
+            "reference": 17.318785563111305,
+            "error": 2.9802322387695312e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1323, 1666; base: atom 1323 Cl -> O)",
+            "production": 17.00571347028017,
+            "reference": 17.00571347773075,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 1298, 1567; base: atom 1298 Nb -> Na)",
+            "production": 4.387888859957457,
+            "reference": 4.38788889721036,
+            "error": 3.725290298461914e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 1300, 665; base: atom 1300 Nb -> Na)",
+            "production": 4.969827555119991,
+            "reference": 4.96982754021883,
+            "error": 1.4901161193847656e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 515, 1772; base: atom 515 Nb -> Na)",
+            "production": 4.834913104772568,
+            "reference": 4.834913149476051,
+            "error": 4.470348358154297e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 79, 212; base: atom 79 Nb -> Na)",
+            "production": 5.295706637203693,
+            "reference": 5.295706633478403,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 855, 942; base: atom 855 Cl -> Na)",
+            "production": 13.218498289585114,
+            "reference": 13.218498326838017,
+            "error": 3.725290298461914e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 1471, 367; base: atom 1471 Cl -> Na)",
+            "production": 13.417643886059523,
+            "reference": 13.41764385998249,
+            "error": 2.60770320892334e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 28, 1302; base: atom 28 Cl -> Na)",
+            "production": 14.303539723157883,
+            "reference": 14.303539719432592,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 706, 1520; base: atom 706 Cl -> Na)",
+            "production": 13.21710442379117,
+            "reference": 13.217104453593493,
+            "error": 2.9802322387695312e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 1321, 1374)",
+            "production": 18.354450937360525,
+            "reference": 18.354450922459364,
+            "error": 1.4901161193847656e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 274, 1666)",
+            "production": 17.961737722158432,
+            "reference": 17.961737733334303,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 993, 729)",
+            "production": 18.076888885349035,
+            "reference": 18.076888877898455,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 1601, 367)",
+            "production": 18.316311225295067,
+            "reference": 18.316311214119196,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> O",
+            "production": 10479.121389374137,
+            "reference": 10479.121389370412,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> Na",
+            "production": 8108.7295235060155,
+            "reference": 8108.729523509741,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> Nb",
+            "production": 10978.972314216197,
+            "reference": 10978.972314216197,
+            "error": 0.0
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> O",
+            "production": 10479.099187120795,
+            "reference": 10479.09918711707,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> Na",
+            "production": 8108.99941604957,
+            "reference": 8108.999416045845,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> Nb",
+            "production": 10979.36332245171,
+            "reference": 10979.36332244426,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> O",
+            "production": -482.62850051373243,
+            "reference": -482.62850051000714,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> Na",
+            "production": -2857.046715989709,
+            "reference": -2857.04671600461,
+            "error": 1.4901161193847656e-08
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> Cl",
+            "production": -10961.077281795442,
+            "reference": -10961.077281799167,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> O",
+            "production": -482.54186104238033,
+            "reference": -482.5418610498309,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> Na",
+            "production": -2857.1572578959167,
+            "reference": -2857.1572578959167,
+            "error": 0.0
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> Cl",
+            "production": -10960.821500133723,
+            "reference": -10960.821500144899,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1710 Cl by 0.15 \u00c5",
+            "production": 0.13583612069487572,
+            "reference": 0.13583610951900482,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 850 Cl by 0.15 \u00c5",
+            "production": 0.05499333515763283,
+            "reference": 0.05499333515763283,
+            "error": 0.0
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 876 Cl by 0.15 \u00c5",
+            "production": -0.035612717270851135,
+            "reference": -0.035612720996141434,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 13 Cl by 0.15 \u00c5",
+            "production": 0.053025733679533005,
+            "reference": 0.0530257448554039,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 753 Cl by 0.15 \u00c5",
+            "production": 0.028052959591150284,
+            "reference": 0.028052974492311478,
+            "error": 1.4901161193847656e-08
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1340 Cl by 0.15 \u00c5",
+            "production": 0.011169318109750748,
+            "reference": 0.011169306933879852,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1228 Nb by 0.15 \u00c5",
+            "production": -0.03530239313840866,
+            "reference": -0.03530237451195717,
+            "error": 1.862645149230957e-08
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1412 Cl by 0.15 \u00c5",
+            "production": 0.022995296865701675,
+            "reference": 0.02299528941512108,
+            "error": 7.450580596923828e-09
+          }
+        ],
+        "passed": true,
+        "nonfinite": [],
+        "moves": {
+          "swap": {
+            "samples": 24,
+            "worst_eV": 4.470348358154297e-08,
+            "worst_label": "swap Na-Cl (atoms 515, 1772; base: atom 515 Nb -> Na)",
+            "worst_k_B_T_min": 2.0750495413086864e-06,
+            "passed": true,
+            "median_abs_dE_ref_eV": 13.217104453593493
+          },
+          "transmute": {
+            "samples": 12,
+            "worst_eV": 1.4901161193847656e-08,
+            "worst_label": "transmute atom 1443 Nb -> Na",
+            "worst_k_B_T_min": 6.916831804362288e-07,
+            "passed": true,
+            "median_abs_dE_ref_eV": 10479.09918711707
+          },
+          "displace": {
+            "samples": 8,
+            "worst_eV": 1.862645149230957e-08,
+            "worst_label": "displace atom 1228 Nb by 0.15 \u00c5",
+            "worst_k_B_T_min": 8.64603975545286e-07,
+            "passed": true,
+            "median_abs_dE_ref_eV": 0.035612720996141434
+          }
+        }
+      }
+    },
+    "NbCl5@1500K": {
+      "structure": "NbCl5",
+      "natoms": 1944,
+      "temperature_K": 1500.0,
+      "build_s": 24.815708280999388,
+      "plan_backend": "hybrid",
+      "describe": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = O Na Cl Nb  (declared (species=), beyond the structure (O Na absent): graph mode, species-dependent rewrites and tables built for the superset (SPEC \u00a78.5, \u00a79.3 rule 8))\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1500 K  (rule 11 sizes the skin and headroom: skin 1.49 A, headroom 1.3 (fastest of 1944 atoms at 1500 K, lightest mass 15.999 u, 1 fs: 0.0371 A per step, 16 steps per rebuild; plus 2 x 0.15 A for displacement moves))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = swap, transmute, displace  (MC: phase 3; Simulation.run refuses mc= blocks)\n  workload.species_changes = on  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (1944 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  NeighbourConfig.skin = 1.49 A  (auto (rule_11_skin_from_workload): skin 1.49 A, headroom 1.3 (fastest of 1944 atoms at 1500 K, lightest mass 15.999 u, 1 fs: 0.0371 A per step, 16 steps per rebuild; plus 2 x 0.15 A for displacement moves))\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.3 from the skin, edge_bucket_fraction as given)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04); rule 11 expects at most 13 padded edge buckets inside the capacity)\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): pending the move-energy gate: the force precision float32 if it passes, float64 otherwise, while MD forces keep theirs (SPEC \u00a710.4, \u00a712.3, decision 35))\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+      "md_s": 43.853369761003705,
+      "references_s": 84.7573489599963,
+      "references": {
+        "ran": "child process",
+        "device": "cuda:0",
+        "steps": [
+          {
+            "device": "cuda:0",
+            "cell": "production",
+            "repeat": null,
+            "atoms": 1944,
+            "outcome": "ran",
+            "reason": null,
+            "process": "child",
+            "gpu_free_bytes": 12442402816
+          }
+        ],
+        "unavailable": null
+      },
+      "configurations": 65,
+      "not_sampleable": [],
+      "float32": {
+        "seconds": 0.9514999609964434,
+        "info": {
+          "precision": "float32",
+          "force_precision": "float32",
+          "backend": "hybrid",
+          "copy": false,
+          "compile_mode": "default",
+          "captured": true,
+          "memory_bytes": 0,
+          "evaluations": 65
+        },
+        "skipped": [],
+        "rows": [
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1866, 1464; base: atom 1866 Cl -> O; base: atom 1464 Cl -> Na)",
+            "production": 3.7398680448532104,
+            "reference": 3.7398607097566128,
+            "error": 7.335096597671509e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 65, 1743; base: atom 65 Cl -> O; base: atom 1743 Cl -> Na)",
+            "production": -1.8051557540893555,
+            "reference": -1.8051521554589272,
+            "error": 3.598630428314209e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1345, 1012; base: atom 1345 Cl -> O; base: atom 1012 Nb -> Na)",
+            "production": 7.136810004711151,
+            "reference": 7.13681773096323,
+            "error": 7.72625207901001e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1930, 1619; base: atom 1930 Cl -> O; base: atom 1619 Cl -> Na)",
+            "production": -1.5974235534667969,
+            "reference": -1.5974154248833656,
+            "error": 8.128583431243896e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 1235, 1475; base: atom 1235 Nb -> O)",
+            "production": 1.2173047065734863,
+            "reference": 1.2173006646335125,
+            "error": 4.041939973831177e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 720, 923; base: atom 720 Nb -> O)",
+            "production": 1.085957795381546,
+            "reference": 1.0859660468995571,
+            "error": 8.25151801109314e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 371, 1258; base: atom 371 Nb -> O)",
+            "production": 0.36272794008255005,
+            "reference": 0.3627243712544441,
+            "error": 3.5688281059265137e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 149, 709; base: atom 149 Nb -> O)",
+            "production": 1.5498384833335876,
+            "reference": 1.5498380474746227,
+            "error": 4.3585896492004395e-07
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1939, 298; base: atom 1939 Cl -> O)",
+            "production": 14.239480912685394,
+            "reference": 14.239479631185532,
+            "error": 1.2814998626708984e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1291, 1234; base: atom 1291 Cl -> O)",
+            "production": 15.66685163974762,
+            "reference": 15.666848238557577,
+            "error": 3.4011900424957275e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1223, 1375; base: atom 1223 Cl -> O)",
+            "production": 16.14797079563141,
+            "reference": 16.147982988506556,
+            "error": 1.2192875146865845e-05
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1323, 1666; base: atom 1323 Cl -> O)",
+            "production": 13.989902138710022,
+            "reference": 13.989903301000595,
+            "error": 1.1622905731201172e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 1298, 1567; base: atom 1298 Nb -> Na)",
+            "production": 3.415822148323059,
+            "reference": 3.4158273600041866,
+            "error": 5.211681127548218e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 1300, 665; base: atom 1300 Nb -> Na)",
+            "production": 4.004537343978882,
+            "reference": 4.004537232220173,
+            "error": 1.1175870895385742e-07
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 515, 1772; base: atom 515 Nb -> Na)",
+            "production": 5.9747209548950195,
+            "reference": 5.974721152335405,
+            "error": 1.9744038581848145e-07
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 79, 212; base: atom 79 Nb -> Na)",
+            "production": 4.701251447200775,
+            "reference": 4.701257973909378,
+            "error": 6.5267086029052734e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 855, 942; base: atom 855 Cl -> Na)",
+            "production": 10.636277735233307,
+            "reference": 10.636270243674517,
+            "error": 7.491558790206909e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 1471, 367; base: atom 1471 Cl -> Na)",
+            "production": 12.111436188220978,
+            "reference": 12.111445177346468,
+            "error": 8.989125490188599e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 28, 1302; base: atom 28 Cl -> Na)",
+            "production": 11.01968264579773,
+            "reference": 11.019679941236973,
+            "error": 2.7045607566833496e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 706, 1520; base: atom 706 Cl -> Na)",
+            "production": 12.124339580535889,
+            "reference": 12.124347142875195,
+            "error": 7.5623393058776855e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 1321, 1374)",
+            "production": 16.761725425720215,
+            "reference": 16.76173770427704,
+            "error": 1.2278556823730469e-05
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 274, 1666)",
+            "production": 17.022839844226837,
+            "reference": 17.02284162864089,
+            "error": 1.7844140529632568e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 993, 729)",
+            "production": 17.7244171500206,
+            "reference": 17.72441876679659,
+            "error": 1.6167759895324707e-06
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 1601, 367)",
+            "production": 16.997906148433685,
+            "reference": 16.9979008436203,
+            "error": 5.304813385009766e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> O",
+            "production": 10478.292844295502,
+            "reference": 10478.29284017533,
+            "error": 4.120171070098877e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> Na",
+            "production": 8108.918491780758,
+            "reference": 8108.918488483876,
+            "error": 3.296881914138794e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> Nb",
+            "production": 10979.229724884033,
+            "reference": 10979.229727644473,
+            "error": 2.7604401111602783e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> O",
+            "production": 10479.459247112274,
+            "reference": 10479.459245529026,
+            "error": 1.5832483768463135e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> Na",
+            "production": 8108.726330280304,
+            "reference": 8108.726332549006,
+            "error": 2.2687017917633057e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> Nb",
+            "production": 10979.513776540756,
+            "reference": 10979.513782911003,
+            "error": 6.370246410369873e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> O",
+            "production": -483.12785971164703,
+            "reference": -483.1278602555394,
+            "error": 5.438923835754395e-07
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> Na",
+            "production": -2858.510601580143,
+            "reference": -2858.5106010250747,
+            "error": 5.550682544708252e-07
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> Cl",
+            "production": -10961.508472800255,
+            "reference": -10961.508476361632,
+            "error": 3.56137752532959e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> O",
+            "production": -482.36310374736786,
+            "reference": -482.3631019294262,
+            "error": 1.817941665649414e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> Na",
+            "production": -2856.983744800091,
+            "reference": -2856.9837361499667,
+            "error": 8.650124073028564e-06
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> Cl",
+            "production": -10960.992414593697,
+            "reference": -10960.992406148463,
+            "error": 8.44523310661316e-06
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1710 Cl by 0.15 \u00c5",
+            "production": 0.25803470611572266,
+            "reference": 0.25802694633603096,
+            "error": 7.759779691696167e-06
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 850 Cl by 0.15 \u00c5",
+            "production": -0.020654916763305664,
+            "reference": -0.020674843341112137,
+            "error": 1.992657780647278e-05
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 876 Cl by 0.15 \u00c5",
+            "production": -0.10541510581970215,
+            "reference": -0.10543849319219589,
+            "error": 2.3387372493743896e-05
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 13 Cl by 0.15 \u00c5",
+            "production": 0.15543484687805176,
+            "reference": 0.15542319416999817,
+            "error": 1.1652708053588867e-05
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 753 Cl by 0.15 \u00c5",
+            "production": 0.15347862243652344,
+            "reference": 0.1534598208963871,
+            "error": 1.880154013633728e-05
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1340 Cl by 0.15 \u00c5",
+            "production": 0.6632285118103027,
+            "reference": 0.6632139645516872,
+            "error": 1.4547258615493774e-05
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1228 Nb by 0.15 \u00c5",
+            "production": 0.29877758026123047,
+            "reference": 0.2987663559615612,
+            "error": 1.1224299669265747e-05
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1412 Cl by 0.15 \u00c5",
+            "production": 0.018692731857299805,
+            "reference": 0.018693160265684128,
+            "error": 4.284083843231201e-07
+          }
+        ],
+        "passed": true,
+        "nonfinite": [],
+        "moves": {
+          "swap": {
+            "samples": 24,
+            "worst_eV": 1.2278556823730469e-05,
+            "worst_label": "swap Cl-Nb (atoms 1321, 1374)",
+            "worst_k_B_T_min": 0.0005699469406794525,
+            "passed": true,
+            "median_abs_dE_ref_eV": 10.636270243674517
+          },
+          "transmute": {
+            "samples": 12,
+            "worst_eV": 8.650124073028564e-06,
+            "worst_label": "transmute atom 1586 Nb -> Na",
+            "worst_k_B_T_min": 0.00040152208624323084,
+            "passed": true,
+            "median_abs_dE_ref_eV": 10478.29284017533
+          },
+          "displace": {
+            "samples": 8,
+            "worst_eV": 2.3387372493743896e-05,
+            "worst_label": "displace atom 876 Cl by 0.15 \u00c5",
+            "worst_k_B_T_min": 0.001085596751694661,
+            "passed": true,
+            "median_abs_dE_ref_eV": 0.15542319416999817
+          }
+        }
+      },
+      "float64": {
+        "seconds": 19.622972559998743,
+        "info": {
+          "precision": "float64",
+          "force_precision": "float32",
+          "backend": "hybrid",
+          "copy": true,
+          "compile_mode": "none",
+          "captured": true,
+          "memory_bytes": 122239395,
+          "evaluations": 65
+        },
+        "skipped": [],
+        "rows": [
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1866, 1464; base: atom 1866 Cl -> O; base: atom 1464 Cl -> Na)",
+            "production": 3.7398607097566128,
+            "reference": 3.7398607097566128,
+            "error": 0.0
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 65, 1743; base: atom 65 Cl -> O; base: atom 1743 Cl -> Na)",
+            "production": -1.8051521517336369,
+            "reference": -1.8051521554589272,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1345, 1012; base: atom 1345 Cl -> O; base: atom 1012 Nb -> Na)",
+            "production": 7.136817745864391,
+            "reference": 7.13681773096323,
+            "error": 1.4901161193847656e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Na (atoms 1930, 1619; base: atom 1930 Cl -> O; base: atom 1619 Cl -> Na)",
+            "production": -1.5974154397845268,
+            "reference": -1.5974154248833656,
+            "error": 1.4901161193847656e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 1235, 1475; base: atom 1235 Nb -> O)",
+            "production": 1.2173006795346737,
+            "reference": 1.2173006646335125,
+            "error": 1.4901161193847656e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 720, 923; base: atom 720 Nb -> O)",
+            "production": 1.0859660468995571,
+            "reference": 1.0859660468995571,
+            "error": 0.0
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 371, 1258; base: atom 371 Nb -> O)",
+            "production": 0.3627243712544441,
+            "reference": 0.3627243712544441,
+            "error": 0.0
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Cl (atoms 149, 709; base: atom 149 Nb -> O)",
+            "production": 1.5498380474746227,
+            "reference": 1.5498380474746227,
+            "error": 0.0
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1939, 298; base: atom 1939 Cl -> O)",
+            "production": 14.239479623734951,
+            "reference": 14.239479631185532,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1291, 1234; base: atom 1291 Cl -> O)",
+            "production": 15.6668482683599,
+            "reference": 15.666848238557577,
+            "error": 2.9802322387695312e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1223, 1375; base: atom 1223 Cl -> O)",
+            "production": 16.147982958704233,
+            "reference": 16.147982988506556,
+            "error": 2.9802322387695312e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap O-Nb (atoms 1323, 1666; base: atom 1323 Cl -> O)",
+            "production": 13.989903278648853,
+            "reference": 13.989903301000595,
+            "error": 2.2351741790771484e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 1298, 1567; base: atom 1298 Nb -> Na)",
+            "production": 3.415827363729477,
+            "reference": 3.4158273600041866,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 1300, 665; base: atom 1300 Nb -> Na)",
+            "production": 4.004537224769592,
+            "reference": 4.004537232220173,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 515, 1772; base: atom 515 Nb -> Na)",
+            "production": 5.974721144884825,
+            "reference": 5.974721152335405,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Cl (atoms 79, 212; base: atom 79 Nb -> Na)",
+            "production": 4.701257981359959,
+            "reference": 4.701257973909378,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 855, 942; base: atom 855 Cl -> Na)",
+            "production": 10.636270239949226,
+            "reference": 10.636270243674517,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 1471, 367; base: atom 1471 Cl -> Na)",
+            "production": 12.11144519597292,
+            "reference": 12.111445177346468,
+            "error": 1.862645149230957e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 28, 1302; base: atom 28 Cl -> Na)",
+            "production": 11.019679922610521,
+            "reference": 11.019679941236973,
+            "error": 1.862645149230957e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Na-Nb (atoms 706, 1520; base: atom 706 Cl -> Na)",
+            "production": 12.124347154051065,
+            "reference": 12.124347142875195,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 1321, 1374)",
+            "production": 16.7617377191782,
+            "reference": 16.76173770427704,
+            "error": 1.4901161193847656e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 274, 1666)",
+            "production": 17.0228416249156,
+            "reference": 17.02284162864089,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 993, 729)",
+            "production": 17.72441879287362,
+            "reference": 17.72441876679659,
+            "error": 2.60770320892334e-08
+          },
+          {
+            "move": "swap",
+            "label": "swap Cl-Nb (atoms 1601, 367)",
+            "production": 16.9979008436203,
+            "reference": 16.9979008436203,
+            "error": 0.0
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> O",
+            "production": 10478.292840182781,
+            "reference": 10478.29284017533,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> Na",
+            "production": 8108.918488483876,
+            "reference": 8108.918488483876,
+            "error": 0.0
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 108 Cl -> Nb",
+            "production": 10979.22972765565,
+            "reference": 10979.229727644473,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> O",
+            "production": 10479.459245536476,
+            "reference": 10479.459245529026,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> Na",
+            "production": 8108.726332556456,
+            "reference": 8108.726332549006,
+            "error": 7.450580596923828e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 65 Cl -> Nb",
+            "production": 10979.513782922179,
+            "reference": 10979.513782911003,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> O",
+            "production": -483.1278602518141,
+            "reference": -483.1278602555394,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> Na",
+            "production": -2858.5106010064483,
+            "reference": -2858.5106010250747,
+            "error": 1.862645149230957e-08
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1443 Nb -> Cl",
+            "production": -10961.508476328105,
+            "reference": -10961.508476361632,
+            "error": 3.3527612686157227e-08
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> O",
+            "production": -482.3631019182503,
+            "reference": -482.3631019294262,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> Na",
+            "production": -2856.9837361499667,
+            "reference": -2856.9837361499667,
+            "error": 0.0
+          },
+          {
+            "move": "transmute",
+            "label": "transmute atom 1586 Nb -> Cl",
+            "production": -10960.992406137288,
+            "reference": -10960.992406148463,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1710 Cl by 0.15 \u00c5",
+            "production": 0.25802694261074066,
+            "reference": 0.25802694633603096,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 850 Cl by 0.15 \u00c5",
+            "production": -0.02067483961582184,
+            "reference": -0.020674843341112137,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 876 Cl by 0.15 \u00c5",
+            "production": -0.10543849319219589,
+            "reference": -0.10543849319219589,
+            "error": 0.0
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 13 Cl by 0.15 \u00c5",
+            "production": 0.15542320534586906,
+            "reference": 0.15542319416999817,
+            "error": 1.1175870895385742e-08
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 753 Cl by 0.15 \u00c5",
+            "production": 0.1534598171710968,
+            "reference": 0.1534598208963871,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1340 Cl by 0.15 \u00c5",
+            "production": 0.6632139906287193,
+            "reference": 0.6632139645516872,
+            "error": 2.60770320892334e-08
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1228 Nb by 0.15 \u00c5",
+            "production": 0.2987663522362709,
+            "reference": 0.2987663559615612,
+            "error": 3.725290298461914e-09
+          },
+          {
+            "move": "displace",
+            "label": "displace atom 1412 Cl by 0.15 \u00c5",
+            "production": 0.018693163990974426,
+            "reference": 0.018693160265684128,
+            "error": 3.725290298461914e-09
+          }
+        ],
+        "passed": true,
+        "nonfinite": [],
+        "moves": {
+          "swap": {
+            "samples": 24,
+            "worst_eV": 2.9802322387695312e-08,
+            "worst_label": "swap O-Nb (atoms 1291, 1234; base: atom 1291 Cl -> O)",
+            "worst_k_B_T_min": 1.3833663608724576e-06,
+            "passed": true,
+            "median_abs_dE_ref_eV": 10.636270243674517
+          },
+          "transmute": {
+            "samples": 12,
+            "worst_eV": 3.3527612686157227e-08,
+            "worst_label": "transmute atom 1443 Nb -> Cl",
+            "worst_k_B_T_min": 1.5562871559815148e-06,
+            "passed": true,
+            "median_abs_dE_ref_eV": 10478.29284017533
+          },
+          "displace": {
+            "samples": 8,
+            "worst_eV": 2.60770320892334e-08,
+            "worst_label": "displace atom 1340 Cl by 0.15 \u00c5",
+            "worst_k_B_T_min": 1.2104455657634004e-06,
+            "passed": true,
+            "median_abs_dE_ref_eV": 0.15542319416999817
+          }
+        }
+      }
+    }
+  },
+  "model_charge_spin": [
+    null,
+    null
+  ]
+}
