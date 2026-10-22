@@ -4,7 +4,7 @@
     python3 tools/ci/local_gpu.py reserve --purpose TEXT --pid PID [--quiet] [--wait-minutes 60]
     python3 tools/ci/local_gpu.py release --pid PID
     python3 tools/ci/local_gpu.py check [--cpu-only] [--min-available-gib 6]
-    python3 tools/ci/local_gpu.py status
+    python3 tools/ci/local_gpu.py status   # the holder and the queue
 
 A GPU suite started while sibling CPU suites ran has crashed WSL (19 October 2026, when WSL had 15 GB of
 RAM; it has 40 GB since 21 October), and WSL's nvidia-smi does not show who is on the GPU. So every local
@@ -14,6 +14,12 @@ suite checks it first:
 - **reserve** creates the marker directory atomically (``mkdir``; default ``~/.fastmace-local-gpu``, or
   ``$FASTMACE_LOCAL_GPU_MARKER``) with ``holder.json``: owner, purpose, pid, the pid's start time and the
   start of the reservation. While another live holder has it, reserve waits, up to ``--wait-minutes``.
+- Waiters are served **first come, first served**: each reserve or run first puts a ticket into the queue
+  next to the marker (``~/.fastmace-local-gpu-queue/<arrival ns>-<pid>.json``, written to a temp file and
+  renamed) and takes the marker only while its ticket is the oldest live one. Without the queue, waiters
+  raced at each release, and one worker's back-to-back jobs kept four short runs waiting 37 minutes
+  (22 October 2026). A ticket whose waiting process is gone is stale and is dropped; a waiter that gives
+  up removes its own ticket.
 - Holding it, reserve **waits for the machine**: until no other ``pytest`` process that can use the GPU
   runs, and at least ``--min-available-gib`` (default 10) GiB of RAM are available. A pytest process whose
   environment sets ``CUDA_VISIBLE_DEVICES`` empty (or ``-1``) cannot use the GPU and does not count
@@ -50,6 +56,7 @@ BUSY = 75  # EX_TEMPFAIL: not reserved in time
 DEFAULT_MARKER = "~/.fastmace-local-gpu"
 HOLDER = "holder.json"
 UNWRITTEN_GRACE_S = 60.0  # a marker without holder.json is a reserver between mkdir and write, this long
+QUEUE_SUFFIX = "-queue"
 
 
 def default_marker():
@@ -229,6 +236,96 @@ def release(marker, pid):
     return True
 
 
+def queue_dir(marker):
+    """The waiters' queue, next to the marker: ``~/.fastmace-local-gpu-queue``."""
+    marker = Path(marker)
+    return marker.with_name(marker.name + QUEUE_SUFFIX)
+
+
+def _write_atomically(path, data):
+    partial = path.with_name("." + path.name + ".partial")
+    partial.write_text(json.dumps(data) + "\n")
+    partial.replace(path)
+
+
+def enqueue(marker, purpose, pid, waiter, proc_root="/proc", user=None, arrival_ns=None):
+    """Append a ticket for the waiting process ``waiter`` (reserving for ``pid``). (path, ticket)."""
+    queue = queue_dir(marker)
+    queue.mkdir(parents=True, exist_ok=True)
+    arrival_ns = time.time_ns() if arrival_ns is None else arrival_ns
+    ticket = dict(owner=user or getpass.getuser(), purpose=purpose, pid=pid, waiter=waiter,
+                  start_ticks=start_ticks(waiter, proc_root), arrival_ns=arrival_ns)
+    # The name sorts in arrival order; the pid breaks ties.
+    path = queue / f"{arrival_ns:020d}-{waiter}.json"
+    _write_atomically(path, ticket)
+    return path, ticket
+
+
+def dequeue(path):
+    Path(path).unlink(missing_ok=True)
+
+
+def _alive(pid, ticks, proc_root):
+    now_ticks = start_ticks(pid, proc_root)
+    return now_ticks is not None and (ticks is None or now_ticks == ticks)
+
+
+def live_tickets(marker, proc_root="/proc"):
+    """The live tickets, oldest first, as (path, ticket). A stale ticket (its waiter gone, or its pid now
+    another process's) is reported and removed."""
+    try:
+        paths = sorted(p for p in queue_dir(marker).iterdir() if p.suffix == ".json" and not p.name.startswith("."))
+    except OSError:
+        return []
+    live = []
+    for path in paths:
+        try:
+            ticket = json.loads(path.read_text())
+        except FileNotFoundError:
+            continue  # its waiter left meanwhile
+        except (OSError, ValueError):
+            ticket = None
+        if ticket is not None and _alive(ticket.get("waiter"), ticket.get("start_ticks"), proc_root):
+            live.append((path, ticket))
+            continue
+        print(f"local_gpu: removing a stale queue ticket {path.name} ({describe_ticket(ticket or {})}; "
+              "waiter process gone)", file=sys.stderr)
+        dequeue(path)
+    return live
+
+
+def describe_ticket(ticket):
+    return f"{ticket.get('purpose')!r} by {ticket.get('owner')}, pid {ticket.get('pid')}"
+
+
+def take_turn(marker, path, ticket, proc_root="/proc", quiet=False):
+    """One poll of a queued waiter: reserve only if its ticket is the oldest live one. (True, holder) on
+    success (the ticket is then removed); else (False, what it waits for)."""
+    if not path.exists():
+        _write_atomically(path, ticket)  # removed by someone else: back at its place in the queue
+    tickets = live_tickets(marker, proc_root)
+    ahead = [t for p, t in tickets if p.name < path.name]
+    if ahead:
+        return False, f"{len(ahead)} waiter(s) ahead in the queue, first {describe_ticket(ahead[0])}"
+    ok, holder = reserve(marker, ticket["purpose"], ticket["pid"], proc_root, quiet=quiet)
+    if not ok:
+        return False, describe(holder)
+    dequeue(path)
+    return True, holder
+
+
+def queue_lines(marker, proc_root="/proc"):
+    """The queue for ``status``: a header and one line per live ticket, oldest first, with its age."""
+    tickets = live_tickets(marker, proc_root)
+    if not tickets:
+        return ["queue empty"]
+    lines = [f"queue ({len(tickets)} waiting, first served first):"]
+    for i, (_, ticket) in enumerate(tickets, 1):
+        age = max(0, int(time.time() - ticket.get("arrival_ns", 0) / 1e9))
+        lines.append(f"  {i}. {describe_ticket(ticket)}, waiting {age // 60}m{age % 60:02d}s")
+    return lines
+
+
 def machine_reasons(proc_root="/proc", own_pid=None, min_available_gib=None, quiet=False):
     """Why the machine is not free: other pytest processes (only those that can use the GPU, unless
     ``quiet``), and less RAM than ``min_available_gib``."""
@@ -259,17 +356,23 @@ def wait_for_machine(proc_root="/proc", own_pid=None, min_available_gib=10.0, wa
 
 
 def acquire(marker, purpose, pid, proc_root="/proc", wait_s=3600.0, interval_s=30.0, min_available_gib=10.0,
-            clock=time.monotonic, sleep=time.sleep, quiet=False):
-    """Reserve (waiting for another holder), then wait for the machine; release again on failure."""
+            clock=time.monotonic, sleep=time.sleep, quiet=False, waiter=None):
+    """Queue, reserve in arrival order (waiting for the holder and earlier waiters), then wait for the
+    machine; release again on failure. ``waiter`` is the waiting process (default ``pid``): its ticket is
+    stale once it is gone."""
     start = clock()
-    while True:
-        ok, holder = reserve(marker, purpose, pid, proc_root, quiet=quiet)
-        if ok:
-            break
-        waited = clock() - start
-        if waited >= wait_s:
-            return False, [describe(holder)]
-        sleep(min(interval_s, wait_s - waited))
+    path, ticket = enqueue(marker, purpose, pid, pid if waiter is None else waiter, proc_root)
+    try:
+        while True:
+            ok, reason = take_turn(marker, path, ticket, proc_root, quiet=quiet)
+            if ok:
+                break
+            waited = clock() - start
+            if waited >= wait_s:
+                return False, [reason]
+            sleep(min(interval_s, wait_s - waited))
+    finally:
+        dequeue(path)
     left = max(0.0, wait_s - (clock() - start))
     ok, reasons = wait_for_machine(proc_root, pid, min_available_gib, left, interval_s, clock, sleep, quiet=quiet)
     if not ok:
@@ -339,7 +442,7 @@ def main(argv=None):
     check_cmd.add_argument("--min-available-gib", type=float, default=None)
     check_cmd.add_argument("--cpu-only", action="store_true",
                            help="for a suite run with CUDA_VISIBLE_DEVICES=: only a quiet reservation blocks it")
-    commands.add_parser("status", help="print the holder, if any")
+    commands.add_parser("status", help="print the holder, if any, and the queue")
     # Accept --marker after the subcommand as well.
     for sub in (run, reserve_cmd, release_cmd, check_cmd):
         sub.add_argument("--marker", type=Path, default=None, dest="sub_marker", help=argparse.SUPPRESS)
@@ -349,6 +452,7 @@ def main(argv=None):
     if args.command == "status":
         holder = live_holder(marker)
         print(describe(holder) if holder else "local GPU free")
+        print("\n".join(queue_lines(marker)))
         return 0
     if args.command == "check":
         free, reasons = check(marker, min_available_gib=args.min_available_gib, cpu_only=args.cpu_only)
@@ -362,7 +466,7 @@ def main(argv=None):
     pid = os.getpid() if args.command == "run" else args.pid
     ok, reasons = acquire(marker, args.purpose, pid, wait_s=args.wait_minutes * 60.0,
                           interval_s=args.interval_seconds, min_available_gib=args.min_available_gib,
-                          quiet=args.quiet)
+                          quiet=args.quiet, waiter=os.getpid())
     if not ok:
         print("local_gpu: not reserved in time: " + "; ".join(reasons), file=sys.stderr)
         return BUSY
