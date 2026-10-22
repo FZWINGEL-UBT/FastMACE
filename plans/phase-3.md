@@ -1426,9 +1426,9 @@ idle.
 | T14 | $1 |
 | T16 | $0.50 |
 | T20 | $2 |
-| T21 | $4 |
+| T21 | $4, raised to $6 by the conductor (22 October 2026): item 9's and item 1's Ada legs moved to the L4, because their leeloo runs were made on trees whose `fastmace/` differs from the freeze |
 
-That is at most $12.50. This month $3.65 is metered so far (22 October), so
+That is at most $14.50 (originally $12.50). The month stood at $7.86 metered after 3-T20's L4 job. This month $3.65 is metered so far (22 October), so
 the total stays inside the $27 limit.
 
 ## Open findings from merged tasks (for 3-T21's report)
