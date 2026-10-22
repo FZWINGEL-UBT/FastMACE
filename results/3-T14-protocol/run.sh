@@ -4,6 +4,8 @@
 #   bash results/3-T14-protocol/run.sh start  RUN_DIR PROTOCOL STEPS   # relaxation + the first STEPS steps
 #   bash results/3-T14-protocol/run.sh resume RUN_DIR STEPS            # the next STEPS steps (and the quench)
 #   bash results/3-T14-protocol/run.sh smoke  RUN_DIR                  # smoke.toml: start 3000, resume the rest
+#   bash results/3-T14-protocol/run.sh yaml   PROTOCOL OUT.yaml CHECKOUT  # for a host without tomllib/tomli:
+#       the protocol as YAML, its shipped structure path made absolute under CHECKOUT (that host's copy)
 #
 # PROTOCOL is a shipped protocol name or a TOML file. Every piece appends to RUN_DIR/pieces.log.
 set -euo pipefail
@@ -27,6 +29,7 @@ fastmace() {
 # A shipped protocol name becomes its file; its relative structure path is a file shipped with it.
 config_for() {
     local source="$1" out="$2" data="$checkout/fastmace/protocols/data"
+    case "$source" in *.yaml|*.yml) echo "$source"; return ;; esac  # made elsewhere (yaml_protocol below)
     [ -f "$source" ] || source="$data/$source.toml"
     if "$python" -c "import tomllib" 2>/dev/null || "$python" -c "import tomli" 2>/dev/null; then
         if [ "$(dirname "$(realpath "$source")")" = "$(realpath "$data")" ]; then
@@ -65,8 +68,22 @@ case "$1" in
         fastmace "$2.pieces.log" run "$(config_for "$config" "$2.smoke")" --output "$2" --steps 3000
         fastmace "$2.pieces.log" run --resume "$2"
         ;;
+    yaml)
+        source="$2"; data="$checkout/fastmace/protocols/data"
+        [ -f "$source" ] || source="$data/$source.toml"
+        python3 - "$source" "$3" "$4/fastmace/protocols/data" <<'PY'
+import json, os, sys, tomllib
+source, out, target = sys.argv[1:]
+with open(source, "rb") as handle:
+    config = tomllib.load(handle)
+if "structure" in config and not os.path.isabs(config["structure"]):
+    config["structure"] = f"{target}/{config['structure']}"
+with open(out, "w") as handle:
+    json.dump(config, handle, indent=1)
+PY
+        ;;
     *)
-        echo "usage: run.sh start RUN_DIR PROTOCOL STEPS | resume RUN_DIR STEPS | smoke RUN_DIR" >&2
+        echo "usage: run.sh start RUN_DIR PROTOCOL STEPS | resume RUN_DIR STEPS | smoke RUN_DIR | yaml PROTOCOL OUT CHECKOUT" >&2
         exit 2
         ;;
 esac
