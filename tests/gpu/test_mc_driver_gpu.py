@@ -102,6 +102,11 @@ for step in (2, 4, 6, 8):
 out["metropolis_counters"] = driver.counters
 out["chlorine"] = counts
 out["records"] = driver.state_dict()
+# A second driver on the same engine has its own captured attempts (the graph keys carry the driver's id).
+second = MCDriver([Swap([("Na", "Cl")], every=1, attempts=5)], seed=8)
+second.attach(sim._engine)
+sim.run(steps=1)
+out["second"] = second.run_block(sim._engine, 9)["moves"]
 print(json.dumps(out, default=str))
 """
 
@@ -121,4 +126,5 @@ def test_captured_attempts_tiny_plain_cueq():
     counters = out["metropolis_counters"]
     assert counters["swap"]["attempted"] == 16 and counters["transmute"]["attempted"] == 12
     assert counters["swap"]["impossible"] == 0
-    assert out["chlorine"] == [32, 32, 32, 32]  # swaps and Na <-> K keep the chlorine count
+    assert out["chlorine"] == [32, 32, 32, 32]
+    assert out["second"][0]["attempted"] == 5  # swaps and Na <-> K keep the chlorine count

@@ -14,12 +14,14 @@ The driver is attached to a built engine (``attach``); ``Simulation.run(mc=...)`
 from __future__ import annotations
 
 import dataclasses
+import itertools
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 from fastmace.config import MC_STREAMS, MCConfig, mc_stream_seeds
 from fastmace.mc.moves import Displace, Swap, Transmute
 
+_IDS = itertools.count()
 # k_B in eV/K (ase.units.kB, CODATA 2018), as fastmace.mc.moves.
 K_B_EV_PER_K = 8.617333262e-5
 COUNTER_KEYS = ("attempted", "impossible", "accepted")
@@ -86,6 +88,7 @@ class MCDriver:
         self.attempts: list = []
         self.streams = None
         self._replays: dict = {}
+        self.id = next(_IDS)
 
     # ------------------------------------------------------------------ setup
 
@@ -215,7 +218,8 @@ class MCDriver:
 
         engine, attempt = self.engine, self.attempts[index]
         edges = engine._active_edges() if hasattr(engine, "_active_edges") else None
-        key = (f"mc.{attempt.move.move}", index, self.evaluator.precision, edges)
+        # The driver's id: another driver on the same engine has its own graphs (and its own tensors in them).
+        key = (f"mc.{attempt.move.move}", self.id, index, self.evaluator.precision, edges)
         replay = self._replays.get(key)
         if replay is None:
             stage, trial = self.evaluator.stage() if getattr(self.evaluator, "graph", False) else (None, None)

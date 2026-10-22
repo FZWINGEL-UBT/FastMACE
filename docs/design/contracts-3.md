@@ -236,7 +236,7 @@ compatibility promise: a restart record's (seed, offset) must give the same numb
   `MCEvaluator(engine)` (the force precision); pass a float64 `MCEvaluator` for float64 MC energies.
 - `due(step)`: the moves whose `every` divides `step` (step > 0). `run_block(engine, step)`: quiesce, the
   baseline (a fresh MC-evaluator energy), every due move's attempts as captured replays (key
-  `("mc.<move>", index, precision, edges)`), one host read of counters, attempt indices and the overflow
+  `("mc.<move>", driver id, index, precision, edges)`), one host read of counters, attempt indices and the overflow
   word, then, after an acceptance, `redraw_all` where chosen, the mass and momentum refreshes and
   `canonicalise(reevaluate=True)` (forces once, `integrator.start`). Returns the block record, also in
   `last_block`: `step`, `moves` (per due move: `move`, `attempts`, `attempted`, `impossible`, `accepted`),
