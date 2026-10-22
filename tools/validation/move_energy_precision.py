@@ -137,6 +137,7 @@ def main(argv=None):
         loaded = loading.load_pristine(args.model, args.head, checkpoint=str(checkpoint),
                                        sha256=meta["checkpoint_sha256"])
         meta["model_charge_spin"] = [loaded.charge, loaded.spin_multiplicity]
+        save()
         workload = Workload(max_temperature_K=max(args.temperatures_K), species_changes=True, mc_moves=MOVES,
                             min_mc_temperature_K=args.min_mc_temperature_K,
                             max_displacement_A=args.max_displacement_A)
@@ -148,9 +149,12 @@ def main(argv=None):
                 integrator = config.IntegratorConfig(seed=args.seed, temperature_K=args.temperatures_K[0],
                                                      timestep_fs=args.timestep_fs)
                 plan = planner.plan(force_field, base, integrator, workload, hardware)
+                meta["runs"][name] = {"stage": "build", "plan_backend": plan.engine.backend}
+                save()
                 started = time.perf_counter()
                 engine = planner.build(plan, force_field, base.copy(), temperature_K=args.temperatures_K[0])
                 build_s = time.perf_counter() - started
+                del meta["runs"][name]
                 for temperature in args.temperatures_K:
                     key = f"{name}@{temperature:g}K"
                     entry = meta["runs"][key] = dict(structure=name, natoms=len(base), temperature_K=temperature,
