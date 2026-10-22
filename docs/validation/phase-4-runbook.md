@@ -4,6 +4,10 @@ Plan task 4-T13, written 23 October 2026 as a prestart, before any phase 4 resul
 task is merged. Results go to `phase-4.md` and `results/4-T13-*/`. 4-T13 changes no library code; its tool
 changes are labelled tool-side. Nothing here runs before the freeze and the conductor's go.
 
+**Accepted** by the conductor on 23 October 2026 (078462b), with the additions beyond the plan: the float64 optimiser
+tolerances, FIRE variable cell on NaCl and NbCl5 only, the widened item 2 rerun trigger, the `protocol` and
+`restart-across` jobs, the shim A/B screen, ASE 3.27 in both environments, and the sampling-check escalation.
+
 Sources: SPEC §16 row 4, §7.7 (adoption layer), §10.2–§10.3 and §10.6, §12.2 ("ASE equivalence", "Restart"),
 §18 decisions 6, 37 and 39; `plans/phase-4.md` (D1–D6, choices 1–10, task 4-T13); `phase-3.md` with its open
 findings 1, 2, 3 and 7; `phase-3b-runbook.md` and 3b-T10's tool-side additions (`fastmace/3b-T10`, 3ea191a).
