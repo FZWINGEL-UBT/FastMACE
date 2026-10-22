@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -63,3 +64,53 @@ def test_other_releases_pin_nothing(tmp_path):
     assert args.integrator_options == {}
     with pytest.raises(SystemExit):
         ab_fastmace.parse_args(_args(tmp_path, "--release", "p3b", "--sides", "2", "p3b"))
+
+
+# --- tools/trajectory_versions.py --against p3b, bitwise ----------------------------------------------------
+
+trajectory_versions = _load(TOOLS / "trajectory_versions.py", "_tool_trajectory_versions_3t21")
+
+
+def _run_args(tmp_path, *extra):
+    return ["run", "--output", str(tmp_path / "out"), "--checkpoint", "m", *extra]
+
+
+def test_trajectory_run_against_p3b(tmp_path):
+    args = trajectory_versions.parse_args(_run_args(tmp_path, "--against", "p3b", "--side", "3", "--device", "cpu",
+                                                    "--backend", "auto"))
+    assert args.expected_commit == "156ab76" and args.device == "cpu" and not args.reproducible
+    args = trajectory_versions.parse_args(_run_args(tmp_path, "--against", "p3b", "--side", "p3b", "--renamed", "v",
+                                                    "--reproducible", "--backend", "cueq"))
+    assert args.reproducible and args.expected_commit == "156ab76"
+    for side in ("1b", "2"):
+        with pytest.raises(SystemExit):
+            trajectory_versions.parse_args(_run_args(tmp_path, "--against", "p3b", "--side", side, "--renamed", "v"))
+    with pytest.raises(SystemExit):
+        trajectory_versions.parse_args(_run_args(tmp_path, "--against", "p3b", "--side", "p3b"))
+    assert trajectory_versions.parse_args(_run_args(tmp_path, "--side", "2")).expected_commit == "673a8a1"
+
+
+def _rows(energy, shift=0.0, positions=True):
+    return [{"step": s, "target": 300.0, "energy": energy, "temperature": 300.0,
+             "positions": [[0.0, 0.0, shift + s * 1e-3]] if positions else None} for s in range(10, 101, 10)]
+
+
+def _write(directory, side, rows):
+    directory.mkdir()
+    meta = dict(status="complete", side=side, fastmace_commit=side, backend="auto", steps=100, every=10, seeds=[1],
+                targets=[300.0, 600.0], structure="NaCl", model="mh1-r2scan",
+                runs={"1": dict(plan=dict(options={"a": True}), rows=rows)})
+    (directory / "trajectory.json").write_text(json.dumps(meta))
+    return directory
+
+
+def test_compare_bitwise(tmp_path):
+    release = _write(tmp_path / "a", "p3b", _rows(-1.0))
+    same = _write(tmp_path / "b", "3", _rows(-1.0))
+    moved = _write(tmp_path / "c", "3", _rows(-1.0, 1e-15))
+    energy = _write(tmp_path / "d", "3", _rows(-1.0 + 1e-15))
+    unrecorded = _write(tmp_path / "e", "3", _rows(-1.0, positions=False))
+    result = trajectory_versions.compare(release, same, exact=True)
+    assert result["passed"] and result["bitwise"] == {"1": True} and result["positions_max_A"] == {"1": 0.0}
+    for other in (moved, energy, unrecorded):
+        assert not trajectory_versions.compare(release, other, exact=True)["passed"]

@@ -252,7 +252,8 @@ class Version:
             integrator = dataclasses.replace(integrator, temperature_K=self.args.temperature_K)
             # A ramped run (tools/trajectory_versions.py) plans for its highest target.
             highest = getattr(self.args, "max_temperature_K", None) or self.args.temperature_K
-            plan = self.planner.plan(force_field, base, integrator, Workload(max_temperature_K=highest),
+            extra = {"reproducible": True} if getattr(self.args, "reproducible", False) else {}
+            plan = self.planner.plan(force_field, base, integrator, Workload(max_temperature_K=highest, **extra),
                                      self.hardware)
             engine = self.planner.build(plan, force_field, base.copy(), temperature_K=self.args.temperature_K)
         else:
