@@ -78,7 +78,8 @@ def run(model, name, steps, equilibration, temperature_K=600.0):
     seconds = time.perf_counter() - started
     total_mass = masses.sum()
     batches = sums / per_batch / units.kB
-    out = {"natoms": len(atoms), "steps": per_batch * BATCHES, "seconds": seconds, "decision": [str(x) for x in decision],
+    out = {"natoms": len(atoms), "steps": per_batch * BATCHES, "seconds": seconds,
+           "decision": [str(x) for x in decision],
            "degrees_of_freedom": sim.degrees_of_freedom, "species": {}}
 
     def estimate(values):
@@ -103,13 +104,15 @@ def main(argv=None):
     parser.add_argument("--cases", default="NaCl-216,LiCs-216,LiCs-16")
     args = parser.parse_args(argv)
     model = fm.load("mh1-r2scan")
-    record = {"gpu": torch.cuda.get_device_name(0), "torch": torch.__version__, "model": "mh1-r2scan",
+    record = {"torch": torch.__version__, "model": "mh1-r2scan",  # the GPU's name after the runs: the plan sets
+              # the allocator before CUDA is touched (SPEC §8.7)
               "temperature_K": 600.0, "friction_per_fs": 0.05, "timestep_fs": 1.0, "runs": {}}
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     for name in args.cases.split(","):
         result = run(model, name, args.steps, 2000)
         record["runs"][name] = result
+        record["gpu"] = torch.cuda.get_device_name(0)
         out.write_text(json.dumps(record, indent=1))
         parts = ", ".join(f"{s} {v['T_fixed_com'][0]:.1f} ± {v['T_fixed_com'][1]:.1f}"
                           for s, v in result["species"].items())
