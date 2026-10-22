@@ -77,6 +77,7 @@ from typing import Any
 
 import torch
 
+from fastmace.events import DerivedStateRegistry
 from fastmace.neighbors.buckets import edge_bucket, round_up_edges
 
 from . import constraints as process
@@ -274,6 +275,17 @@ class GraphEngine(Engine):
             self.fused_integrator_reason = applicable(self)
             if self.fused_integrator_reason is None:
                 self._fused = FusedIntegrator(self)
+        # The derived-state registry (SPEC §8.5, 3-T03): the force field's species tables first, then the
+        # integrator's mass and friction coefficients and its cell force, then the fused constants, so that a
+        # refresh in registration order reads refreshed inputs. Events (fastmace.events) refresh it.
+        self.derived = DerivedStateRegistry()
+        register = getattr(force_field, "register_derived", None)
+        if register is not None:
+            register(self.derived, state)
+        integrator.register_derived(self.derived, state)
+        if self._fused is not None:
+            self._fused.register_derived(self.derived)
+        self.transactions_committed = 0  # committed events; with the step, the state version of caches (3-T07)
         self.registry = Registry(self._registered_buffers)
         self.registry.entries()  # every buffer has a policy (RegistryError otherwise)
         integrator.start(state)  # LangevinBAOAB.__init__: the cell force of the starting forces
@@ -344,6 +356,17 @@ class GraphEngine(Engine):
         while self._pending:
             self._validate_oldest_speculative()
         self._validate_pipelined()
+
+    def quiesce(self) -> None:
+        """An event's first step (SPEC §8.5): finish the pipelined and speculative work, so that the state is
+        a committed step. The output queue is the ``Simulation``'s, which drains it first."""
+        self.flush()
+
+    @property
+    def state_version(self) -> tuple[int, int]:
+        """``(state.step, transactions_committed)``: changes with every committed step and every committed
+        event, for caches of the committed state (3-T07's energy). Not restart state."""
+        return int(self.state.step), int(self.transactions_committed)
 
     def snapshot(self) -> Snapshot:
         """The current step's output values, copied to pinned host memory behind it without draining the GPU.
@@ -607,6 +630,9 @@ class GraphEngine(Engine):
                       "engine.flags_host": self._flags_host, "engine.pipe_flags_host": self._pipe_flags_host,
                       "engine.spec_flags_host": self._spec_flags_host, "engine.overflow": self.overflow})
         named.update({f"engine.mid.{index}": tensor for index, tensor in enumerate(self._mids)})
+        # Derived buffers not registered above under their owner's name (a tensor is registered once).
+        named.update({f"derived.{name}": self.derived[name].buffer for name in self.derived.names()
+                      if isinstance(self.derived[name].buffer, torch.Tensor)})
         return named
 
     # ------------------------------------------------------------------ steps

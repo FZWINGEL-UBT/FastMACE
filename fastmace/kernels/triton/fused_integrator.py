@@ -194,14 +194,8 @@ class FusedIntegrator:
 
     def __init__(self, engine):
         self.engine = engine
-        integrator, state = engine.integrator, engine.state
-        device = state.positions.device
-        n = integrator.natoms
-        factor = (n / (n - 1.0)) ** 0.5 if integrator.fix_com else 1.0
-        # c1, c2, dt, float(n), factor, 1 / dt, 1 / n: float64 on the device (a Python float kernel argument
-        # is float32). The reciprocals are the host's, as PyTorch forms them for a division by a scalar.
-        self.coefficients = torch.tensor([integrator.c1, integrator.c2, integrator.dt, float(n), factor,
-                                          1.0 / integrator.dt, 1.0 / float(n)], dtype=torch.float64, device=device)
+        device = engine.state.positions.device
+        self.coefficients = self._coefficients(device)
         neighbours = engine.force_field.neighbours
         fraction = engine.config.pipeline_rebuild_fraction
         # The neighbour checks' thresholds as SkinNeighbourList.needs_rebuild forms them.
@@ -209,6 +203,22 @@ class FusedIntegrator:
                                        dtype=torch.float64, device=device)
         self.cutoff2 = torch.tensor([neighbours.cutoff ** 2], dtype=torch.float64, device=device)
         self.largest = torch.zeros((), dtype=torch.int64, device=device)
+
+    def _coefficients(self, device):
+        integrator = self.engine.integrator
+        n = integrator.natoms
+        factor = (n / (n - 1.0)) ** 0.5 if integrator.fix_com else 1.0
+        # c1, c2, dt, float(n), factor, 1 / dt, 1 / n: float64 on the device (a Python float kernel argument
+        # is float32). The reciprocals are the host's, as PyTorch forms them for a division by a scalar.
+        return torch.tensor([integrator.c1, integrator.c2, integrator.dt, float(n), factor, 1.0 / integrator.dt,
+                             1.0 / float(n)], dtype=torch.float64, device=device)
+
+    def register_derived(self, registry) -> None:
+        """``coefficients`` follow the friction (``c1``, ``c2``). Its refresh copies host floats to the device:
+        a friction event is a host event that drops the graphs anyway, never replayed inside one (SPEC §8.5)."""
+        registry.register("fused.coefficients", self.coefficients,
+                          lambda: self.coefficients.copy_(self._coefficients(self.coefficients.device)),
+                          depends_on=("friction",))
 
     def stage(self, pipelined: bool) -> None:
         triton, noise_kernel, drift_kernel, inside_kernel, scatter_kernel = _kernels()

@@ -73,12 +73,15 @@ REQUEST_NAME = "request.json"
 RESULT_NAME = "result.json"
 START_NAME = "start.traj"  # the parent's Atoms for the setup child (ASE trajectory: exact float64)
 COMMITTED_NAME = "committed.npz"  # the committed step's output values (Engine.sync)
+COMPOSITION_PREFIX = "composition."  # beside them in that file: species, masses, charges (Committed, 3-T03)
 HEARTBEAT_NAME = "heartbeat"  # a fresh child's default: in its stage
 CHILD_NAME = "child-{:04d}"  # per child process under the hand-off directory: .log and .heartbeat
 SINKS_NAME = "sinks"
 # The host writes a child applies after its resume, by ``Simulation.set_<kind>``: positions and momenta
-# (owner decision D4), and species and masses (3-T03 events; the next hand-off restart holds them, 3-T08).
-HOST_WRITE_KINDS = ("positions", "momenta", "species", "masses")
+# (owner decision D4), and species, masses, charges, the total charge (``set_charges(None, total_charge=)``)
+# and the friction (3-T03 events; the next hand-off restart holds them, 3-T08). ``Simulation.update`` queues
+# one write per field, in the order of its transaction.
+HOST_WRITE_KINDS = ("positions", "momenta", "species", "masses", "charges", "total_charge", "friction")
 REQUEST_VERSION = 1
 POLL_S = 0.2  # how often the parent looks at the child
 LOG_TAIL_LINES = 30  # the child's message when it left no result
@@ -150,6 +153,7 @@ class SubprocessRunner:
         self._decision = None  # the parent plan's "runner" decision, kept on the child's plans
         self._stages = 0
         self._values: dict[str, Any] | None = None
+        self._composition: dict[str, Any] | None = None  # species, masses, charges of the committed step
         self._step = 0
         self._metadata: dict[str, Any] | None = None
         self._host_writes: list[tuple[str, Any]] = []
@@ -222,14 +226,15 @@ class SubprocessRunner:
 
     def committed(self, simulation: Any) -> Any:
         """The committed step of the last hand-off (after any pending host write)."""
-        from fastmace.simulation import Committed, _frozen
+        from fastmace.simulation import Committed, _frozen, committed_composition
 
         self._apply_host_writes(simulation)
         values = self._values
         stress = values.get("stress")
         return Committed(step=self._step, positions=_frozen(values["positions"]), momenta=_frozen(values["momenta"]),
                          cell=_frozen(values["cell"]), energy=float(values["energy"][0]),
-                         forces=_frozen(values["forces"]), stress=None if stress is None else _frozen(stress))
+                         forces=_frozen(values["forces"]), stress=None if stress is None else _frozen(stress),
+                         **committed_composition(self._composition))
 
     def submit_frame(self, simulation: Any, sink: Any) -> None:
         simulation._queue.submit(_HostSnapshot(self._step, self._values), sink)
@@ -511,7 +516,10 @@ class SubprocessRunner:
         from fastmace.protocols import ScheduleState
 
         with np.load(stage / COMMITTED_NAME, allow_pickle=False) as stored:
-            self._values = {key: stored[key] for key in stored.files}
+            values = {key: stored[key] for key in stored.files}
+        self._composition = {key[len(COMPOSITION_PREFIX):]: values.pop(key) for key in list(values)
+                             if key.startswith(COMPOSITION_PREFIX)}
+        self._values = values  # the output values, as the sinks and frames get them
         self._step = int(result["step"])
         if result["saved"]:
             previous, self.current = self.current, stage
@@ -926,7 +934,12 @@ def _child(directory, request, heartbeat, worker=None):
             raise ValueError(f"unknown host write {kind!r}")
         if kind == "species":  # stored as float64 like every host write; atomic numbers are exact there
             values = values.astype(np.int64)
-        getattr(sim, f"set_{kind}")(values)  # a composition change ends at a canonical point (3-T03)
+        elif values.ndim == 0:  # a scalar: the friction or the total charge
+            values = values.item()
+        if kind == "total_charge":
+            sim.set_charges(None, total_charge=values)
+        else:
+            getattr(sim, f"set_{kind}")(values)  # a composition change ends at a canonical point (3-T03)
     sinks = directory / SINKS_NAME
     written = set()
 
@@ -958,6 +971,8 @@ def _child(directory, request, heartbeat, worker=None):
     values = dict(engine.sync())
     if "cell" not in values:
         values["cell"] = engine.state.cell.detach().cpu().numpy()
+    values.update({COMPOSITION_PREFIX + key: value
+                   for key, value in simulations.composition_values(engine.state).items()})
     np.savez(directory / COMMITTED_NAME, **values)
     report = sim.report.to_metadata()
     return {
