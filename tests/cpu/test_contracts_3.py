@@ -499,3 +499,20 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     assert restart.MC_COUNTER_KEYS == ("attempted", "impossible", "accepted")
     assert restart.MC_STREAM_KEYS == ("seed", "offset")
     assert restart.mc_record({}) is None  # 3-T08: no move set attached
+
+
+# --------------------------------------------------------------------------- protocol runs
+
+
+def test_protocol_run_names():  # §10.5 (3-T14)
+    from fastmace.protocols import quench, runner
+
+    assert _parameters(quench.relax) == ["atoms", "calc", "fmax", "max_steps", "logfile", "optimizer"]
+    assert _parameters(quench.select_frames) == ["frames", "min_K", "bin_K", "per_bin", "peak_K"]
+    assert _parameters(quench.picks) == ["resolved", "frame_every", "settings"]
+    assert _parameters(quench.quench_run) == ["directory", "calc", "resolved", "frame_every", "timestep_fs",
+                                              "settings", "log"]
+    assert _keyword_only(runner.start) == ["relax", "quench", "steps", "source", "log"]
+    assert _parameters(runner.resume) == ["directory", "steps", "log"]
+    assert runner.RELAX_KEYS == ("fmax", "optimizer", "max_steps") and runner.PROTOCOL_RECORD == "protocol.json"
+    assert "swap_anneal_NaNbOCl4" in runner.protocol_names()
