@@ -24,13 +24,16 @@ commit, the wall time and the estimated cost at Modal's list prices (``PRICE_PER
 modal.com/pricing). Timeouts are set on every function; containers stop when the call returns.
 
 Budget guard (MODAL-T02, ``budget.py``): before every launch, this month's metered cost
-(``modal.Workspace.billing.summary``) plus the worst case of the jobs still running from this checkout plus this
+(``modal.Workspace.billing.summary``) plus the worst case of the jobs still running from any checkout plus this
 job's worst case (function timeout plus a start allowance, at the GPU, CPU-limit and memory-limit rates of
 ``modal.Workspace.billing.rates``) must stay within $27 (the $30 monthly credit minus a $3 reserve). Otherwise,
 or if the billing cannot be read, the job is refused. ``--limit-usd`` (or ``FASTMACE_MODAL_LIMIT_USD``) sets a
 lower limit; a higher one needs ``--owner-override "who: why"``, which the ledger records. After every job the
-month ledger ``results/modal-ledger.csv`` gets a row with the metered cost before and after (Modal's metering
-lags by minutes, so the after value may not contain the whole job yet). The functions have hard CPU and memory
+month ledger ``~/.fastmace-modal/modal-ledger.csv`` gets a row with the metered cost before and after (Modal's
+metering lags by minutes, so the after value may not contain the whole job yet). The ledger and the list of
+jobs in flight live in one directory for every checkout and worktree on the machine (``FASTMACE_MODAL_STATE``,
+default ``~/.fastmace-modal``), so parallel jobs from different worktrees count against each other; the
+conductor commits copies of the ledger to ``results/modal-ledger.csv``. The functions have hard CPU and memory
 limits, no retries and a 2 s idle window.
 """
 
@@ -48,8 +51,11 @@ from pathlib import Path
 import modal
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE))
-import budget  # noqa: E402  (tools/modal/budget.py: pure Python, tested on CPU)
+# The budget guard runs on the host only. The container gets this file alone, so importing budget there
+# failed every job at container start (22 October 2026, 3-T05 and 3-T16).
+if modal.is_local():
+    sys.path.insert(0, str(HERE))
+    import budget  # noqa: E402  (tools/modal/budget.py: pure Python, tested on CPU)
 
 APP_NAME = "fastmace"
 VOLUME_NAME = "fastmace-data"
@@ -62,8 +68,11 @@ JOB_CPU, JOB_MEMORY_MIB = (4.0, 8.0), (16384, 32768)
 LISTING_CPU, LISTING_MEMORY_MIB = (1.0, 2.0), (1024, 2048)
 LISTING_TIMEOUT_S = 600
 GRACE_S = 600  # the job function's timeout above the command's own
-LEDGER = HERE.parent.parent / "results" / "modal-ledger.csv"
-IN_FLIGHT = HERE.parent.parent / "results" / "modal-in-flight.json"
+# Shared by every checkout and worktree (22 October 2026: per-checkout files let parallel jobs from different
+# worktrees each pass the guard alone).
+STATE = Path(os.path.expanduser(os.environ.get("FASTMACE_MODAL_STATE", "~/.fastmace-modal")))
+LEDGER = STATE / "modal-ledger.csv"
+IN_FLIGHT = STATE / "modal-in-flight.json"
 
 app = modal.App(APP_NAME)
 volume = modal.Volume.from_name(VOLUME_NAME, create_if_missing=True)
@@ -218,6 +227,13 @@ def upload(models: str = "mace-mh-1.model", baseline: str = "~/fastmace-baseline
 
     _guarded(launch, commit="upload", gpu=None, function_timeout_s=LISTING_TIMEOUT_S, cpu=LISTING_CPU,
              memory_mib=LISTING_MEMORY_MIB, limit_usd=limit_usd, owner_override=owner_override)
+
+
+@app.local_entrypoint()
+def listing(limit_usd: str = "", owner_override: str = ""):
+    """The volume's top three levels, from a one-core CPU container (seconds; also checks that jobs start)."""
+    _guarded(lambda: print(volume_listing.remote()), commit="listing", gpu=None, function_timeout_s=LISTING_TIMEOUT_S,
+             cpu=LISTING_CPU, memory_mib=LISTING_MEMORY_MIB, limit_usd=limit_usd, owner_override=owner_override)
 
 
 @app.local_entrypoint()

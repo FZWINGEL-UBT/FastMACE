@@ -201,7 +201,9 @@ These are phase 2's principles, unchanged where they still apply:
     21 October it showed $3.65 against about $3 estimated. The guard in
     `fastmace_modal.py` (MODAL-T02, merged in d35496f) refuses a job whose
     worst case would pass $27 (a $3 reserve), and records every job in
-    `results/modal-ledger.csv`;
+    `~/.fastmace-modal/modal-ledger.csv`, shared by all worktrees (copies in
+    `results/modal-ledger.csv`). Since 22 October 2026 the guard is imported
+    on the host only; before that every job failed at container start;
   - budget per task as in its brief;
   - the noise floors are 0.2 % for NaCl and 0.6 % for NbCl5 on the L4, and
     only same-container ratios count.
