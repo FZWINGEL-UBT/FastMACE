@@ -104,6 +104,8 @@ class DisplaceSide:
         self.baseline = self.evaluator.baseline() - 1e3  # the state after the MD side's last block
 
     def step(self):
+        if self.baseline is None:  # warm_up runs steps without prepare_block
+            self.prepare_block()
         record = self.attempts.run(self.count, temperature_K=self.temperature_K, baseline=self.baseline)
         self.trial_rebuilds += record["trial_rebuilds"]
         self.attempted += record["attempted"]
