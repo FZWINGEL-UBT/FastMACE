@@ -389,6 +389,12 @@ def agree(a: tuple[float, float], b: tuple[float, float], sigmas: float = HYBRID
     return abs(a[0] - b[0]) <= sigmas * math.hypot(a[1], b[1])
 
 
+def deviations(on, off) -> dict[str, float]:
+    """|on − off| in combined standard errors, per observable both have."""
+    return {name: abs(on[name][0] - off[name][0]) / math.hypot(on[name][1], off[name][1])
+            for name in on if name in off}
+
+
 def energy(atoms, calculator) -> float:
     """The float64 reference energy (eV) of ``atoms`` as they are."""
     atoms = atoms.copy()

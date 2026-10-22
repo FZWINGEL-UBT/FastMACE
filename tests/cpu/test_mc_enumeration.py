@@ -21,19 +21,21 @@ Default tier:
 - **charge/spin:** an odd ΔZ − Δq set is refused on a model with charge and spin inputs.
 
 ``slow``: the swap populations against Boltzmann, χ² pooled per energy level (fixed seed).
-``acceptance``: the kinetic temperature with MC on and off for each momentum choice, and the negative
+``acceptance``: the kinetic temperature with MC on and off for each momentum choice (Li and Cs on the cation
+sites of the same cell, mass ratio 19, without fixcm; Na and K with fixcm), and the negative
 control, which must fail the same test. The transmutation χ² runs on the GPU
 (``tests/gpu/test_mc_statistics_gpu.py``).
 """
 
 from __future__ import annotations
 
-import functools
 import math
 
 import numpy as np
 import pytest
 import torch
+from ase.data import chemical_symbols
+from ase.units import kB as K_B_EV_PER_K  # the integrators' and (after 3-T09's fix) the driver's k_B
 
 from _support import mc_reference as ref
 from _support.mc_fixtures import cpu_planner, mc_simulation, tiny_loaded
@@ -43,7 +45,6 @@ from fastmace import integrators
 from fastmace.config import mc_stream_seeds
 from fastmace.errors import CHARGE_PARITY_CODE, ChargeParityRefused
 from fastmace.mc import MCDriver, Swap, Transmute, momenta, moves, streams
-from fastmace.mc.driver import K_B_EV_PER_K
 from fastmace.mc.evaluator import MCEvaluator
 from fastmace.planner.workload import Workload
 
@@ -106,8 +107,8 @@ def langevin(temperature_K, *, fixcm=True, friction_per_fs=0.01):
                                 fixcm=fixcm)
 
 
-def simulation(loaded, atoms, temperature_K, *, fixcm=True, friction_per_fs=0.01, seed=1):
-    return mc_simulation(loaded, atoms, SUPERSET, integrator=langevin(temperature_K, fixcm=fixcm,
+def simulation(loaded, atoms, temperature_K, *, fixcm=True, friction_per_fs=0.01, seed=1, superset=SUPERSET):
+    return mc_simulation(loaded, atoms, superset, integrator=langevin(temperature_K, fixcm=fixcm,
                                                                          friction_per_fs=friction_per_fs),
                          workload=workload(temperature_K), seed=seed)
 
@@ -369,6 +370,17 @@ def test_swap_populations_follow_boltzmann(loaded, swap_case):
 
 # --------------------------------------------------------------------------- hybrid MD/MC (acceptance)
 
+# Two cation pairs on NaCl 2×1×1 (16 atoms), the second species on every second cation site:
+# - Li and Cs (masses 6.94 and 132.9, ratio 19), without fixcm: velocities left unchanged at a swap split the
+#   species temperatures by many standard errors in 6 ps (Na and K, ratio 1.7, gave 3.3 σ, 22 October 2026).
+#   The tiny model is random, so the chemistry is irrelevant;
+# - Na and K (ratio 1.7) with fixcm: the integrator's fixcm (ASE's Langevin: the centre-of-mass part of the
+#   noise removed and the rest scaled by sqrt(N / (N - 1))) is exact only for equal masses. With Li and Cs it
+#   holds Li near 860 K and Cs near 570 K at a 600 K target without any MC (22 October 2026), so MC on and off
+#   cannot agree there; with Na and K its bias is below the statistical error.
+LI, CS = 3, 55
+PAIRS = {"NaK": (NA, K), "LiCs": (LI, CS)}
+SUPERSETS = {"NaK": SUPERSET, "LiCs": (LI, CL, CS)}
 HYBRID_TEMPERATURE_K = 600.0
 HYBRID_FRICTION_PER_FS = 0.05  # energy relaxation 1/(2 γ) = 10 fs, against 10 fs between samples
 HYBRID_STEPS_PER_BLOCK = 10
@@ -376,79 +388,130 @@ HYBRID_ATTEMPTS = 10
 HYBRID_EQUILIBRATION_BLOCKS = 100
 HYBRID_BLOCKS = 600
 
-HYBRID_CASES = [
-    ("swap", "exchange", True),
-    ("swap", "rescale", False),
-    ("swap", "redraw", False),
-    ("swap", "redraw_all", True),
-    ("transmute", "rescale", False),
-    ("transmute", "redraw_all", True),
+HYBRID_CASES = [  # (move, momenta, fixcm, cation pair)
+    ("swap", "exchange", True, "NaK"),
+    ("swap", "redraw_all", True, "NaK"),
+    ("transmute", "redraw_all", True, "NaK"),
+    ("swap", "exchange", False, "LiCs"),
+    ("swap", "rescale", False, "LiCs"),
+    ("swap", "redraw", False, "LiCs"),
+    ("transmute", "rescale", False, "LiCs"),
 ]
 
 
-def hybrid_run(loaded, move, fixcm, *, unchanged=False, seed=7):
-    """Kinetic temperatures (total, Na, K) every block of a Langevin run with MC blocks (``move``) or none."""
-    sim = simulation(loaded, mixed_cations(), HYBRID_TEMPERATURE_K, fixcm=fixcm,
-                     friction_per_fs=HYBRID_FRICTION_PER_FS, seed=seed)
+@pytest.fixture(scope="module")
+def light_heavy(tmp_path_factory):
+    pytest.importorskip("cuequivariance_torch")
+    return tiny_loaded(tmp_path_factory.mktemp("light-heavy"), SUPERSETS["LiCs"])
+
+
+def pair_mu(pair):
+    """Δμ of the pair's second species (relative to the first): the least-squares slope of the enumerated
+    energies of the 8 cation sites, as for the transmutation enumeration."""
+    from mace.calculators import MACECalculator
+
+    calculator = MACECalculator(models=[tiny_mace_model(list(SUPERSETS[pair]), **FAMILIES["mh1"])], device="cpu",
+                                default_dtype="float64")
+    first, second = PAIRS[pair]
+    atoms = transmute_atoms()
+    sites = np.flatnonzero(atoms.numbers == NA)
+    numbers = atoms.numbers.copy()
+    numbers[sites] = first
+    atoms.set_atomic_numbers(numbers)
+    return ref.transmute_case(atoms, sites, (first, second), calculator).delta_mu
+
+
+def cations(pair, rattle=0.05):
+    """NaCl 2×1×1 (16 atoms) with the cations alternately the pair's two species, rattled."""
+    first, second = PAIRS[pair]
+    atoms = transmute_atoms()
+    atoms.rattle(rattle, seed=3)
+    numbers = atoms.numbers.copy()
+    sites = np.flatnonzero(numbers == NA)
+    numbers[sites] = first
+    numbers[sites[::2]] = second
+    atoms.set_atomic_numbers(numbers)
+    return atoms
+
+
+def hybrid_run(loaded, pair, move, fixcm, *, seed=7):
+    """Kinetic temperatures (total and per cation species) every block of a Langevin run with MC blocks
+    (``move``) or none."""
+    sim = simulation(loaded, cations(pair), HYBRID_TEMPERATURE_K, fixcm=fixcm,
+                     friction_per_fs=HYBRID_FRICTION_PER_FS, seed=seed, superset=SUPERSETS[pair])
     engine = sim._engine
     driver = None
     if move is not None:
         driver = MCDriver([move], seed=seed)
         driver.attach(engine)
     natoms = engine.state.natoms
-    dof = 3 * natoms - (3 if fixcm else 0)
-    samples = {"total": [], "Na": [], "K": []}
+    # The integrator's convention (ASE's Langevin): with fixcm the noise is scaled by sqrt(N / (N - 1)), so the
+    # thermostat holds sum m v^2 at 3 N kT, the kinetic temperature over 3 N degrees of freedom.
+    dof = 3 * natoms
+    names = {number: chemical_symbols[number] for number in PAIRS[pair]}
+    samples = {"total": [], **{name: [] for name in names.values()}}
     for block in range(1, HYBRID_EQUILIBRATION_BLOCKS + HYBRID_BLOCKS + 1):
         sim.run(steps=HYBRID_STEPS_PER_BLOCK)
         if block > HYBRID_EQUILIBRATION_BLOCKS:
             state = engine.state
             twice_kinetic = (state.masses * state.velocities ** 2).sum(dim=1)
             samples["total"].append(float(twice_kinetic.sum()) / (dof * K_B_EV_PER_K))
-            for name, number in (("Na", NA), ("K", K)):
+            for number, name in names.items():
                 mask = state.species == number
-                samples[name].append(float(twice_kinetic[mask].sum()) / (3 * int(mask.sum()) * K_B_EV_PER_K))
+                if bool(mask.any()):  # a transmutation may empty a species for a while
+                    samples[name].append(float(twice_kinetic[mask].sum()) / (3 * int(mask.sum()) * K_B_EV_PER_K))
         if driver is not None:
             driver.run_block(engine, block)
-    return {name: ref.batch_mean(values) for name, values in samples.items()}, (
-        None if driver is None else driver.counters)
+    # A species present in fewer than half the samples has no per-species temperature to compare.
+    return {name: ref.batch_mean(values) for name, values in samples.items()
+            if len(values) >= HYBRID_BLOCKS // 2}, (None if driver is None else driver.counters)
 
 
-@functools.cache
-def _md_only(loaded, fixcm):
-    return hybrid_run(loaded, None, fixcm)[0]
+_MD_ONLY = {}
 
 
-def hybrid_move(kind, velocities, delta_mu):
+def _md_only(loaded, pair, fixcm):
+    """The run without MC, once per process, cation pair and fixcm setting."""
+    if (pair, fixcm) not in _MD_ONLY:
+        _MD_ONLY[pair, fixcm] = hybrid_run(loaded, pair, None, fixcm)[0]
+    return _MD_ONLY[pair, fixcm]
+
+
+def hybrid_move(kind, velocities, pair, delta_mu):
+    first, second = (chemical_symbols[number] for number in PAIRS[pair])
     if kind == "swap":
-        return Swap([("Na", "K")], every=1, attempts=HYBRID_ATTEMPTS, velocities=velocities)
-    return Transmute(["Na", "K"], every=1, attempts=HYBRID_ATTEMPTS, velocities=velocities, mu={"K": delta_mu})
+        return Swap([(first, second)], every=1, attempts=HYBRID_ATTEMPTS, velocities=velocities)
+    return Transmute([first, second], every=1, attempts=HYBRID_ATTEMPTS, velocities=velocities,
+                     mu={second: delta_mu})
 
 
 def hybrid_agrees(on, off):
     """MC on and off agree in total and per-species kinetic temperature, and the total is the target."""
-    return (all(ref.agree(on[name], off[name]) for name in on)
+    return (all(ref.agree(on[name], off[name]) for name in on if name in off)
             and ref.agree(on["total"], (HYBRID_TEMPERATURE_K, 0.0)))
 
 
 @pytest.mark.slow
 @pytest.mark.acceptance
-@pytest.mark.parametrize(("kind", "velocities", "fixcm"), HYBRID_CASES)
-def test_kinetic_temperature_with_mc_on_and_off(loaded, transmute_case, kind, velocities, fixcm):
-    on, counters = hybrid_run(loaded, hybrid_move(kind, velocities, transmute_case.delta_mu), fixcm)
-    off = _md_only(loaded, fixcm)
-    print(dict(kind=kind, velocities=velocities, fixcm=fixcm, on=on, off=off, counters=counters))
+@pytest.mark.parametrize(("kind", "velocities", "fixcm", "pair"), HYBRID_CASES)
+def test_kinetic_temperature_with_mc_on_and_off(loaded, light_heavy, kind, velocities, fixcm, pair):
+    model = loaded if pair == "NaK" else light_heavy
+    on, counters = hybrid_run(model, pair, hybrid_move(kind, velocities, pair, pair_mu(pair)), fixcm)
+    off = _md_only(model, pair, fixcm)
+    print(dict(kind=kind, velocities=velocities, fixcm=fixcm, pair=pair, on=on, off=off, counters=counters,
+               deviations=ref.deviations(on, off)))
     assert counters[kind]["accepted"] > 0.1 * counters[kind]["attempted"]
     assert hybrid_agrees(on, off), (on, off)
 
 
 @pytest.mark.slow
 @pytest.mark.acceptance
-def test_kinetic_temperature_negative_control_fails(loaded, monkeypatch):
-    """Velocities unchanged at a Na <-> K swap heat the crystal: the same test must fail."""
+def test_kinetic_temperature_negative_control_fails(light_heavy, monkeypatch):
+    """Velocities unchanged at a Li <-> Cs swap: the same test must fail."""
     monkeypatch.setattr(momenta, "exchange", lambda velocities, masses_old, masses_new, normals, kT: velocities)
-    on, counters = hybrid_run(loaded, hybrid_move("swap", "exchange", 0.0), True)
-    off = _md_only(loaded, True)
-    print(dict(on=on, off=off, counters=counters))
+    on, counters = hybrid_run(light_heavy, "LiCs", hybrid_move("swap", "exchange", "LiCs", 0.0), False)
+    off = _md_only(light_heavy, "LiCs", False)
+    print(dict(on=on, off=off, counters=counters, deviations=ref.deviations(on, off)))
+    assert counters["swap"]["accepted"] > 0.1 * counters["swap"]["attempted"]
+    # Frequent swaps decouple the speeds from the masses: the heavy atoms carry light-atom speeds.
     assert not hybrid_agrees(on, off), (on, off)
-    # Sized in advance for at least 10 standard errors of heating.
-    assert on["total"][0] - off["total"][0] > 10 * math.hypot(on["total"][1], off["total"][1])

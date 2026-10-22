@@ -255,6 +255,7 @@ def test_batch_mean_and_agree():
     assert ref.agree((1.0, 0.3), (2.0, 0.4)) and not ref.agree((1.0, 0.03), (2.0, 0.04))
     with pytest.raises(ValueError, match="batches"):
         ref.batch_mean([1.0], n_batches=2)
+    assert ref.deviations({"a": (1.0, 0.3), "b": (0.0, 1.0)}, {"a": (2.0, 0.4)}) == {"a": pytest.approx(2.0)}
 
 
 def test_cases_from_given_energies(swap_case, transmute_case):
