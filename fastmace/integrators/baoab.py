@@ -15,6 +15,7 @@ centre-of-mass motion; this port does not either.
 
 from __future__ import annotations
 
+import dataclasses
 import math
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
@@ -118,10 +119,6 @@ class LangevinBAOAB(Integrator):
         self.natoms = state.natoms
         self.hydrostatic = config.cell_mode == "hydrostatic"
         self.trace_drag_all_elements = config.ase_trace_drag_all_elements
-        self.T_tau = 1.0 / config.friction
-        # ASE's default with T_tau
-        self.P_tau = 20.0 * self.T_tau if config.barostat_tau_fs is None else config.barostat_tau_fs * units.fs
-        self.barostat_mass = barostat_mass(self.P_tau, self.natoms, None, config.barostat_mass_factor)
         self.Ndof = 3 * self.natoms  # Atoms.get_number_of_degrees_of_freedom() without constraints
         if disable_cell_langevin is None:
             disable_cell_langevin = config.disable_cell_langevin
@@ -141,14 +138,8 @@ class LangevinBAOAB(Integrator):
         self.externalstress = torch.tensor(external_stress(externalstress, self.hydrostatic), **f64)
         self.eye = torch.eye(3, **f64)
 
-        # Constants of LangevinBAOAB.set_temperature, without sqrt(kT), which is a device scalar.
-        dt = self.dt
-        self.gamma = 1.0 / self.T_tau
-        self.ou_unit = math.sqrt(1.0 - math.exp(-2.0 * self.gamma * dt))  # times sqrt(kT / m)
-        self.barostat_gamma = 0.0 if self.disable_cell_langevin else 1.0 / self.P_tau
-        self.barostat_ou_unit = (math.sqrt(1.0 - math.exp(-2.0 * self.barostat_gamma * dt))
-                                 * math.sqrt(self.barostat_mass))  # times sqrt(kT)
-        self.inv_sqrt_masses = 1.0 / torch.sqrt(state.masses)
+        self._friction_constants()
+        self.inv_sqrt_masses = self._inv_sqrt_masses(state.masses)
         self.sqrt_kT = torch.zeros((), **f64)
         self.set_temperature(temperature_K)
 
@@ -157,6 +148,39 @@ class LangevinBAOAB(Integrator):
         allocate_noise(state, (self.noise_batch, 3 * self.natoms + self.cell_numbers))
         self.xi = torch.zeros((self.natoms, 3), **f64)
         self.zeta = torch.zeros(max(self.cell_numbers, 1), **f64)
+
+    def _friction_constants(self) -> None:
+        """Every host float that follows the friction: ``T_tau``; with the default barostat τ, ``P_tau`` and
+        the barostat mass (an explicit ``barostat_tau_fs`` stays); the constants of
+        LangevinBAOAB.set_temperature without sqrt(kT), which is a device scalar. Baked into the stages."""
+        config, dt = self.config, self.dt
+        self.T_tau = 1.0 / config.friction
+        # ASE's default with T_tau
+        self.P_tau = 20.0 * self.T_tau if config.barostat_tau_fs is None else config.barostat_tau_fs * units.fs
+        self.barostat_mass = barostat_mass(self.P_tau, self.natoms, None, config.barostat_mass_factor)
+        self.gamma = 1.0 / self.T_tau
+        self.ou_unit = math.sqrt(1.0 - math.exp(-2.0 * self.gamma * dt))  # times sqrt(kT / m)
+        self.barostat_gamma = 0.0 if self.disable_cell_langevin else 1.0 / self.P_tau
+        self.barostat_ou_unit = (math.sqrt(1.0 - math.exp(-2.0 * self.barostat_gamma * dt))
+                                 * math.sqrt(self.barostat_mass))  # times sqrt(kT)
+
+    @staticmethod
+    def _inv_sqrt_masses(masses):
+        return 1.0 / torch.sqrt(masses)
+
+    def register_derived(self, registry: Any, state: SimulationState) -> None:
+        """``inv_sqrt_masses`` (from the masses) and the cell force ``force_eps`` (from forces, stress, cell
+        and momenta: refreshed in the resume, after the forces; SPEC §8.5 step 6)."""
+        registry.register("integrator.inv_sqrt_masses", self.inv_sqrt_masses,
+                          lambda: self.inv_sqrt_masses.copy_(self._inv_sqrt_masses(state.masses)),
+                          depends_on=("masses",))
+        registry.register("integrator.force_eps", self.force_eps, lambda: self._update_force_eps(state),
+                          depends_on=("masses", "momenta", "forces", "stress", "cell"))
+
+    def set_friction(self, friction: float) -> None:
+        """A friction event's host part (inverse ASE time units): the config and every constant that follows it."""
+        self.config = dataclasses.replace(self.config, friction=float(friction))
+        self._friction_constants()
 
     @property
     def variable_cell(self) -> bool:

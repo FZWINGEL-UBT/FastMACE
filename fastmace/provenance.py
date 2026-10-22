@@ -486,6 +486,9 @@ SUBPROCESS_KEYS = ("python", "reason", "directory", "children", "calls", "persis
 SUBPROCESS_CHILD_KEYS = ("action", "stage", "pid", "exit_code", "seconds", "steps")
 # Counters the caller fills, and those a later phase fills (tier switches: phase 5, §9.6; MC: phase 3).
 COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone")
+# Counters the engine's info() carries (the graph engine's re-capture policy and overflow redos, 3-T04),
+# taken from it when the caller gives none.
+ENGINE_COUNTER_KEYS = ("recaptures", "overflows_redone")
 LATER_COUNTER_KEYS = ("tier_switches", "mc")
 # A restart point: its step and the output chunk indices of io.restart.OUTPUT_KEYS (1b-T06).
 RESTART_POINT_KEYS = ("step", "output_chunk", "output_rows", "output_frames")
@@ -759,6 +762,9 @@ def _counters(counters, engine_info):
             raise ValueError(f"counters: {key!r} is filled by a later phase (tier switches: phase 5, MC: phase 3)")
         if key not in COUNTER_KEYS:
             raise ValueError(f"counters: unknown key {key!r}; 1b records {COUNTER_KEYS}")
+    for key in ENGINE_COUNTER_KEYS:
+        if given.get(key) is None and isinstance(engine_info, Mapping) and engine_info.get(key) is not None:
+            given[key] = engine_info[key]
     out = {key: _plain(given.get(key), f"counters.{key}") for key in COUNTER_KEYS}
     out.update(dict.fromkeys(LATER_COUNTER_KEYS))
     out["engine"] = None if engine_info is None else _plain(engine_info, "counters.engine")

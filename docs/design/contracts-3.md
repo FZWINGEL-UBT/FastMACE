@@ -32,6 +32,22 @@ Constants and functions:
 `mode="compiled"` is already one of `config.MODES`. 3-T06 lifts the planner's `mode-compiled`
 refusal.
 
+**`mode` defaults to `None`** (3-T06, conductor answer 1) in `Simulation`, `fm.md`, `PlannerOptions`,
+`planner_options` and `MinimalPlanner.plan`/`plan_traits`; `simulation.json` records `None`. Without a
+mode the planner picks the graph tier, or the compiled tier where:
+- rule 4: `padding_is_exact` is false (decision code `mode-compiled-rule-4`);
+- rule 9: `host_callbacks_every < minimal.RULE_9_HOST_CALLBACKS` (10), unless `reproducible=True`,
+  whose qualified tiers are graph and eager (code `mode-compiled-rule-9`).
+
+An explicit mode is the user's (code `mode-compiled-tier` for `"compiled"`). An explicit `"graph"` keeps
+the graph tier under rule 9 (`host-callbacks-graph-sync`, the reason says the override), and is refused
+under rule 4 (`inexact-padding`, the reason names `mode="compiled"`). The compiled tier's decisions:
+`capture` off ("compiled tier: no CUDA graphs" and why), `EngineConfig.speculative_graph` off,
+`EngineConfig.dynamic_edges` on when `compile_mode` is not `"none"`, `padding` "exact edge counts"
+(`compiled-exact-edges`) for an inexact model, and `workload.host_callbacks_every`
+`host-callbacks-compiled`. `planner.fixed.COMPILED_TIER = "compiled"`; `FixedPlanner.build` builds it
+with `capture=False`.
+
 Every plan resolves the four new `"auto"` fields, each with a decision `auto (<rule>)`
 (`FixedPlanner._phase_3_fields`, `fixed.AUTO_RULES`). Until the tasks named below give the
 rules, they resolve to today's behaviour:
@@ -40,7 +56,7 @@ rules, they resolve to today's behaviour:
 | --- | --- | --- |
 | `NeighbourConfig.skin` | `DEFAULT_SKIN_A` (0.3 Å) | T05 |
 | `NeighbourConfig.headroom` | `"fixed"` | T05 |
-| `EngineConfig.recapture_budget` | `graph_variant_cap` (64); nothing reads it yet | T04 |
+| `EngineConfig.recapture_budget` | `graph_variant_cap` (64): the T04 rule (below); the engine reads it | T04 |
 | `PrecisionConfig.mc_energy` | the force precision (`dtype`); nothing reads it yet | T11, for MC plans only |
 
 `SkinNeighbourList` reads a `skin="auto"` that reaches it without a plan as `DEFAULT_SKIN_A`.
@@ -59,10 +75,13 @@ ASE (tested in a fresh interpreter).
 | `fm.mc.configurational_mu` | `configurational_mu(mu_full, temperature_K, reference, masses=None) -> dict` | complete |
 | `fm.mc.MCDriver` | `MCDriver(moves, *, seed, config=None)`; `attach(engine)`, `run_block(engine, step)`, `state_dict()`, `load_state_dict(record)` | stub, T09 |
 | `fm.mc.moves.build_attempt` | `build_attempt(move, engine, evaluator, streams)` | stub, T09 (T10 for `Displace`) |
-| `Simulation.set_species` | `set_species(species)`: atomic numbers or symbols, `(N,)` | stub, T03 (superset check T02) |
-| `Simulation.set_masses` | `set_masses(masses)`: amu, `(N,)` | stub, T03 |
-| `Simulation.set_charges` | `set_charges(charges, *, total_charge=None)` | stub, T03 |
-| `Simulation.set_friction` | `set_friction(friction_per_fs)`: 1/fs, as the public integrator records | stub, T03 |
+| `Simulation.update` | `update(*, species=None, masses=None, charges=None, total_charge=None, friction_per_fs=None, positions=None, momenta=None)`: any combination as one transaction with one force evaluation; nothing given, nothing happens | complete, T03 (conductor answer) |
+| `Simulation.set_species` | `set_species(species)`: atomic numbers or symbols, `(N,)`; `update(species=)` | complete, T03; needs T02's `check_species`, refused without it |
+| `Simulation.set_masses` | `set_masses(masses)`: amu, `(N,)`; the momenta stay (ASE): v' = v·m_old/m_new | complete, T03 |
+| `Simulation.set_charges` | `set_charges(charges, *, total_charge=None)`: per-atom charges and/or the total | complete, T03; refused for models that take none, and until T02 registers a buffer that reads them |
+| `Simulation.set_friction` | `set_friction(friction_per_fs)`: 1/fs, as the public integrator records | complete, T03 |
+| `engine.subprocess.HOST_WRITE_KINDS` | `("positions", "momenta", "species", "masses", "charges", "total_charge", "friction")`: through the subprocess runner, `update` queues one host write per field in its transaction's order; the child applies each by `set_<kind>` (`total_charge` by `set_charges(None, total_charge=)`), and its hand-off restart holds the result (T08) | complete, T08 and T03 |
+| `Committed.species`, `.masses`, `.charges` | atomic numbers `(N,)`, amu `(N,)`, charges `(N,)` or `None`; read-only arrays, in the subprocess runner's `committed()` too | complete, T03 |
 
 Notes on the records:
 - **Species stay as given:** symbols or atomic numbers ≥ 1. The driver maps them to atomic numbers.
@@ -100,9 +119,22 @@ Notes on the records:
 - **`DerivedStateRegistry.register(name, buffer, refresh, depends_on)` → `DerivedBuffer`**:
   - `depends_on` names some of `DEPENDENCIES`: species, masses, charges, friction, barostat, positions, cell, momenta, forces, stress;
   - one entry per name;
-  - `names()`, `affected(changed)`, `in` and `len` are complete;
-  - `refresh(changed)` and `check_against(fresh)` (the CI registry check) are T03's.
-- **`Transaction(engine, events, *, evaluate=None, registry=None)`**: `run()`, `quiesce()`, `snapshot()`, `apply()`, `refresh()`, `accept()`, `reject()` and `resume()`. Stub, T03.
+  - `names()`, `affected(changed)`, `in` and `len`;
+  - `refresh(changed)` runs the affected entries in registration order and returns their names. An owner registers a buffer after the buffers it reads;
+  - `check_against(fresh)`: the names whose buffers differ bit for bit from a fresh registry (or engine), or that only one side has.
+- **Where the registry lives (T03):** `GraphEngine.derived`, built after the state, force field and integrator. The engine calls `register_derived(registry, state)` on the force field (if it has one; T02's `MACEForceField.register_derived`), then on the integrator, then on the fused integrator. Every derived tensor is also in the runtime-state registry, under its owner's name or as `derived.<name>` (policy `derived.*`: restart "derived", captured).
+- **Refresh functions** take no arguments and read the committed inputs from the state: `state.species` (int64 atomic numbers), `state.masses` `(N, 1)`, `state.charges`, `state.total_charge`. They write in place at fixed addresses. Those that depend on species, masses or charges are capturable (no host sync, no new buffer; temporaries inside a graph are fine), tested in `tests/gpu/test_events_gpu.py`. A friction refresh may copy host floats: a friction event drops the graphs anyway.
+- **Registered by T03:** Langevin `integrator.c3_unit`, `c4_unit`, `c5_unit` (masses, friction); BAOAB `integrator.inv_sqrt_masses` (masses) and `integrator.force_eps` (masses, momenta, forces, stress, cell); the fused integrator's `fused.coefficients` (friction).
+- **`Transaction(engine, events, *, evaluate=None, registry=None)`**: `run()`, `quiesce()`, `snapshot()`, `apply()`, `refresh()`, `accept()`, `reject()` and `resume()`; `host_writes` (callables `write(state)` run after the events: `Simulation.update`'s positions and momenta); `changed` and `outcome`.
+  - It validates every event when it is made, before anything is written. The host kinds are species, masses, charges and friction; `swap` and `transmute` raise `NotImplementedError` naming 3-T09, `displace` 3-T10, `barostat` (no host API in phase 3).
+  - Values: `masses` amu and `species` atomic numbers or symbols, one per atom of `atoms`; `charges` an array or `{"charges", "total_charge"}`; `friction` in inverse ASE time units.
+  - A total charge goes through the force field's host `set_total_charge(value)` (T02: its device total is base + Σ charges − Σ charges at the base, so T09 changes it in a graph through `state.charges`), then the `charges` refresh; `state.total_charge` keeps the host record. A rejection sets the old base back before the buffers are restored. A model without `set_total_charge` takes no total charge.
+  - A mass change keeps the momenta, only where the mass changes. A species change sets the standard masses the same way; a masses event after it wins.
+  - Accepted: `engine.transactions_committed` counts it; the resume is `canonicalise(reevaluate=True)`, then a refresh of what depends on forces and stress.
+  - Rejected, impossible, redo: the runtime-state registry snapshot is restored in place, with the noise generator and cursor and the integrator's host constants.
+  - A friction event calls T04's `GraphEngine.invalidate_graphs(reason)`, again on a rejection that captured meanwhile. With the default barostat τ it also changes `barostat` (`P_tau`, the barostat mass); an explicit `barostat_tau_fs` stays.
+- **`events.check_against(engine, fresh)`**: the CI registry check of SPEC §12.2. It compares the derived registries, the state's composition, the neighbour list as the set of compacted edges, the integrator's host constants (the floats a stage bakes in, its config) and every other tensor reachable from the force field and integrator that the runtime-state registry does not hold. So a buffer left out of the registry fails it (`tests/cpu/test_events.py` has the negative controls).
+- **`events.species_numbers(values, count)`**: atomic numbers from numbers or symbols, validated.
 
 ## Species superset in the force field (3-T02)
 
@@ -126,11 +158,48 @@ Added by 3-T02 under the conductor's answers (`plans/phase-3.md`, "3-T02 species
 
 ## Engines
 
-- `engine/compiled.py`: `MODE = "compiled"`; `CompiledEngine(config, force_field, integrator, state, neighbours=None, constraints=None, dynamic_edges=True)`. Stub, T06. Only the planner builds it.
+- `GraphEngine.derived` (T03): the derived-state registry above. `GraphEngine.quiesce()`: an event's quiesce (`flush`).
+- `GraphEngine.transactions_committed` (int) and `GraphEngine.state_version == (state.step, transactions_committed)` (T03): T07 tags its energy cache with it. Not restart state.
+- `engine/compiled.py`: `MODE = "compiled"`; `CompiledEngine(config, force_field, integrator, state, neighbours=None, constraints=None, dynamic_edges=True)`, a `GraphEngine` subclass that never captures; `dynamic_edges` steps on exact edge counts (`False`: bucket padding). Its `info()` adds `tier`, `dynamic_edges` and `compile_mode`; restart files keep the engine name `graph`. Only the planner builds it (T06).
+- The fallback's mode dimension (`planner/fallback.py`, T06): when eager passes the reduced gate, a graph plan tries compiled first, then eager (§9.4 step 2). The terminal sequence is unchanged.
 - `engine/graph.py`:
   - `ENERGY_KEY = "E"` and `ENGINE_KEYS = ("A", "AC", "ACB", "ACP", "ACPB", "B", "C", "E")`;
   - `GraphEngine.energy(*, precision=None)`: the energy-only graph. Stub, T07;
-  - `GraphEngine.captured(key, fn) -> replay`: captures `fn`, which takes no arguments and has fixed shapes and addresses, with the engine's warm-up, registry restore and re-capture policy (variant cap, budget, log). It refuses `ENGINE_KEYS`, which are the engine's own. Stub, T04, for T09's attempt graph.
+  - `GraphEngine.captured(key, fn) -> replay`: captures `fn`, which takes no arguments and has fixed shapes and addresses, with the engine's warm-up, registry restore and re-capture policy (variant cap, budget, log). It refuses `ENGINE_KEYS`, which are the engine's own, and tuple keys whose first element is one. The graph is captured at the first replay and again after an invalidation or eviction; without capture the replay calls `fn`. A tuple key's first element is its family, so `("mc.swap", bucket)` keys are variants of one key. Complete (T04), for T09's attempt graph.
+  - `GraphEngine.invalidate_graphs(reason, keys=None)`: drops the captured graphs (all of them, which also retires the pool, or those of `keys`) and logs the reason. The next capture of a dropped key counts as a re-capture. T03 calls it for friction events. Complete (T04).
+  - `GraphEngine.uncommitted() -> bool`: true while a pipelined or speculative step is unvalidated, or an overflowed evaluation is being redone. T08's restart write guard reads it. Complete (T04).
+
+### Overflow before commit (T04)
+
+- **The device word** `GraphEngine.overflow` (int64 scalar, registered as `engine.overflow`, sticky, reset at a canonical point) holds the bits `EDGE_OVERFLOW = 1` and `KVECTOR_OVERFLOW = 2`.
+  - `flag_edge_overflow(count, edges)`: device operations only, so an MC evaluation sets it inside its captured graph (T07, T09, T10).
+  - `overflowed() -> int`: the word, plus `KVECTOR_OVERFLOW` when the PolarMACE flag is set. One host sync.
+  - `clear_overflow()`: clears both.
+- **MD steps:** a step is committed only after its flags are checked.
+  - Edges: the count against the padded edges the force stage read. Pipelined and speculative steps can overflow; a checked step reads the count first, so it cannot.
+  - K-vectors: with PolarMACE and a variable cell, the flag is read after every force stage. That is one host sync per step, only in those plans, recorded as the plan decision `overflow check: per step` (conductor answer 1). `info()["overflow_check"]` is `"per step"` there and `"edges"` otherwise.
+  - An overflowed step restores stage A's mid-step tensors, grows what overflowed (a larger padded size, or the k-vector set rebuilt for the step's cell), and redoes the force stage with the same noise (answer 2).
+  - A pipelined step adds to `state.step` at its launch and is committed at its validation. `snapshot`, `sync`, `canonicalise` and restart writes validate first.
+- **MC attempts:** `redo_on_overflow(attempt, *, keep=(), max_redos=3) -> redos`.
+  1. It quiesces and snapshots the registered state and the tensors of `keep` (the caller's random-number cursors, such as an MC stream's device offset).
+  2. It runs `attempt` and reads `overflowed()`.
+  3. On an overflow it restores both, grows (the neighbour list rebuilt at the restored positions, or the k-vector set at the current cell), and runs `attempt` again with the same numbers.
+  4. After `max_redos` it raises `CapacityOverflow` (internal, in `engine/graph.py`, with `.word`).
+  The engine draws no random numbers itself.
+- **Counters:** `info()["overflows_redone"]` and `info()["overflow_log"]` (step, kinds, mode). A pipelined rebuild redo (a stale list) is not an overflow, and a speculative bucket rollback is. `provenance` takes `counters.overflows_redone` from the engine info when the caller gives none.
+
+### Re-capture policy (T04)
+
+- **Every capture is logged** in `info()["recapture_log"]` (step, key, reason, counted) and as a `logging` line (`fastmace.engine.graph`).
+- **What counts** against `EngineConfig.recapture_budget` (answer 3): a capture that replaces or adds a variant of a key captured before. That covers a new edge size, a capture after `invalidate_graphs`, an eviction, or a pool reset (`POOL_RESET`). The first capture of each key family is logged but not counted.
+- **The variant cap** (answer 4): at most `EngineConfig.graph_variant_cap` graphs are held. Before a capture that would pass it, the least recently replayed graph is evicted. That is recorded in `graph_evictions`, and its later capture counts.
+- **Past the budget:**
+  - the engine warns once (`RecaptureBudgetWarning`);
+  - it records the step (`recapture_budget_exceeded_at`);
+  - `recapture_warning` gives the report's line, which recommends the compiled tier. `Simulation.run` adds it to the report's warnings.
+  - The run never downgrades mid-run (phase 5, §9.6).
+- **The budget's `"auto"` rule** (`FixedPlanner._phase_3_fields`, `recapture_budget_from_workload`): the variant cap. A run that has re-captured as many graphs as it may hold at once has cycled through its whole working set, so the compiled tier is the better plan. An engine built without a plan reads `"auto"` the same way.
+- `provenance` takes `counters.recaptures` from the engine info when the caller gives none. The full record stays in `counters.engine`.
 
 ## Restart version 3 (`io/restart.py`; owner T08)
 

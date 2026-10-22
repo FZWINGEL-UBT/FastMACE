@@ -1,4 +1,4 @@
-"""Rule 11 (SPEC §9.3): the skin, the pair-buffer headroom and the re-capture budget from the workload.
+"""Rule 11 (SPEC §9.3): the skin and the pair-buffer headroom from the workload.
 
 The skin list stays valid while no atom has moved more than skin / 2 since its build
 (``SkinNeighbourList.needs_rebuild``), so the skin sets the rebuild rate. Rule 11 sizes it from the
@@ -22,9 +22,11 @@ expected displacement per rebuild interval, with no per-GPU or per-crystal table
 The pair buffers hold every candidate within cutoff + skin, ``capacity_headroom`` above the first
 build. Between rebuilds atoms cross the candidate sphere's surface; over one interval the shell of
 pairs within skin / 2 of radius R = cutoff + skin turns over, a relative change of about
-3 (skin / 2) / R. The headroom covers that, and at least the floor (1.15). The re-capture budget is
-the number of padded edge buckets the count can visit inside that capacity, above and below the
-first count: 2 ceil((headroom - 1) / bucket fraction) + 1.
+3 (skin / 2) / R. The headroom covers that, and at least the floor (1.15). ``Rule11.recapture_budget``
+is the number of padded edge buckets the count can visit inside that capacity, above and below the
+first count, 2 ceil((headroom - 1) / bucket fraction) + 1. The plan only records it: the run's
+re-capture budget is 3-T04's rule (the graph variant cap, ``FixedPlanner._phase_3_fields``), since one
+new bucket re-captures several stage graphs.
 """
 
 from __future__ import annotations

@@ -296,9 +296,13 @@ def test_a_species_host_write_reaches_the_next_child(loaded, tmp_path, runner_pl
     sim.run(steps=2)
     try:
         sim.set_species(new_species)
+        sim.run(steps=2)  # the child applies it
     except NotImplementedError:
         pytest.skip("Simulation.set_species: plan task 3-T03 (merged before 3-T08)")
-    sim.run(steps=2)
+    except SubprocessRunnerError as error:  # the child's species event refused without 3-T02's check
+        if "check_species" not in str(error):
+            raise
+        pytest.skip("the child's species event needs 3-T02's MACEForceField.check_species")
     sim.save_restart(tmp_path / "saved")
     resumed = Simulation.resume(tmp_path / "saved", allow_plan_change=True)
     resumed.run(steps=1)
@@ -388,6 +392,37 @@ def _wrapper(tmp_path, body, **config):
     python.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n')
     python.chmod(0o755)
     return RunnerConfig(python=str(python), **config)
+
+
+def _drive_update(sim):
+    sim.run(steps=2)
+    masses = sim.committed().masses * np.where(np.arange(8) % 2 == 0, 1.5, 0.8)
+    sim.update(masses=masses, friction_per_fs=0.02)
+    sim.run(steps=2)
+    return masses
+
+
+@POSIX
+@pytest.mark.parametrize("persistent", [True, False], ids=["worker", "fresh-children"])
+def test_mutations_through_the_runner_equal_an_in_process_run(loaded, tmp_path, runner_plans_later, persistent):
+    """``Simulation.update`` reaches the child as one host write per field (``HOST_WRITE_KINDS``, 3-T03), and
+    a fresh child resumes the hand-off restart with the new masses and friction (restart v3, 3-T08);
+    ``committed()`` carries the composition."""
+    whole = _simulation(loaded)
+    masses = _drive_update(whole)
+    want = _state(whole)
+
+    runner_plans_later()
+    sim = _simulation(loaded, runner=RunnerConfig(persistent=persistent))
+    assert sim.plan.runner == "subprocess"
+    _drive_update(sim)
+    _assert_same_state(_state(sim), want)
+    committed = sim.committed()
+    np.testing.assert_array_equal(committed.masses, masses)
+    np.testing.assert_array_equal(committed.species, whole.committed().species)
+    assert committed.charges is None
+    assert sim.integrator.friction_per_fs == 0.02
+    sim.close()
 
 
 @POSIX

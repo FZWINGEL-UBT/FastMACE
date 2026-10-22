@@ -59,6 +59,7 @@ from .plan import Hardware, Plan
 
 TIER = "graph"
 EAGER_TIER = "eager"  # the graph engine without capture or compilation (SPEC §8.3, 2-T02)
+COMPILED_TIER = "compiled"  # the compiled model without capture, exact edge counts (SPEC §8.2, 3-T06)
 
 # The switch map's rule for every field that admits "auto" (tests/cpu/test_config.py AUTO_RULES).
 AUTO_RULES = MappingProxyType({
@@ -504,7 +505,8 @@ class FixedPlanner:
             book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
                         "fixed cell: the graph engine computes no stress")
 
-        phase_3 = self._phase_3_fields(book, dtype, rule_11)
+        phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
+                                       evaluation=evaluation)
         return dict(
             tier="compiled" if evaluation else TIER,
             rewrites=dataclasses.replace(rewrites, **rewrite_values),
@@ -522,16 +524,21 @@ class FixedPlanner:
             auto_options_off=tuple(values["_auto_off"].items()),
         )
 
-    def _phase_3_fields(self, book, dtype, rule_11=None):
-        """The phase 3 "auto" fields (plan task 3-T01): rule 11's skin, headroom and re-capture budget
-        (3-T05), and the MC energy precision (3-T11, which changes it only for MC plans).
+    def _phase_3_fields(self, book, dtype, rule_11=None, *, polar=False, npt=False, evaluation=False):
+        """The phase 3 "auto" fields (plan task 3-T01): rule 11's skin and headroom (3-T05), the re-capture
+        budget (3-T04) and the MC energy precision (3-T11, which changes it only for MC plans).
 
         ``rule_11`` is ``(applies, Rule11)`` from the minimal planner, which knows the workload. Rule 11
-        sizes the "auto" fields only where it applies: workloads with MC moves or declared species
-        changes (conductor answer 3-T05). Elsewhere, and without a workload (this planner's own plans,
-        evaluations), "auto" keeps phase 1a's skin and headroom, and the decision records what the rule
-        would have given.
-        """
+        sizes the "auto" skin and headroom only where it applies: workloads with MC moves or declared
+        species changes (conductor answer 3-T05). Elsewhere, and without a workload (this planner's own
+        plans, evaluations), "auto" keeps phase 1a's skin and headroom, and the decision records what the
+        rule would have given.
+
+        The re-capture budget (3-T04): the variant cap. A run that has re-captured as many graphs as it may
+        hold at once has cycled through its whole working set of edge sizes and stages, so its variants do
+        not fit, and the compiled tier (no graphs) is the better plan for it. The rule needs no run length,
+        GPU or structure. With PolarMACE and a variable cell the plan also records the per-step k-vector
+        check, one host sync after every force stage (3-T04, conductor answer 1)."""
         n, e, p = self.neighbours, self.engine, self.precision
         applies, sized = rule_11 if rule_11 is not None else (False, None)
         neighbours = {}
@@ -562,17 +569,16 @@ class FixedPlanner:
                 n.headroom, AUTO_RULES["NeighbourConfig.headroom"],
                 f"capacity_headroom {n.capacity_headroom:g} and edge_bucket_fraction as given" + would))
         neighbours["headroom"] = "fixed"
-        if e.recapture_budget == "auto" and applies and sized.recapture_budget is not None:
-            budget = sized.recapture_budget
-            book.decide("EngineConfig.recapture_budget", str(budget), Reason(_why(
-                "auto", AUTO_RULES["EngineConfig.recapture_budget"],
-                "every padded edge bucket the count can visit inside the capacity, above and below the first "
-                "count (rule 11)"), rule=11, code="rule-11"))
-        else:
-            budget = e.graph_variant_cap if e.recapture_budget == "auto" else e.recapture_budget
-            book.decide("EngineConfig.recapture_budget", str(budget), _why(
-                "auto" if e.recapture_budget == "auto" else e.recapture_budget,
-                AUTO_RULES["EngineConfig.recapture_budget"], "the graph variant cap"))
+        budget = e.graph_variant_cap if e.recapture_budget == "auto" else e.recapture_budget
+        buckets = ("" if not applies or sized.recapture_budget is None else
+                   f"; rule 11 expects at most {sized.recapture_budget} padded edge buckets inside the capacity")
+        book.decide("EngineConfig.recapture_budget", str(budget), _why(
+            "auto" if e.recapture_budget == "auto" else e.recapture_budget, AUTO_RULES["EngineConfig.recapture_budget"],
+            f"the graph variant cap ({e.graph_variant_cap}): past it the run warns, records and the report "
+            "recommends the compiled tier (3-T04)" + buckets))
+        if polar and npt and not evaluation:
+            book.decide("overflow check", "per step", "PolarMACE with a variable cell: the k-vector flag is read "
+                        "after every force stage, one host sync per step (3-T04)")
         mc_energy = dtype if p.mc_energy == "auto" else p.mc_energy
         book.decide("PrecisionConfig.mc_energy", mc_energy, _why(
             p.mc_energy, AUTO_RULES["PrecisionConfig.mc_energy"],
@@ -761,7 +767,8 @@ class FixedPlanner:
         ``compile_cache`` (``fastmace.model.compile.CompiledModelCache``) is shared by the engines of
         one run, as the research engine shares its compiled models between crystals; ``constraints``
         is the process record (default the process's). ``capture`` is the engine's (default: captured
-        graphs on CUDA); the eager tier (2-T02) passes False and builds a plan of tier ``"eager"``.
+        graphs on CUDA); the eager tier (2-T02) passes False and builds a plan of tier ``"eager"``, and
+        the compiled tier (3-T06) passes False and gets a ``CompiledEngine`` on exact edge counts.
         """
         from fastmace.engine.graph import GraphEngine
         from fastmace.integrators.baoab import LangevinBAOAB
@@ -769,10 +776,11 @@ class FixedPlanner:
         from fastmace.model.forces import MACEForceField
         from fastmace.state import SimulationState
 
-        if plan.tier not in (TIER, EAGER_TIER):
-            raise ValueError(f"FixedPlanner builds tier {TIER!r} and {EAGER_TIER!r} plans, not {plan.tier!r}")
-        if plan.tier == EAGER_TIER and capture is not False:
-            raise ValueError(f"a tier {EAGER_TIER!r} plan runs without CUDA graphs: pass capture=False")
+        if plan.tier not in (TIER, EAGER_TIER, COMPILED_TIER):
+            raise ValueError(f"FixedPlanner builds tier {TIER!r}, {EAGER_TIER!r} and {COMPILED_TIER!r} plans, "
+                             f"not {plan.tier!r}")
+        if plan.tier in (EAGER_TIER, COMPILED_TIER) and capture is not False:
+            raise ValueError(f"a tier {plan.tier!r} plan runs without CUDA graphs: pass capture=False")
         for part in (plan.rewrites, plan.engine, plan.precision, plan.neighbours, plan.polar):
             if part is not None and "auto" in dataclasses.astuple(part):
                 raise ValueError(f"{type(part).__name__} still has 'auto' values; build takes a plan from plan()")
@@ -806,6 +814,11 @@ class FixedPlanner:
                                        **integrator_keywords(plan.integrator))
         else:
             integrator = Langevin(state, plan.integrator, temperature_K=temperature_K)
+        if plan.tier == COMPILED_TIER:
+            from fastmace.engine.compiled import CompiledEngine
+
+            return CompiledEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours,
+                                  constraints=constraints, dynamic_edges=True)
         return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
                            capture=capture)
 
@@ -823,7 +836,8 @@ def enabled_options(plan: Plan) -> tuple[str, ...]:
 
 
 __all__ = (
-    "AUTO_RULES", "EAGER_TIER", "FixedPlanner", "ModelSettings", "PlanRefused", "STAGE2_SUPPORT", "TIER",
+    "AUTO_RULES", "COMPILED_TIER", "EAGER_TIER", "FixedPlanner", "ModelSettings", "PlanRefused", "STAGE2_SUPPORT",
+    "TIER",
     "WORKLOAD_CONSTRAINTS", "auto_options_off", "detect_hardware", "enabled_options", "integrator_keywords",
     "workload_problems",
 )

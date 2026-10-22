@@ -41,20 +41,43 @@ captured buffer of the runtime-state registry (``registry``: the state, ``integr
 ``force_field.buffers`` and the engine's own flags, host mirrors and mid-step copies, sticky flags
 included), which is more than the baseline's ``_graph_state``: SPEC §8.1 lists what that missed.
 
-Seams for 1b and phase 2 (SPEC §8.1, kept at today's behaviour here): every re-capture goes through
-``_clear_graphs`` and ``_capture`` (the re-capture policy and its log); every host decision on a
-step's flags is in ``_step_checked``, ``_validate_pipelined`` and ``_validate_oldest_speculative``
-(overflow before commit); the registry (``fastmace.engine.registry``) holds the policies.
+**Overflow before commit** (SPEC §8.1, plan task 3-T04): a step is committed only after the host has
+checked every flag its evaluation can set. The edge count is checked against the padded edges the force
+stage read (pipelined and speculative steps; a checked step reads the count first, so it cannot
+overflow). With PolarMACE and a variable cell the sticky k-vector flag is read after every force stage
+(one host sync per step, only in those plans; ``overflow_check``). An overflowed step restores what
+stage A produced (the mid-step tensors), grows what overflowed (the neighbour list, or the k-vector set
+at the step's cell) and redoes the force stage with the same noise: stage A is exact, so this is the
+step redone from the state before it. Nothing observable comes from the overflowed evaluation:
+``snapshot``, ``sync``, ``canonicalise`` and restart writes validate first, and ``uncommitted()`` is
+true while a step is unvalidated. MC attempts get the same restore-and-redo with their own random-number
+cursors through ``redo_on_overflow``; their evaluations set the device word ``overflow``
+(``flag_edge_overflow``). A pipelined step adds to ``state.step`` at its launch and is committed at its
+validation.
+
+**Re-capture policy** (SPEC §8.1): every capture goes through ``_captured`` and is logged
+(``recapture_log``, and a ``logging`` line). The first capture of a key is not counted; a capture that
+replaces or adds a variant of a key captured before (a new edge size, a capture after
+``invalidate_graphs``, an eviction or a pool reset) is a re-capture and counts against
+``EngineConfig.recapture_budget``. Past the budget the engine warns once (``RecaptureBudgetWarning``),
+records the step and recommends the compiled tier (``recapture_warning``); it never downgrades mid-run
+(runtime adaptation is phase 5, SPEC §9.6). At most ``EngineConfig.graph_variant_cap`` graphs are kept:
+the least recently replayed one is evicted, and its later capture counts. The registry
+(``fastmace.engine.registry``) holds the buffer policies.
 """
 
 from __future__ import annotations
 
+import logging
 import math
-from collections.abc import Callable, Mapping
+import warnings
+from collections import OrderedDict
+from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
 import torch
 
+from fastmace.events import DerivedStateRegistry
 from fastmace.neighbors.buckets import edge_bucket, round_up_edges
 
 from . import constraints as process
@@ -72,6 +95,40 @@ CAPTURE_STAGE = "capture"
 # captured(key, fn) refuses for other modules' graphs (3-T04).
 ENERGY_KEY = "E"
 ENGINE_KEYS = ("A", "AC", "ACB", "ACP", "ACPB", "B", "C", ENERGY_KEY)
+# Bits of the device overflow word (``GraphEngine.overflow``, ``overflowed()``) and their names in the logs.
+EDGE_OVERFLOW = 1
+KVECTOR_OVERFLOW = 2
+OVERFLOW_KINDS = ((EDGE_OVERFLOW, "edges"), (KVECTOR_OVERFLOW, "k-vectors"))
+# Redos of one evaluation before ``CapacityOverflow``: one grows what overflowed, so a second is a bug.
+MAX_REDOS = 3
+# The reason logged for the graphs a retired pool drops (``_capture``).
+POOL_RESET = "graph pool retired"
+# Entries kept in ``recapture_log`` and ``overflow_log`` (the counters keep counting past it).
+LOG_LIMIT = 256
+
+logger = logging.getLogger(__name__)
+
+
+class CapacityOverflow(RuntimeError):
+    """An evaluation still overflowed after ``MAX_REDOS`` redos (internal, SPEC §7.6: overflows are not public
+    errors). ``word`` holds the ``EDGE_OVERFLOW`` / ``KVECTOR_OVERFLOW`` bits."""
+
+    def __init__(self, word: int, redos: int):
+        self.word = int(word)
+        super().__init__(f"the evaluation still overflowed ({', '.join(_kinds(word))}) after {redos} redos")
+
+
+class RecaptureBudgetWarning(UserWarning):
+    """The run re-captured more graphs than ``EngineConfig.recapture_budget`` (SPEC §8.1)."""
+
+
+def _kinds(word: int) -> list[str]:
+    return [name for bit, name in OVERFLOW_KINDS if word & bit]
+
+
+def _kind(key) -> Any:
+    """A graph key's family: a stage key's first element (``("B", edges)`` -> ``"B"``), else the key."""
+    return key[0] if isinstance(key, tuple) else key
 
 
 def _device(name: str) -> torch.device:
@@ -146,7 +203,7 @@ class GraphEngine(Engine):
         self._initial_forces()
 
         pinned = dict(dtype=torch.int64, pin_memory=self.cuda)
-        self._graphs = {}
+        self._graphs = OrderedDict()  # least recently replayed first (the variant cap evicts from the front)
         self._pool = None
         self._pool_captures = 0
         self._captured_kinds = set()
@@ -186,7 +243,26 @@ class GraphEngine(Engine):
         self.pipelined_rebuild_redos = 0
         self.pipelined_early_rebuilds = 0
         self.canonical_points = 0
-        self.polar_overflow_steps = []  # steps whose canonical point found the sticky polar flag set
+        self.polar_overflow_steps = []  # steps whose evaluation (or canonical point) found the polar flag set
+        # Overflow before commit (3-T04): the device word MC evaluations set (EDGE_OVERFLOW, KVECTOR_OVERFLOW),
+        # the per-step k-vector check of PolarMACE with a variable cell (one host sync after B), the redos.
+        self.overflow = torch.zeros((), dtype=torch.int64, device=device)
+        self.polar_check = self.variable_cell and getattr(force_field, "_polar_state", lambda: None)() is not None
+        self.overflows_redone = 0
+        self.overflow_log = []
+        self._redoing = False
+        # Re-capture policy (3-T04): the log, the budget ("auto" without a plan: the variant cap, as the
+        # planner resolves it), evictions, invalidations, and why a dropped key's next capture counts.
+        budget = config.recapture_budget
+        self.recapture_budget = config.graph_variant_cap if budget == "auto" else int(budget)
+        self.recaptures = 0
+        self.recapture_log = []
+        self.recapture_budget_exceeded_at = None
+        self.graph_evictions = 0
+        self.invalidations = []
+        self._dropped = {}  # key -> why it was dropped (its next capture is a re-capture)
+        self._kinds_seen = set()  # key families captured at least once in this engine
+        self._external = {}  # captured(key, fn): other modules' stage functions
         # What stage A produces and stage B changes (Langevin v; BAOAB v, p_eps), saved inside the
         # pipelined and speculative graphs so that a failed step can redo stage B alone.
         self._mids = tuple(torch.zeros_like(tensor) for tensor in integrator.mid_step_tensors(state))
@@ -199,6 +275,17 @@ class GraphEngine(Engine):
             self.fused_integrator_reason = applicable(self)
             if self.fused_integrator_reason is None:
                 self._fused = FusedIntegrator(self)
+        # The derived-state registry (SPEC §8.5, 3-T03): the force field's species tables first, then the
+        # integrator's mass and friction coefficients and its cell force, then the fused constants, so that a
+        # refresh in registration order reads refreshed inputs. Events (fastmace.events) refresh it.
+        self.derived = DerivedStateRegistry()
+        register = getattr(force_field, "register_derived", None)
+        if register is not None:
+            register(self.derived, state)
+        integrator.register_derived(self.derived, state)
+        if self._fused is not None:
+            self._fused.register_derived(self.derived)
+        self.transactions_committed = 0  # committed events; with the step, the state version of caches (3-T07)
         self.registry = Registry(self._registered_buffers)
         self.registry.entries()  # every buffer has a policy (RegistryError otherwise)
         integrator.start(state)  # LangevinBAOAB.__init__: the cell force of the starting forces
@@ -270,6 +357,17 @@ class GraphEngine(Engine):
             self._validate_oldest_speculative()
         self._validate_pipelined()
 
+    def quiesce(self) -> None:
+        """An event's first step (SPEC §8.5): finish the pipelined and speculative work, so that the state is
+        a committed step. The output queue is the ``Simulation``'s, which drains it first."""
+        self.flush()
+
+    @property
+    def state_version(self) -> tuple[int, int]:
+        """``(state.step, transactions_committed)``: changes with every committed step and every committed
+        event, for caches of the committed state (3-T07's energy). Not restart state."""
+        return int(self.state.step), int(self.transactions_committed)
+
     def snapshot(self) -> Snapshot:
         """The current step's output values, copied to pinned host memory behind it without draining the GPU.
 
@@ -300,8 +398,121 @@ class GraphEngine(Engine):
     def captured(self, key: str, fn: Callable[[], Any]) -> Callable[[], None]:
         """Capture ``fn`` (no arguments, fixed shapes and addresses) as a CUDA graph under ``key`` with the
         engine's warm-up, registry restore and re-capture policy (variant cap, budget, log), and return
-        its replay. For other modules' graphs (the MC attempt, 3-T09); ``ENGINE_KEYS`` are refused."""
-        raise NotImplementedError("GraphEngine.captured: plan task 3-T04")
+        its replay. For other modules' graphs (the MC attempt, 3-T09); ``ENGINE_KEYS`` are refused.
+
+        The graph is captured at the first replay and again after an invalidation or an eviction, so the
+        replay stays valid for the engine's life. Without capture (CPU, eager) the replay calls ``fn``.
+        A tuple key's first element is its family: ``("mc.swap", bucket)`` keys are variants of one key.
+        """
+        if _kind(key) in ENGINE_KEYS:
+            raise ValueError(f"{key!r} is an engine stage key ({', '.join(ENGINE_KEYS)}); other modules' graphs "
+                             "need their own keys")
+        if not callable(fn):
+            raise TypeError(f"captured({key!r}, fn): fn must be callable, got {type(fn).__name__}")
+        self._external[key] = fn
+
+        def replay() -> None:
+            self._run(key)
+
+        return replay
+
+    def invalidate_graphs(self, reason: str, keys: Iterable | None = None) -> None:
+        """Drop the captured graphs (all, or those of ``keys``) and log ``reason``; their next capture is a
+        re-capture (counted against the budget). Dropping all of them also retires the graph pool.
+
+        For changes that captured graphs bake in: a grown capacity that moved buffers, a friction change
+        (``c1``/``c2`` are Python floats in the integrator's kernels; 3-T03).
+        """
+        if keys is None:
+            dropped = list(self._graphs)
+            self._graphs.clear()
+            self._pool = None
+            self._pool_captures = 0
+            self._captured_kinds.clear()
+        else:
+            dropped = [key for key in keys if key in self._graphs]
+            for key in dropped:
+                del self._graphs[key]
+        for key in dropped:
+            self._dropped[key] = str(reason)
+        self.invalidations.append({"step": int(self.state.step), "reason": str(reason), "graphs": len(dropped)})
+        del self.invalidations[:-LOG_LIMIT]
+        logger.info("graph engine: dropped %d captured graphs at step %d (%s)", len(dropped), self.state.step, reason)
+
+    def uncommitted(self) -> bool:
+        """True while a step is unvalidated (pipelined or speculative, in flight) or an overflowed evaluation
+        is being redone: nothing may be written or decided from the state now (3-T08's restart guard)."""
+        return bool(self._pending) or self._pipe_pending is not None or self._redoing
+
+    def overflowed(self) -> int:
+        """The overflow bits set since the last clear: the device word and the polar flag (a host sync)."""
+        word = int(self.overflow)
+        flag = self._polar_flag()
+        if flag is not None and bool(flag):
+            word |= KVECTOR_OVERFLOW
+        return word
+
+    def flag_edge_overflow(self, count: torch.Tensor, edges) -> None:
+        """Set ``EDGE_OVERFLOW`` in the device word when ``count`` exceeds ``edges`` (device ops only, so an MC
+        evaluation can call it inside its captured graph; 3-T07, 3-T09, 3-T10)."""
+        with torch.no_grad():
+            exceeded = torch.as_tensor(count, device=self.device) > torch.as_tensor(edges, device=self.device)
+            self.overflow.bitwise_or_(exceeded.to(torch.int64) * EDGE_OVERFLOW)
+
+    def clear_overflow(self) -> None:
+        """Clear the device word and the polar flag (a host decision, after the redo or at a restart point)."""
+        with torch.no_grad():
+            self.overflow.zero_()
+            flag = self._polar_flag()
+            if flag is not None:
+                flag.zero_()
+
+    def redo_on_overflow(self, attempt: Callable[[], Any], *, keep: Iterable[torch.Tensor] = (),
+                         max_redos: int = MAX_REDOS) -> int:
+        """Run ``attempt`` (an MC attempt or block: proposal, refresh, evaluation) and redo it while it overflows.
+
+        Before it: quiesce (``flush``), then snapshot the registered state and the tensors of ``keep`` (the
+        caller's random-number cursors, e.g. an MC stream's device offset). After it the host reads
+        ``overflowed()`` (one sync). On an overflow it restores both snapshots exactly, grows what
+        overflowed (``_grow``), and runs ``attempt`` again with the same numbers; no decision is taken
+        from the overflowed evaluation. Returns the number of redos; ``CapacityOverflow`` (internal) after
+        ``max_redos``. The engine draws no random numbers itself.
+        """
+        self.flush()
+        keep = tuple(keep)
+        saved = self.registry.snapshot()
+        kept = [tensor.detach().clone() for tensor in keep]
+        self.clear_overflow()
+        redos = 0
+        self._redoing = True
+        try:
+            while True:
+                attempt()
+                word = self.overflowed()
+                if not word:
+                    return redos
+                if redos >= max_redos:
+                    raise CapacityOverflow(word, redos)
+                redos += 1
+                self.registry.restore(saved)
+                with torch.no_grad():
+                    for tensor, value in zip(keep, kept, strict=True):
+                        tensor.copy_(value)
+                self._grow(word)
+                self._record_overflow(word, int(self.state.step), "mc")
+                saved = self.registry.snapshot()  # a grown list has new buffers; the rest is as restored
+        finally:
+            self._redoing = False
+            del saved
+
+    @property
+    def recapture_warning(self) -> str | None:
+        """The report's line once the re-capture budget is exceeded (None before): it recommends the compiled tier."""
+        if self.recapture_budget_exceeded_at is None:
+            return None
+        return (f"{self.recaptures} graph re-captures passed the budget of {self.recapture_budget} at step "
+                f"{self.recapture_budget_exceeded_at}: frequent re-captures cost more than they save; plan the "
+                'compiled tier (mode="compiled") for this workload')
 
     def info(self) -> Mapping[str, Any]:
         extra = {"rebuilds_beside": self.rebuilds_beside} if self.config.overlap_rebuild else {}
@@ -319,6 +530,13 @@ class GraphEngine(Engine):
             "pipelined_rebuild_redos": self.pipelined_rebuild_redos,
             "pipelined_early_rebuilds": self.pipelined_early_rebuilds, "canonical_points": self.canonical_points,
             "polar_overflow_steps": list(self.polar_overflow_steps), "process": dict(self.process),
+            "overflow_check": "per step" if self.polar_check else "edges", "overflows_redone": self.overflows_redone,
+            "overflow_log": [dict(entry) for entry in self.overflow_log], "recaptures": self.recaptures,
+            "recapture_budget": self.recapture_budget,
+            "recapture_budget_exceeded_at": self.recapture_budget_exceeded_at,
+            "graph_variant_cap": self.config.graph_variant_cap, "graph_evictions": self.graph_evictions,
+            "recapture_log": [dict(entry) for entry in self.recapture_log],
+            "invalidations": [dict(entry) for entry in self.invalidations],
         }
 
     # ------------------------------------------------------------------ canonical restart points
@@ -351,13 +569,13 @@ class GraphEngine(Engine):
                 self.polar_overflow_steps.append(state.step)
         moved |= bool(field.rebuild(state.positions))
         if moved:
-            self._clear_graphs()
+            self.invalidate_graphs("the canonical rebuild moved buffers")
         field.compact(state.positions)  # as the build does: eager, then the exact count
         count = int(field.edge_count)  # host sync
         field.use_edges(count)
         with torch.no_grad():
             for tensor in (self.rebuild_needed, self._flags, self._pipe_flags, self._spec_flags, self._flags_host,
-                           self._pipe_flags_host, self._spec_flags_host, *self._mids):
+                           self._pipe_flags_host, self._spec_flags_host, self.overflow, *self._mids):
                 tensor.zero_()
         self._pipe_floor = 0
         self._pipe_edges = self._padded(count)
@@ -385,7 +603,7 @@ class GraphEngine(Engine):
             if not callable(getattr(neighbours, "set_capacity", None)):
                 raise TypeError(f"{type(self.force_field).__name__} has no neighbour list whose capacity can be set")
             if neighbours.set_capacity(neighbour_capacity):
-                self._clear_graphs()
+                self.invalidate_graphs("the restart's neighbour capacity")
         self.canonicalise()
 
     def _registered_buffers(self) -> dict[str, torch.Tensor]:
@@ -410,8 +628,11 @@ class GraphEngine(Engine):
         named.update({"engine.rebuild_needed": self.rebuild_needed, "engine.flags": self._flags,
                       "engine.pipe_flags": self._pipe_flags, "engine.spec_flags": self._spec_flags,
                       "engine.flags_host": self._flags_host, "engine.pipe_flags_host": self._pipe_flags_host,
-                      "engine.spec_flags_host": self._spec_flags_host})
+                      "engine.spec_flags_host": self._spec_flags_host, "engine.overflow": self.overflow})
         named.update({f"engine.mid.{index}": tensor for index, tensor in enumerate(self._mids)})
+        # Derived buffers not registered above under their owner's name (a tensor is registered once).
+        named.update({f"derived.{name}": self.derived[name].buffer for name in self.derived.names()
+                      if isinstance(self.derived[name].buffer, torch.Tensor)})
         return named
 
     # ------------------------------------------------------------------ steps
@@ -453,14 +674,65 @@ class GraphEngine(Engine):
         else:
             grew = self.force_field.rebuild(self.state.positions)
         if grew:
-            self._clear_graphs()
+            self.invalidate_graphs("the neighbour capacity grew")
 
     def _clear_graphs(self) -> None:
-        """Capacity grew: tensors moved, recapture all stages in a new pool (SPEC §8.1 re-capture seam)."""
-        self._graphs.clear()
-        self._pool = None
-        self._pool_captures = 0
-        self._captured_kinds.clear()
+        """Capacity grew: tensors moved, recapture all stages in a new pool (``invalidate_graphs``)."""
+        self.invalidate_graphs("capacity grew")
+
+    # ------------------------------------------------------------------ overflow before commit
+
+    def _polar_flag(self) -> torch.Tensor | None:
+        """The sticky PolarMACE k-vector overflow flag (a device bool), or None without a polar state."""
+        state = getattr(self.force_field, "_polar_state", lambda: None)()
+        return None if state is None else state.overflow
+
+    def _grow(self, word: int) -> None:
+        """Make what overflowed big enough for the current state, then clear the flags (a host decision).
+
+        K-vectors: the set is rebuilt for the current cell (``reset_polar``; the step's cell, which stage A
+        wrote). Edges: the neighbour list is rebuilt at the current positions and compacted. Either may
+        move buffers, which drops the captured graphs (``invalidate_graphs``).
+        """
+        field, state = self.force_field, self.state
+        if word & KVECTOR_OVERFLOW:
+            moved, _ = field.reset_polar(state.cell.detach().cpu().numpy())
+            if moved:
+                self.invalidate_graphs("the k-vector set grew")
+        if word & EDGE_OVERFLOW:
+            if field.rebuild(state.positions):
+                self.invalidate_graphs("the neighbour capacity grew")
+            field.compact(state.positions)
+        self.clear_overflow()
+
+    def _record_overflow(self, word: int, step: int, mode: str | None = None) -> None:
+        self.overflows_redone += 1
+        if word & KVECTOR_OVERFLOW:
+            self.polar_overflow_steps.append(step)
+        self.overflow_log.append({"step": step, "kinds": _kinds(word), "mode": mode or self.mode})
+        del self.overflow_log[:-LOG_LIMIT]
+        logger.info("graph engine: step %d overflowed (%s) and was redone", step, ", ".join(_kinds(word)))
+
+    def _polar_word(self) -> int:
+        """``KVECTOR_OVERFLOW`` if the force stage just run set the polar flag (the per-step host sync)."""
+        if not self.polar_check:
+            return 0
+        flag = self._polar_flag()
+        return KVECTOR_OVERFLOW if flag is not None and bool(flag) else 0  # host sync (polar NPT plans only)
+
+    def _redo_force_stage(self, word: int, step: int) -> None:
+        """An overflowed force stage: restore stage A's output, grow, redo B on the current edges, check again."""
+        for _ in range(MAX_REDOS):
+            self._restore_mid()
+            self._grow(word)
+            self._record_overflow(word, step)
+            edges = self._padded(int(self.force_field.edge_count))  # host sync (redo only)
+            self._use_edges(edges)
+            self._run(("B", edges))
+            word = self._polar_word()
+            if not word:
+                return
+        raise CapacityOverflow(word, MAX_REDOS)
 
     def _step_checked(self) -> None:
         # Same draws, same order as ASE (drawn noise_batch steps ahead).
@@ -478,8 +750,13 @@ class GraphEngine(Engine):
             count = int(self.force_field.edge_count)  # host sync (rebuild steps only)
         edges = self._padded(count)
         self._use_edges(edges)
+        if self.polar_check:
+            self._save_mid()  # a k-vector overflow redoes B from here (the pipelined graphs save it inside)
         self._run(("B", edges))
-        self.state.step += 1
+        word = self._polar_word()
+        if word:
+            self._redo_force_stage(word, self.state.step + 1)
+        self.state.step += 1  # committed: every flag of the step checked
 
     def _step_pipelined(self) -> None:
         self._validate_pipelined()
@@ -515,8 +792,15 @@ class GraphEngine(Engine):
         flags = self._pipe_flags_view
         rebuild, count, early = bool(flags[0]), int(flags[1]), bool(flags[2])
         capacity = self.force_field.edge_capacity
-        if rebuild or count > edges:
-            # Stage A was exact; only B used a stale or truncated edge set.
+        if self.polar_check and self.cuda:
+            torch.cuda.current_stream().synchronize()  # the k-vector flag of B (polar NPT plans only)
+        word = self._polar_word() | (EDGE_OVERFLOW if count > edges and not rebuild else 0)
+        if word:
+            self._record_overflow(word, self.state.step)
+        if word & KVECTOR_OVERFLOW:
+            self._grow(KVECTOR_OVERFLOW)  # the k-vector set for the step's cell, before B is redone below
+        if rebuild or word:
+            # Stage A was exact; only B used a stale or truncated edge set, or too few k-vectors.
             self.pipelined_redos += 1
             self._restore_mid()
             if rebuild:
@@ -528,7 +812,10 @@ class GraphEngine(Engine):
             edges = self._padded(count)
             self._use_edges(edges)
             self._run(("B", edges))
-            self._pipe_floor = 0 if rebuild else edges
+            if self._polar_word():  # the redo itself cannot overflow: the set covers the step's cell
+                raise CapacityOverflow(KVECTOR_OVERFLOW, 1)
+            if rebuild or word & EDGE_OVERFLOW:  # a k-vector redo alone keeps the floor
+                self._pipe_floor = 0 if rebuild else edges
         elif early:
             # Rebuild before the hard limit; the next AC compacts the new candidates.
             self.pipelined_early_rebuilds += 1
@@ -576,6 +863,7 @@ class GraphEngine(Engine):
             self.speculative_rebuild_rollbacks += 1
         else:
             self.speculative_bucket_rollbacks += 1
+            self._record_overflow(EDGE_OVERFLOW, self.state.step + 1)
         # Stage A of the speculative step was exact (positions, random displacements); only its
         # force stage used a stale or truncated edge set. Restore what stage A produced and redo
         # just that stage, rebuilding the neighbour list first when the flags ask for it.
@@ -647,6 +935,9 @@ class GraphEngine(Engine):
             tensor.copy_(saved)
 
     def _stage(self, key):
+        external = self._external.get(key)
+        if external is not None:
+            return external
         if isinstance(key, tuple) and key[0] == "ACB":
             slot = key[2]
 
@@ -675,9 +966,13 @@ class GraphEngine(Engine):
         if not self.capture:
             self._stage(key)()
             return
-        if key not in self._graphs:
+        graph = self._graphs.get(key)
+        if graph is None:
             self._captured(key)
-        self._graphs[key].replay()
+            graph = self._graphs[key]
+        else:
+            self._graphs.move_to_end(key)  # most recently replayed last (the variant cap evicts the first)
+        graph.replay()
 
     def _captured(self, key) -> None:
         """``_capture(key)``; an error it raises is tagged with the stage ``"capture"`` (``CAPTURE_STAGE``)
@@ -691,6 +986,12 @@ class GraphEngine(Engine):
         if edges is not None and active is not None and active != edges:
             raise RuntimeError(f"capturing {key!r} with {active} active edges, not its {edges}: the graph would "
                                "read the wrong edges for the rest of the run (call force_field.use_edges first)")
+        counted, reason = self._capture_reason(key)
+        while len(self._graphs) >= self.config.graph_variant_cap:
+            evicted, _ = self._graphs.popitem(last=False)
+            self._dropped[evicted] = "evicted by the variant cap"
+            self.graph_evictions += 1
+            logger.info("graph engine: evicted %s (variant cap %d)", evicted, self.config.graph_variant_cap)
         try:
             self._capture(key)
         except Exception as error:
@@ -699,6 +1000,30 @@ class GraphEngine(Engine):
             except AttributeError:  # pragma: no cover - an exception type without a __dict__
                 pass
             raise
+        self._kinds_seen.add(_kind(key))
+        self._record_capture(key, counted, reason)
+
+    def _capture_reason(self, key) -> tuple[bool, str]:
+        """Whether capturing ``key`` now counts against the budget, and why (conductor answer 3 of 3-T04)."""
+        if key in self._dropped:
+            return True, self._dropped.pop(key)
+        if _kind(key) in self._kinds_seen:
+            return True, f"new variant of {_kind(key)}"
+        return False, "first capture"
+
+    def _record_capture(self, key, counted: bool, reason: str) -> None:
+        step = int(self.state.step)
+        self.recapture_log.append({"step": step, "key": str(key), "reason": reason, "counted": counted})
+        del self.recapture_log[:-LOG_LIMIT]
+        if not counted:
+            logger.info("graph engine: captured %s at step %d (%s)", key, step, reason)
+            return
+        self.recaptures += 1
+        logger.info("graph engine: re-captured %s at step %d (%s; %d of a budget of %d)", key, step, reason,
+                    self.recaptures, self.recapture_budget)
+        if self.recaptures > self.recapture_budget and self.recapture_budget_exceeded_at is None:
+            self.recapture_budget_exceeded_at = step
+            warnings.warn(self.recapture_warning, RecaptureBudgetWarning, stacklevel=4)
 
     def _warm_up(self, key) -> None:
         """The warm-up runs of a capture without the capture: run ``key`` eagerly, then restore the state."""
@@ -755,7 +1080,7 @@ class GraphEngine(Engine):
             # Something the warm-up keeps alive now lives in the pool, where replays of the existing
             # graphs could overwrite it. Retire the pool: drop all graphs (recaptured on demand in a
             # new pool); the allocation stays valid.
-            self._clear_graphs()
+            self.invalidate_graphs(POOL_RESET)
             self.pool_resets += 1
         self.registry.restore(saved)
         del saved

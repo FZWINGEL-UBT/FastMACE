@@ -47,8 +47,8 @@ REFUSALS = {
                                "fm.ForceField(species=...)",
     "polar-plain-compiled-cueq": "PolarMACE with compiled plain cuEq gives zero forces (rule 3, §4.3); use the "
                                  "hybrid backend (OEq; `fastmace doctor` names a missing piece)",
-    "inexact-padding": "padded edges would change this model's energies (rule 4); the compiled MD tier with exact "
-                       "edge counts comes in phase 3",
+    "inexact-padding": "padded edges would change this model's energies (rule 4); pass mode='compiled', or no "
+                       "mode, for the compiled tier with exact edge counts",
     "reproducible-backend": "reproducible=True needs plain cuEq (rule 5): the hybrid's OEq kernels sum atomically; "
                             "leave the backend on auto",
     "reproducible-conv-fusion": "reproducible=True needs the unfused convolution (rule 5, owner decision 13); leave "
@@ -57,8 +57,8 @@ REFUSALS = {
                                          "drop reproducible=True for statistical reproducibility",
     "reproducible-cueq-version": "reproducible=True: cuEquivariance's run-time kernel choice is pinned for "
                                  "cuequivariance_ops 0.12.0 only (rule 5); install it, or drop reproducible=True",
-    "reproducible-tier": "reproducible=True runs on the graph or eager tier, not the reference tier (rule 5); "
-                         "drop mode='reference' or reproducible=True",
+    "reproducible-tier": "reproducible=True runs on the graph or eager tier, not the compiled or reference tier "
+                         "(rule 5); drop that mode or reproducible=True",
     "reproducible-kernel-not-deterministic": "reproducible=True: a rewrite in use is not declared deterministic "
                                              "(rule 5); switch it off, or drop reproducible=True",
     "naive-cueq": "cuEquivariance's fused kernels do not load (rule 6); install cuequivariance-ops-torch "
@@ -66,7 +66,7 @@ REFUSALS = {
     "atom-count-changes": "a changing atom count is not in 1.0 (rule 7, §8.6)",
     "superset-beyond-structure": "a species superset beyond the structure's species comes in phase 3 (§8.5, "
                                  "owner decision D3); pass species equal to the structure's",
-    "mode-compiled": "MD on the compiled tier comes in phase 3; 1b runs MD on the graph tier",
+    "mode-compiled": "MD on the compiled tier was refused (1b; the tier exists since 3-T06)",
     "mode-eager": "MD on the eager tier is not in 1b; 1b runs MD on the graph tier",
     "mode-reference": "MD on the reference tier is not in 1b (owner decision D6); use MACE's own calculator",
     "hybrid-unavailable": "backend='hybrid' was requested but cannot run here; `fastmace doctor` names the "
@@ -95,9 +95,15 @@ DOWNGRADES = {
     "backend-cueq-process-family": "plain cuEq, not hybrid: this process already compiled the other backend "
                                    "family (§8.7); run in a fresh process",
     "backend-cueq-requested": "plain cuEq as requested (backend='cueq'); auto would choose hybrid where it builds",
-    "host-callbacks-graph-sync": "frequent host callbacks: graph tier with a host sync at each callback (rule 9, "
-                                 "owner decision D6); correct but slower",
+    "host-callbacks-graph-sync": "host callbacks: graph tier with a host sync at each callback (rule 9); correct "
+                                 "but slower when they are frequent",
     "mode-eager-tier": "eager tier: no CUDA graphs, no compilation (mode='eager', SPEC §8.3); correct but slower",
+    # The compiled tier (3-T06; SPEC §8.2): no CUDA graphs, so every step is launched from the host.
+    "mode-compiled-tier": "compiled tier: no CUDA graphs (mode='compiled', SPEC §8.2); correct but slower",
+    "mode-compiled-rule-4": "compiled tier: no CUDA graphs, because padded edges would change this model's "
+                            "energies (rule 4, SPEC §8.2); exact edge counts, correct but slower",
+    "mode-compiled-rule-9": "compiled tier: no CUDA graphs, because host callbacks come too often for graph "
+                            "replays (rule 9, SPEC §8.2); pass mode='graph' to keep the graph tier",
     "precision-promoted-unqualified-energy": "float64 forces, promoted from float32: this MACE is not the "
                                              "qualified 0.3.16 and its float64 energy forward does not hash, so a "
                                              "float64 model sums the energy (SPEC §18 decision 2)",

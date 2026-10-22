@@ -380,10 +380,58 @@ def detach(error: BaseException | None) -> BaseException | None:
     return error
 
 
+# An error text that names a cause stays on one line of about this many characters (3-T17).
+ERROR_TEXT_LIMIT = 300
+
+
+def _first_line(error) -> str:
+    lines = str(error).splitlines()
+    return lines[0].strip() if lines else ""
+
+
+def _innermost(error: BaseException) -> BaseException:
+    """The innermost error of ``error``'s chain: ``__cause__``, else ``__context__`` unless suppressed."""
+    seen, current = {id(error)}, error
+    while True:
+        following = current.__cause__
+        if following is None and not current.__suppress_context__:
+            following = current.__context__
+        if following is None or id(following) in seen:
+            return current
+        seen.add(id(following))
+        current = following
+
+
+def error_text(error: BaseException, head: str | None = None) -> str:
+    """The error's class and first line (or ``head``), and the innermost error of its chain (3-T17).
+
+    A wrapped compile error's first line names no cause: Inductor's ``BackendCompilerFailed`` reads
+    ``backend='inductor' raised:``, and 2-T21d's reason stopped there, dropping ``RuntimeError:
+    Attempting to use a closed pool``. The innermost error of the ``__cause__``/``__context__`` chain
+    (or, with no chain, the line under a trailing ``raised:``) is added as ``Type: first line``. An
+    error with no cause gives the class and first line alone, as before.
+    """
+    head = _first_line(error) if head is None else head
+    text = f"{type(error).__name__}: {head}" if head else type(error).__name__
+    inner = _innermost(error)
+    if inner is not error:
+        message = _first_line(inner)
+        cause = f"{type(inner).__name__}: {message}" if message else type(inner).__name__
+        if message and message in head:
+            return text
+    else:
+        lines = [line.strip() for line in str(error).splitlines()[1:]]
+        cause = next((line for line in lines if line), "") if head.endswith("raised:") else ""
+        if not cause:
+            return text
+    text += (" " if head.endswith(":") else "; innermost ") + cause
+    return text if len(text) <= ERROR_TEXT_LIMIT else text[:ERROR_TEXT_LIMIT - 1] + "…"
+
+
 def _text(error) -> str:
-    """The error's class and first line; a gate error adds its record's reason."""
-    first = str(error).splitlines()[0] if str(error) else ""
-    text = f"{type(error).__name__}: {first}" if first else type(error).__name__
+    """The error's class and first line, with the innermost cause (``error_text``); a gate error adds its
+    record's reason."""
+    text = error_text(error)
     record = getattr(error, "gate_record", None)
     if record is not None and getattr(record, "reason", None) and record.reason not in text:
         text += f" ({record.reason})"
@@ -664,8 +712,8 @@ def diagnose(plan: Any, failure: BaseException | Failure | None, *, test: Callab
     """The failing dimension (§9.4 step 2): ``"mode"`` if eager passes, else ``"rewrites"``.
 
     ``test(mode, enabled)`` is True when the reduced gate fails in ``mode`` with the switches
-    ``enabled`` on. Eager on the full rewrite set passes: ``"mode"`` (a graph plan; for an eager plan
-    the reduced gate cannot see the fault: ``None``). Eager fails and the empty set passes:
+    ``enabled`` on. Eager on the full rewrite set passes: ``"mode"`` (a graph or compiled plan; for an
+    eager plan the reduced gate cannot see the fault: ``None``). Eager fails and the empty set passes:
     ``"rewrites"``. The empty set fails too: ``None``, the fault is not in the rewrites.
     """
     units = frozenset(enabled_rewrites(plan))
@@ -716,10 +764,11 @@ class Fallback:
     - ``failure``: a ``Failure``.
 
     The loop keeps (mode, rewrites off) and, per round, reacts to the last failure: rule 13 for a
-    self-check failure; otherwise ``diagnose``: the mode (eager), or ddmin over the eager rewrite set,
-    whose minimal failing set and its dependants go off; then the candidate is validated
-    (``activate``). Every round changes the mode or switches rewrites off, so the loop ends. When the
-    diagnosis cannot locate the fault or its budget is spent, the terminal sequence runs.
+    self-check failure; otherwise ``diagnose``: the mode (compiled for a graph plan, then eager), or
+    ddmin over the eager rewrite set, whose minimal failing set and its dependants go off; then the
+    candidate is validated (``activate``). Every round changes the mode or switches rewrites off, so
+    the loop ends. When the diagnosis cannot locate the fault or its budget is spent, the terminal
+    sequence runs.
     """
 
     def __init__(self, planner: Any, force_field: Any, atoms: Any, integrator: Any, references: Any,
@@ -979,6 +1028,12 @@ class Fallback:
             return None
         dimension = diagnose(current, last, test=self._test)
         if dimension == "mode":
+            # §9.4 step 2: compiled without graphs first, then eager (3-T06). A compiled candidate that is
+            # refused or fails makes the next round, which tries eager.
+            if mode == "graph":
+                activation = self._validate("compiled", off, f"{MODE_WHY}; compiled first ({_text(last.error)})")
+                if activation is not None:
+                    return "compiled", off, activation
             return "eager", off, self._validate("eager", off, f"{MODE_WHY} ({_text(last.error)})")
         if dimension != "rewrites":
             return None

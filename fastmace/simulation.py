@@ -88,13 +88,14 @@ class PlannerOptions:
     """The planner inputs of ``Simulation`` and ``fm.md`` (plan task 2-T01), validated, recorded in
     ``simulation.json`` and used again by ``Simulation.resume``.
 
-    - ``mode``: the execution mode (``config.Mode``, §9.3); ``allow_reference``: rule 1's flag;
+    - ``mode``: the execution mode (``config.Mode``, §9.3), or ``None`` (the default): the planner picks the
+      graph tier, or the compiled tier by rule 4 or rule 9 (3-T06); ``allow_reference``: rule 1's flag;
     - ``fallback``, ``gate``, ``runner``: the safety records of phase 2 (§9.4, §12.3, §8.7);
     - ``engine``, ``neighbours``: the planner-level options; ``None`` keeps the default planner's
       (``planner.minimal.default_planner``: CUDA if available, else the CPU without compilation).
     """
 
-    mode: Mode = "graph"
+    mode: Mode | None = None
     allow_reference: bool = False
     fallback: FallbackConfig = field(default_factory=FallbackConfig)
     gate: GateConfig = field(default_factory=GateConfig)
@@ -128,19 +129,19 @@ class PlannerOptions:
                 return None
             return kind(**{key: _from_json(value) for key, value in values.items()})
 
-        return planner_options(mode=record.get("mode", "graph"), allow_reference=record.get("allow_reference", False),
+        return planner_options(mode=record.get("mode"), allow_reference=record.get("allow_reference", False),
                                fallback=part("fallback", FallbackConfig), gate=part("gate", GateConfig),
                                runner=part("runner", RunnerConfig), engine=part("engine", EngineConfig),
                                neighbours=part("neighbours", NeighbourConfig))
 
 
-def planner_options(mode: Any = "graph", allow_reference: Any = False, fallback: Any = None, gate: Any = None,
+def planner_options(mode: Any = None, allow_reference: Any = False, fallback: Any = None, gate: Any = None,
                     runner: Any = None, engine: Any = None, neighbours: Any = None) -> PlannerOptions:
     """The validated ``PlannerOptions``: ``ValueError`` or ``TypeError`` before anything is loaded."""
     from fastmace.config import MODES
 
-    if not isinstance(mode, str) or mode not in MODES:
-        raise ValueError(f"mode={mode!r} is not one of {MODES} (SPEC §9.3)")
+    if mode is not None and (not isinstance(mode, str) or mode not in MODES):
+        raise ValueError(f"mode={mode!r} is not None or one of {MODES} (SPEC §9.3)")
     if not isinstance(allow_reference, bool):
         raise TypeError(f"allow_reference must be a bool, got {allow_reference!r}")
     parts = {}
@@ -170,7 +171,9 @@ def _steps(steps: Any) -> int:
 class Committed:
     """The committed step as read-only host arrays: what an observer sees (``Simulation.committed``).
 
-    ``stress`` (3×3, eV/Å³) is ``None`` for fixed-cell integrators; ``energy`` in eV.
+    ``stress`` (3×3, eV/Å³) is ``None`` for fixed-cell integrators; ``energy`` in eV. The composition
+    (3-T03): ``species`` atomic numbers ``(N,)``, ``masses`` amu ``(N,)``, ``charges`` ``(N,)`` or
+    ``None`` for models that take none.
     """
 
     step: int
@@ -180,6 +183,9 @@ class Committed:
     energy: float
     forces: np.ndarray
     stress: np.ndarray | None
+    species: np.ndarray
+    masses: np.ndarray
+    charges: np.ndarray | None
 
 
 def _frozen(array):
@@ -188,6 +194,21 @@ def _frozen(array):
     out = np.array(array, copy=True)
     out.setflags(write=False)
     return out
+
+
+def composition_values(state) -> dict[str, Any]:
+    """The state's species, masses ``(N,)`` and charges as host arrays (charges omitted when ``None``)."""
+    out = {"species": state.species.detach().cpu().numpy(), "masses": state.masses[:, 0].detach().cpu().numpy()}
+    if state.charges is not None:
+        out["charges"] = state.charges.detach().cpu().numpy()
+    return out
+
+
+def committed_composition(values: Mapping[str, Any]) -> dict[str, Any]:
+    """``Committed``'s composition fields from ``composition_values`` (or the runner's copy of them)."""
+    charges = values.get("charges")
+    return {"species": _frozen(values["species"]), "masses": _frozen(values["masses"]),
+            "charges": None if charges is None else _frozen(charges)}
 
 
 class _Queue:
@@ -213,7 +234,7 @@ class Simulation:
     """MD on the graph engine with a plan, an optional gate, schedules and complete restarts.
 
     ``Simulation(atoms, force_field, *, species=None, integrator, workload=None, output=None, seed,
-    check="skip", allow_naive_cueq=False, mode="graph", allow_reference=False, fallback=None, gate=None,
+    check="skip", allow_naive_cueq=False, mode=None, allow_reference=False, fallback=None, gate=None,
     runner=None, engine=None, neighbours=None)``:
 
     - ``atoms``: ASE ``Atoms``, full 3D PBC (§4.4); copied, the caller's object is never changed;
@@ -228,7 +249,8 @@ class Simulation:
     - ``seed``: the integrator's noise seed, recorded;
     - ``check``: one of ``CHECK_MODES``;
     - ``allow_naive_cueq``: accept cuEquivariance's naive kernels (§9.2), recorded;
-    - the planner inputs (``PlannerOptions``, recorded in ``simulation.json``): ``mode`` (§9.3),
+    - the planner inputs (``PlannerOptions``, recorded in ``simulation.json``): ``mode`` (§9.3; ``None``
+      lets the planner choose),
       ``allow_reference`` (rule 1), ``fallback`` (``FallbackConfig``, §9.4), ``gate``
       (``GateConfig``, §12.3 "Resources"; the record is ``sim.gate_config``, the result
       ``sim.gate``), ``runner`` (``RunnerConfig``, §8.7), ``engine`` (``EngineConfig``) and
@@ -241,7 +263,7 @@ class Simulation:
 
     def __init__(self, atoms: Any, force_field: Any, *, species: Any = None, integrator: Any,
                  workload: Workload | None = None, output: Output | None = None, seed: int,
-                 check: Check = "skip", allow_naive_cueq: bool = False, mode: Mode = "graph",
+                 check: Check = "skip", allow_naive_cueq: bool = False, mode: Mode | None = None,
                  allow_reference: bool = False, fallback: FallbackConfig | None = None,
                  gate: GateConfig | None = None, runner: RunnerConfig | None = None,
                  engine: EngineConfig | None = None, neighbours: NeighbourConfig | None = None):
@@ -485,9 +507,11 @@ class Simulation:
         values = engine.sync()
         cell = values["cell"] if "cell" in values else engine.state.cell.detach().cpu().numpy()
         stress = values.get("stress")
+        composition = composition_values(engine.state)
         return Committed(step=int(engine.state.step), positions=_frozen(values["positions"]),
                          momenta=_frozen(values["momenta"]), cell=_frozen(cell), energy=float(values["energy"][0]),
-                         forces=_frozen(values["forces"]), stress=None if stress is None else _frozen(stress))
+                         forces=_frozen(values["forces"]), stress=None if stress is None else _frozen(stress),
+                         **committed_composition(composition))
 
     def submit_frame(self, sink: Callable[[int, Mapping[str, Any]], Any]) -> None:
         """Queue the committed step's output values for ``sink(step, values)`` (host arrays: positions,
@@ -695,6 +719,9 @@ class Simulation:
             raise
         self._stop_clock(synchronised_clock, count_steps=engine.state.step)
         self._status = "paused"
+        recapture = getattr(engine, "recapture_warning", None)  # past the re-capture budget (3-T04)
+        if recapture and recapture not in self._report.extra_warnings:
+            self._report.add_warning(recapture)
         self._report.finish(self._loop_s / self._steps_run, steps=self._steps_run)
         if self._writer is not None:
             self._writer.flush()
@@ -827,12 +854,12 @@ class Simulation:
 
     def _check_restart_point(self):
         """Restart writes happen only at committed steps: never inside an MC block, never from an overflowed
-        step (SPEC §10.6). ``GraphEngine.uncommitted`` is plan task 3-T04's; an engine without it has none."""
+        step (SPEC §10.6, ``GraphEngine.uncommitted``, 3-T04). Without an engine in this process (a plan run
+        in a child) there is nothing to check here."""
         if self._mc_block_active:
             raise RuntimeError("a restart write inside an MC block: restart files are written only at committed "
                                "steps, between MC blocks (SPEC §10.6)")
-        uncommitted = getattr(self._engine, "uncommitted", None)
-        if uncommitted is not None and uncommitted():
+        if self._engine is not None and self._engine.uncommitted():
             raise RuntimeError("a restart write while the engine holds an uncommitted (overflowed) step: restart "
                                "files are written only at committed steps (SPEC §10.6)")
 
@@ -1005,72 +1032,150 @@ class Simulation:
             raise ValueError(f"{name} must be finite")
         return array
 
-    def _host_write(self, write):
-        import torch
-
-        self._queue.drain()
-        engine = self._engine
-        engine.flush()
-        with torch.no_grad():
-            write(engine.state)
-        engine.canonicalise(reevaluate=True)
-        if not self._host_writes:
-            self._report.add_warning(HOST_WRITE_WARNING)
-        self._host_writes += 1
-
     def set_positions(self, positions: Any) -> None:
         """Host write of positions at a canonical point: quiesce, write, rebuild, re-evaluate (owner
         decision D4). ``positions`` in Å, shape ``(N, 3)``; the momenta stay."""
-        import torch
-
         array = self._host_values(positions, "positions")
         if self._runner is not None:  # applied by the next child, after its resume
             self._runner.host_write(self, "positions", array)
             return
-
-        def write(state):
-            state.positions.copy_(torch.as_tensor(array, dtype=state.positions.dtype))
-
-        self._host_write(write)
+        self.update(positions=array)
 
     def set_momenta(self, momenta: Any) -> None:
         """Host write of momenta at a canonical point (owner decision D4). ``momenta`` in ASE units,
         shape ``(N, 3)``; the engine integrates velocities, ``momenta / masses``."""
-        import torch
-
         array = self._host_values(momenta, "momenta")
         if self._runner is not None:
             self._runner.host_write(self, "momenta", array)
             return
+        self.update(momenta=array)
 
-        def write(state):
-            momenta = torch.as_tensor(array, dtype=state.velocities.dtype, device=state.velocities.device)
-            state.velocities.copy_(momenta / state.masses)
+    # Host mutations of composition and coefficients (SPEC §8.5, §7.6): one event each under the transaction
+    # contract of fastmace.events, at a committed step; 3-T02's force field checks the superset.
 
-        self._host_write(write)
+    def update(self, *, species: Any = None, masses: Any = None, charges: Any = None, total_charge: Any = None,
+               friction_per_fs: Any = None, positions: Any = None, momenta: Any = None) -> None:
+        """Any combination of host changes as one transaction with one force evaluation (SPEC §8.5, §7.7).
 
-    # Host mutations of composition and coefficients (SPEC §8.5, §7.6): each one event under the transaction
-    # contract of fastmace.events, at a committed step. 3-T03 fills them; 3-T02 adds the superset checks.
+        - ``species``: atomic numbers or symbols, ``(N,)``; in the ``ForceField``'s superset
+          (``SpeciesNotInSuperset``). Masses follow the new species' standard masses unless ``masses`` is
+          given too;
+        - ``masses``: amu, ``(N,)``; the momenta stay (ASE), so the velocities change;
+        - ``charges``: per-atom charges, ``(N,)``, and ``total_charge``, for models that take them;
+        - ``friction_per_fs``: the Langevin friction in 1/fs (the record's unit); it drops the captured
+          graphs, which bake it in (a recorded re-capture), and with the default barostat τ moves ``P_tau``
+          and the barostat mass with it;
+        - ``positions`` (Å) and ``momenta`` (ASE units), ``(N, 3)``; momenta use the new masses.
+
+        Everything is validated before anything is written. The changes apply in this order: species,
+        masses, charges, friction, positions, momenta; then a canonical point (neighbour list rebuilt at the
+        committed positions, forces and stress evaluated once, ``integrator.start``), as a host write of
+        positions (owner decision D4). Nothing given: nothing happens.
+        """
+        import numpy as np
+        from ase import units
+
+        from fastmace.events import Event, Transaction, species_numbers
+
+        natoms = len(self._atoms)
+        fields = {}
+        if species is not None:
+            fields["species"] = species_numbers(species, natoms)
+        if masses is not None:
+            fields["masses"] = Transaction._array(masses, "masses", natoms)
+            if (fields["masses"] <= 0).any():
+                raise ValueError("masses must be positive (amu)")
+        if charges is not None:
+            fields["charges"] = Transaction._array(charges, "charges", natoms)
+        if total_charge is not None:
+            if isinstance(total_charge, bool) or not np.isfinite(float(total_charge)):
+                raise ValueError(f"the total charge must be a finite number, got {total_charge!r}")
+            fields["total_charge"] = float(total_charge)
+        if friction_per_fs is not None:
+            if isinstance(friction_per_fs, bool) or not isinstance(friction_per_fs, (int, float, np.integer,
+                                                                                      np.floating)):
+                raise TypeError(f"friction_per_fs must be a number (1/fs), got {friction_per_fs!r}")
+            if not (float(friction_per_fs) > 0 and np.isfinite(float(friction_per_fs))):
+                raise ValueError(f"friction_per_fs must be positive and finite, got {friction_per_fs!r}")
+            fields["friction_per_fs"] = float(friction_per_fs)
+        if positions is not None:
+            fields["positions"] = self._host_values(positions, "positions")
+        if momenta is not None:
+            fields["momenta"] = self._host_values(momenta, "momenta")
+        if not fields:
+            return
+        writes = {"positions", "momenta"}
+        if self._runner is not None:  # the next child applies them in this order (HOST_WRITE_KINDS)
+            for name in ("species", "masses", "charges", "total_charge", "friction_per_fs", "positions", "momenta"):
+                if name in fields:
+                    self._runner.host_write(self, "friction" if name == "friction_per_fs" else name, fields[name])
+            self._record_friction(fields.get("friction_per_fs"))
+            return
+
+        engine = self._engine
+        events = []
+        if "species" in fields:
+            events.append(Event("species", values=fields["species"]))
+        if "masses" in fields:
+            events.append(Event("masses", values=fields["masses"]))
+        if "charges" in fields or "total_charge" in fields:
+            events.append(Event("charges", values={"charges": fields.get("charges"),
+                                                   "total_charge": fields.get("total_charge")}))
+        if "friction_per_fs" in fields:
+            events.append(Event("friction", values=fields["friction_per_fs"] / units.fs))
+        self._queue.drain()  # frames queued at the committed step are written before it changes
+        transaction = Transaction(engine, events)  # validates, before anything is written
+        if "positions" in fields:
+            transaction.host_writes.append(lambda state: state.positions.copy_(
+                _tensor(fields["positions"], state.positions)))
+        if "momenta" in fields:  # after the masses: the momenta of the new masses
+            transaction.host_writes.append(lambda state: state.velocities.copy_(
+                _tensor(fields["momenta"], state.velocities) / state.masses))
+        transaction.run()
+        self._record_friction(fields.get("friction_per_fs"))
+        if writes & set(fields):
+            if not self._host_writes:
+                self._report.add_warning(HOST_WRITE_WARNING)
+            self._host_writes += 1
+
+    def _record_friction(self, friction_per_fs):
+        """The public integrator record, its config and the plan's follow a friction change (restart records)."""
+        if friction_per_fs is None:
+            return
+        self.integrator = dataclasses.replace(self.integrator, friction_per_fs=friction_per_fs)
+        self._config = self.integrator.to_config(seed=self.seed)
+        if getattr(self._plan, "integrator", None) is not None:
+            self._plan = dataclasses.replace(self._plan, integrator=dataclasses.replace(
+                self._plan.integrator, friction=self._config.friction))
 
     def set_species(self, species: Any) -> None:
         """Set every atom's species (atomic numbers or symbols, shape ``(N,)``), one event. Each must be in
         the ``ForceField``'s superset (``SpeciesNotInSuperset``); masses follow the new species' standard
         masses unless ``set_masses`` follows."""
-        raise NotImplementedError("Simulation.set_species: plan task 3-T03")
+        self.update(species=species)
 
     def set_masses(self, masses: Any) -> None:
-        """Set every atom's mass in amu, shape ``(N,)``, one event; velocities stay (momenta change)."""
-        raise NotImplementedError("Simulation.set_masses: plan task 3-T03")
+        """Set every atom's mass in amu, shape ``(N,)``, one event; the momenta stay (ASE), so the velocities
+        change: v' = v m_old / m_new."""
+        self.update(masses=masses)
 
     def set_charges(self, charges: Any, *, total_charge: float | None = None) -> None:
         """Set the per-atom charges (models that take them), shape ``(N,)``, and optionally the total charge,
-        one event."""
-        raise NotImplementedError("Simulation.set_charges: plan task 3-T03")
+        one event. ``charges=None`` with ``total_charge`` changes the total only."""
+        if charges is None and total_charge is None:
+            raise ValueError("set_charges needs charges, total_charge or both")
+        self.update(charges=charges, total_charge=total_charge)
 
     def set_friction(self, friction_per_fs: float) -> None:
         """Set the Langevin friction in 1/fs, one event; it drops the graphs that bake ``c1``/``c2`` in (a
         recorded re-capture)."""
-        raise NotImplementedError("Simulation.set_friction: plan task 3-T03")
+        self.update(friction_per_fs=friction_per_fs)
+
+
+def _tensor(array, like):
+    import torch
+
+    return torch.as_tensor(array, dtype=like.dtype, device=like.device)
 
 
 # What a resume compares to decide whether the plan changed (§10.6: "another GPU or rewrite set"), and

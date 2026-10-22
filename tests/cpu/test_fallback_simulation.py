@@ -59,14 +59,14 @@ def simulation(pristine, **kwargs):
     return Simulation(atoms, ff, integrator=LANGEVIN, seed=8, **kwargs)
 
 
-def broken_capture(monkeypatch):
-    """The graph tier's build raises a capture error; eager builds."""
+def broken_capture(monkeypatch, tiers=("graph",)):
+    """The build of ``tiers`` raises a capture error; the others build."""
     original = minimal.MinimalPlanner.build
     built = []
 
     def build(planner, plan, force_field, atoms, **kwargs):
         built.append(plan.tier)
-        if plan.tier == "graph":
+        if plan.tier in tiers:
             raise RuntimeError(CAPTURE_ERROR)
         return original(planner, plan, force_field, atoms, **kwargs)
 
@@ -119,20 +119,30 @@ def test_refuse_raises_the_capture_error(pristine, monkeypatch):
         simulation(pristine, fallback=FallbackConfig(fallback="refuse"))
 
 
-def test_a_broken_capture_runs_eager_with_a_revision(pristine, monkeypatch):
+def test_a_broken_capture_runs_compiled_with_a_revision(pristine, monkeypatch):
+    """3-T06: graph -> compiled (eager only diagnoses)."""
     built = broken_capture(monkeypatch)
     sim = simulation(pristine)
     plan = sim.plan
-    assert plan.tier == "eager" and plan.revision == 1 and plan.predecessor.tier == "graph"
+    assert plan.tier == "compiled" and plan.revision == 1 and plan.predecessor.tier == "graph"
     assert plan.rewrites == plan.predecessor.rewrites
-    assert built[0] == "graph" and set(built[1:]) == {"eager"}
+    assert built == ["graph", "eager", "compiled"]
     assert [t.outcome for t in plan.fallbacks] == ["passed", "activated"]
     assert sim.gate.status == "skipped"  # the user's check="skip"; the validation is in plan.fallbacks
     assert sim._engine.state.plan_revision == 1
     text = sim.report.text()
-    assert "plan revision 1 (fallback): mode eager, reason " in text and CAPTURE_ERROR in text
+    assert "plan revision 1 (fallback): mode compiled, reason " in text and CAPTURE_ERROR in text
     sim.run(steps=3)
     assert np.isfinite(sim.committed().forces).all()
+    sim.close()
+
+
+def test_a_broken_compiled_build_runs_eager(pristine, monkeypatch):
+    built = broken_capture(monkeypatch, tiers=("graph", "compiled"))
+    sim = simulation(pristine)
+    assert sim.plan.tier == "eager" and built == ["graph", "eager", "compiled", "eager"]
+    assert [t.outcome for t in sim.plan.fallbacks] == ["passed", "failed", "activated"]
+    sim.run(steps=2)
     sim.close()
 
 
@@ -150,7 +160,7 @@ def test_resume_rebuilds_the_fallback_revision(pristine, monkeypatch, tmp_path):
 
     monkeypatch.setattr(fallback, "Fallback", refuse)
     resumed = Simulation.resume(tmp_path / "restart")
-    assert resumed.plan.tier == "eager" and resumed.plan.revision == sim.plan.revision
+    assert resumed.plan.tier == "compiled" and resumed.plan.revision == sim.plan.revision
     np.testing.assert_array_equal(resumed.committed().positions, sim.committed().positions)
     resumed.close()
 

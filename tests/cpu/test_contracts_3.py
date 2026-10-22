@@ -328,18 +328,20 @@ def test_derived_state_registry_register():
         registry.register("y", buffer, lambda: None, depends_on=())
     with pytest.raises(TypeError):
         registry.register("z", buffer, "not callable", depends_on=("masses",))
-    _raises_naming("3-T03", lambda: registry.refresh(("masses",)))
-    _raises_naming("3-T03", lambda: registry.check_against(None))
+    # 3-T03: refresh and the CI registry check.
+    assert _parameters(DerivedStateRegistry.refresh) == ["self", "changed"]
+    assert _parameters(DerivedStateRegistry.check_against) == ["self", "fresh"]
+    assert registry.refresh(("masses",)) == ("integrator.c3_unit",)
+    assert registry.check_against(registry) == []
 
 
-def test_transaction_stub():
-    from fastmace.events import Event, Transaction
+def test_transaction_signature():
+    from fastmace.events import Transaction
 
     assert _parameters(Transaction) == ["engine", "events", "evaluate", "registry"]
     assert _keyword_only(Transaction) == ["evaluate", "registry"]
     for name in ("run", "quiesce", "snapshot", "apply", "refresh", "accept", "reject", "resume"):
         assert callable(getattr(Transaction, name))
-    _raises_naming("3-T03", lambda: Transaction(None, [Event("masses", values=(1.0,))]))
 
 
 def test_force_field_superset_contract():  # §8.5 species superset (3-T02)
@@ -364,10 +366,9 @@ def test_simulation_mutation_api(name):
     from fastmace.simulation import Simulation
 
     method = getattr(Simulation, name)
-    assert _parameters(method)[:2] == ["self", {"set_species": "species", "set_masses": "masses",
-                                                "set_charges": "charges", "set_friction": "friction_per_fs"}[name]]
-    stub = object.__new__(Simulation)
-    _raises_naming("3-T03", lambda: method(stub, None))
+    assert _parameters(method) == ["self", {"set_species": "species", "set_masses": "masses",
+                                            "set_charges": "charges", "set_friction": "friction_per_fs"}[name],
+                                   *(["total_charge"] if name == "set_charges" else [])]
 
 
 def test_set_charges_takes_the_total():
@@ -376,16 +377,59 @@ def test_set_charges_takes_the_total():
     assert _keyword_only(Simulation.set_charges) == ["total_charge"]
 
 
+def test_simulation_update_is_one_transaction():  # 3-T03 (conductor answer; T13 applies an observer's change)
+    from fastmace.simulation import Simulation
+
+    fields = ["species", "masses", "charges", "total_charge", "friction_per_fs", "positions", "momenta"]
+    assert _parameters(Simulation.update) == ["self", *fields]
+    assert _keyword_only(Simulation.update) == fields
+    for name in fields:
+        assert inspect.signature(Simulation.update).parameters[name].default is None
+
+
+def test_committed_carries_the_composition():  # 3-T03
+    from fastmace.simulation import Committed
+
+    assert [field.name for field in dataclasses.fields(Committed)] == [
+        "step", "positions", "momenta", "cell", "energy", "forces", "stress", "species", "masses", "charges"]
+
+
+def test_graph_engine_state_version():  # 3-T03, for 3-T07's energy cache; not restart state
+    pytest.importorskip("torch")
+    from fastmace.engine.graph import GraphEngine
+
+    stub = object.__new__(GraphEngine)
+    stub.state = type("State", (), {"step": 4})()
+    stub.transactions_committed = 2
+    assert stub.state_version == (4, 2)
+
+
 # --------------------------------------------------------------------------- engines
 
 
-def test_compiled_engine_stub():  # §8.2 (3-T06)
+def test_compiled_engine():  # §8.2 (3-T06)
+    pytest.importorskip("torch")
     from fastmace.engine import compiled
+    from fastmace.engine.graph import GraphEngine
 
     assert compiled.MODE == "compiled"
     assert _parameters(compiled.CompiledEngine) == ["config", "force_field", "integrator", "state", "neighbours",
                                                    "constraints", "dynamic_edges"]
-    _raises_naming("3-T06", lambda: compiled.CompiledEngine(None, None, None, None))
+    assert issubclass(compiled.CompiledEngine, GraphEngine)
+
+
+def test_mode_defaults_to_none():  # §9.3: the planner picks graph, or compiled by rules 4 and 9 (3-T06)
+    import inspect
+
+    import fastmace as fm
+    from fastmace.planner import minimal
+    from fastmace.simulation import PlannerOptions, Simulation
+
+    assert PlannerOptions().mode is None
+    assert inspect.signature(Simulation).parameters["mode"].default is None
+    assert inspect.signature(fm.md).parameters["mode"].default is None
+    assert inspect.signature(minimal.MinimalPlanner.plan).parameters["mode"].default is None
+    assert minimal.RULE_9_HOST_CALLBACKS == 10
 
 
 def test_graph_engine_energy_and_captured_stubs():  # §8.1 energy-only graph (3-T07), captured (3-T04)
@@ -399,7 +443,24 @@ def test_graph_engine_energy_and_captured_stubs():  # §8.1 energy-only graph (3
     assert _parameters(GraphEngine.captured) == ["self", "key", "fn"]
     stub = object.__new__(GraphEngine)
     _raises_naming("3-T07", lambda: stub.energy())
-    _raises_naming("3-T04", lambda: stub.captured("mc.swap", lambda: None))
+
+
+def test_graph_engine_overflow_and_recapture_names():  # §8.1 overflow before commit, re-capture policy (3-T04)
+    pytest.importorskip("torch")
+    from fastmace.engine import graph
+    from fastmace.engine.graph import GraphEngine
+
+    assert (graph.EDGE_OVERFLOW, graph.KVECTOR_OVERFLOW) == (1, 2)
+    assert issubclass(graph.CapacityOverflow, RuntimeError)  # internal (SPEC §7.6), not in errors.py
+    assert issubclass(graph.RecaptureBudgetWarning, UserWarning)
+    assert _parameters(GraphEngine.invalidate_graphs) == ["self", "reason", "keys"]
+    assert _parameters(GraphEngine.uncommitted) == ["self"]
+    assert _parameters(GraphEngine.overflowed) == ["self"]
+    assert _parameters(GraphEngine.flag_edge_overflow) == ["self", "count", "edges"]
+    assert _parameters(GraphEngine.clear_overflow) == ["self"]
+    assert _parameters(GraphEngine.redo_on_overflow) == ["self", "attempt", "keep", "max_redos"]
+    assert _keyword_only(GraphEngine.redo_on_overflow) == ["keep", "max_redos"]
+    assert isinstance(GraphEngine.recapture_warning, property)
 
 
 # --------------------------------------------------------------------------- restart v3

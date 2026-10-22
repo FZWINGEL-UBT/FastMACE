@@ -232,8 +232,12 @@ def upload(models: str = "mace-mh-1.model", baseline: str = "~/fastmace-baseline
 @app.local_entrypoint()
 def listing(limit_usd: str = "", owner_override: str = ""):
     """The volume's top three levels, from a one-core CPU container (seconds; also checks that jobs start)."""
-    _guarded(lambda: print(volume_listing.remote()), commit="listing", gpu=None, function_timeout_s=LISTING_TIMEOUT_S,
-             cpu=LISTING_CPU, memory_mib=LISTING_MEMORY_MIB, limit_usd=limit_usd, owner_override=owner_override)
+
+    def launch():
+        print(volume_listing.remote())
+
+    _guarded(launch, commit="listing", gpu=None, function_timeout_s=LISTING_TIMEOUT_S, cpu=LISTING_CPU,
+             memory_mib=LISTING_MEMORY_MIB, limit_usd=limit_usd, owner_override=owner_override)
 
 
 @app.local_entrypoint()

@@ -243,7 +243,8 @@ def qualify(plan: Any, traits: Any = None, *, versions: Mapping[str, str | None]
 
     tier = getattr(plan, "tier", "graph")
     if tier not in QUALIFIED_TIERS:
-        block(f"the {tier} tier", f"the {tier} tier runs MACE's own calculator, which is not qualified; "
+        why = "runs MACE's own calculator, which" if tier == "reference" else "(Inductor's generated kernels)"
+        block(f"the {tier} tier", f"the {tier} tier {why} is not qualified; "
               f"reproducible plans run on the {' or '.join(QUALIFIED_TIERS)} tier", "reproducible-tier")
     if family != FAMILY:
         block(f"model family {family}", f"only the MH-1 family is qualified with plain cuEq; this model is {family}",

@@ -53,8 +53,8 @@ SCALARS = (
     ("seed", "Noise seed; without it one is drawn and recorded in metadata.json.", "1"),
     ("check", '"skip" (default), "gate" (the gate on this structure, opt-in) or "allow_unavailable".', '"skip"'),
     ("output", "Output directory, default ./<structure stem>.fastmace/; or the [output] table below.", '"run/"'),
-    ("mode", 'Execution mode: "graph" (default); "eager" and "reference" come in phase 2, "compiled" in phase 3.',
-     '"graph"'),
+    ("mode", 'Execution mode: unset lets the planner choose ("graph", or "compiled" where rules 4 and 9 need '
+             'it); or "graph", "compiled", "eager", "reference".', '"compiled"'),
     ("allow_reference", "Allow the reference tier where rule 1 needs it (SPEC §9.3).", "false"),
 )
 
