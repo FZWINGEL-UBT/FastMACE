@@ -29,6 +29,20 @@ def precision_of(dtype) -> str:
     return str(dtype).removeprefix("torch.")
 
 
+def float64_model(force_field, plan, backend=None):
+    """The plan's checkpoint converted to float64 for the MC energy copy (``ForceField.execution_model``).
+
+    ``force_field`` is the public ``fastmace.ForceField`` the plan was made for; ``backend`` defaults to
+    the plan's (the planner falls back to ``"cueq"`` when the plan's backend has no float64 path or
+    fails the gate in float64; 3-T07 conductor answer 1). Called by the planner, once per plan.
+    """
+    import dataclasses
+
+    engine = plan.engine if backend is None else dataclasses.replace(plan.engine, backend=backend)
+    return force_field.execution_model(dataclasses.replace(
+        plan, engine=engine, precision=dataclasses.replace(plan.precision, dtype="float64")))
+
+
 def float64_copy(force_field, model, *, neighbours=None, polar=None, check=True):
     """A float64 ``MACEForceField`` of ``model`` that follows the float32 ``force_field`` (SPEC §10.4).
 
@@ -212,4 +226,4 @@ class MCEvaluator:
         }
 
 
-__all__ = ["PRECISIONS", "EnergyCache", "MCEvaluator", "float64_copy", "precision_of"]
+__all__ = ["PRECISIONS", "EnergyCache", "MCEvaluator", "float64_copy", "float64_model", "precision_of"]

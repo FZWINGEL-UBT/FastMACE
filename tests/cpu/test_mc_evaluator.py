@@ -339,3 +339,28 @@ def test_float64_evaluator_of_a_float32_engine(mace_engine):
     assert single.info()["memory_bytes"] == 0
     np.testing.assert_allclose(single.baseline().cpu().numpy(), evaluator.baseline().cpu().numpy(), rtol=1e-5)
     assert single.tag() != evaluator.tag()
+
+
+# --------------------------------------------------------------------------- tools/bench/mc_cost.py
+
+
+def _mc_cost():
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "tools" / "bench" / "mc_cost.py"
+    spec = importlib.util.spec_from_file_location("_mc_cost", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_mc_cost_rotates_and_mirrors_the_block_order():
+    tool = _mc_cost()
+    names = ("md", "energy_float32", "energy_float64")
+    orders = [tool.round_order(names, index) for index in range(6)]
+    assert orders[0] == list(names) and orders[3] == list(names)[::-1]
+    for position in range(3):  # every side is first, middle and last equally often
+        assert sorted(order[position] for order in orders) == sorted(names * 2)
+    summary = tool.summarise({"md": [10.0, 12.0], "energy_float32": [2.0, 3.0]}, ("md", "energy_float32"))
+    assert summary["energy_float32"]["over_md_per_round"] == [0.2, 0.25]
+    assert summary["energy_float32"]["over_md_median"] == pytest.approx(0.225)
