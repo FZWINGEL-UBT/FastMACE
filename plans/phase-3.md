@@ -835,9 +835,9 @@ Wave 4   T20 benchmarks (T09 T10 T11)   T21 acceptance
 - **Size:** 20 tasks (3-T19 was left unused when T16 took the cloud recipe),
   about 37 worker-days.
 - **Merge order of the shared files:**
-  - `planner/minimal.py`: T02 (rule 8), T05 (rule 11), T06 (owner: modes,
-    rules 4 and 9), T09 (parity), T11 (MC energy precision), T17 (the
-    shared error text);
+  - `planner/minimal.py`: T02 (rule 8), T06 (owner: modes, rules 4 and 9),
+    T05 (rule 11), T09 (parity), T11 (MC energy precision), T17 (the shared
+    error text);
   - `engine/graph.py`: T04 (owner), T03, T07, T10;
   - `simulation.py`: T03 (mutation API), T08 (restart), T15 (run path), T11
     (the move-energy gate call);
@@ -908,6 +908,12 @@ fixed on the branch.
 - **The neighbour list in the CI registry check** is compared as the set of
   compacted edges within the cutoff, not as candidates or reference positions
   (T03's `check_against`; T10).
+- **Merge orders are the default order.** When two branches edit separate
+  parts of one file, I may merge them in the order they finish. The later
+  branch then syncs with main before its merge.
+  - T06 now merges before T05 in `planner/minimal.py`, because T05 starts
+    after T02's merge.
+  - `planner/fixed.py`: T01, T04, T06 (tiers in `build()`), T05, T11.
 
 ### 3-T02 species superset
 
@@ -1297,7 +1303,8 @@ idle.
 | `simulation.py` | T03, T08, T15, T11 |
 | `report.py` | T06 (one line, if needed), T15, T11 |
 | `engine/subprocess.py` | T03, T08, T15 |
-| `planner/minimal.py` | T02, T05, T06, T09, T11, T17 |
+| `planner/minimal.py` | T02, T06, T05, T09, T11, T17 |
+| `planner/fixed.py` | T01, T04, T06, T05, T11 |
 | `planner/workload.py` | T05 |
 | `io/trajectory.py` | T15 |
 | `tools/bench/mc_cost.py` | T07, T09, T10, T20 |
