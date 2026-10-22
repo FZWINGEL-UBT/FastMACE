@@ -1,12 +1,13 @@
 """Rule 9 measured: the graph tier against the compiled tier with frequent host callbacks (plan task 3-T06).
 
-SPEC §9.3 rule 9 plans the compiled tier when host callbacks come more often than every
-``planner.minimal.RULE_9_HOST_CALLBACKS`` steps, because they break graph replays up. This tool checks
-that on one model and structure, in one process: it builds ``fm.Simulation(mode="graph")`` and
-``fm.Simulation(mode="compiled")`` from the same seed, warms both up, and then, for each callback
-interval k, times blocks round-robin (graph, compiled, graph, ...). A block is ``--block-steps`` steps
-as ``run(steps=k)`` followed by a callback, ``committed()``, which syncs and copies the state to the
-host as an observer would. Times are ms per step; the ratio is compiled over graph (> 1: graph faster).
+SPEC §9.3 rule 9 first planned the compiled tier for frequent host callbacks, because they break graph
+replays up. This tool measured that (3-T06; ``docs/validation/3-T06.md``), and decision 38 amended the
+rule: host callbacks keep the graph tier. It works on one model and structure, in one process: it
+builds ``fm.Simulation(mode="graph")`` and ``fm.Simulation(mode="compiled")`` from the same seed,
+warms both up, and then, for each callback interval k, times blocks round-robin (graph, compiled,
+graph, ...). A block is ``--block-steps`` steps as ``run(steps=k)`` followed by a callback,
+``committed()``, which syncs and copies the state to the host as an observer would. Times are ms per
+step; the ratio is compiled over graph (> 1: graph faster).
 
     PYTHONPATH=$PWD python tools/ab_host_callbacks.py --label mh1-r2scan --structure NaCl \\
         --intervals 1 5 10 --output results/3-T06-rule9/NaCl.json

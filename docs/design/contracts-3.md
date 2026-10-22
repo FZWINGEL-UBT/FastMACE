@@ -35,18 +35,22 @@ refusal.
 
 **`mode` defaults to `None`** (3-T06, conductor answer 1) in `Simulation`, `fm.md`, `PlannerOptions`,
 `planner_options` and `MinimalPlanner.plan`/`plan_traits`; `simulation.json` records `None`. Without a
-mode the planner picks the graph tier, or the compiled tier where:
-- rule 4: `padding_is_exact` is false (decision code `mode-compiled-rule-4`);
-- rule 9: `host_callbacks_every < minimal.RULE_9_HOST_CALLBACKS` (10), unless `reproducible=True`,
-  whose qualified tiers are graph and eager (code `mode-compiled-rule-9`).
+mode the planner picks the graph tier, or the compiled tier where rule 4 applies: `padding_is_exact` is
+false (decision code `mode-compiled-rule-4`).
 
-An explicit mode is the user's (code `mode-compiled-tier` for `"compiled"`). An explicit `"graph"` keeps
-the graph tier under rule 9 (`host-callbacks-graph-sync`, the reason says the override), and is refused
-under rule 4 (`inexact-padding`, the reason names `mode="compiled"`). The compiled tier's decisions:
+**Rule 9 as amended by decision 38** (3-T06b, 22 October 2026): host callbacks, `fastmace.ase` observers
+included, keep the graph tier at every interval, with a host sync at each callback. The decision
+`workload.host_callbacks_every` is `"graph, host sync every n steps"` (`host-callbacks-graph-sync`, rule
+9), and its reason (`minimal.RULE_9_REASON`) names decision 38 and 3-T06's measurement (compiled
+1.3-4.7x slower than graph with a callback every 1-10 steps). 3-T06's `RULE_9_HOST_CALLBACKS` and the
+code `mode-compiled-rule-9` are gone.
+
+An explicit mode is the user's (code `mode-compiled-tier` for `"compiled"`). An explicit `"graph"` is
+refused under rule 4 (`inexact-padding`, the reason names `mode="compiled"`). The compiled tier's decisions:
 `capture` off ("compiled tier: no CUDA graphs" and why), `EngineConfig.speculative_graph` off,
 `EngineConfig.dynamic_edges` on when `compile_mode` is not `"none"`, `padding` "exact edge counts"
-(`compiled-exact-edges`) for an inexact model, and `workload.host_callbacks_every`
-`host-callbacks-compiled`. `planner.fixed.COMPILED_TIER = "compiled"`; `FixedPlanner.build` builds it
+(`compiled-exact-edges`) for an inexact model, and, with host callbacks, `workload.host_callbacks_every`
+`host-callbacks-compiled` (the compiled tier was chosen by rule 4 or `mode="compiled"`). `planner.fixed.COMPILED_TIER = "compiled"`; `FixedPlanner.build` builds it
 with `capture=False`.
 
 Every plan resolves the four new `"auto"` fields, each with a decision `auto (<rule>)`

@@ -645,6 +645,9 @@ def test_observers_declare_the_shortest_interval_as_host_callbacks(loaded):
     dyn.run(1)
     assert dyn.simulation.workload.host_callbacks_every == 3
     _plans_equal(dyn.plan, _simulation(loaded, host_callbacks_every=3).plan)
+    # Decision 38 (3-T06b): observers keep the graph tier, with a host sync at each call.
+    assert dyn.plan.tier == "graph"
+    assert dyn.plan.decision("workload.host_callbacks_every")[2].code == "host-callbacks-graph-sync"
     plain = _langevin(loaded, output="plain")
     plain.run(1)
     assert plain.simulation.workload.host_callbacks_every is None

@@ -236,25 +236,26 @@ def test_unknown_mode_is_a_value_error():
 # --------------------------------------------------------------------------- preferences in 1b
 
 
-def test_rule_9_frequent_host_callbacks_plan_the_compiled_tier():
-    """3-T06: below ``RULE_9_HOST_CALLBACKS`` steps between callbacks, a plan without a mode is compiled;
-    an explicit ``mode="graph"`` overrides the preference and keeps the graph tier with a host sync."""
+def test_rule_9_host_callbacks_keep_the_graph_tier():
+    """Decision 38 (3-T06b): host callbacks keep the graph tier at every interval, with a host sync at each
+    callback; the decision names rule 9, decision 38 and 3-T06's measurement. Only rule 4 or an explicit
+    ``mode="compiled"`` plans the compiled tier."""
     from fastmace.planner import minimal as minimal_module
 
-    assert minimal_module.RULE_9_HOST_CALLBACKS == 10
-    frequent = Workload(max_temperature_K=300.0, host_callbacks_every=2)
-    plan = plan_label("mh1-r2scan", workload=frequent)
-    assert plan.tier == "compiled"
-    mode = plan.decision("mode")
-    assert mode[2].code == "mode-compiled-rule-9" and mode[2].rule == 9 and "10" in mode[2]
-    assert plan.decision("workload.host_callbacks_every")[2].code == "host-callbacks-compiled"
-    graph = plan_label("mh1-r2scan", workload=frequent, mode="graph")
-    assert graph.tier == "graph"
-    key, choice, reason = graph.decision("workload.host_callbacks_every")
-    assert choice == "graph, host sync every 2 steps" and reason.code == "host-callbacks-graph-sync"
-    for every in (10, 1000):
-        rare = plan_label("mh1-r2scan", workload=Workload(max_temperature_K=300.0, host_callbacks_every=every))
-        assert rare.tier == "graph" and rare.decision("mode")[2].code == "mode-graph"
+    assert not hasattr(minimal_module, "RULE_9_HOST_CALLBACKS")
+    for every in (1, 2, 10, 1000):
+        workload = Workload(max_temperature_K=300.0, host_callbacks_every=every)
+        plan = plan_label("mh1-r2scan", workload=workload)
+        assert plan.tier == "graph" and plan.decision("mode")[2].code == "mode-graph"
+        key, choice, reason = plan.decision("workload.host_callbacks_every")
+        assert choice == f"graph, host sync every {every} steps" and reason.code == "host-callbacks-graph-sync"
+        assert reason.rule == 9 and "decision 38" in reason and "1.3-4.7" in reason
+        assert plan_label("mh1-r2scan", workload=workload, mode="graph").decisions == plan.decisions
+    compiled = plan_label("mh1-r2scan", workload=Workload(max_temperature_K=300.0, host_callbacks_every=2),
+                          mode="compiled")
+    assert compiled.tier == "compiled" and compiled.decision("mode")[2].code == "mode-compiled-tier"
+    choice, reason = compiled.decision("workload.host_callbacks_every")[1:]
+    assert choice == "compiled, host callbacks every 2 steps" and reason.code == "host-callbacks-compiled"
 
 
 def test_rule_10_stress_and_headroom_follow_the_integrator():

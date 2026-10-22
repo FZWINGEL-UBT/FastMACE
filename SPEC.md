@@ -848,7 +848,7 @@ warn:    none
   `allow_reference=True`, or MACE's calculator); a constraint (refused until
   phase 4); OEq unavailable (plain cuEq; `fastmace doctor` names the
   missing piece); a model outside the rewrite registry (plain or reference
-  path); frequent host callbacks (compiled tier); a failed rewrite
+  path); padded edges that are not exact (compiled tier, rule 4); a failed rewrite
   self-check (that rewrite off); a fallback after a failed gate (§9.4).
 - NPT, MC and D3 carry an "experimental: not yet qualified" line until their
   qualification studies are recorded (§10.2, §10.4, §11.2). `reproducible`

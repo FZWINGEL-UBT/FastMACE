@@ -10,8 +10,8 @@ and all workers were prestarted. Merged so far: 3-T01 (8dfd9f0), 3-T08
 and its review fixes (f582186), 3-T15 (22c1e73), 3-T14 (7b26cc8), 3-T04b (53fbbfb),
 3-T10 (ecdc164), 3-T22 (eb64374), 3-T11 (963f478), 3-T12 (a031b96) and 3-T22b
 (f2f2258); in ResearchModule 3-T16a (90a1e7b1). Owner checkpoints 2b and 2c were
-decided the same day (SPEC decisions 37 and 38), and their tasks 3-T22c and 3-T06b
-started. 3-T11 started with 3-T09, because its gate
+decided the same day (SPEC decisions 37 and 38). 3-T06b is merged (397da85), and
+3-T22c is running. 3-T11 started with 3-T09, because its gate
 needs T07's evaluator and T03's transactions, not T09's driver. The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
@@ -1466,8 +1466,14 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
     1000 K, because Cl lands about 1.9 Å from Nb. Acceptance stays at zero,
     and the swap block costs about 10 min per run without sampling any anion
     disorder.
-  - The conductor asked for the same estimate for D3's option (b), Nb↔Ta in
-    a 50/50 Na(Nb,Ta)Cl6. Both tables go to the owner for a D3 review.
+  - **The owner (22 October 2026):** "just having this functionality is fine
+    as long as the code works which species to try/what to do is another
+    project".
+    - D3 stays as specified, and item 9 judges that the protocol's code works
+      end to end, not the acceptance rate.
+    - The Nb↔Ta estimate and the GPU swap statistics were dropped.
+    - Choosing swap species and moves (Nb↔Ta, relaxed anion swaps) is a
+      separate project, outside phase 3.
 - **The NAS `mace_cueq_oeq` has no `tomli`.** FastMACE declares it for
   Python 3.10, but runs from a checkout on `PYTHONPATH` install nothing.
   The NAS `mace_cueq_latest` has it only through pytest. So `fastmace run`

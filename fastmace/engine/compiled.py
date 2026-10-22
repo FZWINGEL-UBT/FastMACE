@@ -6,7 +6,7 @@ count and the compiled model sees the edge dimension as dynamic from the first c
 count after a neighbour rebuild does not compile again (the evaluation path of 2-T13); that is what
 lets a model whose edge padding is inexact run here (rule 4). Without it the edges are padded to the
 graph tier's buckets, which needs exact padding. The planner chooses this tier for inexact padding
-(rule 4), frequent host callbacks (rule 9) and as the fallback's second mode (graph → compiled →
+(rule 4), for ``mode="compiled"`` and as the fallback's second mode (graph → compiled →
 eager → reference). Only the planner instantiates it (SPEC §5).
 """
 
