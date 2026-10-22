@@ -1408,6 +1408,9 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
     `fastmace-t20-*` and `fastmace-t14-*`, never the NAS checkout;
   - the GPU must be empty before each run;
   - 3-T20's L4 job then carries items 2–3 only.
+- **3-T06's GPU jobs** passed (merged at 10c67ae). The compiled tier equals graph within float32 noise:
+  MH-1 hybrid 2.2e-7 Å against a graph repeat of 3.0e-7 Å, and MP-0 2.8e-7 Å against 2.2e-7 Å. The gate
+  passes, and nothing recompiles over 37–40 edge counts. The rule-9 timing is owner checkpoint 2c.
 - **3-T14's local smoke** passed every stage (fastmace/3-T14 at 2f1cfee).
   - MD: NaNbOCl4, 756 atoms, 8.78 ms/step.
   - MC: 4.35 ms per attempt. 0 of 2,700 O↔Cl swaps were accepted between
@@ -1506,6 +1509,14 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
    not a new decision.
 2b. After 3-T22's measurement: whether `fixcm` uses the mass-weighted projection by default. That would
    change thermostat results slightly for crystals with unequal masses, in FastMACE and in `main.py`.
+2c. After 3-T06's GPU timing (merged at 10c67ae): whether rule 9 is amended. Today a host callback every
+   fewer than 10 steps, an `fm.ase` observer included (SPEC §10), makes the planner choose the compiled tier.
+   - **Measured:** with MH-1 hybrid float32 on the RTX 5060 Ti, the compiled tier is 4.3–4.7× slower than
+     graph on NaCl (216 atoms) and 1.3–1.5× slower on NbCl5 (1944 atoms), at a callback every 1, 5 and
+     10 steps. A callback every step costs the graph tier 25 % on NaCl and 3 % on NbCl5.
+   - **Proposed:** host callbacks keep the graph tier, and the compiled tier is chosen only where capture
+     is not possible (rule 4) or when it is asked for. Until then, `mode="graph"` overrides rule 9.
+   - The Ada leg is measured in 3-T21.
 3. After T21: the acceptance report, and the tag `fastmace-3`.
 
 ## Owner decisions
