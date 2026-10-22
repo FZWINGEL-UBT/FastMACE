@@ -8,7 +8,12 @@ One evaluation path per process (two backend families never share one):
   stock      MACE 0.3.16's own calculator (plain cuEq, eager), no FastMACE code on the model: its
              energy is the model's definition, its stress the uncorrected one (issue 1642);
   cueq       FastMACE's one-off evaluation plan (fm.ForceField.evaluate) with backend cueq;
-  hybrid     the same with backend hybrid (OEq convolutions; float32 only).
+  hybrid     the same with backend hybrid (OEq convolutions; float32 only);
+  research   1a-T19's polar reference, from the research engine's export (FASTMACE_BASELINE): its
+             calculator (common.load_calculator, cuEq, MACE 0.3.16's conversion), polar_gpu enabled on the
+             structure's unstrained cell with headroom 0.1 before configure_md_calculator, its one-graph
+             strain, energies and stress through ASE (tools/force_stress_gate.py at 096b47b^,
+             reference_child). This is the path that measured 4.4e-4 eV/A^3 on NbCl5 3x3x3.
 
 For each configuration it records the analytic stress and, for every step ``h``, the stress by
 central differences: diagonal ii: strain e_ii = +-h, shear ij: e_ij = e_ji = +-h/2, sigma =
@@ -45,7 +50,7 @@ import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
 # isort: split
 import numpy as np
 
-PATHS = ("reference", "stock", "cueq", "hybrid")
+PATHS = ("reference", "stock", "cueq", "hybrid", "research")
 VOIGT = ((0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1))
 DEFAULT_STEPS = (3e-3, 1e-3, 3e-4, 1e-4, 3e-5, 1e-5)
 # The gate's configuration draw (tools/force_stress_gate.py defaults): first hydrostatic configuration.
@@ -121,14 +126,22 @@ class KSetProbe:
         if self.pending:
             self.mask, self.pending = live.detach().clone(), False
         self.last = {"included": int(live.sum())}
+        true_norm2 = torch.einsum("ni,ni->n", k_vectors, k_vectors)
+        if self.mask is not None:
+            flips = (self.mask != live).nonzero().flatten()
+            # Each flipped k-vector: its integer coefficients, |k| / cutoff, and whether it is inside
+            # graph_longrange's per-call bounds (False: the bounds, not the sphere, excluded it).
+            within_cutoff = true_norm2 <= cutoff * cutoff
+            self.last["flipped"] = int(len(flips))
+            self.last["flips"] = [{"n": call.state.integer[i].tolist(),
+                                   "k_over_cutoff": float(true_norm2[i].sqrt() / cutoff),
+                                   "now_included": bool(live[i]), "within_cutoff": bool(within_cutoff[i])}
+                                  for i in flips.tolist()]
         if self.frozen and self.mask is not None:
             mask = self.mask
-            self.last.update(flipped=int((mask != live).sum()), frozen_included=int(mask.sum()))
-            true_norm2 = torch.einsum("ni,ni->n", k_vectors, k_vectors)
+            self.last["frozen_included"] = int(mask.sum())
             k_norm2 = torch.where(mask, true_norm2, (cutoff * cutoff).to(true_norm2.dtype))
             k_batch = (~mask).to(torch.int64)
-        elif self.mask is not None:
-            self.last["flipped"] = int((self.mask != live).sum())
         return k_vectors, k_norm2, k_batch, k0_mask
 
 
@@ -200,6 +213,55 @@ def fastmace_evaluator(args, atoms):
                               "kspace": _kspace(force_field._polar_model)}
 
 
+def research_evaluator(args, atoms):
+    """1a-T19's reference_child for a polar model (tools/force_stress_gate.py at 096b47b^), on ``base``'s cell."""
+    from fastmace.bench import ab
+
+    export = ab.load_baseline(os.environ["FASTMACE_BASELINE"])
+    ab.activate(export)
+    import langevin
+
+    ab.check_origin(export, "langevin", langevin.__file__)
+    from langevin import workflow as experiment
+
+    md = experiment.parse_args(["--ensemble", "npt", "--backend", "auto", "--model", args.research_label,
+                                "--checkpoint", args.checkpoint, "--dtype", "auto"])
+    experiment.apply_polar_options(md)
+    from langevin import polar_gpu, upstream_mace
+
+    upstream_mace.use_single_graph_strain(md.single_graph_strain)
+    os.environ.update(OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", MACE_BENCH_DEVICE="cuda:0",
+                      MACE_BENCH_DTYPE=args.dtype, MACE_BENCH_CUEQ="1", MACE_BENCH_CHECKPOINT=args.checkpoint)
+    import common
+
+    upstream_mace.use_cueq_conv_fusion(None)
+    calc = common.load_calculator(args.research_label, dtype=args.dtype, enable_cueq=True)
+    model = calc.models[0]
+    base = args.research_base
+    polar_gpu.enable(model, base.cell.array, headroom=0.1)
+    experiment.configure_md_calculator(calc, compute_stress=True)
+    if getattr(model.forward, "__func__", None) is not type(model).forward:
+        raise RuntimeError("the research reference does not run polar_gpu's corrected forward")
+
+    seen = {"overflowed": False}
+
+    def evaluate(config):
+        probe = config.copy()
+        probe.calc = calc
+        values = float(probe.get_potential_energy()), np.asarray(probe.get_stress(voigt=False), float)
+        seen["overflowed"] |= bool(polar_gpu.overflowed(model))  # recorded only: 1a-T19 did not check it
+        return values
+
+    def rebase(config):
+        """1a-T19 sized the k-space state once, on the unstrained base cell; --research-rebase sizes it per
+        configuration instead (as fastmace.reference's rebase)."""
+        if args.research_rebase:
+            polar_gpu.enable(model, np.asarray(config.cell.array, float), headroom=0.1)
+
+    return evaluate, rebase, {"baseline_commit": export.commit, "single_graph_strain": bool(md.single_graph_strain),
+                              "kspace": _kspace(model), "rebase": bool(args.research_rebase), "seen": seen}
+
+
 def _kspace(model):
     """The k-space cutoff and the GTO widths (what a k-vector at the cutoff still weighs)."""
     info = {}
@@ -216,7 +278,7 @@ def _kspace(model):
 
 
 EVALUATORS = {"reference": reference_evaluator, "stock": stock_evaluator, "cueq": fastmace_evaluator,
-              "hybrid": fastmace_evaluator}
+              "hybrid": fastmace_evaluator, "research": research_evaluator}
 
 
 # ------------------------------------------------------------------ measurement
@@ -230,7 +292,7 @@ def fd_stress(evaluate, atoms, h, probe=None):
         energies, flips = [], []
         for sign in (1, -1):
             energies.append(evaluate(strained(atoms, voigt_strain(i, j, sign * h)))[0])
-            flips.append(None if probe is None else probe.last.get("flipped"))
+            flips.append(None if probe is None else probe.last.get("flips"))
         stress[i, j] = stress[j, i] = (energies[0] - energies[1]) / (2 * h * volume)
         detail.append({"component": f"{i}{j}", "e_plus": energies[0], "e_minus": energies[1], "flipped": flips})
     return stress, detail
@@ -254,7 +316,7 @@ def measure(args, evaluate, rebase, probe, key, atoms):
                                "max_rel": float(np.abs(delta).max() / max(np.abs(analytic).max(), 1e-300)),
                                "detail": detail})
         print(key, f"h={h:g}", f"max|fd-analytic|={np.abs(delta).max():.3e}",
-              "flips", [d["flipped"] for d in detail], flush=True)
+              "flips", [[None if f is None else len(f) for f in d["flipped"]] for d in detail], flush=True)
     if args.scan:
         scan = []
         for e in np.linspace(-args.scan_max, args.scan_max, args.scan_points):
@@ -276,17 +338,23 @@ def parse_args(argv=None):
     p.add_argument("--configs", nargs="+", choices=("ideal", "gate"), default=["ideal", "gate"])
     p.add_argument("--steps", nargs="+", type=float, default=list(DEFAULT_STEPS))
     p.add_argument("--frozen-kset", action="store_true", help="Keep each configuration's included k-set fixed")
-    p.add_argument("--probe", action="store_true", help="Count included and flipped k-vectors (FastMACE paths run eager)")
+    p.add_argument("--probe", action="store_true", help="Count included and flipped k-vectors (eager)")
     p.add_argument("--eager", action="store_true", help="FastMACE paths: compile_mode none")
     p.add_argument("--scan", action="store_true", help="E(e_xx) on a fine strain grid")
     p.add_argument("--scan-max", type=float, default=2e-3)
     p.add_argument("--scan-points", type=int, default=81)
+    p.add_argument("--research-label", default="polar1-s", help="research path: the research engine's label")
+    p.add_argument("--checkpoint", help="research path: the checkpoint (default FASTMACE_MODELS/MACE-POLAR-1-S.model)")
+    p.add_argument("--research-rebase", action="store_true",
+                   help="research path: size polar_gpu's k-space state on each configuration's cell (1a-T19 did not)")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args(argv)
     if args.path == "hybrid" and args.dtype != "float32":
         p.error("the hybrid backend runs float32 only")
-    if args.path == "stock" and args.frozen_kset:
-        p.error("the stock path does not use FastMACE's k-vector code; --frozen-kset needs another path")
+    if args.path in ("stock", "research") and (args.frozen_kset or args.probe):
+        p.error(f"the {args.path} path does not use FastMACE's k-vector code; --frozen-kset and --probe need another")
+    if args.path == "research" and args.checkpoint is None:
+        args.checkpoint = str(Path(os.environ.get("FASTMACE_MODELS", ".")) / "MACE-POLAR-1-S.model")
     return args
 
 
@@ -297,6 +365,7 @@ def main(argv=None):
     torch.set_num_threads(2)
     probe = KSetProbe(args.frozen_kset) if (args.frozen_kset or args.probe) else None
     configs = configurations(args.structure, args.repeat, args.configs)
+    args.research_base = configurations(args.structure, args.repeat, ["ideal"])["ideal"]
     first = next(iter(configs.values()))
     started = time.perf_counter()
     evaluate, rebase, info = EVALUATORS[args.path](args, first)
