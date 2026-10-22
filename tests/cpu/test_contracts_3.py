@@ -537,3 +537,9 @@ def test_protocol_run_names():  # §10.5 (3-T14)
     assert _parameters(runner.resume) == ["directory", "steps", "log"]
     assert runner.RELAX_KEYS == ("fmax", "optimizer", "max_steps") and runner.PROTOCOL_RECORD == "protocol.json"
     assert "swap_anneal_NaNbOCl4" in runner.protocol_names()
+
+
+def test_fixcm_projection_field():  # 3-T22 (docs/design/fixcm-projection.md); the default is checkpoint 2b
+    assert config.IntegratorConfig().fixcm_projection == "ase"
+    assert typing.get_args(typing.get_type_hints(config.IntegratorConfig)["fixcm_projection"]) == (
+        "ase", "mass_weighted")

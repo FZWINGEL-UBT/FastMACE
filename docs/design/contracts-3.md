@@ -20,6 +20,7 @@ unchanged. `tests/cpu/test_research_surface.py` is unchanged.
 | `Workload.max_displacement_A` | `None` | the largest displacement δ (Å) any `Displace` may use; required when `"displace"` is in `mc_moves`; rule 11 adds 2δ to the skin, and T10 refuses a larger `delta_A` (`planner/workload.py`) | T05 |
 | `MCConfig.max_attempts_per_block` | `10_000` | attempts of one move per block | T09 |
 | `MCConfig.max_move_sets` | `8` | move records attached at once | T09 |
+| `IntegratorConfig.fixcm_projection` | `"ase"` | how `fixcm` projects the Langevin noise: `"ase"` is ASE's, bit for bit (noise-stream equivalence; right for equal masses only); `"mass_weighted"` is the Gaussian conditioned on a fixed centre of mass (mass-weighted means, no √(N/(N−1)) factor; canonical over 3N − 3 degrees of freedom, per species too; the PyTorch stage only, not the fused one). Added by the conductor's approval; the default is the owner's checkpoint 2b. The public `fm.integrators` records don't expose it yet | T22 (docs/design/fixcm-projection.md) |
 
 Constants and functions:
 - `DEFAULT_SKIN_A = 0.3`;
