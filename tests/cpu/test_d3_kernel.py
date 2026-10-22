@@ -1,23 +1,27 @@
-"""The D3 kernel's three passes on the CPU (plan task 3b-T03, SPEC §11.2).
+"""The D3 kernel's three passes on the CPU: the torch tier (plan task 3b-T03, SPEC §11.2).
 
 On rattled and strained NaCl, NbCl5 and NaNbCl6 (``_support.d3_cases``), with a brute-force half list:
-- float64 energy, forces and stress equal ``torch-dftd`` 0.5.1 (Becke–Johnson, the record's
-  parameters) to ``TORCH_DFTD``. Measured: 4e-16 eV, 2e-16 eV/Å, 1e-17 eV/Å³;
-- and simple-dftd3 (``dftd3``) to twice its own distance from ``torch-dftd``, i.e. to the two
-  references' agreement with each other;
+- float64 energy, forces and stress against ``torch-dftd`` 0.5.1 **and** simple-dftd3, by the
+  runbook's item 1 rule: each deviation at most twice the references' deviation from each other,
+  plus the rounding floors (1e-10 eV/atom, 1e-8 eV/Å, 1e-9 eV/Å³);
 - forces and stress are the derivatives of the energy (central differences), independent of
   either reference;
-- without pass 3 (the CN chain term) the forces fail the ``torch-dftd`` comparison;
+- the negative control: without pass 3 (the CN chain term) the forces fail the comparison;
 - float32 pair terms stay within the gate's floors of float64 (SPEC §12.3);
-- the list's order and padding slots do not matter.
+- ``evaluate_energy`` equals the full evaluation's energy bit for bit, in float64 and float32;
+- the list's order and padding slots, and ``virial=False``, change nothing;
+- a species change written into ``numbers`` equals a fresh kernel (conductor's choice 5);
+- tables that are not ``d3.REFERENCE_TABLES``' are refused.
 
 The Triton kernels run here through Triton's interpreter, in a fresh process, when Triton is
 installed (the GPU environments; the CPU environment skips). On the GPU: tests/gpu/test_d3_kernel_gpu.py.
-The references and the tables need torch-dftd, so the tests skip without it.
+The reference comparisons need torch-dftd and simple-dftd3 (``fastmace[d3-reference]``); the kernel
+itself needs neither, as its tables ship with FastMACE.
 """
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -30,81 +34,68 @@ import numpy as np
 import pytest
 import torch
 
-pytest.importorskip("torch_dftd")
+from _support.d3_cases import CASES, GATE, deviations, half_list, within
+from fastmace.longrange import d3
+from fastmace.longrange import d3_kernel as kernel_module
+from fastmace.longrange.d3_kernel import D3Kernel
 
-from _support.d3_cases import CASES, half_list, torch_dftd  # noqa: E402
-from fastmace.longrange.d3 import D3  # noqa: E402
-from fastmace.longrange.d3_kernel import D3Kernel  # noqa: E402
-
-RECORD = D3(functional="r2scan")
+RECORD = d3.D3(functional="r2scan")
 SKIN = 1.0  # Å added to the list cutoff, so the kernel's own r² mask does the cutting
-
-# float64 against torch-dftd: energy eV, max force component eV/Å, max stress component eV/Å³
-TORCH_DFTD = (1e-10, 1e-10, 1e-12)
-# The gate's absolute floors (SPEC §12.3): energy per atom eV, force eV/Å, stress eV/Å³
-GATE = (1e-5, 1e-5, 1e-7)
-# Without the chain term the NbCl5 and NaNbCl6 forces move by 3e-5 and 1.6e-4 eV/Å (NaCl: its
-# C6 weights sit on one reference, so dE/dCN is ~0 and the chain term vanishes)
+# Without the chain term the NbCl5 and NaNbCl6 forces move by 1e-5 to 1e-4 eV/Å. NaCl's C6 weights
+# sit on one reference, so dE/dCN is ~0 there and the chain term vanishes.
 CHAIN_CASES = ("NbCl5-rattled", "NbCl5-strained", "NaNbCl6-rattled", "NaNbCl6-strained")
 
 
-def evaluate(atoms, *, dtype=torch.float64, chain=True, device="cpu", shuffle=False, padding=0):
-    i, j, images = half_list(atoms, RECORD.pair_cutoff_bohr * RECORD.autoang + SKIN)
+def make_kernel(atoms, *, dtype=torch.float64, chain=True, device="cpu", shuffle=False, padding=0, numbers=None):
+    i, j, index, table = half_list(atoms, d3.pair_cutoff_A(RECORD) + SKIN)
     if shuffle:
         order = np.random.default_rng(0).permutation(len(i))
-        i, j, images = i[order], j[order], images[order]
+        i, j, index = i[order], j[order], index[order]
     if padding:
         n = len(atoms)
         i = np.concatenate([i, np.full(padding, n)])
         j = np.concatenate([j, np.full(padding, n)])
-        images = np.concatenate([images, np.zeros((padding, 3), dtype=np.int64)])
-    kernel = D3Kernel(RECORD, atoms.numbers, device=device, dtype=dtype, chain=chain)
-    kernel.prepare(torch.as_tensor(i), torch.as_tensor(j), torch.as_tensor(images))
-    positions = torch.tensor(atoms.positions, device=device)
-    cell = torch.tensor(atoms.cell.array, device=device)
-    energy, forces, virial = kernel(positions, cell)
-    stress = -virial.cpu().numpy() / atoms.get_volume()
-    return energy.item(), forces.cpu().double().numpy(), stress
+        index = np.concatenate([index, np.zeros(padding, dtype=np.int32)])
+    numbers = torch.tensor(atoms.numbers, device=device) if numbers is None else numbers
+    kernel = D3Kernel(RECORD, numbers, device=device, dtype=dtype, chain=chain)
+    kernel.prepare(torch.as_tensor(i), torch.as_tensor(j), torch.as_tensor(index), torch.as_tensor(table))
+    return kernel
 
 
-def deviations(ours, reference):
-    return (abs(ours[0] - reference[0]), np.abs(ours[1] - reference[1]).max(), np.abs(ours[2] - reference[2]).max())
+def inputs(atoms, device="cpu"):
+    return torch.tensor(atoms.positions, device=device), torch.tensor(atoms.cell.array, device=device)
+
+
+def evaluate(atoms, **options):
+    device = options.get("device", "cpu")
+    result = make_kernel(atoms, **options).evaluate(*inputs(atoms, device))
+    return (result.energy.item(), result.forces.cpu().double().numpy(),
+            result.stress(atoms.get_volume()).cpu().numpy())
 
 
 @pytest.fixture(scope="module")
 def references():
-    return {name: torch_dftd(make(), RECORD) for name, make in CASES.items()}
-
-
-@pytest.mark.parametrize("name", CASES)
-def test_float64_matches_torch_dftd(name, references):
-    assert all(d <= tol for d, tol in zip(deviations(evaluate(CASES[name]()), references[name]), TORCH_DFTD))
-
-
-def simple_dftd3(atoms):
-    """Energy, forces and stress from simple-dftd3 with the record's parameters and cutoffs, ATM off."""
-    from dftd3.interface import DispersionModel, RationalDampingParam
-
-    from fastmace.longrange.d3_kernel import bj_parameters
-
-    bohr = RECORD.autoang
-    model = DispersionModel(atoms.numbers, atoms.positions / bohr, atoms.cell.array / bohr, atoms.pbc)
-    model.set_realspace_cutoff(RECORD.pair_cutoff_bohr, RECORD.pair_cutoff_bohr, RECORD.cn_cutoff_bohr)
-    result = model.get_dispersion(RationalDampingParam(**bj_parameters(RECORD), s9=0.0), grad=True)
-    energy = result["energy"] * RECORD.autoev
-    forces = -result["gradient"] * RECORD.autoev / bohr
-    stress = result["virial"] * RECORD.autoev / atoms.get_volume()
-    return energy, forces, stress
-
-
-@pytest.mark.parametrize("name", CASES)
-def test_float64_matches_simple_dftd3_to_the_references_agreement(name, references):
+    """Per case: torch-dftd's result, simple-dftd3's, and their deviation from each other."""
+    pytest.importorskip("torch_dftd")
     pytest.importorskip("dftd3.interface")
+    from fastmace.reference.d3 import simple_dftd3, torch_dftd3
+
+    out = {}
+    for name, make in CASES.items():
+        atoms = make()
+        first, second = torch_dftd3(atoms, RECORD), simple_dftd3(atoms, RECORD)
+        out[name] = (first, second, deviations(first, second, len(atoms)))
+    return out
+
+
+@pytest.mark.parametrize("which", ["torch-dftd", "simple-dftd3"])
+@pytest.mark.parametrize("name", CASES)
+def test_float64_against_both_references(name, which, references):
     atoms = CASES[name]()
-    other = simple_dftd3(atoms)
-    agreement = deviations(other, references[name])
-    ours = deviations(evaluate(atoms), other)
-    assert all(d <= max(2.0 * a, floor) for d, a, floor in zip(ours, agreement, TORCH_DFTD)), (ours, agreement)
+    first, second, agreement = references[name]
+    reference = first if which == "torch-dftd" else second
+    deviation = deviations(evaluate(atoms), reference, len(atoms))
+    assert within(deviation, agreement), (deviation, agreement)
 
 
 @pytest.mark.parametrize("name", ["NbCl5-strained", "NaNbCl6-rattled"])
@@ -135,24 +126,70 @@ def test_forces_and_stress_are_energy_derivatives(name):
 
 @pytest.mark.parametrize("name", CHAIN_CASES)
 def test_without_the_chain_term_the_forces_fail(name, references):
-    energy, forces, stress = deviations(evaluate(CASES[name](), chain=False), references[name])
-    assert energy <= TORCH_DFTD[0]  # the chain term changes no energy
-    assert forces > 100 * TORCH_DFTD[1]
+    atoms = CASES[name]()
+    first, _, agreement = references[name]
+    energy, forces, _ = deviations(evaluate(atoms, chain=False), first, len(atoms))
+    assert energy <= 2 * agreement[0] + 1e-10  # the chain term changes no energy
+    assert forces > 10 * (2 * agreement[1] + 1e-8)
 
 
 @pytest.mark.parametrize("name", CASES)
 def test_float32_within_the_gate(name):
     atoms = CASES[name]()
-    single, double = evaluate(atoms, dtype=torch.float32), evaluate(atoms)
-    energy, forces, stress = deviations(single, double)
-    assert energy / len(atoms) <= GATE[0] and forces <= GATE[1] and stress <= GATE[2]
+    deviation = deviations(evaluate(atoms, dtype=torch.float32), evaluate(atoms), len(atoms))
+    assert all(d <= g for d, g in zip(deviation, GATE)), deviation
 
 
-def test_order_and_padding_do_not_matter():
+@pytest.mark.parametrize("dtype", [torch.float64, torch.float32], ids=str)
+def test_energy_only_equals_the_full_energy(dtype):
+    atoms = CASES["NbCl5-strained"]()
+    kernel = make_kernel(atoms, dtype=dtype)
+    positions, cell = inputs(atoms)
+    energy = kernel.evaluate_energy(positions, cell)
+    assert energy.dtype == torch.float64 and energy.shape == ()
+    assert torch.equal(energy, kernel.evaluate(positions, cell).energy)
+
+
+def test_order_padding_and_virial_flag_change_nothing():
     atoms = CASES["NbCl5-rattled"]()
     reference = evaluate(atoms)
     shuffled = evaluate(atoms, shuffle=True, padding=37)
-    assert all(d <= 1e-13 for d in deviations(shuffled, reference))
+    assert all(d <= 1e-13 for d in deviations(shuffled, reference, 1))
+    kernel = make_kernel(atoms)
+    full, light = kernel.evaluate(*inputs(atoms)), kernel.evaluate(*inputs(atoms), virial=False)
+    assert light.virial is None
+    assert torch.equal(full.energy, light.energy) and torch.equal(full.forces, light.forces)
+
+
+def test_species_changed_in_place_equals_a_fresh_kernel():
+    atoms = CASES["NaNbCl6-rattled"]()
+    numbers = torch.tensor(atoms.numbers)
+    kernel = make_kernel(atoms, numbers=numbers)
+    positions, cell = inputs(atoms)
+    before = kernel.evaluate(positions, cell)
+    sodium, chlorine = int(np.flatnonzero(atoms.numbers == 11)[0]), int(np.flatnonzero(atoms.numbers == 17)[0])
+    numbers[sodium], numbers[chlorine] = 17, 11
+    after = kernel.evaluate(positions, cell)
+    fresh = make_kernel(atoms, numbers=numbers.clone()).evaluate(positions, cell)
+    assert all(torch.equal(a, b) for a, b in zip((after.energy, after.forces, after.virial),
+                                                 (fresh.energy, fresh.forces, fresh.virial)))
+    assert not torch.equal(before.energy, after.energy)
+
+
+def test_the_shipped_tables_are_torch_dftds():
+    data = kernel_module.TABLES.read_bytes()
+    assert len(data) == 690_158
+    assert d3.REFERENCE_TABLES.endswith("sha256=" + hashlib.sha256(data).hexdigest())
+    assert (kernel_module.TABLES.parent / "LICENSE").read_text().startswith("MIT License")
+    if importlib.util.find_spec("torch_dftd") is not None:
+        theirs = Path(importlib.util.find_spec("torch_dftd").origin).parent / "nn" / "params" / "dftd3_params.npz"
+        assert theirs.read_bytes() == data
+
+
+def test_other_tables_are_refused(monkeypatch):
+    monkeypatch.setattr(d3, "REFERENCE_TABLES", "torch-dftd-0.5.1:dftd3_params.npz:sha256=" + "0" * 64)
+    with pytest.raises(RuntimeError, match="reinstall FastMACE"):
+        kernel_module.reference_tables.__wrapped__()
 
 
 DRIVER = textwrap.dedent("""
@@ -161,22 +198,25 @@ DRIVER = textwrap.dedent("""
     import fastmace  # noqa: F401  (before torch)
     import numpy as np, torch
     from _support.d3_cases import CASES, half_list
-    from fastmace.longrange.d3 import D3
+    from fastmace.longrange import d3
     from fastmace.longrange.d3_kernel import D3Kernel
 
-    record = D3(functional="r2scan")
+    record = d3.D3(functional="r2scan")
     out = {{}}
     for name in ("NaNbCl6-strained", "NaCl-rattled"):
         atoms = CASES[name]()
-        i, j, images = half_list(atoms, record.pair_cutoff_bohr * record.autoang + 1.0)
+        lists = [torch.as_tensor(a) for a in half_list(atoms, d3.pair_cutoff_A(record) + 1.0)]
         for dtype in (torch.float64, torch.float32):
             for chain in (True, False):
                 kernel = D3Kernel(record, atoms.numbers, device="cpu", dtype=dtype, chain=chain)
-                kernel.prepare(torch.as_tensor(i), torch.as_tensor(j), torch.as_tensor(images))
+                kernel.prepare(*lists)
                 positions, cell = torch.tensor(atoms.positions), torch.tensor(atoms.cell.array)
-                ours, theirs = kernel._triton(positions, cell), kernel._torch(positions, cell)
+                ours = kernel._triton(positions, cell, False, True)
+                theirs = kernel._torch(positions, cell, False, True)
+                energy = kernel._triton(positions, cell, True, False)[0]
                 out[f"{{name}} {{dtype}} {{chain}}"] = [float((a.double() - b.double()).abs().max())
-                                                       for a, b in zip(ours, theirs)]
+                                                       for a, b in zip(ours, theirs)] + [
+                    bool(torch.equal(energy, ours[0]))]
     print(json.dumps(out))
 """)
 
@@ -189,23 +229,7 @@ def test_triton_kernels_through_the_interpreter():
                          text=True, timeout=1200)
     assert run.returncode == 0, run.stderr[-3000:]
     result = json.loads(run.stdout.strip().splitlines()[-1])
-    for key, (energy, forces, virial) in result.items():
+    for key, (energy, forces, virial, energy_only_equal) in result.items():
         tolerance = 1e-12 if "float64" in key else 1e-5  # float32: the two paths round differently
         assert energy <= tolerance and forces <= tolerance and virial <= tolerance, (key, result[key])
-
-
-def test_species_changed_in_place_equals_a_fresh_kernel():
-    """A species event writes ``numbers`` in place; the kernel reads Z through it (conductor's choice 5)."""
-    atoms = CASES["NaNbCl6-rattled"]()
-    i, j, images = (torch.as_tensor(a) for a in half_list(atoms, RECORD.pair_cutoff_bohr * RECORD.autoang + SKIN))
-    positions, cell = torch.tensor(atoms.positions), torch.tensor(atoms.cell.array)
-    numbers = torch.tensor(atoms.numbers)
-    kernel = D3Kernel(RECORD, numbers, device="cpu")
-    kernel.prepare(i, j, images)
-    before = kernel(positions, cell)
-    numbers[0], numbers[2] = 17, 11  # Na <-> one Cl
-    after = kernel(positions, cell)
-    fresh = D3Kernel(RECORD, numbers.clone(), device="cpu")
-    fresh.prepare(i, j, images)
-    assert all(torch.equal(a, b) for a, b in zip(after, fresh(positions, cell)))
-    assert not torch.equal(before[0], after[0])
+        assert energy_only_equal, key

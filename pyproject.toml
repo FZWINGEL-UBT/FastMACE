@@ -66,6 +66,8 @@ include = ["fastmace*"]
 # The vendored OEq streaming kernels: the CUDA template and their BSD-3 licence and notice (SPEC §14).
 "fastmace.kernels.oeq_streaming" = ["*.cuh", "LICENSE", "NOTICE.md"]
 "fastmace.protocols" = ["data/*.toml", "data/*.cif", "data/*.md"]
+# The D3 reference tables, byte-identical to torch-dftd 0.5.1's, with its MIT licence (SPEC §11.2, §14).
+"fastmace.longrange" = ["data/dftd3_params.npz", "data/LICENSE", "data/NOTICE.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

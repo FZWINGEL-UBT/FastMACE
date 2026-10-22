@@ -1,31 +1,25 @@
-"""D3 test cases (plan task 3b-T03): rattled and strained cells, a brute-force half list, references.
+"""D3 kernel test cases (plan task 3b-T03): rattled and strained cells, a brute-force half list, tolerances.
 
-- ``CASES``: rattled (0.05 Å) and strained (±2 %, with shear) NaCl, NbCl5 and NaNbCl6;
+- ``CASES``: rattled (0.05 Å) and strained (about ±2 %, with shear) NaCl, NbCl5 and NaNbCl6, every
+  cell narrower than twice the 21.2 Å cutoff;
 - ``half_list(atoms, cutoff)``: every pair within ``cutoff`` from ASE's neighbour list, as the half
-  list the D3 kernel takes (``i < j``, plus each self-image pair once). It stands in for 3b-T02's
-  GPU list in these tests;
-- ``torch_dftd(atoms, record)``: energy, forces and stress from ``torch-dftd`` 0.5.1 with the
-  record's parameters (Becke–Johnson explicit), in float64 on the CPU.
-
-NaNbCl6 is a small cubic test cell (Na at the origin, a NbCl6 octahedron at the centre), not a
-real structure. It stands in until 3b-T01's fixtures land.
+  list the D3 kernel takes (``i < j``, plus each self-image pair once), with its image index and
+  table. It stands in for 3b-T02's GPU list in these tests;
+- ``within(deviation, agreement, floor)``: the runbook's item 1 rule (docs/validation/phase-3b-runbook.md):
+  at most twice the two references' deviation from each other, plus a rounding floor.
 """
 
 from __future__ import annotations
 
 import numpy as np
-from ase import Atoms
 from ase.neighborlist import primitive_neighbor_list
 
-from _support.structures import nacl, nbcl5
+from _support.structures import nacl, nanbcl6, nbcl5
 
-
-def nanbcl6():
-    a, d = 7.4, 2.35 / 7.4
-    cl = [(0.5 + s * d * (k == 0), 0.5 + s * d * (k == 1), 0.5 + s * d * (k == 2))
-          for k in range(3) for s in (1, -1)]
-    return Atoms(["Na", "Nb"] + ["Cl"] * 6, cell=np.eye(3) * a, pbc=True,
-                 scaled_positions=[(0, 0, 0), (0.5, 0.5, 0.5)] + cl)
+# Rounding floors of the runbook, item 1: energy per atom eV, max force component eV/Å, max stress eV/Å³
+FLOORS = (1e-10, 1e-8, 1e-9)
+# The gate's absolute floors (SPEC §12.3), for float32 against float64: the same three quantities
+GATE = (1e-5, 1e-5, 1e-7)
 
 
 def strained(atoms, sign):
@@ -52,24 +46,21 @@ CASES = {
 
 
 def half_list(atoms, cutoff):
-    """``(i, j, images)`` int64 arrays of every pair within ``cutoff`` Å, each undirected pair once."""
+    """``(i, j, image_index, image_table)``: every pair within ``cutoff`` Å once; the table float64, as 3b-T02's."""
     i, j, shifts = primitive_neighbor_list("ijS", atoms.pbc, atoms.cell.array, atoms.positions, cutoff,
                                            self_interaction=False)
-    first_nonzero = np.where(shifts != 0, shifts, 0)
-    sign = np.sign(first_nonzero[np.arange(len(shifts)), np.argmax(shifts != 0, axis=1)])
-    keep = (i < j) | ((i == j) & (sign > 0))
-    return i[keep].astype(np.int64), j[keep].astype(np.int64), shifts[keep].astype(np.int64)
+    first = shifts[np.arange(len(shifts)), np.argmax(shifts != 0, axis=1)]
+    keep = (i < j) | ((i == j) & (first > 0))
+    table, index = np.unique(shifts[keep], axis=0, return_inverse=True)
+    return (i[keep].astype(np.int64), j[keep].astype(np.int64), index.reshape(-1).astype(np.int32),
+            table.astype(np.float64))
 
 
-def torch_dftd(atoms, record):
-    """``(energy eV, forces (N, 3) eV/Å, stress (3, 3) eV/Å³)`` from torch-dftd, float64, CPU."""
-    import torch
-    from ase.units import Bohr
-    from torch_dftd.torch_dftd3_calculator import TorchDFTD3Calculator
+def deviations(ours, reference, n_atoms):
+    """``(energy per atom, max force component, max stress component)`` deviations of two results."""
+    return (abs(ours[0] - reference[0]) / n_atoms, float(np.abs(ours[1] - reference[1]).max()),
+            float(np.abs(ours[2] - reference[2]).max()))
 
-    calc = TorchDFTD3Calculator(damping="bj", xc=record.functional, cutoff=record.pair_cutoff_bohr * Bohr,
-                                cnthr=record.cn_cutoff_bohr * Bohr, abc=False, dtype=torch.float64, device="cpu")
-    atoms = atoms.copy()
-    atoms.calc = calc
-    return (atoms.get_potential_energy(), atoms.get_forces(),
-            atoms.get_stress(voigt=False))
+
+def within(deviation, agreement, floors=FLOORS):
+    return all(d <= 2.0 * a + f for d, a, f in zip(deviation, agreement, floors))
