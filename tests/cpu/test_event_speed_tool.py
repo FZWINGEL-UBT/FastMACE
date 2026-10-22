@@ -81,6 +81,35 @@ def test_the_event_side_runs_a_chunk_then_swaps_and_the_fixed_side_only_runs():
     assert fixed_sim.calls == [("run", 100)] and fixed.events == 0
 
 
+def test_swap_back_undoes_every_other_event_so_the_composition_returns():
+    start = [11, 17, 11, 17, 11, 17]
+    sim = FakeSimulation(start)
+    side = tool.SimulationSide(sim, every=100, kinds=(11, 17), seed=3, swap_back=True)
+    side.step()
+    first = [call for call in sim.calls if call[0] == "update"][0]
+    assert first[1] != start
+    side.step()
+    assert sim.species.tolist() == start  # the second event swapped the same two atoms back
+    updates = [call for call in sim.calls if call[0] == "update"]
+    assert np.allclose(updates[1][2], np.arange(18, dtype=float).reshape(-1, 3))  # momenta back too
+    side.step()
+    assert sim.species.tolist() != start and side.events == 3
+
+
+def test_the_side_records_the_edge_count_before_each_block():
+    counts = iter([7000, 7100, 7200])
+    side = tool.SimulationSide(FakeSimulation([11, 17]), every=100, kinds=None, seed=0, edges=lambda: next(counts))
+    side.prepare_block()
+    side.prepare_block()
+    assert side.block_edges == [7000, 7100]
+
+
+def test_entries_after_takes_the_log_entries_added_while_timed():
+    log = [dict(step=10, key="A"), dict(step=20, key="('B', 8192)", reason="new edge size")]
+    assert tool.entries_after(log, 1) == [log[1]]
+    assert tool.entries_after(log, 2) == []
+
+
 def test_steps_must_be_whole_event_intervals():
     common = ["--output", "o", "--checkpoint", "c"]
     args = tool.parse_args(common)
@@ -99,6 +128,38 @@ def test_summary_reports_per_step_times_the_rate_ratio_and_the_verdict():
     assert summary["rate_ratio"] == pytest.approx(300 / 320)
     assert summary["pass"] is True
     assert tool.summarise({"fixed": 300.0, "events": 340.0}, every=100, threshold=0.9)["pass"] is False
+
+
+class CountingSide:
+    def __init__(self, captures):
+        self.captures = list(captures)  # captures logged after each step
+        self.steps = 0
+
+    def step(self):
+        self.steps += 1
+
+
+def test_settle_warms_up_until_enough_chunks_pass_without_a_new_capture():
+    a, b = CountingSide([]), CountingSide([])
+    logs = {"a": [1, 2, 2, 2, 2, 2, 2], "b": [0, 0, 1, 1, 1, 1, 1]}
+
+    def captures():
+        return {"a": logs["a"][a.steps - 1] if a.steps else 0, "b": logs["b"][b.steps - 1] if b.steps else 0}
+
+    chunks = tool.settle({"a": a, "b": b}, captures, quiet=3, limit=10)
+    assert chunks == 6 and a.steps == b.steps == 6  # b's capture in chunk 3, then 3 quiet chunks
+    assert tool.settle({"a": a, "b": b}, captures, quiet=0, limit=10) == 0
+    noisy = {"a": CountingSide([]), "b": CountingSide([])}
+    count = iter(range(100))
+    assert tool.settle(noisy, lambda: {"a": next(count), "b": 0}, quiet=2, limit=4) == 4  # capped
+
+
+def test_settle_arguments():
+    args = tool.parse_args(["--output", "o", "--checkpoint", "c", "--settle", "3", "--settle-max", "2000"])
+    assert (args.settle, args.settle_max, args.swap_back) == (3, 2000, False)
+    assert tool.parse_args(["--output", "o", "--checkpoint", "c", "--swap-back"]).swap_back is True
+    with pytest.raises(SystemExit):
+        tool.parse_args(["--output", "o", "--checkpoint", "c", "--settle-max", "250"])
 
 
 def test_a_recapture_or_compile_while_timed_invalidates_the_run():

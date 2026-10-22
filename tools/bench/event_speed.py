@@ -17,8 +17,14 @@ number of events. Both sides are built and warmed up first, then 12 blocks of ea
 (``fastmace.bench.ab.run_ab``; build order ``--order``, pattern ``--pattern``). The result is the rate
 ratio median(fixed) / median(events), and the run passes at >= 0.90 (SPEC §16 row 3). It is invalid when
 anything compiled, any graph was captured (``engine.info()["recapture_log"]``) or another process used the
-GPU while timed. ``--superset`` gives both sides that species superset (``fm.ForceField(species=)``).
-The skin each side used is recorded (rule 11 sets it once 3-T05 is in).
+GPU while timed; the captures and graph invalidations while timed are recorded with their step, key and
+reason, and each side's edge count before every block. ``--swap-back`` makes every second event swap the
+previous pair back: always-accepted random swaps otherwise pile up antisite disorder (the NaCl events side ended
+0.25-0.29 eV/atom higher, at edge counts the fixed side never reached), so the system drifts away from the fixed
+side's. ``--settle N`` keeps warming up (untimed, at most ``--settle-max`` steps) until N chunks in a
+row add no capture, since at 1500 K new edge sizes keep appearing. ``--superset`` gives both sides that species
+superset (``fm.ForceField(species=)``). Each side's skin and headroom (rule 11, 3-T05: it sizes the events
+side, which declares species changes) and edge sizes are recorded.
 
 Writes ``<output>.json``. Use an otherwise idle GPU.
 """
@@ -66,25 +72,36 @@ class SimulationSide:
     """A ``Simulation`` as a ``fastmace.bench.step_time.TimedEngine`` whose step is ``every`` MD steps.
 
     With ``kinds`` (two atomic numbers), each step ends with one species-swap event through
-    ``Simulation.update``."""
+    ``Simulation.update``. With ``swap_back``, every second event swaps the previous pair back, so the
+    antisite disorder stays bounded; without it, the swaps accumulate. ``edges()``, if given, is read before
+    each block, outside the clock (``block_edges``)."""
 
-    def __init__(self, sim, *, every, kinds, seed, torch=None):
+    def __init__(self, sim, *, every, kinds, seed, torch=None, swap_back=False, edges=None):
         self.sim, self.every, self.kinds, self.torch = sim, every, kinds, torch
+        self.swap_back, self.edges = swap_back, edges
         self.rng = np.random.default_rng(seed)
         self.events = 0
+        self.block_edges = []
+        self._pending = None  # the pair to swap back at the next event
 
     def step(self):
         self.sim.run(self.every)
         if self.kinds is None:
             return
         committed = self.sim.committed()
-        i, j = swap_pair(committed.species, self.kinds, self.rng)
+        if self._pending is not None:
+            (i, j), self._pending = self._pending, None
+        else:
+            i, j = swap_pair(committed.species, self.kinds, self.rng)
+            if self.swap_back:
+                self._pending = (i, j)
         species, momenta = exchange(committed.species, committed.momenta, i, j)
         self.sim.update(species=species, momenta=momenta)
         self.events += 1
 
     def prepare_block(self):
-        pass
+        if self.edges is not None:
+            self.block_edges.append(int(self.edges()))
 
     def finish_block(self):
         pass  # run() and update() end on a committed step
@@ -98,6 +115,35 @@ def source_commit(environ=os.environ):
     """This checkout's commit: ``ab_step_time.fastmace_commit``, else ``$FASTMACE_SOURCE_COMMIT`` (an app
     worktree on a Windows drive, whose ``.git`` file names a Windows path that WSL's git cannot follow)."""
     return ab_step_time.fastmace_commit() or environ.get("FASTMACE_SOURCE_COMMIT") or None
+
+
+def settle(sides, captures, *, quiet, limit):
+    """Untimed chunks on every side until ``quiet`` chunks in a row add no graph capture (``captures()`` gives
+    {side: captures logged}), at most ``limit`` chunks; returns the chunks run. At 1500 K the edge count keeps
+    growing past a short warm-up, and a capture while timed invalidates the run (3-T20 breakdown)."""
+    if quiet <= 0:
+        return 0
+    last, calm, chunks = captures(), 0, 0
+    while calm < quiet and chunks < limit:
+        for side in sides.values():
+            side.step()
+        chunks += 1
+        now = captures()
+        calm, last = (calm + 1, last) if now == last else (0, now)
+    return chunks
+
+
+def entries_after(log, start):
+    """The entries of an engine log (``recapture_log``, ``invalidations``) added after its first ``start``."""
+    return [dict(entry) for entry in list(log)[start:]]
+
+
+def neighbour_record(engine):
+    """The skin and headroom the plan gave the engine (rule 11, 3-T05) and its edge sizes."""
+    neighbours, config = engine.force_field.neighbours, engine.neighbour_config
+    return dict(skin_A=float(neighbours.skin), capacity_headroom=neighbours.headroom,
+                edge_bucket_fraction=config.edge_bucket_fraction, edge_bucket=int(engine.edge_bucket),
+                edge_capacity=int(engine.force_field.edge_capacity), recapture_budget=engine.recapture_budget)
 
 
 def chunk_protocol(args):
@@ -143,9 +189,16 @@ def parse_args(argv=None):
     p.add_argument("--pattern", choices=("abab", "abba"), default="abab")
     p.add_argument("--order", choices=("ab", "ba"), default="ab", help="Build order: ab = fixed first")
     p.add_argument("--seed", type=int, default=20261022)
+    p.add_argument("--settle", type=int, default=0, metavar="CHUNKS",
+                   help="After --warmup, keep warming up until this many chunks in a row add no graph capture")
+    p.add_argument("--settle-max", type=int, default=3000, metavar="STEPS", help="At most this many settle steps")
+    p.add_argument("--swap-back", action="store_true",
+                   help="Every second event swaps the previous pair back (bounded disorder; the item-1 design)")
     args = p.parse_args(argv)
     if args.every < 1 or args.block % args.every or args.warmup % args.every or args.block < args.every:
         p.error(f"--warmup and --block must be whole multiples of --every ({args.every})")
+    if args.settle < 0 or args.settle_max % args.every:
+        p.error(f"--settle must be >= 0 and --settle-max a whole multiple of --every ({args.every})")
     return args
 
 
@@ -157,7 +210,7 @@ def _side_record(sim):
     masses = committed.masses
     kinetic = 0.5 * float((committed.momenta ** 2 / masses[:, None]).sum())
     from ase import units
-    return dict(skin_A=float(engine.force_field.neighbours.skin), recaptures=info["recaptures"],
+    return dict(**neighbour_record(engine), recaptures=info["recaptures"],
                 captures_logged=len(info["recapture_log"]), neighbour_rebuilds=info["neighbour_rebuilds"],
                 canonical_points=info["canonical_points"], edge_sizes_used=info["edge_sizes_used"],
                 overflows_redone=info["overflows_redone"], step=committed.step,
@@ -195,8 +248,9 @@ def main(argv=None):
                 fastmace_commit=source_commit(), model=args.model, checkpoint_sha256=sha,
                 precision="float32", backend="hybrid", cuda_allocator=allocator,
                 integrator=dataclasses.asdict(integrator),
-                superset=args.superset, every=args.every, seed=args.seed,
-                protocol=dict(warmup_steps=args.warmup, block_steps=args.block, blocks=args.blocks),
+                superset=args.superset, every=args.every, seed=args.seed, swap_back=args.swap_back,
+                protocol=dict(warmup_steps=args.warmup, block_steps=args.block, blocks=args.blocks,
+                              settle_chunks=args.settle, settle_max_steps=args.settle_max),
                 pattern=args.pattern, order=order, load=list(os.getloadavg()), structures={})
     for spec in args.structures:
         name, base = ab_step_time.read_structure(spec, None)
@@ -210,30 +264,46 @@ def main(argv=None):
             workload = Workload(max_temperature_K=args.temperature_K, species_changes=side == "events")
             sims[side] = fm.Simulation(base, field, integrator=integrator, workload=workload, seed=args.seed,
                                        engine=EngineConfig(backend="hybrid"))
+            field_of = sims[side]._engine.force_field
             sides[side] = SimulationSide(sims[side], every=args.every, kinds=kinds if side == "events" else None,
-                                         seed=args.seed, torch=torch)
+                                         seed=args.seed, torch=torch, swap_back=args.swap_back,
+                                         edges=lambda field_of=field_of: field_of.edge_count)
             setup[side] = time.perf_counter() - started
         from fastmace.bench import step_time
         for side in order:  # warm up outside the compile-counter window (new edge sizes compile here)
             step_time.warm_up(sides[side], protocol.warmup)
-        captures = {side: len(sims[side]._engine.info()["recapture_log"]) for side in SIDES}
+
+        def logged():
+            return {side: len(sims[side]._engine.info()["recapture_log"]) for side in SIDES}
+
+        settled = settle({side: sides[side] for side in order}, logged, quiet=args.settle,
+                         limit=args.settle_max // args.every)
+        captures = logged()
+        invalidated = {side: len(sims[side]._engine.info()["invalidations"]) for side in SIDES}
+        for side in SIDES:
+            sides[side].block_edges.clear()
         counted = ab_step_time.compile_counters(counters)
         events_before = sides["events"].events
         result = ab.run_ab(sides, dataclasses.replace(protocol, warmup=0), pattern=args.pattern)
         changes, recompiled = ab_step_time.compile_changes(counted, ab_step_time.compile_counters(counters))
-        after = {side: len(sims[side]._engine.info()["recapture_log"]) for side in SIDES}
+        infos = {side: sims[side]._engine.info() for side in SIDES}
+        after = {side: len(infos[side]["recapture_log"]) for side in SIDES}
+        timed = {side: dict(captures=entries_after(infos[side]["recapture_log"], captures[side]),
+                            invalidations=entries_after(infos[side]["invalidations"], invalidated[side]),
+                            block_edges=list(sides[side].block_edges)) for side in SIDES}
         others = [pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()]
         valid, reasons = validity(captures, after, recompiled=recompiled, others=others)
         medians = {side: result.statistics[side].median_ms for side in SIDES}
         summary = summarise(medians, every=args.every)
         blocks = {side: result.statistics[side].block_ms for side in SIDES}
-        entry = dict(natoms=len(base), kinds=list(kinds), ab=result.as_dict(), **summary,
+        entry = dict(natoms=len(base), kinds=list(kinds), settle_steps=settled * args.every, ab=result.as_dict(),
+                     **summary,
                      pair_rate_ratios=[f / e for f, e in zip(blocks["fixed"], blocks["events"])],
                      events_timed=sides["events"].events - events_before, events_total=sides["events"].events,
                      setup_s=setup, compile_during_timing=dict(changes=changes, recompiled=recompiled),
                      sides={side: _side_record(sims[side]) for side in SIDES},
                      plans={side: sims[side].plan.describe() for side in SIDES},
-                     load_after=list(os.getloadavg()), other_gpu_processes=others, valid=valid,
+                     timed=timed, load_after=list(os.getloadavg()), other_gpu_processes=others, valid=valid,
                      invalid_reasons=reasons)
         meta["structures"][name] = entry
         print(name, " ".join(f"{s} {summary['ms_per_step'][s]:.4f} ms/step" for s in SIDES),

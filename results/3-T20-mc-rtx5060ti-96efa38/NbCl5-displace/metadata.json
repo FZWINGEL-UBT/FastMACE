@@ -1,0 +1,428 @@
+{
+  "schema_version": 1,
+  "status": "done",
+  "tool": "mc_cost",
+  "created_utc": "2026-10-22T11:19:11.556157+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": null,
+  "model": "mh1-r2scan",
+  "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "temperature_K": 1500.0,
+  "block": 20,
+  "rounds": 8,
+  "warmup": 300,
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/home/fzwin/.cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "sides": {
+    "md": {
+      "setup_s": 49.62602631798654,
+      "describe": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = Cl Nb  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1500 K  (rule 11 sizes the skin and headroom: skin 0.6 A, headroom 1.15 (fastest of 1944 atoms at 1500 K, lightest mass 35.45 u, 0.5 fs: 0.0125 A per step, 16 steps per rebuild; plus 2 x 0.1 A for displacement moves))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = displace  (MC moves are attached through Simulation.run(mc=...) (SPEC \u00a77.6))\n  workload.species_changes = off  (rule 8 is not in 1b: species-dependent rewrites are built for the structure's species)\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (1944 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  NeighbourConfig.skin = 0.6 A  (auto (rule_11_skin_from_workload): skin 0.6 A, headroom 1.15 (fastest of 1944 atoms at 1500 K, lightest mass 35.45 u, 0.5 fs: 0.0125 A per step, 16 steps per rebuild; plus 2 x 0.1 A for displacement moves))\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.15 from the skin, edge_bucket_fraction as given)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04); rule 11 expects at most 7 padded edge buckets inside the capacity)\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): pending the move-energy gate: the force precision float32 if it passes, float64 otherwise, while MD forces keep theirs (SPEC \u00a710.4, \u00a712.3, decision 35))\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32"
+    },
+    "energy_float32": {
+      "build_s": 2.610099909361452e-05,
+      "first_call_s": 3.9161405519989785,
+      "kept_bytes": 512,
+      "peak_bytes_during_setup": 394386432,
+      "info": {
+        "precision": "float32",
+        "force_precision": "float32",
+        "backend": "hybrid",
+        "copy": false,
+        "compile_mode": "default",
+        "captured": true,
+        "memory_bytes": 0,
+        "evaluations": 11
+      },
+      "energy_eV": -20564.311401605606
+    },
+    "energy_float64": {
+      "build_s": 10.512977075006347,
+      "first_call_s": 0.5323165269946912,
+      "kept_bytes": 263746048,
+      "peak_bytes_during_setup": 3871064064,
+      "info": {
+        "precision": "float64",
+        "force_precision": "float32",
+        "backend": "hybrid",
+        "copy": true,
+        "compile_mode": "none",
+        "captured": true,
+        "memory_bytes": 117431699,
+        "evaluations": 12
+      },
+      "energy_eV": -20564.31164718293
+    },
+    "swap_float32": {
+      "setup_s": 0.1361094899912132,
+      "evaluator": "energy_float32",
+      "info": {
+        "moves": [
+          {
+            "move": "swap",
+            "pairs": [
+              [
+                "Cl",
+                "Nb"
+              ]
+            ],
+            "every": 1,
+            "attempts": 1,
+            "velocities": "exchange"
+          }
+        ],
+        "seed": 1,
+        "velocities": [
+          "exchange"
+        ],
+        "evaluator": {
+          "precision": "float32",
+          "force_precision": "float32",
+          "backend": "hybrid",
+          "copy": false,
+          "compile_mode": "default",
+          "captured": true,
+          "memory_bytes": 0,
+          "evaluations": 12
+        },
+        "decisions": [],
+        "counters": {
+          "swap": {
+            "attempted": 0,
+            "impossible": 0,
+            "accepted": 0
+          }
+        },
+        "offsets": {
+          "proposal": 0,
+          "acceptance": 0,
+          "velocity": 0
+        },
+        "blocks": 0,
+        "last_block": null,
+        "displacements": {}
+      }
+    },
+    "swap_float64": {
+      "setup_s": 1.6422987029945944,
+      "evaluator": "energy_float64",
+      "info": {
+        "moves": [
+          {
+            "move": "swap",
+            "pairs": [
+              [
+                "Cl",
+                "Nb"
+              ]
+            ],
+            "every": 1,
+            "attempts": 1,
+            "velocities": "exchange"
+          }
+        ],
+        "seed": 1,
+        "velocities": [
+          "exchange"
+        ],
+        "evaluator": {
+          "precision": "float64",
+          "force_precision": "float32",
+          "backend": "hybrid",
+          "copy": true,
+          "compile_mode": "none",
+          "captured": true,
+          "memory_bytes": 117431699,
+          "evaluations": 13
+        },
+        "decisions": [],
+        "counters": {
+          "swap": {
+            "attempted": 0,
+            "impossible": 0,
+            "accepted": 0
+          }
+        },
+        "offsets": {
+          "proposal": 0,
+          "acceptance": 0,
+          "velocity": 0
+        },
+        "blocks": 0,
+        "last_block": null,
+        "displacements": {}
+      }
+    },
+    "displace_graph": {
+      "delta_A": 0.1
+    },
+    "displace_trial": {
+      "delta_A": 0.6
+    }
+  },
+  "structure": "NbCl5",
+  "natoms": 1944,
+  "copy_backend": "hybrid",
+  "copy_backend_errors": {},
+  "swap_pair": [
+    "Cl",
+    "Nb"
+  ],
+  "displace": {
+    "skin_A": 0.6,
+    "attempts_per_call": 10,
+    "trial_attempts_per_call": 1,
+    "max_displacement_A": 0.1
+  },
+  "timing": {
+    "md": {
+      "median_ms": 21.278257600351935,
+      "mean_ms": 21.287914418644505,
+      "min_ms": 21.249614800035488,
+      "max_ms": 21.339401549630566,
+      "stdev_ms": 0.03359381907577552,
+      "spread": 0.004219647646036237,
+      "block_ms": [
+        21.25496189983096,
+        21.339401549630566,
+        21.26468224960263,
+        21.249614800035488,
+        21.28198920036084,
+        21.27452600034303,
+        21.31968159956159,
+        21.318458049790934
+      ]
+    },
+    "energy_float32": {
+      "median_ms": 9.181066025121254,
+      "mean_ms": 9.18345435629817,
+      "min_ms": 9.162806650419952,
+      "max_ms": 9.21141379949404,
+      "stdev_ms": 0.01579102390491649,
+      "spread": 0.005294281616218414,
+      "block_ms": [
+        9.169026149902493,
+        9.162806650419952,
+        9.174023150262656,
+        9.180428750551073,
+        9.19472145033069,
+        9.181703299691435,
+        9.21141379949404,
+        9.193511599733029
+      ],
+      "over_md_per_round": [
+        0.43138285512407404,
+        0.4293844243527336,
+        0.43142065527144613,
+        0.43202800789291207,
+        0.4320423886962029,
+        0.43158203851608207,
+        0.43206150882119454,
+        0.43124655536816314
+      ],
+      "over_md_median": 0.43150134689376407
+    },
+    "energy_float64": {
+      "median_ms": 267.0800030002283,
+      "mean_ms": 267.082948537427,
+      "min_ms": 267.02599950003787,
+      "max_ms": 267.1561908493459,
+      "stdev_ms": 0.04646030846248789,
+      "spread": 0.0004874619883387345,
+      "block_ms": [
+        267.1561908493459,
+        267.0489871998143,
+        267.0394380998914,
+        267.02599950003787,
+        267.05581880014506,
+        267.10418720031157,
+        267.11960539978463,
+        267.1133612500853
+      ],
+      "over_md_per_round": [
+        12.569121135496863,
+        12.514361594383022,
+        12.557885180949814,
+        12.5661571756864,
+        12.548442548576102,
+        12.55511813499416,
+        12.52924928321995,
+        12.52967548713988
+      ],
+      "over_md_median": 12.55178034178513
+    },
+    "swap_float32": {
+      "median_ms": 9.793985050055198,
+      "mean_ms": 9.79750962515027,
+      "min_ms": 9.754548750061076,
+      "max_ms": 9.83768654987216,
+      "stdev_ms": 0.02994151944069256,
+      "spread": 0.008488659047995511,
+      "block_ms": [
+        9.754548750061076,
+        9.791380249953363,
+        9.764468500361545,
+        9.83768654987216,
+        9.785108000505716,
+        9.826561550289625,
+        9.823733550001634,
+        9.796589850157034
+      ],
+      "over_md_per_round": [
+        0.45893042744709195,
+        0.4588404331387107,
+        0.4591871341291268,
+        0.46295834736052394,
+        0.4597835243868936,
+        0.46189332491502666,
+        0.46078237632796754,
+        0.4595355736928219
+      ],
+      "over_md_median": 0.45965954903985773
+    },
+    "swap_float64": {
+      "median_ms": 267.67294714991294,
+      "mean_ms": 267.68335148753977,
+      "min_ms": 267.64479385019513,
+      "max_ms": 267.7607565499784,
+      "stdev_ms": 0.03834590820542662,
+      "spread": 0.00043322532597334676,
+      "block_ms": [
+        267.67222984999535,
+        267.64479385019513,
+        267.7080471999943,
+        267.66405579983257,
+        267.6457457499055,
+        267.67366444983054,
+        267.7607565499784,
+        267.69751845058636
+      ],
+      "over_md_per_round": [
+        12.593399654700116,
+        12.542282089200794,
+        12.589327414238554,
+        12.596183898796394,
+        12.576162088521663,
+        12.581886169661997,
+        12.559322487981458,
+        12.557076962384324
+      ],
+      "over_md_median": 12.579024129091831
+    },
+    "displace_graph": {
+      "median_ms": 101.60402674991929,
+      "mean_ms": 101.65760406243862,
+      "min_ms": 101.32737405001535,
+      "max_ms": 102.15270634944318,
+      "stdev_ms": 0.2831148155857933,
+      "spread": 0.008123027460902118,
+      "block_ms": [
+        101.4726415000041,
+        101.32737405001535,
+        101.388463100011,
+        101.68094149994431,
+        101.52711199989426,
+        102.15270634944318,
+        101.81041995019768,
+        101.9011740499991
+      ],
+      "over_md_per_round": [
+        4.774068378866918,
+        4.748369995960339,
+        4.767927491693681,
+        4.785072221627965,
+        4.770564961952562,
+        4.801644292699921,
+        4.775419345488315,
+        4.7799504922917455
+      ],
+      "over_md_median": 4.774743862177616,
+      "per_attempt_ms": 10.160402674991929,
+      "per_attempt_over_md": 0.4775016294014543,
+      "trial_rebuild_fraction": 0.0
+    },
+    "displace_trial": {
+      "median_ms": 30.173401350111817,
+      "mean_ms": 30.243245112524164,
+      "min_ms": 28.616434700234095,
+      "max_ms": 32.212748500023736,
+      "stdev_ms": 1.0210587062174876,
+      "spread": 0.11918821342216077,
+      "block_ms": [
+        30.750000199623173,
+        29.709868800273398,
+        30.37251030036714,
+        32.212748500023736,
+        29.974292399856495,
+        29.903479250060627,
+        28.616434700234095,
+        30.40662674975465
+      ],
+      "over_md_per_round": [
+        1.4467210218743194,
+        1.392254076627924,
+        1.4283077425685355,
+        1.5159215262560872,
+        1.4084347152731511,
+        1.4056002587121548,
+        1.3422543186959486,
+        1.4263051614116549
+      ],
+      "over_md_median": 1.417369938342403,
+      "per_attempt_ms": 30.173401350111817,
+      "per_attempt_over_md": 1.418039104367867,
+      "trial_rebuild_fraction": 1.0
+    },
+    "graph_attempt_ms": 10.160402674991929,
+    "trial_rebuild_ms": 30.173401350111817
+  },
+  "energies_after_md": {
+    "md_eV": -20520.237806081772,
+    "energy_float32": -20520.237805843353,
+    "energy_float64": -20520.238110751226
+  },
+  "swap_blocks": {
+    "swap_float32": {
+      "step": 461,
+      "moves": [
+        {
+          "move": "swap",
+          "attempts": 50,
+          "attempted": 50,
+          "impossible": 0,
+          "accepted": 0
+        }
+      ],
+      "baseline_eV": -20519.845003843307,
+      "energy_eV": -20519.845003843307,
+      "accepted": 0,
+      "device_ms": 490.03448486328125,
+      "temperature_K": 1500.0,
+      "md_step_ms": 21.278257600351935,
+      "per_attempt_ms": 9.800689697265625
+    },
+    "swap_float64": {
+      "step": 462,
+      "moves": [
+        {
+          "move": "swap",
+          "attempts": 50,
+          "attempted": 50,
+          "impossible": 0,
+          "accepted": 0
+        }
+      ],
+      "baseline_eV": -20519.44830424893,
+      "energy_eV": -20519.44830424893,
+      "accepted": 0,
+      "device_ms": 13383.3701171875,
+      "temperature_K": 1500.0,
+      "md_step_ms": 21.278257600351935,
+      "per_attempt_ms": 267.66740234375
+    }
+  }
+}
