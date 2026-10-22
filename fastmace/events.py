@@ -224,11 +224,16 @@ def check_against(engine: Any, fresh: Any) -> list[str]:
         if name not in constants or name not in expected or not _same(constants[name], expected[name]):
             out.append(f"integrator.{name}")
     covered = {_storage(tensor) for tensor in engine.registry.tensors().values()}
+    # The neighbour list is compared as its compacted edges above; its candidates, reference positions and
+    # build workspaces (the GPU pair search's) depend on the build history, not on the committed state.
+    inside = {id(tensor) for one in lists if one is not None for _, tensor in reachable_tensors(one).values()}
     for root in ("force_field", "integrator"):
         got = dict(reachable_tensors(getattr(engine, root), root).values())
         want = dict(reachable_tensors(getattr(fresh, root), root).values())
         for path in sorted(set(got) | set(want)):
             if path in got and _storage(got[path]) in covered:
+                continue
+            if id(got.get(path)) in inside or id(want.get(path)) in inside:
                 continue
             if path not in got or path not in want or not _same(got[path], want[path]):
                 out.append(path)
