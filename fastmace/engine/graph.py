@@ -751,6 +751,9 @@ class GraphEngine(Engine):
         sqrt_kT = getattr(self.integrator, "sqrt_kT", None)
         if isinstance(sqrt_kT, torch.Tensor):
             named.setdefault("integrator.sqrt_kT", sqrt_kT)
+        externalstress = getattr(self.integrator, "externalstress", None)  # the pressure target (3b-T05)
+        if isinstance(externalstress, torch.Tensor):
+            named.setdefault("integrator.externalstress", externalstress)
         named.update({f"force_field.{name}": tensor for name, tensor in self.force_field.buffers().items()})
         named.update({"engine.rebuild_needed": self.rebuild_needed, "engine.flags": self._flags,
                       "engine.pipe_flags": self._pipe_flags, "engine.spec_flags": self._spec_flags,

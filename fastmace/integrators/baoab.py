@@ -26,6 +26,7 @@ from ase import units
 from ase.stress import voigt_6_to_full_3x3_stress
 
 from fastmace.config import IntegratorConfig
+from fastmace.config import external_stress as stress_components
 from fastmace.neighbors.skin import det_3x3, times_3x3
 
 from .base import Integrator
@@ -136,6 +137,10 @@ class LangevinBAOAB(Integrator):
         self.p_eps = state.p_eps
         self.force_eps = state.force_eps
         self.externalstress = torch.tensor(external_stress(externalstress, self.hydrostatic), **f64)
+        self.externalstress_host = self.externalstress.detach().cpu().numpy().copy()
+        # The target of the step in flight: stage A copies the filled target here and stage B reads it, so
+        # a pipelined B(n), launched after the host filled step n+1's target, still uses step n's.
+        self.externalstress_step = self.externalstress.clone()
         self.eye = torch.eye(3, **f64)
 
         self._friction_constants()
@@ -190,6 +195,50 @@ class LangevinBAOAB(Integrator):
         self.temperature_K = float(temperature_K)
         self.sqrt_kT.fill_(math.sqrt(units.kB * temperature_K))
 
+    def set_pressure(self, pressure_GPa: float) -> None:
+        """Fill a hydrostatic pressure target (GPa) for the next step: ``set_external_stress(-pressure_GPa)``.
+
+        A device fill between steps (SPEC §10.1). The new target enters at the next step's cell-force
+        update, so that step's first barostat half kick still uses the previous target: a half-step
+        lag, as in ASE when ``externalstress`` is replaced between steps (``set_externalstress``).
+        """
+        if isinstance(pressure_GPa, bool) or not isinstance(pressure_GPa, (int, float)):
+            raise ValueError(f"pressure_GPa must be a number of GPa, got {pressure_GPa!r}")
+        self.set_external_stress(-pressure_GPa)
+
+    def set_external_stress(self, stress_GPa: Any) -> None:
+        """Fill the external stress target in GPa, ASE sign (``IntegratorConfig.external_stress_GPa``'s forms).
+
+        A scalar, or for the full cell also six Voigt components (xx, yy, zz, yz, xz, xy). Same arithmetic
+        as the config's target, so a run filled to P equals one configured with P bit for bit.
+        """
+        stress = stress_components(stress_GPa, "external_stress_GPa")
+        if stress is None:
+            raise ValueError("external_stress_GPa must be a number or six Voigt components, got None")
+        if self.hydrostatic and not isinstance(stress, float):
+            raise ValueError(f"a hydrostatic cell takes a scalar external stress, got {stress_GPa!r}")
+        self.set_externalstress(np.asarray(stress) * units.GPa)
+
+    def set_externalstress(self, externalstress: Any) -> None:
+        """Fill the target in ASE units (the constructor's ``externalstress`` forms; restarts store this).
+
+        A ``copy_`` into the tensor the half steps read (SPEC §10.1): captured graphs see the new target
+        without a recapture. The next step's stage A copies it into ``externalstress_step``, which its
+        cell-force update (stage B) reads: the end of the next step, as replacing ``externalstress``
+        between ASE's steps does. That step's first barostat half kick still uses the cell force of the
+        previous target. Outside a step (a restart, the engine's start) both take the value at once.
+        """
+        value = np.asarray(external_stress(externalstress, self.hydrostatic), dtype=np.float64)
+        if not np.all(np.isfinite(value)):
+            raise ValueError(f"externalstress must be finite, got {externalstress!r}")
+        self.externalstress.copy_(torch.from_numpy(value))
+        self.externalstress_host = value.copy()
+
+    def restore_externalstress(self, externalstress: Any) -> None:
+        """A restart's target: the filled target and the step's copy both (no step is in flight)."""
+        self.set_externalstress(externalstress)
+        self.externalstress_step.copy_(self.externalstress)
+
     def prepare_step(self, state: SimulationState) -> None:
         rng = state.rng
         if rng.cursor == self.noise_batch:
@@ -205,6 +254,7 @@ class LangevinBAOAB(Integrator):
 
     def start(self, state: SimulationState) -> None:
         """LangevinBAOAB.__init__: the cell force of the starting forces and stress."""
+        self.externalstress_step.copy_(self.externalstress)
         self._update_force_eps(state)
 
     def _kinetic_tensor(self, state):
@@ -219,11 +269,11 @@ class LangevinBAOAB(Integrator):
             ke2 = (state.masses * state.velocities ** 2).sum()  # 2 KE
             tr_virial = -volume * torch.diagonal(state.stress).sum()
             X = (ke2 + tr_virial) / (3.0 * volume)
-            self.force_eps.copy_(3.0 * volume * (X + self.externalstress) + (3.0 / self.Ndof) * ke2)
+            self.force_eps.copy_(3.0 * volume * (X + self.externalstress_step) + (3.0 / self.Ndof) * ke2)
         else:
             kinetic = self._kinetic_tensor(state)
             X = (kinetic - volume * state.stress) / volume
-            self.force_eps.copy_(volume * (X + self.externalstress)
+            self.force_eps.copy_(volume * (X + self.externalstress_step)
                                  + torch.diagonal(kinetic).sum() / self.Ndof * self.eye)
 
     def _barostat_a(self, state):
@@ -243,6 +293,7 @@ class LangevinBAOAB(Integrator):
     def first_half(self, state: SimulationState) -> None:
         dt = self.dt
         x, v, masses = state.positions, state.velocities, state.masses
+        self.externalstress_step.copy_(self.externalstress)    # this step's pressure target
         self.p_eps.add_(0.5 * dt * self.force_eps)             # barostat B
         v.add_(0.5 * dt * state.forces / masses)               # B
         self._barostat_a(state)                                # barostat A
@@ -278,7 +329,7 @@ class LangevinBAOAB(Integrator):
 
     def buffers(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
         return dict(positions=state.positions, velocities=state.velocities, cell=state.cell, p_eps=self.p_eps,
-                    force_eps=self.force_eps, xi=self.xi, zeta=self.zeta)
+                    force_eps=self.force_eps, xi=self.xi, zeta=self.zeta, externalstress_step=self.externalstress_step)
 
     def output_values(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
         values = base_output_values(state)

@@ -156,8 +156,12 @@ def _mc_checked(record: Any) -> dict[str, Any]:
 
 
 def _integrator_json(integrator: Any) -> str:
-    return _json({"class": type(integrator).__name__, "config": dataclasses.asdict(integrator.config),
-                  "temperature_K": getattr(integrator, "temperature_K", None)}, "integrator")
+    record = {"class": type(integrator).__name__, "config": dataclasses.asdict(integrator.config),
+              "temperature_K": getattr(integrator, "temperature_K", None)}
+    stress = getattr(integrator, "externalstress_host", None)
+    if stress is not None:  # the current pressure target in ASE units (3b-T05), exact
+        record["externalstress"] = np.asarray(stress).tolist()
+    return _json(record, "integrator")
 
 
 def state_arrays(state: SimulationState, engine: str, integrator_state: Mapping[str, Any] | None = None,
@@ -355,8 +359,22 @@ def physical_record(restart: Mapping[str, Any]) -> dict[str, Any] | None:
 
 
 def integrator_record(restart: Mapping[str, Any]) -> dict[str, Any] | None:
-    """The integrator's class, ``IntegratorConfig`` fields and thermostat target, if stored."""
+    """The integrator's class, ``IntegratorConfig`` fields, thermostat target and (variable cell, since
+    3b-T05) the current ``externalstress`` in ASE units, if stored."""
     return _record(restart, "integrator")
+
+
+def restore_targets(restart: Mapping[str, Any], integrator: Any) -> None:
+    """Fill the integrator's targets with the restart's: temperature, and the pressure target if stored.
+
+    Files without ``externalstress`` (before 3b-T05) keep the configured target. The fills do not
+    touch the stored cell force, so the resumed run continues as the uninterrupted one.
+    """
+    record = integrator_record(restart) or {}
+    if record.get("temperature_K") is not None:
+        integrator.set_temperature(record["temperature_K"])
+    if record.get("externalstress") is not None:
+        integrator.restore_externalstress(record["externalstress"])
 
 
 def protocol_record(restart: Mapping[str, Any]) -> dict[str, Any] | None:

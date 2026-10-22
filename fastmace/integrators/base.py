@@ -58,6 +58,14 @@ class Integrator(abc.ABC):
         """
         raise NotImplementedError
 
+    def set_pressure(self, pressure_GPa: float) -> None:
+        """Fill the device pressure target (GPa) for the next step; variable-cell integrators only."""
+        raise NotImplementedError(f"{type(self).__name__} keeps a fixed cell: it has no pressure target")
+
+    def set_external_stress(self, stress_GPa: Any) -> None:
+        """Fill the device external stress target (GPa, ASE sign); variable-cell integrators only."""
+        raise NotImplementedError(f"{type(self).__name__} keeps a fixed cell: it has no external stress target")
+
     @abc.abstractmethod
     def prepare_step(self, state: SimulationState) -> None:
         """Host-side work before the step's graphs: copy the next noise row into the step buffers.

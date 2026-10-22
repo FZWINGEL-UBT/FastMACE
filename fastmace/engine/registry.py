@@ -106,6 +106,9 @@ POLICIES = (
     *(_policy(f"integrator.{name}", "integrator", "derived") for name in (
         "x_old", "rnd_pos", "rnd_vel", "xi", "eta", "zeta")),
     _policy("integrator.sqrt_kT", "integrator", "derived", "Integrator.set_temperature"),
+    _policy("integrator.externalstress", "integrator", "derived", "Integrator.set_external_stress"),
+    # BAOAB's copy of the target for the step in flight: stage A writes it from the target above.
+    _policy("integrator.externalstress_step", "integrator", "derived", "LangevinBAOAB.restore_externalstress"),
     # Neighbour list: the copy of the current cell, then everything a rebuild makes.
     _policy("force_field.neighbours.cell", "neighbours", "derived", "ForceField.set_cell"),
     _policy("force_field.neighbours.*", "neighbours", "reset", "ForceField.rebuild"),
