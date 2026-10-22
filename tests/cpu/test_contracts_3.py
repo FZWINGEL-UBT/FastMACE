@@ -257,22 +257,25 @@ def test_configurational_mu_uses_ase_masses_by_default():
     assert configurational_mu({17: 0.0}, 500.0, reference=8) == {17: pytest.approx(expected)}
 
 
-def test_mc_driver_stub():
+def test_mc_driver_contract():  # filled by 3-T09
     from fastmace.mc import MCDriver, Swap
 
     assert _parameters(MCDriver) == ["moves", "seed", "config"]
     assert _keyword_only(MCDriver) == ["seed", "config"]
-    for name in ("attach", "run_block", "state_dict", "load_state_dict"):
+    for name in ("attach", "run_block", "state_dict", "load_state_dict", "due"):
         assert callable(getattr(MCDriver, name))
-    _raises_naming("3-T09", lambda: MCDriver((Swap([("Na", "Cl")], 10, 5),), seed=1))
+    assert _parameters(MCDriver.attach) == ["self", "engine", "evaluator"]
+    assert _keyword_only(MCDriver.attach) == ["evaluator"]
+    assert _parameters(MCDriver.run_block) == ["self", "engine", "step"]
+    driver = MCDriver((Swap([("Na", "Cl")], 10, 5),), seed=1)
+    assert driver.last_block is None and driver.offsets == dict.fromkeys(config.MC_STREAMS, 0)
 
 
-def test_attempt_stubs_name_their_task():
-    from fastmace.mc import Displace, Swap, Transmute, moves
+def test_attempt_contract():  # filled by 3-T09; displacements stay 3-T10's
+    from fastmace.mc import Displace, moves
 
-    assert _parameters(moves.build_attempt) == ["move", "engine", "evaluator", "streams"]
-    _raises_naming("3-T09", lambda: moves.build_attempt(Swap([("Na", "Cl")], 10, 5), None, None, None))
-    _raises_naming("3-T09", lambda: moves.build_attempt(Transmute(["Na", "K"], 10, 5), None, None, None))
+    assert _parameters(moves.build_attempt) == ["move", "engine", "evaluator", "streams", "fixcm"]
+    assert _keyword_only(moves.build_attempt) == ["fixcm"]
     _raises_naming("3-T10", lambda: moves.build_attempt(Displace(0.1, 10, 5), None, None, None))
 
 
