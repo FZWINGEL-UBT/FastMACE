@@ -36,6 +36,7 @@ run() {  # name command...
   note "end $name exit=$?"
 }
 tier() {  # name marker
+  export FASTMACE_RESULTS=$root/$1/results  # the tests' result records (tests/gpu/test_engine_gpu.py: report)
   run "$1" "$latest" -m pytest tests/gpu -m "$2" -p no:cacheprovider --basetemp="$cache/pytest-$1" -rfEs \
     --durations=60 --junitxml="$root/$1/junit.xml"
 }
@@ -81,6 +82,17 @@ case "$job" in
     done
     ;;
   acceptance-tier) tier acceptance-tier acceptance ;;
+  targeted)  # the 7 acceptance tests corrected at acceptance (208f09a, bdcc312); owner, 22 October 2026
+    export FASTMACE_RESULTS=$root/targeted/results
+    run targeted "$latest" -m pytest -p no:cacheprovider --basetemp="$cache/pytest-targeted" -rA --durations=20 \
+      --junitxml="$root/targeted/junit.xml" \
+      "tests/gpu/test_fallback_gpu.py::test_a_broken_capture_drops_the_graph_mode" \
+      "tests/gpu/test_fallback_gpu.py::test_a_capture_error_before_the_first_step_falls_back_to_compiled" \
+      "tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine" \
+      "tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine" \
+      "tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine" \
+      "tests/gpu/test_mc_statistics_gpu.py::test_mh1_kinetic_temperature_with_mc_on_and_off[fixcm]"
+    ;;
   slow-tier) tier slow-tier "slow and not acceptance" ;;
   protocol)  # item 9: the short swap-MC protocol end to end (3-T14's run.sh): start, then resume to the quench
     export FASTMACE_COMMIT=$FASTMACE_SOURCE_COMMIT
