@@ -76,6 +76,9 @@ COMMITTED_NAME = "committed.npz"  # the committed step's output values (Engine.s
 HEARTBEAT_NAME = "heartbeat"  # a fresh child's default: in its stage
 CHILD_NAME = "child-{:04d}"  # per child process under the hand-off directory: .log and .heartbeat
 SINKS_NAME = "sinks"
+# The host writes a child applies after its resume, by ``Simulation.set_<kind>``: positions and momenta
+# (owner decision D4), and species and masses (3-T03 events; the next hand-off restart holds them, 3-T08).
+HOST_WRITE_KINDS = ("positions", "momenta", "species", "masses")
 REQUEST_VERSION = 1
 POLL_S = 0.2  # how often the parent looks at the child
 LOG_TAIL_LINES = 30  # the child's message when it left no result
@@ -208,9 +211,11 @@ class SubprocessRunner:
         self._run_child(simulation, steps=steps, schedule=schedule, check="skip", gate=False)
 
     def host_write(self, simulation: Any, kind: str, values: Any) -> None:
-        """Queue a host write of positions or momenta; the next child applies it after its resume."""
+        """Queue a host write (``HOST_WRITE_KINDS``); the next child applies it after its resume."""
         from fastmace.simulation import HOST_WRITE_WARNING
 
+        if kind not in HOST_WRITE_KINDS:
+            raise ValueError(f"unknown host write {kind!r}; known: {HOST_WRITE_KINDS}")
         self._host_writes.append((kind, values))
         if HOST_WRITE_WARNING not in simulation._report.extra_warnings:
             simulation._report.add_warning(HOST_WRITE_WARNING)
@@ -917,12 +922,11 @@ def _child(directory, request, heartbeat, worker=None):
         sim._started = False  # the step-0 output belongs to the first run(), as in process
     for kind, name in request.get("host_writes", ()):
         values = np.load(directory / name, allow_pickle=False)
-        if kind == "positions":
-            sim.set_positions(values)
-        elif kind == "momenta":
-            sim.set_momenta(values)
-        else:
+        if kind not in HOST_WRITE_KINDS:
             raise ValueError(f"unknown host write {kind!r}")
+        if kind == "species":  # stored as float64 like every host write; atomic numbers are exact there
+            values = values.astype(np.int64)
+        getattr(sim, f"set_{kind}")(values)  # a composition change ends at a canonical point (3-T03)
     sinks = directory / SINKS_NAME
     written = set()
 

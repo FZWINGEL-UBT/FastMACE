@@ -96,11 +96,11 @@ def runner_plans(runner_plans_later):
     runner_plans_later()
 
 
-def _simulation(loaded, *, seed=11, output=None, runner=None, **options):
+def _simulation(loaded, *, seed=11, output=None, runner=None, atoms=None, **options):
     from fastmace.model.forcefield import ForceField
     from fastmace.simulation import Simulation
 
-    atoms = nacl(repeat=1, rattle=0.05, seed=3)
+    atoms = nacl(repeat=1, rattle=0.05, seed=3) if atoms is None else atoms
     return Simulation(atoms, ForceField(loaded, atoms, precision="float64"), integrator=LANGEVIN, output=output,
                       seed=seed, engine=CPU_ENGINE, runner=runner, **options)
 
@@ -243,6 +243,69 @@ def test_resume_through_the_runner_continues_bitwise(loaded, tmp_path, runner_pl
     _assert_same_state(_state(resumed), want)
     resumed.close()
     assert output_io.read_thermo(tmp_path / "parts") == output_io.read_thermo(tmp_path / "whole")
+
+
+def _swapped(atoms):
+    """The structure after an accepted Na <-> Cl swap of atoms 0 and 1, with the new species' masses."""
+    from ase.data import atomic_masses
+
+    atoms = atoms.copy()
+    numbers = atoms.numbers.copy()
+    numbers[[0, 1]] = numbers[[1, 0]]
+    atoms.numbers = numbers
+    atoms.set_masses(atomic_masses[numbers])
+    return atoms
+
+
+def test_a_child_resumes_the_composition_of_the_restart(loaded, tmp_path, runner_plans_later):
+    """A fresh child takes species and masses from the hand-off restart, not the initial structure (3-T08)."""
+    from fastmace.simulation import SIMULATION_NAME, Simulation
+
+    initial = nacl(repeat=1, rattle=0.05, seed=3)
+    current = _swapped(initial)
+    whole = _simulation(loaded, output=_output(tmp_path / "whole"), atoms=current)
+    whole.run(steps=5)
+    want = _state(whole)
+    whole.close()
+
+    first = _simulation(loaded, output=_output(tmp_path / "parts"), atoms=current)
+    first.run(steps=4)  # the restart file is from step 3
+    del first
+    record_path = tmp_path / "parts" / SIMULATION_NAME
+    record = json.loads(record_path.read_text())
+    record["structure"]["numbers"] = [int(z) for z in initial.numbers]
+    record["structure"]["masses"] = [float(m) for m in initial.get_masses()]
+    record_path.write_text(json.dumps(record))
+    runner_plans_later()
+    resumed = Simulation.resume(tmp_path / "parts", allow_plan_change=True)
+    assert resumed.plan.runner == "subprocess" and resumed.committed().step == 3
+    resumed.run(steps=2)
+    _assert_same_state(_state(resumed), want)
+    resumed.close()
+
+
+def test_a_species_host_write_reaches_the_next_child(loaded, tmp_path, runner_plans):
+    """A composition change through the runner: the next fresh child applies it after its resume, and
+    its hand-off restart holds the new species, which the child after it resumes (3-T08)."""
+    from fastmace.simulation import Simulation
+
+    initial = nacl(repeat=1, rattle=0.05, seed=3)
+    new_species = _swapped(initial).numbers
+    sim = _simulation(loaded, output=_output(tmp_path / "parts"), runner=RunnerConfig(persistent=False))
+    assert sim.plan.runner == "subprocess"
+    sim.run(steps=2)
+    try:
+        sim.set_species(new_species)
+    except NotImplementedError:
+        pytest.skip("Simulation.set_species: plan task 3-T03 (merged before 3-T08)")
+    sim.run(steps=2)
+    sim.save_restart(tmp_path / "saved")
+    resumed = Simulation.resume(tmp_path / "saved", allow_plan_change=True)
+    resumed.run(steps=1)
+    sim.run(steps=1)
+    _assert_same_state(_state(resumed), _state(sim))
+    sim.close()
+    resumed.close()
 
 
 def test_the_ase_shim_through_the_runner(loaded, tmp_path, monkeypatch, runner_plans_later):
