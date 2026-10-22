@@ -409,9 +409,10 @@ class Report:
             return f"pending (measured over steps {_number(first)}–{_number(last)} of this run)"
         speed = self.speed
         span = f"steps {_number(speed['first_step'])}–{_number(speed['last_step'])}"
+        md_only = "; MD only; MC blocks: see mc" if self.mc else ""  # the blocks' cost is the mc line's
         if speed["status"] == "measured":
-            return f"{_ms(speed['seconds_per_step'])}, measured over {span} of this run"
-        return f"{_ms(speed['seconds_per_step'])}, whole-run mean over {span}"
+            return f"{_ms(speed['seconds_per_step'])}, measured over {span} of this run{md_only}"
+        return f"{_ms(speed['seconds_per_step'])}, whole-run mean over {span}{md_only}"
 
     def _why(self):
         """Reasons the run is not on the plan of a complete installation, or was refused."""

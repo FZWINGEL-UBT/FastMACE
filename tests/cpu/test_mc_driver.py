@@ -17,6 +17,8 @@ engine:
 
 from __future__ import annotations
 
+import math
+
 import pytest
 import torch
 from test_canonical_restart import assert_same_registered_state, registered
@@ -466,3 +468,99 @@ def test_charge_inputs_refuse_an_odd_set_and_move_the_total_charge(omol_dir, mon
     torch.testing.assert_close(resumed._engine.force_field.derived_buffers()["total_charge"],
                                engine.force_field.derived_buffers()["total_charge"], rtol=0, atol=0)
     assert restart.mc_record(restart.read_restart(path)) == driver.state_dict()
+
+
+# --------------------------------------------------------------------------- review follow-ups (3-T09-followup)
+
+
+def test_a_second_attach_uses_new_graph_keys_and_drops_the_old_ones(loaded, monkeypatch):
+    """A re-attach builds new tensors; its captured attempts must not be the old graphs (which read the old
+    tensors). The keys carry a fresh id per attach, and the old keys are dropped."""
+    force(monkeypatch, True)
+    sim = simulation(loaded)
+    engine = sim._engine
+    dropped = []
+    original = engine.invalidate_graphs
+    monkeypatch.setattr(engine, "invalidate_graphs",
+                        lambda reason, keys=None: (dropped.append((reason, list(keys or ()))), original(reason, keys)))
+    driver = MCDriver([Swap([("Na", "Cl")], every=2, attempts=2)], seed=4)
+    driver.attach(engine)
+    sim.run(steps=2)
+    driver.run_block(engine, 2)
+    first = set(driver._replays)
+    driver.attach(engine)  # detach and attach again (run(mc=None), then run(mc=...))
+    sim.run(steps=2)
+    record = driver.run_block(engine, 4)
+    assert record["moves"][0]["attempted"] == 2
+    assert not first & set(driver._replays)
+    assert dropped and set(dropped[-1][1]) == first
+    keys = set(driver._replays)
+    driver.detach()  # run(mc=None): the driver's graphs go with it
+    assert set(dropped[-1][1]) == keys and driver._replays == {}
+
+
+def test_resume_refreshes_the_species_derived_buffers(loaded, monkeypatch):
+    """A captured attempt keeps the refresh list of its capture; the block's resume refreshes every buffer
+    that depends on species and charges, so a buffer registered later (a float64 evaluator's) follows."""
+    force(monkeypatch, True)
+    sim = simulation(loaded)
+    engine = sim._engine
+    driver = MCDriver([Swap([("Na", "Cl")], every=2, attempts=1)], seed=4)
+    driver.attach(engine)
+    calls = []
+    refresh = engine.derived.refresh
+    monkeypatch.setattr(engine.derived, "refresh", lambda changed: (calls.append(tuple(changed)), refresh(changed))[1])
+    sim.run(steps=2)
+    calls.clear()
+    driver.run_block(engine, 2)
+    resumed = [set(call) for call in calls[2:]]  # after the attempt's own two refreshes
+    assert any({"species", "charges"} <= call for call in resumed)
+
+
+def test_per_atom_charges_record_the_new_total(tmp_path_factory, monkeypatch):
+    """With per-atom charges in the state (a stub: the model's charge source aliased as state.charges), an
+    accepted transmutation with formal charges moves the charges and the device total; the host total follows."""
+    pytest.importorskip("cuequivariance_torch")
+    superset = (NA, MG, CL)
+    loaded = tiny_loaded(tmp_path_factory.mktemp("omol-q"), superset, family="omol", charge=0, spin_multiplicity=1)
+    sim = mc_simulation(loaded, structure(), superset, integrator=LANGEVIN)
+    engine = sim._engine
+    engine.state.charges = engine.force_field.charges  # the stub: per-atom charges the model reads
+    force(monkeypatch, True)
+    sim.run(steps=2)
+    driver = MCDriver([Transmute(["Na", "Mg"], every=2, attempts=1, formal_charges={"Na": 1, "Mg": 2})], seed=6)
+    driver.attach(engine)
+    driver.run_block(engine, 2)
+    atom = int(torch.nonzero(engine.state.species == MG)[0, 0])
+    assert float(engine.state.charges[atom]) == 1.0  # 0 + (q_Mg - q_Na), kept: they are the state's
+    assert float(engine.force_field.derived_buffers()["total_charge"].reshape(-1)[0]) == 1.0
+    assert engine.state.total_charge == 1
+
+
+def test_records_and_checks_refuse_the_same_species_twice():
+    with pytest.raises(ValueError, match="different species"):
+        Swap([("Na", 11)], every=1, attempts=1)
+    with pytest.raises(ValueError, match="different species"):
+        Transmute(["Na", 11], every=1, attempts=1)
+    Swap([("Na", 17)], every=1, attempts=1)
+    record = Transmute(["Na", "K"], every=1, attempts=1)
+    object.__setattr__(record, "species", ("Na", 11))  # a record built around the checks
+    with pytest.raises(PlanRefused) as raised:
+        check_mc_moves([record], superset=SUPERSET, charge_inputs=False, fixcm=True)
+    assert [reason.code for reason in raised.value.reasons] == ["mc-same-species"]
+
+
+def test_mc_uses_the_thermostats_boltzmann_constant(loaded):
+    from ase import units
+
+    from fastmace.mc import configurational_mu
+
+    sim = simulation(loaded)
+    driver = MCDriver([Swap([("Na", "Cl")], every=2, attempts=1)], seed=4)
+    driver.attach(sim._engine)
+    sim.run(steps=2)
+    driver.run_block(sim._engine, 2)
+    assert float(driver.streams.kT[0]) == units.kB * 600.0
+    assert float(sim._engine.integrator.sqrt_kT) ** 2 == pytest.approx(float(driver.streams.kT[0]), rel=1e-15)
+    out = configurational_mu({"Cl": 0.0}, 500.0, reference="Na", masses={"Na": 1.0, "Cl": 4.0})
+    assert out["Cl"] == pytest.approx(1.5 * units.kB * 500.0 * math.log(4.0), rel=1e-15)

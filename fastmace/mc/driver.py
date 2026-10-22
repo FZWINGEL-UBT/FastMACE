@@ -22,8 +22,6 @@ from fastmace.config import MC_STREAMS, MCConfig, mc_stream_seeds
 from fastmace.mc.moves import Displace, Swap, Transmute
 
 _IDS = itertools.count()
-# k_B in eV/K (ase.units.kB, CODATA 2018), as fastmace.mc.moves.
-K_B_EV_PER_K = 8.617333262e-5
 COUNTER_KEYS = ("attempted", "impossible", "accepted")
 
 
@@ -117,6 +115,10 @@ class MCDriver:
         charge_inputs = moves_module.charge_inputs(field)
         fixcm = bool(getattr(engine.integrator.config, "fixcm", False))
         self.decisions = check_mc_moves(self.moves, superset=superset, charge_inputs=charge_inputs, fixcm=fixcm)
+        # A new attach has new tensors: drop the graphs of an earlier attach (they read the old ones) and take a
+        # fresh id, so no key of this attach can find an old graph (3-T09 follow-up, review item 1).
+        self.detach()
+        self.id = next(_IDS)
         self.engine = engine
         self.evaluator = MCEvaluator(engine) if evaluator is None else evaluator
         self.streams = BlockStreams(self.seeds, state.positions.device)
@@ -135,6 +137,15 @@ class MCDriver:
         self._charges_at_attach = None if charges is None else charges.detach().clone()
         engine.state.mc = self.state_dict()
 
+    def detach(self) -> None:
+        """Drop this driver's captured attempts from its engine (``run(mc=None)``, or before a new attach).
+        Their keys carry this attach's id, so nothing replays them again; dropping frees their graphs."""
+        engine, keys = self.engine, list(self._replays)
+        if engine is not None and keys and hasattr(engine, "invalidate_graphs"):
+            engine.invalidate_graphs("MC driver detached: its attempts' graphs read its own tensors", keys=keys)
+        self._replays = {}
+        self.engine = None
+
     def due(self, step: int) -> tuple:
         """The moves due at ``step``: those whose ``every`` divides it (step > 0), in attached order."""
         if step <= 0:
@@ -147,6 +158,7 @@ class MCDriver:
         """One MC block at ``step`` (after its MD steps): the attempts of every due move and, after an
         acceptance, the resume. Returns the block record (``last_block``), or ``None`` when no move is due."""
         import torch
+        from ase import units
 
         if engine is not self.engine:
             raise ValueError("run_block needs the engine the driver is attached to (attach)")
@@ -160,7 +172,7 @@ class MCDriver:
             raise ValueError(f"an MC block needs a positive target temperature, got {temperature!r} K")
         before = engine.overflowed() if hasattr(engine, "overflowed") else 0
         streams = self.streams
-        streams.kT.fill_(K_B_EV_PER_K * temperature)
+        streams.kT.fill_(units.kB * temperature)  # the thermostat's constant (set_temperature)
         streams.baseline.copy_(self.evaluator.baseline().reshape(1))
         baseline = float(streams.baseline[0])  # one sync at the block start, after the quiesce
         cuda = state.positions.device.type == "cuda"
@@ -287,6 +299,9 @@ class MCDriver:
         from fastmace.mc import streams as mc_streams
 
         state = engine.state
+        # Every buffer derived from species and charges: a captured attempt refreshes the list of its capture,
+        # which misses buffers registered after it (a float64 evaluator added later; review item 2).
+        engine.derived.refresh(("species", "charges"))
         with torch.no_grad():
             for offset in redraw_all.values():
                 base = torch.tensor(offset, dtype=torch.int64, device=state.positions.device)
@@ -299,21 +314,23 @@ class MCDriver:
         engine.derived.refresh(("forces", "stress"))
 
     def _record_total_charge(self, engine: Any) -> None:
-        """A transmutation with formal charges moved the force field's device total charge through its per-atom
-        charges. Make that a host total, as a fresh construction from the committed state has it: the per-atom
-        charges as at attach, the total charge set (``set_total_charge``) and recorded in ``state.total_charge``."""
-        if not any(attempt.write_charges and attempt.charges is not None and engine.state.charges is None
-                   for attempt in self.attempts):
+        """A transmutation with formal charges moved the force field's device total charge through the per-atom
+        charges. Record the new total in ``state.total_charge`` (the restart's), as a fresh construction from the
+        committed state has it. Without per-atom charges in the state, the force field's own per-atom charges go
+        back to those at attach and the total becomes a host total (``set_total_charge``); with them, the
+        charges are the state's and stay (review item 3)."""
+        if not any(attempt.write_charges for attempt in self.attempts):
             return
-        field = engine.force_field
-        total = field.derived_buffers().get("total_charge")
+        field, state = engine.force_field, engine.state
+        total = getattr(field, "derived_buffers", dict)().get("total_charge")
         if total is None:
             return
         value = float(total.reshape(-1)[0])
-        field.charges.copy_(self._charges_at_attach)
-        field.set_total_charge(value)
-        engine.derived.refresh(("charges",))
-        engine.state.total_charge = round(value) if abs(value - round(value)) < 1e-9 else value
+        if state.charges is None:
+            field.charges.copy_(self._charges_at_attach)
+            field.set_total_charge(value)
+            engine.derived.refresh(("charges",))
+        state.total_charge = round(value) if abs(value - round(value)) < 1e-9 else value
 
     # ------------------------------------------------------------------ restart
 
