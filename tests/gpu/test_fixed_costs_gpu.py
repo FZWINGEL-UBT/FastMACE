@@ -59,8 +59,10 @@ sim.close()
 print(json.dumps(out))
 """
 
-CASES = {"default": {}, "overlap_rebuild": {"overlap_rebuild": True}, "step_graph": {"step_graph": True},
-         "both": {"overlap_rebuild": True, "step_graph": True}}
+# overlap_rebuild is on by default since OPT-DEF-2 (953aa72), after this test was written: "no_overlap" keeps the
+# path without it, and "default" now rebuilds beside the step.
+CASES = {"default": {}, "no_overlap": {"overlap_rebuild": False}, "overlap_rebuild": {"overlap_rebuild": True},
+         "step_graph": {"step_graph": True}, "both": {"overlap_rebuild": True, "step_graph": True}}
 
 
 def test_the_fixed_cost_options_are_bitwise_equal_to_the_default():
@@ -70,8 +72,8 @@ def test_the_fixed_cost_options_are_bitwise_equal_to_the_default():
     ENGINE.report("opt2-T04-fixed-costs-mh1-nacl", summary)
     default = runs["default"]
     assert default["pipelined"] and default["tier"] == "graph" and default["early_rebuilds"] > 0, summary
-    assert default["beside"] is None, summary
-    for name in ("overlap_rebuild", "both"):
+    assert runs["no_overlap"]["beside"] is None, summary
+    for name in ("default", "overlap_rebuild", "both"):
         assert runs[name]["beside"] == runs[name]["early_rebuilds"] > 0, summary
     for name in ("step_graph", "both"):
         graphs = runs[name]["graphs"]
