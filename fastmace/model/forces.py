@@ -526,16 +526,27 @@ class MACEForceField:
         self._column_of, self._group_of = column_of.to(device), group_of.to(device)
         self.atomic_numbers = torch.as_tensor(atoms.numbers, dtype=torch.int64).to(device)
         self.charges = torch.as_tensor(atoms.get_initial_charges(), dtype=torch.float64).to(device)
-        self._species_index = torch.zeros(n, dtype=torch.int64, device=device)  # scratch: node_attrs column
+        # The atoms' node_attrs columns, as every species refresh leaves them (a fresh construction equals a
+        # refreshed one in every tensor, 3-T03's registry check).
+        self._species_index = torch.index_select(self._column_of, 0, self.atomic_numbers)
         self._ones = torch.ones((n, 1), dtype=self.data["node_attrs"].dtype, device=device)
         self._sender_groups = torch.index_select(self._group_of, 0, self.atomic_numbers)
         # Total charge = its value at construction + the change of the summed per-atom charges, so
         # that it is exactly the given total until a charge changes.
-        self._charge_sum = torch.zeros(1, dtype=torch.float64, device=device)
-        torch.sum(self.charges, dim=0, keepdim=True, out=self._charge_sum)
-        self._charge_sum0 = self._charge_sum.clone()
-        self._charge_base = {name: self.data[name].detach().to(torch.float64).clone()
-                             for name in ("total_charge", "total_spin") if torch.is_tensor(self.data.get(name))}
+        # Total charge = offset + sum of the per-atom charges, offset = the given total - their sum at
+        # construction: a transmutation changes the per-atom charges only, and the total follows on the
+        # device. Integer charges keep it exact; a fresh construction has the same offset and scratch.
+        self._has_total = {name: torch.is_tensor(self.data.get(name)) for name in ("total_charge", "total_spin")}
+        self._charge_sum = torch.zeros(1, dtype=torch.float64, device=device)  # scratch: the total charge
+        self._charge_offset = torch.zeros(1, dtype=torch.float64, device=device)
+        self._spin_base = None
+        if self._has_total["total_charge"]:
+            self._charge_offset.copy_(self.data["total_charge"].detach().to(torch.float64).reshape(1))
+            self._charge_offset.sub_(self.charges.sum(dim=0, keepdim=True))
+            torch.sum(self.charges, dim=0, keepdim=True, out=self._charge_sum)
+            self._charge_sum.add_(self._charge_offset)
+        if self._has_total["total_spin"]:
+            self._spin_base = self.data["total_spin"].detach().clone()
         self._tables = []  # (FirstInteractionReassociation, its [S, C] table, its refresh)
 
     def _setup_tables(self):
@@ -610,12 +621,12 @@ class MACEForceField:
         import torch
 
         torch.sum(self.charges, dim=0, keepdim=True, out=self._charge_sum)
-        self._charge_sum.sub_(self._charge_sum0).add_(self._charge_base["total_charge"].reshape(1))
+        self._charge_sum.add_(self._charge_offset)
         self.data["total_charge"].copy_(self._charge_sum.reshape(self.data["total_charge"].shape))
 
     def _refresh_total_spin(self):
         # The spin multiplicity stays: a transmutation is allowed only with ΔZ − Δq even (SPEC §10.4).
-        self.data["total_spin"].copy_(self._charge_base["total_spin"].reshape(self.data["total_spin"].shape))
+        self.data["total_spin"].copy_(self._spin_base)
 
     def _derived(self):
         """(name, buffer, refresh, depends_on) of every derived buffer, dependencies first."""
@@ -624,11 +635,11 @@ class MACEForceField:
         out = [("node_attrs", self.data["node_attrs"], self._refresh_node_attrs, ("species",))]
         if energy64.NODE_E0_KEY in self.data:
             out.append(("node_e0", self.data[energy64.NODE_E0_KEY], self._refresh_node_e0, ("species",)))
-        if self.neighbours.sender_groups is not None:
-            out.append(("sender_groups", self._sender_groups, self._refresh_sender_groups, ("species",)))
-        if "total_charge" in self._charge_base:
+        # Registered whether or not this list sorts by sender group, so that it never goes stale.
+        out.append(("sender_groups", self._sender_groups, self._refresh_sender_groups, ("species",)))
+        if self._has_total["total_charge"]:
             out.append(("total_charge", self.data["total_charge"], self._refresh_total_charge, ("charges",)))
-        if "total_spin" in self._charge_base:
+        if self._has_total["total_spin"]:
             out.append(("total_spin", self.data["total_spin"], self._refresh_total_spin, ("charges",)))
         out += [(f"species_feats.interactions.{index}", table, refresh, ("charges",))
                 for index, _, table, refresh in self._tables]
@@ -662,7 +673,7 @@ class MACEForceField:
     def use_sources(self, species, charges=None):
         """Read the species ((N,) int64 atomic numbers) and per-atom charges ((N,) float64) from these
         device tensors from now on (aliases, not copies). Their values must be this force field's
-        current ones: the total-charge baseline is taken from ``charges`` here."""
+        current ones."""
         import torch
 
         if species.shape != self.atomic_numbers.shape or species.dtype != torch.int64:
@@ -675,19 +686,19 @@ class MACEForceField:
             if charges.shape != self.charges.shape:
                 raise ValueError(f"charges source must have shape {tuple(self.charges.shape)}, got "
                                  f"{tuple(charges.shape)}")
+            if not torch.equal(charges.to(self.charges), self.charges):
+                raise ValueError("the charges source differs from the force field's current charges")
             self.charges = charges
-            torch.sum(self.charges, dim=0, keepdim=True, out=self._charge_sum0)
 
     def set_total_charge(self, total_charge):
         """A host event's new total charge (3-T03's ``set_charges(total_charge=...)``): the device baseline
-        is set so that the next ``total_charge`` refresh gives exactly ``total_charge`` for the current
-        per-atom charges. Host side, between replays (it reads the charge sum); transmutations change
-        the per-atom charges only, and their refresh follows on the device."""
-        if "total_charge" not in self._charge_base:
+        offset is set so that the next ``total_charge`` refresh gives ``total_charge`` for the current
+        per-atom charges (exactly, for integer charges). Host side, between replays; transmutations
+        change the per-atom charges only, and their refresh follows on the device."""
+        if not self._has_total["total_charge"]:
             raise ValueError("this model takes no total charge")
-        self._charge_base["total_charge"].fill_(float(total_charge))
-        torch_sum = self.charges.sum(dim=0, keepdim=True)
-        self._charge_sum0.copy_(torch_sum)
+        self._charge_offset.fill_(float(total_charge))
+        self._charge_offset.sub_(self.charges.sum(dim=0, keepdim=True))
 
     # ------------------------------------------------------------------ graph level
 

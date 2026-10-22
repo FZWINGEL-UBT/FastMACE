@@ -302,3 +302,31 @@ def test_a_host_total_charge_change_sets_the_baseline():
     fresh = field(calc, atoms, GENERIC, charge=2, spin_multiplicity=1)
     for a, b in zip(outputs(ff, atoms), outputs(fresh, atoms)):
         assert torch.equal(a, b)
+
+
+@pytest.mark.parametrize("joint", [False, True])
+def test_every_force_field_tensor_equals_a_fresh_construction(joint):
+    """3-T03's registry check compares every tensor the force field holds, scratch buffers included."""
+    if joint:
+        calc, names, options = calculator("residual", embedding_specs=JOINT_SPECS), GENERIC, dict(spin_multiplicity=1)
+    else:
+        calc, names, options = calculator(), MH1_PACKAGE, {}
+    atoms = structure()
+    ff = field(calc, atoms, names, neighbours=UNSORTED, **({"charge": 0} if joint else {}), **options)
+    registry = DerivedStateRegistry()
+    ff.register_derived(registry)
+    target = mutated(atoms)
+    charges = np.zeros(len(atoms))
+    if joint:
+        charges[[2, 7]] = 1.0
+        target.set_initial_charges(charges)
+    ff.atomic_numbers.copy_(torch.as_tensor(target.numbers))
+    ff.charges.copy_(torch.as_tensor(charges))
+    refresh(registry, ["species", "charges"])
+    fresh = field(calc, target, names, neighbours=UNSORTED, **({"charge": 2} if joint else {}), **options)
+    outputs(ff, target)
+    outputs(fresh, target)
+    tensors = {name: value for name, value in vars(fresh).items() if torch.is_tensor(value)}
+    assert {"_species_index", "_sender_groups", "_charge_sum", "_charge_offset"} <= set(tensors)
+    for name, value in tensors.items():
+        assert torch.equal(vars(ff)[name], value), name
