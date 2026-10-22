@@ -16,7 +16,9 @@ export TORCHINDUCTOR_COMPILE_THREADS=4
 fastmace() {
     local log="$1"; shift
     mkdir -p "$(dirname "$log")"
-    { echo "=== $(date -u +%FT%TZ) fastmace $*"; git -C "$checkout" rev-parse HEAD; } >>"$log"
+    # An app worktree's .git names a Windows path that WSL's git cannot follow: the caller may pass the commit.
+    local commit="${FASTMACE_COMMIT:-$(git -C "$checkout" rev-parse HEAD 2>/dev/null || echo unknown)}"
+    echo "=== $(date -u +%FT%TZ) fastmace $* (FastMACE $commit)" >>"$log"
     "$python" -m fastmace.cli "$@" 2>&1 | tee -a "$log"
 }
 
