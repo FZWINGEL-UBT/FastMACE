@@ -1,9 +1,11 @@
 # Phase 3: dynamic topology and Monte Carlo
 
-Status: **planned**, 22 October 2026. The owner accepted the
+Status: **in progress**, 22 October 2026. The owner accepted the
 recommendations for D1–D6 the same day ("Accept the recommendations for
 D1-D6 and prestart all phase 3 workers"). They are SPEC §18 decisions 31–36,
-and all workers were prestarted. Spec: [SPEC.md](../SPEC.md)
+and all workers were prestarted. 3-T01 is merged (main 8dfd9f0). The
+binding answers to the prestart reports are in "Conductor answers to the
+prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
 - §8.1: overflow before commit, the re-capture policy, the energy-only graph;
 - §8.2: the compiled tier;
@@ -610,8 +612,9 @@ Tests first:
 GPU: capture of the attempt graph for MH-1 hybrid NaCl and NbCl5; swap
 attempt cost in float32 and float64 (acceptance item 2).
 
-Done when `Simulation.run(mc=Swap(...))` and `Transmute(...)` run captured,
-with T15 wiring the front ends.
+Done when `MCDriver` runs `Swap(...)` and `Transmute(...)` captured on a
+`Simulation`'s engine. T15 then wires `Simulation.run(mc=…)` and the other
+front ends (conductor answers below).
 
 #### 3-T10 Displacement moves (M, GPU: local, timing) — after T04, T05, T09
 
@@ -818,8 +821,10 @@ Wave 4   T20 benchmarks (T09 T10 T11)   T21 acceptance
 ```
 
 - **Workers:** at most five active, one GPU job per reservation.
-  1. Start order in wave 1: T02, T03 and T07 (the critical path), then T04,
-     T06 and T08, then T05.
+  1. Start order in wave 1 (conductor, 22 October 2026, after T01's merge):
+     T02, T03, T04, T06 and T08 first. T07 starts when T02 has merged,
+     because it edits `model/forces.py` after T02. T05 starts after T02's
+     sender-group part, and T17 after T06.
   2. T16a can start at once, since it doesn't depend on the library.
   3. T12 prepares from the start and runs after T09.
 - **Critical path:** T01 → T02 → T07 → T09 → T11 → T20 → T21. That is about
@@ -831,9 +836,11 @@ Wave 4   T20 benchmarks (T09 T10 T11)   T21 acceptance
   about 37 worker-days.
 - **Merge order of the shared files:**
   - `planner/minimal.py`: T02 (rule 8), T05 (rule 11), T06 (owner: modes,
-    rules 4 and 9), T09 (parity), T11 (MC energy precision);
+    rules 4 and 9), T09 (parity), T11 (MC energy precision), T17 (the
+    shared error text);
   - `engine/graph.py`: T04 (owner), T03, T07, T10;
-  - `simulation.py`: T03 (mutation API), T08 (restart), T15 (run path);
+  - `simulation.py`: T03 (mutation API), T08 (restart), T15 (run path), T11
+    (the move-energy gate call);
   - `model/forces.py`: T02 (owner), T07;
   - `neighbors/skin.py`: T02 (sender groups), T05 (owner), T10 (trial
     buffers);
@@ -866,6 +873,448 @@ Wave 4   T20 benchmarks (T09 T10 T11)   T21 acceptance
   phase 3 notes") was the `prepare()` defect fixed in 2-T21d, not physics.
   1 fs production rests on the October 1 fs checks of the research engine
   and on the fixed FastMACE path.
+
+## Conductor answers to the prestart reports (22 October 2026)
+
+These answers bind every phase 3 worker. When an answer adds a public name,
+the task that adds it also adds a row to `docs/design/contracts-3.md` and a
+pin to `tests/cpu/test_contracts_3.py`. 3-T01 is merged (main 8dfd9f0), and
+its ten "Decisions made in 3-T01" are accepted as written. The conductor's
+trial merge found one stale assertion in `tests/cpu/test_forces.py`, which is
+fixed on the branch.
+
+### Rules for every task
+
+- **At the go:** sync with main (`sync_with_base_branch`), read
+  `docs/design/contracts-3.md`, then write the tests first.
+- **Resources** as in "Resource rules" above.
+  - No workstation for any phase 3 task except 3-T18.
+  - Modal only through `tools/modal/fastmace_modal.py`, within the task's
+    budget below. The guard is merged.
+- **Refresh functions are capturable.** Every function registered in the
+  derived-state registry runs on the device, in place, at fixed addresses,
+  with no host sync and no allocation. That lets T09 replay it inside an
+  attempt graph. T02 and T03 each capture one in a fast-tier GPU test.
+- **Accepted changes end at a canonical point.** A host event, and an MC
+  block with at least one acceptance, end with
+  `GraphEngine.canonicalise(reevaluate=True)`. That call rebuilds and sorts
+  the neighbour list at the committed positions, evaluates forces and stress
+  once, and calls `integrator.start` (`force_eps`).
+  - "A fresh construction from the committed state" is then a plain
+    `Simulation` construction, with no special edge order.
+  - A rejected change restores the state bit for bit. Tests compare it with
+    the state before the event, with the event placed right after a canonical
+    point.
+- **The neighbour list in the CI registry check** is compared as the set of
+  compacted edges within the cutoff, not as candidates or reference positions
+  (T03's `check_against`; T10).
+
+### 3-T02 species superset
+
+1. Register through T01's `DerivedStateRegistry.register`, which works now.
+2. **The force field checks; the transaction applies.**
+   - The force field exposes `MACEForceField.check_species(numbers)`, which
+     raises `SpeciesNotInSuperset` before anything is written, and registers
+     its refresh functions.
+   - The force field has no `set_species`. T03's transaction checks, writes
+     the species buffer and calls `registry.refresh`.
+   - Your "host species change equals a fresh construction" test runs at
+     force-field level through the registry.
+3. **The reassociation table always comes from the identity basis, for all S
+   species.** Item 4 needs this: a fresh construction after a transmutation
+   must give the same rows.
+   - First check the default plan, CPU float64, bitwise against main.
+   - If it isn't bitwise, try the same kernel and shape as the forward's
+     `linear_up`.
+   - If it still isn't bitwise, stop and report the difference (maximum ulp,
+     and a 50-step CPU float64 trajectory). I decide then.
+4. Noted. The contracts page names the test, so the line numbers don't
+   matter.
+
+Also yours:
+- the total charge and spin as registered device buffers that depend on
+  `charges`, so that T09's transmutations update them inside the graph;
+- the superset cost measurement, as planned.
+
+### 3-T03 events and the derived-state registry
+
+1. Yes, as in "Accepted changes end at a canonical point".
+2. `set_masses` keeps momenta (ASE semantics): v' = v·m_old/m_new.
+3. Yes. Derived quantities follow the construction rules. With the default
+   barostat τ, `P_tau` and the barostat mass follow the new friction. An
+   explicit `barostat_tau_fs` stays.
+4. **Subprocess runner:**
+   - The persistent child gets the setters through the existing host-write
+     queue, as new kinds.
+   - The non-persistent child resumes from a restart and needs version 3.
+     T08 adds that path and its test.
+5. T04 provides `GraphEngine.invalidate_graphs(reason, keys=None)`, and you
+   call it.
+   - It drops the captured graphs (all of them, or the keys given) and logs
+     the reason. The next capture counts as a re-capture.
+   - You merge after T04 in `graph.py`.
+
+Also yours:
+- **`Simulation.update(*, species=None, masses=None, charges=None,
+  total_charge=None, friction_per_fs=None, positions=None, momenta=None)`.**
+  Any combination is one transaction with one force evaluation. The four
+  setters call it with one field. T13 needs it, because SPEC §7.7 applies an
+  observer's change as one event.
+- **`Committed` gains `species`, `masses` and `charges`**, in the subprocess
+  runner's `committed()` too.
+- **A state version for caches:**
+  - `GraphEngine.transactions_committed`, an int;
+  - `GraphEngine.state_version`, the pair `(state.step, transactions_committed)`.
+
+  T07 tags its energy cache with it. It is not restart state.
+
+### 3-T04 overflow before commit and the re-capture policy
+
+1. Option (a): one extra host sync after B, only in plans with a polar model
+   and a variable cell. That combination is rare, and the sync is recorded as
+   a plan decision. Moving the check into stage A can come later as an
+   optimisation.
+2. Yes. Redoing B from A's exact mid-step tensors with the same noise counts
+   as "redone from the state before it". Check this with the fused integrator
+   (the default) and in pipelined mode.
+3. **What counts against the budget:** a capture that replaces or adds a
+   variant of a key already captured. That covers a new edge bucket, and
+   captures after `invalidate_graphs` or a pool reset. The first capture of
+   each key is logged but not counted: `prepare`, T07's "E", T09's attempt
+   graph.
+4. Evict the least recently used variant and record it. Its later
+   re-capture counts. Never refuse at run time.
+5. Yes: you write `captured(key, fn)` as a thin public wrapper. T07 adds "E"
+   through the engine's internal path, since "E" is an engine key.
+
+Also yours:
+- `GraphEngine.uncommitted()`, a bool that is true while an unvalidated or
+  overflowed step is pending, for T08's write guard;
+- `invalidate_graphs`, above.
+
+### 3-T05 adaptive skin and headroom, rule 11
+
+1–2. **Rule 11 applies only to workloads with MC moves or declared species
+changes.**
+   - For MD-only workloads, `"auto"` stays 0.3 Å with fixed headroom, so
+     default plans don't change. The decision records what the rule would
+     have given.
+   - Your A/B passes explicit skins: 1500 K (NaCl, NbCl5), and the production
+     case at 1 fs and 1000 K.
+   - The rule must not slow down any measured case. If it does at one of the
+     design points, change the general rule (n*) and measure again.
+   - If the rule wins, I take it to the owner as a default candidate for
+     MD-only runs.
+3. **The fields:** T01 gave you the skin, headroom and budget fields. For
+   δ_max, add `Workload.max_displacement_A: float | None = None`.
+   - It is required when `"displace"` is in `mc_moves`.
+   - You are the only phase 3 editor of `planner/workload.py`.
+   - T10 refuses a `Displace` whose `delta_A` exceeds it.
+4. You resolve it, in `FixedPlanner._phase_3_fields` (merge order T01, T04,
+   T05, T11). Evaluation plans keep 0.3 Å.
+5. **The lightest mass** is the lightest of the structure's masses and the
+   superset species' standard masses. A lighter mass later needs no refusal
+   and no re-plan: the rebuild test keeps the run correct, and the skin only
+   sets the rebuild rate. The report shows the planned mass.
+6. The guard is merged, and the L4 job is approved within $2.
+
+### 3-T06 compiled MD tier
+
+1. **`mode` defaults to `None`** in `Simulation`, `fm.md` and the CLI: the
+   planner picks graph unless rule 4 or rule 9 says compiled.
+   - An explicit `mode="graph"` is a user override, so rule 9 (a preference)
+     doesn't apply to it.
+   - With inexact padding, an explicit `mode="graph"` raises `PlanRefused`
+     naming `mode="compiled"`, because rule 4 is hard.
+2. **The bitwise test:** use the same `compile_mode` on both sides.
+   - With `compile_mode="none"`, the two must be bitwise equal.
+   - With Inductor on both sides, test it too. If they differ only by
+     rounding, record it in `docs/validation/3-T06.md`, and I judge item 8 at
+     float64 rounding.
+3. **The rule 9 threshold** is a module constant (10) in `planner/minimal.py`,
+   cited in the decision.
+   - No front end sets `host_callbacks_every` today. T13 makes the
+     `fastmace.ase` observers set it (SPEC §7.7).
+   - Measure graph against compiled with host callbacks every 1, 5 and 10
+     steps, on NaCl and NbCl5, locally. If graph stays faster, I take an
+     amendment of rule 9 to the owner.
+4. If the report already prints the tier, the plan decision is enough.
+   Otherwise add one line to `report.py`; you are its first editor, before
+   T15 and T11.
+5. Record the mode. Keep the class name only where §8.7's schema expects it.
+
+### 3-T07 energy-only graph and the MC evaluator
+
+1. **The float64 copy's backend:** the plan's backend in float64, if it
+   exists and passes the gate; otherwise cuEq float64.
+   - It may run captured without `torch.compile` (eager-captured). That
+     avoids a second compiled backend in one process (§9.4 step 3).
+   - Record the backend, and report memory and time.
+2. Accept the grad-mode variant (one per edge bucket), and record it. If it
+   hits a limit, compile a separate copy.
+3. Use T03's `GraphEngine.state_version`.
+4. Yes: the evaluator also works uncaptured, in compiled and eager modes and
+   on the CPU, with the same results.
+5. Yes. Every evaluation that can overflow sets T04's flag, and no MC decision
+   uses a flagged evaluation. In practice only displacements and a variable
+   cell can set it.
+
+Also yours: create `tools/bench/mc_cost.py` with the energy-only rows. T09,
+T10 and T20 extend it, in that order.
+
+### 3-T08 restart v3
+
+1. Agreed: keep `species`, and add no `numbers` key.
+2. You add `SimulationState.mc` (`dict | None`, with the keys
+   `MC_RECORD_KEYS`). T09 and T10 fill it through `MCDriver.state_dict()` and
+   `load_state_dict()`.
+3. Yes: you are the second editor of `engine/subprocess.py` (order T03, T08,
+   T15). Your part is the restart hand-off, including the non-persistent
+   child after a composition change.
+4. **The write guard** refuses when either is true:
+   - `Simulation._mc_block_active`, which you add (default False) and T15's
+     block hook sets;
+   - T04's `GraphEngine.uncommitted()`.
+
+   Tests set both by monkeypatching.
+5. Yes. The final version uses T03's API; you merge after T03 in
+   `simulation.py`.
+
+### 3-T09 MC swaps and transmutations
+
+1. **Driver API only:** `MCDriver(...).attach(engine)` and
+   `run_block(engine, step)`, tested on a `Simulation`'s engine. T15 wires
+   `run(mc=…)` in `simulation.py`. You are done when the driver runs Swap and
+   Transmute captured on MH-1 hybrid, NaCl and NbCl5.
+2. **Accepted: counter-based Philox streams**, which match T01's (seed,
+   offset) record.
+   - Each attempt's numbers come from the stream seed and an offset: the
+     block's offset plus the attempt index times a fixed count.
+   - The attempt index is a device counter that advances only when an attempt
+     completes. T10's flagged attempts can stop it, and the host can resume.
+3. A block with an acceptance ends at a canonical point (see "Rules for every
+   task"). There is no "fresh construction with the committed edge order".
+4. Yes: the parity rule applies only to models or heads with charge or spin
+   inputs. For the others, record "parity: not applicable".
+5. Yes, ASE's standard masses for transmuted atoms. A swap exchanges the two
+   atoms' species, masses and charges.
+6. Yes, that is the meaning: an impossible attempt changes nothing and
+   consumes its fixed counts. The compute it costs is allowed.
+7. Use `tools/bench/mc_cost.py`, as its second editor after T07.
+
+Also yours:
+- **The stream layout** and how proposals decode, documented in
+  `contracts-3.md`.
+  - `fastmace.mc.streams` is importable by tests (T12).
+  - The layout is a restart compatibility promise.
+- **The momentum treatments** as named functions in `fastmace/mc/momenta.py`,
+  so that T12's negative control can monkeypatch one.
+- **A CPU test fixture:** the tiny model reporting charge and spin inputs,
+  for the parity refusal. T12 uses it too.
+- **Per-block device time** (CUDA events, read with the counters) for T15's
+  cost line.
+- **`MCDriver.last_block`:** the counters and baseline energy of the last
+  block.
+
+### 3-T10 displacement moves
+
+1. Yes, with T09's design above. Attempts after a flagged one stop the
+   attempt index; the host handles the flagged attempt and resumes. That is
+   one host read per block, plus one per flagged attempt.
+2. **Adaptive δ:** `adaptive=True` adapts δ at the end of each block of that
+   `run(mc=…)` call.
+   - The update is δ ← δ·clamp(acc/0.3, 0.5, 2), at most `delta_A` and at
+     most `Workload.max_displacement_A`.
+   - The user uses it for equilibration. The report marks those blocks and
+     gives the adapted δ, to pass as the sampling run's
+     `Displace(delta_A=…)`.
+   - Every value goes into the MC record.
+3. **No variable cell in phase 3.** Refuse displacements under a variable cell
+   with `PlanRefused`, code `displace-variable-cell`. Swaps and transmutations
+   under NPT stay (T09, and T03's `force_eps` test).
+4. Yes: a `trial_rebuilds` counter for each displacement move, beside
+   `MC_COUNTER_KEYS`. Overflow redos stay engine-wide, in
+   `counters.overflows_redone`.
+
+Also yours: at attach, refuse a `delta_A` larger than
+`Workload.max_displacement_A`.
+
+### 3-T11 move-energy gate
+
+1. You are a second editor of `simulation.py` after T15 (order T03, T08,
+   T15, T11) for:
+   - the gate call under `check="skip"`;
+   - passing the chosen precision to the evaluator.
+
+   You are also an editor of `report.py` after T15, for the gate and precision
+   items.
+2. In `PrecisionConfig.mc_energy` (T01's decision 2). You resolve it in the
+   planner.
+3. Yes: `status` stays `skipped`, and `move_energy.status` holds the result.
+4. An explicit `float32` that fails the gate raises `GateFailed` with the
+   measured error, like any explicit option. Only `"auto"` moves to float64.
+5. Use `Workload.max_displacement_A` (T05).
+6. **A swap pair with an absent species:**
+   - with Transmute declared, sample on a base where one atom is transmuted
+     into the absent species;
+   - without it, record "not sampleable", since that pair can never happen.
+7. The superset {Na, Nb, O, Cl} for all three structures (D3's superset), so
+   that absent species are measured.
+8. Yes, within your $3.
+
+### 3-T12 exact enumeration
+
+1. Call `MCDriver.run_block` repeatedly, with no MD between the blocks.
+2. Yes: T09 documents the layout, and `fastmace.mc.streams` is importable.
+   The coupling is accepted.
+3. **What to read:**
+   - the species from `Simulation.committed().species` (T03);
+   - the baseline from `MCDriver.last_block`.
+
+   Yes, `attempts=1` is valid.
+4. `fastmace/mc/momenta.py` (T09).
+5. T09's fixture.
+6. Yes.
+7. The default CPU tier gets at most 60 s for your file. Longer χ² runs are
+   marked `slow` or `acceptance`, checked by `tools/test_budget.py`.
+8. T11 measures it. Expect seconds on the tiny model.
+
+### 3-T13 ase observer events
+
+1. One event, through T03's `Simulation.update(...)`.
+2. **Apply what `atoms` reports after the callback:** `numbers`,
+   `get_masses()` and `get_initial_charges()`.
+   - ASE then decides whether masses follow numbers: implicit masses follow,
+     explicit masses stay.
+   - The shim writes back only values the engine changed.
+3. Momenta, as ASE stores them. Pass them to `update`.
+4. T03 adds the fields.
+
+Also yours: the shim declares `host_callbacks_every` as the shortest observer
+interval, in the `Workload` it builds (rule 9; SPEC §7.7).
+
+### 3-T14 swap-MC annealing protocol
+
+1. Yes: port the relaxation, the frame selection and the quench to
+   `fastmace/protocols/quench.py`.
+2. You add `fastmace run --resume RUN_DIR`, as the second editor of
+   `cli/run.py` after T15.
+3. **Where things go:**
+   - the protocol data and the CIF in `fastmace/protocols/data/`, shipped with
+     the package, with the CIF's source recorded;
+   - the CLI takes a protocol name or a path;
+   - the code in `fastmace/protocols/`.
+4. **Where it runs:**
+   - the full protocol locally;
+   - on the L4, a shortened profile with every stage, within $1;
+   - the full Ada run on a workstation when they're back, or else inside
+     T21's budget.
+5. Yes, as the research `select_frames` does.
+
+Frames with the current species are T15's (`io/trajectory.py`).
+
+### 3-T15 front ends
+
+1. Yes.
+2. Yes, plus the displacement move's `trial_rebuilds`.
+3. T11 adds those items after you.
+4. Use T09's per-block time.
+5. **The cycle position** is MC state and carries across `run` calls.
+   Detaching keeps it, and re-attaching resumes it, so blocks need no
+   alignment.
+
+Also yours:
+- `io/trajectory.py` writes each frame's current species;
+- the child runner forwards `mc=` (`engine/subprocess.py`, after T03 and
+  T08).
+
+### 3-T16 ResearchModule main.py
+
+1. Yes: `--timestep-fs auto` gives 0.5 fs when the structure contains H, and
+   1 fs otherwise. The choice is recorded.
+2. Keep `--fastmace-api` for one phase, with `simulation` as its only choice.
+   `adapter` is refused with a message naming `--engine gpu`.
+3. Yes. I tag ResearchModule main before your merge
+   (`research-adapter-last-20261022`). No adapter run is known to be
+   unfinished.
+4. It is merged (d35496f).
+5. Write results to the Modal volume and fetch them with `modal volume get`
+   to WSL's disk. The quench runs locally.
+6. Yes.
+7. Yes.
+8. Approved under the guard, at most $0.50.
+
+### 3-T17 fallback innermost error
+
+1. The outer type plus the innermost message, on one line of at most about
+   300 characters.
+2. Yes: one shared helper, which `minimal.py`'s `_error_text` also calls. You
+   are that file's last editor, after T11.
+3. Yes, a new file.
+
+### 3-T18 coraline soft-lock check
+
+1. Yes, both runs.
+2. Yes.
+
+It runs only after the owner says the workstations are back and coraline is
+idle.
+
+### 3-T20 phase 3 benchmarks
+
+1. Judge the host path: `Simulation.update` swapping two atoms' species, one
+   event every 100 steps. Add the captured path as a second row only if T09
+   has one.
+2. Yes, plus the canonical rebuild.
+3. Yes, add a {Na, Nb, O, Cl} row.
+4. Yes.
+5. For item 2, use `tools/bench/mc_cost.py`; you are its last editor. For
+   item 1, write your own `tools/bench/event_speed.py`.
+6. One L4 job for items 1–3, within $2. T21 reuses your L4 tables where the
+   code hasn't changed.
+
+### 3-T21 phase 3 acceptance
+
+1. **The baseline:** B is main 156ab76, just before the 3-T01 merge, tagged
+   `phase-3-baseline`.
+   - The only plan differences allowed are the new phase 3 fields and their
+     decisions, which resolve to today's values. The T02 table is allowed
+     too, if I accept it under T02's answer 3.
+   - Trajectories are bitwise on CPU float64 and in reproducible mode.
+2. Yes, long reservations with the PC kept quiet. I pause other GPU work.
+3. Up to $4. Reuse T14's and T20's L4 results where `git diff` shows the
+   measured paths unchanged.
+4. Collect them at the freeze, as you proposed.
+5. Yes.
+6. Yes.
+7. Rerun locally at the freeze. Cite the L4 tables where the paths are
+   unchanged, and rerun them otherwise.
+
+### Merge orders added by these answers
+
+| File | Editors, in merge order |
+| --- | --- |
+| `simulation.py` | T03, T08, T15, T11 |
+| `report.py` | T06 (one line, if needed), T15, T11 |
+| `engine/subprocess.py` | T03, T08, T15 |
+| `planner/minimal.py` | T02, T05, T06, T09, T11, T17 |
+| `planner/workload.py` | T05 |
+| `io/trajectory.py` | T15 |
+| `tools/bench/mc_cost.py` | T07, T09, T10, T20 |
+
+### Modal budgets
+
+| Task | Budget |
+| --- | --- |
+| T05 | $2 |
+| T11 | $3 |
+| T14 | $1 |
+| T16 | $0.50 |
+| T20 | $2 |
+| T21 | $4 |
+
+That is at most $12.50. This month $3.65 is metered so far (22 October), so
+the total stays inside the $27 limit.
 
 ## Checkpoints for the owner
 
