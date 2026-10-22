@@ -124,13 +124,13 @@ def main(argv=None):
     save()
     try:
         planner = MinimalPlanner(engine=config.EngineConfig(backend=args.backend))
+        hardware = planner.hardware()  # sets the allocator before the first CUDA allocation
         loaded = loading.load_pristine(args.model, checkpoint=str(checkpoint), sha256=meta["checkpoint_sha256"])
         name, base = ab_step_time.read_structure(args.structure, None)
         meta.update(structure=name, natoms=len(base))
         force_field = ForceField(loaded, base, precision=precision)
         integrator = config.IntegratorConfig(seed=args.seed, temperature_K=args.temperature_K)
-        plan = planner.plan(force_field, base, integrator, Workload(max_temperature_K=args.temperature_K),
-                            planner.hardware())
+        plan = planner.plan(force_field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
         started = time.perf_counter()
         engine = planner.build(plan, force_field, base.copy(), temperature_K=args.temperature_K)
         md = ab_step_time.FastMACESide(engine, torch)
