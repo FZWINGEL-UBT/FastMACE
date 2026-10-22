@@ -432,7 +432,7 @@ def test_mode_defaults_to_none():  # §9.3: the planner picks graph, or compiled
     assert minimal.RULE_9_HOST_CALLBACKS == 10
 
 
-def test_graph_engine_energy_and_captured_stubs():  # §8.1 energy-only graph (3-T07), captured (3-T04)
+def test_graph_engine_energy_and_captured_names():  # §8.1 energy-only graph (3-T07), captured (3-T04)
     pytest.importorskip("torch")
     from fastmace.engine.graph import ENERGY_KEY, ENGINE_KEYS, GraphEngine
 
@@ -441,8 +441,26 @@ def test_graph_engine_energy_and_captured_stubs():  # §8.1 energy-only graph (3
     assert _parameters(GraphEngine.energy) == ["self", "precision"]
     assert _keyword_only(GraphEngine.energy) == ["precision"]
     assert _parameters(GraphEngine.captured) == ["self", "key", "fn"]
-    stub = object.__new__(GraphEngine)
-    _raises_naming("3-T07", lambda: stub.energy())
+    assert _parameters(GraphEngine.add_energy_field) == ["self", "field"]  # the float64 MC copy (3-T07)
+    assert isinstance(GraphEngine.energy_fields, property)
+    assert _parameters(GraphEngine.energy_stage) == ["self", "precision"]
+    assert _keyword_only(GraphEngine.energy_stage) == ["precision"]
+
+
+def test_mc_evaluator_names():  # §10.4 evaluation, baseline energy, energy precision (3-T07)
+    pytest.importorskip("torch")
+    from fastmace.mc import evaluator
+    from fastmace.model.forces import MACEForceField
+
+    assert evaluator.PRECISIONS == ("float32", "float64")
+    assert _parameters(evaluator.MCEvaluator.__init__) == ["self", "engine", "precision", "model", "copy", "polar"]
+    assert _keyword_only(evaluator.MCEvaluator.__init__) == ["model", "copy", "polar"]
+    for name in ("evaluate", "stage", "baseline", "current", "accept", "reject", "tag", "info"):
+        assert callable(getattr(evaluator.MCEvaluator, name))
+    assert _parameters(evaluator.float64_copy) == ["force_field", "model", "neighbours", "polar", "check"]
+    assert _parameters(evaluator.float64_model) == ["force_field", "plan", "backend"]
+    assert _parameters(MACEForceField.energy_only) == ["self", "positions"]
+    assert _parameters(MACEForceField.follow) == ["self", "leader"]
 
 
 def test_graph_engine_overflow_and_recapture_names():  # §8.1 overflow before commit, re-capture policy (3-T04)

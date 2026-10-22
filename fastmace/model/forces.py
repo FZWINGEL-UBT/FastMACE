@@ -268,6 +268,8 @@ class MACEForceField:
         first = next(source.parameters())
         self._dtype, self._device = first.dtype, first.device
         self._compute_stress = bool(compute_stress)
+        # The force field an MC energy copy follows (``follow``) and that copy's shift buffers.
+        self._leader = self._unit_shifts = self._shifts64 = self._shifts = None
         # CUDA-graph edge padding relies on far edges contributing exactly zero (the engine checks).
         self._padding_exact = padding_is_exact(source)
         self.backend = loaded.backend if loaded is not None else _backend(source, calc)
@@ -710,7 +712,8 @@ class MACEForceField:
         call binds its own counter and table before the model runs; a captured graph keeps the
         address it was captured with. Nothing outside the force field ever rebinds.
         """
-        count = self.neighbours.count
+        # A copy that follows another force field (``follow``) reads that force field's edges and count.
+        count = (self.neighbours if self._leader is None else self._leader.neighbours).count
         for module in self._streaming:
             if module._buffers.get("streaming_count") is not count:
                 module.register_buffer("streaming_count", count, persistent=False)
@@ -740,6 +743,83 @@ class MACEForceField:
         # MACE's stress path replaces "positions" and "shifts" in the dict it gets (strained
         # copies); a shallow copy keeps ours bound to the buffers.
         return self._model_call(dict(self.data), training=self.training, compute_force=True, compute_stress=True)
+
+    def energy_only(self, positions):
+        """The float64 energy [1] at float64 ``positions`` on the current edges: a forward pass only (SPEC §8.1).
+
+        Under ``torch.no_grad()``, with forces, stress and ``training`` off, so no autograd graph is
+        built and the output holds no ``grad_fn``. Calling the force path with forces switched off
+        while the positions require gradients would run AOTAutograd's joint graph, keep activations
+        nobody reads and leave ``grad_fn`` references that break later captures (the failure noted
+        in the research engine's ``polar_gpu._Call``). A compiled model compiles this call as its
+        own variant (grad mode and ``training`` are guarded). The sum is the same float64 sum as the
+        force path's (SPEC §7.3). A copy that follows another force field (``follow``) first reads
+        that force field's compacted edges and cell.
+        """
+        import contextlib
+
+        import torch
+
+        from fastmace.rewrites import engine as engine_rewrites
+
+        self._bind_streaming_count()
+        # A copy in another precision runs under its own default dtype: MACE (and the capture-safe
+        # mask_head) make tensors in torch's process-wide default dtype, which the force field it
+        # follows set when its model was loaded (host side only; captured graphs do not read it).
+        scope = (engine_rewrites._default_dtype(self._dtype)
+                 if self._leader is not None and torch.get_default_dtype() != self._dtype else contextlib.nullcontext())
+        with torch.no_grad(), scope:
+            if self._leader is not None:
+                self._read_leader()
+            self.positions.copy_(positions)
+            out = self._model_call(self.data, training=False, compute_force=False, compute_stress=False)
+            energy = out["energy"]
+            return energy if energy.dtype == torch.float64 else energy.to(torch.float64)
+
+    # ------------------------------------------------------------------ a copy in another precision (3-T07)
+
+    def follow(self, leader):
+        """Evaluate on ``leader``'s compacted edges and cell from now on: the MC energy copy in another
+        precision (SPEC §10.4 "Energy precision"; ``fastmace.mc.evaluator.float64_copy``).
+
+        ``leader`` is the engine's force field, of the same structure and superset. This copy then reads
+        the leader's edge index as a view, rebuilds the image shifts in its own precision from the
+        leader's integer unit shifts and float64 cell (exactly as a force field of this precision
+        computes them), and shares the leader's species, charge and total-charge sources, so the
+        derived-state refreshes of both force fields follow one transaction. Its own neighbour list
+        is not used again. ``use_edges`` takes the leader's padded edge count.
+        """
+        import torch
+
+        if self._compute_stress != leader.compute_stress:
+            raise ValueError("the copy and the force field it follows must both be variable-cell or both fixed-cell")
+        if tuple(self.superset) != tuple(leader.superset) or len(self.numbers) != len(leader.numbers):
+            raise ValueError(f"the copy has species {_symbols(self.superset)} and {len(self.numbers)} atoms, the "
+                             f"force field it follows {_symbols(leader.superset)} and {len(leader.numbers)}: build it "
+                             "from the same structure and superset")
+        if self.is_polar != leader.is_polar or self.data["node_attrs"].shape != leader.data["node_attrs"].shape:
+            raise ValueError("the copy and the force field it follows must be the same model (species columns "
+                             f"{tuple(self.data['node_attrs'].shape)} and {tuple(leader.data['node_attrs'].shape)})")
+        self.use_sources(leader.atomic_numbers, leader.charges)
+        self._charge_offset = leader._charge_offset  # a host total-charge event reaches both
+        self._leader = leader
+        if not self._compute_stress:
+            self._leader_cell = torch.as_tensor(leader.neighbours.cell, dtype=torch.float64).to(self._device)
+        self.use_edges(int(leader.data["edge_index"].shape[1]))
+
+    def _read_leader(self):
+        """Copy the leader's unit shifts and cell into this copy's fixed-address inputs (capturable)."""
+        import torch
+
+        leader = self._leader.neighbours
+        self._unit_shifts.copy_(leader.unit_shifts)
+        if self._compute_stress:
+            self.set_cell(leader.cell_t)
+            cell = leader.cell_t
+        else:
+            cell = self._leader_cell
+        torch.matmul(self._unit_shifts.to(torch.float64), cell, out=self._shifts64)
+        self._shifts.copy_(self._shifts64)
 
     def set_cell(self, cell):
         """compute_stress: the current float64 cell for the neighbour list and the model inputs; graph safe."""
@@ -776,8 +856,24 @@ class MACEForceField:
         return self.neighbours.build(positions)
 
     def use_edges(self, num_edges):
-        """Let the model read the first ``num_edges`` compacted edges (views, no copy)."""
-        self.data["edge_index"], self.data["shifts"], self.data["unit_shifts"] = self.neighbours.edges(num_edges)
+        """Let the model read the first ``num_edges`` compacted edges (views, no copy).
+
+        A copy that follows another force field (``follow``) reads that force field's edge index and
+        its own shift buffers, sized to that force field's capacity (moved when it grows).
+        """
+        if self._leader is not None:
+            import torch
+
+            leader = self._leader.neighbours
+            capacity = leader.capacity
+            if self._unit_shifts is None or self._unit_shifts.shape[0] != capacity:
+                self._unit_shifts = torch.zeros((capacity, 3), dtype=leader.unit_shifts.dtype, device=self._device)
+                self._shifts64 = torch.zeros((capacity, 3), dtype=torch.float64, device=self._device)
+                self._shifts = torch.zeros((capacity, 3), dtype=self._dtype, device=self._device)
+            self.data["edge_index"] = leader.edge_index[:, :num_edges]
+            self.data["shifts"], self.data["unit_shifts"] = self._shifts[:num_edges], self._unit_shifts[:num_edges]
+        else:
+            self.data["edge_index"], self.data["shifts"], self.data["unit_shifts"] = self.neighbours.edges(num_edges)
         if self.dynamic_edges:
             from fastmace.model import compile as compiling
 
@@ -931,4 +1027,5 @@ class MACEForceField:
             "spin_multiplicity": self.spin_multiplicity, "dynamo_reset": self.dynamo_reset,
             "polar": None if state is None else state.info(), "float64_energy": self.float64_energy,
             "energy_treatment": self.energy_treatment, "strain_path": self.strain_path,
+            "follows": None if self._leader is None else str(self._leader.dtype).removeprefix("torch."),
         }
