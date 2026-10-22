@@ -12,8 +12,10 @@ and its review fixes (f582186), 3-T15 (22c1e73), 3-T14 (7b26cc8), 3-T04b (53fbbf
 (f2f2258); in ResearchModule 3-T16a (90a1e7b1). Owner checkpoints 2b and 2c were
 decided the same day (SPEC decisions 37 and 38). 3-T06b (397da85) and 3-T22c
 (3c3e871) are merged, and so is 3-T22c's ResearchModule part (21165421, `main.py
---fixcm-projection`). 3-T14 is merged too (266b641; item 9 end to end on both GPUs),
-and 3-T16b started. 3-T11 started with 3-T09, because its gate
+--fixcm-projection`). 3-T14 (266b641; item 9 end to end on both GPUs), 3-T02's GPU
+results (5a202d2) and 3-T20 (c3bf93f; items 1–3 pass) are merged too. **Freeze for
+3-T21:** main c3bf93f, whose `fastmace/` equals cd43463. 3-T16b (ResearchModule) and 3-T18
+(coraline, when the workstations are back) don't block acceptance. 3-T11 started with 3-T09, because its gate
 needs T07's evaluator and T03's transactions, not T09's driver. The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
