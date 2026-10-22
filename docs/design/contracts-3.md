@@ -113,7 +113,7 @@ Notes on the records:
 
 ## Restart version 3 (`io/restart.py`; owner T08)
 
-The writer stays at `FORMAT_VERSION = 2` until T08 switches it to `NEXT_FORMAT_VERSION = 3`. Version 2 files keep loading.
+Since 3-T08 the writer is at `FORMAT_VERSION = NEXT_FORMAT_VERSION = 3`. Version 0, 1 and 2 files keep loading.
 - **`COMPOSITION_KEYS`**: `species`, `masses`, `charges` and `physical` (total charge, spin).
   - These are already written. In version 3 they are the resumed state; today resume rebuilds the `Atoms` from the initial structure.
 - **`V3_KEYS = ("mc",)`**: one JSON record, present when a move set is attached. Its keys (`MC_RECORD_KEYS`):
