@@ -143,9 +143,10 @@ def torch_device_type(device: str) -> str:
 
 
 def _error_text(error) -> str:
-    text = getattr(error, "what", None) or (str(error).splitlines() or [""])[0]
+    from fastmace.planner.fallback import error_text
+
     why = getattr(error, "why", None)
-    return f"{type(error).__name__}: {text}" + (f" ({why})" if why else "")
+    return error_text(error, getattr(error, "what", None) or None) + (f" ({why})" if why else "")
 
 
 def _cuda_initialised() -> bool:
