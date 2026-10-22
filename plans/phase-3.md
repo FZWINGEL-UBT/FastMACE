@@ -1385,6 +1385,20 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   - The transmutation χ² is GPU and acceptance tier only. The 60 s CPU tier
     rests on replaying each decision exactly. The thresholds fixed in advance
     stay (conductor).
+- **3-T09:**
+  - An attempt costs about 0.55 ms more than its energy evaluation, roughly
+    19 % of a NaCl MD step. Most of it is the kernel launches of the
+    plain-PyTorch Philox. A fused kernel is a possible follow-up.
+  - Swap attempt cost as a fraction of one MD step, MH-1 hybrid, RTX 5060 Ti,
+    1500 K: NaCl 0.61 (float32) and 11.8 (float64); NbCl5 0.47 and 12.7.
+  - The planner never fills `state.total_charge` at construction.
+  - The first block's `device_ms` includes the captures; 3-T15's cost line
+    leaves it out.
+  - The swap and transmutation paths were reviewed in the trial merges only
+    through their tests.
+- **3-T07:** `test_mc_evaluator.py::test_a_force_evaluation_after_energy_only_is_unaffected[omol]`
+  fails intermittently under `-n 4` load (forces not bitwise). It passes
+  alone, and 3-T07 investigates on a follow-up branch.
 - **3-T16a (ResearchModule):**
   - An NbCl5 anneal at 1 fs on the L4 takes about 192 min, more than the 3 h
     job limit, so it needs an A100 and a measured step time.
