@@ -272,6 +272,15 @@ class FusedIntegrator:
             neighbours.edge_index, neighbours.unit_shifts, neighbours.shifts, neighbours.count, self.largest,
             self.thresholds, engine.rebuild_needed, engine._flags, engine._pipe_flags, capacity,
             PIPELINED=pipelined, BLOCK=BLOCK, enable_fp_fusion=False)
+        d3_needs_rebuild = getattr(engine.force_field, "d3_needs_rebuild", None)
+        if d3_needs_rebuild is not None:  # the D3 list's own test, OR-ed into the flags the kernels wrote (3b-T04)
+            flag = d3_needs_rebuild(state.positions)
+            engine.rebuild_needed.logical_or_(flag)
+            engine._flags[0].copy_(engine.rebuild_needed)
+            if pipelined:
+                engine._pipe_flags[0].copy_(engine.rebuild_needed)
+                early = d3_needs_rebuild(state.positions, engine.config.pipeline_rebuild_fraction)
+                engine._pipe_flags[2].copy_(engine._pipe_flags[2].bool() | early)
 
 
 __all__ = ["BLOCK", "FusedIntegrator", "applicable"]

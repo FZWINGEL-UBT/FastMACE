@@ -155,7 +155,9 @@ class D3Kernel:
 
         The image table holds integer image vectors, in an integer or float dtype (3b-T02's
         ``D3PairList.shifts`` is float64). Unused slots have ``i = j = N`` (any image index).
-        Capturable: sorts and searches, no host synchronisation, shapes fixed by P and M.
+        Capturable: sorts and searches, no host synchronisation, shapes fixed by P and M. Returns True when
+        a buffer address changed (a new P, or another image table tensor): captured graphs are then stale.
+        With the shapes of the last call the buffers are refilled in place.
         """
         n = self.n_atoms
         pair_i = torch.as_tensor(pair_i, device=self.device).to(torch.int64).reshape(-1)
@@ -171,16 +173,37 @@ class D3Kernel:
         pair_j = torch.cat([pair_j, sentinel])
         image_index = torch.cat([image_index, image_index.new_zeros(1)])
         order = torch.argsort(pair_i, stable=True)
-        self.pair_i = pair_i[order].to(torch.int32).contiguous()
-        self.pair_j = pair_j[order].to(torch.int32).contiguous()
-        self.image_index = image_index[order].contiguous()
-        self.image_table = image_table.contiguous()
-        by_j = torch.argsort(self.pair_j.to(torch.int64), stable=True)
+        sorted_i = pair_i[order].to(torch.int32).contiguous()
+        sorted_j = pair_j[order].to(torch.int32).contiguous()
+        by_j = torch.argsort(sorted_j.to(torch.int64), stable=True)
         atoms = torch.arange(n + 1, device=self.device, dtype=torch.int32)
-        self.row = torch.searchsorted(self.pair_i, atoms).to(torch.int32).contiguous()
-        self.by_j = by_j.to(torch.int32).contiguous()
-        self.col = torch.searchsorted(self.pair_j[by_j], atoms).to(torch.int32).contiguous()
+        fresh = {"pair_i": sorted_i, "pair_j": sorted_j, "image_index": image_index[order].contiguous(),
+                 "row": torch.searchsorted(sorted_i, atoms).to(torch.int32).contiguous(),
+                 "by_j": by_j.to(torch.int32).contiguous(),
+                 "col": torch.searchsorted(sorted_j[by_j], atoms).to(torch.int32).contiguous()}
+        # Same shapes as the last prepare: copy in place, so captured graphs that read these addresses stay
+        # valid after a list rebuild (3b-T04); new shapes (a grown list) move them.
+        moved = False
+        for name, tensor in fresh.items():
+            old = getattr(self, name, None)
+            if old is not None and old.shape == tensor.shape and old.dtype == tensor.dtype:
+                old.copy_(tensor)
+            else:
+                setattr(self, name, tensor)
+                moved = True
+        table = image_table.contiguous()
+        old = getattr(self, "image_table", None)
+        if old is None or (old.data_ptr(), old.shape, old.dtype) != (table.data_ptr(), table.shape, table.dtype):
+            moved = True
+        self.image_table = table
         self._prepared = True
+        return moved
+
+    def buffers(self):
+        """The prepared list's device buffers by name (the runtime-state registry and trial saves, 3b-T04)."""
+        if not self._prepared:
+            return {}
+        return {name: getattr(self, name) for name in ("pair_i", "pair_j", "image_index", "row", "by_j", "col")}
 
     # ----------------------------------------------------------------------------- evaluation
     def evaluate(self, positions, cell, *, virial: bool = True) -> d3.DispersionResult:

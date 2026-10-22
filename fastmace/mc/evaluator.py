@@ -87,6 +87,11 @@ def float64_copy(force_field, model, *, neighbours=None, polar=None, check=True)
         atomic_energies=force_field.atomic_energies, species=force_field.superset)
     if copy.dtype != torch.float64:
         raise ValueError(f"the MC energy copy needs a float64 model; this one is {precision_of(copy.dtype)}")
+    if getattr(force_field, "dispersion", None) is not None:
+        # D3 (3b-T04): the copy follows the MACE force field and adds a float64 D3 kernel on its D3 list.
+        from fastmace.model.dispersed import DispersedForceField
+
+        return DispersedForceField.following(copy, force_field)
     copy.follow(force_field)
     return copy
 

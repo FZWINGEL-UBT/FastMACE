@@ -499,15 +499,19 @@ class MinimalPlanner:
         ``mode`` (default ``None``) is the execution mode; without one the planner picks the graph tier,
         or the compiled tier where rule 4 (inexact padding) says so; host callbacks keep the graph tier
         (rule 9, decision 38).
-        ``d3_cutoff_A``: the largest D3 cutoff when the force field has D3 (rules 11 and 12 size its list, 3b-T02).
+        ``d3_cutoff_A``: the largest D3 cutoff (rules 11 and 12 size its list, 3b-T02); default, with D3 on
+        the force field, the larger of its record's pair and CN cutoffs. The plan carries the record
+        (``Plan.dispersion``; 3b-T04).
         ``variable_cell`` (default: the integrator's) says whether the run changes the cell. Raises
         ``PlanRefused`` (``SpeciesNotInSuperset``) with every reason, ``ModelElementError``, or
         ``ProcessConstraintError``; nothing is loaded onto the GPU or compiled. A reproducible plan that
         runs here prepares the process (``planner.reproducible.prepare_process``).
         """
-        from fastmace.model.forcefield import refuse_until_integrated
+        record = getattr(force_field, "dispersion", None)
+        if record is not None and d3_cutoff_A is None:
+            from fastmace.longrange.d3_term import cutoff_A
 
-        refuse_until_integrated(force_field)  # D3 until 3b-T04
+            d3_cutoff_A = cutoff_A(record)
         superset = force_field.superset_for(atoms)
         if (workload.reproducible and str(self.engine.device).startswith("cuda") and not _cuda_initialised()
                 and getattr(self.process, "reproducible", None) is not False):
@@ -521,7 +525,7 @@ class MinimalPlanner:
                                 d3_cutoff_A=d3_cutoff_A)
         if workload.reproducible and plan.runner == "in-process":  # the CPU device, or already done above
             reproducible_mode.prepare_process(self.process, owner=f"a reproducible {plan.engine.backend} MD plan")
-        return plan
+        return _with_dispersion(plan, record)
 
     def plan_traits(self, traits, atoms, integrator: IntegratorConfig, workload, hardware: Hardware, *,
                     precision: str, rewrites: Any = "auto", species=None, loaded=None,
@@ -819,14 +823,12 @@ class MinimalPlanner:
     def plan_evaluation(self, force_field, atoms, hardware: Hardware | None = None, *,
                         allow_naive_cueq: bool = False) -> Plan:
         """The one-off evaluation plan (``fm.ForceField.evaluate``, ``fm.calc``): compiled, with stress, no workload."""
-        from fastmace.model.forcefield import refuse_until_integrated
-
-        refuse_until_integrated(force_field)  # D3 until 3b-T04
         superset = force_field.superset_for(atoms)
-        return self.plan_evaluation_traits(force_field.traits, atoms, hardware or self.hardware(),
+        plan = self.plan_evaluation_traits(force_field.traits, atoms, hardware or self.hardware(),
                                            precision=force_field.precision, rewrites=force_field.rewrites,
                                            species=superset, loaded=force_field.model,
                                            allow_naive_cueq=allow_naive_cueq)
+        return _with_dispersion(plan, getattr(force_field, "dispersion", None))
 
     def plan_evaluation_traits(self, traits, atoms, hardware: Hardware, *, precision: str, rewrites: Any = "auto",
                                species=None, loaded=None, allow_naive_cueq: bool = False) -> Plan:
@@ -1007,7 +1009,8 @@ class MinimalPlanner:
         return True, f"a trial evaluation on {plan.engine.device} ran"
 
     def build_evaluation(self, plan: Plan, force_field, atoms, *, compile_cache=None, check: bool = True):
-        """The ``MACEForceField`` of an evaluation ``plan`` (``evaluate`` path, with stress, no graphs)."""
+        """The ``MACEForceField`` of an evaluation ``plan`` (``evaluate`` path, with stress, no graphs); with D3, a
+        ``DispersedForceField`` around it (3b-T04)."""
         from fastmace.model.forces import MACEForceField
         from fastmace.rewrites import registry as reg
 
@@ -1019,10 +1022,23 @@ class MinimalPlanner:
         inner.configure_process(plan.engine)
         registry = self.registry or reg.default_registry()
         resolution = inner.rewrite_resolution(plan, model.model, registry)
-        return MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,
-                              polar=plan.polar or PolarConfig(), compute_stress=True, compile_cache=compile_cache,
-                              registry=registry, check=check, float64_energy=plan.precision.float64_energy,
-                              species=plan.superset or None)
+        field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,
+                               polar=plan.polar or PolarConfig(), compute_stress=True, compile_cache=compile_cache,
+                               registry=registry, check=check, float64_energy=plan.precision.float64_energy,
+                               species=plan.superset or None)
+        return fixed._with_d3(field, plan, atoms)
+
+
+def _with_dispersion(plan, record):
+    """``plan`` carrying the force field's D3 record (3b-T04), with its decision; unchanged without D3."""
+    if record is None:
+        return plan
+    from fastmace.longrange import d3
+
+    decisions = plan.decisions + (("dispersion", d3.describe(record), Reason(
+        "the force field's D3 record: MACE plus D3 in the force graph, its own half list; results are "
+        "non-stock (SPEC §11.2, §12.1)", code="d3"),),)
+    return dataclasses.replace(plan, dispersion=record, decisions=decisions)
 
 
 __all__ = ("MODES", "MinimalPlanner", "SoftwareTraits", "default_planner", "detect_software", "species_numbers")

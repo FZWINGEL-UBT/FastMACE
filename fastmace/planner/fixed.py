@@ -868,6 +868,7 @@ class FixedPlanner:
                                polar=plan.polar or PolarConfig(), compute_stress=npt, compile_cache=compile_cache,
                                registry=registry, check=check, float64_energy=plan.precision.float64_energy,
                                species=plan.superset or None)
+        field = _with_d3(field, plan, atoms)
         state = SimulationState.from_atoms(atoms, field.device, plan.integrator.seed, compute_stress=npt)
         if npt:
             integrator = LangevinBAOAB(state, plan.integrator, temperature_K=temperature_K,
@@ -881,6 +882,15 @@ class FixedPlanner:
                                   constraints=constraints, dynamic_edges=True)
         return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
                            capture=capture)
+
+
+def _with_d3(field, plan: Plan, atoms):
+    """``field`` with the plan's D3 term (``fastmace.model.dispersed``, 3b-T04); ``field`` itself without D3."""
+    if plan.dispersion is None:
+        return field
+    from fastmace.model import dispersed
+
+    return dispersed.wrap(field, plan.dispersion, atoms, skin=float(plan.neighbours.d3_skin))
 
 
 def auto_options_off(plan: Plan) -> dict[str, str]:

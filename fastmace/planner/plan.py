@@ -136,7 +136,10 @@ class Plan:
       record: the child resumes the plan in its own process;
     - ``selfchecks``: the per-record self-checks (``SelfCheck``) of the built plan, in application
       order; ``()`` before the build (``MinimalPlanner.build`` fills them, 2-T04). Not in the
-      restart record: a resume runs them again.
+      restart record: a resume runs them again;
+    - ``dispersion``: the force field's complete ``fm.D3`` record, or ``None`` without D3 (3b-T04). The
+      build puts the D3 term into the force field (``fastmace.model.dispersed``); its list's skin is
+      ``neighbours.d3_skin``.
     """
 
     tier: str
@@ -161,6 +164,7 @@ class Plan:
     step: int | None = None
     runner: Literal["in-process", "subprocess"] = "in-process"
     selfchecks: tuple[SelfCheck, ...] = ()
+    dispersion: Any = None
 
     def __post_init__(self):
         if self.runner not in RUNNERS:
@@ -201,6 +205,10 @@ class Plan:
             lines.append("  requested: " + ", ".join(f"{item}={value}" for item, value in self.requested))
         if self.allowances:
             lines.append("  allowed: " + ", ".join(self.allowances))
+        if self.dispersion is not None:
+            from fastmace.longrange import d3
+
+            lines.append(f"  dispersion: {d3.describe(self.dispersion)}, non-stock (SPEC §12.1)")
         if self.runner != "in-process":
             lines.append(f"  runner: {self.runner} (SPEC §8.7)")
         if self.selfchecks:
@@ -256,6 +264,8 @@ class Plan:
             "allowances": list(self.allowances),
             "fallbacks": [dataclasses.asdict(tried) for tried in self.fallbacks],
         }
+        if self.dispersion is not None:  # absent without D3, so D3-free records are unchanged
+            record["dispersion"] = dataclasses.asdict(self.dispersion)
         return record
 
     @classmethod
@@ -308,7 +318,17 @@ class Plan:
             predecessor=predecessor,
             reason=record["reason"],
             step=record["step"],
+            dispersion=_dispersion(record.get("dispersion")),
         )
+
+
+def _dispersion(values):
+    """The ``fm.D3`` of a restart record's ``dispersion`` entry, or ``None``."""
+    if values is None:
+        return None
+    from fastmace.longrange.d3 import D3
+
+    return D3(**values)
 
 
 def _json_safe(value):

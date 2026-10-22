@@ -120,8 +120,7 @@ class _Dynamics:
             raise ValueError(f"loginterval must be a positive int, got {loginterval!r}")
         if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
             raise TypeError(f"seed must be an int, got {seed!r}")
-        self._model = _model(model, force_field, head)
-        _dispersion(dispersion, self._model)
+        self._model = _dispersion(dispersion, _model(model, force_field, head), atoms)
         _check_constraints(atoms)
 
         self.atoms = atoms
@@ -699,20 +698,26 @@ def _model(model, force_field, head):
     return model
 
 
-def _dispersion(dispersion, model):
-    """``dispersion=`` as ``fm.md``: ``"d3bj"`` expands from the training functional (``ValueError`` when
-    it already contains dispersion or is unknown), and a complete record is refused until phase 3b."""
+def _dispersion(dispersion, model, atoms):
+    """``model`` (a loaded model or an ``fm.ForceField``) with ``dispersion=`` as ``fm.md`` takes it: ``"d3bj"``
+    expands from the training functional (``ValueError`` when it already contains dispersion or is
+    unknown), and the complete record goes into an ``fm.ForceField`` (MACE plus D3; 3b-T04). A force
+    field that already has D3 keeps it; a different record for it is a ``ValueError``."""
     from fastmace.longrange import d3
     from fastmace.model.forcefield import ForceField
 
+    if dispersion is None:
+        return model
     loaded = model.model if isinstance(model, ForceField) else model
     name = loaded.label or str(loaded.path)
-    record, notes = d3.expand(dispersion, functional=loaded.functional, model=name)
-    if record is not None:
-        text = f"D3: phase 3b; the expanded record is {d3.describe(record)}"
-        if notes:
-            text += f" ({'; '.join(notes)})"
-        raise _refuse(text + " (SPEC §11.2)", code="d3-phase-3b")
+    record, _ = d3.expand(dispersion, functional=loaded.functional, model=name)
+    if isinstance(model, ForceField):
+        if model.dispersion != record:
+            raise ValueError(f"dispersion={d3.describe(record)} differs from the force field's "
+                             f"{None if model.dispersion is None else d3.describe(model.dispersion)}; pass "
+                             "dispersion= to fm.ForceField instead")
+        return model
+    return ForceField(model, atoms, precision="float32", dispersion=record)
 
 
 def _check_constraints(atoms):

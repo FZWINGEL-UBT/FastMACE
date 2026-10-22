@@ -20,8 +20,8 @@ What ``md`` decides itself, before anything is loaded:
   0.001965/fs), a drawn and recorded seed, the output directory ``./<structure stem>.fastmace/``
   (``./fastmace-run/`` for an in-memory ``Atoms``), and ``repeat=(1, 1, 1)``.
 
-Then the refusals, every reason at once in one ``PlanRefused``: NVE (phase 4) and a complete D3
-record (phase 3b, the record shown).
+Then the refusals, every reason at once in one ``PlanRefused``: NVE (phase 4). A D3 record goes into the
+``ForceField`` (``dispersion=``; 3b-T04), and the report and ``metadata.json`` show it.
 
 MC (3-T15): with a schedule, the move set is attached only over the step ranges whose target is at
 or above ``min_mc_temperature_K`` (``mc_ranges``), through ``Simulation.run(mc=…)`` and
@@ -91,8 +91,9 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
       schedule: the whole schedule);
     - ``mc`` and ``min_mc_temperature_K``: one ``fm.mc`` record or a sequence of them, checked as §7.7
       says, attached where the target is at or above ``min_mc_temperature_K``;
-    - ``dispersion``: ``None``, ``"d3bj"`` or an ``fm.D3``; a complete record is refused until
-      phase 3b, with the record shown;
+    - ``dispersion``: ``None``, ``"d3bj"`` or an ``fm.D3``: the complete record goes into the force field
+      (MACE plus D3, SPEC §11.2) and is shown in the report; a functional other than the training one
+      is a report warning;
     - ``repeat``: the supercell, ``(1, 1, 1)`` by default (never expanded silently);
     - ``output``: a directory or an ``fm.Output``; default ``./<structure stem>.fastmace/``, or
       ``./fastmace-run/`` for an ``Atoms``;
@@ -208,11 +209,6 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     if ensemble == "NVE" and integrator is None:
         reasons.append(Reason("NVE: phase 4; 1b runs NVT (Langevin) and NPT (LangevinBAOAB) (SPEC §16)",
                               code="nve-phase-4"))
-    if record is not None:
-        text = f"D3: phase 3b; the expanded record is {d3.describe(record)}"
-        if d3_warnings:
-            text += f" ({'; '.join(d3_warnings)})"
-        reasons.append(Reason(text + " (SPEC §11.2)", code="d3-phase-3b"))
     if reasons:
         raise PlanRefused.from_reasons(reasons)
 
@@ -242,7 +238,13 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     species = None
     if mc is not None:  # the superset: the structure's species and every species the move set names
         species = sorted({int(z) for z in atoms.numbers} | mc_species(mc))
-    sim = Simulation(atoms, model, species=species, integrator=integrator, workload=workload, output=output,
+    force_field = model
+    if record is not None:  # MACE plus D3 (3b-T04): the force field Simulation would build, with the record
+        from fastmace.model.forcefield import ForceField
+
+        force_field = ForceField(model, atoms, precision="float32", species=species, dispersion=record)
+        species = None
+    sim = Simulation(atoms, force_field, species=species, integrator=integrator, workload=workload, output=output,
                      seed=seed, check=check,
                      **{field.name: getattr(planner_inputs, field.name) for field in fields(planner_inputs)})
     sim.report.repeat = repeat

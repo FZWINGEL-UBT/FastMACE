@@ -12,8 +12,8 @@ entries of §12.1, and a fifth list for the numerical treatment of the yardstick
   differences of the reference energy on NaCl 3x3x3. It is required for every PolarMACE record
   on MACE 0.3.16, and retired by the record of a MACE that contains it;
 - ``optional_physics``: opt-in model changes, applied to the reference too and labelling the
-  results non-stock. PR 1762 (Fukui regularisation, dipole cap) is accepted; D3 is declared and
-  refused until phase 3b;
+  results non-stock. PR 1762 (Fukui regularisation, dipole cap) and D3 (MACE plus torch-dftd on the
+  ``fm.D3`` record's numbers, 3b-T04) are accepted;
 - ``integrator_corrections``: today the full-cell BAOAB drag, with 1b-T09's qualification
   (``fastmace.reference.integrators.QUALIFICATION``);
 - ``numerical``: float64 accumulation of the yardstick's energy (§12.1 "Energy accumulation in
@@ -91,8 +91,11 @@ POLAR_STRESS_FIX = {
 OPTIONAL_PHYSICS = {
     "pr1762": {"status": "accepted", "upstream": "MACE PR 1762 (open)",
                "changes": "regularised Fukui normalisation and charge-dipole cap (PolarConfig)"},
-    "d3": {"status": "refused until phase 3b",
-           "reference": "MACE plus torch-dftd with the parameters of SPEC §11.2"},
+    "d3": {"status": "accepted",
+           "reference": "MACE plus torch-dftd 0.5.1 with the parameters of SPEC §11.2 (the fm.D3 record), summed "
+                        "as ASE's SumCalculator does; torch-dftd in float64 for the reference and the yardstick, so "
+                        "the yardstick measures MACE's float32 alone",
+           "changes": "adds the D3(BJ) dispersion energy, forces and stress"},
 }
 
 FLOAT64_ACCUMULATION = {
@@ -239,7 +242,8 @@ def record_for(mace_version, family, *, polar=None, d3=None):
     """The reference record for (MACE version, model family) and the requested physics options.
 
     ``polar``: a ``PolarConfig`` (its PR 1762 options become an optional-physics entry);
-    ``d3``: a ``D3`` record, refused until phase 3b. A version outside ``QUALIFIED_MACE_VERSIONS``
+    ``d3``: a ``D3`` record, an optional-physics entry with every number (``d3.identity_entry``); refused
+    for PolarMACE (SPEC §18 decision 41). A version outside ``QUALIFIED_MACE_VERSIONS``
     gets the unqualified stock record (module docstring). Raises ``ReferencePolicyError`` for
     PolarMACE on such a version, an unknown family, or options the family cannot take.
     """
@@ -255,11 +259,11 @@ def record_for(mace_version, family, *, polar=None, d3=None):
     if family not in FAMILIES:
         raise ReferencePolicyError(f"unknown model family {family!r} for a reference record",
                                    why=f"the families are {', '.join(FAMILIES)}.")
-    if d3 is not None:
+    if d3 is not None and family == "polar":
         raise ReferencePolicyError(
-            "a D3 reference is refused until phase 3b",
-            why="the D3 reference (MACE plus torch-dftd, SPEC §11.2) and its kernel arrive in phase 3b.",
-            next_step="Run without dispersion, or wait for phase 3b.")
+            "a D3 reference for PolarMACE is refused in phase 3b",
+            why="PolarMACE with D3 is not qualified (SPEC §18 decision 41).",
+            next_step="Run PolarMACE without dispersion.")
     fixes = (POLAR_STRESS_FIX,) if family == "polar" else ()
     optional = ()
     options = _pr1762_options(polar)
@@ -267,6 +271,10 @@ def record_for(mace_version, family, *, polar=None, d3=None):
         if family != "polar":
             raise ReferencePolicyError(f"the PR 1762 options apply to PolarMACE only, not to family {family!r}")
         optional = ({"name": "pr1762", **OPTIONAL_PHYSICS["pr1762"], "options": options},)
+    if d3 is not None:
+        from fastmace.longrange import d3 as dispersion
+
+        optional += ({"name": "d3", **OPTIONAL_PHYSICS["d3"], "parameters": dispersion.identity_entry(d3)},)
     correction = {"name": "baoab_full_cell_drag", "id": QUALIFICATION["id"], "qualification": QUALIFICATION}
     stock, numerical = STOCK, (FLOAT64_ACCUMULATION,)
     if not qualified:

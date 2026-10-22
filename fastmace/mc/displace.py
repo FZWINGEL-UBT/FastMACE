@@ -219,7 +219,9 @@ class DisplaceAttempt:
         import torch
 
         engine, state, field = self.engine, self.engine.state, self.engine.force_field
-        neighbours = field.neighbours
+        # The committed lists of a trial build: the MACE list's, and with D3 the D3 term's too (3b-T04).
+        save = getattr(field, "save_trial", field.neighbours.save_list)
+        restore = getattr(field, "restore_trial", field.neighbours.restore_list)
         word = engine.overflowed()
         if word:  # the captured attempt's edges were too few: redone below on enough edges
             engine.record_mc_overflow(word)
@@ -227,7 +229,7 @@ class DisplaceAttempt:
         with torch.no_grad():
             atom, d, acceptance = self._proposal()
             while True:
-                self._saved = neighbours.save_list(self._saved)
+                self._saved = save(self._saved)
                 positions = state.positions
                 old = positions.index_select(0, atom)
                 positions.index_copy_(0, atom, old + d)
@@ -245,7 +247,7 @@ class DisplaceAttempt:
                 if word:  # pragma: no cover - the edges were sized for this count; grow and redo if not
                     positions.index_copy_(0, atom, old)
                     if rebuild:
-                        neighbours.restore_list(self._saved)
+                        restore(self._saved)
                     engine.use_trial_edges()
                     engine.record_mc_overflow(word)
                     continue
@@ -261,7 +263,7 @@ class DisplaceAttempt:
             else:
                 positions.index_copy_(0, atom, old)
                 if rebuild:
-                    neighbours.restore_list(self._saved)
+                    restore(self._saved)
                 engine.use_trial_edges()
             self.counters.add_(torch.tensor([1, 0, int(accepted)], dtype=torch.int64, device=self.counters.device))
             block.index.add_(1)

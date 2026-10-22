@@ -48,7 +48,7 @@ SCALARS = (
     ("min_mc_temperature_K", "MC: the lowest MC temperature, required with a schedule (MC runs only at or "
                              "above it).", "300.0"),
     ("repeat", "Supercell repeats; the cell is never expanded silently.", "[1, 1, 1]"),
-    ("dispersion", "\"d3bj\": the D3(BJ) record of the head's training functional, refused until phase 3b;\n"
+    ("dispersion", "\"d3bj\": the D3(BJ) record of the head's training functional (MACE plus D3);\n"
                    "# a full record is the [dispersion] table below.", '"d3bj"'),
     ("seed", "Noise seed; without it one is drawn and recorded in metadata.json.", "1"),
     ("check", '"skip" (default), "gate" (the gate on this structure, opt-in) or "allow_unavailable".', '"skip"'),
