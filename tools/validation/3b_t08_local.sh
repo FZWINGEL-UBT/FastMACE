@@ -26,8 +26,8 @@ declare -A JOBS=(
   [ref-f64-gate-scan]="--path reference --dtype float64 --probe --configs gate --steps 1e-4 --scan --scan-points 21 --scan-max 1e-4"
   [ref-f32]="--path reference --dtype float32 --steps 1e-3"
   [stock-f64]="--path stock --dtype float64"
-  [cueq-f64]="--path cueq --dtype float64 --steps 1e-3"
-  [cueq-f32]="--path cueq --dtype float32 --steps 1e-3"
+  [cueq-f64]="--path cueq --dtype float64 --eager --steps 1e-3"
+  [cueq-f32]="--path cueq --dtype float32 --eager --steps 1e-3"
   [hybrid-f32]="--path hybrid --dtype float32 --steps 1e-3"
   [hybrid-f32-frozen]="--path hybrid --dtype float32 --frozen-kset $F32_STEPS"
   [ref-f64-NaCl]="--path reference --dtype float64 --probe --structure NaCl"
@@ -38,6 +38,7 @@ declare -A JOBS=(
 # 1a-T19's references ran in mace_cueq_latest; the research path keeps that.
 declare -A JOB_PY=([research-f64-gate]=$HOME/environments/mace_cueq_latest/bin/python
                    [research-f64-gate-rebase]=$HOME/environments/mace_cueq_latest/bin/python)
+# Plain cuEq runs eager: the planner refuses compiled plain cuEq for PolarMACE (zero forces).
 # Precision (analytic stress of each path against the float64 reference; one step for a coarse check), then
 # the energy step on a fine strain grid. research-f64-gate* are not needed: fastmace.reference reproduces
 # 1a-T19's 4.364e-4 to four digits (ref-f64-gate).

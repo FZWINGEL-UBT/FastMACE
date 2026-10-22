@@ -1,0 +1,317 @@
+{
+ "tool": "tools/polar_stress_fd.py",
+ "argv": [
+  "--path",
+  "reference",
+  "--dtype",
+  "float32",
+  "--steps",
+  "1e-3",
+  "--output",
+  "/mnt/d/Margraf/FastMACE/.claude/worktrees/silly-hawking-10a1b1/results/3b-T08-local-20261022/ref-f32.json"
+ ],
+ "path": "reference",
+ "dtype": "float32",
+ "label": "polar-1-s",
+ "structure": "NbCl5",
+ "repeat": [
+  3,
+  3,
+  3
+ ],
+ "frozen_kset": false,
+ "started": "2026-10-22T21:09:43+00:00",
+ "load_s": 6.261002913000084,
+ "info": {
+  "reference": {
+   "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+   "role": "yardstick",
+   "dtype": "float32",
+   "float64_energy": true,
+   "energy_bound": "float64 accumulation",
+   "e0_table": "checkpoint",
+   "backend": "cueq",
+   "cueq_conv_fusion": false,
+   "model": {
+    "path": "/home/fzwin/models/MACE-POLAR-1-S.model",
+    "sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+    "label": "polar1-s",
+    "head": "Default"
+   },
+   "patches": [
+    "single_graph_strain",
+    "polar_longrange"
+   ],
+   "corrections_active": [
+    "polar_kspace_stress"
+   ],
+   "optional_physics": [],
+   "polar": {
+    "bounds": [
+     19,
+     18,
+     6
+    ],
+    "k_vectors": 3959,
+    "k_superset": 7986,
+    "headroom": 0.1
+   }
+  },
+  "kspace": {
+   "kspace_cutoff": 1.8467166423797607,
+   "sigma2": [
+    2.25
+   ],
+   "sigma2_module": "electric_potential_descriptor.density_basis.radial_spline"
+  }
+ },
+ "commit": "d2add8e",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+ "configs": {
+  "ideal": {
+   "natoms": 1944,
+   "volume_A3": 55909.94847866195,
+   "cell": [
+    [
+     56.89230867,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     54.533092350000004,
+     0.0
+    ],
+    [
+     -0.14664423044107086,
+     0.0,
+     18.02085569312872
+    ]
+   ],
+   "energy_eV": -20790881.209332597,
+   "analytic": [
+    [
+     0.019527172669768333,
+     -2.688459899147233e-09,
+     0.00037728529423475266
+    ],
+    [
+     -2.688459899147233e-09,
+     0.014541815035045147,
+     1.2811879335217213e-09
+    ],
+    [
+     0.00037728529423475266,
+     1.2811879335217213e-09,
+     0.016562629491090775
+    ]
+   ],
+   "first_evaluation_s": 3.2709462620000522,
+   "kset": null,
+   "steps": [
+    {
+     "h": 0.001,
+     "fd": [
+      [
+       0.019527606682732655,
+       6.971516421211309e-07,
+       0.0003749793984092381
+      ],
+      [
+       6.971516421211309e-07,
+       0.014546793282985453,
+       -2.0968186563825797e-06
+      ],
+      [
+       0.0003749793984092381,
+       -2.0968186563825797e-06,
+       0.016568573822810916
+      ]
+     ],
+     "max_abs": 5.944331720141721e-06,
+     "max_rel": 0.0003044133331879962,
+     "detail": [
+      {
+       "component": "00",
+       "e_plus": -20790880.10086124,
+       "e_minus": -20790882.284436207,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "11",
+       "e_plus": -20790880.382716153,
+       "e_minus": -20790882.00933708,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "22",
+       "e_plus": -20790880.26887564,
+       "e_minus": -20790882.121571857,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "12",
+       "e_plus": -20790881.202941757,
+       "e_minus": -20790881.20270729,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "02",
+       "e_plus": -20790881.179587837,
+       "e_minus": -20790881.221517995,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "01",
+       "e_plus": -20790881.20457821,
+       "e_minus": -20790881.204656165,
+       "flipped": [
+        null,
+        null
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  "gate": {
+   "natoms": 1944,
+   "volume_A3": 54452.741174540985,
+   "cell": [
+    [
+     56.393680917181754,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     54.05514174598367,
+     0.0
+    ],
+    [
+     -0.14535897967874506,
+     0.0,
+     17.862913451230128
+    ]
+   ],
+   "energy_eV": -20790789.207273744,
+   "analytic": [
+    [
+     0.01253478042781353,
+     -0.0016760447761043906,
+     -0.0013575744815170765
+    ],
+    [
+     -0.0016760447761043906,
+     0.013457024469971657,
+     0.0030455661471933126
+    ],
+    [
+     -0.0013575744815170765,
+     0.0030455661471933126,
+     0.010963077656924725
+    ]
+   ],
+   "first_evaluation_s": 0.558188445000269,
+   "kset": null,
+   "steps": [
+    {
+     "h": 0.001,
+     "fd": [
+      [
+       0.012578282737333893,
+       -0.0016698326610802858,
+       -0.0013021874918625177
+      ],
+      [
+       -0.0016698326610802858,
+       0.013490077167502482,
+       0.003028834879860962
+      ],
+      [
+       -0.0013021874918625177,
+       0.003028834879860962,
+       0.011001843054693265
+      ]
+     ],
+     "max_abs": 5.538698965455876e-05,
+     "max_rel": 0.00411584223378286,
+     "detail": [
+      {
+       "component": "00",
+       "e_plus": -20790788.498968985,
+       "e_minus": -20790789.868812934,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "11",
+       "e_plus": -20790788.454177584,
+       "e_minus": -20790789.923320945,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "22",
+       "e_plus": -20790788.590583824,
+       "e_minus": -20790789.78874485,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "12",
+       "e_plus": -20790789.035096828,
+       "e_minus": -20790789.36495355,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "02",
+       "e_plus": -20790789.266362417,
+       "e_minus": -20790789.12454706,
+       "flipped": [
+        null,
+        null
+       ]
+      },
+      {
+       "component": "01",
+       "e_plus": -20790789.29161132,
+       "e_minus": -20790789.10975739,
+       "flipped": [
+        null,
+        null
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "finished": "2026-10-22T21:10:02+00:00"
+}

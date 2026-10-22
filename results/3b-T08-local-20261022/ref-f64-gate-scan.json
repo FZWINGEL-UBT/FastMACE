@@ -1,0 +1,588 @@
+{
+ "tool": "tools/polar_stress_fd.py",
+ "argv": [
+  "--path",
+  "reference",
+  "--dtype",
+  "float64",
+  "--probe",
+  "--configs",
+  "gate",
+  "--steps",
+  "1e-4",
+  "--scan",
+  "--scan-points",
+  "21",
+  "--scan-max",
+  "1e-4",
+  "--output",
+  "/mnt/d/Margraf/FastMACE/.claude/worktrees/silly-hawking-10a1b1/results/3b-T08-local-20261022/ref-f64-gate-scan.json"
+ ],
+ "path": "reference",
+ "dtype": "float64",
+ "label": "polar-1-s",
+ "structure": "NbCl5",
+ "repeat": [
+  3,
+  3,
+  3
+ ],
+ "frozen_kset": false,
+ "started": "2026-10-22T21:11:45+00:00",
+ "load_s": 6.568442072999915,
+ "info": {
+  "reference": {
+   "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+   "role": "reference",
+   "dtype": "float64",
+   "float64_energy": false,
+   "energy_bound": "float64 accumulation",
+   "e0_table": null,
+   "backend": "cueq",
+   "cueq_conv_fusion": false,
+   "model": {
+    "path": "/home/fzwin/models/MACE-POLAR-1-S.model",
+    "sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+    "label": "polar1-s",
+    "head": "Default"
+   },
+   "patches": [
+    "single_graph_strain",
+    "polar_longrange"
+   ],
+   "corrections_active": [
+    "polar_kspace_stress"
+   ],
+   "optional_physics": [],
+   "polar": {
+    "bounds": [
+     19,
+     18,
+     6
+    ],
+    "k_vectors": 3844,
+    "k_superset": 7986,
+    "headroom": 0.1
+   }
+  },
+  "kspace": {
+   "kspace_cutoff": 1.8467166423797607,
+   "sigma2": [
+    2.25
+   ],
+   "sigma2_module": "electric_potential_descriptor.density_basis.radial_spline"
+  }
+ },
+ "commit": "d2add8e",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+ "configs": {
+  "gate": {
+   "natoms": 1944,
+   "volume_A3": 54452.741174540985,
+   "cell": [
+    [
+     56.393680917181754,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     54.05514174598367,
+     0.0
+    ],
+    [
+     -0.14535897967874506,
+     0.0,
+     17.862913451230128
+    ]
+   ],
+   "energy_eV": -20790789.20891601,
+   "analytic": [
+    [
+     0.012534768882852137,
+     -0.0016760152547640075,
+     -0.0013576104798972508
+    ],
+    [
+     -0.0016760152547640075,
+     0.013456897596826112,
+     0.003045586754108248
+    ],
+    [
+     -0.0013576104798972508,
+     0.003045586754108248,
+     0.01096301031568143
+    ]
+   ],
+   "first_evaluation_s": 9.357427929000096,
+   "kset": {
+    "included": 2894,
+    "flipped": 0,
+    "flips": []
+   },
+   "steps": [
+    {
+     "h": 0.0001,
+     "fd": [
+      [
+       0.012971195733559928,
+       -0.001676014723959472,
+       -0.0009213106139529759
+      ],
+      [
+       -0.001676014723959472,
+       0.013456889272597358,
+       0.0030455858699838406
+      ],
+      [
+       -0.0009213106139529759,
+       0.0030455858699838406,
+       0.011399284120281208
+      ]
+     ],
+     "max_abs": 0.00043642685070779084,
+     "max_rel": 0.03243146108288174,
+     "detail": [
+      {
+       "component": "00",
+       "e_plus": -20790789.13569629,
+       "e_minus": -20790789.27695972,
+       "flipped": [
+        [
+         {
+          "n": [
+           12,
+           -6,
+           3
+          ],
+          "k_over_cutoff": 0.9999759570295367,
+          "now_included": true,
+          "within_cutoff": true
+         },
+         {
+          "n": [
+           12,
+           6,
+           3
+          ],
+          "k_over_cutoff": 0.9999759570295367,
+          "now_included": true,
+          "within_cutoff": true
+         }
+        ],
+        []
+       ]
+      },
+      {
+       "component": "11",
+       "e_plus": -20790789.135480948,
+       "e_minus": -20790789.28203385,
+       "flipped": [
+        [],
+        []
+       ]
+      },
+      {
+       "component": "22",
+       "e_plus": -20790789.144326016,
+       "e_minus": -20790789.26847047,
+       "flipped": [
+        [
+         {
+          "n": [
+           12,
+           -6,
+           3
+          ],
+          "k_over_cutoff": 0.9999950422705934,
+          "now_included": true,
+          "within_cutoff": true
+         },
+         {
+          "n": [
+           12,
+           6,
+           3
+          ],
+          "k_over_cutoff": 0.9999950422705934,
+          "now_included": true,
+          "within_cutoff": true
+         }
+        ],
+        []
+       ]
+      },
+      {
+       "component": "12",
+       "e_plus": -20790789.192269985,
+       "e_minus": -20790789.225438084,
+       "flipped": [
+        [],
+        []
+       ]
+      },
+      {
+       "component": "02",
+       "e_plus": -20790789.211461905,
+       "e_minus": -20790789.201428328,
+       "flipped": [
+        [
+         {
+          "n": [
+           12,
+           -6,
+           3
+          ],
+          "k_over_cutoff": 0.9999865723059473,
+          "now_included": true,
+          "within_cutoff": true
+         },
+         {
+          "n": [
+           12,
+           6,
+           3
+          ],
+          "k_over_cutoff": 0.9999865723059473,
+          "now_included": true,
+          "within_cutoff": true
+         }
+        ],
+        []
+       ]
+      },
+      {
+       "component": "01",
+       "e_plus": -20790789.21798897,
+       "e_minus": -20790789.199736252,
+       "flipped": [
+        [],
+        []
+       ]
+      }
+     ]
+    }
+   ],
+   "scan_xx": [
+    {
+     "e_xx": -0.0001,
+     "energy_eV": -20790789.27695972,
+     "stress_xx": 0.012457067448763074,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": -9e-05,
+     "energy_eV": -20790789.27017439,
+     "stress_xx": 0.012464839316927885,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": -8e-05,
+     "energy_eV": -20790789.263384826,
+     "stress_xx": 0.012472610802270818,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": -7e-05,
+     "energy_eV": -20790789.256591037,
+     "stress_xx": 0.012480381904576631,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": -6e-05,
+     "energy_eV": -20790789.249793008,
+     "stress_xx": 0.012488152623693847,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": -5e-05,
+     "energy_eV": -20790789.242990755,
+     "stress_xx": 0.012495922959468492,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": -3.9999999999999996e-05,
+     "energy_eV": -20790789.236184265,
+     "stress_xx": 0.01250369291174766,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": -2.9999999999999997e-05,
+     "energy_eV": -20790789.229373544,
+     "stress_xx": 0.012511462480379647,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": -1.9999999999999998e-05,
+     "energy_eV": -20790789.2225586,
+     "stress_xx": 0.012519231665207416,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": -9.999999999999999e-06,
+     "energy_eV": -20790789.215739418,
+     "stress_xx": 0.012527000466082515,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": 0.0,
+     "energy_eV": -20790789.20891601,
+     "stress_xx": 0.012534768882852931,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": 9.999999999999999e-06,
+     "energy_eV": -20790789.202088367,
+     "stress_xx": 0.012542536915360522,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": 2.0000000000000012e-05,
+     "energy_eV": -20790789.195256498,
+     "stress_xx": 0.012550304563508242,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": 3.000000000000001e-05,
+     "energy_eV": -20790789.188420396,
+     "stress_xx": 0.012558071827209439,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": 4.000000000000001e-05,
+     "energy_eV": -20790789.181580067,
+     "stress_xx": 0.012565838706463122,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": 5.000000000000001e-05,
+     "energy_eV": -20790789.17473551,
+     "stress_xx": 0.012573605201215766,
+     "kset": {
+      "included": 2894,
+      "flipped": 0,
+      "flips": []
+     }
+    },
+    {
+     "e_xx": 6.000000000000001e-05,
+     "energy_eV": -20790789.16313585,
+     "stress_xx": 0.012582348036762118,
+     "kset": {
+      "included": 2896,
+      "flipped": 2,
+      "flips": [
+       {
+        "n": [
+         12,
+         -6,
+         3
+        ],
+        "k_over_cutoff": 0.9999969185350949,
+        "now_included": true,
+        "within_cutoff": true
+       },
+       {
+        "n": [
+         12,
+         6,
+         3
+        ],
+        "k_over_cutoff": 0.9999969185350949,
+        "now_included": true,
+        "within_cutoff": true
+       }
+      ]
+     }
+    },
+    {
+     "e_xx": 7.000000000000001e-05,
+     "energy_eV": -20790789.156282306,
+     "stress_xx": 0.012590113848014254,
+     "kset": {
+      "included": 2896,
+      "flipped": 2,
+      "flips": [
+       {
+        "n": [
+         12,
+         -6,
+         3
+        ],
+        "k_over_cutoff": 0.999991677964098,
+        "now_included": true,
+        "within_cutoff": true
+       },
+       {
+        "n": [
+         12,
+         6,
+         3
+        ],
+        "k_over_cutoff": 0.999991677964098,
+        "now_included": true,
+        "within_cutoff": true
+       }
+      ]
+     }
+    },
+    {
+     "e_xx": 8e-05,
+     "energy_eV": -20790789.149424527,
+     "stress_xx": 0.012597879274117457,
+     "kset": {
+      "included": 2896,
+      "flipped": 2,
+      "flips": [
+       {
+        "n": [
+         12,
+         -6,
+         3
+        ],
+        "k_over_cutoff": 0.999986437522842,
+        "now_included": true,
+        "within_cutoff": true
+       },
+       {
+        "n": [
+         12,
+         6,
+         3
+        ],
+        "k_over_cutoff": 0.999986437522842,
+        "now_included": true,
+        "within_cutoff": true
+       }
+      ]
+     }
+    },
+    {
+     "e_xx": 9e-05,
+     "energy_eV": -20790789.14256252,
+     "stress_xx": 0.012605644315020507,
+     "kset": {
+      "included": 2896,
+      "flipped": 2,
+      "flips": [
+       {
+        "n": [
+         12,
+         -6,
+         3
+        ],
+        "k_over_cutoff": 0.9999811972113232,
+        "now_included": true,
+        "within_cutoff": true
+       },
+       {
+        "n": [
+         12,
+         6,
+         3
+        ],
+        "k_over_cutoff": 0.9999811972113232,
+        "now_included": true,
+        "within_cutoff": true
+       }
+      ]
+     }
+    },
+    {
+     "e_xx": 0.0001,
+     "energy_eV": -20790789.13569629,
+     "stress_xx": 0.01261340897057084,
+     "kset": {
+      "included": 2896,
+      "flipped": 2,
+      "flips": [
+       {
+        "n": [
+         12,
+         -6,
+         3
+        ],
+        "k_over_cutoff": 0.9999759570295367,
+        "now_included": true,
+        "within_cutoff": true
+       },
+       {
+        "n": [
+         12,
+         6,
+         3
+        ],
+        "k_over_cutoff": 0.9999759570295367,
+        "now_included": true,
+        "within_cutoff": true
+       }
+      ]
+     }
+    }
+   ]
+  }
+ },
+ "finished": "2026-10-22T21:15:09+00:00"
+}
