@@ -763,6 +763,12 @@ class MinimalPlanner:
         book.decide("NeighbourConfig.d3_skin", f"{skin:g} A", why)
         memory = rule_12_d3(natoms=len(atoms), volume_A3=float(atoms.get_volume()), radius_A=cutoff_A + skin,
                             headroom=DEFAULT_HEADROOM, gpu_memory_bytes=hardware.memory_bytes)
+        free = self._free_memory_bytes(hardware)
+        if free and memory.list_bytes > free:
+            book.refuse(Reason(f"{memory.text()}: the D3 list's buffers alone need more than the "
+                               f"{free / 2**30:.1f} GiB of free GPU memory (SPEC §9.3 rule 12)", rule=12,
+                               code="rule-12-d3-memory"),
+                        "rule-12-d3-memory", 12)
         if memory.warn:
             text = (f"{memory.text()}: above {D3_MEMORY_WARN_FRACTION:.0%} of the GPU memory; a D3 build may run "
                     "out of memory (SPEC §9.3 rule 12)")
@@ -771,6 +777,17 @@ class MinimalPlanner:
         else:
             book.decide("d3 list memory", "fits", Reason(memory.text(), rule=12, code="rule-12-d3"))
         return dataclasses.replace(neighbours, d3_skin=skin)
+
+    def _free_memory_bytes(self, hardware):
+        """Free device memory at plan time: CUDA's own count once this process has initialised CUDA (the planner
+        never initialises it for this), else the device's total memory; ``None`` off CUDA."""
+        if not str(self.engine.device).startswith("cuda"):
+            return None
+        if _cuda_initialised():
+            import torch
+
+            return int(torch.cuda.mem_get_info(torch.device(self.engine.device))[0])
+        return hardware.memory_bytes
 
     def _workload_decisions(self, book, workload, rule_11, mode="graph"):
         applies, sized = rule_11

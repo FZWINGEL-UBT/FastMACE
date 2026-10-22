@@ -58,7 +58,7 @@ def test_half_screen_equals_the_full_screen():
 
 @pytest.mark.parametrize("variable_cell", [False, True], ids=["fixed", "variable"])
 def test_device_stages_replay_in_a_cuda_graph(variable_cell):
-    """set_cell, needs_rebuild and prepare captured once, replayed with new inputs: same as eager."""
+    """needs_rebuild (with the cell) captured once, replayed with new inputs: same as eager."""
     atoms = nbcl5(repeat=2, rattle=0.05, seed=7)
     nl = D3PairList(atoms.cell.array, D3_CUTOFF, 1.0, "cuda", variable_cell=variable_cell)
     eager = D3PairList(atoms.cell.array, D3_CUTOFF, 1.0, "cuda", variable_cell=variable_cell)
@@ -70,10 +70,7 @@ def test_device_stages_replay_in_a_cuda_graph(variable_cell):
     flag = torch.zeros((), dtype=torch.bool, device="cuda")
 
     def stage():
-        if variable_cell:
-            nl.set_cell(cell)
         flag.copy_(nl.needs_rebuild(x, cell if variable_cell else None))
-        nl.prepare(x)
 
     stream = torch.cuda.Stream()
     stream.wait_stream(torch.cuda.current_stream())
@@ -94,12 +91,11 @@ def test_device_stages_replay_in_a_cuda_graph(variable_cell):
         if variable_cell:
             eager.set_cell(cell)
         expected = eager.needs_rebuild(new)
-        eager.prepare(new)
         torch.cuda.synchronize()
         assert bool(flag) == bool(expected)
-        for name in ("shifted_positions", "image_vectors"):
+        for name in ("cell_t", "shift_vectors"):
             assert torch.equal(getattr(nl, name), getattr(eager, name)), name
-        assert torch.equal(nl.inside(), eager.inside())
+        assert torch.equal(nl.inside(new), eager.inside(new))
 
 
 def test_nbcl5_3x3x3_pairs_and_build_time():

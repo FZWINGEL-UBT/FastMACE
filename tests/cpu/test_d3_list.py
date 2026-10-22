@@ -54,8 +54,7 @@ def inside(nl, positions, cell=None):
     """The pairs the kernel's mask keeps at ``positions`` (and ``cell``): {(i, j, n)}."""
     if cell is not None:
         nl.set_cell(torch.as_tensor(cell, dtype=torch.float64))
-    nl.prepare(torch.as_tensor(positions, dtype=torch.float64))
-    mask = nl.inside()
+    mask = nl.inside(torch.as_tensor(positions, dtype=torch.float64))
     i, j, shifts = nl.pairs()
     keep = mask[:nl.num_pairs].numpy()
     assert not mask[nl.num_pairs:].any(), "a padding pair is within the cutoff"
@@ -94,22 +93,28 @@ def test_build_equals_brute_force(atoms):
     assert inside(nl, atoms.positions) == brute_force(atoms.positions, atoms.cell.array, D3_CUTOFF)
 
 
-def test_pair_vectors_from_the_layout():
-    """shifted_positions[j] - shifted_positions[i] + image_vectors[image] = x_j - x_i + n h, padding far away."""
-    atoms = CASES[-1][1]
+def test_layout():
+    """Unwrapped positions plus integer shifts times the cell; sorted by (i, j, shift); padding i = j = N, row 0."""
+    atoms = CASES[-1][1]  # unwrapped: the shifts absorb the atoms' whole-cell offsets
     nl = D3PairList(atoms.cell.array, D3_CUTOFF, SKIN, "cpu")
     nl.build(atoms.positions)
+    n, natoms = nl.num_pairs, len(atoms)
+    assert nl.index.dtype == nl.image.dtype == torch.int32 and int(nl.count) == n < nl.capacity
+    i, j, image = nl.index[0, :n].long(), nl.index[1, :n].long(), nl.image[:n].long()
+    table = nl.shifts[:nl.num_shifts]
+    assert torch.equal(table, table.round()) and torch.equal(nl.shifts[nl.num_shifts:], torch.zeros_like(
+        nl.shifts[nl.num_shifts:]))
+    assert len(torch.unique(table, dim=0)) == nl.num_shifts
+    torch.testing.assert_close(nl.shift_vectors, nl.shifts @ torch.tensor(atoms.cell.array), rtol=0, atol=1e-10)
+    key = (i * natoms + j) * nl.num_shifts + image
+    assert torch.equal(key, torch.sort(key).values) and len(torch.unique(key)) == n
+    # Lexicographic table: the row order is the shift order.
+    rows = [tuple(row) for row in table.tolist()]
+    assert rows == sorted(rows)
     x = torch.tensor(atoms.positions)
-    nl.prepare(x)
-    i, j = nl.index[0].long(), nl.index[1].long()
-    vectors = nl.shifted_positions[j] - nl.shifted_positions[i] + nl.image_vectors[nl.image.long()]
-    ii, jj, shifts = nl.pairs()
-    expected = x[jj] - x[ii] + torch.tensor(shifts, dtype=torch.float64) @ torch.tensor(atoms.cell.array)
-    n = nl.num_pairs
-    torch.testing.assert_close(vectors[:n], expected, rtol=0, atol=1e-10)
-    assert nl.capacity > n and (vectors[n:].norm(dim=1) > 1000).all()
-    assert nl.index.dtype == nl.image.dtype == torch.int32
-    assert int(nl.count) == n
+    vectors = x[j] - x[i] + nl.shift_vectors[image]
+    assert ((vectors * vectors).sum(dim=1) < (D3_CUTOFF + SKIN) ** 2).all()
+    assert (nl.index[:, n:] == natoms).all() and (nl.image[n:] == 0).all()
 
 
 def test_self_image_pairs_once():
@@ -179,8 +184,7 @@ def test_variable_cell_rebuild_follows_the_cell():
     x = atoms.positions @ SHEAR
     nl.set_cell(torch.tensor(cell))
     assert bool(nl.needs_rebuild(torch.tensor(x)))
-    moved = nl.build(x)
-    assert moved  # a sheared cell needs more images
+    nl.build(x)
     assert listed(nl) == brute_force(x, cell, D3_CUTOFF + SKIN)
     torch.testing.assert_close(nl.build_cell, torch.tensor(cell))
 
@@ -197,16 +201,18 @@ def test_counters_capacity_and_canonical_rebuild():
     assert counters["d3_capacity"] >= math.ceil(nl.num_pairs * d3_list.DEFAULT_HEADROOM) - 1
     # A canonical point at the same positions reproduces every buffer bit for bit.
     fresh = D3PairList(atoms.cell.array, D3_CUTOFF, SKIN, "cpu")
-    fresh.set_capacity(nl.capacity)
+    fresh.set_capacity(nl.capacity, nl.shift_capacity)
     fresh.canonicalise(atoms.positions)
     nl.canonicalise(atoms.positions)
     for name, tensor in nl.buffers().items():
         assert torch.equal(tensor, fresh.buffers()[name]), name
-        assert torch.equal(tensor, first[name]) or name == "shifted_positions", name
+        assert torch.equal(tensor, first[name]), name
     with pytest.raises(ValueError, match="below"):
         nl.set_capacity(nl.num_pairs - 1)
     assert nl.set_capacity(nl.capacity + 1024)
-    assert (nl.image == nl.images.shape[0] - 1).all()  # padding until the next build
+    assert (nl.index == len(atoms)).all() and int(nl.count) == 0  # padding until the next build
+    with pytest.raises(ValueError, match="shift capacity"):
+        nl.set_capacity(nl.capacity, 0)
 
 
 def test_trial_list_save_and_restore():
@@ -219,7 +225,7 @@ def test_trial_list_save_and_restore():
     saved = nl.save_list()
     trial = atoms.positions.copy()
     trial[3] += [0.9, -0.4, 0.3]
-    assert not nl.build(trial)  # in place
+    nl.build(trial)  # in place (same capacities here)
     assert listed(nl) == brute_force(trial, atoms.cell.array, D3_CUTOFF + SKIN)
     nl.restore_list(saved)
     assert nl.num_pairs == pairs

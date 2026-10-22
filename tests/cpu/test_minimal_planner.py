@@ -400,6 +400,17 @@ def test_rule_11_d3_keeps_an_explicit_skin_and_rule_12_warns():
     assert plan.decision("d3 list memory")[2].code == "rule-12-d3-warn"
 
 
+def test_rule_12_d3_refuses_when_the_list_exceeds_free_memory():
+    """Only the D3 buffers themselves against the free memory (here the device total: CUDA not initialised)."""
+    tiny = dataclasses.replace(GPU, memory_bytes=2**18)
+    planner = minimal()
+    planner._free_memory_bytes = lambda hardware: hardware.memory_bytes  # as on CUDA before initialisation
+    with pytest.warns(ResourceWarning), pytest.raises(PlanRefused) as refused:
+        planner.plan_traits(tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(), WORKLOAD, tiny,
+                            precision="float32", d3_cutoff_A=D3_CUTOFF)
+    assert "rule-12-d3-memory" in codes(refused.value)
+
+
 def test_rule_11_evaluation_plans_keep_the_1a_skin():
     plan = minimal().plan_evaluation_traits(tp.traits("mh1-r2scan"), nacl(), GPU, precision="float32")
     assert plan.neighbours.skin == DEFAULT_SKIN_A and plan.neighbours.capacity_headroom == 1.15
