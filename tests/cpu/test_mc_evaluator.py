@@ -118,6 +118,12 @@ def test_a_force_evaluation_after_energy_only_is_unaffected(family):
     atoms = structure(family)
     calc = calculator(model64(family))
     positions = positions_of(atoms)
+    # e3nn's TorchScript-scripted modules (OMOL-0's tiny model reaches them) run the profiling graph in the
+    # first call of a process and the optimised one afterwards; the two round one force differently in the
+    # last bit (4e-19 eV/A here; identical with torch._C._set_graph_executor_optimize(False)). Whichever test
+    # an xdist worker runs first made the comparison flaky, so both compared calls follow a warm-up call.
+    # The GPU plans' cuEq and compiled paths have no TorchScript.
+    field(calc, atoms)(positions)
     fresh = field(calc, atoms)(positions)
     ff = field(calc, atoms)
     ff.energy_only(positions)

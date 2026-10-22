@@ -75,7 +75,7 @@ Top-level keys, in order. "Source" is the input of `metadata_record`.
 | `integrator` | integrator parameters | `integrator`, default the plan's `IntegratorConfig` |
 | `schedule` | the schedule and its position | `schedule`: a mapping or `to_restart()` (T07) |
 | `gate` | `status`, `reason`, `selfchecks`, `device`, `reduced_cell`, `steps`, and the rest of the gate record (2-T05: `copies`, `quantities`, `references`, `seconds`, `replay`, …). `selfchecks` defaults to the plan's per-record self-checks (2-T04 `SelfCheck`: `name`, `passed`, `max_relative_error`, `threshold`, `modules`, `dtype`, `detail`) | `gate`; default `{"status": "skipped", "reason": "opt-in: check=\"gate\"", ...}` (D1), with `device` and `reduced_cell` `null` and `steps` `[]` |
-| `counters` | `recaptures`, `neighbour_lists` (`{name: {rebuilds, build_time_s, skin_A}}` for MACE and D3), `overflows_redone`; `tier_switches` (phase 5) and `mc` (phase 3) always `null`; `engine` (the engine's `info()`) | `counters`, `engine_info` |
+| `counters` | `recaptures`, `neighbour_lists` (`{name: {rebuilds, build_time_s, skin_A}}` for MACE and D3), `overflows_redone`; `mc` (3-T15: `{move: {attempted, impossible, accepted}}`, plus `trial_rebuilds` for `displace`; `null` when no move set was ever attached); `tier_switches` (phase 5) always `null`; `engine` (the engine's `info()`) | `counters`, `engine_info` |
 | `restart_points` | `[{step, output_chunk, output_rows, output_frames, ...}]` (T06's indices, §10.6) | `restart_points` |
 | `timing` | `setup_s` (`{stage: seconds}`), `setup_total_s`, then the timing summary | `setup`, `timing` |
 | `report` | the run report | `report`: T15's `to_metadata()` or a mapping |
@@ -86,8 +86,9 @@ Setup stages use §12.5's names: load, rewrites, compilation, capture, gate. 1b-
 further: load, plan, rewrites, self-checks, model copy, first compiled call, captures. The
 record keeps whatever stage names it is given. Values must be seconds ≥ 0.
 
-`counters` takes only the keys listed. The phase-2 and phase-3 keys (`tier_switches`, `mc`)
-are refused as inputs, so that 1b cannot fill them by accident.
+`counters` takes only the keys listed. The phase-5 key `tier_switches` is refused as an input,
+so that nothing fills it by accident. `counters.mc` is checked: known move types only, exactly
+those keys.
 
 ## SPEC §13 item by item
 
@@ -107,7 +108,7 @@ are refused as inputs, so that 1b cannot fill them by accident.
 | integrator parameters, schedule | `integrator`, `schedule` |
 | gate status, self-check results | `gate.status`, `gate.selfchecks` |
 | re-captures; rebuilds, build times, skins; overflows redone | `counters.recaptures`, `.neighbour_lists`, `.overflows_redone` |
-| tier switches; MC counters | `counters.tier_switches`, `counters.mc`: `null` (phases 5 and 3) |
+| tier switches; MC counters | `counters.tier_switches`: `null` (phase 5); `counters.mc` (3-T15) |
 | restart points with chunk indices; timing summary | `restart_points`; `timing` |
 | code version (package + git hash) | `code.version`, `code.git_commit` |
 

@@ -83,6 +83,7 @@ SINKS_NAME = "sinks"
 # one write per field, in the order of its transaction.
 HOST_WRITE_KINDS = ("positions", "momenta", "species", "masses", "charges", "total_charge", "friction")
 REQUEST_VERSION = 1
+MC_KEEP = "keep"  # a run request's "mc": keep the attached move set (Simulation.run's mc=...)
 POLL_S = 0.2  # how often the parent looks at the child
 LOG_TAIL_LINES = 30  # the child's message when it left no result
 CLOSE_GRACE_S = 30.0  # close(): the worker's time to close its files and exit before it is killed
@@ -207,12 +208,14 @@ class SubprocessRunner:
         sim._started = True
         self._run_child(sim, steps=None, schedule=None, check=sim.check, gate=True)
 
-    def run(self, simulation: Any, *, steps: int | None = None, schedule: Any = None) -> None:
+    def run(self, simulation: Any, *, steps: int | None = None, schedule: Any = None, mc: Any = ...) -> None:
         """Hand ``simulation``'s last committed step to a child, run ``steps`` there (along the attached
         schedule, or ``schedule``, a fresh ``ScheduleState`` that replaces it), and take the child's
-        state, plan and records back. ``SubprocessRunnerError`` on any child failure."""
+        state, plan and records back. ``mc`` is ``Simulation.run``'s, already checked: the child attaches,
+        keeps (``...``) or detaches (``None``) the move set (3-T15). ``SubprocessRunnerError`` on any child
+        failure."""
         simulation._queue.drain()  # frames queued at the committed step come before the steps
-        self._run_child(simulation, steps=steps, schedule=schedule, check="skip", gate=False)
+        self._run_child(simulation, steps=steps, schedule=schedule, check="skip", gate=False, mc=mc)
 
     def host_write(self, simulation: Any, kind: str, values: Any) -> None:
         """Queue a host write (``HOST_WRITE_KINDS``); the next child applies it after its resume."""
@@ -323,8 +326,10 @@ class SubprocessRunner:
         if self._host_writes:
             self._run_child(sim, steps=None, schedule=None, check="skip", gate=False)
 
-    def _run_child(self, sim, *, steps, schedule, check, gate):
+    def _run_child(self, sim, *, steps, schedule, check, gate, mc=...):
         import numpy as np
+
+        from fastmace.simulation import mc_moves, move_record
 
         stage = self._stage()
         writes = []
@@ -334,7 +339,8 @@ class SubprocessRunner:
             writes.append([kind, name])
         request = {"action": "run", "source": str(self.current), "steps": steps,
                    "schedule": None if schedule is None else schedule.to_restart(), "started": sim._started,
-                   "check": check, "host_writes": writes, "sinks": sorted({interval for interval, _ in sim._sinks})}
+                   "check": check, "host_writes": writes, "sinks": sorted({interval for interval, _ in sim._sinks}),
+                   "mc": MC_KEEP if mc is ... else None if mc is None else [move_record(m) for m in mc_moves(mc)]}
         result = self._launch(stage, request)
         self._host_writes = []
         self._take(sim, stage, result, gate=gate)
@@ -536,6 +542,10 @@ class SubprocessRunner:
                 fields[name] = tuple(fields.get(name) or ())
             sim._gate = GateRecord(**fields)
         sim._schedule = None if result["schedule"] is None else ScheduleState.from_restart(result["schedule"])
+        if result.get("mc") is not None:  # the child's MC record for the report (3-T15)
+            from fastmace.simulation import move_from_record
+
+            sim._report.mc = {**result["mc"], "moves": tuple(move_from_record(m) for m in result["mc"]["moves"])}
         sim._restart_points = [dict(point) for point in result["restart_points"]]
         sim._status = result["simulation_status"]
         sim._steps_run = result["steps_run"]
@@ -958,7 +968,11 @@ def _child(directory, request, heartbeat, worker=None):
         sim._engine.state.protocol = sim._schedule
     steps = request.get("steps")
     if steps:
-        sim.run(steps=int(steps))
+        mc = request.get("mc", MC_KEEP)
+        if mc == MC_KEEP:
+            sim.run(steps=int(steps))
+        else:  # attach or detach (3-T15); the parent checked the move set against the workload
+            sim.run(steps=int(steps), mc=None if mc is None else [simulations.move_from_record(m) for m in mc])
     saved = action == "setup" or bool(steps) or bool(request.get("host_writes"))
     if saved:
         sim.save_restart(directory)  # the next hand-off: a canonical restart point (§10.6)
@@ -990,7 +1004,18 @@ def _child(directory, request, heartbeat, worker=None):
         "report": report,
         "extra_warnings": list(sim.report.extra_warnings),
         "metadata": sim.metadata(),
+        "mc": _mc_summary(sim),
     }
+
+
+def _mc_summary(sim):
+    """The child's MC record for the parent's report (``Simulation._mc_summary``), JSON-safe, or ``None``."""
+    from fastmace.simulation import move_record
+
+    summary = sim._mc_summary()
+    if summary is None:
+        return None
+    return {**summary, "moves": [move_record(move) for move in summary["moves"]]}
 
 
 def _construct(directory, request):

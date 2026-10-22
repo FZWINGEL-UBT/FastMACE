@@ -191,6 +191,68 @@ def species_numbers(species) -> tuple[int, ...]:
     return tuple(sorted(out))
 
 
+def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool) -> tuple[tuple[str, str, str], ...]:
+    """Check swap and transmutation records against the force field and the integrator (SPEC §10.4; 3-T09).
+
+    - Every species once: a swap's two species and a transmutable set's members differ as atomic numbers
+      (code ``mc-same-species``).
+    - Rule 2: every species a move names is in ``superset`` (atomic numbers), code
+      ``species-not-in-superset`` (``SpeciesNotInSuperset``).
+    - ``fixcm`` (the integrator removes the centre-of-mass noise): the single-atom ``rescale`` and ``redraw``
+      would change the total momentum behind its back, so they are refused (code ``mc-velocities-fixcm``).
+    - Charge and spin, only when the model or head takes charge or spin inputs (``charge_inputs``): every
+      pair of a transmutable set needs ΔZ − Δq even (code ``transmute-charge-parity``,
+      ``ChargeParityRefused``); otherwise the decision records "parity: not applicable".
+
+    Raises with every reason at once; returns the decisions ``(dimension, choice, why)``.
+    """
+    from fastmace.errors import CHARGE_PARITY_CODE, ChargeParityRefused, PlanRefused, Reason
+    from fastmace.mc.moves import resolved_velocities, species_number
+
+    superset = set(int(z) for z in superset)
+    reasons, parity = [], []
+    for move in moves:
+        kind = getattr(move, "move", None)
+        if kind not in ("swap", "transmute"):
+            continue
+        named = ([species_number(item) for pair in move.pairs for item in pair] if kind == "swap"
+                 else [species_number(item) for item in move.species])
+        if len(set(named)) != len(named) or (kind == "swap" and any(
+                species_number(a) == species_number(b) for a, b in move.pairs)):
+            reasons.append(Reason(f"the {kind} move names one species twice ({_symbols(set(named))}); a swap needs two "
+                                  "species and a transmutable set distinct ones (SPEC §10.4)", code="mc-same-species"))
+        outside = sorted(set(named) - superset)
+        if outside:
+            reasons.append(Reason(f"the {kind} move names {_symbols(outside)}, outside the ForceField's superset "
+                                  f"({_symbols(superset)}) (SPEC §8.5, §10.4)", rule=2,
+                                  code="species-not-in-superset"))
+        velocities = resolved_velocities(move, fixcm)
+        if fixcm and velocities in ("rescale", "redraw"):
+            reasons.append(Reason(
+                f"the {kind} move's velocities={velocities!r} change the total momentum, and the integrator fixes "
+                "the centre of mass (fixcm); use 'redraw_all' (or 'exchange' for swaps) (SPEC §10.4 \"Centre of "
+                "mass\")", code="mc-velocities-fixcm"))
+        if kind == "transmute" and charge_inputs:
+            charges = {species_number(species): value for species, value in move.formal_charges}
+            for index, first in enumerate(named):
+                for second in named[index + 1:]:
+                    odd = (second - first) - (charges.get(second, 0) - charges.get(first, 0))
+                    if odd % 2:
+                        parity.append(Reason(
+                            f"transmuting {_symbols([first])} <-> {_symbols([second])} changes Z - q by {odd}, an odd "
+                            "number, which makes the spin multiplicity invalid; give formal charges so that every "
+                            "ΔZ − Δq is even (SPEC §10.4 \"Charge and spin\")", code=CHARGE_PARITY_CODE))
+    reasons += parity
+    if reasons:
+        raise (ChargeParityRefused if parity else PlanRefused).from_reasons(reasons)
+    transmutes = any(getattr(move, "move", None) == "transmute" for move in moves)
+    if not transmutes:
+        return ()
+    if charge_inputs:
+        return (("parity", "checked", "ΔZ − Δq even for every pair of every transmutable set"),)
+    return (("parity", "not applicable", "the model takes no charge or spin inputs"),)
+
+
 class MinimalPlanner:
     """The rule-based planner of phase 1b.
 
@@ -674,8 +736,8 @@ class MinimalPlanner:
                 code="host-callbacks-graph-sync"))
         moves = ", ".join(workload.mc_moves) or "none"
         book.decide("workload.mc_moves", moves, Reason(
-            "no MC" if not workload.mc_moves else "MC: phase 3; Simulation.run refuses mc= blocks",
-            code="no-mc" if not workload.mc_moves else "mc-phase-3"))
+            "no MC" if not workload.mc_moves else "MC moves are attached through Simulation.run(mc=...) (SPEC §7.6)",
+            code="no-mc" if not workload.mc_moves else "mc-moves"))
         book.decide("workload.species_changes", "on" if workload.species_changes else "off",
                     "rule 8 is not in 1b: species-dependent rewrites are built for the structure's species")
         book.decide("workload.needs_per_atom", ", ".join(sorted(workload.needs_per_atom)) or "none", "recorded")
@@ -726,12 +788,11 @@ class MinimalPlanner:
             raise PlanRefused.from_reasons([Reason(str(error), rule=6, code="naive-cueq")]) from error
 
     def _check_atoms(self, plan, atoms):
-        # The structure's species must lie in the plan's superset; a superset beyond them is rule 8's
-        # (species absent at setup, 3-T02), which the move-energy gate samples (3-T11).
+        # Within the superset, not equal to it: a superset species may be absent (rule 8; 3-T09).
         structure = tuple(sorted({int(z) for z in atoms.numbers}))
         if plan.superset and not set(structure) <= set(plan.superset):
             raise SpeciesNotInSuperset.from_reasons([Reason(
-                f"the structure's species ({_symbols(structure)}) are not in the plan's superset "
+                f"the structure's species ({_symbols(structure)}) are not within the plan's superset "
                 f"({_symbols(plan.superset)}); plan again for this structure (SPEC §8.5)", rule=2,
                 code="species-not-in-superset")])
 

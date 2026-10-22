@@ -338,3 +338,24 @@ def test_import_is_light():
     code = "import sys, fastmace.report; print('torch' in sys.modules, 'mace' in sys.modules)"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout.split()
     assert out == ["False", "False"]
+
+
+def test_the_mc_line():  # 3-T15
+    from fastmace.mc import Displace, Swap
+
+    mc = {"moves": (Swap(pairs=[("Na", "Nb")], every=100, attempts=50), Displace(delta_A=0.1, every=10, attempts=8)),
+          "ranges": [[0, 1000], [3000, 5000]], "blocks": 30, "device_ms": 24.0, "timed_attempts": 120,
+          "counters": {"swap": {"attempted": 100, "impossible": 0, "accepted": 7},
+                       "displace": {"attempted": 80, "impossible": 0, "accepted": 30}}}
+    text = make_report(mc=mc).text()
+    line = next(line for line in text.splitlines() if line.startswith("mc:"))
+    assert "swap Na-Nb every 100, 50 attempts (exchange); accepted 7/100" in line
+    assert "displace δ 0.1 Å every 10, 8 attempts; accepted 30/80" in line
+    assert "0.2 ms/attempt over 30 blocks" in line  # 24 ms over the 120 timed attempts
+    assert "attached over steps 0–1,000, 3,000–5,000" in line
+    assert "MC: experimental: not yet qualified" in text
+    metadata = make_report(mc=mc).to_metadata()["mc"]
+    assert metadata["ranges"] == [[0, 1000], [3000, 5000]] and metadata["timed_attempts"] == 120
+    untimed = make_report(mc={**mc, "device_ms": None, "timed_attempts": 0}).text()
+    assert "ms/attempt" not in untimed and "30 blocks" in untimed
+    assert "\nmc:" not in make_report().text() and make_report().to_metadata()["mc"] is None

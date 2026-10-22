@@ -6,7 +6,7 @@ D1-D6 and prestart all phase 3 workers"). They are SPEC §18 decisions 31–36,
 and all workers were prestarted. Merged so far: 3-T01 (8dfd9f0), 3-T08
 (d73e8b7), 3-T02 (344d221), 3-T04 (623238d), 3-T06 (5a98a51), 3-T03
 (467123b), 3-T13 (77c8403), 3-T17 (2c0c63b), 3-T12's reference helper (49e20b1),
-3-T05 (cda1801), 3-T07 (40ce297) and 3-T20's item-1 tools (2a42aa2); in
+3-T05 (cda1801), 3-T07 (40ce297), 3-T20's item-1 tools (2a42aa2) and 3-T09 (1ad78cb); in
 ResearchModule 3-T16a (90a1e7b1). 3-T11 started with 3-T09, because its gate
 needs T07's evaluator and T03's transactions, not T09's driver. The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
@@ -805,6 +805,22 @@ closed pool", into `plan.reason` and the report line. Files:
 
 This is 2-T22, carried over.
 
+#### 3-T22 The Langevin fixcm projection with unequal masses (S–M, CPU) — added by the conductor, 22 October 2026
+
+Found by 3-T12's hybrid MD/MC tests without MC (`side-session-notes/…/3-T12-finding-fixcm-unequal-masses.md`):
+- `integrators/langevin.py` (ASE's Langevin, copied for its noise stream) removes the centre-of-mass part of
+  the random velocities as P/(N·m_i) per atom and scales by √(N/(N−1)). That is right only for equal masses.
+- On Li/Cs NaCl 2×1×1 at 600 K the light species ran hot: Li 860 K, Cs 567 K, total 666 K. Without `fixcm`,
+  or with Na/K, there was no bias.
+
+The task:
+- measure the bias at production sizes (NaCl, NbCl5, NaNbOCl4 at 3×3×3) on the CPU;
+- prepare the mass-weighted projection behind an option, with ASE's behaviour kept bit for bit for the
+  noise-stream equivalence;
+- check the research engine read-only.
+
+A default change is the owner's decision (checkpoint 2b below). Worker: 3-T03's session.
+
 ### Wave 4: acceptance
 
 #### 3-T20 Phase 3 benchmarks (M, GPU: local timing; Ada) — after T09, T10, T11
@@ -1357,10 +1373,15 @@ the total stays inside the $27 limit.
 Recorded by the conductor at each merge; 3-T21 carries the ones still open into
 `docs/validation/phase-3.md`.
 
-- **3-T02, 3-T06: GPU parts not run yet.** The capture test of the refresh
-  functions, the superset cost, and the compiled-versus-graph and rule-9
-  timing. The workers' permission checks refused the launches; they wait for
-  the owner.
+- **GPU runs refused by the workers' permission checks, waiting for the
+  owner** (22 October 2026):
+  - 3-T02: the refresh-capture test and the superset cost;
+  - 3-T06: compiled against graph on the GPU, and the rule-9 timing;
+  - 3-T20: the 8-run item-1 A/B series;
+  - 3-T14: the protocol smoke and the full local run (item 9).
+
+  Single runs in other workers' sessions were allowed, so the checks don't
+  agree with one another.
 - **3-T03:**
   - The friction refreshes copy host floats to the device, so they are not
     capturable. This is harmless: a friction event drops the graphs anyway.
@@ -1385,6 +1406,27 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   - The transmutation χ² is GPU and acceptance tier only. The 60 s CPU tier
     rests on replaying each decision exactly. The thresholds fixed in advance
     stay (conductor).
+- **3-T09:**
+  - An attempt costs about 0.55 ms more than its energy evaluation, roughly
+    19 % of a NaCl MD step. Most of it is the kernel launches of the
+    plain-PyTorch Philox. A fused kernel is a possible follow-up.
+  - Swap attempt cost as a fraction of one MD step, MH-1 hybrid, RTX 5060 Ti,
+    1500 K: NaCl 0.61 (float32) and 11.8 (float64); NbCl5 0.47 and 12.7.
+  - The planner never fills `state.total_charge` at construction.
+  - The first block's `device_ms` includes the captures; 3-T15's cost line
+    leaves it out.
+  - A conductor-commissioned code review (22 October 2026) found the core MC
+    logic correct: proposals, acceptance, streams, restore, momenta and
+    parity. It also found one medium bug: a second `attach()` of one driver
+    replays stale CUDA graphs. The four smaller items are a stale refresh list
+    after `add_energy_field`, the host total charge with per-atom charges,
+    species compared as given, and kB from CODATA 2018 against ASE's CODATA
+    2014. All five go to 3-T09's follow-up branch.
+- **3-T15:** the parent process doesn't check a move set that a child
+  attached before a resume (the child's own `run` still checks it).
+- **3-T07:** `test_mc_evaluator.py::test_a_force_evaluation_after_energy_only_is_unaffected[omol]`
+  fails intermittently under `-n 4` load (forces not bitwise). It passes
+  alone, and 3-T07 investigates on a follow-up branch.
 - **3-T16a (ResearchModule):**
   - An NbCl5 anneal at 1 fs on the L4 takes about 192 min, more than the 3 h
     job limit, so it needs an A100 and a measured step time.
@@ -1404,6 +1446,8 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
 2. After T11's measurement: whether float32 MC energies are accepted where
    the ΔE gate passes. That is SPEC's rule; the checkpoint is information,
    not a new decision.
+2b. After 3-T22's measurement: whether `fixcm` uses the mass-weighted projection by default. That would
+   change thermostat results slightly for crystals with unequal masses, in FastMACE and in `main.py`.
 3. After T21: the acceptance report, and the tag `fastmace-3`.
 
 ## Owner decisions

@@ -37,6 +37,13 @@ changes (``protocols.TargetFill``), and output is asynchronous: a thermo or fram
 snapshot that is written after the next step has been launched. ``Simulation`` owns the step
 timing that the run report (1b-T15) shows: the steady-state window after warm-up, and the
 whole-run mean at the end of each ``run``.
+
+MC (plan task 3-T15, SPEC §7.6): ``run(mc=…)`` attaches a move set to the simulation through T09's
+``fastmace.mc.driver.MCDriver``, and it stays attached until a later ``run`` passes another
+``mc=`` or ``mc=None``. A block runs right after the MD step it is due at (``MCDriver.due``), before
+that step's output and restart, with ``_mc_block_active`` set for the restart guard. The streams,
+counters and cycle position carry across a detach and re-attach, and across a restart (attached:
+the restart's ``mc`` record; detached: ``simulation.json``).
 """
 
 from __future__ import annotations
@@ -67,6 +74,8 @@ CHECK_MODES = ("skip", "gate", "allow_unavailable")
 THERMO_HEADER = ("step", "time_ps", "phase", "target_K", "temperature_K", "potential_eV_atom", "kinetic_eV_atom",
                  "total_eV_atom")
 NPT_COLUMNS = ("volume_A3_atom", "pressure_GPa")
+# The MC thermo columns, per declared move type (Workload.mc_moves): cumulative, as of the last block.
+MC_THERMO_COUNTERS = ("attempted", "accepted")
 CONSTANT_PHASE = "constant"  # the thermo phase column without a schedule
 ENGINE_NAME = "fastmace"  # the restart file's engine entry
 RESTART_NAME = "restart.npz"  # io.restart.RESTART_NAME (that module imports torch)
@@ -157,6 +166,52 @@ def planner_options(mode: Any = None, allow_reference: Any = False, fallback: An
         else:
             raise TypeError(f"{name} must be a fastmace.config.{kind.__name__} or None, got {type(value).__name__}")
     return PlannerOptions(mode=mode, allow_reference=allow_reference, **parts)
+
+
+def mc_columns(workload: Any) -> tuple[str, ...]:
+    """The thermo columns of a workload's MC moves: ``mc_<move>_attempted``, ``mc_<move>_accepted``."""
+    return tuple(f"mc_{move}_{counter}" for move in workload.mc_moves for counter in MC_THERMO_COUNTERS)
+
+
+def mc_moves(mc: Any) -> tuple:
+    """The move records of an ``mc=`` argument (one ``fm.mc`` record or a sequence of them), validated."""
+    from fastmace import mc as records
+
+    blocks = tuple(mc) if isinstance(mc, (list, tuple)) else (mc,)
+    if not blocks:
+        raise ValueError("mc= is an empty move set; pass mc=None to detach (SPEC §7.6)")
+    kinds = (records.Swap, records.Transmute, records.Displace)
+    for block in blocks:
+        if not isinstance(block, kinds):
+            raise TypeError(f"mc= takes fm.mc records (Swap, Transmute, Displace), got {type(block).__name__}")
+    return blocks
+
+
+def move_record(move: Any) -> dict[str, Any]:
+    """A move record as JSON-safe data (T09's ``fastmace.mc.driver.move_record``: ``{"move": ..., **fields}``)."""
+    from fastmace.mc.driver import move_record as record
+
+    return record(move)
+
+
+def move_from_record(record: Mapping[str, Any]) -> Any:
+    """The ``fm.mc`` record of ``move_record``'s data (a restart's ``mc.moves`` entry or a CLI ``[[mc]]`` table),
+    through T09's ``fastmace.mc.driver.move_from_record``. ``ValueError`` names an unknown move type or field."""
+    from fastmace import mc as records
+    from fastmace.mc.driver import move_from_record as from_record
+
+    classes = {cls.move: cls for cls in (records.Swap, records.Transmute, records.Displace)}
+    move = record.get("move")
+    if move not in classes:
+        raise ValueError(f"an MC move needs move = one of {tuple(classes)}, got {move!r}")
+    names = {item.name for item in dataclasses.fields(classes[move])}
+    unknown = sorted(set(record) - names - {"move"})
+    if unknown:
+        raise ValueError(f"unknown field{'s' if len(unknown) > 1 else ''} {', '.join(unknown)} for move {move!r}; "
+                         f"fm.mc.{classes[move].__name__} takes {', '.join(sorted(names))}")
+    # A TOML table gives mu and formal_charges as mappings; T09's records take them as (species, value) pairs.
+    return from_record({key: list(value.items()) if isinstance(value, Mapping) else value
+                        for key, value in record.items()})
 
 
 def _steps(steps: Any) -> int:
@@ -313,7 +368,17 @@ class Simulation:
         self._config = integrator.to_config(seed=seed)
         self._npt = self._config.ensemble == "npt"
         self._schedule = None
-        self._mc = None  # the attached move set; always None until phase 3
+        self._mc = None  # the attached move set's MCDriver (3-T15), or None
+        self._mc_moves = None  # its move records, also while a child runs the plan
+        self._mc_record = None  # the last MC state (MCDriver.state_dict), kept across a detach
+        self._mc_ranges = []  # [first, last] step ranges run with a move set attached
+        self._mc_blocks = 0
+        self._mc_device_ms = None  # device time of the timed blocks: each driver's first block holds its captures
+        self._mc_timed_attempts = 0
+        self._mc_block_s = 0.0  # wall time of this process's MC blocks: left out of the speed line
+        self._mc_block_s_before = 0.0  # the blocks' time before a resume (simulation.json)
+        self._mc_untimed = None  # the driver whose first block has not run yet
+        self._frame_composition = None  # host species and masses for the frames, after a composition change
         self._status = "setup"
         self._queue = _Queue()
         self._writer = None
@@ -520,7 +585,7 @@ class Simulation:
         if self._runner is not None:
             self._runner.submit_frame(self, sink)
             return
-        self._queue.submit(self._engine.snapshot(), sink)
+        self._queue.submit(self._snapshot(), sink)
 
     def add_sink(self, sink: Callable[[int, Mapping[str, Any]], Any], interval: int) -> None:
         """Call ``sink(step, values)`` for every step of ``run`` that is a multiple of ``interval``, with
@@ -570,10 +635,12 @@ class Simulation:
 
         ``schedule=None`` continues the attached schedule, or keeps the target without one.
         ``mc=...`` (the default) keeps the attached move set, ``mc=None`` detaches it, a move set
-        attaches it (§7.6). Every check runs before the first step: a schedule above
+        attaches it in place of any attached one (§7.6): one ``fm.mc`` record (``Swap``, ``Transmute``,
+        ``Displace``) or a sequence of them. Every check runs before the first step: a schedule above
         ``Workload.max_temperature_K`` raises ``PlanRefused``, ``steps`` beyond the schedule
-        ``ValueError``, and in 1b any ``mc`` is checked against the workload, then refused ("MC:
-        phase 3").
+        ``ValueError``, and the move set that will be attached (given or kept) is checked against the
+        workload over every step of this call (``PlanRefused``; ``SpeciesNotInSuperset`` for a species
+        outside the superset).
         """
         from fastmace.errors import PlanRefused, Reason
         from fastmace.protocols import Schedule, ScheduleState
@@ -601,29 +668,38 @@ class Simulation:
                              "nothing fixes the run's length (SPEC §7.2)")
         else:
             count = steps
-        if mc is not ... and mc is not None:
-            self._refuse_mc(mc, position, count)  # raises: nothing is attached before phase 3
+        moves = None if mc is ... or mc is None else mc_moves(mc)
+        attached = moves if moves is not None else None if mc is None else self._mc_moves
+        if attached:
+            self._check_mc(attached, position, count)
 
-        if self._runner is not None:  # the plan runs in a child (SPEC §8.7)
-            self._runner.run(self, steps=count, schedule=position if schedule is not None else None)
+        if self._runner is not None:  # the plan runs in a child (SPEC §8.7), which attaches the move set
+            self._runner.run(self, steps=count, schedule=position if schedule is not None else None, mc=mc)
+            if mc is not ...:
+                self._mc_moves = moves
             return
+        if mc is None:
+            self._detach_mc()
+        elif moves is not None:
+            self._attach_mc(moves)
         self._schedule = position
         self._engine.state.protocol = position
         self._advance(count)
 
-    def _refuse_mc(self, mc, position, count):
-        """Check an MC block against the workload (§7.6 "Simulation inputs"), then refuse it: MC is phase 3."""
+    # ------------------------------------------------------------------ MC (§7.6, §10.4; 3-T15)
+
+    def _check_mc(self, blocks, position, count):
+        """Check a move set against the workload over the ``count`` steps of this call (§7.6 "Simulation
+        inputs"): every reason at once in one ``PlanRefused``. T09's driver adds its own checks at attach."""
         from fastmace.errors import PlanRefused, Reason
         from fastmace.planner.minimal import _symbols, species_numbers
 
         workload = self.workload
         reasons = []
-        blocks = tuple(mc) if isinstance(mc, (list, tuple)) else (mc,)
         moves, named = [], set()
         for block in blocks:
-            move = getattr(block, "move", None) or getattr(block, "kind", None) or type(block).__name__.lower()
-            moves.append(str(move))
-            for attribute in ("pairs", "species", "transmutable", "elements"):
+            moves.append(block.move)
+            for attribute in ("pairs", "species"):
                 value = getattr(block, attribute, None)
                 if value is None:
                     continue
@@ -649,8 +725,132 @@ class Simulation:
             reasons.append(Reason(
                 f"the MC block names {_symbols(outside)}, outside the ForceField's superset "
                 f"({_symbols(self._plan.superset)}) (SPEC §7.6, §8.5)", rule=2, code="species-not-in-superset"))
-        reasons.append(Reason("MC: phase 3; Simulation.run in 1b runs MD only (SPEC §16)", code="mc-phase-3"))
-        raise PlanRefused.from_reasons(reasons)
+        if reasons:
+            raise PlanRefused.from_reasons(reasons)
+
+    def _attach_mc(self, moves):
+        """Attach ``moves`` through a new ``MCDriver``; the streams, counters and cycle position of the move set
+        attached before (or detached since) carry over, so a re-attach resumes them (§7.6)."""
+        from fastmace.mc import driver as mc_driver
+
+        previous = self._mc.state_dict() if self._mc is not None else self._mc_record
+        if self._mc is not None:
+            self._mc.detach()  # its captured attempts go with it (3-T09 follow-up)
+        driver = mc_driver.MCDriver(moves, seed=self.seed)
+        driver.attach(self._engine)
+        if previous is not None:
+            driver.load_state_dict(_carried_mc_record(previous, driver.state_dict()), other_moves=True)
+        self._mc, self._mc_moves, self._mc_untimed = driver, tuple(moves), driver
+        self._mc_record = driver.state_dict()
+        self._engine.state.mc = self._mc_record
+        self._report.mc = self._mc_summary()
+
+    def _detach_mc(self):
+        """Detach the attached move set (``run(mc=None)``); its state stays for a later re-attach."""
+        if self._mc is not None:
+            self._mc_record = self._mc.state_dict()
+            self._mc.detach()  # its captured attempts go with it (3-T09 follow-up)
+        self._mc = None
+        self._mc_moves = None
+        if self._engine is not None:
+            self._engine.state.mc = None
+
+    def _resume_mc(self, record):
+        """Re-attach the move set of a restart's ``mc`` record (§7.6: the attached move set is restart state)."""
+        from fastmace.mc import driver as mc_driver
+
+        moves = tuple(move_from_record(entry) for entry in record["moves"])
+        driver = mc_driver.MCDriver(moves, seed=self.seed)
+        driver.attach(self._engine)
+        driver.load_state_dict(record)
+        self._mc, self._mc_moves, self._mc_untimed = driver, moves, driver
+        self._mc_record = driver.state_dict()
+        self._engine.state.mc = self._mc_record
+
+    def _synchronised_time(self):
+        """``time.perf_counter()`` once the engine's queued work is done (flush, then a CUDA synchronisation)."""
+        import torch
+
+        engine = self._engine
+        engine.flush()
+        if engine.device.type == "cuda":
+            torch.cuda.synchronize(engine.device)
+        return time.perf_counter()
+
+    def _run_block(self, driver, step):
+        """One MC block at ``step``, with the restart guard set while it runs (T08's ``_mc_block_active``). Its
+        wall time, between synchronisations (the block quiesces and reads its counters anyway), is left out of
+        the speed line."""
+        self._mc_block_active = True
+        started = self._synchronised_time()
+        try:
+            block = driver.run_block(self._engine, step)
+        finally:
+            self._mc_block_active = False
+            self._mc_block_s += self._synchronised_time() - started
+        if block is None:
+            return
+        self._mc_blocks += 1
+        if self._mc_untimed is driver:  # its first block's time includes the attempts' captures (T09)
+            self._mc_untimed = None
+        elif block.get("device_ms") is not None:
+            self._mc_device_ms = (self._mc_device_ms or 0.0) + float(block["device_ms"])
+            self._mc_timed_attempts += sum(int(entry["attempted"]) for entry in block["moves"])
+        if block.get("accepted"):
+            self._composition_changed()  # at the block's canonical point: one read of the new composition
+
+    def _mc_counters(self):
+        """``counters.mc``: the cumulative counters per move type, or ``None`` if no move set was ever attached."""
+        if self._mc is not None:
+            counters = self._mc.counters
+        elif self._mc_record is not None:
+            counters = self._mc_record["counters"]
+        else:
+            return None
+        return {move: dict(counts) for move, counts in counters.items()}
+
+    def _mc_tail(self):
+        """The MC thermo columns' values (``mc_columns``), as of the last completed block: no device read."""
+        counters = self._mc_counters() or {}
+        return tuple(int(counters.get(move, {}).get(counter, 0)) for move in self.workload.mc_moves
+                     for counter in MC_THERMO_COUNTERS)
+
+    def _mc_summary(self):
+        """The report's MC record (``fastmace.report.Report.mc``), or ``None`` without MC."""
+        counters = self._mc_counters()
+        if counters is None and not self._mc_moves:
+            return None
+        moves = self._mc_moves
+        if moves is None and self._mc_record is not None:
+            moves = tuple(move_from_record(entry) for entry in self._mc_record["moves"])
+        return {"moves": tuple(moves or ()), "ranges": [list(pair) for pair in self._mc_ranges],
+                "blocks": self._mc_blocks, "device_ms": self._mc_device_ms, "timed_attempts": self._mc_timed_attempts,
+                "counters": counters or {}}
+
+    def _mc_simulation_record(self):
+        """``simulation.json``'s MC entry: what a resume needs beyond the restart's ``mc`` record."""
+        if self._mc_record is None and not self._mc_ranges:
+            return None
+        return {"attached": self._mc is not None,
+                "record": self._mc.state_dict() if self._mc is not None else self._mc_record,
+                "ranges": [list(pair) for pair in self._mc_ranges], "blocks": self._mc_blocks,
+                "device_ms": self._mc_device_ms, "timed_attempts": self._mc_timed_attempts,
+                "block_s": self._mc_block_s_before + self._mc_block_s}
+
+    def _composition_changed(self):
+        """Read the committed species and masses once, for every later frame (``io.trajectory``)."""
+        import torch
+
+        values = composition_values(self._engine.state)
+        self._frame_composition = {"numbers": torch.from_numpy(values["species"].copy()),
+                                   "masses": torch.from_numpy(values["masses"].copy())}  # host tensors, as a snapshot
+
+    def _snapshot(self):
+        """The engine's output snapshot, with the current species and masses after a composition change."""
+        snapshot = self._engine.snapshot()
+        if self._frame_composition is not None:
+            snapshot.values = {**snapshot.values, **self._frame_composition}
+        return snapshot
 
     def _advance(self, count):
         """``count`` MD steps along the attached schedule (if any), with output and step timing."""
@@ -680,6 +880,13 @@ class Simulation:
         self._status = "running"
         self._run_started = time.perf_counter()
         resolved = position.resolved if position is not None else None
+        driver = self._mc
+        if driver is not None:  # the steps of this call, run with the move set attached
+            first = int(engine.state.step)
+            if self._mc_ranges and self._mc_ranges[-1][1] == first:
+                self._mc_ranges[-1][1] = first + count
+            else:
+                self._mc_ranges.append([first, first + count])
         try:
             for _ in range(count):
                 if position is not None:
@@ -689,6 +896,8 @@ class Simulation:
                     position.step += 1
                 step = engine.state.step
                 self._queue.drain()
+                if driver is not None and driver.due(step):  # after the step's MD, before its output and restart
+                    self._run_block(driver, step)
                 row = thermo_every is not None and step % thermo_every == 0
                 frame = frame_every is not None and step % frame_every == 0
                 if row or frame:
@@ -696,13 +905,13 @@ class Simulation:
                 if self._sinks:
                     for interval, sink in self._sinks:
                         if step % interval == 0:
-                            self._queue.submit(engine.snapshot(), sink)
+                            self._queue.submit(self._snapshot(), sink)
                 if restart_every is not None and step % restart_every == 0:
                     self.save_restart(Path(output.directory) / RESTART_NAME)
                 if step == window_first:
-                    self._window_clock = synchronised_clock()
+                    self._window_clock = synchronised_clock() - self._mc_block_s  # MD only: blocks left out
                 elif step == window_last and self._window_clock is not None and self._report.measured is None:
-                    elapsed = synchronised_clock() - self._window_clock
+                    elapsed = synchronised_clock() - self._mc_block_s - self._window_clock
                     self._report.record_speed(elapsed / (window_last - window_first), window_first, window_last)
             self._queue.drain()
             if output is None:
@@ -719,10 +928,14 @@ class Simulation:
             raise
         self._stop_clock(synchronised_clock, count_steps=engine.state.step)
         self._status = "paused"
+        if self._mc_record is not None or self._mc is not None:
+            if self._mc is not None:
+                self._mc_record = self._mc.state_dict()
+            self._report.mc = self._mc_summary()
         recapture = getattr(engine, "recapture_warning", None)  # past the re-capture budget (3-T04)
         if recapture and recapture not in self._report.extra_warnings:
             self._report.add_warning(recapture)
-        self._report.finish(self._loop_s / self._steps_run, steps=self._steps_run)
+        self._report.finish(max(self._loop_s - self._mc_block_s, 1e-12) / self._steps_run, steps=self._steps_run)
         if self._writer is not None:
             self._writer.flush()
         self._write_metadata()
@@ -739,7 +952,7 @@ class Simulation:
 
         directory = Path(self.output.directory)
         directory.mkdir(parents=True, exist_ok=True)
-        header = THERMO_HEADER + (NPT_COLUMNS if self._npt else ())
+        header = THERMO_HEADER + (NPT_COLUMNS if self._npt else ()) + mc_columns(self.workload)
         self._writer = ChunkedOutput(directory, self._atoms.copy(), header, resume_from=resume_from)
 
     def _sample(self, step):
@@ -753,9 +966,10 @@ class Simulation:
 
     def _submit_output(self, step, *, row, frame):
         sample = self._sample(step) if row else None
-        self._queue.submit(self._engine.snapshot(), lambda step, values: self._write(step, values, sample, frame))
+        tail = self._mc_tail() if row and self.workload.mc_moves else ()
+        self._queue.submit(self._snapshot(), lambda step, values: self._write(step, values, sample, frame, tail))
 
-    def _write(self, step, values, sample, frame):
+    def _write(self, step, values, sample, frame, tail=()):
         from fastmace.errors import NonFiniteError
 
         if sample is not None:
@@ -764,7 +978,7 @@ class Simulation:
                 if not math.isfinite(value):
                     raise NonFiniteError(f"non-finite {name} ({value}) at step {step}",
                                          why="the run stops at a non-finite energy; it is never fixed (SPEC §9.6)")
-        self._writer.write(values, sample, frame)
+        self._writer.write(values, sample, frame, tail=tail)
 
     # ------------------------------------------------------------------ report and metadata
 
@@ -802,7 +1016,8 @@ class Simulation:
         return provenance.metadata_record(
             checkpoint=self.force_field.model, identity=self.force_field.identity, plan=plan, seed=self.seed,
             generators={"integrator": state.rng.generator}, cursors={"integrator": int(state.rng.cursor)},
-            schedule=self._schedule, gate=self._gate, engine_info=self._engine.info(),
+            schedule=self._schedule, gate=self._gate, counters={"mc": self._mc_counters()},
+            engine_info=self._engine.info(),
             restart_points=self._restart_points, setup=self._setup_s, timing=timing, report=self._report,
             device=str(self._engine.device), force_field=self._engine.force_field)
 
@@ -897,6 +1112,7 @@ class Simulation:
                           "pbc": [bool(p) for p in atoms.pbc]},
             "plan_revision": int(self._plan.revision),
             "restart_points": list(self._restart_points),
+            "mc": self._mc_simulation_record(),
         }
 
     @classmethod
@@ -986,11 +1202,22 @@ class Simulation:
         self._fill.reset()
         self._started = True
         self._restart_points = [dict(point) for point in record.get("restart_points", ())]
+        mc = record.get("mc")  # 3-T15: the MC history, and the state of a detached move set
+        if mc is not None:
+            self._mc_ranges = [list(pair) for pair in mc["ranges"]]
+            self._mc_blocks, self._mc_device_ms = int(mc["blocks"]), mc["device_ms"]
+            self._mc_timed_attempts = int(mc.get("timed_attempts") or 0)
+            self._mc_block_s_before = float(mc.get("block_s") or 0.0)
+            self._mc_record = mc["record"]
+        if engine.state.mc is not None:  # the restart's attached move set stays attached (§7.6)
+            self._resume_mc(engine.state.mc)
+        if output is not None:
+            self.output = output  # before the report, whose output line names it
         self._report = self._new_report()
+        self._report.mc = self._mc_summary()
         if versions:
             self._report.add_warning(_versions_text(versions))
         if output is not None:
-            self.output = output
             self._open_output(resume_from=restart.output_indices(stored))
         self._write_metadata()
 
@@ -1132,6 +1359,8 @@ class Simulation:
             transaction.host_writes.append(lambda state: state.velocities.copy_(
                 _tensor(fields["momenta"], state.velocities) / state.masses))
         transaction.run()
+        if {"species", "masses"} & set(fields):
+            self._composition_changed()
         self._record_friction(fields.get("friction_per_fs"))
         if writes & set(fields):
             if not self._host_writes:
@@ -1170,6 +1399,17 @@ class Simulation:
         """Set the Langevin friction in 1/fs, one event; it drops the graphs that bake ``c1``/``c2`` in (a
         recorded re-capture)."""
         self.update(friction_per_fs=friction_per_fs)
+
+
+def _carried_mc_record(previous, fresh):
+    """The state a newly attached move set starts from: ``fresh``'s moves, with ``previous``'s streams, cycle
+    position and cumulative counters (new move types from zero) and the step sizes of moves still present."""
+    counters = {move: dict(counts) for move, counts in fresh["counters"].items()}
+    counters.update({move: dict(counts) for move, counts in previous["counters"].items()})
+    moves = {entry["move"] for entry in fresh["moves"]}
+    return {**fresh, "cycle_position": previous["cycle_position"], "counters": counters,
+            "streams": {stream: dict(position) for stream, position in previous["streams"].items()},
+            "delta_A": {move: delta for move, delta in (previous.get("delta_A") or {}).items() if move in moves}}
 
 
 def _tensor(array, like):
