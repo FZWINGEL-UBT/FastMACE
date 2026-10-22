@@ -298,3 +298,92 @@ def test_the_gate_job_carries_the_record(loaded, planner):
     assert selfcheck._d3_record(job) == RECORD
     plain = dataclasses.replace(plan, dispersion=None)
     assert selfcheck._d3_record(selfcheck._job(plain, _field(loaded, atoms, None), [])) is None
+
+
+# --------------------------------------------------------------------------- tiers, restart, fm.calc
+
+
+@pytest.mark.parametrize("mode", ["eager", "compiled"])
+def test_the_eager_and_compiled_tiers_add_d3(loaded, monkeypatch, mode):
+    from fastmace.model.dispersed import DispersedForceField
+
+    atoms = nacl(1, rattle=0.05, seed=11)
+    planner = _planner()
+    field = _field(loaded, atoms)
+    plan = planner.plan(field, atoms, _npt(), Workload(max_temperature_K=300.0), mode=mode)
+    assert plan.tier == mode and plan.dispersion == RECORD
+    engine = planner.build(plan, field, atoms)
+    assert isinstance(engine.force_field, DispersedForceField)
+    state = engine.state
+    ours = (float(state.energy[0]), state.forces.detach().numpy(), state.stress.detach().numpy())
+    _assert_close(ours, _reference(atoms, loaded, monkeypatch), len(atoms))
+
+
+def test_a_resumed_d3_run_equals_the_uninterrupted_run(loaded, planner, tmp_path):
+    """The record is in simulation.json and the identity; the D3 list is rebuilt at every restart point."""
+    import json
+
+    from fastmace.io.output import Output
+    from fastmace.simulation import SIMULATION_NAME, Simulation
+
+    atoms = nacl(1, rattle=0.05, seed=12)
+    langevin = integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.01)
+
+    def simulation(directory):
+        output = Output(directory, thermo_every=1, trajectory_every=1, restart_every=3)
+        return Simulation(atoms, _field(loaded, atoms), integrator=langevin, output=output, seed=11)
+
+    whole = simulation(tmp_path / "whole")
+    whole.run(steps=7)
+    whole.close()
+    first = simulation(tmp_path / "parts")
+    first.run(steps=5)  # the restart file is from step 3
+    del first
+    record = json.loads((tmp_path / "parts" / SIMULATION_NAME).read_text())
+    assert D3(**record["force_field"]["dispersion"]) == RECORD
+    resumed = Simulation.resume(tmp_path / "parts")
+    assert resumed.force_field.dispersion == RECORD and resumed.plan.dispersion == RECORD
+    resumed.run(steps=4)
+    resumed.close()
+    a, b = resumed.committed(), whole.committed()
+    assert a.step == b.step
+    np.testing.assert_array_equal(a.positions, b.positions)
+    np.testing.assert_array_equal(a.forces, b.forces)
+    assert a.energy == b.energy
+
+
+def test_a_resume_without_the_d3_record_is_refused(loaded, planner, tmp_path):
+    import json
+
+    from fastmace.io.output import Output
+    from fastmace.simulation import SIMULATION_NAME, Simulation
+
+    atoms = nacl(1, rattle=0.05, seed=13)
+    langevin = integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.01)
+    output = Output(tmp_path, thermo_every=1, trajectory_every=1, restart_every=2)
+    sim = Simulation(atoms, _field(loaded, atoms), integrator=langevin, output=output, seed=11)
+    sim.run(steps=3)
+    del sim
+    path = tmp_path / SIMULATION_NAME
+    record = json.loads(path.read_text())
+    record["force_field"].pop("dispersion")
+    path.write_text(json.dumps(record))
+    with pytest.raises(Exception, match="dispersion|identity"):
+        Simulation.resume(tmp_path)
+
+
+def test_fm_calc_takes_dispersion(loaded, planner, monkeypatch):
+    import dataclasses
+
+    from fastmace.ase.calculator import FastMACECalculator
+
+    r2scan = dataclasses.replace(loaded, functional="r2scan")
+    calculator = FastMACECalculator(r2scan, precision="float64", dispersion="d3bj")
+    assert calculator.dispersion == RECORD and "energies" not in calculator.implemented_properties
+    atoms = nacl(1, rattle=0.05, seed=14)
+    atoms.calc = calculator
+    from ase.stress import voigt_6_to_full_3x3_stress
+
+    ours = (atoms.get_potential_energy(), atoms.get_forces(), voigt_6_to_full_3x3_stress(atoms.get_stress()))
+    assert calculator.plan.dispersion == RECORD
+    _assert_close(ours, _reference(atoms, loaded, monkeypatch), len(atoms))

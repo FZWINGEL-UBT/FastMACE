@@ -16,8 +16,9 @@ plan is the code path of before, bit for bit.
 - **Energy only** (MC energies, ``energy_only``): MACE's forward plus D3's ``evaluate_energy``.
 - **Lists.** ``needs_rebuild`` is the OR of the MACE list's flag and the D3 list's (device ops,
   capturable). ``rebuild`` (host side, after a flag) rebuilds the MACE list as before and the D3 list
-  only when its own test asks for it, so the D3 list keeps the cadence its own skin gives (rule 11). ``rebuild_all`` rebuilds both: the canonical restart points (SPEC §10.6). A grown
-  capacity of either returns True, and the engine captures its graphs again.
+  only when its own test asks for it, so the D3 list keeps the cadence its own skin gives (rule 11).
+  ``rebuild_all`` rebuilds both: the canonical restart points (SPEC §10.6). A grown capacity of either
+  returns True, and the engine captures its graphs again.
 - **Cell.** ``set_cell`` gives the cell to both (the D3 list's deformation-aware test and its shifts).
 - **Species.** ``register_derived`` registers MACE's derived buffers and points the D3 kernels at the
   state's species (``D3Term.use_numbers``); the kernels index their tables by atomic number, so a
@@ -129,6 +130,13 @@ class DispersedForceField:
         """Rebuild the MACE list, and the D3 list when its own test asks for it; True if a buffer moved."""
         grew = bool(self.mace.rebuild(positions))
         if self.d3.needs_rebuild_now(positions):  # host sync (rebuild steps only)
+            # An early rebuild beside the force call in flight (OPT2-T04) runs on a side stream: the force call
+            # reads the D3 list in place, so its build waits for it (the MACE build writes candidates only).
+            reader = getattr(self.mace.neighbours, "reader_stream", None)
+            if reader is not None:
+                import torch
+
+                torch.cuda.current_stream().wait_stream(reader)
             grew |= bool(self.d3.build(positions, None))
         return grew
 

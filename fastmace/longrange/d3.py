@@ -3,8 +3,8 @@
 Plan task 1b-T01 fixes the record; 1b-T20 adds the ``"d3bj"`` expansion from the head's training
 functional (``expand``); 3b-T01 adds the explicit Becke–Johnson numbers, the precision semantics,
 the identity entry and the ``DispersionTerm`` interface that the D3 list (3b-T02) and kernel
-(3b-T03) implement. Until 3b-T04 integrates them, plans with D3 are refused ("D3: phase 3b"), with
-the record shown (``describe``). The contract is docs/design/d3.md.
+(3b-T03) implement; 3b-T04 composes them into ``fastmace.longrange.d3_term.D3Term`` and puts it into
+the plan's force field (``fastmace.model.dispersed``). The contract is docs/design/d3.md.
 
 "D3(BJ)" alone does not identify the correction, so every choice is a field, and the whole record
 is part of the force-field identity (§10.6). The defaults are the §11.2 table (the 15 October

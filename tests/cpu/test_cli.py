@@ -127,19 +127,20 @@ def test_md_value_error_is_a_usage_error(capsys):
     assert "Traceback" not in err
 
 
-def test_d3bj_is_expanded_then_refused_at_plan_time(capsys):
-    assert cli.main(["md", *REQUIRED, "--head", "matpes_r2scan", "--temperature", "300", "--steps", "10",
-                     "--dispersion", "d3bj"]) == 1
-    err = capsys.readouterr().err
-    assert "D3: phase 3b" in err and "functional=r2scan" in err
-    assert "Traceback" not in err
+@pytest.mark.parametrize("extra,expected", [([], "d3bj"), (["--d3-functional", "pbe"], "D3:pbe")])
+def test_d3_reaches_fm_md_through_main(monkeypatch, capsys, extra, expected):
+    """3b-T04: the d3-phase-3b refusal is gone; ``--dispersion d3bj`` reaches ``fm.md`` (which expands it)."""
+    from types import SimpleNamespace
 
+    from fastmace import quick
+    from fastmace.longrange.d3 import D3
 
-def test_explicit_d3_functional_is_refused_with_the_record(capsys):
+    calls = []
+    monkeypatch.setattr(quick, "md", lambda structure, **options: calls.append(options) or SimpleNamespace(
+        summary="summary", output="run/"))
     assert cli.main(["md", *REQUIRED, "--head", "matpes_r2scan", "--temperature", "300", "--steps", "10",
-                     "--dispersion", "d3bj", "--d3-functional", "pbe"]) == 1
-    err = capsys.readouterr().err
-    assert "D3: phase 3b" in err and "functional=pbe" in err
+                     "--dispersion", "d3bj", *extra]) == 0
+    assert calls[0]["dispersion"] == ("d3bj" if expected == "d3bj" else D3(functional="pbe"))
 
 
 def test_nve_is_refused_through_main(capsys):

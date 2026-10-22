@@ -368,7 +368,9 @@ class Report:
     def _physics(self):
         if self.dispersion:
             d3 = self.dispersion
-            parts = [f"D3({str(d3.get('damping', 'bj')).upper()}) functional {d3.get('functional')}"]
+            parts = [f"D3({str(d3.get('damping', 'bj')).upper()}) functional {d3.get('functional')} "
+                     f"(s6 {d3.get('s6')}, s8 {d3.get('s8')}, a1 {d3.get('a1')}, a2 {d3.get('a2')}, cutoff "
+                     f"{d3.get('pair_cutoff_bohr')} bohr), non-stock (MACE plus D3)"]
         else:
             parts = ["no dispersion"]
         if self.charge_spin is None:
