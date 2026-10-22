@@ -14,8 +14,9 @@ decided the same day (SPEC decisions 37 and 38). 3-T06b (397da85) and 3-T22c
 (3c3e871) are merged, and so is 3-T22c's ResearchModule part (21165421, `main.py
 --fixcm-projection`). 3-T14 (266b641; item 9 end to end on both GPUs), 3-T02's GPU
 results (5a202d2) and 3-T20 (c3bf93f; items 1–3 pass) are merged too. **Freeze for
-3-T21:** main c3bf93f, whose `fastmace/` equals cd43463. 3-T16b (ResearchModule) and 3-T18
-(coraline, when the workstations are back) don't block acceptance. 3-T11 started with 3-T09, because its gate
+3-T21:** main c3bf93f, whose `fastmace/` equals cd43463. 3-T16b is merged in
+ResearchModule (3cc4207f, `main.py --profile swap-anneal`). 3-T18 (coraline, when the
+workstations are back) doesn't block acceptance. 3-T11 started with 3-T09, because its gate
 needs T07's evaluator and T03's transactions, not T09's driver. The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
@@ -1612,6 +1613,10 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
     sequences that the fused integrator changed before phase 3. A task that
     changes behaviour covered by acceptance tests should update and run the
     affected ones;
+  - cross-process control clauses in timing rules should use the documented
+    cross-process noise floor (about 3 %), or be left out where same-process
+    alternating A/Bs are the measurement. 3-T21's NbCl5 control (1.017 against
+    a self-set 1.008) missed only that clause, while the A/Bs passed;
   - GPU launches without refusals:
     - an allow rule for a fixed local-GPU launcher, never for
       `ssh <workstation>`;
