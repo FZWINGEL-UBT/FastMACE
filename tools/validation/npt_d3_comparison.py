@@ -3,7 +3,10 @@
 The independent side is ASE's ``LangevinBAOAB`` with MACE's own ``MACECalculator`` (cuEquivariance,
 float32, MH-1 ``matpes_r2scan``) plus ``torch-dftd`` (float64) on exactly ``fm.D3("r2scan")``'s numbers
 (``fastmace.reference.d3.torch_dftd3_calculator``), summed by ASE's ``SumCalculator``. No FastMACE code is in
-its force path or its integrator. The FastMACE side (``run-fastmace``) follows 3b-T04.
+its force path or its integrator. The FastMACE side (``run-fastmace``) is ``fm.Simulation`` on the default
+planner's (production) plan of ``fm.ForceField(MH-1, precision="float32", dispersion=fm.D3("r2scan"))`` with
+``fm.integrators.LangevinBAOAB`` on the same settings; its samples come from an output sink and go through the
+same arithmetic as the ASE side's.
 
 Settings (``SETTINGS``, recorded with every run; the same on both engines): NbCl5 1x1x3 (216 atoms) from
 the r2SCAN source cell, hydrostatic, 0 GPa, 1 fs, friction 0.02 per ASE time unit (T_tau about 0.49 ps),
@@ -64,13 +67,23 @@ def npt_observables(natoms, volume, kinetic, stress):
     return volume / natoms, pressure / units.GPa
 
 
+def observables_row(step, timestep_fs, natoms, cell, kinetic, potential, stress):
+    """One sample: ``cell`` a 3x3 array (Å), ``kinetic`` and ``potential`` in eV, ``stress`` potential (ASE sign).
+
+    The temperature counts 3N degrees of freedom, as ASE's ``get_temperature`` without constraints."""
+    from ase import units
+
+    cell = np.asarray(cell, dtype=float)
+    volume = abs(float(np.linalg.det(cell)))
+    volume_atom, pressure = npt_observables(natoms, volume, kinetic, stress)
+    a, b, c = np.linalg.norm(cell, axis=1)
+    return (step, step * timestep_fs / 1000.0, 2.0 * kinetic / (3.0 * natoms * units.kB), potential / natoms,
+            kinetic / natoms, volume_atom, pressure, a, b, c)
+
+
 def sample_row(step, timestep_fs, atoms, potential, stress):
-    natoms = len(atoms)
-    kinetic = atoms.get_kinetic_energy()
-    volume_atom, pressure = npt_observables(natoms, atoms.get_volume(), kinetic, stress)
-    a, b, c = atoms.cell.lengths()
-    return (step, step * timestep_fs / 1000.0, atoms.get_temperature(), potential / natoms, kinetic / natoms,
-            volume_atom, pressure, a, b, c)
+    return observables_row(step, timestep_fs, len(atoms), atoms.cell.array, atoms.get_kinetic_energy(), potential,
+                           stress)
 
 
 # --------------------------------------------------------------------------- the ASE side
@@ -131,11 +144,47 @@ def run_ase(atoms, calculator, temperature_K, seed, steps, sample_every, sink, s
     return atoms
 
 
+def fastmace_side(checkpoint, atoms, temperature_K, seed, steps, sample_every, sink, settings=SETTINGS):
+    """``fm.Simulation`` (default planner) from ``atoms`` (velocities drawn here, as ``run_ase``); returns it."""
+    from ase import units
+    from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
+
+    import fastmace as fm
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K, rng=np.random.default_rng(seed))
+    model = fm.load(str(checkpoint), head=settings["head"], trusted=True)
+    force_field = fm.ForceField(model, atoms, precision="float32", dispersion=d3_record())
+    integrator = fm.integrators.LangevinBAOAB(
+        timestep_fs=settings["timestep_fs"], temperature_K=temperature_K,
+        friction_per_fs=settings["friction_per_ase_time"] * units.fs, pressure_GPa=settings["pressure_GPa"],
+        cell_mode=settings["cell_mode"], barostat_tau_fs=settings["barostat_tau_fs"],
+        barostat_mass_factor=settings["barostat_mass_factor"],
+        disable_cell_langevin=not settings["cell_langevin"])
+    simulation = fm.Simulation(atoms, force_field, integrator=integrator, seed=seed,
+                               workload=fm.Workload(max_temperature_K=temperature_K))
+    natoms = len(atoms)
+
+    def frame(step, values):
+        host = {key: np.asarray(value, dtype=float) for key, value in values.items()
+                if key in ("cell", "kinetic", "energy", "stress")}
+        sink(observables_row(step, settings["timestep_fs"], natoms, host["cell"], float(host["kinetic"].sum()),
+                             float(host["energy"].reshape(-1)[0]), host["stress"]))
+
+    simulation.submit_frame(frame)
+    simulation.add_sink(frame, sample_every)
+    simulation.run(steps)
+    simulation.flush_output()
+    return simulation
+
+
 def _versions():
     import importlib.metadata as metadata
 
     versions = {}
-    for package in ("ase", "torch", "mace-torch", "torch-dftd", "cuequivariance", "cuequivariance-torch", "numpy"):
+    for package in ("ase", "torch", "mace-torch", "torch-dftd", "cuequivariance", "cuequivariance-torch",
+                    "openequivariance", "numpy"):
         try:
             versions[package] = metadata.version(package)
         except metadata.PackageNotFoundError:
@@ -143,18 +192,17 @@ def _versions():
     return versions
 
 
-def command_run_ase(args):
+def command_run(args):
     import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
 
     # isort: split
     import torch
-    from ase.io import write
 
     args.output.mkdir(parents=True, exist_ok=True)
     root = args.structures or os.environ.get("FASTMACE_STRUCTURES", ".")
     atoms = source_atoms(root)
     steps = round((args.equilibration_ps + args.production_ps) * 1000.0 / SETTINGS["timestep_fs"])
-    record = dict(engine="ase", temperature_K=args.temperature_K, seed=args.seed, steps=steps,
+    record = dict(engine=args.engine, temperature_K=args.temperature_K, seed=args.seed, steps=steps,
                   equilibration_ps=args.equilibration_ps, production_ps=args.production_ps,
                   sample_every=args.sample_every, settings=SETTINGS, natoms=len(atoms),
                   checkpoint=str(args.checkpoint), machine=args.machine or platform.node(),
@@ -162,7 +210,7 @@ def command_run_ase(args):
                   python=sys.executable, versions=_versions(),
                   fastmace_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"),
                   created_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"))
-    calculator = ase_calculator(args.checkpoint, args.device)
+    calculator = ase_calculator(args.checkpoint, args.device) if args.engine == "ase" else None
     started = time.perf_counter()
     steady = {}  # the first sample at or after 10 % of the steps: the rate without start-up and first calls
     with open(args.output / "samples.csv", "w", newline="") as handle:
@@ -175,16 +223,24 @@ def command_run_ase(args):
             if not steady and row[0] >= steps // 10 and row[0] > 0:
                 steady.update(step=row[0], time=time.perf_counter())
 
-        final = run_ase(atoms, calculator, args.temperature_K, args.seed, steps, args.sample_every, sink)
+        if args.engine == "ase":
+            final = run_ase(atoms, calculator, args.temperature_K, args.seed, steps, args.sample_every, sink)
+        else:
+            simulation = fastmace_side(args.checkpoint, atoms, args.temperature_K, args.seed, steps,
+                                       args.sample_every, sink)
+            record["simulation"] = json.loads(json.dumps(simulation.metadata(), default=str))
     record["wall_s"] = time.perf_counter() - started
     record["s_per_step"] = record["wall_s"] / max(steps, 1)
     if steady and steps > steady["step"]:
         record["steady_s_per_step"] = (started + record["wall_s"] - steady["time"]) / (steps - steady["step"])
-    write(args.output / "final.extxyz", final)
+    if args.engine == "ase":
+        from ase.io import write
+
+        write(args.output / "final.extxyz", final)
     (args.output / "run.json").write_text(json.dumps(record, indent=2) + "\n")
     steady_ms = record.get("steady_s_per_step", math.nan) * 1e3
-    print(f"ase {args.temperature_K:g} K seed {args.seed}: {steps} steps, {record['s_per_step'] * 1e3:.1f} ms/step, "
-          f"{steady_ms:.1f} after the first 10 %")
+    print(f"{args.engine} {args.temperature_K:g} K seed {args.seed}: {steps} steps, "
+          f"{record['s_per_step'] * 1e3:.1f} ms/step, {steady_ms:.1f} after the first 10 %")
     return 0
 
 
@@ -303,7 +359,20 @@ def command_analyse(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
-    run = commands.add_parser("run-ase", help="one ASE LangevinBAOAB + MACE + torch-dftd run")
+    for name, engine, text in (("run-ase", "ase", "one ASE LangevinBAOAB + MACE + torch-dftd run"),
+                               ("run-fastmace", "fastmace", "one fm.Simulation run on the production plan")):
+        run = commands.add_parser(name, help=text)
+        _run_arguments(run)
+        run.set_defaults(handler=command_run, engine=engine)
+    compare = commands.add_parser("analyse", help="the comparison of run directories")
+    compare.add_argument("runs", nargs="+", type=Path)
+    compare.add_argument("--output", type=Path, required=True)
+    compare.set_defaults(handler=command_analyse)
+    args = parser.parse_args(argv)
+    return args.handler(args)
+
+
+def _run_arguments(run):
     run.add_argument("--temperature-K", type=float, required=True)
     run.add_argument("--seed", type=int, required=True)
     run.add_argument("--output", type=Path, required=True)
@@ -315,13 +384,6 @@ def main(argv=None):
     run.add_argument("--sample-every", type=int, default=10)
     run.add_argument("--device", default="cuda")
     run.add_argument("--machine", help="the machine's name for the record (e.g. 'Modal L4')")
-    run.set_defaults(handler=command_run_ase)
-    compare = commands.add_parser("analyse", help="the comparison of run directories")
-    compare.add_argument("runs", nargs="+", type=Path)
-    compare.add_argument("--output", type=Path, required=True)
-    compare.set_defaults(handler=command_analyse)
-    args = parser.parse_args(argv)
-    return args.handler(args)
 
 
 if __name__ == "__main__":

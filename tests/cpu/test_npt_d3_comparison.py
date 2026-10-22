@@ -151,3 +151,27 @@ def test_d3_record_is_the_r2scan_bj_set():
     record = tool.d3_record()
     assert (record.s6, record.s8, record.a1, record.a2) == (1.0, 0.7898, 0.4948, 5.7308)  # conductor's choice 2
     assert record.damping == "bj" and not record.three_body and record.pair_cutoff_bohr == 40.0
+
+
+def test_fastmace_side_runs_a_simulation_with_d3(tmp_path, monkeypatch):
+    """``fastmace_side`` on a tiny model (CPU planner): one row per sample, the cell moves, the plan has D3."""
+    pytest.importorskip("cuequivariance_torch")
+    import torch
+
+    from _support.mc_fixtures import cpu_planner
+    from _support.structures import nacl
+    from _support.tiny_models import FAMILIES, tiny_mace_model
+
+    cpu_planner(monkeypatch)
+    path = tmp_path / "tiny-mh1-11-17.model"
+    torch.save(tiny_mace_model([11, 17], **FAMILIES["mh1"]), path)
+    settings = {**tool.SETTINGS, "head": None}
+    rows = []
+    atoms = nacl(1, rattle=0.05, seed=3)
+    simulation = tool.fastmace_side(path, atoms, 300.0, 5, 20, 5, rows.append, settings=settings)
+    assert [row[0] for row in rows] == [0, 5, 10, 15, 20]
+    volumes = [row[tool.COLUMNS.index("volume_A3_atom")] for row in rows]
+    assert volumes[0] == pytest.approx(atoms.get_volume() / len(atoms))
+    assert volumes[-1] != volumes[0]
+    assert all(math.isfinite(row[tool.COLUMNS.index("pressure_GPa")]) for row in rows)
+    assert "D3" in json.dumps(simulation.metadata(), default=str)
