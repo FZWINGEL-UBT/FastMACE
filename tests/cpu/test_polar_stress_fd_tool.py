@@ -68,3 +68,29 @@ def test_arguments():
         tool.parse_args(["--path", "hybrid", "--dtype", "float64", "--output", "o.json"])
     with pytest.raises(SystemExit):
         tool.parse_args(["--path", "stock", "--frozen-kset", "--output", "o.json"])
+
+
+def test_included_kset_of_a_cubic_cell_and_a_crossing():
+    # Cubic cell a = 2 pi: |k| = |n|, so with cutoff 1.5 the half-space set within the sphere is the
+    # origin, the 3 axis vectors and the 6 face diagonals of one half-space: 10.
+    cell = np.identity(3) * 2 * np.pi
+    kset = tool.included_kset(cell, cutoff=1.5)
+    assert sum(included for included, _ in kset.values()) == 10
+    assert kset[(1, 1, 0)] == (True, pytest.approx(np.sqrt(2) / 1.5))
+    assert not kset[(1, 1, 1)][0]
+    # Cutoff just below sqrt(2): the face diagonals sit outside. Stretching x by 1e-4 shrinks the k_x
+    # of the diagonals with n1 = 1, which brings those four in; compressing brings in none.
+    cutoff = np.sqrt(2) * (1 - 2e-5)
+    flips = tool.kset_flips(cell, np.diag([1e-4, 0.0, 0.0]), cutoff=cutoff)
+    assert sorted(n for n, _, _ in flips) == [(1, -1, 0), (1, 0, -1), (1, 0, 1), (1, 1, 0)]
+    assert all(not before[0] and after[0] for _, before, after in flips)
+    assert tool.kset_flips(cell, -np.diag([1e-4, 0.0, 0.0]), cutoff=cutoff) == []
+
+
+def test_replay_needs_no_path():
+    args = tool.parse_args(["--replay", "--output", "o.json"])
+    assert args.replay and args.path is None
+    with pytest.raises(SystemExit):
+        tool.parse_args(["--output", "o.json"])
+    with pytest.raises(SystemExit):
+        tool.parse_args(["--replay", "--path", "reference", "--output", "o.json"])

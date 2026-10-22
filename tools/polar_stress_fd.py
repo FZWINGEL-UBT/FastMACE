@@ -98,6 +98,68 @@ def voigt_strain(i, j, h):
     return e
 
 
+# ------------------------------------------------------------------ the included k-set on the host
+
+# POLAR-1-S's float32 kspace_cutoff (1/A), as the float64 reference reads it.
+POLAR_1_S_KSPACE_CUTOFF = 1.8467166423797607
+
+
+def included_kset(cell, cutoff=POLAR_1_S_KSPACE_CUTOFF):
+    """{(n1, n2, n3): (included, |k| / cutoff)} for graph_longrange's per-call k-vector set of ``cell``.
+
+    graph_longrange.kspace.compute_k_vectors_flat in float64: bounds n_i = ceil(cutoff / (b_i . a_i/|a_i|)),
+    the half-space parts (0,0,0), (0,0,0<c<n3), (0,0<b<n2,-n3<=c<n3), (0<a<n1,-n2<=b<n2,-n3<=c<n3), then
+    |k| <= cutoff. The set depends on the cell only.
+    """
+    cell = np.asarray(cell, dtype=np.float64)
+    reciprocal = 2 * np.pi * np.linalg.inv(cell.T)
+    dots = np.einsum("ij,ij->i", reciprocal, cell / np.linalg.norm(cell, axis=1)[:, None])
+    n1, n2, n3 = (int(n) for n in np.ceil(cutoff / dots))
+    out = {}
+    for a in range(0, n1 + 1):
+        for b in range(-n2 - 1, n2 + 1):
+            for c in range(-n3 - 1, n3 + 1):
+                if a == 0 and (b < 0 or (b == 0 and c < 0)):
+                    continue
+                if a == 0 and b == 0:
+                    in_bounds = c == 0 or 0 < c < n3
+                elif a == 0:
+                    in_bounds = 0 < b < n2 and -n3 <= c < n3
+                else:
+                    in_bounds = a < n1 and -n2 <= b < n2 and -n3 <= c < n3
+                ratio = float(np.linalg.norm(np.array([a, b, c]) @ reciprocal) / cutoff)
+                out[(a, b, c)] = (bool(in_bounds and ratio <= 1.0), ratio)
+    return out
+
+
+def kset_flips(cell, strain, cutoff=POLAR_1_S_KSPACE_CUTOFF):
+    """The k-vectors whose inclusion differs between ``cell`` and ``cell (I + strain)``: [(n, before, after)]."""
+    before = included_kset(cell, cutoff)
+    after = included_kset(np.asarray(cell) @ (np.identity(3) + strain), cutoff)
+    return [(n, before[n], after.get(n, (False, None))) for n in sorted(set(before) | set(after))
+            if before.get(n, (False,))[0] != after.get(n, (False,))[0]]
+
+
+def replay(args):
+    """--replay: the flips of every configuration, component and step, on the host (no model, no GPU)."""
+    result = {"tool": "tools/polar_stress_fd.py --replay", "cutoff": args.replay_cutoff, "configs": {}}
+    for key, atoms in configurations(args.structure, args.repeat, args.configs).items():
+        rows = []
+        for h in args.steps:
+            for i, j in VOIGT:
+                for sign in (1, -1):
+                    flips = kset_flips(atoms.cell.array, voigt_strain(i, j, sign * h), args.replay_cutoff)
+                    rows.append({"h": h, "component": f"{i}{j}", "sign": sign,
+                                 "flips": [{"n": list(n), "before": b, "after": a} for n, b, a in flips]})
+                    if flips:
+                        print(key, f"h={h:g}", f"{i}{j}", "+" if sign > 0 else "-",
+                              [(n, round(b[1], 6), round(a[1], 6)) for n, b, a in flips], flush=True)
+        result["configs"][key] = rows
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(result, indent=1))
+    print("wrote", args.output, flush=True)
+
+
 # ------------------------------------------------------------------ the frozen k-set control
 
 class KSetProbe:
@@ -330,7 +392,10 @@ def measure(args, evaluate, rebase, probe, key, atoms):
 
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--path", choices=PATHS, required=True)
+    p.add_argument("--path", choices=PATHS)
+    p.add_argument("--replay", action="store_true",
+                   help="No model: the k-vectors that change sides at each step, from the cell alone (host only)")
+    p.add_argument("--replay-cutoff", type=float, default=POLAR_1_S_KSPACE_CUTOFF)
     p.add_argument("--dtype", choices=("float32", "float64"), default="float64")
     p.add_argument("--label", default="polar-1-s")
     p.add_argument("--structure", default="NbCl5")
@@ -349,6 +414,8 @@ def parse_args(argv=None):
                    help="research path: size polar_gpu's k-space state on each configuration's cell (1a-T19 did not)")
     p.add_argument("--output", type=Path, required=True)
     args = p.parse_args(argv)
+    if (args.path is None) == (not args.replay):
+        p.error("give --path or --replay")
     if args.path == "hybrid" and args.dtype != "float32":
         p.error("the hybrid backend runs float32 only")
     if args.path in ("stock", "research") and (args.frozen_kset or args.probe):
@@ -360,6 +427,8 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
+    if args.replay:
+        return replay(args)
     import torch
 
     torch.set_num_threads(2)
