@@ -241,3 +241,27 @@ def test_thinned_and_counts():
     sequence = np.arange(10)
     assert ref.thinned(sequence, 3).tolist() == [2, 5, 8]
     assert ref.counts_of(np.array([0, 2, 2]), 4).tolist() == [1, 0, 2, 0]
+
+
+def test_batch_mean_and_agree():
+    values = np.repeat([1.0, 3.0], 5)
+    mean, error = ref.batch_mean(values, n_batches=2)
+    assert mean == 2.0 and error == pytest.approx(1.0)
+    # Independent normal values: the standard error matches sigma / sqrt(n).
+    rng = np.random.default_rng(3)
+    mean, error = ref.batch_mean(rng.normal(size=100_000))
+    assert abs(mean) < 4 * error and error == pytest.approx(1 / math.sqrt(100_000), rel=0.5)
+    assert ref.agree((1.0, 0.1), (1.3, 0.0)) and not ref.agree((1.0, 0.1), (1.5, 0.0))
+    assert ref.agree((1.0, 0.3), (2.0, 0.4)) and not ref.agree((1.0, 0.03), (2.0, 0.04))
+    with pytest.raises(ValueError, match="batches"):
+        ref.batch_mean([1.0], n_batches=2)
+    assert ref.deviations({"a": (1.0, 0.3), "b": (0.0, 1.0)}, {"a": (2.0, 0.4)}) == {"a": pytest.approx(2.0)}
+
+
+def test_cases_from_given_energies(swap_case, transmute_case):
+    again = ref.swap_case(nacl(repeat=1), (Z_NA, Z_CL), None, energies=swap_case.energies.tolist())
+    np.testing.assert_array_equal(again.plan.matrix, swap_case.plan.matrix)
+    atoms = nacl(repeat=1).repeat((2, 1, 1))
+    other = ref.transmute_case(atoms, transmute_case.sites, (Z_NA, Z_K), None, energies=transmute_case.energies)
+    assert other.delta_mu == transmute_case.delta_mu
+    np.testing.assert_array_equal(other.plan.x, transmute_case.plan.x)
