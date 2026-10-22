@@ -95,6 +95,12 @@ def summarise(blocks, names):
 
 def main(argv=None):
     args = parse_args(argv)
+    from fastmace import config
+    from fastmace.planner.minimal import MinimalPlanner
+
+    # The allocator first: nothing may touch CUDA before it (the engine's process constraints).
+    planner = MinimalPlanner(engine=config.EngineConfig(backend=args.backend))
+    hardware = planner.hardware()
     from fastmace.model import loading
     oeq_runtime = str(loading.prepare_hybrid()) if args.backend == "hybrid" else None
     if ab_step_time.gpu_processes():
@@ -103,10 +109,8 @@ def main(argv=None):
     checkpoint = args.checkpoint.expanduser().resolve(strict=True)
     import torch
 
-    from fastmace import config
     from fastmace.mc.evaluator import MCEvaluator, float64_model
     from fastmace.model.forcefield import ForceField
-    from fastmace.planner.minimal import MinimalPlanner
     from fastmace.planner.workload import Workload
 
     precision = "float32" if args.backend == "hybrid" else "float64"
@@ -123,8 +127,6 @@ def main(argv=None):
 
     save()
     try:
-        planner = MinimalPlanner(engine=config.EngineConfig(backend=args.backend))
-        hardware = planner.hardware()  # sets the allocator before the first CUDA allocation
         loaded = loading.load_pristine(args.model, checkpoint=str(checkpoint), sha256=meta["checkpoint_sha256"])
         name, base = ab_step_time.read_structure(args.structure, None)
         meta.update(structure=name, natoms=len(base))
