@@ -170,6 +170,13 @@ def three_engines(backend, python):
     return result
 
 
+# The rewrites the optimisation rounds turned on by default for the MH-1 hybrid float32 plan: opt-1 stage A and B
+# (gated_rows, segment_gemm) and OPT-DEF-2 (953aa72: species_tables, fold_readout_tail, fold_product_linear,
+# folded_backward_tiles). The hand-built engine keeps HYBRID_REWRITES; the trajectories hold the two together.
+ROUND_DEFAULTS = ("gated_rows", "segment_gemm", "species_tables", "fold_readout_tail", "fold_product_linear",
+                  "folded_backward_tiles")
+
+
 @functools.cache
 def three_engines_once(backend, python):
     """``three_engines``, once per process: the step-time test reuses the numerical test's run."""
@@ -238,8 +245,9 @@ def test_mh1_hybrid_float32_planned_equals_hand_built_and_minimal():
     scatter = ENGINE.deviation(result["planned_repeat"]["positions"], planned["positions"])
     report = summary(result, planned_scatter_500=scatter)
     ENGINE.report("1b-T27-mh1-hybrid-float32-three-engines", report)
-    # The production set: every MH-1 rewrite, the linear family, streaming on receiver-sorted edges.
-    assert set(planned["records"]) == set(ENGINE.HYBRID_REWRITES)
+    # The production set: every MH-1 rewrite, the linear family, streaming on receiver-sorted edges, and the
+    # optimisation rounds' defaults (all "auto" before phase 3, phase-3-baseline 156ab76).
+    assert set(planned["records"]) == {*ENGINE.HYBRID_REWRITES, *ROUND_DEFAULTS}
     assert (planned["backend"], planned["dtype"]) == ("hybrid", "float32")
     same_plan(result)
     limit = max(3 * scatter, 1e-6)

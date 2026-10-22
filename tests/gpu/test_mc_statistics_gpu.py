@@ -176,6 +176,12 @@ def replay(kind, blocks, attempts):
 
 
 def float64_evaluator(sim):
+    # An MC plan whose move-energy gate picks float64 MC energies (decision 35; here min_mc_temperature_K=1)
+    # already holds the engine's one float64 energy field (3-T07: one per precision): use it.
+    if sim._engine.energy_fields.get("float64") is not None:
+        evaluator = MCEvaluator(sim._engine, "float64")
+        evaluator.evaluate()
+        return evaluator, "engine's float64 field"
     errors = {}
     for backend in (sim.plan.engine.backend, "cueq"):
         try:
