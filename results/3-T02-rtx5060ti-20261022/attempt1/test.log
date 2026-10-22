@@ -1,0 +1,89 @@
+Cannot read termcap database;
+using dumb terminal settings.
+.F                                                                       [100%]
+=================================== FAILURES ===================================
+_________ test_captured_refresh_equals_a_fresh_construction[residual] __________
+
+family = 'residual'
+names = ('generic_species_skip', 'generic_reassociate', 'generic_fused_radial_backward')
+options = {'embedding_specs': {'total_spin': {'type': 'categorical', 'per': 'graph', 'in_dim': 1, 'emb_dim': 4, ...}, 'total_charge': {'type': 'categorical', 'per': 'graph', 'in_dim': 1, 'emb_dim': 4, ...}}}
+
+    @pytest.mark.parametrize("family, names, options", CASES, ids=[case[0] for case in CASES])
+    def test_captured_refresh_equals_a_fresh_construction(family, names, options):
+        from _support.tiny_models import FAMILIES, tiny_mace_calculator
+    
+        calc = tiny_mace_calculator(Z_VALUES, device="cuda", **{**FAMILIES[family], **options,
+                                                                "atomic_energies": np.array([-1.25, -2.5, -3.75, -5.125])})
+        joint = "embedding_specs" in options
+        atoms = structure()
+        field = build(calc, atoms, names, 0 if joint else None)
+        registry = DerivedStateRegistry()
+        field.register_derived(registry)
+        outputs(field, atoms)
+        addresses = {name: registry[name].buffer.data_ptr() for name in registry.names()}
+    
+        stream = torch.cuda.Stream()
+        stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(stream):  # warm-up outside the capture, as the engine does
+            for name in registry.names():
+                registry[name].refresh()
+        torch.cuda.current_stream().wait_stream(stream)
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            for name in registry.names():
+                registry[name].refresh()
+    
+        target = atoms.copy()
+        numbers = target.numbers.copy()
+        numbers[0], numbers[1] = atoms.numbers[1], atoms.numbers[0]
+        numbers[[5, 9]] = 26  # the absent, last superset species
+        target.numbers = numbers
+        charges = np.zeros(len(atoms))
+        if joint:
+            charges[[2, 7]] = 1.0
+            target.set_initial_charges(charges)
+        field.check_species(target.numbers)
+        field.atomic_numbers.copy_(torch.as_tensor(target.numbers))
+        field.charges.copy_(torch.as_tensor(charges))
+        graph.replay()
+        torch.cuda.synchronize()
+        assert {name: registry[name].buffer.data_ptr() for name in registry.names()} == addresses
+    
+        fresh = build(calc, target, names, 2 if joint else None)
+        for name, tensor in fresh.derived_buffers().items():
+            torch.testing.assert_close(field.derived_buffers()[name], tensor, rtol=1e-14, atol=0, msg=name)
+>       assert field.neighbours.group_count == len(Z_VALUES)
+E       assert 1 == 4
+E        +  where 1 = <fastmace.neighbors.skin.SkinNeighbourList object at 0x7df76ff8fb80>.group_count
+E        +    where <fastmace.neighbors.skin.SkinNeighbourList object at 0x7df76ff8fb80> = <fastmace.model.forces.MACEForceField object at 0x7df77424ecb0>.neighbours
+E        +  and   4 = len([8, 11, 17, 26])
+
+tests/gpu/test_superset_gpu.py:102: AssertionError
+=============================== warnings summary ===============================
+tests/gpu/test_superset_gpu.py::test_captured_refresh_equals_a_fresh_construction[mh1]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/gpu/test_superset_gpu.py: 23 warnings
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_superset_gpu.py: 22 warnings
+  /home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/ast.py:418: UserWarning: The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`.
+    return visitor(node)
+
+tests/gpu/test_superset_gpu.py::test_captured_refresh_equals_a_fresh_construction[mh1]
+tests/gpu/test_superset_gpu.py::test_captured_refresh_equals_a_fresh_construction[mh1]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:89: FutureWarning: `torch.jit.save` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_superset_gpu.py::test_captured_refresh_equals_a_fresh_construction[mh1]
+tests/gpu/test_superset_gpu.py::test_captured_refresh_equals_a_fresh_construction[mh1]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/gpu/test_superset_gpu.py::test_captured_refresh_equals_a_fresh_construction[residual]
+1 failed, 1 passed, 50 warnings in 18.36s
+test exit 1
