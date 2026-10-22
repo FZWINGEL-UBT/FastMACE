@@ -13,6 +13,7 @@ fresh process. A captured engine and an uncaptured twin (``capture=False``, same
 import importlib.util
 from pathlib import Path
 
+import pytest
 import torch
 
 from _support.tiny_models import FAMILIES, tiny_mace_model
@@ -51,8 +52,10 @@ from fastmace.mc.displace import DisplaceAttempts
 from fastmace.mc.evaluator import MCEvaluator
 
 captured = planner.build(plan, loaded, structure(), temperature_K=300.0)
-twin = planner.build(plan, loaded, structure(), temperature_K=300.0, capture=False)
-engines = (captured, twin)
+engines = (captured,)
+if SPEC["twin"]:
+    engines += (planner.build(plan, loaded, structure(), temperature_K=300.0, capture=False),)
+names = ("captured", "twin")[:len(engines)]
 for engine in engines:
     for _ in range(10):
         engine.step()
@@ -64,23 +67,24 @@ def lists(engine):
 
 out = {"blocks": []}
 moves = {}
-for delta in (0.01, 0.2):
-    for name, engine in zip(("captured", "twin"), engines):
+DELTAS = (0.01, 0.2) if SPEC["twin"] else (0.2,)
+for delta in DELTAS:
+    for name, engine in zip(names, engines):
         evaluator = MCEvaluator(engine)
         attempts = DisplaceAttempts(Displace(delta_A=delta, every=10, attempts=8), engine, evaluator,
                                     seeds=mc_stream_seeds(5), max_displacement_A=0.2, index=0 if delta < 0.1 else 1)
         moves[name, delta] = (attempts, evaluator)
-for delta in (0.01, 0.2):
+for delta in DELTAS:
     for temperature in (5.0, 300.0):
         records = []
-        for name, engine in zip(("captured", "twin"), engines):
+        for name, engine in zip(names, engines):
             attempts, evaluator = moves[name, delta]
             record = attempts.run(8, temperature_K=temperature, baseline=evaluator.baseline().clone())
             if record["accepted"]:
                 engine.canonicalise(reevaluate=True)
             records.append(record)
         out["blocks"].append(records)
-out["positions_diff"] = float((captured.state.positions - twin.state.positions).abs().max())
+out["positions_diff"] = float((captured.state.positions - engines[-1].state.positions).abs().max())
 # A block of rejections with trial builds leaves the list and positions as they were.
 before, positions = lists(captured), captured.state.positions.clone()
 attempts, evaluator = moves["captured", 0.2]
@@ -89,16 +93,33 @@ after = lists(captured)
 out["list_same"] = all(torch.equal(before[name], after[name]) for name in before)
 out["positions_same"] = bool(torch.equal(positions, captured.state.positions))
 out["graphs"] = [str(key) for key in captured._graphs]
-out["twin_graphs"] = [str(key) for key in twin._graphs]
+out["twin_graphs"] = [str(key) for key in engines[-1]._graphs] if SPEC["twin"] else []
 print(json.dumps(out, default=str))
 """
 
 
-def test_displacement_attempts_captured_and_on_the_host_path(tmp_path):
+def run(tmp_path, twin):
     path = tmp_path / "tiny-mh1.model"
     torch.save(tiny_mace_model([11, 17], **FAMILIES["mh1"]), path)
-    out = ENGINE.run_fresh(f"SPEC = {{'path': {str(path)!r}}}\n" + CHILD)
+    out = ENGINE.run_fresh(f"SPEC = {{'path': {str(path)!r}, 'twin': {twin!r}}}\n" + CHILD)
     print(out)
+    return out
+
+
+def test_displacement_attempts_captured_with_trial_builds(tmp_path):
+    """The fast tier's cheaper check: the captured engine alone, displacements beyond skin/2."""
+    out = run(tmp_path, twin=False)
+    assert any("mc.displace" in key for key in out["graphs"])
+    assert all(block[0]["attempted"] == 8 for block in out["blocks"])
+    assert sum(block[0]["trial_rebuilds"] for block in out["blocks"]) > 0
+    assert out["rejected"]["accepted"] == 0 and out["rejected"]["trial_rebuilds"] > 0
+    assert out["list_same"] and out["positions_same"]
+
+
+@pytest.mark.slow
+def test_displacement_attempts_captured_and_on_the_host_path(tmp_path):
+    """Against an uncaptured twin on the same GPU, small and large displacements, two temperatures."""
+    out = run(tmp_path, twin=True)
     assert any("mc.displace" in key for key in out["graphs"]) and not out["twin_graphs"]
     small, large = out["blocks"][:2], out["blocks"][2:]
     for captured, twin in out["blocks"]:
