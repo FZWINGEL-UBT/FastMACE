@@ -49,6 +49,7 @@ AUTO_RULES = {
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
     "NeighbourConfig.skin": "rule_11_skin_from_workload",
     "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
+    "NeighbourConfig.d3_skin": "rule_11_d3_skin_from_workload",
     "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",

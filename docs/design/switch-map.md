@@ -106,6 +106,7 @@ How to read the tables:
 | `EDGE_MULTIPLE` | `NeighbourConfig.edge_multiple` | `256` | — | neighbour list (buckets) |
 | `EDGE_BUCKET_FRACTION` (also `GPULangevin(edge_bucket_fraction=...)`) | `NeighbourConfig.edge_bucket_fraction` | `0.05` | — | neighbour list (buckets) |
 | `SkinNeighbourList(headroom=1.15)` (constructor default, not a global) | `NeighbourConfig.capacity_headroom` | `1.15` | — | neighbour list (buckets) |
+| none (new in the library, SPEC §11.2, §9.3 rule 11; 3b-T02) | `NeighbourConfig.d3_skin` | `"auto"` | `rule_11_d3_skin_from_workload` | D3 pair list (its own skin; read only when the force field has D3; an explicit float is kept) |
 | none (new in the library, SPEC §9.3 rule 11; 3-T01) | `NeighbourConfig.headroom` | `"auto"` | `rule_11_headroom_from_workload` | neighbour list (buckets; `"fixed"`: `capacity_headroom` and `edge_bucket_fraction` as given; `"auto"` resolves to `"fixed"` until 3-T05) |
 
 ## 5. PolarMACE → `PolarConfig`
@@ -215,6 +216,7 @@ reach the planner through `Simulation(fallback=, gate=, runner=)` and `fm.md`
 | none (new, SPEC §12.3 "Resources") | `GateConfig.reduced_cell` | `"auto"` | `largest_smaller_supercell_at_least_min_height` | gate resources (2-T05) |
 | `rule_11_skin_from_workload` | Rule 11 (3-T05): the skin from `max_temperature_K`, the lightest mass and the timestep (the expected displacement per rebuild interval), at least 2δ plus the MD drift for displacement workloads; no tables. Until 3-T05: `DEFAULT_SKIN_A` (0.3 Å). | `NeighbourConfig.skin` |
 | `rule_11_headroom_from_workload` | Rule 11 (3-T05): pair-buffer and edge-bucket headroom from the same expected displacement. Until 3-T05: `"fixed"`. | `NeighbourConfig.headroom` |
+| `rule_11_d3_skin_from_workload` | Rule 11 with D3 (3b-T02): the D3 list's skin, max(floor, 2 n d + cutoff f / (1 - f)), from the fastest atom's displacement d per step at `max_temperature_K` and the barostat's thermal strain f over a target interval of n steps (`neighbors.adaptive.rule_11_d3`); floor and n provisional until 3b-T06. Without D3 it stays `"auto"`. | `NeighbourConfig.d3_skin` |
 | `recapture_budget_from_workload` | The re-capture budget of a run: `graph_variant_cap`; a run that has re-captured as many graphs as it may hold at once has cycled through its whole working set of edge sizes and stages, so the compiled tier is the better plan (3-T04; 3-T05 may refine it with rule 11). | `EngineConfig.recapture_budget` |
 | `force_precision_if_move_energy_gate_passes_else_float64` | MC energies in the force precision if the move-energy gate (SPEC §12.3; always run for MC plans, decision 35) passes, float64 otherwise or when the reference is unavailable (3-T11). Plans without MC: the force precision. | `PrecisionConfig.mc_energy` |
 | none (new, SPEC §12.3 "Resources") | `GateConfig.reduced_cell_min_height_cutoffs` | `2.0` | — | gate resources |
@@ -322,6 +324,8 @@ model is an error with a reason, never a silent downgrade.
   `NeighbourConfig.skin` admit `"auto"`, plus the record `MCConfig` with 2 fields (section 11), 80 in
   all. Four more fields admit `"auto"` (`skin`, `headroom`, `recapture_budget`, `mc_energy`). None
   comes from the research engine.
+- Phase 3b (plan task 3b-T02) added `NeighbourConfig.d3_skin` (admits `"auto"`), 81 in all. It does not
+  come from the research engine, whose D3 ran through torch-dftd on the ASE path.
 
 ## Open questions for the conductor
 

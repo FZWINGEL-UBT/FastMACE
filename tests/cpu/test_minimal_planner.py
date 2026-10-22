@@ -343,6 +343,63 @@ def test_rule_11_keeps_explicit_values():
     assert (plan.neighbours.skin, plan.neighbours.capacity_headroom, plan.engine.recapture_budget) == (0.4, 1.3, 5)
 
 
+D3_CUTOFF = 40 * 0.52917726  # 40 bohr, torch-dftd's constant
+
+
+def test_rule_11_d3_skin_without_d3_is_unused():
+    from fastmace.neighbors.adaptive import D3_FLOOR_SKIN_A
+
+    plan = plan_label("mh1-r2scan")
+    assert plan.neighbours.d3_skin == D3_FLOOR_SKIN_A
+    assert plan.decision("NeighbourConfig.d3_skin")[1] == "unused"
+    with pytest.raises(KeyError):
+        plan.decision("d3 list memory")
+
+
+def test_rule_11_d3_skin_for_md_only_and_npt_workloads():
+    """3b-T02: with D3 the list's own skin comes from rule 11 for MD-only plans too; a barostat adds strain."""
+    from fastmace.neighbors.adaptive import barostat_strain_rate, rule_11_d3
+
+    workload = Workload(max_temperature_K=1000.0)
+    nvt_integrator = IntegratorConfig(timestep_fs=1.0)
+    nvt = plan_label("mh1-r2scan", integrator=nvt_integrator, workload=workload, d3_cutoff_A=D3_CUTOFF)
+    masses = nacl().get_masses()
+    expected = rule_11_d3(max_temperature_K=1000.0, lightest_mass_u=min(masses), timestep_fs=1.0,
+                          natoms=len(nacl()), cutoff_A=D3_CUTOFF)
+    assert nvt.neighbours.d3_skin == expected.skin_A
+    assert nvt.neighbours.skin == DEFAULT_SKIN_A  # the MACE skin is untouched (MD only)
+    reason = nvt.decision("NeighbourConfig.d3_skin")[2]
+    assert (reason.code, reason.rule) == ("rule-11-d3", 11)
+    assert [entry[0] for entry in nvt.decisions].count("NeighbourConfig.d3_skin") == 1
+    memory = nvt.decision("d3 list memory")
+    assert memory[1] == "fits" and memory[2].code == "rule-12-d3" and memory[2].rule == 12
+
+    npt_integrator = IntegratorConfig(timestep_fs=1.0, ensemble="npt")
+    npt = plan_label("mh1-r2scan", integrator=npt_integrator, workload=workload, d3_cutoff_A=D3_CUTOFF,
+                     variable_cell=True)
+    rate = barostat_strain_rate(temperature_K=1000.0, natoms=len(nacl()),
+                                P_tau_fs=20.0 / npt_integrator.friction / 0.09822694788464063)
+    with_strain = rule_11_d3(max_temperature_K=1000.0, lightest_mass_u=min(masses), timestep_fs=1.0,
+                             natoms=len(nacl()), cutoff_A=D3_CUTOFF, strain_rate_per_fs=rate)
+    assert npt.neighbours.d3_skin == with_strain.skin_A > nvt.neighbours.d3_skin
+    assert "barostat strain" in str(npt.decision("NeighbourConfig.d3_skin")[2])
+
+
+def test_rule_11_d3_keeps_an_explicit_skin_and_rule_12_warns():
+    from fastmace.config import NeighbourConfig
+
+    planner = minimal(neighbours=NeighbourConfig(d3_skin=2.0))
+    plan = plan_label("mh1-r2scan", planner=planner, d3_cutoff_A=D3_CUTOFF)
+    assert plan.neighbours.d3_skin == 2.0
+    assert plan.decision("NeighbourConfig.d3_skin")[2].code == "rule-11-d3-given"
+    small = dataclasses.replace(GPU, memory_bytes=2**24)
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        plan = minimal().plan_traits(tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(), WORKLOAD, small,
+                                     precision="float32", d3_cutoff_A=D3_CUTOFF)
+    assert plan.decision("d3 list memory")[1] == "warn"
+    assert plan.decision("d3 list memory")[2].code == "rule-12-d3-warn"
+
+
 def test_rule_11_evaluation_plans_keep_the_1a_skin():
     plan = minimal().plan_evaluation_traits(tp.traits("mh1-r2scan"), nacl(), GPU, precision="float32")
     assert plan.neighbours.skin == DEFAULT_SKIN_A and plan.neighbours.capacity_headroom == 1.15

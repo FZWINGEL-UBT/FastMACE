@@ -287,11 +287,16 @@ class NeighbourConfig:
     # "fixed": capacity_headroom and edge_bucket_fraction as given; "auto": rule 11 sizes them from the
     # workload (3-T05; until then "fixed").
     headroom: Literal["auto", "fixed"] = "auto"
+    # The D3 pair list's own skin in Angstrom (SPEC §11.2; 3b-T02). "auto": rule 11 from the workload and
+    # the barostat when the force field has D3; without D3 it stays "auto" and nothing reads it.
+    d3_skin: float | Literal["auto"] = "auto"
 
     def __post_init__(self):
         _check_choices(self)
         if self.skin != "auto":
             _positive(self, "skin")
+        if self.d3_skin != "auto":
+            _positive(self, "d3_skin")
         _positive(self, "edge_multiple", "capacity_headroom")
         _nonnegative(self, "edge_bucket_fraction")
         if not isinstance(self.edge_multiple, int):

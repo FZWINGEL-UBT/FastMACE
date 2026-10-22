@@ -34,6 +34,10 @@ What 1b decides (the rules of §9.3 that have their tiers in 1b):
   sizes the skin, pair-buffer headroom and re-capture budget of MC and species-change workloads
   (``neighbors.adaptive``) and records what it would give MD-only ones, which keep 1a's sizes.
   Rule 12 is not in 1b.
+- **D3 (3b-T02)**, with ``d3_cutoff_A`` given: rule 11 sizes the D3 list's own skin
+  (``NeighbourConfig.d3_skin``) for every workload, MD-only too, from the fastest atom and, under a
+  barostat, its thermal strain (``neighbors.adaptive.rule_11_d3``); rule 12 records the D3 list's pairs
+  and memory and warns above a quarter of the GPU memory (``rule_12_d3``).
 
 The rewrite set and the engine options come from 1a's resolution (``FixedPlanner._resolve``),
 unchanged: the minimal plan of a ``main.py`` configuration has the rewrites and engine options of
@@ -48,6 +52,7 @@ from __future__ import annotations
 
 import dataclasses
 import importlib.util
+import warnings
 from collections.abc import Mapping
 from typing import Any
 
@@ -488,12 +493,13 @@ class MinimalPlanner:
 
     def plan(self, force_field, atoms, integrator: IntegratorConfig, workload, hardware: Hardware | None = None, *,
              variable_cell: bool | None = None, allow_naive_cueq: bool = False, allow_reference: bool = False,
-             mode: str | None = None) -> Plan:
+             mode: str | None = None, d3_cutoff_A: float | None = None) -> Plan:
         """The MD plan for ``force_field`` (an ``fm.ForceField``), ``atoms``, ``integrator`` and ``workload``.
 
         ``mode`` (default ``None``) is the execution mode; without one the planner picks the graph tier,
         or the compiled tier where rule 4 (inexact padding) says so; host callbacks keep the graph tier
         (rule 9, decision 38).
+        ``d3_cutoff_A``: the largest D3 cutoff when the force field has D3 (rules 11 and 12 size its list, 3b-T02).
         ``variable_cell`` (default: the integrator's) says whether the run changes the cell. Raises
         ``PlanRefused`` (``SpeciesNotInSuperset``) with every reason, ``ModelElementError``, or
         ``ProcessConstraintError``; nothing is loaded onto the GPU or compiled. A reproducible plan that
@@ -511,7 +517,8 @@ class MinimalPlanner:
         plan = self.plan_traits(force_field.traits, atoms, integrator, workload, hardware or self.hardware(),
                                 precision=force_field.precision, rewrites=force_field.rewrites, species=superset,
                                 loaded=force_field.model, variable_cell=variable_cell,
-                                allow_naive_cueq=allow_naive_cueq, allow_reference=allow_reference, mode=mode)
+                                allow_naive_cueq=allow_naive_cueq, allow_reference=allow_reference, mode=mode,
+                                d3_cutoff_A=d3_cutoff_A)
         if workload.reproducible and plan.runner == "in-process":  # the CPU device, or already done above
             reproducible_mode.prepare_process(self.process, owner=f"a reproducible {plan.engine.backend} MD plan")
         return plan
@@ -519,11 +526,13 @@ class MinimalPlanner:
     def plan_traits(self, traits, atoms, integrator: IntegratorConfig, workload, hardware: Hardware, *,
                     precision: str, rewrites: Any = "auto", species=None, loaded=None,
                     variable_cell: bool | None = None, allow_naive_cueq: bool = False,
-                    allow_reference: bool = False, mode: str | None = None) -> Plan:
+                    allow_reference: bool = False, mode: str | None = None,
+                    d3_cutoff_A: float | None = None) -> Plan:
         """``plan`` from model ``traits`` (``capabilities.ModelTraits``) and the ForceField's facts.
 
         ``precision``, ``rewrites`` and ``species`` are the ForceField's; ``loaded`` is its model, if
-        loaded (rule 6 is checked on it when it already has the plan's backend).
+        loaded (rule 6 is checked on it when it already has the plan's backend). ``d3_cutoff_A``: the
+        largest D3 cutoff (pair and coordination number) when the ForceField has D3, else ``None``.
         """
         from fastmace.planner.workload import Workload
 
@@ -575,6 +584,10 @@ class MinimalPlanner:
                                                                       rule_11=rule_11,
                                                                       mc=(workload.mc_moves,
                                                                           workload.mc_energy_precision))
+            if d3_cutoff_A is not None:
+                parts["neighbours"] = self._d3_list(book, parts["neighbours"], atoms, superset, integrator,
+                                                    workload, hardware, float(d3_cutoff_A))
+                parts["decisions"] = tuple(book.decisions)
         if mode == "eager":
             self._eager(book, parts, traits)
         elif mode == fixed.COMPILED_TIER:
@@ -718,6 +731,46 @@ class MinimalPlanner:
                         edge_bucket_fraction=self.neighbours.edge_bucket_fraction,
                         max_displacement_A=workload.max_displacement_A)
         return bool(workload.mc_moves or workload.species_changes), sized
+
+    def _d3_list(self, book, neighbours, atoms, superset, integrator, workload, hardware, cutoff_A):
+        """Rules 11 and 12 for the D3 pair list (3b-T02): its skin into ``neighbours``, and its memory."""
+        from ase import units
+        from ase.data import atomic_masses
+
+        from fastmace.neighbors.adaptive import D3_MEMORY_WARN_FRACTION, barostat_strain_rate, rule_11_d3, rule_12_d3
+        from fastmace.neighbors.d3_list import DEFAULT_HEADROOM
+
+        masses = [float(mass) for mass in atoms.get_masses()] + [float(atomic_masses[z]) for z in superset]
+        rate = 0.0
+        if integrator.ensemble == "npt":
+            p_tau_fs = (integrator.barostat_tau_fs if integrator.barostat_tau_fs is not None
+                        else 20.0 / integrator.friction / units.fs)  # ASE's default, 20 T_tau
+            rate = barostat_strain_rate(temperature_K=workload.max_temperature_K, natoms=len(atoms),
+                                        P_tau_fs=p_tau_fs, mass_factor=integrator.barostat_mass_factor,
+                                        cell_mode=integrator.cell_mode)
+        sized = rule_11_d3(max_temperature_K=workload.max_temperature_K, lightest_mass_u=min(masses),
+                           timestep_fs=integrator.timestep_fs, natoms=len(atoms), cutoff_A=cutoff_A,
+                           strain_rate_per_fs=rate)
+        if self.neighbours.d3_skin == "auto":
+            skin = sized.skin_A
+            why = Reason(fixed._why("auto", fixed.AUTO_RULES["NeighbourConfig.d3_skin"], sized.text()), rule=11,
+                         code="rule-11-d3")
+        else:
+            skin = float(self.neighbours.d3_skin)
+            why = Reason(f"{skin:g} A kept as given (rule 11 is a preference); rule 11 would give {sized.text()}",
+                         rule=11, code="rule-11-d3-given")
+        book.decisions[:] = [entry for entry in book.decisions if entry[0] != "NeighbourConfig.d3_skin"]
+        book.decide("NeighbourConfig.d3_skin", f"{skin:g} A", why)
+        memory = rule_12_d3(natoms=len(atoms), volume_A3=float(atoms.get_volume()), radius_A=cutoff_A + skin,
+                            headroom=DEFAULT_HEADROOM, gpu_memory_bytes=hardware.memory_bytes)
+        if memory.warn:
+            text = (f"{memory.text()}: above {D3_MEMORY_WARN_FRACTION:.0%} of the GPU memory; a D3 build may run "
+                    "out of memory (SPEC §9.3 rule 12)")
+            warnings.warn(text, ResourceWarning, stacklevel=4)
+            book.decide("d3 list memory", "warn", Reason(text, rule=12, code="rule-12-d3-warn"))
+        else:
+            book.decide("d3 list memory", "fits", Reason(memory.text(), rule=12, code="rule-12-d3"))
+        return dataclasses.replace(neighbours, d3_skin=skin)
 
     def _workload_decisions(self, book, workload, rule_11, mode="graph"):
         applies, sized = rule_11
