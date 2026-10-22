@@ -695,6 +695,9 @@ class Simulation:
             raise
         self._stop_clock(synchronised_clock, count_steps=engine.state.step)
         self._status = "paused"
+        recapture = getattr(engine, "recapture_warning", None)  # past the re-capture budget (3-T04)
+        if recapture and recapture not in self._report.extra_warnings:
+            self._report.add_warning(recapture)
         self._report.finish(self._loop_s / self._steps_run, steps=self._steps_run)
         if self._writer is not None:
             self._writer.flush()
@@ -827,12 +830,12 @@ class Simulation:
 
     def _check_restart_point(self):
         """Restart writes happen only at committed steps: never inside an MC block, never from an overflowed
-        step (SPEC §10.6). ``GraphEngine.uncommitted`` is plan task 3-T04's; an engine without it has none."""
+        step (SPEC §10.6, ``GraphEngine.uncommitted``, 3-T04). Without an engine in this process (a plan run
+        in a child) there is nothing to check here."""
         if self._mc_block_active:
             raise RuntimeError("a restart write inside an MC block: restart files are written only at committed "
                                "steps, between MC blocks (SPEC §10.6)")
-        uncommitted = getattr(self._engine, "uncommitted", None)
-        if uncommitted is not None and uncommitted():
+        if self._engine is not None and self._engine.uncommitted():
             raise RuntimeError("a restart write while the engine holds an uncommitted (overflowed) step: restart "
                                "files are written only at committed steps (SPEC §10.6)")
 

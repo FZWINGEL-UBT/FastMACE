@@ -39,7 +39,7 @@ rules, they resolve to today's behaviour:
 | --- | --- | --- |
 | `NeighbourConfig.skin` | `DEFAULT_SKIN_A` (0.3 Å) | T05 |
 | `NeighbourConfig.headroom` | `"fixed"` | T05 |
-| `EngineConfig.recapture_budget` | `graph_variant_cap` (64); nothing reads it yet | T04 |
+| `EngineConfig.recapture_budget` | `graph_variant_cap` (64): the T04 rule (below); the engine reads it | T04 |
 | `PrecisionConfig.mc_energy` | the force precision (`dtype`); nothing reads it yet | T11, for MC plans only |
 
 `SkinNeighbourList` reads a `skin="auto"` that reaches it without a plan as `DEFAULT_SKIN_A`.
@@ -129,7 +129,41 @@ Added by 3-T02 under the conductor's answers (`plans/phase-3.md`, "3-T02 species
 - `engine/graph.py`:
   - `ENERGY_KEY = "E"` and `ENGINE_KEYS = ("A", "AC", "ACB", "ACP", "ACPB", "B", "C", "E")`;
   - `GraphEngine.energy(*, precision=None)`: the energy-only graph. Stub, T07;
-  - `GraphEngine.captured(key, fn) -> replay`: captures `fn`, which takes no arguments and has fixed shapes and addresses, with the engine's warm-up, registry restore and re-capture policy (variant cap, budget, log). It refuses `ENGINE_KEYS`, which are the engine's own. Stub, T04, for T09's attempt graph.
+  - `GraphEngine.captured(key, fn) -> replay`: captures `fn`, which takes no arguments and has fixed shapes and addresses, with the engine's warm-up, registry restore and re-capture policy (variant cap, budget, log). It refuses `ENGINE_KEYS`, which are the engine's own, and tuple keys whose first element is one. The graph is captured at the first replay and again after an invalidation or eviction; without capture the replay calls `fn`. A tuple key's first element is its family, so `("mc.swap", bucket)` keys are variants of one key. Complete (T04), for T09's attempt graph.
+  - `GraphEngine.invalidate_graphs(reason, keys=None)`: drops the captured graphs (all of them, which also retires the pool, or those of `keys`) and logs the reason. The next capture of a dropped key counts as a re-capture. T03 calls it for friction events. Complete (T04).
+  - `GraphEngine.uncommitted() -> bool`: true while a pipelined or speculative step is unvalidated, or an overflowed evaluation is being redone. T08's restart write guard reads it. Complete (T04).
+
+### Overflow before commit (T04)
+
+- **The device word** `GraphEngine.overflow` (int64 scalar, registered as `engine.overflow`, sticky, reset at a canonical point) holds the bits `EDGE_OVERFLOW = 1` and `KVECTOR_OVERFLOW = 2`.
+  - `flag_edge_overflow(count, edges)`: device operations only, so an MC evaluation sets it inside its captured graph (T07, T09, T10).
+  - `overflowed() -> int`: the word, plus `KVECTOR_OVERFLOW` when the PolarMACE flag is set. One host sync.
+  - `clear_overflow()`: clears both.
+- **MD steps:** a step is committed only after its flags are checked.
+  - Edges: the count against the padded edges the force stage read. Pipelined and speculative steps can overflow; a checked step reads the count first, so it cannot.
+  - K-vectors: with PolarMACE and a variable cell, the flag is read after every force stage. That is one host sync per step, only in those plans, recorded as the plan decision `overflow check: per step` (conductor answer 1). `info()["overflow_check"]` is `"per step"` there and `"edges"` otherwise.
+  - An overflowed step restores stage A's mid-step tensors, grows what overflowed (a larger padded size, or the k-vector set rebuilt for the step's cell), and redoes the force stage with the same noise (answer 2).
+  - A pipelined step adds to `state.step` at its launch and is committed at its validation. `snapshot`, `sync`, `canonicalise` and restart writes validate first.
+- **MC attempts:** `redo_on_overflow(attempt, *, keep=(), max_redos=3) -> redos`.
+  1. It quiesces and snapshots the registered state and the tensors of `keep` (the caller's random-number cursors, such as an MC stream's device offset).
+  2. It runs `attempt` and reads `overflowed()`.
+  3. On an overflow it restores both, grows (the neighbour list rebuilt at the restored positions, or the k-vector set at the current cell), and runs `attempt` again with the same numbers.
+  4. After `max_redos` it raises `CapacityOverflow` (internal, in `engine/graph.py`, with `.word`).
+  The engine draws no random numbers itself.
+- **Counters:** `info()["overflows_redone"]` and `info()["overflow_log"]` (step, kinds, mode). A pipelined rebuild redo (a stale list) is not an overflow, and a speculative bucket rollback is. `provenance` takes `counters.overflows_redone` from the engine info when the caller gives none.
+
+### Re-capture policy (T04)
+
+- **Every capture is logged** in `info()["recapture_log"]` (step, key, reason, counted) and as a `logging` line (`fastmace.engine.graph`).
+- **What counts** against `EngineConfig.recapture_budget` (answer 3): a capture that replaces or adds a variant of a key captured before. That covers a new edge size, a capture after `invalidate_graphs`, an eviction, or a pool reset (`POOL_RESET`). The first capture of each key family is logged but not counted.
+- **The variant cap** (answer 4): at most `EngineConfig.graph_variant_cap` graphs are held. Before a capture that would pass it, the least recently replayed graph is evicted. That is recorded in `graph_evictions`, and its later capture counts.
+- **Past the budget:**
+  - the engine warns once (`RecaptureBudgetWarning`);
+  - it records the step (`recapture_budget_exceeded_at`);
+  - `recapture_warning` gives the report's line, which recommends the compiled tier. `Simulation.run` adds it to the report's warnings.
+  - The run never downgrades mid-run (phase 5, §9.6).
+- **The budget's `"auto"` rule** (`FixedPlanner._phase_3_fields`, `recapture_budget_from_workload`): the variant cap. A run that has re-captured as many graphs as it may hold at once has cycled through its whole working set, so the compiled tier is the better plan. An engine built without a plan reads `"auto"` the same way.
+- `provenance` takes `counters.recaptures` from the engine info when the caller gives none. The full record stays in `counters.engine`.
 
 ## Restart version 3 (`io/restart.py`; owner T08)
 

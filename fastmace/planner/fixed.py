@@ -503,7 +503,7 @@ class FixedPlanner:
             book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
                         "fixed cell: the graph engine computes no stress")
 
-        phase_3 = self._phase_3_fields(book, dtype)
+        phase_3 = self._phase_3_fields(book, dtype, polar=bool(traits.polar), npt=npt, evaluation=evaluation)
         return dict(
             tier="compiled" if evaluation else TIER,
             rewrites=dataclasses.replace(rewrites, **rewrite_values),
@@ -521,10 +521,16 @@ class FixedPlanner:
             auto_options_off=tuple(values["_auto_off"].items()),
         )
 
-    def _phase_3_fields(self, book, dtype):
+    def _phase_3_fields(self, book, dtype, *, polar=False, npt=False, evaluation=False):
         """The phase 3 "auto" fields (plan task 3-T01), resolved to today's behaviour until their tasks give
         the rules: rule 11's skin and headroom (3-T05), the re-capture budget (3-T04) and the MC energy
-        precision (3-T11, which changes it only for MC plans)."""
+        precision (3-T11, which changes it only for MC plans).
+
+        The re-capture budget (3-T04): the variant cap. A run that has re-captured as many graphs as it may
+        hold at once has cycled through its whole working set of edge sizes and stages, so its variants do
+        not fit, and the compiled tier (no graphs) is the better plan for it. The rule needs no run length,
+        GPU or structure. With PolarMACE and a variable cell the plan also records the per-step k-vector
+        check, one host sync after every force stage (3-T04, conductor answer 1)."""
         n, e, p = self.neighbours, self.engine, self.precision
         skin = DEFAULT_SKIN_A if n.skin == "auto" else n.skin
         book.decide("NeighbourConfig.skin", f"{skin:g} A", _why(
@@ -537,7 +543,11 @@ class FixedPlanner:
         budget = e.graph_variant_cap if e.recapture_budget == "auto" else e.recapture_budget
         book.decide("EngineConfig.recapture_budget", str(budget), _why(
             "auto" if e.recapture_budget == "auto" else e.recapture_budget, AUTO_RULES["EngineConfig.recapture_budget"],
-            "the graph variant cap until the workload rule (3-T04)"))
+            f"the graph variant cap ({e.graph_variant_cap}): past it the run warns, records and the report "
+            "recommends the compiled tier (3-T04)"))
+        if polar and npt and not evaluation:
+            book.decide("overflow check", "per step", "PolarMACE with a variable cell: the k-vector flag is read "
+                        "after every force stage, one host sync per step (3-T04)")
         mc_energy = dtype if p.mc_energy == "auto" else p.mc_energy
         book.decide("PrecisionConfig.mc_energy", mc_energy, _why(
             p.mc_energy, AUTO_RULES["PrecisionConfig.mc_energy"],

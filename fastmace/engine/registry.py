@@ -121,7 +121,7 @@ POLICIES = (
     _policy("force_field.polar.*", "polar", "reset", "fastmace.longrange.polar.enable"),
     # The engine's device flags and mid-step copies: quiesced (validated) at a restart point.
     *(_policy(f"engine.{name}", "engine", "reset", "GraphEngine.flush", sticky=True)
-      for name in ("rebuild_needed", "flags", "pipe_flags", "spec_flags")),
+      for name in ("rebuild_needed", "flags", "pipe_flags", "spec_flags", "overflow")),
     _policy("engine.mid.*", "engine", "reset", "GraphEngine.flush"),
     # Host mirrors of the flags: overwritten by the copy behind every step before the host reads them.
     *(_policy(f"engine.{name}", "engine", "derived", capture=False)
