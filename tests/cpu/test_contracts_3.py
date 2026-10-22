@@ -432,7 +432,7 @@ def test_mode_defaults_to_none():  # §9.3: the planner picks graph, or compiled
     assert inspect.signature(Simulation).parameters["mode"].default is None
     assert inspect.signature(fm.md).parameters["mode"].default is None
     assert inspect.signature(minimal.MinimalPlanner.plan).parameters["mode"].default is None
-    assert minimal.RULE_9_HOST_CALLBACKS == 10
+    assert not hasattr(minimal, "RULE_9_HOST_CALLBACKS")  # decision 38: host callbacks keep graph (3-T06b)
 
 
 def test_graph_engine_energy_and_captured_names():  # §8.1 energy-only graph (3-T07), captured (3-T04)
