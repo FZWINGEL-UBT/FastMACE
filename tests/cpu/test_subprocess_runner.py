@@ -596,30 +596,6 @@ def test_a_failing_heartbeat_write_never_raises(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- mc= through the runner (3-T15)
 
 
-def _fake_mc_python(tmp_path):
-    """A wrapper interpreter whose child runs with tests/_support/fake_mc.py's driver (T09's API)."""
-    tests = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    script = tmp_path / "child_mc.py"
-    script.write_text(textwrap.dedent(f"""\
-        import sys
-
-        sys.path.insert(0, {tests!r})
-        from _support import fake_mc
-        from fastmace.mc import driver
-
-        fake_mc.FakeDriver.made = []
-        driver.MCDriver = fake_mc.FakeDriver
-        from fastmace.engine import subprocess as runner
-
-        sys.exit(runner.main(sys.argv[3:]))  # after "-m fastmace.engine.subprocess"
-        """))
-    python = tmp_path / "python"
-    python.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n')
-    python.chmod(0o755)
-    return str(python)
-
-
-@POSIX
 @pytest.mark.parametrize("persistent", [True, False], ids=["worker", "fresh-children"])
 def test_mc_attaches_keeps_and_detaches_through_the_runner(loaded, tmp_path, runner_plans, persistent):
     from fastmace.errors import PlanRefused
@@ -629,7 +605,7 @@ def test_mc_attaches_keeps_and_detaches_through_the_runner(loaded, tmp_path, run
     workload = Workload(max_temperature_K=300.0, species_changes=True, mc_moves=("swap",),
                         min_mc_temperature_K=250.0)
     sim = _simulation(loaded, workload=workload, output=_output(tmp_path / "run"),
-                      runner=RunnerConfig(python=_fake_mc_python(tmp_path), persistent=persistent))
+                      runner=RunnerConfig(persistent=persistent))
     assert sim.plan.runner == "subprocess"
     with pytest.raises(PlanRefused):  # checked in the parent, before any child runs
         sim.run(steps=2, mc=Displace(delta_A=0.1, every=2, attempts=1))
@@ -637,7 +613,8 @@ def test_mc_attaches_keeps_and_detaches_through_the_runner(loaded, tmp_path, run
     sim.run(steps=2)  # kept: the block at 6 (a fresh child resumes it from the hand-off restart)
     sim.run(steps=2, mc=None)  # detached
     sim.run(steps=2)
-    assert sim.metadata()["counters"]["mc"] == {"swap": {"attempted": 15, "impossible": 0, "accepted": 5}}
+    counters = sim.metadata()["counters"]["mc"]
+    assert counters["swap"]["attempted"] == 15 and counters["swap"]["impossible"] == 0
     assert "swap Na-Cl every 2, 5 attempts" in sim.report.text()
     header, rows = output_io.read_thermo(tmp_path / "run")
     assert header[-2:] == ["mc_swap_attempted", "mc_swap_accepted"]

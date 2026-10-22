@@ -430,7 +430,7 @@ def test_run_with_mc_tables_runs_mc(model_path, cpu_planner, tmp_path, monkeypat
     from _support import fake_mc
     from _support.structures import nacl
 
-    drivers = fake_mc.install(monkeypatch)
+    drivers = fake_mc.spy(monkeypatch)
     structure = tmp_path / "nacl.extxyz"
     nacl(repeat=1, rattle=0.05, seed=3).write(structure)
     config = tmp_path / "mc.toml"
@@ -440,6 +440,6 @@ def test_run_with_mc_tables_runs_mc(model_path, cpu_planner, tmp_path, monkeypat
                       '[[mc]]\nmove = "swap"\npairs = [["Na", "Cl"]]\nevery = 2\nattempts = 3\n', encoding="utf-8")
     assert cli.main(["run", str(config)]) == 0
     assert "swap Na-Cl every 2, 3 attempts" in capsys.readouterr().out
-    assert [step for step, _ in drivers[0].blocks] == [2, 4]
+    assert [step for step, _ in drivers[0].spied] == [2, 4]
     metadata = json.loads((tmp_path / "run" / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["counters"]["mc"]["swap"]["attempted"] == 6

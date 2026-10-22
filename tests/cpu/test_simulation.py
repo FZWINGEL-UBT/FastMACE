@@ -365,7 +365,7 @@ def test_schedule_must_be_a_schedule(loaded):
         sim.run(schedule=[300.0, 200.0], steps=1)
 
 
-# --------------------------------------------------------------------------- mc= (§7.6; T09's driver API, faked)
+# --------------------------------------------------------------------------- mc= (§7.6; T09's driver, observed)
 
 
 def Swap(pairs, every=2, attempts=5, **fields):
@@ -382,10 +382,10 @@ def Displace(every=2, attempts=5):
 
 @pytest.fixture
 def drivers(monkeypatch):
-    """T09's MCDriver replaced by tests/_support/fake_mc.py's host stand-in; the drivers made, in order."""
+    """T09's MCDriver, observed (tests/_support/fake_mc.py's spy); the drivers made, in order."""
     from _support import fake_mc
 
-    return fake_mc.install(monkeypatch)
+    return fake_mc.spy(monkeypatch)
 
 
 def _mc_workload(**changes):
@@ -398,16 +398,16 @@ def test_a_move_set_attaches_and_stays_attached_until_mc_none(loaded, drivers, m
     from _support import fake_mc
 
     sim = _simulation(loaded, workload=_mc_workload())
-    monkeypatch.setattr(fake_mc.FakeDriver, "flag", staticmethod(lambda: sim._mc_block_active))
+    monkeypatch.setattr(fake_mc, "flag", lambda: sim._mc_block_active)
     sim.run(steps=4, mc=Swap(pairs=(("Na", "Cl"),)))
     (driver,) = drivers
     assert driver.engine is sim._engine and driver.seed == sim.seed
-    assert driver.blocks == [(2, True), (4, True)]  # after the MD steps of each block, with the restart guard set
+    assert driver.spied == [(2, True), (4, True)]  # after the MD steps of each block, with the restart guard set
     assert not sim._mc_block_active
     sim.run(steps=2)  # still attached (§7.6)
-    assert [step for step, _ in driver.blocks] == [2, 4, 6]
+    assert [step for step, _ in driver.spied] == [2, 4, 6]
     sim.run(steps=2, mc=None)  # detached
-    assert [step for step, _ in driver.blocks] == [2, 4, 6] and sim.committed().step == 8
+    assert [step for step, _ in driver.spied] == [2, 4, 6] and sim.committed().step == 8
     sim.run(steps=2)  # nothing attached
     assert len(drivers) == 1 and sim.committed().step == 10
 
@@ -430,7 +430,7 @@ def test_a_new_move_set_replaces_the_attached_one(loaded, drivers):
     sim = _simulation(loaded, workload=_mc_workload())
     sim.run(steps=2, mc=Swap(pairs=(("Na", "Cl"),)))
     sim.run(steps=2, mc=[Swap(pairs=(("Na", "Cl"),), every=1)])
-    assert len(drivers) == 2 and [step for step, _ in drivers[1].blocks] == [3, 4]
+    assert len(drivers) == 2 and [step for step, _ in drivers[1].spied] == [3, 4]
     assert drivers[1].loaded[0]["streams"] == drivers[0].state_dict()["streams"]
 
 
@@ -503,10 +503,13 @@ def test_mc_thermo_columns_counters_and_report(loaded, drivers, tmp_path):
     attempted = [int(row[-2]) for row in rows]
     assert attempted == [0, 0, 5, 5, 10]  # cumulative, as of the last completed block (blocks at 2 and 4)
     metadata = json.loads((tmp_path / "run" / "metadata.json").read_text(encoding="utf-8"))
-    assert metadata["counters"]["mc"] == {"swap": {"attempted": 10, "impossible": 0, "accepted": 3}}
+    counters = drivers[0].counters
+    assert metadata["counters"]["mc"] == counters and counters["swap"]["attempted"] == 10
+    accepted = [int(row[-1]) for row in rows]
+    assert accepted[-1] == counters["swap"]["accepted"] and accepted == sorted(accepted)
     text = sim.report.text()
-    assert "swap Na-Cl every 2, 5 attempts" in text and "accepted 3/10" in text
-    assert "ms/attempt" in text and "MC: experimental" in text
+    assert "swap Na-Cl every 2, 5 attempts" in text and f"accepted {counters['swap']['accepted']}/10" in text
+    assert "2 blocks" in text and "MC: experimental" in text  # no device time on the CPU
 
 
 def test_md_only_thermo_has_no_mc_columns(loaded, tmp_path):
@@ -532,7 +535,7 @@ def test_a_restart_in_a_block_step_carries_the_move_set(loaded, drivers, tmp_pat
     assert len(drivers) == 2
     assert drivers[1].loaded == [record] and drivers[1].moves == drivers[0].moves
     resumed.run(steps=2)  # the move set stays attached across the resume (§7.6)
-    assert [step for step, _ in drivers[1].blocks] == [6]
+    assert [step for step, _ in drivers[1].spied] == [6]
     resumed.close()
 
 

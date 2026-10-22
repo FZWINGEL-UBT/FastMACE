@@ -188,32 +188,30 @@ def mc_moves(mc: Any) -> tuple:
 
 
 def move_record(move: Any) -> dict[str, Any]:
-    """A move record as JSON-safe data: ``{"move": ..., **fields}`` (tuples as lists)."""
-    def plain(value):
-        if isinstance(value, (list, tuple)):
-            return [plain(item) for item in value]
-        return value
+    """A move record as JSON-safe data (T09's ``fastmace.mc.driver.move_record``: ``{"move": ..., **fields}``)."""
+    from fastmace.mc.driver import move_record as record
 
-    return {"move": move.move, **{name: plain(value) for name, value in dataclasses.asdict(move).items()}}
+    return record(move)
 
 
 def move_from_record(record: Mapping[str, Any]) -> Any:
-    """The ``fm.mc`` record of ``move_record``'s data (a restart's ``mc.moves`` entry or a CLI ``[[mc]]`` table).
-
-    ``ValueError`` names an unknown move type or field."""
+    """The ``fm.mc`` record of ``move_record``'s data (a restart's ``mc.moves`` entry or a CLI ``[[mc]]`` table),
+    through T09's ``fastmace.mc.driver.move_from_record``. ``ValueError`` names an unknown move type or field."""
     from fastmace import mc as records
+    from fastmace.mc.driver import move_from_record as from_record
 
     classes = {cls.move: cls for cls in (records.Swap, records.Transmute, records.Displace)}
-    fields = dict(record)
-    move = fields.pop("move", None)
+    move = record.get("move")
     if move not in classes:
         raise ValueError(f"an MC move needs move = one of {tuple(classes)}, got {move!r}")
     names = {item.name for item in dataclasses.fields(classes[move])}
-    unknown = sorted(set(fields) - names)
+    unknown = sorted(set(record) - names - {"move"})
     if unknown:
         raise ValueError(f"unknown field{'s' if len(unknown) > 1 else ''} {', '.join(unknown)} for move {move!r}; "
                          f"fm.mc.{classes[move].__name__} takes {', '.join(sorted(names))}")
-    return classes[move](**fields)
+    # A TOML table gives mu and formal_charges as mappings; T09's records take them as (species, value) pairs.
+    return from_record({key: list(value.items()) if isinstance(value, Mapping) else value
+                        for key, value in record.items()})
 
 
 def _steps(steps: Any) -> int:
@@ -375,7 +373,9 @@ class Simulation:
         self._mc_record = None  # the last MC state (MCDriver.state_dict), kept across a detach
         self._mc_ranges = []  # [first, last] step ranges run with a move set attached
         self._mc_blocks = 0
-        self._mc_device_ms = None
+        self._mc_device_ms = None  # device time of the timed blocks: each driver's first block holds its captures
+        self._mc_timed_attempts = 0
+        self._mc_untimed = None  # the driver whose first block has not run yet
         self._frame_composition = None  # host species and masses for the frames, after a composition change
         self._status = "setup"
         self._queue = _Queue()
@@ -735,8 +735,8 @@ class Simulation:
         driver = mc_driver.MCDriver(moves, seed=self.seed)
         driver.attach(self._engine)
         if previous is not None:
-            driver.load_state_dict(_carried_mc_record(previous, driver.state_dict()))
-        self._mc, self._mc_moves = driver, tuple(moves)
+            driver.load_state_dict(_carried_mc_record(previous, driver.state_dict()), other_moves=True)
+        self._mc, self._mc_moves, self._mc_untimed = driver, tuple(moves), driver
         self._mc_record = driver.state_dict()
         self._engine.state.mc = self._mc_record
         self._report.mc = self._mc_summary()
@@ -758,7 +758,7 @@ class Simulation:
         driver = mc_driver.MCDriver(moves, seed=self.seed)
         driver.attach(self._engine)
         driver.load_state_dict(record)
-        self._mc, self._mc_moves = driver, moves
+        self._mc, self._mc_moves, self._mc_untimed = driver, moves, driver
         self._mc_record = driver.state_dict()
         self._engine.state.mc = self._mc_record
 
@@ -772,8 +772,11 @@ class Simulation:
         if block is None:
             return
         self._mc_blocks += 1
-        if block.get("device_ms") is not None:
+        if self._mc_untimed is driver:  # its first block's time includes the attempts' captures (T09)
+            self._mc_untimed = None
+        elif block.get("device_ms") is not None:
             self._mc_device_ms = (self._mc_device_ms or 0.0) + float(block["device_ms"])
+            self._mc_timed_attempts += sum(int(entry["attempted"]) for entry in block["moves"])
         if block.get("accepted"):
             self._composition_changed()  # at the block's canonical point: one read of the new composition
 
@@ -802,7 +805,8 @@ class Simulation:
         if moves is None and self._mc_record is not None:
             moves = tuple(move_from_record(entry) for entry in self._mc_record["moves"])
         return {"moves": tuple(moves or ()), "ranges": [list(pair) for pair in self._mc_ranges],
-                "blocks": self._mc_blocks, "device_ms": self._mc_device_ms, "counters": counters or {}}
+                "blocks": self._mc_blocks, "device_ms": self._mc_device_ms, "timed_attempts": self._mc_timed_attempts,
+                "counters": counters or {}}
 
     def _mc_simulation_record(self):
         """``simulation.json``'s MC entry: what a resume needs beyond the restart's ``mc`` record."""
@@ -811,7 +815,7 @@ class Simulation:
         return {"attached": self._mc is not None,
                 "record": self._mc.state_dict() if self._mc is not None else self._mc_record,
                 "ranges": [list(pair) for pair in self._mc_ranges], "blocks": self._mc_blocks,
-                "device_ms": self._mc_device_ms}
+                "device_ms": self._mc_device_ms, "timed_attempts": self._mc_timed_attempts}
 
     def _composition_changed(self):
         """Read the committed species and masses once, for every later frame (``io.trajectory``)."""
@@ -1182,6 +1186,7 @@ class Simulation:
         if mc is not None:
             self._mc_ranges = [list(pair) for pair in mc["ranges"]]
             self._mc_blocks, self._mc_device_ms = int(mc["blocks"]), mc["device_ms"]
+            self._mc_timed_attempts = int(mc.get("timed_attempts") or 0)
             self._mc_record = mc["record"]
         if engine.state.mc is not None:  # the restart's attached move set stays attached (§7.6)
             self._resume_mc(engine.state.mc)

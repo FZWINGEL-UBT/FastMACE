@@ -4,7 +4,7 @@ A tiny MH-1-class model, NaCl, the minimal planner on the CPU without compilatio
 ``test_simulation.py``). ``fm.md`` builds a ``Simulation`` and nothing else, so its plan and gate
 equal the equivalent ``Simulation``'s; its inferences lose to explicit arguments; every
 ``ValueError`` of §7.7 comes before anything is loaded; NVE and D3 are refused with their
-phase, and MC runs (T09's driver faked); ``summary`` is the run report (1b-T15) and ``metadata``
+phase, and MC runs (on T09's driver); ``summary`` is the run report (1b-T15) and ``metadata``
 the ``metadata.json`` record.
 """
 
@@ -340,10 +340,10 @@ def test_explicit_d3_with_another_functional_names_the_warning(tmp_path):
 
 @pytest.fixture
 def drivers(monkeypatch):
-    """T09's MCDriver replaced by tests/_support/fake_mc.py's host stand-in; the drivers made, in order."""
+    """T09's MCDriver, observed (tests/_support/fake_mc.py's spy); the drivers made, in order."""
     from _support import fake_mc
 
-    return fake_mc.install(monkeypatch)
+    return fake_mc.spy(monkeypatch)
 
 
 def _swap(every=2, attempts=5):
@@ -355,7 +355,7 @@ def _swap(every=2, attempts=5):
 def test_mc_runs_at_a_constant_temperature(model_path, tmp_path, drivers):
     run = _md(model_path, tmp_path, mc=_swap(), steps=4)
     (driver,) = drivers
-    assert [step for step, _ in driver.blocks] == [2, 4]
+    assert [step for step, _ in driver.spied] == [2, 4]
     workload = run.simulation.workload
     assert workload.mc_moves == ("swap",) and workload.species_changes
     assert workload.min_mc_temperature_K == pytest.approx(300.0)
@@ -370,7 +370,7 @@ def test_mc_with_a_schedule_attaches_only_at_or_above_the_minimum(model_path, tm
     run = _md(model_path, tmp_path, schedule=schedule, steps=None, mc=_swap(every=1, attempts=1),
               min_mc_temperature_K=250.0)
     assert run.simulation.schedule.finished
-    assert [step for driver in drivers for step, _ in driver.blocks] == [2, 3, 4, 5, 6]
+    assert [step for driver in drivers for step, _ in driver.spied] == [2, 3, 4, 5, 6]
     assert run.metadata["report"]["mc"]["ranges"] == [[1, 6]]  # steps 2-6 run with MC: attached from step 1
     assert run.simulation.workload.min_mc_temperature_K == 250.0
 

@@ -1,4 +1,7 @@
-"""A stand-in for ``fastmace.mc.driver.MCDriver`` with T09's published API (3-T15's front-end tests).
+"""T09's ``MCDriver`` for 3-T15's front-end tests: a host stand-in (``install``) and a spy on the real one (``spy``).
+
+The front ends need the stand-in only where the real driver cannot run: a hand-made restart record
+whose stream seeds are not the simulation's (``test_restart_v3.py``).
 
 The front ends (``Simulation.run(mc=…)``, ``fm.md``, the CLI) only attach, call ``due`` and
 ``run_block``, read ``counters``, ``offsets`` and ``last_block``, and move ``state_dict`` through the
@@ -72,7 +75,7 @@ class FakeDriver:
                             for stream, offset in self.offsets.items()},
                 "delta_A": {}}
 
-    def load_state_dict(self, record):
+    def load_state_dict(self, record, **options):
         self.loaded.append(record)
         self.cycle_position = int(record["cycle_position"])
         for move, counter in record["counters"].items():
@@ -96,4 +99,39 @@ def install(monkeypatch):
     made = []
     monkeypatch.setattr(FakeDriver, "made", made)
     monkeypatch.setattr(driver, "MCDriver", FakeDriver)
+    return made
+
+
+# --------------------------------------------------------------------------- the real driver, observed
+
+flag = None  # () -> bool set by a test: Simulation._mc_block_active, read as each spied block starts
+
+
+def spy(monkeypatch):
+    """T09's real ``MCDriver``, recording each block's step in ``spied`` (with ``flag()``) and each ``load_state_dict``
+    record; returns the list of drivers made, oldest first. For the CPU, where the real driver runs."""
+    from fastmace.mc import driver
+
+    real = driver.MCDriver
+    made = []
+
+    class Spy(real):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.spied = []
+            self.loaded = []
+            made.append(self)
+
+        def run_block(self, engine, step):
+            inside = None if flag is None else flag()
+            block = super().run_block(engine, step)
+            if block is not None:
+                self.spied.append((step, inside))
+            return block
+
+        def load_state_dict(self, record, **options):
+            self.loaded.append(record)
+            return super().load_state_dict(record, **options)
+
+    monkeypatch.setattr(driver, "MCDriver", Spy)
     return made

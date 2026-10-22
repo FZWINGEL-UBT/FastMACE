@@ -288,7 +288,8 @@ class Report:
     - ``charge_spin``: ``None`` when the model does not read them, else ``(total charge, spin multiplicity)``;
     - ``mc``: the MC record of the run (``Simulation`` keeps it, 3-T15), or ``None`` without MC: ``moves``
       (the records attached last), ``ranges`` (``[first, last]`` step ranges with a move set attached),
-      ``blocks``, ``device_ms`` (summed per-block device time; ``None`` on the CPU) and ``counters``
+      ``blocks``, ``device_ms`` and ``timed_attempts`` (device time and attempts of the blocks after the first
+      one of each attach, whose time includes the captures; ``None`` and 0 on the CPU) and ``counters``
       (``{move: {attempted, impossible, accepted, ...}}``);
     - ``cell_heights_A`` and ``cutoff_A``: the small-cell warning;
     - ``warnings``: extra warning lines (more through ``add_warning``);
@@ -384,10 +385,11 @@ class Report:
             counts = counters.get(move.move, {})
             text = f"{describe_move(move)}; accepted {counts.get('accepted', 0)}/{counts.get('attempted', 0)}"
             parts.append(text)
-        attempted = sum(counts.get("attempted", 0) for counts in counters.values())
+        timed = int(mc.get("timed_attempts") or 0)
         blocks = int(mc.get("blocks") or 0)
-        if mc.get("device_ms") is not None and attempted:
-            parts.append(f"{mc['device_ms'] / attempted:.3g} ms/attempt over {_number(blocks)} blocks")
+        if mc.get("device_ms") is not None and timed:
+            parts.append(f"{mc['device_ms'] / timed:.3g} ms/attempt over {_number(blocks)} blocks (device time; "
+                         "each attach's first block, with its captures, left out)")
         else:
             parts.append(f"{_number(blocks)} blocks")
         ranges = mc.get("ranges") or ()
@@ -540,5 +542,6 @@ class Report:
             "mc": None if not self.mc else {
                 "moves": [describe_move(move) for move in self.mc.get("moves", ())],
                 "ranges": [list(pair) for pair in self.mc.get("ranges", ())],
-                "blocks": int(self.mc.get("blocks") or 0), "device_ms": self.mc.get("device_ms")},
+                "blocks": int(self.mc.get("blocks") or 0), "device_ms": self.mc.get("device_ms"),
+                "timed_attempts": int(self.mc.get("timed_attempts") or 0)},
         }
