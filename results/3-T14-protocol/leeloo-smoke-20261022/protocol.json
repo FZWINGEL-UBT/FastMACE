@@ -1,0 +1,94 @@
+{
+  "protocol_record_version": 1,
+  "source": "/mnt/homes/zwingel/fastmace-t14-ed55026/protocols/smoke.yaml",
+  "structure": "/mnt/homes/zwingel/fastmace-t14-ed55026/fastmace/protocols/data/NaNbOCl4_I4m_Ma2026.cif",
+  "repeat": [
+    3,
+    3,
+    3
+  ],
+  "atoms": 756,
+  "timestep_fs": 1.0,
+  "relax": {
+    "fmax": 0.01,
+    "optimizer": "LBFGS",
+    "max_steps": 5000
+  },
+  "relaxation": {
+    "optimizer": "LBFGS",
+    "fixed_cell": true,
+    "fmax_target_eV_A": 0.01,
+    "max_steps": 5000,
+    "converged": true,
+    "steps": 19,
+    "seconds": 62.32923131715506,
+    "initial_eV_atom": -10.248026051849285,
+    "energy_eV_atom": -10.250177155411432,
+    "fmax_eV_A": 0.008168187658947139
+  },
+  "quench": {
+    "min_K": 500.0,
+    "bin_K": 100.0,
+    "per_bin": 2,
+    "fmax": 0.01,
+    "optimizer": "LBFGS",
+    "max_steps": 5000
+  },
+  "quench_result": {
+    "settings": {
+      "min_K": 500.0,
+      "bin_K": 100.0,
+      "per_bin": 2,
+      "fmax": 0.01,
+      "optimizer": "LBFGS",
+      "max_steps": 5000,
+      "fixed_cell": true,
+      "selection": "thermostat target temperature; each ramp separately; evenly spaced within each bin; plus the final frame"
+    },
+    "frames": 21,
+    "frame_every": 10,
+    "trajectory_frames": 551,
+    "quench_wall_s": 70.08760094176978,
+    "quench_seconds_sum": 69.846245306544,
+    "not_converged": 0,
+    "heating": {
+      "n": 10,
+      "mean_eV_atom": -10.250178913496159,
+      "sd_eV_atom": 5.440536603838737e-07
+    },
+    "cooling": {
+      "n": 10,
+      "mean_eV_atom": -10.248845060445644,
+      "sd_eV_atom": 0.0011228468862750738
+    },
+    "final_quenched_eV_atom": -10.24841274313195
+  },
+  "mc": [
+    {
+      "move": "swap",
+      "pairs": [
+        [
+          "O",
+          "Cl"
+        ]
+      ],
+      "every": 100,
+      "attempts": 50,
+      "velocities": "exchange"
+    }
+  ],
+  "min_mc_temperature_K": 250.0,
+  "pieces": [
+    {
+      "first_step": 0,
+      "last_step": 3000,
+      "wall_s": 168.07697360869497
+    },
+    {
+      "first_step": 3000,
+      "last_step": 5500,
+      "wall_s": 136.97557274159044
+    }
+  ],
+  "status": "complete"
+}
