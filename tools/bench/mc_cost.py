@@ -118,11 +118,11 @@ class DisplaceSide:
 
     def prepare_block(self):
         # Untimed: the block's baseline and stream start, as SwapSide.
-        from fastmace.mc.driver import K_B_EV_PER_K
+        from ase.units import kB
 
         driver, engine = self.driver, self.engine
         engine.flush()
-        driver.streams.kT.fill_(K_B_EV_PER_K * float(engine.integrator.temperature_K))
+        driver.streams.kT.fill_(kB * float(engine.integrator.temperature_K))
         driver.streams.baseline.copy_(driver.evaluator.baseline().reshape(1))
         driver.streams.start(driver.offsets)
         self.ready = True

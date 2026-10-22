@@ -21,6 +21,7 @@ import math
 import numpy as np
 import pytest
 import torch
+from ase.units import kB
 
 from _support.structures import nacl
 from _support.tiny_models import FAMILIES, tiny_mace_model
@@ -28,7 +29,6 @@ from fastmace.config import EngineConfig, IntegratorConfig, PrecisionConfig, mc_
 from fastmace.errors import PlanRefused
 from fastmace.mc import Displace, MCDriver, moves, streams
 from fastmace.mc import displace as dm
-from fastmace.mc.moves import K_B_EV_PER_K
 
 pytest.importorskip("mace")
 torch.serialization.add_safe_globals([slice])
@@ -214,7 +214,7 @@ def test_attach_refuses_a_variable_cell_and_a_delta_beyond_the_workload(mace_eng
 def run_one_by_one(make, engine, driver, count, temperature_K):
     """``count`` blocks of one attempt each, each checked against a direct evaluation and the acceptance rule."""
     natoms = engine.state.positions.shape[0]
-    kT = K_B_EV_PER_K * temperature_K
+    kT = kB * temperature_K  # the driver's (ase.units.kB, as the thermostat)
     attempt = driver.attempts[0]
     outcomes = []
     for _ in range(count):
