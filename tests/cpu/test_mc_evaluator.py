@@ -382,6 +382,12 @@ def test_energy_graph_keys_and_the_copy_in_the_derived_registry(mace_engine):
         engine.add_energy_field(evaluator.field)
     energy = engine.energy(precision="float64")
     assert energy is engine.energy(precision="float64") and energy.grad_fn is None
+    stage, out = evaluator.stage()
+    assert out is energy
+    value = energy.clone()
+    out.zero_()
+    stage()
+    assert torch.equal(out, value)
     assert engine.overflowed() == 0
     info = engine.info()["energy_graphs"]
     assert info["float64"]["copy"] and info["float64"]["compile_mode"] == "none" and not info["float32"]["copy"]

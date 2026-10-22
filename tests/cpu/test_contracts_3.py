@@ -430,6 +430,8 @@ def test_graph_engine_energy_and_captured_names():  # §8.1 energy-only graph (3
     assert _parameters(GraphEngine.captured) == ["self", "key", "fn"]
     assert _parameters(GraphEngine.add_energy_field) == ["self", "field"]  # the float64 MC copy (3-T07)
     assert isinstance(GraphEngine.energy_fields, property)
+    assert _parameters(GraphEngine.energy_stage) == ["self", "precision"]
+    assert _keyword_only(GraphEngine.energy_stage) == ["precision"]
 
 
 def test_mc_evaluator_names():  # §10.4 evaluation, baseline energy, energy precision (3-T07)
@@ -440,7 +442,7 @@ def test_mc_evaluator_names():  # §10.4 evaluation, baseline energy, energy pre
     assert evaluator.PRECISIONS == ("float32", "float64")
     assert _parameters(evaluator.MCEvaluator.__init__) == ["self", "engine", "precision", "model", "copy", "polar"]
     assert _keyword_only(evaluator.MCEvaluator.__init__) == ["model", "copy", "polar"]
-    for name in ("evaluate", "baseline", "current", "accept", "reject", "tag", "info"):
+    for name in ("evaluate", "stage", "baseline", "current", "accept", "reject", "tag", "info"):
         assert callable(getattr(evaluator.MCEvaluator, name))
     assert _parameters(evaluator.float64_copy) == ["force_field", "model", "neighbours", "polar", "check"]
     assert _parameters(evaluator.float64_model) == ["force_field", "plan", "backend"]

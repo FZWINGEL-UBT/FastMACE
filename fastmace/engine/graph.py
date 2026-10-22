@@ -414,6 +414,22 @@ class GraphEngine(Engine):
         nothing from it before ``overflowed()`` or ``redo_on_overflow`` (SPEC §8.1 "Overflow before commit").
         Without capture (CPU, eager) the stage runs directly, with the same result.
         """
+        if self._pending or self._pipe_pending is not None:
+            self.flush()  # the committed state: no step in flight
+        key = self._energy_key(precision)
+        self._run(key)
+        return self._energy_out[key[1]]
+
+    def energy_stage(self, *, precision: str | None = None) -> tuple[Callable[[], None], torch.Tensor]:
+        """``(stage, out)``: the energy-only evaluation as a plain function, for another module's captured graph
+        (3-T09's attempt: propose, apply, refresh, energy, accept). ``stage()`` writes the float64 energy at
+        the current positions and active edges into ``out`` and flags an edge overflow, without a capture
+        of its own; it reads the edges active now, so the caller captures one stage per edge size."""
+        key = self._energy_key(precision)
+        return self._stage_energy(key), self._energy_out[key[1]]
+
+    def _energy_key(self, precision):
+        """``(ENERGY_KEY, precision, edges)`` for the edges active now; binds the copy's edges and the output."""
         precision = _precision(self.force_field) if precision is None else precision
         field = self._energy_fields.get(precision)
         if field is None:
@@ -424,8 +440,7 @@ class GraphEngine(Engine):
             field.use_edges(edges)
         if precision not in self._energy_out:
             self._energy_out[precision] = torch.zeros(1, dtype=torch.float64, device=self.device)
-        self._run((ENERGY_KEY, precision, edges))
-        return self._energy_out[precision]
+        return ENERGY_KEY, precision, edges
 
     @property
     def energy_fields(self) -> Mapping[str, Any]:

@@ -123,3 +123,67 @@ def test_energy_only_graph_and_evaluator_tiny_plain_cueq(tmp_path):
     # Bitwise where the GPU kernels are deterministic; within float32 reduction-order noise otherwise.
     assert out["positions_diff"] <= 1e-6 and out["forces_diff"] <= 1e-4, out
     assert out["after_md"][0] == out["after_md"][1]
+
+
+# --------------------------------------------------------------------------- PolarMACE (the polar_gpu._Call failure)
+
+
+def _capture(call):
+    """A CUDA graph of ``call`` after two warm-up calls on a side stream; returns (graph, captured outputs)."""
+    stream = torch.cuda.Stream()
+    stream.wait_stream(torch.cuda.current_stream())
+    with torch.cuda.stream(stream):
+        for _ in range(2):
+            call()
+    torch.cuda.current_stream().wait_stream(stream)
+    graph = torch.cuda.CUDAGraph()
+    with torch.cuda.graph(graph):
+        captured = call()
+    return graph, captured
+
+
+def test_polar_energy_only_then_a_force_capture():
+    """A captured energy-only call leaves no autograd state behind: the force and stress call of the same
+    PolarMACE force field is captured after it and replays as the eager call (SPEC §8.1; the research
+    engine's polar_gpu._Call kept one call's autograd graph and broke the next capture)."""
+    import pytest
+
+    from _support.structures import nacl
+    from _support.tiny_models import polar_available, tiny_family_calculator
+    from fastmace.config import EngineConfig, NeighbourConfig
+    from fastmace.model.forces import MACEForceField
+
+    if not polar_available():
+        pytest.skip("PolarMACE needs graph_longrange")
+    from mace.cli.convert_e3nn_cueq import run
+
+    calc = tiny_family_calculator("polar", [11, 17], device="cuda:0")
+    calc.models = [run(calc.models[0], device="cuda:0", return_model=True)]
+    atoms = nacl(repeat=2, rattle=0.05, seed=3)
+    ff = MACEForceField(calc, atoms, engine=EngineConfig(compile_mode="none"), compute_stress=True,
+                        neighbours=NeighbourConfig(skin=0.5, sort_receivers="off", gpu_neighbour_list="off"))
+    positions = torch.tensor(atoms.positions, dtype=torch.float64, device="cuda:0")
+    eager = ff(positions)
+    expected = (eager.energy.detach().clone(), eager.forces.detach().clone(), eager.stress.detach().clone())
+    energy = ff.energy_only(positions)
+    assert energy.grad_fn is None and not energy.requires_grad
+    torch.testing.assert_close(energy, expected[0], rtol=1e-12, atol=0)
+
+    out = torch.zeros(1, dtype=torch.float64, device="cuda:0")
+    energy_graph, _ = _capture(lambda: out.copy_(ff.energy_only(positions)))
+    energy_graph.replay()
+    torch.cuda.synchronize()
+    torch.testing.assert_close(out, expected[0], rtol=1e-12, atol=0)
+
+    def forces():
+        result = ff(positions)
+        return result.energy.detach(), result.forces.detach(), result.stress.detach()
+
+    force_graph, captured = _capture(forces)
+    for _ in range(2):
+        energy_graph.replay()
+        force_graph.replay()
+    torch.cuda.synchronize()
+    for got, want in zip(captured, expected):
+        torch.testing.assert_close(got, want, rtol=1e-10, atol=1e-12)
+    torch.testing.assert_close(out, expected[0], rtol=1e-12, atol=0)

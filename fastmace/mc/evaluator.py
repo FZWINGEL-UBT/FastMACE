@@ -193,6 +193,13 @@ class MCEvaluator:
             self.field.use_edges(int(engine.force_field.data["edge_index"].shape[1]))
         return self.field.energy_only(engine.state.positions)
 
+    def stage(self):
+        """``(stage, out)``: the evaluation as a plain function writing ``out``, for a caller's own captured graph
+        (3-T09's attempt graph). Graph engines only (``GraphEngine.energy_stage``)."""
+        if not self.graph:
+            raise ValueError("an evaluation stage needs a graph engine (GraphEngine.energy_stage)")
+        return self.engine.energy_stage(precision=self.precision)
+
     def baseline(self):
         """Evaluate the current state with this evaluator and cache it as the block's baseline (never the MD
         energy; SPEC §10.4 "Baseline energy"). Returns the cached device energy."""
