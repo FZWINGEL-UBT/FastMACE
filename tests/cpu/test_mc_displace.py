@@ -10,6 +10,9 @@
 - an overflowing displacement (edges beyond the active size, or a trial build that grows the capacity)
   is redone with the same numbers: the outcome equals a run that did not overflow;
 - the refusals (variable cell, δ beyond ``Workload.max_displacement_A``) and adaptive δ.
+
+Everything runs through ``MCDriver`` (3-T09's driver), as ``Simulation.run(mc=...)`` will; forced decisions
+patch ``moves.metropolis`` before attach.
 """
 
 import dataclasses
@@ -23,7 +26,7 @@ from _support.structures import nacl
 from _support.tiny_models import FAMILIES, tiny_mace_model
 from fastmace.config import EngineConfig, IntegratorConfig, PrecisionConfig, mc_stream_seeds
 from fastmace.errors import PlanRefused
-from fastmace.mc import Displace, streams
+from fastmace.mc import Displace, MCDriver, moves, streams
 from fastmace.mc import displace as dm
 from fastmace.mc.moves import K_B_EV_PER_K
 
@@ -66,14 +69,23 @@ def mace_engine(tmp_path, monkeypatch):
     return make
 
 
-def attempts_of(engine, delta, *, max_displacement_A=None, adaptive=False):
-    from fastmace.mc.evaluator import MCEvaluator
+def attached(engine, delta, attempts, *, max_displacement_A=None, adaptive=False, seed=SEED):
+    """An ``MCDriver`` with one ``Displace`` move, attached to ``engine`` (patch ``moves.metropolis`` first)."""
+    driver = MCDriver([Displace(delta_A=delta, every=1, attempts=attempts, adaptive=adaptive)], seed=seed)
+    driver.attach(engine, max_displacement_A=delta if max_displacement_A is None else max_displacement_A)
+    return driver
 
-    evaluator = MCEvaluator(engine)
-    move = Displace(delta_A=delta, every=5, attempts=4, adaptive=adaptive)
-    attempts = dm.DisplaceAttempts(move, engine, evaluator, seeds=mc_stream_seeds(SEED),
-                                   max_displacement_A=delta if max_displacement_A is None else max_displacement_A)
-    return attempts, evaluator
+
+def block(driver, engine, temperature_K=300.0):
+    """One MC block at ``temperature_K``; the displacement move's entry of the block record."""
+    engine.integrator.set_temperature(temperature_K)
+    record = driver.run_block(engine, max(1, int(engine.state.step)))
+    return record["moves"][0]
+
+
+def force(monkeypatch, accept):
+    """Every decision ``accept`` (before attach: each attempt binds ``moves.metropolis`` when it is built)."""
+    monkeypatch.setattr(moves, "metropolis", lambda u, excess, kT: torch.full_like(u, accept, dtype=torch.bool))
 
 
 def fresh_energy(make, positions):
@@ -87,16 +99,17 @@ def fresh_energy(make, positions):
     return float(field.energy_only(torch.as_tensor(positions, dtype=torch.float64))[0])
 
 
-def proposal(attempts, natoms):
-    """The next attempt's atom and displacement, decoded on the host from the stream offsets."""
-    seeds = attempts.seeds
-    base = torch.tensor(attempts.offsets["proposal"], dtype=torch.int64)
-    numbers = streams.positions(base, dm.PROPOSAL_COUNT)
+
+
+def proposal(driver, natoms):
+    """The next attempt's atom and displacement, decoded on the host from the driver's stream offsets."""
+    seeds, offsets = driver.seeds, driver.offsets
+    numbers = streams.positions(torch.tensor(offsets["proposal"], dtype=torch.int64), dm.PROPOSAL_COUNT)
     atom, d = dm.decode_displace(streams.uniforms(seeds["proposal"], numbers),
                                  streams.normals(seeds["proposal"], numbers), natoms,
-                                 torch.tensor([attempts.delta_A], dtype=torch.float64))
+                                 torch.tensor([driver.attempts[0].delta_A], dtype=torch.float64))
     u = streams.uniforms(seeds["acceptance"],
-                         streams.positions(torch.tensor(attempts.offsets["acceptance"], dtype=torch.int64), 1))
+                         streams.positions(torch.tensor(offsets["acceptance"], dtype=torch.int64), 1))
     return int(atom[0]), d[0].numpy(), float(u[0])
 
 
@@ -169,13 +182,6 @@ def test_refusals_variable_cell_and_delta_beyond_the_workload():
     assert dm.VARIABLE_CELL_CODE == "displace-variable-cell"
 
 
-def test_attach_refuses_a_variable_cell(mace_engine):
-    engine = mace_engine(npt=True)
-    with pytest.raises(PlanRefused) as raised:
-        attempts_of(engine, 0.05)
-    assert raised.value.codes == (dm.VARIABLE_CELL_CODE,)
-
-
 def test_adapted_delta_rule():
     # delta <- delta * clamp(acc / 0.3, 0.5, 2), at most delta_A and the workload's maximum.
     assert dm.adapted_delta(0.1, 3, 10, delta_A=0.5, max_displacement_A=0.5) == pytest.approx(0.1)
@@ -188,184 +194,209 @@ def test_adapted_delta_rule():
 # --------------------------------------------------------------------------- attempts on an engine
 
 
-def run_one_by_one(make, engine, attempts, evaluator, count, temperature_K, trial_rebuild_expected=None):
+def test_attach_refuses_a_variable_cell_and_a_delta_beyond_the_workload(mace_engine):
+    with pytest.raises(PlanRefused) as raised:
+        attached(mace_engine(npt=True), 0.05, 4)
+    assert raised.value.codes == (dm.VARIABLE_CELL_CODE,)
+    engine = mace_engine()
+    with pytest.raises(PlanRefused) as raised:
+        attached(engine, 0.2, 4, max_displacement_A=0.1)
+    assert raised.value.codes == (dm.BEYOND_MAX_CODE,)
+    driver = MCDriver([Displace(delta_A=0.2, every=1, attempts=4)], seed=SEED)
+    with pytest.raises(PlanRefused) as raised:
+        driver.attach(engine)  # no Workload.max_displacement_A given
+    assert raised.value.codes == (dm.BEYOND_MAX_CODE,)
+
+
+# --------------------------------------------------------------------------- attempts through the driver
+
+
+def run_one_by_one(make, engine, driver, count, temperature_K):
     """``count`` blocks of one attempt each, each checked against a direct evaluation and the acceptance rule."""
     natoms = engine.state.positions.shape[0]
     kT = K_B_EV_PER_K * temperature_K
+    attempt = driver.attempts[0]
     outcomes = []
     for _ in range(count):
         before = engine.state.positions.clone()
         reference = engine.force_field.neighbours.reference_positions.clone()
-        atom, d, u = proposal(attempts, natoms)
+        atom, d, u = proposal(driver, natoms)
         trial = before.clone()
         trial[atom] += torch.from_numpy(d)
         needs = bool(((trial - reference) ** 2).sum(dim=1).max() > (SKIN / 2) ** 2)
-        baseline = evaluator.baseline().clone()
         rebuilds = engine.force_field.neighbours.rebuilds
-        record = attempts.run(1, temperature_K=temperature_K, baseline=baseline)
-        assert record["attempted"] == 1
-        assert record["trial_rebuilds"] == int(needs)
-        assert engine.force_field.neighbours.rebuilds == rebuilds + int(needs)  # one build, no loop
+        entry = block(driver, engine, temperature_K)
+        assert entry["attempted"] == 1 and entry["impossible"] == 0
+        assert entry["trial_rebuilds"] == int(needs)
+        accepted = bool(entry["accepted"])
+        # One trial build, no loop (an acceptance adds the block's canonical rebuild).
+        assert engine.force_field.neighbours.rebuilds == rebuilds + int(needs) + int(accepted)
         expected = fresh_energy(make, trial.numpy())
-        assert float(attempts.trial_energy[0]) == pytest.approx(expected, rel=1e-12, abs=1e-12)
-        delta_e = float(attempts.trial_energy[0]) - float(baseline[0])
-        accepted = u == 0 or math.log(u) < -delta_e / kT
-        assert record["accepted"] == int(accepted)
+        assert float(attempt.trial_energy[0]) == pytest.approx(expected, rel=1e-12, abs=1e-12)
+        delta_e = float(attempt.trial_energy[0]) - driver.last_block["baseline_eV"]
+        assert accepted == (u == 0 or math.log(u) < -delta_e / kT)
         torch.testing.assert_close(engine.state.positions, trial if accepted else before, rtol=0, atol=0)
-        if accepted:
-            # The committed list is the one around the accepted geometry: every pair within the cutoff.
-            fresh = make()
-            fresh.force_field.rebuild(trial)
-            fresh.force_field.compact(trial)
-            assert compacted_edges(engine) == compacted_edges(fresh)
-            engine.canonicalise(reevaluate=True)  # a block with an acceptance ends at a canonical point
         outcomes.append((accepted, needs))
     return outcomes
 
 
 def test_small_displacements_stay_on_the_attempt_path(mace_engine):
     engine = mace_engine()
-    attempts, evaluator = attempts_of(engine, 0.01)
-    outcomes = run_one_by_one(mace_engine, engine, attempts, evaluator, 6, temperature_K=300.0)
+    driver = attached(engine, 0.01, 1)
+    outcomes = run_one_by_one(mace_engine, engine, driver, 6, temperature_K=300.0)
     assert not any(needs for _, needs in outcomes)
-    assert attempts.counters["trial_rebuilds"] == 0
+    assert driver.attempts[0].trial_rebuilds == 0
 
 
 def test_displacement_beyond_half_the_skin_uses_a_list_around_the_trial(mace_engine):
     engine = mace_engine()
-    attempts, evaluator = attempts_of(engine, 0.2)
+    driver = attached(engine, 0.2, 1)
     # A low temperature: downhill moves are accepted, uphill ones rejected; both happen in these attempts.
-    outcomes = run_one_by_one(mace_engine, engine, attempts, evaluator, 10, temperature_K=5.0)
+    outcomes = run_one_by_one(mace_engine, engine, driver, 10, temperature_K=5.0)
     rebuilt = [accepted for accepted, needs in outcomes if needs]
     assert True in rebuilt and False in rebuilt, outcomes
-    assert attempts.counters["trial_rebuilds"] == sum(needs for _, needs in outcomes)
+    assert driver.info()["displacements"]["displace:0"]["trial_rebuilds"] == sum(needs for _, needs in outcomes)
 
 
-def test_a_block_of_attempts_runs_through_flagged_attempts(mace_engine):
-    """Several attempts in one block: the flagged ones are handled on the host and the block resumes."""
+def test_accepted_trials_chain_on_their_trial_lists(mace_engine, monkeypatch):
+    """Every attempt accepted in one block: each later trial runs on the list built around the previous
+    accepted geometry, and the block's last energy equals a direct evaluation of the final positions."""
+    force(monkeypatch, True)
     engine = mace_engine()
-    attempts, evaluator = attempts_of(engine, 0.2)
-    other = mace_engine()
-    single, single_evaluator = attempts_of(other, 0.2)
-    record = attempts.run(8, temperature_K=50.0, baseline=evaluator.baseline().clone())
-    baseline = single_evaluator.baseline().clone()
-    accepted = 0
-    for _ in range(8):
-        step = single.run(1, temperature_K=50.0, baseline=baseline)
-        accepted += step["accepted"]
-        baseline = single.baseline  # the block's baseline after the attempt, as the next attempt sees it
-    assert record["attempted"] == 8 and record["accepted"] == accepted
-    assert record["trial_rebuilds"] == single.counters["trial_rebuilds"] > 0
-    torch.testing.assert_close(engine.state.positions, other.state.positions, rtol=0, atol=0)
-    assert attempts.offsets == single.offsets == {"proposal": 8 * dm.PROPOSAL_COUNT, "acceptance": 8}
+    driver = attached(engine, 0.2, 5)
+    entry = block(driver, engine)
+    assert entry["attempted"] == entry["accepted"] == 5 and entry["trial_rebuilds"] > 0
+    final = fresh_energy(mace_engine, engine.state.positions.numpy())
+    assert driver.last_block["energy_eV"] == pytest.approx(final, rel=1e-12, abs=1e-12)
+    assert float(engine.state.energy[0]) == pytest.approx(final, rel=1e-12, abs=1e-12)  # the canonical point
 
 
-def test_a_rejected_displacement_leaves_the_committed_list(mace_engine):
+def test_a_block_runs_through_halted_attempts(mace_engine, monkeypatch):
+    force(monkeypatch, False)
+    engine = mace_engine()
+    driver = attached(engine, 0.2, 8)
+    entry = block(driver, engine)
+    assert entry["attempted"] == 8 and entry["accepted"] == 0 and 0 < entry["trial_rebuilds"] <= 8
+    assert driver.offsets == {"proposal": 8 * dm.PROPOSAL_COUNT, "acceptance": 8, "velocity": 0}
+
+
+def test_a_rejected_displacement_leaves_the_committed_list(mace_engine, monkeypatch):
+    force(monkeypatch, False)
     for delta in (0.01, 0.2):  # without and with a trial rebuild
         engine = mace_engine()
-        attempts, evaluator = attempts_of(engine, delta)
+        driver = attached(engine, delta, 5)
         before, positions = list_state(engine), engine.state.positions.clone()
-        # A baseline far below every trial: every attempt is rejected.
-        record = attempts.run(5, temperature_K=300.0, baseline=evaluator.baseline() - 1e3)
-        assert record["accepted"] == 0 and record["attempted"] == 5
-        assert (record["trial_rebuilds"] > 0) == (delta > SKIN / 2)
+        entry = block(driver, engine)
+        assert entry["accepted"] == 0 and entry["attempted"] == 5
+        assert (entry["trial_rebuilds"] > 0) == (delta > SKIN / 2)
         assert_same_list(before, list_state(engine))
         torch.testing.assert_close(engine.state.positions, positions, rtol=0, atol=0)
-        # The streams advanced by the fixed counts all the same.
-        assert attempts.offsets == {"proposal": 5 * dm.PROPOSAL_COUNT, "acceptance": 5}
 
 
-def test_stream_offsets_do_not_depend_on_decisions(mace_engine):
-    engine = mace_engine()
-    attempts, evaluator = attempts_of(engine, 0.2)
-    attempts.run(3, temperature_K=300.0, baseline=evaluator.baseline() + 1e3)  # every attempt accepted
-    assert attempts.counters["accepted"] == 3
-    assert attempts.offsets == {"proposal": 3 * dm.PROPOSAL_COUNT, "acceptance": 3}
+def test_stream_offsets_do_not_depend_on_decisions(mace_engine, monkeypatch):
+    offsets = []
+    for accept in (True, False):
+        force(monkeypatch, accept)
+        engine = mace_engine()
+        driver = attached(engine, 0.2, 3)
+        assert block(driver, engine)["accepted"] == (3 if accept else 0)
+        offsets.append(dict(driver.offsets))
+    assert offsets[0] == offsets[1] == {"proposal": 3 * dm.PROPOSAL_COUNT, "acceptance": 3, "velocity": 0}
 
 
-def test_an_edge_overflow_is_redone_with_the_same_numbers(mace_engine):
-    """The active edges are shrunk below the count before the block (a forced overflow, as in 3-T04's tests):
-    the first attempt overflows, is restored and redone with the same numbers on enough edges."""
-    plain, forced = mace_engine(), mace_engine()
+def test_an_edge_overflow_is_redone_with_the_same_numbers(mace_engine, monkeypatch):
+    """The active edges are shrunk below the count after the block's baseline (a forced overflow, as in 3-T04's
+    tests): the first attempt overflows, is restored and redone with the same numbers on enough edges."""
     outcomes = []
-    for engine, shrink in ((plain, False), (forced, True)):
-        attempts, evaluator = attempts_of(engine, 0.01)
-        baseline = evaluator.baseline().clone()
+    for shrink in (False, True):
+        engine = mace_engine()
+        driver = attached(engine, 0.01, 4)
         if shrink:
-            engine.force_field.use_edges(int(engine.force_field.edge_count) - 20)
-        record = attempts.run(4, temperature_K=300.0, baseline=baseline)
-        outcomes.append((record, engine.state.positions.clone(), dict(attempts.offsets),
-                         float(attempts.baseline[0])))
-    (plain_record, plain_positions, plain_offsets, plain_e), (record, positions, offsets, energy) = outcomes
+            baseline = driver.evaluator.baseline
+
+            def shrunk(baseline=baseline, engine=engine):
+                out = baseline()
+                engine.force_field.use_edges(int(engine.force_field.edge_count) - 20)
+                return out
+
+            monkeypatch.setattr(driver.evaluator, "baseline", shrunk)
+        redos = engine.info()["overflows_redone"]
+        entry = block(driver, engine)
+        outcomes.append((entry, engine.state.positions.clone(), dict(driver.offsets),
+                         driver.last_block["energy_eV"], engine.info()["overflows_redone"] - redos))
+        assert not engine.overflowed()
+    (plain, plain_positions, plain_offsets, plain_e, plain_redos), (entry, positions, offsets, energy, redos) = outcomes
     # On the CPU the edges are exact counts, so a displacement that adds a pair overflows in the plain run too.
-    assert record["overflows_redone"] > plain_record["overflows_redone"]
+    assert redos > plain_redos
     for key in ("attempted", "accepted", "trial_rebuilds"):
-        assert record[key] == plain_record[key], key
+        assert entry[key] == plain[key], key
     torch.testing.assert_close(positions, plain_positions, rtol=0, atol=0)
     assert offsets == plain_offsets
     assert energy == pytest.approx(plain_e, rel=1e-12, abs=1e-12)
-    assert forced.info()["overflows_redone"] >= 1
-    assert not forced.overflowed()
 
 
-def test_a_trial_build_that_grows_the_capacity_is_redone_with_the_same_numbers(mace_engine):
+def test_a_trial_build_that_grows_the_capacity_is_redone_with_the_same_numbers(mace_engine, monkeypatch):
     """The neighbour capacity is set to the candidates of the last build (no headroom): a trial build with
     more pairs grows it, which moves the buffers; the attempt is restored and redone with the same numbers."""
-    plain, forced = mace_engine(), mace_engine()
+    force(monkeypatch, True)
     outcomes = []
-    for engine, tight in ((plain, False), (forced, True)):
-        attempts, evaluator = attempts_of(engine, 0.2)
+    for tight in (False, True):
+        engine = mace_engine()
         if tight:
             nl = engine.force_field.neighbours
             nl.set_capacity(nl.num_candidates)
             engine.canonicalise()  # build into the exact-size buffers
             nl.headroom = 1.0  # no headroom on growth either, so later trials with more pairs grow again
-        baseline = evaluator.baseline().clone()
-        record = attempts.run(6, temperature_K=300.0, baseline=baseline + 1e3)  # all accepted
-        outcomes.append((record, engine.state.positions.clone(), engine.force_field.neighbours.capacity))
-    (plain_record, plain_positions, _), (record, positions, capacity) = outcomes
-    assert record["overflows_redone"] >= 1
+        driver = attached(engine, 0.2, 6)
+        redos = engine.info()["overflows_redone"]
+        entry = block(driver, engine)
+        outcomes.append((entry, engine.state.positions.clone(), engine.info()["overflows_redone"] - redos))
+    (plain, plain_positions, _), (entry, positions, redos) = outcomes
+    assert redos >= 1
     for key in ("attempted", "accepted", "trial_rebuilds"):
-        assert record[key] == plain_record[key], key
+        assert entry[key] == plain[key], key
     torch.testing.assert_close(positions, plain_positions, rtol=0, atol=0)
-    assert capacity >= forced.force_field.neighbours.num_candidates
 
 
-def test_adaptive_delta_changes_only_at_the_end_of_a_block_and_is_recorded(mace_engine):
+def test_adaptive_delta_changes_at_the_end_of_a_block_and_is_recorded(mace_engine, monkeypatch):
+    from fastmace.io import restart
+
+    force(monkeypatch, False)
     engine = mace_engine()
-    attempts, evaluator = attempts_of(engine, 0.2, adaptive=True)
-    record = attempts.run(4, temperature_K=300.0, baseline=evaluator.baseline() - 1e3)  # none accepted
-    assert record["delta_A"] == pytest.approx(0.2)  # the δ the block used
-    assert record["adapted_delta_A"] == pytest.approx(0.1)  # clamp(0 / 0.3) = 0.5
-    assert attempts.delta_A == pytest.approx(0.1)
-    state = attempts.state_dict()
-    assert state["delta_A"] == pytest.approx(0.1)
-    assert state["delta_history"] == pytest.approx([0.2, 0.1])
-    fixed, fixed_evaluator = attempts_of(mace_engine(), 0.2)
-    record = fixed.run(4, temperature_K=300.0, baseline=fixed_evaluator.baseline() - 1e3)
-    assert fixed.delta_A == pytest.approx(0.2) and "adapted_delta_A" not in record
+    driver = attached(engine, 0.2, 4, adaptive=True)
+    entry = block(driver, engine)
+    assert entry["delta_A"] == pytest.approx(0.2)  # the δ the block used
+    assert entry["adapted_delta_A"] == pytest.approx(0.1)  # clamp(0 / 0.3) = 0.5
+    state = driver.state_dict()
+    assert state["delta_A"] == {"displace:0": pytest.approx(0.1)}
+    assert driver.info()["displacements"]["displace:0"]["delta_history"] == pytest.approx([0.2, 0.1])
+    restart._mc_checked(state)  # a valid restart record
+    # A resumed driver continues with the adapted δ, attached before or after the record is loaded.
+    for load_first in (True, False):
+        again = MCDriver([Displace(delta_A=0.2, every=1, attempts=4, adaptive=True)], seed=SEED)
+        if load_first:
+            again.load_state_dict(state)
+            again.attach(mace_engine(), max_displacement_A=0.2)
+        else:
+            again.attach(mace_engine(), max_displacement_A=0.2)
+            again.load_state_dict(state)
+        assert again.attempts[0].delta_A == pytest.approx(0.1)
+        assert float(again.attempts[0].delta[0]) == pytest.approx(0.1)
+    fixed = attached(mace_engine(), 0.2, 4)
+    entry = block(fixed, fixed.engine)
+    assert fixed.attempts[0].delta_A == pytest.approx(0.2) and "adapted_delta_A" not in entry
 
 
-def test_state_dict_round_trip(mace_engine):
-    engine = mace_engine()
-    attempts, evaluator = attempts_of(engine, 0.2, adaptive=True)
-    attempts.run(3, temperature_K=300.0, baseline=evaluator.baseline().clone())
-    state = attempts.state_dict()
-    again, _ = attempts_of(mace_engine(), 0.2, adaptive=True)
-    again.load_state_dict(state)
-    assert again.state_dict() == state
-    assert set(state["counters"]) == set(dm.COUNTER_KEYS)
-
-
-def test_md_after_a_rejected_block_equals_md_without_it(mace_engine):
+def test_md_after_a_rejected_block_equals_md_without_it(mace_engine, monkeypatch):
     """A rejected block leaves nothing behind: the following MD steps are bitwise those of an engine that never
     ran it, and the registry check against a fresh construction finds no difference (SPEC §8.5, §12.2)."""
     from fastmace import events
 
+    force(monkeypatch, False)
     engine, untouched = mace_engine(), mace_engine()
-    attempts, evaluator = attempts_of(engine, 0.2)
-    record = attempts.run(6, temperature_K=300.0, baseline=evaluator.baseline() - 1e3)
-    assert record["accepted"] == 0 and record["trial_rebuilds"] > 0
+    driver = attached(engine, 0.2, 6)
+    entry = block(driver, engine)
+    assert entry["accepted"] == 0 and entry["trial_rebuilds"] > 0
     assert events.check_against(engine, untouched) == []
     for _ in range(3):
         engine.step()

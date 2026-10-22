@@ -32,7 +32,7 @@ CHILD = """
 import dataclasses, json
 import numpy as np
 import fastmace
-from fastmace.config import EngineConfig, IntegratorConfig, PrecisionConfig, mc_stream_seeds
+from fastmace.config import EngineConfig, IntegratorConfig, PrecisionConfig
 from fastmace.planner import fixed
 
 def structure():
@@ -47,9 +47,7 @@ loaded = planner.load(SPEC["path"], trusted=True)
 plan = planner.plan(loaded, structure(), IntegratorConfig(timestep_fs=1.0, friction=0.02, seed=7), planner.hardware())
 plan = dataclasses.replace(plan, neighbours=dataclasses.replace(plan.neighbours, skin=0.1))
 import torch
-from fastmace.mc import Displace
-from fastmace.mc.displace import DisplaceAttempts
-from fastmace.mc.evaluator import MCEvaluator
+from fastmace.mc import Displace, MCDriver, moves
 
 captured = planner.build(plan, loaded, structure(), temperature_K=300.0)
 engines = (captured,)
@@ -66,29 +64,26 @@ def lists(engine):
     return {name: tensor.clone() for name, tensor in nl.buffers().items()}
 
 out = {"blocks": []}
-moves = {}
+drivers = {}
 DELTAS = (0.01, 0.2) if SPEC["twin"] else (0.2,)
 for delta in DELTAS:
     for name, engine in zip(names, engines):
-        evaluator = MCEvaluator(engine)
-        attempts = DisplaceAttempts(Displace(delta_A=delta, every=10, attempts=8), engine, evaluator,
-                                    seeds=mc_stream_seeds(5), max_displacement_A=0.2, index=0 if delta < 0.1 else 1)
-        moves[name, delta] = (attempts, evaluator)
+        drivers[name, delta] = MCDriver([Displace(delta_A=delta, every=1, attempts=8)], seed=5)
+        drivers[name, delta].attach(engine, max_displacement_A=0.2)
 for delta in DELTAS:
     for temperature in (5.0, 300.0):
         records = []
         for name, engine in zip(names, engines):
-            attempts, evaluator = moves[name, delta]
-            record = attempts.run(8, temperature_K=temperature, baseline=evaluator.baseline().clone())
-            if record["accepted"]:
-                engine.canonicalise(reevaluate=True)
-            records.append(record)
+            engine.integrator.set_temperature(temperature)
+            records.append(drivers[name, delta].run_block(engine, 10)["moves"][0])
         out["blocks"].append(records)
 out["positions_diff"] = float((captured.state.positions - engines[-1].state.positions).abs().max())
 # A block of rejections with trial builds leaves the list and positions as they were.
+moves.metropolis = lambda u, excess, kT: torch.zeros_like(u, dtype=torch.bool)  # before attach: all rejected
+rejecting = MCDriver([Displace(delta_A=0.2, every=1, attempts=8)], seed=6)
+rejecting.attach(captured, max_displacement_A=0.2)
 before, positions = lists(captured), captured.state.positions.clone()
-attempts, evaluator = moves["captured", 0.2]
-out["rejected"] = attempts.run(8, temperature_K=300.0, baseline=evaluator.baseline() - 1e3)
+out["rejected"] = rejecting.run_block(captured, 10)["moves"][0]
 after = lists(captured)
 out["list_same"] = all(torch.equal(before[name], after[name]) for name in before)
 out["positions_same"] = bool(torch.equal(positions, captured.state.positions))

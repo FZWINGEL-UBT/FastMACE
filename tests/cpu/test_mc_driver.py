@@ -395,7 +395,7 @@ def test_attach_refuses_a_move_the_checks_refuse(loaded):
         MCDriver([Transmute(["Na", "K"], 1, 1, velocities="rescale")], seed=1).attach(sim._engine)
     with pytest.raises(SpeciesNotInSuperset):
         MCDriver([Swap([("Na", "Rb")], 1, 1)], seed=1).attach(sim._engine)
-    with pytest.raises(NotImplementedError, match="3-T10"):
+    with pytest.raises(PlanRefused, match="max_displacement_A"):  # 3-T10: the workload's maximum is required
         MCDriver([fm_displace()], seed=1).attach(sim._engine)
     with pytest.raises(ValueError, match="max_attempts_per_block"):
         from fastmace.config import MCConfig

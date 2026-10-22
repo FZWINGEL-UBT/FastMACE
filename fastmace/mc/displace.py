@@ -2,8 +2,8 @@
 step 4; plan task 3-T10).
 
 One atom, chosen uniformly, moves to a uniform point in a sphere of radius δ. The proposal is symmetric,
-so the acceptance is Metropolis on the MC evaluator's ΔE: accept iff ``ln u < −ΔE/kT`` (``u = 0`` accepts),
-as for swaps (``docs/design/contracts-3.md``, "MC streams").
+so the acceptance is Metropolis on the MC evaluator's ΔE, ``moves.metropolis``: accept iff
+``ln u < −ΔE/kT`` (``u = 0`` accepts), as for swaps (``docs/design/contracts-3.md``, "MC streams").
 
 **Numbers.** Attempt ``k`` of a block reads ``PROPOSAL_COUNT`` = 5 proposal numbers from
 ``base + 5k``: number 0 as a uniform picks the atom ``min(floor(u N), N − 1)``, numbers 1–3 as normals
@@ -11,20 +11,21 @@ give the direction, number 4 as a uniform the radius ``δ u^(1/3)``. It reads on
 ``base + k`` and no velocity number (momenta stay). The counts are fixed whatever the outcome, and the
 layout is a restart compatibility promise like the swap's.
 
-**Two paths per attempt.**
-- *The captured attempt* (key ``("mc.displace", index, precision, edges)``): propose, apply, the rebuild
-  test against the list's reference positions (the MD drift included), compaction, the energy-only
-  stage, the decision and the masked restore, then compaction at the committed positions. It is valid
-  only when no rebuild is needed and the compacted count fits the active edges. An invalid attempt
-  restores itself, does not advance the device attempt index and sets ``halted``: the attempts replayed
-  after it do nothing, and the host reads the index and the flag once per block.
+**Two paths per attempt** (``DisplaceAttempt``, run by ``MCDriver``):
+- *The captured attempt* (key ``("mc.displace", driver id, index, precision, edges)``): propose, apply,
+  the rebuild test against the list's reference positions (the MD drift included), compaction, the
+  energy-only stage, the decision and the masked restore, then compaction at the committed positions. It
+  is valid only when no rebuild is needed and the compacted count fits the active edges. An invalid
+  attempt restores itself, does not advance the device attempt index and sets ``halted``: the attempts
+  replayed after it do nothing. The driver reads the index and the flag once after the move's replays.
 - *The host path* for a halted attempt, with the same numbers (the index did not move): the committed
   list is saved (``SkinNeighbourList.save_list``), the attempt is applied, the list is built eagerly
   around the trial geometry when the test asks for it (``GraphEngine.trial_rebuild``: the GPU build
   reads its pair count on the host and may reallocate), the edges are sized for the trial
   (``use_trial_edges``) and the captured energy graph runs. Accept keeps the trial list
   (``adopt_trial_list``); reject restores the position and the committed list. The trial is never
-  re-tested at the restored positions, so nothing loops (§8.5 step 4).
+  re-tested at the restored positions, so nothing loops (§8.5 step 4). The driver then replays the
+  move's remaining attempts.
 
 **Overflows** are execution events, not outcomes: an edge count beyond the active edges halts the
 captured attempt, which the host path redoes on enough edges; a trial build that grows the capacity
@@ -32,8 +33,9 @@ captured attempt, which the host path redoes on enough edges; a trial build that
 the attempt with the same numbers. Both count in the engine's ``overflows_redone``.
 
 **δ** is a device scalar, so changing it needs no re-capture. It is fixed while sampling; with
-``adaptive=True`` it changes at the end of each block, δ ← δ·clamp(acc/0.3, 0.5, 2), at most ``delta_A``
-and ``Workload.max_displacement_A`` (3-T10 answer 2). Every value is recorded (``delta_history``).
+``adaptive=True`` the driver changes it at the end of each block, δ ← δ·clamp(acc/0.3, 0.5, 2), at most
+``delta_A`` and ``Workload.max_displacement_A`` (3-T10 answer 2). Every value is recorded
+(``delta_history``; the restart keeps the current one).
 
 Displacements under a variable cell are refused (``displace-variable-cell``; 3-T10 answer 3), and so is a
 ``delta_A`` beyond ``Workload.max_displacement_A``, which sized the skin (rule 11).
@@ -42,17 +44,16 @@ Displacements under a variable cell are refused (``displace-variable-cell``; 3-T
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
 from typing import Any
 
 from fastmace.errors import PlanRefused, Reason
 from fastmace.mc import streams
-from fastmace.mc.moves import K_B_EV_PER_K, Displace
+from fastmace.mc.moves import Displace
 
 PROPOSAL_COUNT = 5  # atom uniform, three normals (direction), radius uniform
 ACCEPTANCE_COUNT = streams.ACCEPTANCE_COUNT
-# io.restart.MC_COUNTER_KEYS, then the trial builds of this move (3-T10 answer 4). "impossible" stays 0:
-# every atom can be displaced.
+# A displacement move's counts in a block record: io.restart.MC_COUNTER_KEYS ("impossible" stays 0: every
+# atom can be displaced), then its trial builds (3-T10 answer 4; a run counter, not restart state).
 COUNTER_KEYS = ("attempted", "impossible", "accepted", "trial_rebuilds")
 ADAPT_TARGET = 0.3  # the acceptance adaptive δ steers to
 ADAPT_LIMITS = (0.5, 2.0)  # the factor per block
@@ -104,117 +105,117 @@ def adapted_delta(delta: float, accepted: int, attempted: int, *, delta_A: float
     return float(min(delta * factor, delta_A, max_displacement_A))
 
 
-class DisplaceAttempts:
-    """The attempts of one ``Displace`` move on a built graph engine, with the MC ``evaluator`` (3-T07).
+class DisplaceAttempt:
+    """The attempt of a ``Displace`` move on a built graph engine, in the shape of ``fastmace.mc.moves.Attempt``:
+    ``bound(stage, trial)`` is what the driver captures, ``counters`` (int64 ``[3]``: attempted, impossible,
+    accepted) count on the device, and the block's ``streams`` (``streams.BlockStreams``) give the numbers,
+    the attempt index, kT and the baseline. ``moves.build_attempt`` builds it; ``MCDriver`` runs it.
 
-    ``seeds``: the stream seeds (``config.mc_stream_seeds``). ``max_displacement_A``: the workload's
-    ``max_displacement_A``. ``index``: the move's place in the attached set (part of its graph key).
-    ``offsets``: the streams' positions (host ints), advanced by the fixed counts after each block; the
-    MC driver sets them before a block when moves share the streams.
-
-    ``run(attempts, temperature_K=, baseline=)`` runs one block's attempts against ``baseline`` (the
-    block's MC-evaluator energy, a device tensor) and leaves the baseline after its acceptances in
-    ``baseline``. A block with an acceptance must end at a canonical point (the driver's resume).
+    A captured attempt that cannot decide (a rebuild is needed, or the count passes the active edges)
+    restores itself and sets ``halted``; the driver then calls ``host_attempt()`` for it and replays the
+    rest (module docstring). ``delta`` is a device scalar (``set_delta``); ``max_displacement_A`` caps it
+    (the driver sets the workload's at attach).
     """
 
-    def __init__(self, move: Displace, engine: Any, evaluator: Any, *, seeds: Mapping[str, int],
-                 max_displacement_A: float | None, index: int = 0, offsets: Mapping[str, int] | None = None):
+    def __init__(self, move: Displace, engine: Any, evaluator: Any, block_streams: Any):
         import torch
 
+        from fastmace.mc import moves
+
         if not isinstance(move, Displace):
-            raise TypeError(f"DisplaceAttempts needs a Displace move, got {type(move).__name__}")
-        check_displace(move, max_displacement_A=max_displacement_A, variable_cell=bool(engine.variable_cell))
+            raise TypeError(f"DisplaceAttempt needs a Displace move, got {type(move).__name__}")
         if not callable(getattr(engine, "trial_rebuild", None)):
             raise TypeError(f"displacement attempts need a graph engine, got {type(engine).__name__}")
-        self.move, self.engine, self.evaluator, self.index_in_set = move, engine, evaluator, int(index)
-        self.seeds = {name: int(seeds[name]) for name in ("proposal", "acceptance")}
-        self.max_displacement_A = float(max_displacement_A)
-        self.offsets = {"proposal": 0, "acceptance": 0} if offsets is None else {
-            name: int(offsets[name]) for name in ("proposal", "acceptance")}
-        self.natoms = int(engine.state.positions.shape[0])
-        device = engine.state.positions.device
-
-        def zeros(*shape, dtype=torch.float64):
-            return torch.zeros(shape, dtype=dtype, device=device)
-
-        # Device state of a block; the captured attempt reads and writes these at fixed addresses.
+        self.move, self.engine, self.evaluator, self.streams = move, engine, evaluator, block_streams
+        self.max_displacement_A = move.delta_A
+        state = engine.state
+        device = state.positions.device
+        self.natoms = int(state.positions.shape[0])
+        self.velocities = None  # momenta stay
+        self.counts = attempt_counts(self.natoms)
+        self.block_velocity_count = 0
+        self.write_charges, self.charges = False, None
+        self.accept = moves.metropolis  # looked up when the attempt is built, as for swaps (tests replace it)
+        self.counters = torch.zeros(3, dtype=torch.int64, device=device)
+        self.accepted = torch.zeros(1, dtype=torch.bool, device=device)
+        self.halted = torch.zeros(1, dtype=torch.int64, device=device)
+        self.trial_energy = torch.zeros(1, dtype=torch.float64, device=device)  # the last evaluated trial's
         self.delta = torch.full((1,), move.delta_A, dtype=torch.float64, device=device)
-        self.kT = zeros(1)
-        self.baseline = zeros(1)  # the block's baseline after the attempts so far
-        self.trial_energy = zeros(1)  # the last evaluated trial's energy
-        self.base = zeros(2, dtype=torch.int64)  # stream offsets at the block's start: proposal, acceptance
-        self.index = zeros(1, dtype=torch.int64)  # the attempt index: advances only when an attempt completes
-        self.halted = zeros(1, dtype=torch.int64)  # an attempt needed the host path; later replays do nothing
-        self.counts = zeros(2, dtype=torch.int64)  # attempted, accepted in this block
-        self._old = zeros(1, 3)
-        self._keep = (self.baseline, self.trial_energy, self.index, self.halted, self.counts, self._old)
-        self._replays = {}
+        self._old = torch.zeros(1, 3, dtype=torch.float64, device=device)
+        self.stage, self.trial = None, None
         self._saved = None  # the committed list during a host-path attempt (SkinNeighbourList.save_list)
         self.delta_A = move.delta_A
         self.delta_history = [move.delta_A]
-        self.counters = dict.fromkeys(COUNTER_KEYS, 0)
-
-    # ------------------------------------------------------------------ numbers
-
-    def _numbers(self, index):
-        """Attempt ``index``'s proposal numbers as uniforms and normals, and its acceptance uniform."""
-        offsets = streams.positions(self.base[0] + index * PROPOSAL_COUNT, PROPOSAL_COUNT)
-        seed = self.seeds["proposal"]
-        acceptance = streams.uniforms(self.seeds["acceptance"], streams.positions(self.base[1] + index, 1))
-        return streams.uniforms(seed, offsets), streams.normals(seed, offsets), acceptance
-
-    def _accepts(self, energy, acceptance):
-        import torch
-
-        return (acceptance == 0) | (torch.log(acceptance) < -(energy - self.baseline) / self.kT)
+        self.trial_rebuilds = 0  # host count, cumulative (3-T10 answer 4)
 
     # ------------------------------------------------------------------ the captured attempt
 
-    def _attempt(self, stage, out, edges: int):
+    def bound(self, stage, trial):
+        """``run`` with one edge size's energy stage and output (``MCEvaluator.stage``), for the driver to capture."""
+
+        def run() -> None:
+            self.stage, self.trial = stage, trial
+            self.run()
+
+        return run
+
+    def _proposal(self):
+        block = self.streams
+        u = block.uniforms("proposal", PROPOSAL_COUNT)
+        g = block.normals("proposal", PROPOSAL_COUNT)
+        acceptance = block.uniforms("acceptance", ACCEPTANCE_COUNT)
+        atom, d = decode_displace(u, g, self.natoms, self.delta)
+        return atom, d, acceptance
+
+    def _energy(self):
+        if self.stage is not None:
+            self.stage()
+            return self.trial
+        return self.evaluator.evaluate()
+
+    def run(self) -> None:
         import torch
 
-        state, field = self.engine.state, self.engine.force_field
+        state, field, block = self.engine.state, self.engine.force_field, self.streams
+        edges = int(field.data["edge_index"].shape[-1])
+        with torch.no_grad():
+            positions = state.positions
+            active = self.halted == 0
+            atom, d, acceptance = self._proposal()
+            old = positions.index_select(0, atom)
+            self._old.copy_(old)
+            new = old + d * active.to(torch.float64)[:, None]
+            positions.index_copy_(0, atom, new)
+            rebuild = field.needs_rebuild(positions).reshape(1)
+            field.compact(positions)
+            trial = self._energy()  # flags an edge count beyond the active edges
+            valid = active & ~rebuild & (field.edge_count.reshape(1) <= edges)
+            accepted = valid & self.accept(acceptance, trial - block.baseline, block.kT)
+            self.accepted.copy_(accepted)
+            positions.index_copy_(0, atom, torch.where(accepted[:, None], new, self._old))
+            field.compact(positions)  # the list of the committed positions
+            self.trial_energy.copy_(torch.where(valid, trial, self.trial_energy))
+            block.baseline.copy_(torch.where(accepted, trial, block.baseline))
+            self.counters.add_(torch.cat((valid, torch.zeros_like(valid), accepted)).to(torch.int64))
+            block.index.add_(valid.to(torch.int64))
+            self.halted.bitwise_or_((active & ~valid).to(torch.int64))
 
-        def attempt():
-            with torch.no_grad():
-                positions = state.positions
-                active = self.halted == 0
-                u, g, acceptance = self._numbers(self.index)
-                atom, d = decode_displace(u, g, self.natoms, self.delta)
-                old = positions.index_select(0, atom)
-                self._old.copy_(old)
-                new = old + d * active.to(torch.float64)[:, None]
-                positions.index_copy_(0, atom, new)
-                rebuild = field.needs_rebuild(positions).reshape(1)
-                field.compact(positions)
-                stage()  # the trial energy into ``out``; flags an edge count beyond ``edges``
-                valid = active & ~rebuild & (field.edge_count.reshape(1) <= edges)
-                accept = valid & self._accepts(out, acceptance)
-                positions.index_copy_(0, atom, torch.where(accept[:, None], new, self._old))
-                field.compact(positions)  # the list of the committed positions
-                self.trial_energy.copy_(torch.where(valid, out, self.trial_energy))
-                self.baseline.copy_(torch.where(accept, out, self.baseline))
-                self.counts.add_(torch.cat((valid, accept)).to(torch.int64))
-                self.index.add_(valid.to(torch.int64))
-                self.halted.bitwise_or_((active & ~valid).to(torch.int64))
-
-        return attempt
-
-    def _replay(self):
-        """The captured attempt for the edges active now (one variant per edge size)."""
-        edges = int(self.engine.force_field.data["edge_index"].shape[-1])
-        key = (MOVE_KEY, self.index_in_set, self.evaluator.precision, edges)
-        replay = self._replays.get(key)
-        if replay is None:
-            stage, out = self.evaluator.stage()
-            replay = self.engine.captured(key, self._attempt(stage, out, edges), keep=self._keep)
-            self._replays[key] = replay
-        return replay
+    def tensors(self):
+        """The attempt's own mutable device tensors (snapshots around a capture)."""
+        return (self.counters, self.accepted, self.halted, self.trial_energy, self._old)
 
     # ------------------------------------------------------------------ the host path
 
-    def _host_attempt(self) -> None:
-        """The halted attempt again, with the same numbers, outside the graph (module docstring)."""
+    def poll(self) -> tuple[int, bool]:
+        """``(attempt index, halted)`` from the device (one host read)."""
+        import torch
+
+        index, halted = (int(value) for value in torch.cat((self.streams.index, self.halted)).tolist())
+        return index, bool(halted)
+
+    def host_attempt(self) -> bool:
+        """The halted attempt again, with the same numbers, outside the graph (module docstring). Returns
+        whether it took a trial build around its geometry."""
         import torch
 
         engine, state, field = self.engine, self.engine.state, self.engine.force_field
@@ -224,8 +225,7 @@ class DisplaceAttempts:
             engine.record_mc_overflow(word)
         self.halted.zero_()
         with torch.no_grad():
-            u, g, acceptance = self._numbers(self.index)
-            atom, d = decode_displace(u, g, self.natoms, self.delta)
+            atom, d, acceptance = self._proposal()
             while True:
                 self._saved = neighbours.save_list(self._saved)
                 positions = state.positions
@@ -250,11 +250,12 @@ class DisplaceAttempts:
                     engine.record_mc_overflow(word)
                     continue
                 break
-            accept = self._accepts(energy, acceptance)
-            accepted = bool(accept)  # host sync
+            block = self.streams
+            accepted = bool(self.accept(acceptance, energy - block.baseline, block.kT))  # host sync
             self.trial_energy.copy_(energy)
+            self.accepted.fill_(accepted)
             if accepted:
-                self.baseline.copy_(energy)
+                block.baseline.copy_(energy)
                 if rebuild:
                     engine.adopt_trial_list()
             else:
@@ -262,91 +263,32 @@ class DisplaceAttempts:
                 if rebuild:
                     neighbours.restore_list(self._saved)
                 engine.use_trial_edges()
-            self.counts.add_(torch.tensor([1, int(accepted)], dtype=torch.int64, device=self.counts.device))
-            self.index.add_(1)
+            self.counters.add_(torch.tensor([1, 0, int(accepted)], dtype=torch.int64, device=self.counters.device))
+            block.index.add_(1)
         if rebuild:
-            self.counters["trial_rebuilds"] += 1
-            self._block_trial_rebuilds += 1
+            self.trial_rebuilds += 1
+        return rebuild
 
-    # ------------------------------------------------------------------ a block
+    # ------------------------------------------------------------------ δ
 
-    def run(self, attempts: int, *, temperature_K: float, baseline) -> dict[str, Any]:
-        """``attempts`` attempts against ``baseline`` at ``temperature_K`` (the integrator's target of the block).
+    def set_delta(self, delta_A: float, *, record: bool = True) -> None:
+        """Set δ (Å; a device fill, no re-capture), at most the move's ``delta_A`` and the workload's maximum;
+        ``record``: append it to ``delta_history``."""
+        delta_A = float(delta_A)
+        limit = min(self.move.delta_A, self.max_displacement_A)
+        if not (math.isfinite(delta_A) and 0 < delta_A <= limit):
+            raise ValueError(f"delta_A must be in (0, {limit:g}], got {delta_A!r}")
+        self.delta.fill_(delta_A)
+        self.delta_A = delta_A
+        if record:
+            self.delta_history.append(delta_A)
 
-        One host read per block, plus the host path for each halted attempt. Returns the block's record:
-        attempted, impossible, accepted, trial_rebuilds, overflows_redone, delta_A (the δ the block used) and,
-        with ``adaptive``, adapted_delta_A (the next block's).
-        """
-        import torch
-
-        if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
-            raise ValueError(f"attempts must be an int of at least 1, got {attempts!r}")
-        engine = self.engine
-        engine.quiesce()
-        redos = int(engine.overflows_redone)
-        self._block_trial_rebuilds = 0
-        with torch.no_grad():
-            self.baseline.copy_(torch.as_tensor(baseline, dtype=torch.float64).reshape(1))
-            self.kT.fill_(K_B_EV_PER_K * float(temperature_K))
-            self.base.copy_(torch.tensor([self.offsets["proposal"], self.offsets["acceptance"]], dtype=torch.int64))
-            for tensor in (self.index, self.halted, self.counts):
-                tensor.zero_()
-        done = 0
-        while done < attempts:
-            replay = self._replay()
-            for _ in range(attempts - done):
-                replay()
-            index, halted = (int(value) for value in torch.cat((self.index, self.halted)).tolist())  # host sync
-            if not halted:
-                if index != attempts:  # pragma: no cover - a bug, never an outcome
-                    raise RuntimeError(f"displacement block ended at attempt {index} of {attempts} without a halt")
-                break
-            self._host_attempt()
-            done = index + 1
-        attempted, accepted = (int(value) for value in self.counts.tolist())
-        self.offsets = {"proposal": self.offsets["proposal"] + attempts * PROPOSAL_COUNT,
-                        "acceptance": self.offsets["acceptance"] + attempts * ACCEPTANCE_COUNT}
-        self.counters["attempted"] += attempted
-        self.counters["accepted"] += accepted
-        record = {"move": Displace.move, "attempts": attempts, "attempted": attempted, "impossible": 0,
-                  "accepted": accepted, "trial_rebuilds": self._block_trial_rebuilds,
-                  "overflows_redone": int(engine.overflows_redone) - redos, "delta_A": self.delta_A}
+    def adapt(self, accepted: int, attempted: int) -> float:
+        """With ``adaptive``: the next block's δ from this block's acceptance (answer 2); returns δ."""
         if self.move.adaptive:
             self.set_delta(adapted_delta(self.delta_A, accepted, attempted, delta_A=self.move.delta_A,
                                          max_displacement_A=self.max_displacement_A))
-            record["adapted_delta_A"] = self.delta_A
-        return record
-
-    def set_delta(self, delta_A: float) -> None:
-        """Set δ (Å; a device fill, no re-capture) and record it; at most the move's ``delta_A`` and the workload's
-        maximum."""
-        delta_A = float(delta_A)
-        if not (math.isfinite(delta_A) and 0 < delta_A <= min(self.move.delta_A, self.max_displacement_A)):
-            raise ValueError(f"delta_A must be in (0, {min(self.move.delta_A, self.max_displacement_A):g}], "
-                             f"got {delta_A!r}")
-        self.delta.fill_(delta_A)
-        self.delta_A = delta_A
-        self.delta_history.append(delta_A)
-
-    # ------------------------------------------------------------------ restart
-
-    def state_dict(self) -> dict[str, Any]:
-        """The move's part of the restart's ``mc`` record: δ and its history, the counters and the streams."""
-        return {"move": Displace.move, "delta_A": self.delta_A, "delta_history": list(self.delta_history),
-                "counters": dict(self.counters),
-                "streams": {name: {"seed": self.seeds[name], "offset": self.offsets[name]} for name in self.seeds}}
-
-    def load_state_dict(self, record: Mapping[str, Any]) -> None:
-        if record.get("move") != Displace.move:
-            raise ValueError(f"not a displacement record: {record.get('move')!r}")
-        for name, entry in record["streams"].items():
-            if int(entry["seed"]) != self.seeds[name]:
-                raise ValueError(f"the {name} stream's seed differs from the record's")
-        self.offsets = {name: int(entry["offset"]) for name, entry in record["streams"].items()}
-        self.counters = {key: int(record["counters"][key]) for key in COUNTER_KEYS}
-        self.delta_A = float(record["delta_A"])
-        self.delta.fill_(self.delta_A)
-        self.delta_history = [float(value) for value in record["delta_history"]]
+        return self.delta_A
 
 
 def _edge_overflow() -> int:
@@ -356,5 +298,5 @@ def _edge_overflow() -> int:
 
 
 __all__ = ["ACCEPTANCE_COUNT", "ADAPT_LIMITS", "ADAPT_TARGET", "BEYOND_MAX_CODE", "COUNTER_KEYS", "MOVE_KEY",
-           "PROPOSAL_COUNT", "VARIABLE_CELL_CODE", "DisplaceAttempts", "adapted_delta", "attempt_counts",
+           "PROPOSAL_COUNT", "VARIABLE_CELL_CODE", "DisplaceAttempt", "adapted_delta", "attempt_counts",
            "check_displace", "decode_displace"]

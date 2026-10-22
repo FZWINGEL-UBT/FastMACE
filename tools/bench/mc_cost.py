@@ -107,24 +107,43 @@ class EnergySide:
 
 
 class DisplaceSide:
-    """A ``fastmace.mc.displace.DisplaceAttempts`` as a timed engine: one "step" is one block of ``attempts``
-    attempts, all rejected (a baseline 1000 eV below the state), so the MD side's state is unchanged."""
+    """A displacement move's captured attempts (``MCDriver``'s replay) as a timed engine: one "step" is ``count``
+    replays and the move's halted attempts on the host (``MCDriver._finish_displacements``). The decisions are
+    forced to reject (``moves.metropolis`` patched at attach), so the MD side's state is unchanged."""
 
-    def __init__(self, attempts, evaluator, count, temperature_K, torch):
-        self.attempts, self.evaluator, self.count, self.temperature_K = attempts, evaluator, count, temperature_K
-        self.torch = torch
-        self.baseline = None
-        self.trial_rebuilds = self.attempted = 0
+    def __init__(self, driver, engine, count, torch):
+        self.driver, self.engine, self.count, self.torch = driver, engine, count, torch
+        self.ready = False
+        self.calls = 0
 
     def prepare_block(self):
-        self.baseline = self.evaluator.baseline() - 1e3  # the state after the MD side's last block
+        # Untimed: the block's baseline and stream start, as SwapSide.
+        from fastmace.mc.driver import K_B_EV_PER_K
+
+        driver, engine = self.driver, self.engine
+        engine.flush()
+        driver.streams.kT.fill_(K_B_EV_PER_K * float(engine.integrator.temperature_K))
+        driver.streams.baseline.copy_(driver.evaluator.baseline().reshape(1))
+        driver.streams.start(driver.offsets)
+        self.ready = True
 
     def step(self):
-        if self.baseline is None:  # warm_up runs steps without prepare_block
+        if not self.ready:  # warm_up runs steps without prepare_block
             self.prepare_block()
-        record = self.attempts.run(self.count, temperature_K=self.temperature_K, baseline=self.baseline)
-        self.trial_rebuilds += record["trial_rebuilds"]
-        self.attempted += record["attempted"]
+        replay = self.driver._replay(0)
+        for _ in range(self.count):
+            replay()
+        self.driver._finish_displacements(0)
+        self.driver.streams.start(self.driver.offsets)  # the next call's attempt index 0 (host, between replays)
+        self.calls += 1
+
+    @property
+    def attempted(self):
+        return self.calls * self.count
+
+    @property
+    def trial_rebuilds(self):
+        return self.driver.attempts[0].trial_rebuilds
 
     def finish_block(self):
         pass
@@ -313,9 +332,8 @@ def main(argv=None):
             save()
         mc_moves.metropolis = metropolis
         if args.displace_delta_A is not None:
-            from fastmace.config import mc_stream_seeds
-            from fastmace.mc import Displace
-            from fastmace.mc.displace import DisplaceAttempts
+            import fastmace.mc.moves as mc_moves
+            from fastmace.mc import Displace, MCDriver
 
             skin = float(engine.force_field.neighbours.skin)
             meta["displace"] = dict(skin_A=skin, attempts_per_call=args.displace_attempts,
@@ -323,15 +341,17 @@ def main(argv=None):
                                     max_displacement_A=args.displace_delta_A)
             counts = {"displace_graph": args.displace_attempts, "displace_trial": args.displace_trial_attempts}
             own = evaluators["energy_" + precision]
+            metropolis = mc_moves.metropolis
+            mc_moves.metropolis = lambda u, excess, kT: torch.zeros_like(u, dtype=torch.bool)
             for index, (side, delta) in enumerate((("displace_graph", args.displace_delta_A),
                                                    ("displace_trial", skin))):
-                move = Displace(delta_A=delta, every=1, attempts=counts[side])
+                driver = MCDriver([Displace(delta_A=delta, every=1, attempts=counts[side])], seed=args.seed + index)
                 # The trial side's delta is the skin, beyond the workload's maximum on purpose (to force builds).
-                attempts = DisplaceAttempts(move, engine, own, seeds=mc_stream_seeds(args.seed + index),
-                                            max_displacement_A=max(delta, args.displace_delta_A), index=index)
-                sides[side] = DisplaceSide(attempts, own, counts[side], args.temperature_K, torch)
+                driver.attach(engine, evaluator=own, max_displacement_A=max(delta, args.displace_delta_A))
+                sides[side] = DisplaceSide(driver, engine, counts[side], torch)
                 step_time.warm_up(sides[side], 3)
                 meta["sides"][side] = dict(delta_A=delta)
+            mc_moves.metropolis = metropolis
         names = tuple(sides)
         blocks = {name: [] for name in names}
         for index in range(args.rounds):

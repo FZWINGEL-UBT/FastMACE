@@ -167,7 +167,7 @@ Added by 3-T02 under the conductor's answers (`plans/phase-3.md`, "3-T02 species
   - `GraphEngine.energy(*, precision=None)`: the energy-only graph. It returns a fixed-address float64 `[1]` buffer that the next call overwrites. Its key is `(ENERGY_KEY, precision, edges)`: one variant per edge size, captured at the first call. It reads the current positions and active edges, and sets `EDGE_OVERFLOW` when the count passes them. Without capture it runs directly. Complete (T07);
   - `GraphEngine.add_energy_field(field)`: the energy-only graph's force field in another precision, the float64 MC copy that follows the engine's force field. Its derived buffers join `GraphEngine.derived` as `energy.<precision>.*`. One per precision. `GraphEngine.energy_fields`: `{precision: force field}`. Complete (T07);
   - `GraphEngine.energy_stage(*, precision=None) -> (stage, out)`: the same evaluation as a plain function, for T09's attempt graph, which captures it with its own key, one per edge size. Complete (T07);
-  - `GraphEngine.captured(key, fn) -> replay`: captures `fn`, which takes no arguments and has fixed shapes and addresses, with the engine's warm-up, registry restore and re-capture policy (variant cap, budget, log). It refuses `ENGINE_KEYS`, which are the engine's own, and tuple keys whose first element is one. The graph is captured at the first replay and again after an invalidation or eviction; without capture the replay calls `fn`. A tuple key's first element is its family, so `("mc.swap", bucket)` keys are variants of one key. Complete (T04), for T09's attempt graph. `keep=` (3-T10): the caller's own tensors that `fn` writes (an attempt's index, counters, baseline), restored after the warm-up runs as the registered state is.
+  - `GraphEngine.captured(key, fn) -> replay`: captures `fn`, which takes no arguments and has fixed shapes and addresses, with the engine's warm-up, registry restore and re-capture policy (variant cap, budget, log). It refuses `ENGINE_KEYS`, which are the engine's own, and tuple keys whose first element is one. The graph is captured at the first replay and again after an invalidation or eviction; without capture the replay calls `fn`. A tuple key's first element is its family, so `("mc.swap", bucket)` keys are variants of one key. Complete (T04), for T09's attempt graph.
   - `GraphEngine.invalidate_graphs(reason, keys=None)`: drops the captured graphs (all of them, which also retires the pool, or those of `keys`) and logs the reason. The next capture of a dropped key counts as a re-capture. T03 calls it for friction events. Complete (T04).
   - `GraphEngine.uncommitted() -> bool`: true while a pipelined or speculative step is unvalidated, or an overflowed evaluation is being redone. T08's restart write guard reads it. Complete (T04).
 
@@ -298,20 +298,30 @@ compatibility promise: a restart record's (seed, offset) must give the same numb
 - **`check_displace(move, *, max_displacement_A, variable_cell)`**: `PlanRefused` with every reason, codes
   `displace-variable-cell` (answer 3) and `displace-beyond-max-displacement` (`delta_A` above
   `Workload.max_displacement_A`, or none declared).
-- **`DisplaceAttempts(move, engine, evaluator, *, seeds, max_displacement_A, index=0, offsets=None)`**: `run(attempts,
-  *, temperature_K, baseline) -> record` (attempted, impossible = 0, accepted, trial_rebuilds, overflows_redone,
-  delta_A, and `adapted_delta_A` with `adaptive`); `baseline` (device, the block's after its acceptances),
-  `trial_energy`, `offsets` (host, per stream), `counters` (`COUNTER_KEYS` = `MC_COUNTER_KEYS` + `trial_rebuilds`,
-  answer 4), `delta_A`, `delta_history`, `set_delta`, `state_dict()` / `load_state_dict()`. T09's driver calls it
-  for `Displace` moves; a block with an acceptance ends at the driver's canonical point.
-- **Paths:** the captured attempt (key `("mc.displace", index, precision, edges)`) is valid only when the rebuild
-  test passes and the count fits the active edges; otherwise it restores itself, leaves the attempt index and sets
-  `halted`, the later replays do nothing, and the host runs that attempt again with the same numbers: the committed
-  list saved, a trial build around the trial geometry when needed, edges sized for the trial, the captured energy
-  graph, then accept (keep the trial list) or reject (restore the position and the list). One host read per block,
-  plus one per halted attempt (answer 1).
-- **Adaptive δ** (answer 2): at the end of each block, δ ← δ·clamp(acc/0.3, 0.5, 2), at most `delta_A` and
-  `Workload.max_displacement_A`; every value in `delta_history`.
+- **`DisplaceAttempt(move, engine, evaluator, block_streams)`**, built by `moves.build_attempt` for a `Displace`: the
+  shape of T09's `Attempt` (`bound(stage, trial)`, `run()`, `tensors()`, `counters` `[3]`, `accepted`, `counts`,
+  `block_velocity_count = 0`, `velocities = None`; `accept` binds `moves.metropolis` when built), plus `halted`,
+  `trial_energy`, `delta` (device), `poll() -> (index, halted)`, `host_attempt() -> rebuilt`, `set_delta(delta_A, *,
+  record=True)`, `adapt(accepted, attempted)`, `delta_A`, `delta_history`, `trial_rebuilds` (host, cumulative) and
+  `max_displacement_A`.
+- **Paths:** the captured attempt (key `("mc.displace", driver id, index, precision, edges)`, T09's scheme) is valid
+  only when the rebuild test passes and the count fits the active edges; otherwise it restores itself, leaves the
+  attempt index and sets `halted`, the later replays do nothing, and the host runs that attempt again with the same
+  numbers: the committed list saved, a trial build around the trial geometry when needed, edges sized for the trial,
+  the captured energy graph, then accept (keep the trial list) or reject (restore the position and the list).
+- **In `MCDriver`:**
+  - `attach(engine, *, evaluator=None, max_displacement_A=None)`: `check_displace` for every `Displace`, with the
+    workload's maximum (T15 passes `Workload.max_displacement_A`) and the engine's `variable_cell`.
+  - `run_block`: after a displacement move's replays, `_finish_displacements(index)` reads its attempt index and
+    `halted` (one host read), runs a halted attempt on the host and replays the rest; one more read per halted
+    attempt (answer 1). Moves due in the block still run in attached order.
+  - The block record's displacement entry adds `trial_rebuilds` (answer 4; a run counter, not restart state, since
+    the restart's counters are exactly `MC_COUNTER_KEYS`), `delta_A` (the δ the block used) and, with `adaptive`,
+    `adapted_delta_A`.
+  - Adaptive δ (answer 2) at the end of each block: δ ← δ·clamp(acc/0.3, 0.5, 2), at most `delta_A` and
+    `Workload.max_displacement_A`. The restart's `delta_A` holds each displacement move's current δ by
+    `"displace:<index>"`; `load_state_dict` restores it before or after attach. `info()["displacements"]` gives
+    δ, its history and the trial builds per move.
 
 Beside it:
 - `SkinNeighbourList.save_list(into=None) -> dict` and `restore_list(saved)`: copies of `buffers()` and the candidate

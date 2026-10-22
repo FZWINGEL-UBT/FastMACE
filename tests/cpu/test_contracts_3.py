@@ -264,19 +264,20 @@ def test_mc_driver_contract():  # filled by 3-T09
     assert _keyword_only(MCDriver) == ["seed", "config"]
     for name in ("attach", "run_block", "state_dict", "load_state_dict", "due"):
         assert callable(getattr(MCDriver, name))
-    assert _parameters(MCDriver.attach) == ["self", "engine", "evaluator"]
-    assert _keyword_only(MCDriver.attach) == ["evaluator"]
+    assert _parameters(MCDriver.attach) == ["self", "engine", "evaluator", "max_displacement_A"]
+    assert _keyword_only(MCDriver.attach) == ["evaluator", "max_displacement_A"]  # 3-T10
     assert _parameters(MCDriver.run_block) == ["self", "engine", "step"]
     driver = MCDriver((Swap([("Na", "Cl")], 10, 5),), seed=1)
     assert driver.last_block is None and driver.offsets == dict.fromkeys(config.MC_STREAMS, 0)
 
 
-def test_attempt_contract():  # filled by 3-T09; displacements stay 3-T10's
+def test_attempt_contract():  # filled by 3-T09; displacements by 3-T10
     from fastmace.mc import Displace, moves
 
     assert _parameters(moves.build_attempt) == ["move", "engine", "evaluator", "streams", "fixcm"]
     assert _keyword_only(moves.build_attempt) == ["fixcm"]
-    _raises_naming("3-T10", lambda: moves.build_attempt(Displace(0.1, 10, 5), None, None, None))
+    with pytest.raises(TypeError, match="graph engine"):  # a DisplaceAttempt, which needs a graph engine
+        moves.build_attempt(Displace(0.1, 10, 5), None, None, None)
 
 
 # --------------------------------------------------------------------------- events
@@ -443,8 +444,7 @@ def test_graph_engine_energy_and_captured_names():  # §8.1 energy-only graph (3
     assert {"ACP", "B", "C", "E"} <= set(ENGINE_KEYS)
     assert _parameters(GraphEngine.energy) == ["self", "precision"]
     assert _keyword_only(GraphEngine.energy) == ["precision"]
-    assert _parameters(GraphEngine.captured) == ["self", "key", "fn", "keep"]
-    assert _keyword_only(GraphEngine.captured) == ["keep"]  # 3-T10: the caller's tensors restored after warm-ups
+    assert _parameters(GraphEngine.captured) == ["self", "key", "fn"]
     assert _parameters(GraphEngine.add_energy_field) == ["self", "field"]  # the float64 MC copy (3-T07)
     assert isinstance(GraphEngine.energy_fields, property)
     assert _parameters(GraphEngine.energy_stage) == ["self", "precision"]
@@ -512,10 +512,9 @@ def test_displacement_names():  # §10.4 displacements (3-T10)
     assert displace.COUNTER_KEYS == (*MC_COUNTER_KEYS, "trial_rebuilds")
     assert (displace.VARIABLE_CELL_CODE, displace.BEYOND_MAX_CODE) == (
         "displace-variable-cell", "displace-beyond-max-displacement")
-    assert _parameters(displace.DisplaceAttempts) == ["move", "engine", "evaluator", "seeds", "max_displacement_A",
-                                                     "index", "offsets"]
-    assert _keyword_only(displace.DisplaceAttempts) == ["seeds", "max_displacement_A", "index", "offsets"]
-    assert _keyword_only(displace.DisplaceAttempts.run) == ["temperature_K", "baseline"]
+    assert _parameters(displace.DisplaceAttempt) == ["move", "engine", "evaluator", "block_streams"]
+    for name in ("bound", "run", "tensors", "poll", "host_attempt", "set_delta", "adapt"):
+        assert callable(getattr(displace.DisplaceAttempt, name))
     assert _keyword_only(displace.check_displace) == ["max_displacement_A", "variable_cell"]
     assert _parameters(SkinNeighbourList.save_list) == ["self", "into"]
     assert _parameters(SkinNeighbourList.restore_list) == ["self", "saved"]
