@@ -252,6 +252,14 @@ def find(name, head=None):
             raise ValueError(f"label {name!r} is head {entry.head!r}; drop head={head!r} or use the checkpoint "
                              f"name {entry.checkpoint.name!r}")
         return entry
+    if ":" in name and ALIASES.get(name, name) not in CHECKPOINTS:
+        # The label of a head without its own entry ("mh-1:omol", below): a reload by that label (the plan's
+        # execution model, a gate reference child) finds the same checkpoint and head.
+        base, own_head = name.rsplit(":", 1)
+        if base in CHECKPOINTS:
+            if head is not None and head != own_head:
+                raise ValueError(f"label {name!r} is head {own_head!r}; drop head={head!r}")
+            return find(base, own_head)
     checkpoint = CHECKPOINTS.get(ALIASES.get(name, name))
     if checkpoint is None:
         return None

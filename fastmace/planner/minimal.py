@@ -553,12 +553,14 @@ class MinimalPlanner:
         self._workload_decisions(book, workload, rule_11, mode, given)
         if reference:
             parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend,
-                                          rule_11)
+                                          rule_11, mc=(workload.mc_moves, workload.mc_energy_precision))
         else:
             parts = self._fixed(rewrites, precision, engine)._resolve(book, traits, atoms, integrator, hardware,
                                                                       backend_choice=backend, texts=TEXTS,
                                                                       reproducible=workload.reproducible,
-                                                                      rule_11=rule_11)
+                                                                      rule_11=rule_11,
+                                                                      mc=(workload.mc_moves,
+                                                                          workload.mc_energy_precision))
         if mode == "eager":
             self._eager(book, parts, traits)
         elif mode == fixed.COMPILED_TIER:
@@ -574,7 +576,8 @@ class MinimalPlanner:
         plan = self._claim_family(plan, f"a {plan.engine.backend} MD plan", offer_runner=True)
         return plan
 
-    def _reference_parts(self, book, traits, atoms, integrator, hardware, rewrites, precision, backend, rule_11=None):
+    def _reference_parts(self, book, traits, atoms, integrator, hardware, rewrites, precision, backend, rule_11=None,
+                         mc=None):
         """The reference tier's plan parts (plan task 2-T03): 1a's resolution on the uncompiled stock backend,
         then every rewrite off, no capture, no pipelining, and the graph tier's padding refusals lifted."""
         from fastmace.reference import records
@@ -584,7 +587,8 @@ class MinimalPlanner:
                                      cueq_conv_fusion="on" if records.STOCK["cueq_conv_fusion"] else "off")
         inner = fixed._Book()
         parts = self._fixed(rewrites, precision, engine)._resolve(inner, traits, atoms, integrator, hardware,
-                                                                  backend_choice=backend, texts=TEXTS, rule_11=rule_11)
+                                                                  backend_choice=backend, texts=TEXTS, rule_11=rule_11,
+                                                                  mc=mc)
         book.refusals.extend(reason for reason in inner.refusals if reason.code not in REFERENCE_LIFTS)
         toggles = [name for name in fixed.REWRITE_FIELDS if getattr(parts["rewrites"], name) in ("on", "off")]
         replaced = {"tier": (REFERENCE_TIER, REFERENCE_REASONS["tier"]),

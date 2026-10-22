@@ -296,6 +296,38 @@ compatibility promise: a restart record's (seed, offset) must give the same numb
 - **The budget's `"auto"` rule** (`FixedPlanner._phase_3_fields`, `recapture_budget_from_workload`): the variant cap. A run that has re-captured as many graphs as it may hold at once has cycled through its whole working set, so the compiled tier is the better plan. An engine built without a plan reads `"auto"` the same way.
 - `provenance` takes `counters.recaptures` from the engine info when the caller gives none. The full record stays in `counters.engine`.
 
+## The move-energy gate and the MC energy precision (3-T11)
+
+Added by 3-T11 under the conductor's answers (`plans/phase-3.md`, "3-T11 move-energy gate"). SPEC §12.3
+"move-energy differences", §10.4 "Energy precision", §9.4 step 2, decision 35.
+
+| Name | Signature | Meaning |
+| --- | --- | --- |
+| `selfcheck.sample_moves` | `sample_moves(atoms, superset, workload, seed, samples=MOVE_SAMPLES) -> MoveSet` | the sample moves (below), drawn from the seed |
+| `selfcheck.move_references` | `move_references(plan, force_field, atoms, workload, *, seed, check="skip", gate=None, samples=MOVE_SAMPLES) -> MoveReferences \| None` | the float64 reference energy of every sample configuration, before any engine, on the gate's ladder (plan device, then the CPU; no reduced cell); `None` without `mc_moves`; `unavailable` is recorded, never raised |
+| `selfcheck.move_gate` | `move_gate(engine, references, *, plan, force_field, record=None, requested=None) -> GateRecord` | ΔE through the engine's `MCEvaluator`; returns `record` (default `skipped`) with `move_energy` and `mc_energy_precision`; raises `GateFailed` |
+| `selfcheck.move_rows`, `move_verdict`, `move_threshold` | | the rows, the rule and `0.01 k_B T_min` (eV) |
+| `GateRecord.move_energy`, `.mc_energy_precision` | fields | the move-energy part: `status` (`passed`, `failed`, `unavailable`), `requested`, `precision`, `threshold_eV`, `min_mc_temperature_K`, `fraction`, `superset`, `samples`, `not_sampleable`, `moves` (per type: samples, worst eV and in k_B T_min), `tried` (each precision), `rows`, `references`, `seconds`, `reason`. `GateRecord.status` stays the energy, force and stress gate's (`skipped` under `check="skip"`) |
+| `fallback.DIMENSIONS` | `("mc_energy", "mode", "rewrites", "backend")` | the MC energy precision first |
+| `fallback.candidate(plan, {"mc_energy": "float64", ...})` | | the revision with float64 MC energies; nothing re-planned |
+| `fallback.mc_energy_revision(plan, record)` | → plan | the gate's chosen precision as an `mc_energy` revision with its `TriedCandidate` |
+| `fallback.move_energy_only(failure)` | → bool | only the move-energy part failed |
+| `fallback.activate(..., moves=None)`, `Fallback(..., moves=None)` | keyword | every candidate and diagnosis run also passes the move-energy gate |
+
+- **Sample moves.** The move records arrive only with `run(mc=…)`, so the gate samples what any record
+  could declare: `MOVE_SAMPLES["swap"]` (2) swaps per unordered pair of superset species;
+  `MOVE_SAMPLES["transmute"]` (1) atoms of each present species, each to every other superset species;
+  `MOVE_SAMPLES["displace"]` (4) displacements of exactly `Workload.max_displacement_A`. A pair with an
+  absent species is sampled on a base where another atom was transmuted into it, if transmutations are
+  declared, and is "not sampleable" otherwise.
+- **Precision.** `PrecisionConfig.mc_energy` for an MC plan: "auto" is the force precision pending the
+  gate (decision code `mc-energy-gate-pending`); an explicit request is kept (`mc-energy-requested`),
+  and float32 below float64 forces is refused (`mc-energy-below-force-precision`). `move_gate` under
+  "auto" tries the force precision, then float64; its result goes into the plan through
+  `mc_energy_revision`. An explicit precision that fails raises `GateFailed`.
+- **When.** MC plans always run it, also under `check="skip"` (decision 35). `Simulation` calls it
+  after T15 (second editor of `simulation.py`).
+
 ### Displacements (T10)
 
 `fastmace/mc/displace.py` (owner T10, second editor of `fastmace/mc/` after T09):

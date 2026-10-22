@@ -501,6 +501,29 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     assert restart.mc_record({}) is None  # 3-T08: no move set attached
 
 
+def test_move_energy_gate_names():  # §12.3 move-energy differences, §10.4 energy precision, §9.4 (3-T11)
+    import dataclasses
+
+    from fastmace.planner import fallback, selfcheck
+
+    assert selfcheck.MOVE_FRACTION == 0.01
+    assert set(selfcheck.MOVE_SAMPLES) == {"swap", "transmute", "displace"}
+    assert _parameters(selfcheck.sample_moves) == ["atoms", "superset", "workload", "seed", "samples"]
+    assert _parameters(selfcheck.move_references) == ["plan", "force_field", "atoms", "workload", "seed", "check",
+                                                      "gate", "samples"]
+    assert _keyword_only(selfcheck.move_references) == ["seed", "check", "gate", "samples"]
+    assert _parameters(selfcheck.move_gate) == ["engine", "references", "plan", "force_field", "record", "requested"]
+    assert _keyword_only(selfcheck.move_gate) == ["plan", "force_field", "record", "requested"]
+    assert _parameters(selfcheck.move_rows) == ["engine", "evaluator", "references"]
+    fields = {field.name for field in dataclasses.fields(selfcheck.GateRecord)}
+    assert {"move_energy", "mc_energy_precision"} <= fields
+    assert fallback.DIMENSIONS == ("mc_energy", "mode", "rewrites", "backend")
+    assert _parameters(fallback.mc_energy_revision) == ["plan", "record"]
+    assert _parameters(fallback.move_energy_only) == ["failure"]
+    assert "moves" in _keyword_only(fallback.activate)
+    assert "moves" in _keyword_only(fallback.Fallback.__init__)
+
+
 def test_displacement_names():  # §10.4 displacements (3-T10)
     from fastmace.engine.graph import GraphEngine
     from fastmace.io.restart import MC_COUNTER_KEYS
