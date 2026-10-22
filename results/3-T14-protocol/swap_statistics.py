@@ -44,6 +44,34 @@ def _bin(row, bin_K, min_K):
     return f"{row['phase']} {low:g}-{low + bin_K:g} K"
 
 
+def swap_ratios(atoms, calculator, first, second, count, kT, rng):
+    """ΔE/kT of ``count`` uniform swaps of an atom of species ``first`` with one of ``second`` in ``atoms``,
+    each evaluated as the exchange of the two atoms' positions from the unswapped frame."""
+    import numpy as np
+
+    atoms.calc = calculator
+    base = atoms.get_potential_energy()
+    one, other = np.flatnonzero(atoms.numbers == first), np.flatnonzero(atoms.numbers == second)
+    positions = atoms.get_positions()
+    ratios = []
+    for _ in range(count):
+        i, j = int(rng.choice(one)), int(rng.choice(other))
+        trial = positions.copy()
+        trial[[i, j]] = trial[[j, i]]
+        atoms.set_positions(trial)
+        ratios.append(float((atoms.get_potential_energy() - base) / kT))
+    atoms.set_positions(positions)
+    return ratios
+
+
+def summary(ratios):
+    """Median, 1st and 5th percentiles and minimum of ΔE/kT, and the mean Metropolis probability."""
+    return {"sampled_swaps": len(ratios), "dE_over_kT_median": _percentile(ratios, 0.5),
+            "dE_over_kT_p01": _percentile(ratios, 0.01), "dE_over_kT_p05": _percentile(ratios, 0.05),
+            "dE_over_kT_min": min(ratios),
+            "mean_metropolis_probability": sum(math.exp(-r) if r > 0 else 1.0 for r in ratios) / len(ratios)}
+
+
 def _percentile(values, q):
     ordered = sorted(values)
     position = (len(ordered) - 1) * q
@@ -100,31 +128,15 @@ def main(argv=None):
     for name in sorted(bins, key=lambda n: (n.split()[0] != "heating", float(n.split()[1].split("-")[0])
                                             * (1 if n.startswith("heating") else -1))):
         entry = bins[name]
-        ratios, probabilities = [], []
+        ratios = []
         for row in entry["picked"]:
             atoms = atoms_at[row["step"] // frame_every].copy()
-            atoms.calc = calculator
-            kT = K_B_EV * row["target_K"]
-            base = atoms.get_potential_energy()
-            oxygen = np.flatnonzero(atoms.numbers == 8)
-            chlorine = np.flatnonzero(atoms.numbers == 17)
-            positions = atoms.get_positions()
-            for _ in range(args.swaps_per_frame):
-                i, j = int(rng.choice(oxygen)), int(rng.choice(chlorine))
-                trial = positions.copy()
-                trial[[i, j]] = trial[[j, i]]
-                atoms.set_positions(trial)
-                ratio = (atoms.get_potential_energy() - base) / kT
-                ratios.append(float(ratio))
-                probabilities.append(math.exp(-ratio) if ratio > 0 else 1.0)
-            atoms.set_positions(positions)
+            ratios += swap_ratios(atoms, calculator, 8, 17, args.swaps_per_frame, K_B_EV * row["target_K"], rng)
         result = {"attempted": entry["attempted"], "accepted": entry["accepted"],
                   "acceptance": entry["accepted"] / entry["attempted"] if entry["attempted"] else None,
-                  "sampled_frames": [row["step"] for row in entry["picked"]], "sampled_swaps": len(ratios)}
+                  "sampled_frames": [row["step"] for row in entry["picked"]]}
         if ratios:
-            result.update(dE_over_kT_median=_percentile(ratios, 0.5), dE_over_kT_p01=_percentile(ratios, 0.01),
-                          dE_over_kT_p05=_percentile(ratios, 0.05), dE_over_kT_min=min(ratios),
-                          mean_metropolis_probability=sum(probabilities) / len(probabilities))
+            result.update(summary(ratios))
         report["bins"][name] = result
         print(name, json.dumps(result), flush=True)
     Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
