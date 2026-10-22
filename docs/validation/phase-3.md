@@ -293,7 +293,7 @@ targeted run of the corrected tests). A "fail" on leeloo is a stale expectation;
 | `test_subprocess_runner_gpu::test_hybrid_after_a_plain_cueq_runs_in_a_child` | – | pass | – | – |
 
 Totals: leeloo 19 passed, 7 failed (all seven on stale expectations, corrected above); coraline 13 / 13;
-the corrected tests locally: fallback 3 / 3, [fixcm] 1 / 1, `test_engine_gpu` 3 3 / 3 after the B-graph correction (e8e1317).
+the corrected tests locally: fallback 3 / 3, [fixcm] 1 / 1, `test_engine_gpu` 3 / 3 after the B-graph correction (e8e1317).
 
 ## GPU slow tier (paused; appendix to follow)
 
