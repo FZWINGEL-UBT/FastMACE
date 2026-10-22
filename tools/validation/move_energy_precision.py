@@ -60,6 +60,9 @@ def parse_args(argv=None):
     p.add_argument("--displace-samples", type=int, default=8)
     p.add_argument("--backend", choices=("auto", "hybrid", "cueq"), default="hybrid")
     p.add_argument("--precision", choices=("float32", "float64"), default="float32", help="force precision")
+    p.add_argument("--compile-mode", default=None,
+                   help="EngineConfig.compile_mode ('none': eager, still captured; for models whose compile does "
+                        "not fit a 15-minute slot, such as OMOL-0 XL)")
     p.add_argument("--seed", type=int, default=1)
     return p.parse_args(argv)
 
@@ -90,7 +93,10 @@ def main(argv=None):
     from fastmace.planner.minimal import MinimalPlanner
 
     # The allocator first: nothing may touch CUDA before it (the engine's process constraints).
-    planner = MinimalPlanner(engine=config.EngineConfig(backend=args.backend))
+    engine_options = {"backend": args.backend}
+    if args.compile_mode is not None:
+        engine_options["compile_mode"] = args.compile_mode
+    planner = MinimalPlanner(engine=config.EngineConfig(**engine_options))
     hardware = planner.hardware()
     from fastmace.model import loading
 
@@ -114,7 +120,8 @@ def main(argv=None):
     threshold = selfcheck.move_threshold(args.min_mc_temperature_K)
     meta = dict(schema_version=SCHEMA_VERSION, status="running", tool="move_energy_precision",
                 created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename, python=sys.executable,
-                fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, head=args.head,
+                fastmace_commit=ab_step_time.fastmace_commit() or os.environ.get("FASTMACE_SOURCE_COMMIT"),
+                compile_mode=args.compile_mode, model=args.model, head=args.head,
                 checkpoint=str(checkpoint), checkpoint_sha256=ab_step_time._sha256(checkpoint), backend=args.backend,
                 dtype=precision, superset=list(args.superset), temperatures_K=args.temperatures_K,
                 md_steps=args.md_steps, timestep_fs=args.timestep_fs, min_mc_temperature_K=args.min_mc_temperature_K,
