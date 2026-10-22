@@ -184,3 +184,37 @@ def test_a_tiny_npt_d3_protocol_records_d3_and_quenches_at_the_frame_cells(model
     assert len({row["volume_A3_atom"] for row in rows}) > 1  # the cells differ: NPT moved them
     summary = json.loads((out / "quench" / quench.SUMMARY).read_text(encoding="utf-8"))
     assert summary["settings"]["fixed_cell"] is True and summary["settings"]["cell"] == "frame"
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_a_diverging_npt_protocol_records_the_stopped_piece(model_path, cpu_planner, tmp_path, capsys):
+    import json
+
+    from _support.structures import nacl
+    from fastmace import cli
+
+    structure = tmp_path / "nacl.extxyz"
+    nacl(repeat=2, rattle=0.02, seed=1).write(structure)
+    config = tmp_path / "tension.toml"
+    # Tension at -2 GPa expands the cell past V/V0 = 1.02 within the 24 steps.
+    config.write_text(
+        f'structure = "{structure.as_posix()}"\nmodel = "{model_path.replace(chr(92), "/")}"\ntrusted = true\n'
+        'seed = 7\n'
+        '[integrator]\ntype = "LangevinBAOAB"\ntimestep_fs = 1.0\ntemperature_K = 0.0\npressure_GPa = -2.0\n'
+        'barostat_tau_fs = 100.0\nmax_volume_ratio = 1.02\n'
+        '[[schedule]]\nkind = "ramp"\nstart_K = 0.0\nend_K = 300.0\nps = 0.024\n'
+        '[output]\ntrajectory_every = 2\nthermo_every = 2\nrestart_every = 100\n'
+        '[quench]\nmin_K = 100.0\nbin_K = 100.0\nper_bin = 1\nfmax = 0.5\noptimizer = "LBFGS"\nmax_steps = 5\n',
+        encoding="utf-8")
+    out = tmp_path / "run"
+    assert cli.main(["run", str(config), "--output", str(out)]) == 1
+    assert "V/V0" in capsys.readouterr().err
+    record = json.loads((out / runner.PROTOCOL_RECORD).read_text(encoding="utf-8"))
+    assert record["status"] == "cell diverged" and "V/V0" in record["stop"]
+    assert record["timestep_fs"] == 1.0  # the integrator record's, not fm.md's default
+    (piece,) = record["pieces"]
+    assert piece["first_step"] == 0 and 0 < piece["last_step"] < 24
+    assert piece["counters"]["neighbour_rebuilds"] is not None and record["counters"] == piece["counters"]
+    assert record["quench_result"] is None and (out / "restart.npz").is_file()
+    assert cli.main(["run", "--resume", str(out)]) == 2  # stopped: not resumable
+    assert "cell diverged" in capsys.readouterr().err

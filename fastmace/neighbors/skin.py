@@ -51,6 +51,17 @@ def _resolved(value, config_value, name):
     return config_value == "on"
 
 
+# The largest matscipy cell list a CPU build allocates: about 4 bytes per bin, so 2**27 bins is about 0.5 GiB
+# (a cubic cell of about 3,000 Å sides at a 6 Å cutoff; measured, 3b-T07).
+MAX_CPU_CELL_LIST_BINS = 2**27
+
+
+def cpu_cell_list_bins(cell, cutoff) -> int:
+    """The bins of matscipy's cell list for ``cell`` at ``cutoff``: one per ``cutoff`` of each cell height."""
+    heights = 1.0 / np.linalg.norm(np.linalg.inv(np.asarray(cell, dtype=float)).T, axis=1)
+    return int(np.prod([max(1, int(height // cutoff)) for height in heights]))
+
+
 class SkinNeighbourList:
     """Periodic pairs within cutoff + skin, compacted to the cutoff on the device.
 
@@ -186,7 +197,10 @@ class SkinNeighbourList:
         return self.build_cpu(positions)
 
     def build_cpu(self, positions) -> bool:
-        """Rebuild with matscipy from (N, 3) float64 positions. Returns True if the capacity grew."""
+        """Rebuild with matscipy from (N, 3) float64 positions. Returns True if the capacity grew.
+
+        ``CellListTooLargeError`` before matscipy runs if its cell list would need more than
+        ``MAX_CPU_CELL_LIST_BINS`` bins."""
         from matscipy.neighbours import neighbour_list
 
         if torch.is_tensor(positions):
@@ -194,6 +208,16 @@ class SkinNeighbourList:
         positions = np.asarray(positions, dtype=np.float64)
         if self.variable_cell:
             self._take_current_cell()
+        bins = cpu_cell_list_bins(self.cell, self.cutoff + self.skin)
+        if bins > MAX_CPU_CELL_LIST_BINS:
+            from fastmace.errors import CellListTooLargeError
+
+            heights = 1.0 / np.linalg.norm(np.linalg.inv(self.cell).T, axis=1)
+            raise CellListTooLargeError(
+                f"the CPU neighbour search of a cell with heights {np.array2string(heights, precision=1)} Å would need "
+                f"{bins:.3g} cell-list bins (about {4 * bins / 2**30:.3g} GiB), more than {MAX_CPU_CELL_LIST_BINS:.3g}",
+                why="matscipy bins the cell by the cutoff, about 4 bytes per bin; an NPT vapour's cell of 2.4e5 Å "
+                    "sides needs about 1e14 bins and exhausted the machine's memory (3b-T07)")
         # Same call and self-edge rule as mace.data.neighborhood.get_neighborhood.
         sender, receiver, unit_shifts = neighbour_list(
             quantities="ijS", pbc=(True, True, True), cell=self.cell,

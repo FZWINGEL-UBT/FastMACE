@@ -20,7 +20,9 @@ Every piece ends with a restart at its last step, so a long protocol runs as pie
 wall time. ``protocol.json`` records the stages, the pieces, the relaxation and the quench summary,
 and the counters of ``PIECE_COUNTERS`` per piece (each piece builds a new engine and force field) with
 their sums over the run in ``counters``. With D3 (``dispersion=``) the relaxation and the quench use
-MACE plus the run's D3 record, and the quench relaxes each frame at its own cell (NPT's).
+MACE plus the run's D3 record, and the quench relaxes each frame at its own cell (NPT's). An NPT
+piece that ``CellDivergedError`` stops is recorded with its counters and the stop, status
+``"cell diverged"``, and the error is raised again (no quench; not resumable).
 ``metadata.json`` is the run's, with the plan, gate and ``counters.mc``.
 """
 
@@ -34,6 +36,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+from fastmace.errors import CellDivergedError
 from fastmace.longrange import d3
 from fastmace.protocols import quench as quench_stage
 from fastmace.protocols.profiles import OPTIMIZERS, _quench
@@ -155,7 +158,9 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
     if mc is not None and schedule is not None and options.get("min_mc_temperature_K") is None:
         raise ValueError("mc= with a schedule needs min_mc_temperature_K= (SPEC §7.7)")
     repeat = quick._repeat(options.pop("repeat", (1, 1, 1)))
-    timestep_fs = options.get("timestep_fs", 0.5)
+    # fm.md's timestep: an explicit integrator record's, else timestep_fs= (default 0.5 fs).
+    integrator = options.get("integrator")
+    timestep_fs = integrator.timestep_fs if integrator is not None else options.get("timestep_fs", 0.5)
     steps = _remaining(schedule, timestep_fs, steps)
 
     atoms = quick._structure(structure)
@@ -197,7 +202,11 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
     _write(directory, record)
 
     started = time.perf_counter()
-    result = quick.md(atoms, model=model, output=output, steps=steps, **options)
+    try:
+        result = quick.md(atoms, model=model, output=output, steps=steps, **options)
+    except CellDivergedError as error:
+        _stopped(directory, record, 0, started, error)
+        raise
     log(result.summary)
     sim = result.simulation
     sim.report.repeat = repeat
@@ -227,16 +236,21 @@ def resume(directory: str | Path, *, steps: int | None = None, log: Callable[[st
     if record["status"] == "md" and position is not None and not position.finished:
         count = position.remaining if steps is None else min(steps, position.remaining)
         moves = None if record["mc"] is None else tuple(move_from_record(move) for move in record["mc"])
-        if moves is None:
-            sim.run(steps=count)
-        else:
-            low = record["min_mc_temperature_K"]
-            # The last step ran with the move set iff its target is at or above the minimum (fm.md's rule),
-            # and an attached set is in the restart: keep it (mc=...) rather than attach a new driver.
-            attached = position.step > 0 and position.resolved.target(position.step) >= low
-            for piece, wanted in mc_ranges(position, count, low):
-                sim.run(steps=piece, mc=... if wanted == attached else moves if wanted else None)
-                attached = wanted
+        try:
+            if moves is None:
+                sim.run(steps=count)
+            else:
+                low = record["min_mc_temperature_K"]
+                # The last step ran with the move set iff its target is at or above the minimum (fm.md's rule),
+                # and an attached set is in the restart: keep it (mc=...) rather than attach a new driver.
+                attached = position.step > 0 and position.resolved.target(position.step) >= low
+                for piece, wanted in mc_ranges(position, count, low):
+                    sim.run(steps=piece, mc=... if wanted == attached else moves if wanted else None)
+                    attached = wanted
+        except CellDivergedError as error:
+            sim.close()
+            _stopped(directory, record, first, started, error)
+            raise
         sim.flush_output()
         log(sim.report.text())
     return _end_piece(sim, directory, record, first, started, log)
@@ -279,9 +293,24 @@ def _end_piece(sim, directory, record, first, started, log):
     return record
 
 
+def _stopped(directory, record, first, started, error):
+    """Record the piece that a ``CellDivergedError`` stopped (its restart and metadata are written) and the
+    stop; the run is not resumable (3b-T07)."""
+    metadata = json.loads((Path(directory) / "metadata.json").read_text(encoding="utf-8"))
+    record["pieces"].append({"first_step": first, "last_step": error.step, "wall_s": time.perf_counter() - started,
+                             "counters": _counters(metadata)})
+    record["counters"] = _sum_counters(record["pieces"])
+    record["status"] = "cell diverged"
+    record["stop"] = error.what
+    _write(directory, record)
+
+
 def _piece_counters(sim):
     """``PIECE_COUNTERS`` of this piece's engine and force field (``None`` where it does not report one)."""
-    metadata = sim.metadata()
+    return _counters(sim.metadata())
+
+
+def _counters(metadata):
     engine = (metadata.get("counters") or {}).get("engine") or {}
     dispersion = (metadata.get("force_field") or {}).get("d3") or {}
     return {"neighbour_rebuilds": engine.get("neighbour_rebuilds"),

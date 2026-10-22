@@ -274,6 +274,26 @@ class NonFiniteError(FastMACEError):
     default_record = "metadata.json"
 
 
+class CellDivergedError(FastMACEError):
+    """An NPT run's cell left the range its integrator record allows (3b-T07): V/V0 outside
+    [1 / max_volume_ratio, max_volume_ratio] or a cell vector longer than max_cell_length_A. The run
+    stops with a restart at the stop; ``step`` is the step whose cell was checked."""
+
+    default_next_step = ("The structure left its condensed phase (a vapour expands without bound at low pressure) "
+                         "or the barostat diverged: raise the pressure or lower the temperature, or change "
+                         "max_volume_ratio / max_cell_length_A in fm.integrators.LangevinBAOAB. The restart at the "
+                         "stop holds the state.")
+    default_record = "metadata.json"
+    step = None
+
+
+class CellListTooLargeError(FastMACEError, ValueError):
+    """A CPU neighbour search whose matscipy cell list would need more bins than memory allows (3b-T07)."""
+
+    default_next_step = ("Check the cell: a cell this large is no condensed structure. An NPT run whose cell "
+                         "diverges stops before this (CellDivergedError).")
+
+
 # --------------------------------------------------------------------------- backends (1a)
 
 class HybridUnavailableError(FastMACEError):
