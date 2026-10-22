@@ -128,16 +128,16 @@ def test_energy_only_graph_and_evaluator_tiny_plain_cueq(tmp_path):
 # --------------------------------------------------------------------------- PolarMACE (the polar_gpu._Call failure)
 
 
-def _capture(call):
-    """A CUDA graph of ``call`` after two warm-up calls on a side stream; returns (graph, captured outputs)."""
-    stream = torch.cuda.Stream()
+def _capture(call, stream):
+    """A CUDA graph of ``call`` after two warm-up calls, both on ``stream`` (as GraphEngine._capture: autograd's
+    leaf nodes then remember the capture stream); returns (graph, captured outputs)."""
     stream.wait_stream(torch.cuda.current_stream())
     with torch.cuda.stream(stream):
         for _ in range(2):
             call()
     torch.cuda.current_stream().wait_stream(stream)
     graph = torch.cuda.CUDAGraph()
-    with torch.cuda.graph(graph):
+    with torch.cuda.graph(graph, stream=stream):
         captured = call()
     return graph, captured
 
@@ -160,17 +160,23 @@ def test_polar_energy_only_then_a_force_capture():
     calc = tiny_family_calculator("polar", [11, 17], device="cuda:0")
     calc.models = [run(calc.models[0], device="cuda:0", return_model=True)]
     atoms = nacl(repeat=2, rattle=0.05, seed=3)
-    ff = MACEForceField(calc, atoms, engine=EngineConfig(compile_mode="none"), compute_stress=True,
-                        neighbours=NeighbourConfig(skin=0.5, sort_receivers="off", gpu_neighbour_list="off"))
+    def build():
+        return MACEForceField(calc, atoms, engine=EngineConfig(compile_mode="none"), compute_stress=True,
+                              neighbours=NeighbourConfig(skin=0.5, sort_receivers="off", gpu_neighbour_list="off"))
+
+    ff = build()
     positions = torch.tensor(atoms.positions, dtype=torch.float64, device="cuda:0")
-    eager = ff(positions)
+    eager = build()(positions)  # another force field: ff's own leaves see only the capture stream
     expected = (eager.energy.detach().clone(), eager.forces.detach().clone(), eager.stress.detach().clone())
-    energy = ff.energy_only(positions)
+    stream = torch.cuda.Stream()
+    with torch.cuda.stream(stream):
+        energy = ff.energy_only(positions)
+    torch.cuda.current_stream().wait_stream(stream)
     assert energy.grad_fn is None and not energy.requires_grad
     torch.testing.assert_close(energy, expected[0], rtol=1e-12, atol=0)
 
     out = torch.zeros(1, dtype=torch.float64, device="cuda:0")
-    energy_graph, _ = _capture(lambda: out.copy_(ff.energy_only(positions)))
+    energy_graph, _ = _capture(lambda: out.copy_(ff.energy_only(positions)), stream)
     energy_graph.replay()
     torch.cuda.synchronize()
     torch.testing.assert_close(out, expected[0], rtol=1e-12, atol=0)
@@ -179,7 +185,7 @@ def test_polar_energy_only_then_a_force_capture():
         result = ff(positions)
         return result.energy.detach(), result.forces.detach(), result.stress.detach()
 
-    force_graph, captured = _capture(forces)
+    force_graph, captured = _capture(forces, stream)
     for _ in range(2):
         energy_graph.replay()
         force_graph.replay()

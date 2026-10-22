@@ -533,7 +533,11 @@ class GraphEngine(Engine):
         """Set ``EDGE_OVERFLOW`` in the device word when ``count`` exceeds ``edges`` (device ops only, so an MC
         evaluation can call it inside its captured graph; 3-T07, 3-T09, 3-T10)."""
         with torch.no_grad():
-            exceeded = torch.as_tensor(count, device=self.device) > torch.as_tensor(edges, device=self.device)
+            count = torch.as_tensor(count, device=self.device)
+            # A host number is compared as a scalar: as_tensor(int, device=cuda) is a host-to-device copy,
+            # which a CUDA graph capture refuses (3-T07).
+            limit = edges if isinstance(edges, (int, float)) else torch.as_tensor(edges, device=self.device)
+            exceeded = count > limit
             self.overflow.bitwise_or_(exceeded.to(torch.int64) * EDGE_OVERFLOW)
 
     def clear_overflow(self) -> None:

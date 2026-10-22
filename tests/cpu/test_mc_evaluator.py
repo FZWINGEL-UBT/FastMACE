@@ -389,6 +389,9 @@ def test_energy_graph_keys_and_the_copy_in_the_derived_registry(mace_engine):
     stage()
     assert torch.equal(out, value)
     assert engine.overflowed() == 0
+    engine.flag_edge_overflow(engine.force_field.edge_count, 0)  # a host int limit (capturable: no copy)
+    assert engine.overflowed() == 1
+    engine.clear_overflow()
     info = engine.info()["energy_graphs"]
     assert info["float64"]["copy"] and info["float64"]["compile_mode"] == "none" and not info["float32"]["copy"]
     assert ENERGY_KEY == "E"
