@@ -156,6 +156,27 @@ def _positive(value, what):
     return float(value)
 
 
+def describe_move(move):
+    """One MC move record in words: ``swap Na-Cl every 100, 50 attempts (exchange)``."""
+    from ase.data import chemical_symbols
+
+    def symbol(species):
+        return chemical_symbols[species] if isinstance(species, int) else str(species)
+
+    kind = getattr(move, "move", type(move).__name__.lower())
+    if kind == "swap":
+        what = "swap " + ", ".join(f"{symbol(a)}-{symbol(b)}" for a, b in move.pairs)
+    elif kind == "transmute":
+        what = "transmute " + "/".join(symbol(s) for s in move.species)
+    elif kind == "displace":
+        what = f"displace δ {move.delta_A:g} Å" + (" (adaptive)" if move.adaptive else "")
+    else:
+        what = str(kind)
+    text = f"{what} every {_number(move.every)}, {_number(move.attempts)} attempts"
+    velocities = getattr(move, "velocities", None)
+    return text + (f" ({velocities})" if velocities else "")
+
+
 def _mapping(record):
     """A gate or D3 record as a dict: a mapping, ``to_metadata()``/``to_dict()``, a dataclass, or attributes."""
     if record is None or isinstance(record, Mapping):
@@ -237,6 +258,32 @@ def gate_line(gate) -> str:
 
 
 
+def move_energy_line(gate) -> str | None:
+    """The report's MC energy line from a gate record's move-energy part (3-T11; SPEC §12.3, §10.4, decision 35):
+    the MC energy precision and why, the worst ΔE error per move type in k_B T_min against 0.01. ``None``
+    without an MC plan."""
+    gate = _mapping(gate)
+    part = None if gate is None else gate.get("move_energy")
+    if not part:
+        return None
+    precision, status = part.get("precision"), part.get("status")
+    limit = f"limit {part.get('fraction', 0.01):g} k_B T_min at T_min {part.get('min_mc_temperature_K', 0):g} K"
+    if status == "unavailable":
+        return f"{precision}; move-energy gate unavailable ({part.get('reason')})"
+    moves = part.get("moves") or {}
+    worst = ", ".join(f"{move} {entry['worst_k_B_T_min']:.2g}" for move, entry in moves.items())
+    text = f"{precision}; move-energy gate {status} (worst ΔE error in k_B T_min: {worst or 'none'}; {limit}"
+    text += f"; {part.get('configurations', 0)} configurations"
+    if part.get("not_sampleable"):
+        text += f"; {len(part['not_sampleable'])} not sampleable"
+    text += ")"
+    tried = part.get("tried") or ()
+    if len(tried) > 1:
+        steps = ", ".join(f"{entry['precision']} {entry['status']}" for entry in tried)
+        text += f"; {steps} (MD forces keep their precision)"
+    return text
+
+
 def revision_lines(plan) -> list[str]:
     """One line per fallback revision of ``plan``'s chain, oldest first (SPEC §9.4, §9.5; 2-T15):
     ``plan revision 1 (fallback): rewrites X, Y off, reason …``. Empty when nothing fell back."""
@@ -265,7 +312,11 @@ class Report:
     - ``setup_s``: ``{stage: seconds}``, §12.5's stage names or finer ones, in order;
     - ``outputs``: the output files; ``dispersion``: ``None`` or the ``fm.D3`` record;
     - ``charge_spin``: ``None`` when the model does not read them, else ``(total charge, spin multiplicity)``;
-    - ``mc``: the attached move set, if any (phase 3);
+    - ``mc``: the MC record of the run (``Simulation`` keeps it, 3-T15), or ``None`` without MC: ``moves``
+      (the records attached last), ``ranges`` (``[first, last]`` step ranges with a move set attached),
+      ``blocks``, ``device_ms`` and ``timed_attempts`` (device time and attempts of the blocks after the first
+      one of each attach, whose time includes the captures; ``None`` and 0 on the CPU) and ``counters``
+      (``{move: {attempted, impossible, accepted, ...}}``);
     - ``cell_heights_A`` and ``cutoff_A``: the small-cell warning;
     - ``warnings``: extra warning lines (more through ``add_warning``);
     - ``warmup_steps``, ``window_steps``, ``start_step``: the speed window, steps counted from
@@ -351,6 +402,27 @@ class Report:
     def _gate(self):
         return gate_line(self.gate)
 
+    def _mc(self):
+        """The MC line: the moves, acceptance per move type and the measured cost per attempt (§7.7)."""
+        mc = self.mc
+        counters = mc.get("counters") or {}
+        parts = []
+        for move in mc.get("moves", ()):
+            counts = counters.get(move.move, {})
+            text = f"{describe_move(move)}; accepted {counts.get('accepted', 0)}/{counts.get('attempted', 0)}"
+            parts.append(text)
+        timed = int(mc.get("timed_attempts") or 0)
+        blocks = int(mc.get("blocks") or 0)
+        if mc.get("device_ms") is not None and timed:
+            parts.append(f"{mc['device_ms'] / timed:.3g} ms/attempt over {_number(blocks)} blocks (device time; "
+                         "each attach's first block, with its captures, left out)")
+        else:
+            parts.append(f"{_number(blocks)} blocks")
+        ranges = mc.get("ranges") or ()
+        if ranges:
+            parts.append("attached over steps " + ", ".join(f"{_number(a)}–{_number(b)}" for a, b in ranges))
+        return "; ".join(parts) if parts else "attached"
+
     def _setup(self):
         if not self.setup_s:
             return "not timed"
@@ -363,9 +435,10 @@ class Report:
             return f"pending (measured over steps {_number(first)}–{_number(last)} of this run)"
         speed = self.speed
         span = f"steps {_number(speed['first_step'])}–{_number(speed['last_step'])}"
+        md_only = "; MD only; MC blocks: see mc" if self.mc else ""  # the blocks' cost is the mc line's
         if speed["status"] == "measured":
-            return f"{_ms(speed['seconds_per_step'])}, measured over {span} of this run"
-        return f"{_ms(speed['seconds_per_step'])}, whole-run mean over {span}"
+            return f"{_ms(speed['seconds_per_step'])}, measured over {span} of this run{md_only}"
+        return f"{_ms(speed['seconds_per_step'])}, whole-run mean over {span}{md_only}"
 
     def _why(self):
         """Reasons the run is not on the plan of a complete installation, or was refused."""
@@ -433,7 +506,11 @@ class Report:
         fields = [("", self._header()), ("physics", self._physics()), ("plan", self._plan())]
         fields += [(None, line) for line in revision_lines(self.plan)]
         fields += self._why()
-        fields += [("gate", self._gate()), ("setup", self._setup()), ("speed", self._speed()),
+        fields += [("gate", self._gate())]
+        mc_energy = move_energy_line(self.gate)
+        fields += [("mc ΔE", mc_energy)] if mc_energy else []
+        fields += [("mc", self._mc())] if self.mc else []
+        fields += [("setup", self._setup()), ("speed", self._speed()),
                    ("output", ", ".join(self.outputs) or "none"), ("licence", self.licence_line)]
         warnings = self.warnings() or ["none"]
         fields += [("warn", warnings[0])] + [(None, line) for line in warnings[1:]]
@@ -490,6 +567,14 @@ class Report:
             "setup_total_s": float(sum(self.setup_s.values())),
             "licence": {"licence": self.licence, "source": "label table" if self.licence else None},
             "gate_status": "skipped" if self.gate is None else self.gate.get("status", "skipped"),
+            "move_energy_status": None if not (self.gate or {}).get("move_energy") else
+            self.gate["move_energy"].get("status"),
+            "mc_energy_precision": None if self.gate is None else self.gate.get("mc_energy_precision"),
             "reasons": [{"kind": kind, "text": text} for kind, text in why],
             "warnings": self.warnings(),
+            "mc": None if not self.mc else {
+                "moves": [describe_move(move) for move in self.mc.get("moves", ())],
+                "ranges": [list(pair) for pair in self.mc.get("ranges", ())],
+                "blocks": int(self.mc.get("blocks") or 0), "device_ms": self.mc.get("device_ms"),
+                "timed_attempts": int(self.mc.get("timed_attempts") or 0)},
         }

@@ -11,27 +11,40 @@ records in Python are TOML values or tables:
 - ``integrator``: a table with ``type = "Langevin"`` or ``"LangevinBAOAB"`` and the record's
   fields (``fm.integrators``); ``friction_per_fs`` defaults to ``fm.md``'s friction;
 - ``dispersion``: ``"none"``, ``"d3bj"`` or a ``[dispersion]`` table of ``fm.D3`` fields;
-- ``mc``: one ``[mc]`` table or ``[[mc]]`` tables, each with ``move`` (checked, then refused
-  until phase 3);
-- ``output``: a directory or an ``[output]`` table of ``fm.Output`` fields;
+- ``mc``: one ``[mc]`` table or ``[[mc]]`` tables, each an ``fm.mc`` record: ``move`` (``"swap"``,
+  ``"transmute"`` or ``"displace"``) and that record's fields (``pairs``, ``species``, ``delta_A``,
+  ``every``, ``attempts``, ``velocities``, ``mu``, ``formal_charges``, ``adaptive``);
+- ``output``: a directory or an ``[output]`` table of ``fm.Output`` fields (the table's
+  ``directory`` defaults to ``fm.md``'s, ``./<structure stem>.fastmace/``);
 - ``repeat``: an array of three ints.
+
+Protocols (SPEC §10.5, plan task 3-T14): ``CONFIG`` may also name a protocol shipped with FastMACE
+(``fastmace.protocols.runner.protocol_names``), whose relative structure path is a file shipped with
+it. A file with a ``[relax]`` or ``[quench]`` table, or a run with ``--steps``, is a protocol run
+(``fastmace.protocols.runner``): the relaxation, ``fm.md`` for at most ``--steps`` steps of the
+schedule with a restart at the end, and the quench once the schedule is done. ``--resume RUN_DIR``
+continues it for at most ``--steps`` more steps. ``--output`` sets the output directory.
 """
 
 import dataclasses
 import inspect
 import sys
-import types
 from pathlib import Path
 
 from fastmace.cli.md import run_md, usage_error
 
-HELP = "run MD from a TOML file of fm.md arguments (write one with fastmace init)"
+HELP = "run MD or a protocol from a TOML file of fm.md arguments (write one with fastmace init)"
 
 INTEGRATOR_TYPES = ("Langevin", "LangevinBAOAB")
 
 
 def add_arguments(parser):
-    parser.add_argument("config", metavar="CONFIG.toml", help="the TOML file ('-' reads standard input)")
+    parser.add_argument("config", metavar="CONFIG.toml", nargs="?",
+                        help="the TOML file ('-' reads standard input) or the name of a shipped protocol")
+    parser.add_argument("--resume", metavar="RUN_DIR", help="continue the protocol run in RUN_DIR")
+    parser.add_argument("--steps", type=int, help="run at most this many MD steps, then write a restart and stop "
+                        "(a protocol run; continue it with --resume)")
+    parser.add_argument("--output", metavar="DIR", help="the output directory (in place of the file's)")
 
 
 def _tomllib():
@@ -107,10 +120,12 @@ def _mc(value):
     blocks = [value] if isinstance(value, dict) else value
     if not isinstance(blocks, list) or not all(isinstance(block, dict) for block in blocks):
         raise ValueError(f"mc must be [mc] or [[mc]] tables, got {value!r}")
+    from fastmace.simulation import move_from_record
+
     for block in blocks:
         if "move" not in block:
             raise ValueError(f"every mc table needs move = ..., got {block!r}")
-    return tuple(types.SimpleNamespace(**block) for block in blocks)
+    return tuple(move_from_record(block) for block in blocks)
 
 
 def _output(value):
@@ -163,16 +178,82 @@ def md_arguments(data):
 
 
 def _read(config):
+    """``(name, text, shipped data directory or None)`` of ``config``: standard input, a file or a shipped protocol."""
     if config == "-":
-        return "<stdin>", sys.stdin.read()
+        return "<stdin>", sys.stdin.read(), None
+    from fastmace.protocols import runner
+
     path = Path(config)
-    return str(path), path.read_text(encoding="utf-8")
+    if not path.is_file() and config in runner.protocol_names():
+        path, _ = runner.protocol_file(config)
+        return config, path.read_text(encoding="utf-8"), runner.DATA
+    return str(path), path.read_text(encoding="utf-8"), None
+
+
+def _with_output(data, directory):
+    """The output entry with ``directory`` (``--output``) or, for a table without one, ``fm.md``'s default."""
+    value = data.get("output")
+    if isinstance(value, dict):
+        if directory is None and "directory" not in value:
+            from fastmace.quick import _output
+
+            directory = _output(None, data.get("structure", "")).directory
+        return {**value, "directory": directory} if directory is not None else value
+    return directory if directory is not None else value
 
 
 def run(args):
-    name, text = _read(args.config)
+    if args.steps is not None and args.steps < 1:
+        return usage_error("run", f"--steps must be a positive number of steps, got {args.steps}")
+    if args.resume is not None:
+        if args.config is not None:
+            return usage_error("run", "give CONFIG.toml or --resume RUN_DIR, not both")
+        from fastmace.protocols import runner
+
+        try:
+            runner.read_record(args.resume)
+        except ValueError as error:
+            return usage_error("run", error)
+        return _protocol(lambda: runner.resume(args.resume, steps=args.steps), args)
+    if args.config is None:
+        return usage_error("run", "give CONFIG.toml or --resume RUN_DIR")
     try:
-        structure, options = md_arguments(parse_toml(text))
+        name, text, shipped = _read(args.config)
+    except OSError as error:
+        return usage_error("run", error)
+    try:
+        from fastmace.protocols import runner
+
+        data = parse_toml(text)
+        if shipped is not None and "structure" in data and not Path(data["structure"]).is_absolute():
+            data["structure"] = str(shipped / data["structure"])
+        if "output" in data or args.output is not None:
+            data["output"] = _with_output(data, args.output)
+        stages, rest = runner.split_stages(data)
+        structure, options = md_arguments(rest)
     except ValueError as error:
         return usage_error("run", f"{name}: {error}")
-    return run_md(structure, options, command="run", debug=args.debug)
+    if stages["relax"] is None and stages["quench"] is None and args.steps is None:
+        return run_md(structure, options, command="run", debug=args.debug)
+    source = args.config if shipped is not None else str(Path(name).resolve()) if name != "<stdin>" else name
+    return _protocol(lambda: runner.start(structure, options, steps=args.steps, source=source, **stages), args)
+
+
+def _protocol(call, args):
+    """Run a protocol stage; a ``ValueError`` before the run is a usage error (2), a stopped stage an error (1)."""
+    from fastmace.errors import FastMACEError
+
+    try:
+        call()
+    except FastMACEError:
+        raise
+    except ValueError as error:
+        if args.debug:
+            raise
+        return usage_error("run", error)
+    except RuntimeError as error:
+        if args.debug:
+            raise
+        print(f"fastmace run: {error}", file=sys.stderr)
+        return 1
+    return 0

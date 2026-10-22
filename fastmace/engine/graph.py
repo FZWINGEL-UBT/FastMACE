@@ -268,6 +268,7 @@ class GraphEngine(Engine):
         self._dropped = {}  # key -> why it was dropped (its next capture is a re-capture)
         self._kinds_seen = set()  # key families captured at least once in this engine
         self._external = {}  # captured(key, fn): other modules' stage functions
+        self.trial_rebuilds = 0  # MC displacement trials built around their geometry (trial_rebuild, 3-T10)
         # The energy-only graph (3-T07): the force field per MC energy precision (the engine's own in its
         # precision, a float64 copy beside it, add_energy_field) and each precision's output buffer.
         self._energy_fields = {_precision(force_field): force_field}
@@ -585,6 +586,47 @@ class GraphEngine(Engine):
         finally:
             self._redoing = False
             del saved
+
+    # ------------------------------------------------------------------ MC trial lists (3-T10)
+
+    def trial_rebuild(self) -> bool:
+        """Rebuild the neighbour list around the current (trial) positions, eagerly, between replays: a
+        displacement beyond the skin test (SPEC §8.5 step 4, §10.4 "Graph capture"). The GPU build reads
+        its pair count on the host and may reallocate, which is why it runs outside the captured attempt.
+
+        The list is built in place, so the captured graphs that read it stay valid. The caller saved the
+        committed list first (``SkinNeighbourList.save_list``) and restores it on a rejection. Returns True
+        if the capacity grew: the buffers moved and the captured graphs are dropped, and the caller
+        restores the attempt and redoes it with the same numbers (an overflow, not an outcome).
+        """
+        self.trial_rebuilds += 1
+        grew = bool(self.force_field.rebuild(self.state.positions))
+        if grew:
+            self.invalidate_graphs("a trial neighbour build grew the capacity")
+        return grew
+
+    def use_trial_edges(self) -> int:
+        """Compact at the current positions and let the model read the padded edge count (one host sync, between
+        replays); returns the padded size, which an MC attempt's graph key names."""
+        field = self.force_field
+        field.compact(self.state.positions)
+        edges = self._padded(int(field.edge_count))  # host sync
+        self._use_edges(edges)
+        return edges
+
+    def adopt_trial_list(self) -> None:
+        """An accepted displacement keeps the list built around its geometry: the pipeline's padded sizes follow
+        it as after a rebuild (its floor is dropped). The block still ends at a canonical point."""
+        edges = self._padded(int(self.force_field.edge_count))  # host sync
+        self._pipe_floor = 0
+        self._pipe_edges = edges
+        self._spec_edges = edges
+
+    def record_mc_overflow(self, word: int) -> None:
+        """An MC attempt overflowed (``word``) and its caller redoes it with the same numbers after growing what
+        overflowed: count it (``overflows_redone``, the log) and clear the flags."""
+        self._record_overflow(int(word), int(self.state.step), "mc")
+        self.clear_overflow()
 
     @property
     def recapture_warning(self) -> str | None:

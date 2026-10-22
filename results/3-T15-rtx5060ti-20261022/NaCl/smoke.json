@@ -1,0 +1,82 @@
+{
+  "tool": "mc_front_end_smoke",
+  "created_utc": "2026-10-22T05:21:32.379053+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "92691c9",
+  "model": "mh1-r2scan",
+  "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "torch": "2.14.1+cu130",
+  "temperature_K": 1000.0,
+  "steps": 1200,
+  "resume_steps": 600,
+  "every": 100,
+  "attempts": 50,
+  "seed": 1,
+  "oeq_runtime": "prepared",
+  "status": "passed",
+  "structure": "NaCl",
+  "natoms": 216,
+  "md_s": 43.12354916399636,
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "tier": "graph",
+  "backend": "hybrid",
+  "report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1×1×1), 3D PBC, NVT Langevin 0.5 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nmc:      swap Na-Cl every 100, 50 attempts (exchange); accepted 0/600; 2 ms/attempt over 12 blocks (device time; each attach's first block, with its captures, left out); attached over steps 0–1,200\nsetup:   33 s (plan 0.037 s, build 23 s, capture 9.9 s, provenance 0.04 s)\nspeed:   8.01 ms/step, whole-run mean over steps 1–1,200\noutput:  /home/fzwin/fastmace-runs/3-T15-smoke-20261022\nlicence: ASL (non-commercial), from the label table (§4.3)\nwarn:    MC: experimental: not yet qualified (§10.4)",
+  "counters_mc": {
+    "swap": {
+      "attempted": 600,
+      "impossible": 0,
+      "accepted": 0
+    }
+  },
+  "report_mc": {
+    "moves": [
+      "swap Na-Cl every 100, 50 attempts (exchange)"
+    ],
+    "ranges": [
+      [
+        0,
+        1200
+      ]
+    ],
+    "blocks": 12,
+    "device_ms": 1099.805793762207,
+    "timed_attempts": 550
+  },
+  "thermo_last": {
+    "step": "1200",
+    "time_ps": "0.6",
+    "phase": "constant",
+    "target_K": "1000.0",
+    "temperature_K": "676.2914805712556",
+    "potential_eV_atom": "-6.798435670358163",
+    "kinetic_eV_atom": "0.0874174063849234",
+    "total_eV_atom": "-6.71101826397324",
+    "mc_swap_attempted": "600",
+    "mc_swap_accepted": "0"
+  },
+  "resume_s": 23.144763074000366,
+  "restart_step": 1200,
+  "counters_mc_at_resume": {
+    "swap": {
+      "attempted": 600,
+      "impossible": 0,
+      "accepted": 0
+    }
+  },
+  "counters_mc_after_resume": {
+    "swap": {
+      "attempted": 900,
+      "impossible": 0,
+      "accepted": 0
+    }
+  },
+  "report_after_resume": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1×1×1), 3D PBC, NVT Langevin 0.5 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nmc:      swap Na-Cl every 100, 50 attempts (exchange); accepted 0/900; 1.94 ms/attempt over 18 blocks (device time; each attach's first block, with its captures, left out); attached over steps 0–1,800\nsetup:   23 s (plan 0.0042 s, build 23 s, provenance 7.9e-05 s)\nspeed:   21.1 ms/step, whole-run mean over steps 1,201–1,800\noutput:  none\nlicence: ASL (non-commercial), from the label table (§4.3)\nwarn:    MC: experimental: not yet qualified (§10.4)",
+  "checks": {
+    "attempted_is_blocks_times_attempts": true,
+    "cost_line_has_device_time": true,
+    "thermo_equals_counters": true,
+    "resume_continues_the_counters": true
+  }
+}

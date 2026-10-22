@@ -231,7 +231,7 @@ def test_configurational_mu():  # §10.4: Δμ_conf = Δμ_full + (3/2) k_B T ln
     from fastmace.mc import configurational_mu
 
     assert _parameters(configurational_mu) == ["mu_full", "temperature_K", "reference", "masses"]
-    k_b = 8.617333262e-5
+    from ase.units import kB as k_b  # the thermostat's constant (3-T09 follow-up)
     result = configurational_mu({"B": 0.5}, 300.0, reference="A", masses={"A": 1.0, "B": 4.0})
     assert result == {"B": pytest.approx(0.5 + 1.5 * k_b * 300.0 * math.log(4.0))}
     # Equal masses: unchanged; the reference itself is 0 by definition.
@@ -248,32 +248,35 @@ def test_configurational_mu():  # §10.4: Δμ_conf = Δμ_full + (3/2) k_B T ln
 def test_configurational_mu_uses_ase_masses_by_default():
     pytest.importorskip("ase")
     from ase.data import atomic_masses, atomic_numbers
+    from ase.units import kB as k_b  # the thermostat's constant (3-T09 follow-up)
 
     from fastmace.mc import configurational_mu
-
-    k_b = 8.617333262e-5
     expected = 1.5 * k_b * 500.0 * math.log(atomic_masses[atomic_numbers["Cl"]] / atomic_masses[8])
     assert configurational_mu({"Cl": 0.0}, 500.0, reference="O") == {"Cl": pytest.approx(expected)}
     assert configurational_mu({17: 0.0}, 500.0, reference=8) == {17: pytest.approx(expected)}
 
 
-def test_mc_driver_stub():
+def test_mc_driver_contract():  # filled by 3-T09
     from fastmace.mc import MCDriver, Swap
 
     assert _parameters(MCDriver) == ["moves", "seed", "config"]
     assert _keyword_only(MCDriver) == ["seed", "config"]
-    for name in ("attach", "run_block", "state_dict", "load_state_dict"):
+    for name in ("attach", "run_block", "state_dict", "load_state_dict", "due"):
         assert callable(getattr(MCDriver, name))
-    _raises_naming("3-T09", lambda: MCDriver((Swap([("Na", "Cl")], 10, 5),), seed=1))
+    assert _parameters(MCDriver.attach) == ["self", "engine", "evaluator", "max_displacement_A"]
+    assert _keyword_only(MCDriver.attach) == ["evaluator", "max_displacement_A"]  # 3-T10
+    assert _parameters(MCDriver.run_block) == ["self", "engine", "step"]
+    driver = MCDriver((Swap([("Na", "Cl")], 10, 5),), seed=1)
+    assert driver.last_block is None and driver.offsets == dict.fromkeys(config.MC_STREAMS, 0)
 
 
-def test_attempt_stubs_name_their_task():
-    from fastmace.mc import Displace, Swap, Transmute, moves
+def test_attempt_contract():  # filled by 3-T09; displacements by 3-T10
+    from fastmace.mc import Displace, moves
 
-    assert _parameters(moves.build_attempt) == ["move", "engine", "evaluator", "streams"]
-    _raises_naming("3-T09", lambda: moves.build_attempt(Swap([("Na", "Cl")], 10, 5), None, None, None))
-    _raises_naming("3-T09", lambda: moves.build_attempt(Transmute(["Na", "K"], 10, 5), None, None, None))
-    _raises_naming("3-T10", lambda: moves.build_attempt(Displace(0.1, 10, 5), None, None, None))
+    assert _parameters(moves.build_attempt) == ["move", "engine", "evaluator", "streams", "fixcm"]
+    assert _keyword_only(moves.build_attempt) == ["fixcm"]
+    with pytest.raises(TypeError, match="graph engine"):  # a DisplaceAttempt, which needs a graph engine
+        moves.build_attempt(Displace(0.1, 10, 5), None, None, None)
 
 
 # --------------------------------------------------------------------------- events
@@ -496,3 +499,70 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     assert restart.MC_COUNTER_KEYS == ("attempted", "impossible", "accepted")
     assert restart.MC_STREAM_KEYS == ("seed", "offset")
     assert restart.mc_record({}) is None  # 3-T08: no move set attached
+
+
+def test_move_energy_gate_names():  # §12.3 move-energy differences, §10.4 energy precision, §9.4 (3-T11)
+    import dataclasses
+
+    from fastmace.planner import fallback, selfcheck
+
+    assert selfcheck.MOVE_FRACTION == 0.01
+    assert set(selfcheck.MOVE_SAMPLES) == {"swap", "transmute", "displace"}
+    assert _parameters(selfcheck.sample_moves) == ["atoms", "superset", "workload", "seed", "samples"]
+    assert _parameters(selfcheck.move_references) == ["plan", "force_field", "atoms", "workload", "seed", "check",
+                                                      "gate", "samples"]
+    assert _keyword_only(selfcheck.move_references) == ["seed", "check", "gate", "samples"]
+    assert _parameters(selfcheck.move_gate) == ["engine", "references", "plan", "force_field", "record", "requested"]
+    assert _keyword_only(selfcheck.move_gate) == ["plan", "force_field", "record", "requested"]
+    assert _parameters(selfcheck.move_rows) == ["engine", "evaluator", "references"]
+    fields = {field.name for field in dataclasses.fields(selfcheck.GateRecord)}
+    assert {"move_energy", "mc_energy_precision"} <= fields
+    assert fallback.DIMENSIONS == ("mc_energy", "mode", "rewrites", "backend")
+    assert _parameters(fallback.mc_energy_revision) == ["plan", "record"]
+    assert _parameters(fallback.move_energy_only) == ["failure"]
+    assert "moves" in _keyword_only(fallback.activate)
+    assert "moves" in _keyword_only(fallback.Fallback.__init__)
+
+
+def test_displacement_names():  # §10.4 displacements (3-T10)
+    from fastmace.engine.graph import GraphEngine
+    from fastmace.io.restart import MC_COUNTER_KEYS
+    from fastmace.mc import displace
+    from fastmace.neighbors.skin import SkinNeighbourList
+
+    assert displace.PROPOSAL_COUNT == 5 and displace.ACCEPTANCE_COUNT == 1
+    assert displace.COUNTER_KEYS == (*MC_COUNTER_KEYS, "trial_rebuilds")
+    assert (displace.VARIABLE_CELL_CODE, displace.BEYOND_MAX_CODE) == (
+        "displace-variable-cell", "displace-beyond-max-displacement")
+    assert _parameters(displace.DisplaceAttempt) == ["move", "engine", "evaluator", "block_streams"]
+    for name in ("bound", "run", "tensors", "poll", "host_attempt", "set_delta", "adapt"):
+        assert callable(getattr(displace.DisplaceAttempt, name))
+    assert _keyword_only(displace.check_displace) == ["max_displacement_A", "variable_cell"]
+    assert _parameters(SkinNeighbourList.save_list) == ["self", "into"]
+    assert _parameters(SkinNeighbourList.restore_list) == ["self", "saved"]
+    for name in ("trial_rebuild", "use_trial_edges", "adopt_trial_list"):
+        assert _parameters(getattr(GraphEngine, name)) == ["self"]
+    assert _parameters(GraphEngine.record_mc_overflow) == ["self", "word"]
+
+
+# --------------------------------------------------------------------------- protocol runs
+
+
+def test_protocol_run_names():  # §10.5 (3-T14)
+    from fastmace.protocols import quench, runner
+
+    assert _parameters(quench.relax) == ["atoms", "calc", "fmax", "max_steps", "logfile", "optimizer"]
+    assert _parameters(quench.select_frames) == ["frames", "min_K", "bin_K", "per_bin", "peak_K"]
+    assert _parameters(quench.picks) == ["resolved", "frame_every", "settings"]
+    assert _parameters(quench.quench_run) == ["directory", "calc", "resolved", "frame_every", "timestep_fs",
+                                              "settings", "log"]
+    assert _keyword_only(runner.start) == ["relax", "quench", "steps", "source", "log"]
+    assert _parameters(runner.resume) == ["directory", "steps", "log"]
+    assert runner.RELAX_KEYS == ("fmax", "optimizer", "max_steps") and runner.PROTOCOL_RECORD == "protocol.json"
+    assert "swap_anneal_NaNbOCl4" in runner.protocol_names()
+
+
+def test_fixcm_projection_field():  # 3-T22 (docs/design/fixcm-projection.md); the default is checkpoint 2b
+    assert config.IntegratorConfig().fixcm_projection == "ase"
+    assert typing.get_args(typing.get_type_hints(config.IntegratorConfig)["fixcm_projection"]) == (
+        "ase", "mass_weighted")

@@ -67,9 +67,10 @@ supercell. The summary report shows the plan, the gate status and the speed.
 The Langevin friction is `fm.md`'s default, 0.02 per ASE time unit (about
 0.002/fs), as in `main.py`.
 
-In phase 1b, some requests are refused before anything runs, with the reason:
-NVE (phase 4), MC (phase 3) and D3 (phase 3b). For D3, the refusal shows the
-expanded record. An error prints its message without a traceback and exits
+Some requests are refused before anything runs, with the reason: NVE
+(phase 4) and D3 (phase 3b). For D3, the refusal shows the expanded record.
+MC moves run through `fastmace run` (below), and they are experimental until
+their qualification study is recorded. An error prints its message without a traceback and exits
 1. `--debug` also prints the traceback. A wrong combination of arguments
 exits 2.
 

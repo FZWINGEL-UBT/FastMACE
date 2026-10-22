@@ -4,7 +4,7 @@
 loaded, so this module imports neither torch nor MACE nor ASE. They are checked against the
 workload and the superset by ``Simulation.run(mc=...)`` (§7.6). Species stay as given (symbols
 or atomic numbers); the driver maps them to atomic numbers. ``build_attempt`` builds the captured
-attempt of a move: 3-T09 (swaps, transmutations), 3-T10 (displacements).
+attempt of a move: 3-T09 (swaps, transmutations), 3-T10 (displacements, ``fastmace.mc.displace``).
 """
 
 from __future__ import annotations
@@ -17,8 +17,6 @@ from typing import Any, ClassVar
 from fastmace.config import SWAP_VELOCITIES, TRANSMUTE_VELOCITIES
 
 MOVE_TYPES = ("swap", "transmute", "displace")
-# Boltzmann constant in eV/K (CODATA 2018, as ase.units.kB).
-K_B_EV_PER_K = 8.617333262e-5
 
 
 def _species(value: Any, where: str) -> Any:
@@ -26,6 +24,26 @@ def _species(value: Any, where: str) -> Any:
             isinstance(value, int) and value < 0):
         raise ValueError(f"{where}: a species is a symbol or an atomic number >= 1, got {value!r}")
     return value
+
+
+def _key(species: Any) -> Any:
+    """A species as compared between records: its atomic number. Symbols are looked up in ASE only when a
+    record mixes symbols and numbers, so building a record of symbols (or of numbers) imports nothing."""
+    if isinstance(species, int):
+        return species
+    from ase.data import atomic_numbers
+
+    return atomic_numbers.get(species, species)
+
+
+def _distinct(items: tuple) -> bool:
+    """True when no species repeats, symbols and atomic numbers compared as atomic numbers ("Na" is 11)."""
+    if len(set(items)) != len(items):
+        return False
+    if all(isinstance(item, str) for item in items) or all(isinstance(item, int) for item in items):
+        return True
+    keys = [_key(item) for item in items]
+    return len(set(keys)) == len(keys)
 
 
 def _count(value: Any, where: str) -> int:
@@ -79,7 +97,7 @@ class Swap:
             if len(pair) != 2 or isinstance(pair, str):
                 raise ValueError(f"Swap.pairs: each pair names two species, got {pair!r}")
             first, second = (_species(item, "Swap.pairs") for item in pair)
-            if first == second:
+            if not _distinct((first, second)):
                 raise ValueError(f"Swap.pairs: a pair needs two different species, got {pair!r}")
         object.__setattr__(self, "pairs", pairs)
         _count(self.every, "Swap.every")
@@ -112,7 +130,7 @@ class Transmute:
         if isinstance(self.species, (str, bytes)):
             raise ValueError(f"Transmute.species must be a set of species, got {self.species!r}")
         species = tuple(_species(item, "Transmute.species") for item in self.species)
-        if len(species) < 2 or len(set(species)) != len(species):
+        if len(species) < 2 or not _distinct(species):
             raise ValueError(f"Transmute.species needs at least two different species, got {self.species!r}")
         object.__setattr__(self, "species", species)
         _count(self.every, "Transmute.every")
@@ -178,15 +196,212 @@ def configurational_mu(mu_full: Mapping[Any, float], temperature_K: float, refer
             raise ValueError(f"configurational_mu: no mass for {species!r}")
         return float(masses[species])
 
+    from ase.units import kB  # the thermostat's constant (the integrators' set_temperature)
+
     reference_mass = mass(reference)
-    k_t = K_B_EV_PER_K * float(temperature_K)
+    k_t = kB * float(temperature_K)
     return {species: 0.0 if species == reference
             else float(value) + 1.5 * k_t * math.log(mass(species) / reference_mass)
             for species, value in mu_full.items()}
 
 
-def build_attempt(move: Swap | Transmute | Displace, engine: Any, evaluator: Any, streams: Any) -> Any:
-    """The captured attempt of ``move`` (propose → apply → refresh → energy → accept mask → restore,
-    §10.4 "Graph capture") on ``engine``, with the MC ``evaluator`` (3-T07) and the device ``streams``."""
-    task = "3-T10" if isinstance(move, Displace) else "3-T09"
-    raise NotImplementedError(f"MC attempts of {type(move).__name__}: plan task {task}")
+def species_number(species: Any) -> int:
+    """An atomic number from a symbol or an atomic number."""
+    from ase.data import atomic_numbers
+
+    if isinstance(species, str):
+        if species not in atomic_numbers:
+            raise ValueError(f"unknown chemical symbol {species!r}")
+        return int(atomic_numbers[species])
+    return int(species)
+
+
+def resolved_velocities(move: Swap | Transmute, fixcm: bool) -> str:
+    """The momentum treatment a move uses: its own, or for ``Transmute(velocities=None)`` the default
+    (``rescale``, or ``redraw_all`` when the integrator fixes the centre of mass; SPEC §10.4)."""
+    if move.velocities is not None:
+        return move.velocities
+    return "redraw_all" if fixcm else "rescale"
+
+
+def metropolis(u, excess, kT):
+    """The accept mask: ``ln u < -excess / kT`` with ``excess`` = ΔE − Σ Δμ ΔN and ``kT`` in eV; a NaN
+    excess rejects. Looked up when an attempt is built, so a test can replace it."""
+    import torch
+
+    return torch.log(u) < -excess / kT
+
+
+def charge_inputs(field: Any) -> bool:
+    """Whether the force field's model or head takes charge or spin inputs (SPEC §10.4 "Charge and spin"):
+    PolarMACE, or a joint embedding of the total charge or spin (MACE-OMOL-0)."""
+    if getattr(field, "is_polar", False):
+        return True
+    model = getattr(field, "model", None)
+    model = getattr(model, "_orig_mod", model)
+    specs = getattr(model, "embedding_specs", None) or {}
+    return any(name in specs for name in ("total_charge", "total_spin"))
+
+
+# Tables by atomic number (0 .. 118), ASE's element range.
+TABLE_SIZE = 119
+
+
+class Attempt:
+    """The attempt of a swap or transmutation move on a built engine. ``run()`` is one attempt: propose →
+    apply → refresh → energy → accept mask → restore, as device operations with fixed shapes and
+    addresses, so the driver captures it (``GraphEngine.captured``) and replays it once per attempt.
+
+    ``counters`` (int64 ``[3]``: attempted, impossible, accepted) count on the device. The block's
+    ``streams`` (``streams.BlockStreams``) give the random numbers, kT and the baseline energy.
+    """
+
+    def __init__(self, move: Swap | Transmute, engine: Any, evaluator: Any, streams: Any, *, fixcm: bool):
+        import torch
+        from ase.data import atomic_masses
+
+        from fastmace.mc import momenta
+        from fastmace.mc import streams as mc_streams
+
+        self.move, self.engine, self.evaluator, self.streams = move, engine, evaluator, streams
+        state = engine.state
+        device = state.positions.device
+        self.natoms = state.natoms
+        self.velocities = resolved_velocities(move, fixcm)
+        self.counts = mc_streams.attempt_counts(move.move, self.velocities, self.natoms)
+        self.block_velocity_count = mc_streams.block_velocity_count(self.velocities, self.natoms)
+        self.counters = torch.zeros(3, dtype=torch.int64, device=device)
+        self.standard_masses = torch.as_tensor(atomic_masses[:TABLE_SIZE], dtype=torch.float64).to(device)
+        field = engine.force_field
+        self.charge_inputs = charge_inputs(field)
+        # The per-atom charge source of the force field (it aliases state.charges when the model reads them).
+        self.charges = getattr(field, "charges", None)
+        if isinstance(move, Swap):
+            pairs = [(species_number(a), species_number(b)) for a, b in move.pairs]
+            self.pairs = torch.tensor(pairs, dtype=torch.int64, device=device)
+            # Per-atom charges travel with the species where the model reads them.
+            self.write_charges = state.charges is not None and self.charges is not None
+        else:
+            numbers = [species_number(item) for item in move.species]
+            self.set = torch.tensor(numbers, dtype=torch.int64, device=device)
+            self.members = torch.zeros(TABLE_SIZE, dtype=torch.bool, device=device)
+            self.members[self.set] = True
+            self.position = torch.zeros(TABLE_SIZE, dtype=torch.int64, device=device)
+            self.position[self.set] = torch.arange(len(numbers), dtype=torch.int64, device=device)
+            self.mu = torch.zeros(TABLE_SIZE, dtype=torch.float64, device=device)
+            for species, value in move.mu:
+                self.mu[species_number(species)] = float(value)
+            self.formal = torch.zeros(TABLE_SIZE, dtype=torch.float64, device=device)
+            for species, value in move.formal_charges:
+                self.formal[species_number(species)] = float(value)
+            changes_charge = any(value for _, value in move.formal_charges)
+            self.write_charges = (changes_charge and self.charges is not None
+                                  and (state.charges is not None or self.charge_inputs))
+        self.refreshed = ("species", "charges") if self.write_charges else ("species",)
+        self.treatment = None if self.velocities == "redraw_all" else getattr(momenta, self.velocities)
+        self.accept = metropolis
+        self.stage, self.trial = None, None  # the energy stage of the edges the replay reads (``bound``)
+        self.accepted = torch.zeros(1, dtype=torch.bool, device=device)  # the last attempt's decision
+
+    def energy(self):
+        """The MC evaluator's float64 energy ``[1]`` of the current (trial) state."""
+        if self.stage is not None:
+            self.stage()
+            return self.trial
+        return self.evaluator.evaluate()
+
+    def bound(self, stage, trial):
+        """The function to capture for one edge size: ``run`` with that size's energy stage and output buffer
+        (``MCEvaluator.stage``; ``None`` on engines without one, which evaluate directly)."""
+
+        def run() -> None:
+            self.stage, self.trial = stage, trial
+            self.run()
+
+        return run
+
+    def run(self) -> None:
+        import torch
+
+        with torch.no_grad():
+            self._run(torch)
+
+    def _run(self, torch) -> None:
+        state, streams = self.engine.state, self.streams
+        species, masses, velocities = state.species, state.masses, state.velocities
+        u = streams.uniforms("proposal", self.counts["proposal"])
+        acceptance = streams.uniforms("acceptance", self.counts["acceptance"])
+        normals = (streams.normals("velocity", self.counts["velocity"]).view(-1, 3) if self.counts["velocity"]
+                   else None)
+        if isinstance(self.move, Swap):
+            from fastmace.mc.streams import decode_swap
+
+            atoms, possible = decode_swap(u, species, self.pairs)
+            old_species = species[atoms]
+            new_species = torch.where(possible, old_species.flip(0), old_species)
+            old_masses = masses[atoms]
+            new_masses = old_masses.flip(0)
+            excess_mu = None
+        else:
+            from fastmace.mc.streams import decode_transmute
+
+            atoms, proposed, possible = decode_transmute(u, species, self.set, self.members, self.position)
+            old_species = species[atoms]
+            new_species = torch.where(possible, proposed, old_species)
+            old_masses = masses[atoms]
+            new_masses = self.standard_masses[new_species][:, None]
+            excess_mu = self.mu[new_species] - self.mu[old_species]
+        new_masses = torch.where(possible[:, None], new_masses, old_masses)
+        if self.write_charges:
+            old_charges = self.charges[atoms]
+            if excess_mu is None:
+                new_charges = old_charges.flip(0)
+            else:
+                new_charges = old_charges + (self.formal[new_species] - self.formal[old_species])
+            new_charges = torch.where(possible, new_charges, old_charges)
+            self.charges[atoms] = new_charges
+        # Apply the trial species, refresh what the energy reads, evaluate.
+        species[atoms] = new_species
+        self.engine.derived.refresh(self.refreshed)
+        trial = self.energy()
+        excess = trial - streams.baseline
+        if excess_mu is not None:
+            excess = excess - excess_mu
+        accepted = possible & self.accept(acceptance, excess, streams.kT)
+        self.accepted.copy_(accepted)
+        streams.baseline.copy_(torch.where(accepted, trial, streams.baseline))
+        self.counters.add_(torch.cat((torch.ones_like(possible), ~possible, accepted)).to(torch.int64))
+        # Keep the trial where accepted, restore the snapshot rows elsewhere (copies, so bit for bit).
+        species[atoms] = torch.where(accepted, new_species, old_species)
+        masses[atoms] = torch.where(accepted[:, None], new_masses, old_masses)
+        if self.write_charges:
+            self.charges[atoms] = torch.where(accepted, new_charges, old_charges)
+        if self.treatment is not None:
+            old_velocities = velocities[atoms]
+            new_velocities = self.treatment(old_velocities, old_masses, new_masses, normals, streams.kT)
+            velocities[atoms] = torch.where(accepted[:, None], new_velocities, old_velocities)
+        self.engine.derived.refresh(self.refreshed)
+        streams.index.add_(1)
+
+    def tensors(self):
+        """The attempt's own mutable device tensors (snapshots around a capture)."""
+        out = [self.counters, self.accepted]
+        if self.write_charges:
+            out.append(self.charges)
+        return tuple(out)
+
+
+def build_attempt(move: Swap | Transmute | Displace, engine: Any, evaluator: Any, streams: Any, *,
+                  fixcm: bool = False) -> Any:
+    """The attempt of ``move`` (propose → apply → refresh → energy → accept mask → restore, §10.4 "Graph
+    capture") on ``engine``, with the MC ``evaluator`` (3-T07) and the block's device ``streams``
+    (``streams.BlockStreams``); ``Attempt.run`` is what the driver captures. ``fixcm``: the integrator
+    fixes the centre of mass, which sets a transmutation's default treatment. A ``Displace`` gives a
+    ``fastmace.mc.displace.DisplaceAttempt`` (3-T10), which moves no momentum. Imports torch."""
+    if isinstance(move, Displace):
+        from fastmace.mc.displace import DisplaceAttempt
+
+        return DisplaceAttempt(move, engine, evaluator, streams)
+    if not isinstance(move, (Swap, Transmute)):
+        raise TypeError(f"build_attempt takes a Swap, a Transmute or a Displace, got {type(move).__name__}")
+    return Attempt(move, engine, evaluator, streams, fixcm=fixcm)
