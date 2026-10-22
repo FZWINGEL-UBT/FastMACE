@@ -16,7 +16,7 @@ job() {  # name temperature timestep structure order pattern
   log "start $1 gpu=$(nvidia-smi --query-gpu=name,driver_version,utilization.gpu,memory.used --format=csv,noheader)"
   $GPU --purpose "3-T05 $1 (<15 min)" -- nice -n 0 $P -W ignore $SRC/tools/ab_skin.py --output $W/ab/$1 \
     --checkpoint $HOME/models/mace-mh-1.model --structures $4 --temperature-K $2 --timestep-fs $3 --order $5 \
-    --pattern $6 "${extra[@]}" > $W/ab/$1.out 2> $W/ab/$1.err
+    --pattern $6 --warmup 1500 "${extra[@]}" > $W/ab/$1.out 2> $W/ab/$1.err
   log "end $1 exit $? $(tail -1 $W/ab/$1.out)"
 }
 log "source $(cat $SRC/.source_commit) host $(hostname) target=${TARGET:-default}"
