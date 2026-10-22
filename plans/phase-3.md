@@ -1357,10 +1357,15 @@ the total stays inside the $27 limit.
 Recorded by the conductor at each merge; 3-T21 carries the ones still open into
 `docs/validation/phase-3.md`.
 
-- **3-T02, 3-T06: GPU parts not run yet.** The capture test of the refresh
-  functions, the superset cost, and the compiled-versus-graph and rule-9
-  timing. The workers' permission checks refused the launches; they wait for
-  the owner.
+- **GPU runs refused by the workers' permission checks, waiting for the
+  owner** (22 October 2026):
+  - 3-T02: the refresh-capture test and the superset cost;
+  - 3-T06: compiled against graph on the GPU, and the rule-9 timing;
+  - 3-T20: the 8-run item-1 A/B series;
+  - 3-T14: the protocol smoke and the full local run (item 9).
+
+  Single runs in other workers' sessions were allowed, so the checks don't
+  agree with one another.
 - **3-T03:**
   - The friction refreshes copy host floats to the device, so they are not
     capturable. This is harmless: a friction event drops the graphs anyway.
