@@ -1477,6 +1477,18 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
       3-T21 cites these runs if `git diff cd43463..<freeze> -- fastmace/` is
       empty, and otherwise reruns them on the L4.
     - Murphy and leto were busy with other users' GPU jobs.
+  - **The workstations had to be free by 16:40 CEST for the shutdown** (owner).
+    3-T21 split the tier, all at cd43463:
+    - leeloo (RTX 4000 Ada): 19 passed and 7 failed, all 7 stale test
+      expectations, fixed on fastmace/3-T21. Stopped at 16:12 CEST, after the
+      MC statistics tests.
+    - coraline (RTX A4000, sm_86, freed by its other user): the remaining 13
+      files' tests all passed, by 16:25 CEST. There were no NFS lock errors
+      with the soft-lock hook, which is evidence for 3-T18.
+  - At 16:26 CEST neither machine had a job of ours left. Leeloo's NVIDIA
+    library was already at 595.99 while its loaded module was still 595.84:
+    a driver update with a reboot pending. When the workstations are back,
+    record the new driver.
 - **3-T06's GPU jobs** passed (merged at 10c67ae). The compiled tier equals graph within float32 noise:
   MH-1 hybrid 2.2e-7 Å against a graph repeat of 3.0e-7 Å, and MP-0 2.8e-7 Å against 2.2e-7 Å. The gate
   passes, and nothing recompiles over 37–40 edge counts. The rule-9 timing is owner checkpoint 2c.
