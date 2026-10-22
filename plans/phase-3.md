@@ -1427,6 +1427,23 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
 - **3-T07:** `test_mc_evaluator.py::test_a_force_evaluation_after_energy_only_is_unaffected[omol]`
   fails intermittently under `-n 4` load (forces not bitwise). It passes
   alone, and 3-T07 investigates on a follow-up branch.
+- **3-T11:**
+  - OMOL-0 XL was not measured. Its float64 references are too slow: about
+    25 NaCl configurations did not finish in 13 minutes locally, nor NaCl in
+    50 minutes on an A100 ($2.22). An energy-only reference for the move gate
+    would help every model.
+  - A rejected transaction (T03, T09) leaves unregistered scratch that a fresh
+    construction doesn't have. It is harmless, but `events.check_against`
+    reports it.
+  - The gate's references ran at charge 0 for charged models (since 1b);
+    fixed. The models used so far load without a charge.
+- **3-T22:** at 3×3×3 the ASE `fixcm` projection is off by at most 0.2 % per
+  species (O in NaNbOCl4 at 1500 K: +0.18 %, 1.4σ). Small cells with a large
+  mass contrast are biased: Li/Cs, 16 atoms, 600 K gives Li +233 K. The
+  research engine has the same projection (`GPULangevin._stage_a`, and ASE on
+  the CPU). 3-T22b makes MC plans with `redraw_all` under `fixcm` use
+  `mass_weighted`, exposes the option and teaches the fused stage. The MD
+  default is checkpoint 2b.
 - **3-T16a (ResearchModule):**
   - An NbCl5 anneal at 1 fs on the L4 takes about 192 min, more than the 3 h
     job limit, so it needs an A100 and a measured step time.
