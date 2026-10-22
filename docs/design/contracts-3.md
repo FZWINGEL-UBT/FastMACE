@@ -91,7 +91,7 @@ Notes on the records:
   - Move records as data: T09's `mc.driver.move_record` and `move_from_record`, through `simulation.move_record` and `simulation.move_from_record`, which also names an unknown field and takes `mu` and `formal_charges` as TOML tables (restart `mc.moves`, CLI `[[mc]]` tables, the child runner).
   - Thermo: `mc_<move>_attempted` and `mc_<move>_accepted` per `Workload.mc_moves` entry (`simulation.mc_columns`), as of the last block; none without MC moves. `counters.mc` and the report's `mc:` line and `report.mc` metadata block (moves, ranges, blocks, device time). The cost per attempt is the device time over the attempts of the timed blocks: each attach's first block, whose time includes the attempts' captures, is left out (`timed_attempts`).
   - `fm.md(mc=…)` adds the move set's species to the superset and, with a schedule, attaches it only over the steps at or above `min_mc_temperature_K` (`quick.mc_ranges`).
-- **`configurational_mu` formula:** Δμ_s^conf = Δμ_s^full + (3/2) k_B T ln(m_s / m_ref), with k_B = 8.617333262 × 10⁻⁵ eV/K. The reference's own Δμ must be 0. `masses=None` takes ASE's standard atomic masses.
+- **`configurational_mu` formula:** Δμ_s^conf = Δμ_s^full + (3/2) k_B T ln(m_s / m_ref), with k_B = `ase.units.kB` (8.617330337 × 10⁻⁵ eV/K in ASE 3.27), the constant the thermostats use, as in the MC acceptance. The reference's own Δμ must be 0. `masses=None` takes ASE's standard atomic masses.
 
 ## Errors (`errors.py`, new classes only)
 
@@ -230,7 +230,7 @@ compatibility promise: a restart record's (seed, offset) must give the same numb
     marks the attempt impossible. An impossible attempt changes nothing and consumes its counts.
   - Acceptance: with `u` the acceptance number, accept iff `ln u < −(ΔE − Δμ)/kT`, where ΔE = E_trial −
     E_baseline (float64, the MC evaluator's), Δμ = μ[new] − μ[old] for a transmutation (0 for swaps; absent
-    species have μ = 0) and kT = k_B·T with T the integrator's target at the block. `u = 0` accepts.
+    species have μ = 0) and kT = `ase.units.kB`·T (the thermostat's constant) with T the integrator's target at the block. `u = 0` accepts.
   - Velocities (`fastmace/mc/momenta.py`, named functions): `redraw` writes `sqrt(kT/m_new)·z` with the
     velocity numbers of the attempt, atom i's x, y, z then atom j's; `redraw_all` writes `sqrt(kT/m)·z` for
     atom a, component c from number `base + 3a + c`, then removes the centre-of-mass velocity.

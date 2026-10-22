@@ -375,6 +375,8 @@ class Simulation:
         self._mc_blocks = 0
         self._mc_device_ms = None  # device time of the timed blocks: each driver's first block holds its captures
         self._mc_timed_attempts = 0
+        self._mc_block_s = 0.0  # wall time of this process's MC blocks: left out of the speed line
+        self._mc_block_s_before = 0.0  # the blocks' time before a resume (simulation.json)
         self._mc_untimed = None  # the driver whose first block has not run yet
         self._frame_composition = None  # host species and masses for the frames, after a composition change
         self._status = "setup"
@@ -732,6 +734,8 @@ class Simulation:
         from fastmace.mc import driver as mc_driver
 
         previous = self._mc.state_dict() if self._mc is not None else self._mc_record
+        if self._mc is not None:
+            self._mc.detach()  # its captured attempts go with it (3-T09 follow-up)
         driver = mc_driver.MCDriver(moves, seed=self.seed)
         driver.attach(self._engine)
         if previous is not None:
@@ -745,6 +749,7 @@ class Simulation:
         """Detach the attached move set (``run(mc=None)``); its state stays for a later re-attach."""
         if self._mc is not None:
             self._mc_record = self._mc.state_dict()
+            self._mc.detach()  # its captured attempts go with it (3-T09 follow-up)
         self._mc = None
         self._mc_moves = None
         if self._engine is not None:
@@ -762,13 +767,27 @@ class Simulation:
         self._mc_record = driver.state_dict()
         self._engine.state.mc = self._mc_record
 
+    def _synchronised_time(self):
+        """``time.perf_counter()`` once the engine's queued work is done (flush, then a CUDA synchronisation)."""
+        import torch
+
+        engine = self._engine
+        engine.flush()
+        if engine.device.type == "cuda":
+            torch.cuda.synchronize(engine.device)
+        return time.perf_counter()
+
     def _run_block(self, driver, step):
-        """One MC block at ``step``, with the restart guard set while it runs (T08's ``_mc_block_active``)."""
+        """One MC block at ``step``, with the restart guard set while it runs (T08's ``_mc_block_active``). Its
+        wall time, between synchronisations (the block quiesces and reads its counters anyway), is left out of
+        the speed line."""
         self._mc_block_active = True
+        started = self._synchronised_time()
         try:
             block = driver.run_block(self._engine, step)
         finally:
             self._mc_block_active = False
+            self._mc_block_s += self._synchronised_time() - started
         if block is None:
             return
         self._mc_blocks += 1
@@ -815,7 +834,8 @@ class Simulation:
         return {"attached": self._mc is not None,
                 "record": self._mc.state_dict() if self._mc is not None else self._mc_record,
                 "ranges": [list(pair) for pair in self._mc_ranges], "blocks": self._mc_blocks,
-                "device_ms": self._mc_device_ms, "timed_attempts": self._mc_timed_attempts}
+                "device_ms": self._mc_device_ms, "timed_attempts": self._mc_timed_attempts,
+                "block_s": self._mc_block_s_before + self._mc_block_s}
 
     def _composition_changed(self):
         """Read the committed species and masses once, for every later frame (``io.trajectory``)."""
@@ -889,9 +909,9 @@ class Simulation:
                 if restart_every is not None and step % restart_every == 0:
                     self.save_restart(Path(output.directory) / RESTART_NAME)
                 if step == window_first:
-                    self._window_clock = synchronised_clock()
+                    self._window_clock = synchronised_clock() - self._mc_block_s  # MD only: blocks left out
                 elif step == window_last and self._window_clock is not None and self._report.measured is None:
-                    elapsed = synchronised_clock() - self._window_clock
+                    elapsed = synchronised_clock() - self._mc_block_s - self._window_clock
                     self._report.record_speed(elapsed / (window_last - window_first), window_first, window_last)
             self._queue.drain()
             if output is None:
@@ -915,7 +935,7 @@ class Simulation:
         recapture = getattr(engine, "recapture_warning", None)  # past the re-capture budget (3-T04)
         if recapture and recapture not in self._report.extra_warnings:
             self._report.add_warning(recapture)
-        self._report.finish(self._loop_s / self._steps_run, steps=self._steps_run)
+        self._report.finish(max(self._loop_s - self._mc_block_s, 1e-12) / self._steps_run, steps=self._steps_run)
         if self._writer is not None:
             self._writer.flush()
         self._write_metadata()
@@ -1187,15 +1207,17 @@ class Simulation:
             self._mc_ranges = [list(pair) for pair in mc["ranges"]]
             self._mc_blocks, self._mc_device_ms = int(mc["blocks"]), mc["device_ms"]
             self._mc_timed_attempts = int(mc.get("timed_attempts") or 0)
+            self._mc_block_s_before = float(mc.get("block_s") or 0.0)
             self._mc_record = mc["record"]
         if engine.state.mc is not None:  # the restart's attached move set stays attached (§7.6)
             self._resume_mc(engine.state.mc)
+        if output is not None:
+            self.output = output  # before the report, whose output line names it
         self._report = self._new_report()
         self._report.mc = self._mc_summary()
         if versions:
             self._report.add_warning(_versions_text(versions))
         if output is not None:
-            self.output = output
             self._open_output(resume_from=restart.output_indices(stored))
         self._write_metadata()
 
