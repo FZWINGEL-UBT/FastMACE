@@ -120,8 +120,10 @@ def main(argv=None):
         for row in picks:
             chosen[row["step"] // frame_every] = row
     atoms_at = read_frames_at(run, sorted(chosen))[0] if chosen else {}
-    model = simulation["model"]
-    calculator = None if args.no_energies else calc(model["label"], head=model["head"], sha256=model["sha256"])
+    calculator = None
+    if not args.no_energies:
+        model = simulation["model"]
+        calculator = calc(model["label"], head=model["head"], sha256=model["sha256"])
     rng = np.random.default_rng(args.seed)
 
     report = {"run": str(run), "frames_per_bin": args.frames_per_bin, "swaps_per_frame": args.swaps_per_frame,

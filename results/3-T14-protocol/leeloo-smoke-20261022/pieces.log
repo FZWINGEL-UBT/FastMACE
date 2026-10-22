@@ -1,0 +1,57 @@
+=== 2026-10-22T10:12:59Z fastmace run /mnt/homes/zwingel/fastmace-t14-ed55026/protocols/smoke.yaml --output /mnt/homes/zwingel/fastmace-runs/3-T14-leeloo-20261022/smoke --steps 3000 (FastMACE ed5502692e447f89afa34cb2a16d52b1818515d3)
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+W1022 12:13:50.400000 3406882 torch/_inductor/utils.py:1806] [0/0_1] Not enough SMs to use max_autotune_gemm mode
+compatibility tier: compiled, no CUDA graphs; use `fm.md` or `fastmace.ase` integrators for full speed
+relaxation: LBFGS at fixed cell, -10.248026 -> -10.250177 eV/atom in 19 steps (62.3 s), fmax 0.0082 eV/Å
+FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl432Na108Nb108O108, 756 atoms (1×1×1), 3D PBC, NVT Langevin 1 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)
+gate:    not run (opt-in: check="gate")
+mc ΔE:   float32; move-energy gate passed (worst ΔE error in k_B T_min: swap 0.0025; limit 0.01 k_B T_min at T_min 250 K; 13 configurations)
+mc:      swap O-Cl every 100, 50 attempts (exchange); accepted 0/1450; 4.77 ms/attempt over 29 blocks (device time; each attach's first block, with its captures, left out); attached over steps 124–3,000
+setup:   129 s (plan 0.0075 s, build 42 s, capture 30 s, move_energy_gate 56 s, provenance 0.015 s)
+speed:   10.5 ms/step, whole-run mean over steps 1–3,000; MD only; MC blocks: see mc
+output:  /mnt/homes/zwingel/fastmace-runs/3-T14-leeloo-20261022/smoke
+licence: ASL (non-commercial), from the label table (§4.3)
+paused at step 3000 of 5500; continue with fastmace run --resume /mnt/homes/zwingel/fastmace-runs/3-T14-leeloo-20261022/smoke
+=== 2026-10-22T10:17:18Z fastmace run --resume /mnt/homes/zwingel/fastmace-runs/3-T14-leeloo-20261022/smoke --steps 100000 (FastMACE ed5502692e447f89afa34cb2a16d52b1818515d3)
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+W1022 12:18:03.897000 3408827 torch/_inductor/utils.py:1806] [0/0_1] Not enough SMs to use max_autotune_gemm mode
+FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl432Na108Nb108O108, 756 atoms (3×3×3), 3D PBC, NVT Langevin 1 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)
+gate:    not run (opt-in: check="gate")
+mc ΔE:   float32; move-energy gate passed (worst ΔE error in k_B T_min: swap 0.0014; limit 0.01 k_B T_min at T_min 250 K; 13 configurations)
+mc:      swap O-Cl every 100, 50 attempts (exchange); accepted 0/2700; 4.75 ms/attempt over 54 blocks (device time; each attach's first block, with its captures, left out); attached over steps 124–5,500
+setup:   72 s (plan 0.013 s, build 42 s, move_energy_gate 30 s, provenance 0.011 s)
+speed:   17.6 ms/step, whole-run mean over steps 3,001–5,500; MD only; MC blocks: see mc
+output:  /mnt/homes/zwingel/fastmace-runs/3-T14-leeloo-20261022/smoke
+licence: ASL (non-commercial), from the label table (§4.3)
+mc swap: 2700 attempted, 0 impossible, 0 accepted
+compatibility tier: compiled, no CUDA graphs; use `fm.md` or `fastmace.ase` integrators for full speed
+quench 1/21: heating 520 K -> -10.250178 eV/atom in 80 steps (29.3 s)
+quench 2/21: heating 560 K -> -10.250179 eV/atom in 87 steps (1.3 s)
+quench 3/21: heating 620 K -> -10.250179 eV/atom in 92 steps (1.5 s)
+quench 4/21: heating 660 K -> -10.250179 eV/atom in 94 steps (1.3 s)
+quench 5/21: heating 720 K -> -10.250179 eV/atom in 97 steps (1.5 s)
+quench 6/21: heating 760 K -> -10.250179 eV/atom in 104 steps (1.7 s)
+quench 7/21: heating 820 K -> -10.250180 eV/atom in 110 steps (1.7 s)
+quench 8/21: heating 860 K -> -10.250179 eV/atom in 109 steps (1.5 s)
+quench 9/21: heating 920 K -> -10.250178 eV/atom in 111 steps (1.5 s)
+quench 10/21: heating 980 K -> -10.250179 eV/atom in 117 steps (1.6 s)
+quench 11/21: cooling 974 K -> -10.250177 eV/atom in 124 steps (1.7 s)
+quench 12/21: cooling 925 K -> -10.250179 eV/atom in 142 steps (2.0 s)
+quench 13/21: cooling 876 K -> -10.249704 eV/atom in 217 steps (3.0 s)
+quench 14/21: cooling 826 K -> -10.249703 eV/atom in 147 steps (2.0 s)
+quench 15/21: cooling 775 K -> -10.249087 eV/atom in 212 steps (3.0 s)
+quench 16/21: cooling 726 K -> -10.248977 eV/atom in 186 steps (2.6 s)
+quench 17/21: cooling 674 K -> -10.248265 eV/atom in 224 steps (3.4 s)
+quench 18/21: cooling 625 K -> -10.247326 eV/atom in 148 steps (2.4 s)
+quench 19/21: cooling 576 K -> -10.247328 eV/atom in 168 steps (2.6 s)
+quench 20/21: cooling 526 K -> -10.247705 eV/atom in 167 steps (2.4 s)
+quench 21/21: final 250 K -> -10.248413 eV/atom in 117 steps (1.8 s)
+quench: 21 frames, final quenched -10.248413 eV/atom, 0 not converged (/mnt/homes/zwingel/fastmace-runs/3-T14-leeloo-20261022/smoke/quench)

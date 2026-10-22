@@ -1,0 +1,94 @@
+{
+  "protocol_record_version": 1,
+  "source": "/mnt/homes/zwingel/fastmace-t14-ed55026/protocols/swap_anneal_NaNbOCl4.yaml",
+  "structure": "/mnt/homes/zwingel/fastmace-t14-ed55026/fastmace/protocols/data/NaNbOCl4_I4m_Ma2026.cif",
+  "repeat": [
+    3,
+    3,
+    3
+  ],
+  "atoms": 756,
+  "timestep_fs": 1.0,
+  "relax": {
+    "fmax": 0.01,
+    "optimizer": "LBFGS",
+    "max_steps": 5000
+  },
+  "relaxation": {
+    "optimizer": "LBFGS",
+    "fixed_cell": true,
+    "fmax_target_eV_A": 0.01,
+    "max_steps": 5000,
+    "converged": true,
+    "steps": 19,
+    "seconds": 26.54950717370957,
+    "initial_eV_atom": -10.248026054687601,
+    "energy_eV_atom": -10.250177191994178,
+    "fmax_eV_A": 0.008163957564942084
+  },
+  "quench": {
+    "min_K": 500.0,
+    "bin_K": 100.0,
+    "per_bin": 2,
+    "fmax": 0.01,
+    "optimizer": "LBFGS",
+    "max_steps": 5000
+  },
+  "quench_result": {
+    "settings": {
+      "min_K": 500.0,
+      "bin_K": 100.0,
+      "per_bin": 2,
+      "fmax": 0.01,
+      "optimizer": "LBFGS",
+      "max_steps": 5000,
+      "fixed_cell": true,
+      "selection": "thermostat target temperature; each ramp separately; evenly spaced within each bin; plus the final frame"
+    },
+    "frames": 21,
+    "frame_every": 10,
+    "trajectory_frames": 27001,
+    "quench_wall_s": 117.79438260104507,
+    "quench_seconds_sum": 117.47040938027203,
+    "not_converged": 0,
+    "heating": {
+      "n": 10,
+      "mean_eV_atom": -10.247241553364606,
+      "sd_eV_atom": 0.0037736667201132617
+    },
+    "cooling": {
+      "n": 10,
+      "mean_eV_atom": -10.238022079606536,
+      "sd_eV_atom": 0.000911678728912394
+    },
+    "final_quenched_eV_atom": -10.240948107507494
+  },
+  "mc": [
+    {
+      "move": "swap",
+      "pairs": [
+        [
+          "O",
+          "Cl"
+        ]
+      ],
+      "every": 100,
+      "attempts": 50,
+      "velocities": "exchange"
+    }
+  ],
+  "min_mc_temperature_K": 250.0,
+  "pieces": [
+    {
+      "first_step": 0,
+      "last_step": 135000,
+      "wall_s": 1825.451640076004
+    },
+    {
+      "first_step": 135000,
+      "last_step": 270000,
+      "wall_s": 1861.0237710736692
+    }
+  ],
+  "status": "complete"
+}
