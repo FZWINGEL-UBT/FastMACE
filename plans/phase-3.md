@@ -16,7 +16,10 @@ decided the same day (SPEC decisions 37 and 38). 3-T06b (397da85) and 3-T22c
 results (5a202d2) and 3-T20 (c3bf93f; items 1–3 pass) are merged too. **Freeze for
 3-T21:** main c3bf93f, whose `fastmace/` equals cd43463. 3-T16b is merged in
 ResearchModule (3cc4207f, `main.py --profile swap-anneal`). 3-T18 (coraline, when the
-workstations are back) doesn't block acceptance. 3-T11 started with 3-T09, because its gate
+workstations are back) doesn't block acceptance. **3-T21's acceptance report is merged
+(7dfa54c, `docs/validation/phase-3.md`):** every item passes on the frozen code, with
+test-side corrections only. The GPU slow tier's appendix follows before the owner's
+`fastmace-3` tag (checkpoint 3). 3-T11 started with 3-T09, because its gate
 needs T07's evaluator and T03's transactions, not T09's driver. The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
