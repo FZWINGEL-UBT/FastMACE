@@ -1394,8 +1394,15 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   - The planner never fills `state.total_charge` at construction.
   - The first block's `device_ms` includes the captures; 3-T15's cost line
     leaves it out.
-  - The swap and transmutation paths were reviewed in the trial merges only
-    through their tests.
+  - A conductor-commissioned code review (22 October 2026) found the core MC
+    logic correct: proposals, acceptance, streams, restore, momenta and
+    parity. It also found one medium bug: a second `attach()` of one driver
+    replays stale CUDA graphs. The four smaller items are a stale refresh list
+    after `add_energy_field`, the host total charge with per-atom charges,
+    species compared as given, and kB from CODATA 2018 against ASE's CODATA
+    2014. All five go to 3-T09's follow-up branch.
+- **3-T15:** the parent process doesn't check a move set that a child
+  attached before a resume (the child's own `run` still checks it).
 - **3-T07:** `test_mc_evaluator.py::test_a_force_evaluation_after_energy_only_is_unaffected[omol]`
   fails intermittently under `-n 4` load (forces not bitwise). It passes
   alone, and 3-T07 investigates on a follow-up branch.
