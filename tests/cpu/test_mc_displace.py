@@ -403,3 +403,24 @@ def test_md_after_a_rejected_block_equals_md_without_it(mace_engine, monkeypatch
         untouched.step()
     torch.testing.assert_close(engine.state.positions, untouched.state.positions, rtol=0, atol=0)
     torch.testing.assert_close(engine.state.velocities, untouched.state.velocities, rtol=0, atol=0)
+
+
+def test_simulation_runs_displacements_with_the_workload_maximum(tmp_path, monkeypatch):
+    """``Simulation.run(mc=Displace(...))`` (3-T15's front end) attaches with ``Workload.max_displacement_A``."""
+    from _support.mc_fixtures import cpu_planner, mc_simulation, tiny_loaded
+    from fastmace import integrators
+    from fastmace.planner.workload import Workload
+
+    pytest.importorskip("cuequivariance_torch")
+    cpu_planner(monkeypatch)
+    loaded = tiny_loaded(tmp_path, (11, 17))
+    workload = Workload(max_temperature_K=600.0, min_mc_temperature_K=1.0, mc_moves=("displace",),
+                        max_displacement_A=0.2)
+    sim = mc_simulation(loaded, nacl(repeat=1, rattle=0.05, seed=3), (11, 17), workload=workload,
+                        integrator=integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.01))
+    sim.run(steps=4, mc=Displace(delta_A=0.2, every=2, attempts=5))
+    assert sim.committed().step == 4
+    assert sim._mc.counters["displace"]["attempted"] == 10
+    with pytest.raises(PlanRefused) as raised:  # above the workload's maximum
+        sim.run(steps=2, mc=Displace(delta_A=0.3, every=2, attempts=5))
+    assert raised.value.codes == (dm.BEYOND_MAX_CODE,)
