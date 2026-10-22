@@ -1408,6 +1408,21 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
     `fastmace-t20-*` and `fastmace-t14-*`, never the NAS checkout;
   - the GPU must be empty before each run;
   - 3-T20's L4 job then carries items 2–3 only.
+- **3-T14's local smoke** passed every stage (fastmace/3-T14 at 2f1cfee).
+  - MD: NaNbOCl4, 756 atoms, 8.78 ms/step.
+  - MC: 4.35 ms per attempt. 0 of 2,700 O↔Cl swaps were accepted between
+    250 and 1000 K.
+  - The full run takes about 1 h. The full run's report gives the acceptance
+    per 100 K bin and the attempted ΔE in kT, so the owner can judge D3 if
+    acceptance stays near zero.
+- **The NAS `mace_cueq_oeq` has no `tomli`.** FastMACE declares it for
+  Python 3.10, but runs from a checkout on `PYTHONPATH` install nothing.
+  The NAS `mace_cueq_latest` has it only through pytest. So `fastmace run`
+  can't read TOML in the NAS hybrid environment.
+  - 3-T14 used YAML; its branch makes `fastmace run` read `.yaml`/`.yml`
+    with `safe_load`.
+  - The conductor installs `tomli` there after the leeloo runs of
+    22 October, under the package rule of 14 October.
 - **3-T03:**
   - The friction refreshes copy host floats to the device, so they are not
     capturable. This is harmless: a friction event drops the graphs anyway.
