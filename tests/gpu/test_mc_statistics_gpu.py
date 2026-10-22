@@ -265,9 +265,13 @@ def hybrid(kind, velocities, fixcm, unchanged, pair, spec):
         driver = MCDriver([move], seed=spec["seed"])
         driver.attach(engine)
     natoms = engine.state.natoms
-    # ASE's convention: with fixcm the Langevin noise is scaled by sqrt(N / (N - 1)), so the thermostat holds
-    # sum m v^2 at 3 N kT.
-    dof = 3 * natoms
+    # The degrees of freedom the thermostat fills. ASE's projection (fixcm_projection="ase"): the fixcm noise is
+    # scaled by sqrt(N / (N - 1)), so it holds sum m v^2 at 3 N kT. The mass-weighted projection (decision 37, the
+    # NVT fixcm default since 3-T22c) holds the zero-momentum subspace, (3N - 3) kT, and atom i carries
+    # 3 (1 - m_i / M) kT of it on average, so species s carries (3 n_s - 3 M_s / M) kT.
+    projection = sim.plan.decision("IntegratorConfig.fixcm_projection")[1]
+    mass_weighted = bool(fixcm and projection == "mass_weighted")
+    dof = 3 * natoms - (3 if mass_weighted else 0)
     samples = {"total": [], **{name: [] for name in symbols.values()}, "split": []}
     largest_momentum = 0.0
     scale = math.sqrt(natoms * float(engine.state.masses.mean()) * K_B_EV_PER_K * spec["temperature"])
@@ -282,7 +286,10 @@ def hybrid(kind, velocities, fixcm, unchanged, pair, spec):
             for number, name in symbols.items():
                 mask = state.species == number
                 if bool(mask.any()):
-                    per_species[name] = float(twice[mask].sum()) / (3 * int(mask.sum()) * K_B_EV_PER_K)
+                    species_dof = 3 * int(mask.sum())
+                    if mass_weighted:
+                        species_dof -= 3 * float(state.masses[mask].sum() / state.masses.sum())
+                    per_species[name] = float(twice[mask].sum()) / (species_dof * K_B_EV_PER_K)
                     samples[name].append(per_species[name])
             if len(per_species) == 2:  # T(second) - T(first): zero in equilibrium, no common mode
                 samples["split"].append(per_species[symbols[second]] - per_species[symbols[first]])
@@ -291,7 +298,7 @@ def hybrid(kind, velocities, fixcm, unchanged, pair, spec):
         if fixcm:
             momentum = (engine.state.masses * engine.state.velocities).sum(dim=0)
             largest_momentum = max(largest_momentum, float(momentum.abs().max()) / scale)
-    return dict(stats={name: ref.batch_mean(values) for name, values in samples.items()
+    return dict(fixcm_projection=projection, stats={name: ref.batch_mean(values) for name, values in samples.items()
                        if len(values) >= spec["blocks"] // 2},
                 counters=None if driver is None else driver.counters, momentum=largest_momentum,
                 seconds=time.perf_counter() - started, backend=sim.plan.engine.backend, dtype=sim.plan.precision.dtype)
