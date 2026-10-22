@@ -277,8 +277,16 @@ Merge orders where files overlap:
 - **Workstations:** none until the owner says they're back. Then only when
   nobody else is on the GPU or running active jobs, with files only under
   `/mnt/homes/zwingel`.
-- **Modal:** under the guard, at most $5 for the phase (the month stood at
-  $7.86 on 22 October).
+- **Modal:** a phase may use as much of the monthly $30 as it needs
+  (owner, 22 October 2026), but never more than the month allows. The guard
+  stops at $27, keeping the $3 reserve. The month stood at $7.86 on
+  22 October. Long untimed runs (the ASE comparison, the full protocol) may
+  move to Modal; timed items stay on the RTX 5060 Ti.
+- **Tests and merges (owner, 22 October 2026):**
+  - workers run only the test files their change touches;
+  - the full CPU suite runs once per merge, in the conductor's trial;
+  - finished branches are trial-merged in batches;
+  - one full CPU suite runs on the PC at a time.
 
 ## Conductor answers to the prestart reports (22 October 2026)
 
