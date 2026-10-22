@@ -58,7 +58,8 @@ def parse_args(argv=None):
     p.add_argument("--swap-samples", type=int, default=4)
     p.add_argument("--transmute-samples", type=int, default=2)
     p.add_argument("--displace-samples", type=int, default=8)
-    p.add_argument("--backend", choices=("hybrid", "cueq"), default="hybrid")
+    p.add_argument("--backend", choices=("auto", "hybrid", "cueq"), default="hybrid")
+    p.add_argument("--precision", choices=("float32", "float64"), default="float32", help="force precision")
     p.add_argument("--seed", type=int, default=1)
     return p.parse_args(argv)
 
@@ -94,6 +95,8 @@ def main(argv=None):
     from fastmace.model import loading
 
     oeq_runtime = str(loading.prepare_hybrid()) if args.backend == "hybrid" else None
+    if args.backend == "auto":
+        oeq_runtime = str(loading.prepare_hybrid_if_possible())
     if ab_step_time.gpu_processes():
         raise RuntimeError("GPU must be idle")
     args.output.mkdir(parents=True, exist_ok=False)
@@ -105,7 +108,7 @@ def main(argv=None):
     from fastmace.planner import selfcheck
     from fastmace.planner.workload import Workload
 
-    precision = "float32" if args.backend == "hybrid" else "float64"
+    precision = args.precision
     superset = tuple(atomic_numbers[symbol] for symbol in args.superset)
     samples = {"swap": args.swap_samples, "transmute": args.transmute_samples, "displace": args.displace_samples}
     threshold = selfcheck.move_threshold(args.min_mc_temperature_K)
@@ -144,7 +147,8 @@ def main(argv=None):
                 for temperature in args.temperatures_K:
                     key = f"{name}@{temperature:g}K"
                     entry = meta["runs"][key] = dict(structure=name, natoms=len(base), temperature_K=temperature,
-                                                     build_s=build_s, describe=plan.describe())
+                                                     build_s=build_s, plan_backend=plan.engine.backend,
+                                                     describe=plan.describe())
                     started = time.perf_counter()
                     engine.integrator.set_temperature(temperature)
                     engine.run(args.md_steps)
