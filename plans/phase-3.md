@@ -1606,6 +1606,12 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   - the conductor adopts measured, performance-only defaults without a
     checkpoint (like rule 9). This needs the owner's decision, while physics
     and protocol defaults stay with the owner;
+  - acceptance-only tests don't run at merges, so they go stale. 3-T21 found 6
+    on leeloo: test_fallback_gpu still expected the old "eager" first
+    fallback, from before 3-T06's order, and test_engine_gpu compared kernel
+    sequences that the fused integrator changed before phase 3. A task that
+    changes behaviour covered by acceptance tests should update and run the
+    affected ones;
   - GPU launches without refusals:
     - an allow rule for a fixed local-GPU launcher, never for
       `ssh <workstation>`;
