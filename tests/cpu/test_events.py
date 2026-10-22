@@ -498,11 +498,23 @@ def test_committed_carries_species_masses_and_charges(loaded):
 
 def test_charges_need_a_model_that_takes_them(loaded):
     sim = simulation(loaded)
+    engine = sim._engine
     with pytest.raises(ValueError, match="charges"):
         sim.set_charges(np.zeros(8))
-    with pytest.raises(ValueError, match="total charge"):
-        sim.set_charges(None, total_charge=1.0)
-    assert sim._engine.state_version == (0, 0)
+    assert engine.state_version == (0, 0)
+    if "force_field.total_charge" not in engine.derived:  # before 3-T02, or a model without a total charge
+        with pytest.raises(ValueError, match="total charge"):
+            sim.set_charges(None, total_charge=1.0)
+        assert engine.state_version == (0, 0)
+        return
+    # 3-T02's total-charge buffer: a rejected change restores it, an accepted one moves it.
+    engine.canonicalise()
+    before = registered(engine)
+    Transaction(engine, [Event("charges", values={"total_charge": 1.0})], evaluate=lambda eng: "rejected").run()
+    assert_same_registered_state(registered(engine), before)
+    sim.set_charges(None, total_charge=1.0)
+    assert float(engine.derived["force_field.total_charge"].buffer.reshape(-1)[0]) == 1.0
+    assert engine.state_version == (0, 1)
 
 
 @pytest.mark.skipif(_has_superset_check(), reason="3-T02 merged: the species tests below apply")

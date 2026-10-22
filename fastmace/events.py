@@ -347,7 +347,9 @@ class Transaction:
                     raise ValueError("this model takes no per-atom charges")
                 charges = self._array(charges, "charges", count)
             if total is not None:
-                if getattr(self.engine.force_field, "set_total_charge", None) is None:
+                field = self.engine.force_field
+                buffers = getattr(field, "derived_buffers", dict)()
+                if getattr(field, "set_total_charge", None) is None or "total_charge" not in buffers:
                     raise ValueError("this model takes no total charge")
                 total = float(total)
                 if not np.isfinite(total):
@@ -456,7 +458,8 @@ class Transaction:
             # The force field's device total is base + (sum of charges - their sum at the base), so that 3-T09's
             # transmutations change it inside a graph through state.charges; a host total moves the base (3-T02).
             field = self.engine.force_field
-            self._snapshot.setdefault("total_charge", getattr(field, "charge", state.total_charge))
+            previous = field.derived_buffers()["total_charge"]
+            self._snapshot.setdefault("total_charge", float(previous.reshape(-1)[0]))  # host sync: a host event
             field.set_total_charge(total)
             state.total_charge = total
         self.changed.add("charges")
