@@ -205,6 +205,6 @@ def test_every_remote_call_is_behind_the_guard():
                     pytest.fail(f"{node.name} calls .remote outside a guarded launch")
     launchers = [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)
                  and any(isinstance(c, ast.FunctionDef) and c.name == "launch" for c in n.body)]
-    assert {n.name for n in launchers} == {"upload", "_job"}
+    assert {n.name for n in launchers} == {"upload", "listing", "_job"}
     for launcher in launchers:
         assert any(isinstance(c, ast.Call) and getattr(c.func, "id", "") == "_guarded" for c in ast.walk(launcher))
