@@ -264,11 +264,87 @@ def test_rule_10_stress_and_headroom_follow_the_integrator():
     assert (nvt.polar.kspace_headroom, npt.polar.kspace_headroom) == (0.0, 0.1)
 
 
-def test_rule_11_records_max_temperature_and_keeps_the_1a_skin():
-    plan = plan_label("mh1-r2scan", workload=Workload(max_temperature_K=2500.0))
+def _rule_11(plan, atoms, integrator, workload, masses):
+    from fastmace.neighbors.adaptive import rule_11
+
+    return rule_11(max_temperature_K=workload.max_temperature_K, lightest_mass_u=min(masses),
+                   timestep_fs=integrator.timestep_fs, natoms=len(atoms), cutoff_A=tp.traits("mh1-r2scan").r_max,
+                   edge_bucket_fraction=plan.neighbours.edge_bucket_fraction,
+                   max_displacement_A=workload.max_displacement_A)
+
+
+MC_SWAP = dict(species_changes=True, mc_moves=("swap",), min_mc_temperature_K=300.0)
+
+
+def test_rule_11_md_only_keeps_the_1a_skin_and_records_the_rule():
+    """Conductor answer 3-T05 1-2: MD-only workloads keep 0.3 Å and 1.15; the decision shows the rule's value."""
+    workload = Workload(max_temperature_K=2500.0)
+    integrator = IntegratorConfig(timestep_fs=1.0)
+    plan = plan_label("mh1-r2scan", integrator=integrator, workload=workload)
     assert plan.workload.max_temperature_K == 2500.0
-    assert plan.neighbours.skin == DEFAULT_SKIN_A  # NeighbourConfig().skin is "auto" since 3-T01
-    assert "phase 3" in plan.decision("workload.max_temperature_K")[2]
+    assert plan.neighbours.skin == DEFAULT_SKIN_A
+    assert (plan.neighbours.headroom, plan.neighbours.capacity_headroom) == ("fixed", 1.15)
+    sized = _rule_11(plan, nacl(), integrator, workload, nacl().get_masses())
+    assert sized.skin_A > 3 * DEFAULT_SKIN_A  # the rule would raise it
+    item, choice, reason = plan.decision("NeighbourConfig.skin")
+    assert choice == "0.3 A" and f"rule 11 would give {sized.skin_A:g} A" in str(reason)
+    assert plan.decision("workload.max_temperature_K")[2].code == "rule-11-md-only"
+    assert "phase 3" not in str(plan.decision("workload.max_temperature_K")[2])
+
+
+def test_rule_11_sizes_the_skin_headroom_and_budget_of_mc_workloads():
+    workload = Workload(max_temperature_K=1500.0, **MC_SWAP)
+    integrator = IntegratorConfig(timestep_fs=1.0)
+    atoms = nacl()
+    plan = plan_label("mh1-r2scan", atoms=atoms, integrator=integrator, workload=workload)
+    sized = _rule_11(plan, atoms, integrator, workload, atoms.get_masses())
+    assert sized.skin_A > DEFAULT_SKIN_A
+    assert plan.neighbours.skin == sized.skin_A
+    assert (plan.neighbours.headroom, plan.neighbours.capacity_headroom) == ("fixed", sized.capacity_headroom)
+    # The budget is 3-T04's rule (the variant cap); the decision names rule 11's bucket count.
+    assert plan.engine.recapture_budget == plan.engine.graph_variant_cap
+    budget_reason = str(plan.decision("EngineConfig.recapture_budget")[2])
+    assert f"at most {sized.recapture_budget} padded edge buckets" in budget_reason
+    reason = plan.decision("NeighbourConfig.skin")[2]
+    assert reason.code == "rule-11" and reason.rule == 11
+    assert plan.decision("workload.max_temperature_K")[2].code == "rule-11"
+    assert f"{sized.lightest_mass_u:g} u" in str(plan.decision("workload.max_temperature_K")[2])
+
+
+def test_rule_11_lightest_mass_includes_the_superset():
+    """Answer 5: the lightest of the structure's masses and the superset species' standard masses (O here)."""
+    from ase.data import atomic_masses
+
+    workload = Workload(max_temperature_K=1500.0, **MC_SWAP)
+    integrator = IntegratorConfig(timestep_fs=1.0)
+    plan = plan_label("mh1-r2scan", integrator=integrator, workload=workload, species=["Na", "Cl", "O"])
+    sized = _rule_11(plan, nacl(), integrator, workload, [atomic_masses[8]])
+    assert sized.lightest_mass_u == atomic_masses[8]
+    assert plan.neighbours.skin == sized.skin_A
+
+
+def test_rule_11_displacement_skin():
+    workload = Workload(max_temperature_K=300.0, mc_moves=("displace",), min_mc_temperature_K=300.0,
+                        max_displacement_A=0.25)
+    plan = plan_label("mh1-r2scan", workload=workload)
+    sized = _rule_11(plan, nacl(), IntegratorConfig(), workload, nacl().get_masses())
+    assert sized.md_skin_A == DEFAULT_SKIN_A and plan.neighbours.skin == sized.skin_A == DEFAULT_SKIN_A + 0.5
+
+
+def test_rule_11_keeps_explicit_values():
+    """Rule 11 is a preference: an explicit skin, a fixed headroom and an explicit budget are kept."""
+    from fastmace.config import NeighbourConfig
+
+    workload = Workload(max_temperature_K=1500.0, **MC_SWAP)
+    planner = minimal(neighbours=NeighbourConfig(skin=0.4, headroom="fixed", capacity_headroom=1.3),
+                      engine=EngineConfig(recapture_budget=5))
+    plan = plan_label("mh1-r2scan", workload=workload, planner=planner)
+    assert (plan.neighbours.skin, plan.neighbours.capacity_headroom, plan.engine.recapture_budget) == (0.4, 1.3, 5)
+
+
+def test_rule_11_evaluation_plans_keep_the_1a_skin():
+    plan = minimal().plan_evaluation_traits(tp.traits("mh1-r2scan"), nacl(), GPU, precision="float32")
+    assert plan.neighbours.skin == DEFAULT_SKIN_A and plan.neighbours.capacity_headroom == 1.15
 
 
 # --------------------------------------------------------------------------- backend and process family

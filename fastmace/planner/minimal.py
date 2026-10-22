@@ -30,8 +30,10 @@ What 1b decides (the rules of §9.3 that have their tiers in 1b):
   is respected (§8.7): the first compiled plan fixes it, a later plan of the other family raises
   ``ProcessConstraintError``;
 - **preferences in 1b**: rule 9 keeps the graph tier with a host sync at each callback (D6),
-  rule 10 takes the stress path and k-vector headroom from the integrator, rule 11 records
-  ``max_temperature_K`` and keeps 1a's skin and buckets. Rules 8 and 12 are not in 1b.
+  rule 10 takes the stress path and k-vector headroom from the integrator, rule 11 (3-T05)
+  sizes the skin, pair-buffer headroom and re-capture budget of MC and species-change workloads
+  (``neighbors.adaptive``) and records what it would give MD-only ones, which keep 1a's sizes.
+  Rule 12 is not in 1b.
 
 The rewrite set and the engine options come from 1a's resolution (``FixedPlanner._resolve``),
 unchanged: the minimal plan of a ``main.py`` configuration has the rewrites and engine options of
@@ -485,13 +487,16 @@ class MinimalPlanner:
             backend = self._backend(book, software, engine, workload.reproducible)
         superset, precision, requested = self._common(book, traits, atoms, species, precision, software, backend[0],
                                                       allow_naive_cueq, loaded)
-        self._workload_decisions(book, workload, mode, given)
+        rule_11 = self._rule_11(traits, atoms, superset, integrator, workload)
+        self._workload_decisions(book, workload, rule_11, mode, given)
         if reference:
-            parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend)
+            parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend,
+                                          rule_11)
         else:
             parts = self._fixed(rewrites, precision, engine)._resolve(book, traits, atoms, integrator, hardware,
                                                                       backend_choice=backend, texts=TEXTS,
-                                                                      reproducible=workload.reproducible)
+                                                                      reproducible=workload.reproducible,
+                                                                      rule_11=rule_11)
         if mode == "eager":
             self._eager(book, parts, traits)
         elif mode == fixed.COMPILED_TIER:
@@ -507,7 +512,7 @@ class MinimalPlanner:
         plan = self._claim_family(plan, f"a {plan.engine.backend} MD plan", offer_runner=True)
         return plan
 
-    def _reference_parts(self, book, traits, atoms, integrator, hardware, rewrites, precision, backend):
+    def _reference_parts(self, book, traits, atoms, integrator, hardware, rewrites, precision, backend, rule_11=None):
         """The reference tier's plan parts (plan task 2-T03): 1a's resolution on the uncompiled stock backend,
         then every rewrite off, no capture, no pipelining, and the graph tier's padding refusals lifted."""
         from fastmace.reference import records
@@ -517,7 +522,7 @@ class MinimalPlanner:
                                      cueq_conv_fusion="on" if records.STOCK["cueq_conv_fusion"] else "off")
         inner = fixed._Book()
         parts = self._fixed(rewrites, precision, engine)._resolve(inner, traits, atoms, integrator, hardware,
-                                                                  backend_choice=backend, texts=TEXTS)
+                                                                  backend_choice=backend, texts=TEXTS, rule_11=rule_11)
         book.refusals.extend(reason for reason in inner.refusals if reason.code not in REFERENCE_LIFTS)
         toggles = [name for name in fixed.REWRITE_FIELDS if getattr(parts["rewrites"], name) in ("on", "off")]
         replaced = {"tier": (REFERENCE_TIER, REFERENCE_REASONS["tier"]),
@@ -622,10 +627,34 @@ class MinimalPlanner:
                      requested=tuple(entry for entry in parts["requested"]
                                      if entry in own or not entry[0].startswith("EngineConfig.")))
 
-    def _workload_decisions(self, book, workload, mode="graph", given=True):
-        book.decide("workload.max_temperature_K", f"{workload.max_temperature_K:g} K", Reason(
-            "recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3",
-            code="max-temperature-recorded"))
+    def _rule_11(self, traits, atoms, superset, integrator, workload):
+        """``(applies, Rule11)``: rule 11's sizes for the workload, and whether they are used (3-T05).
+
+        The lightest mass is the lightest of the structure's masses and the superset species' standard
+        masses (conductor answer 3-T05 5). The rule applies to workloads with MC moves or declared
+        species changes; MD-only plans keep phase 1a's sizes (answer 1-2).
+        """
+        from ase.data import atomic_masses
+
+        from fastmace.neighbors.adaptive import rule_11
+
+        masses = [float(mass) for mass in atoms.get_masses()] + [float(atomic_masses[z]) for z in superset]
+        sized = rule_11(max_temperature_K=workload.max_temperature_K, lightest_mass_u=min(masses),
+                        timestep_fs=integrator.timestep_fs, natoms=len(atoms),
+                        cutoff_A=float(traits.r_max) if traits.r_max else None,
+                        edge_bucket_fraction=self.neighbours.edge_bucket_fraction,
+                        max_displacement_A=workload.max_displacement_A)
+        return bool(workload.mc_moves or workload.species_changes), sized
+
+    def _workload_decisions(self, book, workload, rule_11, mode="graph", given=True):
+        applies, sized = rule_11
+        if applies:
+            why = Reason(f"rule 11 sizes the skin and headroom: {sized.text()}", rule=11,
+                         code="rule-11")
+        else:
+            why = Reason(f"MD only: phase 1a's skin and headroom; rule 11 would give {sized.text()} (it applies to "
+                         "MC and species-change workloads)", rule=11, code="rule-11-md-only")
+        book.decide("workload.max_temperature_K", f"{workload.max_temperature_K:g} K", why)
         every = workload.host_callbacks_every
         if every is None:
             book.decide("workload.host_callbacks_every", "none", Reason("no host callbacks", code="no-host-callbacks"))

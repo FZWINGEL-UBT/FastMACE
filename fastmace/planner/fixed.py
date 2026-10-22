@@ -382,13 +382,14 @@ class FixedPlanner:
         return Plan(**parts, reason="fixed plan of phase 1a (main.py)")
 
     def _resolve(self, book, traits, atoms, integrator, hardware, *, backend_choice=None, evaluation=False,
-                 texts=None, reproducible=False):
+                 texts=None, reproducible=False, rule_11=None):
         """The plan's parts (``Plan`` keywords except the reason), decisions and refusals in ``book``.
 
         Shared with the minimal planner (1b-T12): ``backend_choice`` is its backend rule;
         ``evaluation`` plans a one-off compiled evaluation with stress (no integrator, no graph
         tier, so exact padding is not required); ``texts`` maps a refusal code to a function that
-        rewrites its text; ``reproducible`` (minimal planner, rule 5) takes the unfused convolution.
+        rewrites its text; ``reproducible`` (minimal planner, rule 5) takes the unfused convolution;
+        ``rule_11`` (minimal planner, 3-T05) is ``(applies, neighbors.adaptive.Rule11)`` for the workload.
         """
         from fastmace.longrange import polar as longrange
         from fastmace.model.capabilities import ModelTraits, model_traits
@@ -504,7 +505,8 @@ class FixedPlanner:
             book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
                         "fixed cell: the graph engine computes no stress")
 
-        phase_3 = self._phase_3_fields(book, dtype, polar=bool(traits.polar), npt=npt, evaluation=evaluation)
+        phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
+                                       evaluation=evaluation)
         return dict(
             tier="compiled" if evaluation else TIER,
             rewrites=dataclasses.replace(rewrites, **rewrite_values),
@@ -522,10 +524,15 @@ class FixedPlanner:
             auto_options_off=tuple(values["_auto_off"].items()),
         )
 
-    def _phase_3_fields(self, book, dtype, *, polar=False, npt=False, evaluation=False):
-        """The phase 3 "auto" fields (plan task 3-T01), resolved to today's behaviour until their tasks give
-        the rules: rule 11's skin and headroom (3-T05), the re-capture budget (3-T04) and the MC energy
-        precision (3-T11, which changes it only for MC plans).
+    def _phase_3_fields(self, book, dtype, rule_11=None, *, polar=False, npt=False, evaluation=False):
+        """The phase 3 "auto" fields (plan task 3-T01): rule 11's skin and headroom (3-T05), the re-capture
+        budget (3-T04) and the MC energy precision (3-T11, which changes it only for MC plans).
+
+        ``rule_11`` is ``(applies, Rule11)`` from the minimal planner, which knows the workload. Rule 11
+        sizes the "auto" skin and headroom only where it applies: workloads with MC moves or declared
+        species changes (conductor answer 3-T05). Elsewhere, and without a workload (this planner's own
+        plans, evaluations), "auto" keeps phase 1a's skin and headroom, and the decision records what the
+        rule would have given.
 
         The re-capture budget (3-T04): the variant cap. A run that has re-captured as many graphs as it may
         hold at once has cycled through its whole working set of edge sizes and stages, so its variants do
@@ -533,19 +540,42 @@ class FixedPlanner:
         GPU or structure. With PolarMACE and a variable cell the plan also records the per-step k-vector
         check, one host sync after every force stage (3-T04, conductor answer 1)."""
         n, e, p = self.neighbours, self.engine, self.precision
-        skin = DEFAULT_SKIN_A if n.skin == "auto" else n.skin
-        book.decide("NeighbourConfig.skin", f"{skin:g} A", _why(
-            "auto" if n.skin == "auto" else n.skin, AUTO_RULES["NeighbourConfig.skin"],
-            "phase 1a's skin until rule 11 (3-T05)"))
-        headroom = "fixed" if n.headroom == "auto" else n.headroom
-        book.decide("NeighbourConfig.headroom", headroom, _why(
-            n.headroom, AUTO_RULES["NeighbourConfig.headroom"],
-            "capacity_headroom and edge_bucket_fraction as given until rule 11 (3-T05)"))
+        applies, sized = rule_11 if rule_11 is not None else (False, None)
+        neighbours = {}
+        if n.skin != "auto":
+            skin, why = n.skin, _why(n.skin, AUTO_RULES["NeighbourConfig.skin"], "kept as given (rule 11 is a "
+                                     "preference)")
+        elif applies:
+            skin, why = sized.skin_A, Reason(_why("auto", AUTO_RULES["NeighbourConfig.skin"], sized.text()),
+                                             rule=11, code="rule-11")
+        else:
+            skin = DEFAULT_SKIN_A
+            would = "" if sized is None else f"; rule 11 would give {sized.skin_A:g} A"
+            why = Reason(_why("auto", AUTO_RULES["NeighbourConfig.skin"],
+                              "phase 1a's skin: rule 11 sizes only MC and species-change workloads" + would),
+                         rule=11, code="rule-11-fixed")
+        book.decide("NeighbourConfig.skin", f"{skin:g} A", why)
+        neighbours["skin"] = skin
+        if n.headroom == "auto" and applies:
+            neighbours["capacity_headroom"] = sized.capacity_headroom
+            book.decide("NeighbourConfig.headroom", "fixed", Reason(_why(
+                "auto", AUTO_RULES["NeighbourConfig.headroom"],
+                f"capacity_headroom {sized.capacity_headroom:g} from the skin, edge_bucket_fraction as given"),
+                rule=11, code="rule-11"))
+        else:
+            would = (f"; rule 11 would give {sized.capacity_headroom:g}"
+                     if n.headroom == "auto" and sized is not None else "")
+            book.decide("NeighbourConfig.headroom", "fixed", _why(
+                n.headroom, AUTO_RULES["NeighbourConfig.headroom"],
+                f"capacity_headroom {n.capacity_headroom:g} and edge_bucket_fraction as given" + would))
+        neighbours["headroom"] = "fixed"
         budget = e.graph_variant_cap if e.recapture_budget == "auto" else e.recapture_budget
+        buckets = ("" if not applies or sized.recapture_budget is None else
+                   f"; rule 11 expects at most {sized.recapture_budget} padded edge buckets inside the capacity")
         book.decide("EngineConfig.recapture_budget", str(budget), _why(
             "auto" if e.recapture_budget == "auto" else e.recapture_budget, AUTO_RULES["EngineConfig.recapture_budget"],
             f"the graph variant cap ({e.graph_variant_cap}): past it the run warns, records and the report "
-            "recommends the compiled tier (3-T04)"))
+            "recommends the compiled tier (3-T04)" + buckets))
         if polar and npt and not evaluation:
             book.decide("overflow check", "per step", "PolarMACE with a variable cell: the k-vector flag is read "
                         "after every force stage, one host sync per step (3-T04)")
@@ -553,7 +583,7 @@ class FixedPlanner:
         book.decide("PrecisionConfig.mc_energy", mc_energy, _why(
             p.mc_energy, AUTO_RULES["PrecisionConfig.mc_energy"],
             "the force precision: no MC energies before the move-energy gate (3-T11)"))
-        return {"neighbours": {"skin": skin, "headroom": headroom}, "engine": {"recapture_budget": budget},
+        return {"neighbours": neighbours, "engine": {"recapture_budget": budget},
                 "precision": {"mc_energy": mc_energy}}
 
     def _requested(self):
