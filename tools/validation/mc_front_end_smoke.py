@@ -74,7 +74,7 @@ def main(argv=None):
     record = dict(tool="mc_front_end_smoke", created_utc=datetime.now(timezone.utc).isoformat(),
                   host=os.uname().nodename, python=sys.executable, fastmace_commit=args.commit,
                   model=args.model, checkpoint=str(checkpoint), checkpoint_sha256=ab_step_time._sha256(checkpoint),
-                  gpu=torch.cuda.get_device_name(0), torch=torch.__version__, temperature_K=args.temperature_K,
+                  torch=torch.__version__, temperature_K=args.temperature_K,
                   steps=args.steps, resume_steps=args.resume_steps, every=args.every, attempts=args.attempts,
                   seed=args.seed, oeq_runtime=hybrid, status="running")
     path = args.output / "smoke.json"
@@ -93,6 +93,7 @@ def main(argv=None):
         result = md(atoms, model=loaded, temperature_K=args.temperature_K, steps=args.steps, mc=swap,
                     output=output, seed=args.seed)
         record["md_s"] = time.perf_counter() - started
+        record["gpu"] = torch.cuda.get_device_name(0)  # only now: the engine configures the allocator first
         sim = result.simulation
         plan = sim.plan
         record.update(tier=plan.tier, backend=plan.engine.backend if plan.engine is not None else None,
