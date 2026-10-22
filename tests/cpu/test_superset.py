@@ -270,3 +270,35 @@ def test_rewrites_follow_the_superset_columns():
     assert ff.model.interactions[0].first_reassociation.columns.tolist() == [0, 1, 2, 3]
     assert ff.info()["species_columns"] == [0, 1, 2, 3] and ff.info()["superset"] == list(SUPERSET)
 
+
+
+def test_refreshes_read_the_engine_state_when_given():
+    """3-T03's engine passes its SimulationState: the transaction then writes state.species only."""
+    from fastmace.state import SimulationState
+
+    calc, atoms = calculator(), structure()
+    ff = field(calc, atoms, MH1_PACKAGE)
+    state = SimulationState.from_atoms(atoms, ff.device, 1)
+    registry = DerivedStateRegistry()
+    ff.register_derived(registry, state)
+    assert ff.atomic_numbers is state.species
+    target = mutated(atoms)
+    state.species.copy_(torch.as_tensor(target.numbers))
+    refresh(registry, ["species"])
+    fresh = field(calc, target, MH1_PACKAGE)
+    for a, b in zip(outputs(ff, target), outputs(fresh, target)):
+        assert torch.equal(a, b)
+    with pytest.raises(ValueError, match="differs"):
+        ff.use_sources(torch.as_tensor(atoms.numbers, dtype=torch.int64))
+
+
+def test_a_host_total_charge_change_sets_the_baseline():
+    calc, atoms = calculator("residual", embedding_specs=JOINT_SPECS), structure()
+    ff = field(calc, atoms, GENERIC, charge=0, spin_multiplicity=1)
+    registry = DerivedStateRegistry()
+    ff.register_derived(registry)
+    ff.set_total_charge(2)
+    refresh(registry, ["charges"])
+    fresh = field(calc, atoms, GENERIC, charge=2, spin_multiplicity=1)
+    for a, b in zip(outputs(ff, atoms), outputs(fresh, atoms)):
+        assert torch.equal(a, b)

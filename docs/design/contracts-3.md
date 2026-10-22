@@ -113,7 +113,9 @@ Added by 3-T02 under the conductor's answers (`plans/phase-3.md`, "3-T02 species
 | `MACEForceField.superset`, `.species_columns` | tuples | the superset (by model column) and its `node_attrs` columns; the compile key of species-dependent rewrites |
 | `MACEForceField.atomic_numbers`, `.charges` | device tensors, (N,) int64 and float64 | what a transaction writes (3-T03); every derived buffer below is refreshed from them |
 | `MACEForceField.check_species(numbers)` | host | raises `SpeciesNotInSuperset` (rule 2, code `species-not-in-superset`) before anything is written; a wrong length raises `ValueError` |
-| `MACEForceField.register_derived(registry, prefix="force_field")` | → list of `DerivedBuffer` | registers `node_attrs`, `node_e0`, `sender_groups` (species), `total_charge`, `total_spin` and `species_feats.interactions.<i>` (charges), in that order. Each refresh runs on the device, in place, at fixed addresses, without host synchronisation |
+| `MACEForceField.register_derived(registry, state=None, prefix="force_field")` | → list of `DerivedBuffer`; with `state` (the engine's, 3-T03) the refreshes read `state.species` and `state.charges` (`use_sources`) | registers `node_attrs`, `node_e0`, `sender_groups` (species), `total_charge`, `total_spin` and `species_feats.interactions.<i>` (charges), in that order. Each refresh runs on the device, in place, at fixed addresses, without host synchronisation |
+| `MACEForceField.use_sources(species, charges=None)` | device tensors | alias the species and per-atom charge sources; their values must be the current ones |
+| `MACEForceField.set_total_charge(total_charge)` | host, between replays | a host total-charge event: the next `total_charge` refresh gives exactly this value; transmutations change only the per-atom charges, and the device refresh follows them |
 | `MACEForceField.derived_buffers()` | → `{name: tensor}` | the same buffers without the prefix |
 | `fastmace.rewrites.registry.structure_inputs(batch, species_columns=None)` | → `Context.inputs` | `node_attrs`, the per-graph `joint_features` (`JOINT_FEATURES = ("total_charge", "total_spin")`) and the superset columns |
 

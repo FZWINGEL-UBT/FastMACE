@@ -335,7 +335,9 @@ def test_force_field_superset_contract():  # §8.5 species superset (3-T02)
 
     assert "species" in _keyword_only(MACEForceField)
     assert _parameters(MACEForceField.check_species) == ["self", "numbers"]
-    assert _parameters(MACEForceField.register_derived) == ["self", "registry", "prefix"]
+    assert _parameters(MACEForceField.register_derived) == ["self", "registry", "state", "prefix"]
+    assert _parameters(MACEForceField.use_sources) == ["self", "species", "charges"]
+    assert _parameters(MACEForceField.set_total_charge) == ["self", "total_charge"]
     assert _parameters(MACEForceField.derived_buffers) == ["self"]
     assert _parameters(reg.structure_inputs) == ["batch", "species_columns"]
     assert reg.JOINT_FEATURES == ("total_charge", "total_spin")

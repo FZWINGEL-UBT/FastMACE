@@ -638,7 +638,7 @@ class MACEForceField:
         """The derived device buffers by name (without the ``force_field.`` prefix of ``register_derived``)."""
         return {name: buffer for name, buffer, _, _ in self._derived()}
 
-    def register_derived(self, registry, prefix="force_field"):
+    def register_derived(self, registry, state=None, prefix="force_field"):
         """Register every derived buffer with its refresh function in ``registry`` (a
         ``fastmace.events.DerivedStateRegistry``) as ``<prefix>.<name>``.
 
@@ -649,9 +649,45 @@ class MACEForceField:
         charge and spin, and each reassociated interaction's sender-feature table (identity basis;
         OMOL-0's joint embedding reads the total charge and spin, so it follows them). The
         neighbour list reads the sender groups at its next build.
+
+        ``state`` (a ``SimulationState``; the engine passes it, 3-T03): the refreshes then read the
+        committed ``state.species`` and, when the model takes them, ``state.charges`` instead of the
+        force field's own buffers (``use_sources``), so a transaction writes the state only.
         """
+        if state is not None:
+            self.use_sources(state.species, getattr(state, "charges", None))
         return [registry.register(f"{prefix}.{name}", buffer, refresh, depends)
                 for name, buffer, refresh, depends in self._derived()]
+
+    def use_sources(self, species, charges=None):
+        """Read the species ((N,) int64 atomic numbers) and per-atom charges ((N,) float64) from these
+        device tensors from now on (aliases, not copies). Their values must be this force field's
+        current ones: the total-charge baseline is taken from ``charges`` here."""
+        import torch
+
+        if species.shape != self.atomic_numbers.shape or species.dtype != torch.int64:
+            raise ValueError(f"species source must be int64 {tuple(self.atomic_numbers.shape)}, got "
+                             f"{species.dtype} {tuple(species.shape)}")
+        if not torch.equal(species.to(self.atomic_numbers.device), self.atomic_numbers):
+            raise ValueError("the species source differs from the force field's current species")
+        self.atomic_numbers = species
+        if charges is not None:
+            if charges.shape != self.charges.shape:
+                raise ValueError(f"charges source must have shape {tuple(self.charges.shape)}, got "
+                                 f"{tuple(charges.shape)}")
+            self.charges = charges
+            torch.sum(self.charges, dim=0, keepdim=True, out=self._charge_sum0)
+
+    def set_total_charge(self, total_charge):
+        """A host event's new total charge (3-T03's ``set_charges(total_charge=...)``): the device baseline
+        is set so that the next ``total_charge`` refresh gives exactly ``total_charge`` for the current
+        per-atom charges. Host side, between replays (it reads the charge sum); transmutations change
+        the per-atom charges only, and their refresh follows on the device."""
+        if "total_charge" not in self._charge_base:
+            raise ValueError("this model takes no total charge")
+        self._charge_base["total_charge"].fill_(float(total_charge))
+        torch_sum = self.charges.sum(dim=0, keepdim=True)
+        self._charge_sum0.copy_(torch_sum)
 
     # ------------------------------------------------------------------ graph level
 
