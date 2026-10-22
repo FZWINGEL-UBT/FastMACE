@@ -13,8 +13,13 @@ backend, and the energies of both precisions against the MD energy.
         --checkpoint ~/models/mace-mh-1.model --structure NaCl --output results/3-T07-<machine>-<date>/NaCl
 
 Hybrid float32 by default. Use an otherwise idle GPU. Output: <output>/metadata.json. Later tasks add
-their rows (swap and transmutation attempts: 3-T09; displacements with and without a trial rebuild:
-3-T10) as further sides.
+their rows (displacements with and without a trial rebuild: 3-T10) as further sides.
+
+3-T09's rows (``--swap A-B``, default the structure's two lightest species): one captured swap attempt
+(propose, apply, refresh, energy, accept mask, restore; ``fastmace.mc.MCDriver``) per evaluator precision,
+timed like the others. The decisions are forced to reject while timing (the same kernels run; the state
+stays). Afterwards one real block of ``--block-attempts`` swaps per precision at the run's temperature
+records its device time (CUDA events) and counters.
 """
 
 from __future__ import annotations
@@ -53,6 +58,8 @@ def parse_args(argv=None):
     p.add_argument("--block", type=int, default=100)
     p.add_argument("--rounds", type=int, default=12)
     p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--swap", default=None, help="swap pair A-B (symbols); default the two lightest species")
+    p.add_argument("--block-attempts", type=int, default=50)
     return p.parse_args(argv)
 
 
@@ -73,6 +80,47 @@ class EnergySide:
 
     def synchronize(self):
         self.torch.cuda.synchronize()
+
+
+class SwapSide:
+    """One captured swap attempt (``MCDriver``'s replay) as a ``TimedEngine``: one "step" is one attempt."""
+
+    def __init__(self, driver, engine, torch):
+        self.driver, self.engine, self.torch = driver, engine, torch
+        self.replay = None
+
+    def step(self):
+        self.replay()
+
+    def prepare_block(self):
+        # Untimed: the block's baseline and stream start; the attempt for the current edges (captured once).
+        from fastmace.mc.driver import K_B_EV_PER_K
+
+        driver, engine = self.driver, self.engine
+        engine.flush()
+        driver.streams.kT.fill_(K_B_EV_PER_K * float(engine.integrator.temperature_K))
+        driver.streams.baseline.copy_(driver.evaluator.baseline().reshape(1))
+        driver.streams.start(driver.offsets)
+        self.replay = driver._replay(0)
+
+    def finish_block(self):
+        pass
+
+    def synchronize(self):
+        self.torch.cuda.synchronize()
+
+
+def swap_pair(atoms, text):
+    """The swap pair: ``A-B`` symbols, or the structure's two lightest species."""
+    if text:
+        first, second = text.split("-")
+        return first, second
+    from ase.data import chemical_symbols
+
+    numbers = sorted(set(int(z) for z in atoms.numbers))
+    if len(numbers) < 2:
+        raise ValueError("a swap needs two species in the structure")
+    return chemical_symbols[numbers[0]], chemical_symbols[numbers[1]]
 
 
 def round_order(names, index):
@@ -177,6 +225,30 @@ def main(argv=None):
                 raise RuntimeError(f"no float64 copy: {errors}")
 
             add("energy_float64", copy)
+        # 3-T09: swap attempts per evaluator precision, decisions forced to reject while timing.
+        import fastmace.mc.moves as mc_moves
+        from fastmace.mc import MCDriver, Swap
+
+        pair = swap_pair(base, args.swap)
+        meta["swap_pair"] = list(pair)
+        metropolis = mc_moves.metropolis
+        mc_moves.metropolis = lambda u, excess, kT: torch.zeros_like(u, dtype=torch.bool)
+        drivers = {}
+        for side, evaluator in evaluators.items():
+            name = "swap_" + evaluator.precision
+            torch.cuda.synchronize()
+            started = time.perf_counter()
+            driver = MCDriver([Swap([pair], every=1, attempts=1)], seed=args.seed)
+            driver.attach(engine, evaluator=evaluator)
+            sides[name] = SwapSide(driver, engine, torch)
+            sides[name].prepare_block()
+            sides[name].step()  # captures
+            torch.cuda.synchronize()
+            drivers[name] = driver
+            meta["sides"][name] = dict(setup_s=time.perf_counter() - started, evaluator=side,
+                                       info=driver.info())
+            save()
+        mc_moves.metropolis = metropolis
         names = tuple(sides)
         blocks = {name: [] for name in names}
         for index in range(args.rounds):
@@ -187,6 +259,17 @@ def main(argv=None):
         md_energy = float(engine.state.energy[0])
         meta["energies_after_md"] = {"md_eV": md_energy, **{
             side: float(evaluator.baseline()[0]) for side, evaluator in evaluators.items()}}
+        # One real block of swaps per precision (the Metropolis rule at the run's temperature).
+        meta["swap_blocks"] = {}
+        for name, timed in drivers.items():
+            driver = MCDriver([Swap([pair], every=1, attempts=args.block_attempts)], seed=args.seed + 1)
+            driver.attach(engine, evaluator=timed.evaluator)
+            engine.step()
+            record = driver.run_block(engine, max(1, int(engine.state.step)))
+            record = driver.run_block(engine, max(1, int(engine.state.step)))  # the second: captured already
+            meta["swap_blocks"][name] = dict(record, md_step_ms=meta["timing"]["md"]["median_ms"],
+                                             per_attempt_ms=record["device_ms"] / args.block_attempts)
+            save()
         meta["status"] = "done"
     except BaseException as error:
         meta.update(status="failed", error=repr(error))

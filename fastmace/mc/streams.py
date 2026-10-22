@@ -163,7 +163,7 @@ def decode_swap(u, species, pairs):
     natoms = species.shape[0]
     count = pairs.shape[0]
     choice = torch.clamp((u[:1] * count).to(torch.int64), max=count - 1)
-    pair = pairs[choice[0]]  # [2], a device gather
+    pair = pairs.index_select(0, choice)[0]  # [2]; a 0-d tensor index would read it on the host
     first, first_ok = select(u[1:natoms + 1], species == pair[0])
     second, second_ok = select(u[natoms + 1:2 * natoms + 1], species == pair[1])
     return torch.cat((first, second)), first_ok & second_ok
