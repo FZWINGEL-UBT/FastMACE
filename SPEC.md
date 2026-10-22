@@ -2446,6 +2446,25 @@ Open decisions for the owner:
      - the tests corrected at acceptance;
      - the GPU slow tier;
      - the items' own runs.
+40–43. Decided (user, 22 October 2026, the phase 3b plan's D1–D4, the
+   recommendation of each: "Accept the recommendations for phase 3b's D1-D4
+   and prestart the phase 3b workers"; `plans/phase-3b.md`):
+   - **The acceptance melt–quench protocol** (40):
+     - NbCl5 3×3×3 on MH-1 `matpes_r2scan` with D3-BJ (`r2scan`);
+     - hydrostatic NPT at 0 GPa;
+     - the anneal profile at 1 fs, with the library's barostat defaults;
+     - relaxation and quench at fixed cell, the quench frames at their NPT
+       cells;
+     - the outcome is recorded, not judged.
+   - **PolarMACE in 3b** (41): only the hybrid polar stress precision is
+     investigated: POLAR-1-S on NbCl5 3×3×3 against finite differences, as
+     decision 26 asked. There is no qualification, and PolarMACE + D3 stays
+     refused.
+   - **D3's cost target** (42): if D3 misses the 10 % target of §11.2, the
+     miss is recorded and the phase continues. Optimisation is a follow-up.
+   - **ResearchModule `main.py`** (43) gets `--dispersion off|d3bj` for NVT
+     and NPT, default `off`, recorded in `run.json`. Whether the chlorides'
+     production NPT defaults to `d3bj` is decided after acceptance.
 
 ---
 

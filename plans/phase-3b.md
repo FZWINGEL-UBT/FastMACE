@@ -1,8 +1,11 @@
 # Phase 3b: NPT for the chlorides
 
-Status: **planned**, 22 October 2026, written while phase 3's acceptance closes
-(report merged at 7dfa54c; the GPU slow tier's appendix and the owner's
-`fastmace-3` tag follow). Spec: [SPEC.md](../SPEC.md) §16 row "3b. NPT for the
+Status: **in progress**, 22 October 2026, written while phase 3's acceptance
+closes (report merged at 7dfa54c; the GPU slow tier's appendix and the owner's
+`fastmace-3` tag follow). The owner accepted the recommendations for D1–D4 the
+same day ("Accept the recommendations for phase 3b's D1-D4 and prestart the
+phase 3b workers"). They are SPEC §18 decisions 40–43, and the workers are
+prestarted. Spec: [SPEC.md](../SPEC.md) §16 row "3b. NPT for the
 chlorides", and the sections it cites:
 - §11.2: the GPU D3 term (own half list, own skin, three passes with
   analytic derivatives, stress, cost target, parameter table, acceptance);
@@ -55,8 +58,9 @@ D3 (torch-dftd, ASE float64) it holds 29.0 ± 0.4 Å³/atom at 300 K and
 
 ## Owner decisions
 
-Each comes with a recommendation; the conductor's choices follow in the next
-section.
+**Decided (user, 22 October 2026): the recommendation of each**, as SPEC §18
+decisions 40 (D1), 41 (D2), 42 (D3) and 43 (D4). The conductor's choices
+follow in the next section.
 
 **D1. The acceptance melt–quench protocol.**
 - **Recommended:**
