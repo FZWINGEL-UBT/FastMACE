@@ -5,7 +5,8 @@ every pair with ``|wrapped[receiver] - wrapped[sender] + image_vectors[image]|``
 ``radius + SCREEN_MARGIN`` (float32 screen; the caller decides in float64). On CUDA one Triton
 kernel tests all sender x receiver tiles over all images in registers and appends the hits of
 a tile with one atomic add; the order of the appended hits depends on scheduling, so the caller
-must sort them. The CPU uses chunked PyTorch.
+must sort them. The CPU uses chunked PyTorch. ``half=True`` returns only pairs with
+``sender <= receiver`` (the D3 half list) and skips the tiles below the diagonal.
 """
 
 from __future__ import annotations
@@ -27,10 +28,14 @@ def _triton_kernel():
 
     @triton.jit
     def kernel(pos_ptr, image_ptr, out_ptr, counter_ptr, natoms, nimages, screen, capacity,
-               BLOCK: tl.constexpr):
+               BLOCK: tl.constexpr, HALF: tl.constexpr):
         senders = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
         receivers = tl.program_id(1) * BLOCK + tl.arange(0, BLOCK)
         valid = (senders < natoms)[:, None] & (receivers < natoms)[None, :]
+        loops = nimages
+        if HALF:  # tiles below the diagonal hold no sender <= receiver pair: no image loop
+            valid = valid & (senders[:, None] <= receivers[None, :])
+            loops = tl.where(tl.program_id(0) > tl.program_id(1), 0, nimages)
         sx = tl.load(pos_ptr + senders * 3, mask=senders < natoms, other=0.0)
         sy = tl.load(pos_ptr + senders * 3 + 1, mask=senders < natoms, other=0.0)
         sz = tl.load(pos_ptr + senders * 3 + 2, mask=senders < natoms, other=0.0)
@@ -38,7 +43,8 @@ def _triton_kernel():
         ry = tl.load(pos_ptr + receivers * 3 + 1, mask=receivers < natoms, other=0.0)
         rz = tl.load(pos_ptr + receivers * 3 + 2, mask=receivers < natoms, other=0.0)
         pair = senders.to(tl.int64)[:, None] * natoms + receivers.to(tl.int64)[None, :]
-        for image in range(nimages):
+        pairs = natoms.to(tl.int64) * natoms  # int64: image * N^2 overflows int32 for large lists
+        for image in range(loops):
             ix = tl.load(image_ptr + image * 3)
             iy = tl.load(image_ptr + image * 3 + 1)
             iz = tl.load(image_ptr + image * 3 + 2)
@@ -51,13 +57,13 @@ def _triton_kernel():
             if count > 0:
                 base = tl.atomic_add(counter_ptr, count)
                 slot = (base + tl.cumsum(flat, axis=0) - flat).to(tl.int64)
-                code = tl.reshape(image * natoms * natoms + pair, [BLOCK * BLOCK])
+                code = tl.reshape(image * pairs + pair, [BLOCK * BLOCK])
                 tl.store(out_ptr + slot, code, mask=(flat > 0) & (slot < capacity))
 
     return kernel
 
 
-def _candidate_pairs_cpu(wrapped, image_vectors, screen):
+def _candidate_pairs_cpu(wrapped, image_vectors, screen, half=False):
     natoms, nimages = wrapped.shape[0], image_vectors.shape[0]
     positions, images = wrapped.float(), image_vectors.float()
     rows = max(1, CPU_CHUNK // max(1, natoms * nimages))
@@ -68,23 +74,28 @@ def _candidate_pairs_cpu(wrapped, image_vectors, screen):
             d = (positions[None, None, :, axis] - positions[None, start:start + rows, None, axis]
                  + images[:, None, None, axis])
             squared = d * d if squared is None else squared.add_(d * d)
-        hits = torch.nonzero(squared < screen)
+        hit = squared < screen
+        if half:  # sender (row) <= receiver (column)
+            rows_here = torch.arange(start, start + hit.shape[1], device=hit.device)
+            hit &= rows_here[None, :, None] <= torch.arange(natoms, device=hit.device)[None, None, :]
+        hits = torch.nonzero(hit)
         hits[:, 1] += start
         found.append(hits)
     hits = torch.cat(found)
     return hits[:, 0], hits[:, 1], hits[:, 2]
 
 
-def candidate_pairs(wrapped, image_vectors, radius, state=None):
+def candidate_pairs(wrapped, image_vectors, radius, state=None, half=False):
     """(image, sender, receiver) int64 tensors of the screened pairs (unordered on CUDA).
 
     ``wrapped``: (N, 3) positions inside the cell; ``image_vectors``: (M, 3) Cartesian image
-    translations; ``state``: optional dict that keeps the CUDA output buffer between calls.
+    translations; ``state``: optional dict that keeps the CUDA output buffer between calls;
+    ``half``: only pairs with ``sender <= receiver``.
     """
     natoms, nimages = wrapped.shape[0], image_vectors.shape[0]
     screen = (radius + SCREEN_MARGIN) ** 2
     if not wrapped.is_cuda:
-        return _candidate_pairs_cpu(wrapped, image_vectors, screen)
+        return _candidate_pairs_cpu(wrapped, image_vectors, screen, half)
     import triton
 
     state = {} if state is None else state
@@ -98,7 +109,7 @@ def candidate_pairs(wrapped, image_vectors, radius, state=None):
             out = state["buffer"] = torch.empty(max(1 << 16, 128 * natoms), dtype=torch.int64,
                                                 device=wrapped.device)
         _triton_kernel()[grid](positions, images, out, counter, natoms, nimages, screen, out.numel(),
-                               BLOCK=BLOCK, num_warps=4)
+                               BLOCK=BLOCK, HALF=bool(half), num_warps=4)
         found = int(counter.item())  # host sync (rebuild steps only)
         if found <= out.numel():
             break
