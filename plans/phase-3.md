@@ -1636,7 +1636,13 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
       changed before phase 3;
     - test_mc_statistics_gpu's fixcm case counted 3N degrees of freedom,
       where decision 37's mass-weighted projection holds 3N − 3 (measured
-      1881 ± 12.5 K against an expected 1875 K). A task that
+      1881 ± 12.5 K against an expected 1875 K).
+    - The GPU slow tier had one more: test_fixed_costs_gpu still expected
+      overlap_rebuild off, but OPT-DEF-2 (953aa72) had turned it on before
+      phase 3. Its bitwise part hadn't run since.
+    - More generally, trials run on the CPU only, so no GPU test, slow or
+      acceptance, runs at merges. A task that changes behaviour covered by GPU
+      tests should run the affected ones. A task that
     changes behaviour covered by acceptance tests should update and run the
     affected ones;
   - cross-process control clauses in timing rules should use the documented
