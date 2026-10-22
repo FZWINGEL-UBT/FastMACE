@@ -1246,9 +1246,7 @@ class Simulation:
         protocol = restart.protocol_record(stored)
         self._schedule = None if protocol is None else ScheduleState.from_restart(protocol)
         engine.state.protocol = self._schedule
-        target = (restart.integrator_record(stored) or {}).get("temperature_K")
-        if target is not None:
-            engine.integrator.set_temperature(target)
+        restart.restore_targets(stored, engine.integrator)
         self._fill.reset()
         self._started = True
         self._restart_points = [dict(point) for point in record.get("restart_points", ())]

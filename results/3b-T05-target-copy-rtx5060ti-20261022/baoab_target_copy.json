@@ -1,0 +1,94 @@
+{
+  "probe": "tools/validation/baoab_target_copy.py",
+  "created_utc": "2026-10-22T20:55:45+00:00",
+  "machine": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "c74b186c34bdff226fe5e7c35615d340a3b714b6",
+  "before_ref": "main",
+  "before_commit": "7b117300cb41bdccf978f929b75c14b67b7e0327",
+  "force_field": "tests/gpu/test_engine_gpu.py DeterministicLJ, argon 3x3x3 (108 atoms), float64",
+  "bitwise": {
+    "checked/hydrostatic": {
+      "bitwise_equal": true,
+      "max_abs_difference": 0.0,
+      "final_cell_diagonal": [
+        15.823991364136523,
+        15.823991364136523,
+        15.823991364136523
+      ]
+    },
+    "checked/full": {
+      "bitwise_equal": true,
+      "max_abs_difference": 0.0,
+      "final_cell_diagonal": [
+        15.633053993342998,
+        15.691844028502675,
+        15.528767282903763
+      ]
+    },
+    "pipelined/hydrostatic": {
+      "bitwise_equal": true,
+      "max_abs_difference": 0.0,
+      "final_cell_diagonal": [
+        15.823991364136521,
+        15.823991364136521,
+        15.823991364136521
+      ]
+    },
+    "pipelined/full": {
+      "bitwise_equal": true,
+      "max_abs_difference": 0.0,
+      "final_cell_diagonal": [
+        15.633053993343001,
+        15.691844028502658,
+        15.528767282903786
+      ]
+    }
+  },
+  "cost": {
+    "us_per_step": {
+      "after": [
+        1110.496484000123,
+        1094.6298874998774,
+        1080.473168000026,
+        1105.5359844999657,
+        1115.760876999957,
+        1091.616685999952,
+        1113.494206500036,
+        1105.50216799993,
+        1107.4974435000513,
+        1117.6799375000428
+      ],
+      "before": [
+        1098.9252184999714,
+        1057.2378775000288,
+        1124.572593000039,
+        1110.6171859998994,
+        1101.9360389998383,
+        1071.7134960000294,
+        1112.8760979997878,
+        1119.0350899998975,
+        1115.314137500036,
+        1097.199081999861
+      ]
+    },
+    "median_us_per_step": {
+      "after": 1106.5167140000085,
+      "before": 1106.2766124998689
+    },
+    "median_difference_us": 6.094687000199883,
+    "difference_range_us": [
+      -44.09942500001307,
+      37.3920099998486
+    ],
+    "blocks": 10,
+    "block_steps": 2000,
+    "warmup_steps": 500,
+    "rebuilds": {
+      "after": 1701,
+      "before": 1701
+    }
+  }
+}
