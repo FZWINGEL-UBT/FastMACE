@@ -692,6 +692,9 @@ class Simulation:
             raise
         self._stop_clock(synchronised_clock, count_steps=engine.state.step)
         self._status = "paused"
+        recapture = getattr(engine, "recapture_warning", None)  # past the re-capture budget (3-T04)
+        if recapture and recapture not in self._report.extra_warnings:
+            self._report.add_warning(recapture)
         self._report.finish(self._loop_s / self._steps_run, steps=self._steps_run)
         if self._writer is not None:
             self._writer.flush()

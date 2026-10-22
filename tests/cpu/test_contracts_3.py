@@ -372,7 +372,24 @@ def test_graph_engine_energy_and_captured_stubs():  # §8.1 energy-only graph (3
     assert _parameters(GraphEngine.captured) == ["self", "key", "fn"]
     stub = object.__new__(GraphEngine)
     _raises_naming("3-T07", lambda: stub.energy())
-    _raises_naming("3-T04", lambda: stub.captured("mc.swap", lambda: None))
+
+
+def test_graph_engine_overflow_and_recapture_names():  # §8.1 overflow before commit, re-capture policy (3-T04)
+    pytest.importorskip("torch")
+    from fastmace.engine import graph
+    from fastmace.engine.graph import GraphEngine
+
+    assert (graph.EDGE_OVERFLOW, graph.KVECTOR_OVERFLOW) == (1, 2)
+    assert issubclass(graph.CapacityOverflow, RuntimeError)  # internal (SPEC §7.6), not in errors.py
+    assert issubclass(graph.RecaptureBudgetWarning, UserWarning)
+    assert _parameters(GraphEngine.invalidate_graphs) == ["self", "reason", "keys"]
+    assert _parameters(GraphEngine.uncommitted) == ["self"]
+    assert _parameters(GraphEngine.overflowed) == ["self"]
+    assert _parameters(GraphEngine.flag_edge_overflow) == ["self", "count", "edges"]
+    assert _parameters(GraphEngine.clear_overflow) == ["self"]
+    assert _parameters(GraphEngine.redo_on_overflow) == ["self", "attempt", "keep", "max_redos"]
+    assert _keyword_only(GraphEngine.redo_on_overflow) == ["keep", "max_redos"]
+    assert isinstance(GraphEngine.recapture_warning, property)
 
 
 # --------------------------------------------------------------------------- restart v3
