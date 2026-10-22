@@ -414,6 +414,10 @@ class Simulation:
         references = selfcheck.references(self._plan, ff, atoms, integrator, check=check, seed=seed,
                                          gate=options.gate)
         gate_s = time.perf_counter() - started
+        # An MC plan's move-energy references, whatever check is (decision 35; 3-T11): None without MC moves.
+        started = time.perf_counter()
+        moves = selfcheck.move_references(self._plan, ff, atoms, workload, seed=seed, check=check, gate=options.gate)
+        move_s = time.perf_counter() - started
 
         started = time.perf_counter()
         failure = None
@@ -445,11 +449,25 @@ class Simulation:
                 failure = self._failure("gate", error, stored)
         if check != "skip":
             setup["gate"] = gate_s + time.perf_counter() - started
+        # The move-energy part of an MC plan (SPEC §12.3, decision 35): it chooses the MC energy precision, and
+        # the plan records the choice (fallback.mc_energy_revision); a failure goes to the fallback.
+        if failure is None and moves is not None:
+            started = time.perf_counter()
+            try:
+                self._gate = selfcheck.move_gate(self._engine, moves, plan=self._plan, force_field=ff,
+                                                 record=self._gate)
+            except Exception as error:
+                failure = self._failure("gate", error, stored)
+            else:
+                self._plan = fallback.mc_energy_revision(self._plan, self._gate)
+                self._engine.plan = self._plan
+                self._engine.state.plan_revision = self._plan.revision
+            setup["move_energy_gate"] = move_s + time.perf_counter() - started
         if failure is not None:  # the fallback (§9.4; plan task 2-T15)
             self._engine = None
             started = time.perf_counter()
             result = fallback.Fallback(planner, ff, atoms, self._config, references, options.fallback, seed=seed,
-                                       gate=options.gate).run(failure)
+                                       gate=options.gate, moves=moves).run(failure)
             setup["fallback"] = time.perf_counter() - started
             self._plan = result.plan
             if result.runner:  # the candidate runs in a child (§9.4 step 3, 2-T07)
@@ -459,8 +477,11 @@ class Simulation:
                 return
             self._engine = result.engine
             self._attach_engine()
-            # The user's check="skip" stays "skipped"; the validation is in plan.fallbacks.
-            self._gate = result.gate if check != "skip" else selfcheck.skipped_record()
+            # The user's check="skip" stays "skipped"; the validation is in plan.fallbacks. The move-energy
+            # part of an MC plan stays in the record (decision 35).
+            self._gate = result.gate if check != "skip" else dataclasses.replace(
+                selfcheck.skipped_record(), move_energy=getattr(result.gate, "move_energy", None),
+                mc_energy_precision=getattr(result.gate, "mc_energy_precision", None))
         # The software block of metadata.json, built once per process here, in the setup time,
         # not at the first run() (provenance.fastmace_block, 1b-T28).
         from fastmace import provenance
@@ -737,13 +758,26 @@ class Simulation:
         if self._mc is not None:
             self._mc.detach()  # its captured attempts go with it (3-T09 follow-up)
         driver = mc_driver.MCDriver(moves, seed=self.seed)
-        driver.attach(self._engine)
+        driver.attach(self._engine, evaluator=self._mc_evaluator())
         if previous is not None:
             driver.load_state_dict(_carried_mc_record(previous, driver.state_dict()), other_moves=True)
         self._mc, self._mc_moves, self._mc_untimed = driver, tuple(moves), driver
         self._mc_record = driver.state_dict()
         self._engine.state.mc = self._mc_record
         self._report.mc = self._mc_summary()
+
+    def _mc_evaluator(self):
+        """The MC evaluator in the plan's MC energy precision (``PrecisionConfig.mc_energy``, chosen by the
+        move-energy gate, 3-T11): the engine's own force field, or its float64 copy (the one the gate made, or a
+        new one for a plan whose gate reference was unavailable)."""
+        from fastmace.mc.evaluator import MCEvaluator, float64_model, precision_of
+
+        engine = self._engine
+        precision = getattr(self._plan.precision, "mc_energy", None)
+        own = precision in (None, "auto") or precision == precision_of(engine.force_field.dtype)
+        if own or precision in engine.energy_fields:
+            return MCEvaluator(engine, None if precision in (None, "auto") else precision)
+        return MCEvaluator(engine, precision, model=float64_model(self.force_field, self._plan))
 
     def _detach_mc(self):
         """Detach the attached move set (``run(mc=None)``); its state stays for a later re-attach."""
@@ -761,7 +795,7 @@ class Simulation:
 
         moves = tuple(move_from_record(entry) for entry in record["moves"])
         driver = mc_driver.MCDriver(moves, seed=self.seed)
-        driver.attach(self._engine)
+        driver.attach(self._engine, evaluator=self._mc_evaluator())
         driver.load_state_dict(record)
         self._mc, self._mc_moves, self._mc_untimed = driver, moves, driver
         self._mc_record = driver.state_dict()
@@ -997,7 +1031,8 @@ class Simulation:
             model=model.label or Path(str(model.path)).name, head=model.head, sha256=model.sha256,
             structure=atoms.get_chemical_formula(), n_atoms=len(atoms), pbc=tuple(bool(p) for p in atoms.pbc),
             species=_symbols(self._plan.superset).split(), plan=self._plan,
-            gate=None if self._gate.status == "skipped" else self._gate, setup_s=self._setup_s,
+            gate=None if self._gate.status == "skipped" and self._gate.move_energy is None else self._gate,
+            setup_s=self._setup_s,
             outputs=outputs, charge_spin=(model.charge, model.spin_multiplicity) if reads_charge else None,
             cell_heights_A=tuple(float(h) for h in heights), cutoff_A=self.force_field.traits.r_max,
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,

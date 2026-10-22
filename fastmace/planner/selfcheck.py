@@ -1791,6 +1791,9 @@ def _configuration_energies(engine, evaluator, configurations):
             energies.append(result.get("energy"))
     finally:
         engine.registry.restore(snapshot)
+        # Scratch the refreshes write but the registry does not hold (the force field's species index):
+        # refreshed from the restored state, so the engine equals a fresh construction in every tensor.
+        engine.derived.refresh(("species", "charges"))
         _restore_attributes(neighbours, host)
         field.use_edges(edges_before)
         engine.edge_sizes_used.clear()
@@ -1878,7 +1881,8 @@ def move_gate(engine, references: MoveReferences | None, *, plan, force_field, r
     tried, mode = [], None
     for precision in order:
         evaluator = _move_evaluator(engine, precision, plan, force_field)
-        mode = ("captured energy-only graph" if evaluator.info()["captured"] else "eager energy-only evaluation")
+        captured = evaluator.graph and bool(getattr(engine, "capture", False))
+        mode = "captured energy-only graph" if captured else "eager energy-only evaluation"
         rows, skipped = move_rows(engine, evaluator, references)
         result = move_verdict(rows, moves.threshold_eV)
         worst = max((entry["worst_k_B_T_min"] for entry in result["moves"].values()), default=None)

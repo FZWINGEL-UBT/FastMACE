@@ -382,3 +382,77 @@ def test_move_references_in_a_child_process_equal_in_process(pristine, no_engine
     np.testing.assert_allclose(child.energies, moves.energies, rtol=0, atol=1e-10)
     record = selfcheck.move_gate(engine, child, plan=plan, force_field=ff)
     assert record.move_energy["status"] == "passed"
+
+
+# --------------------------------------------------------------------------- through Simulation (after 3-T15)
+
+
+def simulation(pristine, precision, **options):
+    from fastmace import integrators
+    from fastmace.model.forcefield import ForceField
+    from fastmace.simulation import Simulation
+
+    atoms = structure()
+    return Simulation(atoms, ForceField(pristine, atoms, precision=precision, species=SUPERSET),
+                      integrator=integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.01),
+                      workload=workload(**options), seed=3)
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_simulation_runs_the_move_energy_gate_under_skip(pristine, no_engines_yet):
+    sim = simulation(pristine, "float64")
+    assert sim.gate.status == "skipped"  # the energy, force and stress gate stays opt-in
+    assert sim.gate.move_energy["status"] == "passed" and sim.gate.mc_energy_precision == "float64"
+    assert sim.plan.precision.mc_energy == "float64"
+    text = sim.report.text()
+    assert "mc ΔE:" in text and "move-energy gate passed" in text
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_simulation_moves_auto_to_float64_and_the_driver_uses_it(pristine, no_engines_yet, monkeypatch):
+    from fastmace import mc
+    from fastmace.model.forces import MACEForceField
+
+    original = MACEForceField.energy_only
+
+    def float32_error(self, positions):
+        energy = original(self, positions)
+        if self.dtype == torch.float32:
+            energy = energy + 1e-3 * (self.atomic_numbers == NA).sum().to(torch.float64)
+        return energy
+
+    monkeypatch.setattr(MACEForceField, "energy_only", float32_error)
+    sim = simulation(pristine, "float32", moves=("swap", "transmute"))
+    assert sim.plan.precision.dtype == "float32" and sim.plan.precision.mc_energy == "float64"
+    assert sim.plan.fallbacks[-1].dimension == "mc_energy"
+    assert [entry["status"] for entry in sim.gate.move_energy["tried"]] == ["failed", "passed"]
+    sim.run(4, mc=mc.Transmute(["Na", "Cl"], every=2, attempts=1))
+    assert sim._mc.evaluator.precision == "float64"
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_a_charged_model_gates_against_references_at_its_charge(tmp_path, no_engines_yet):
+    """The references carry the model's total charge and spin (found by 3-T11: they ran at charge 0)."""
+    pytest.importorskip("cuequivariance_torch")
+    from _support.mc_fixtures import tiny_loaded
+    from fastmace.config import IntegratorConfig
+    from fastmace.model.forcefield import ForceField
+    from fastmace.planner.plan import Hardware
+
+    torch.serialization.add_safe_globals([slice])
+    superset = (11, 12, 17)
+    loaded = tiny_loaded(tmp_path, superset, family="omol", charge=1, spin_multiplicity=1)
+    atoms = nacl(repeat=1, rattle=0.05, seed=3)
+    numbers = atoms.numbers.copy()
+    numbers[2] = 12  # one Mg: total charge 1 with even electrons
+    atoms.set_atomic_numbers(numbers)
+    ff = ForceField(loaded, atoms, precision="float64", species=list(superset))
+    load = Workload(max_temperature_K=1000.0, species_changes=True, min_mc_temperature_K=1.0,
+                    mc_moves=("transmute",))
+    planner = cpu_planner()
+    plan = planner.plan(ff, atoms, IntegratorConfig(temperature_K=300.0), load, Hardware("cpu", (0, 0), 0))
+    references = selfcheck.move_references(plan, ff, atoms, load, seed=1)
+    engine = planner.build(plan, ff, atoms)
+    record = selfcheck.move_gate(engine, references, plan=plan, force_field=ff)
+    assert record.move_energy["status"] == "passed", record.move_energy.get("reason")
+    assert max(row["error"] for row in record.move_energy["rows"]) < 1e-9

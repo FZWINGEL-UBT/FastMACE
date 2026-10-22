@@ -191,7 +191,7 @@ class ReferenceCalculator:
 
         self.require_active()
         calc = self.calculator
-        batch = calc._atoms_to_batch(atoms)
+        batch = calc._atoms_to_batch(self._with_charge_spin(atoms))
         dtype = next(self.model.parameters()).dtype
         data = {key: (value.to(dtype=dtype) if torch.is_tensor(value) and torch.is_floating_point(value) else value)
                 for key, value in batch.to_dict().items()}
@@ -214,6 +214,25 @@ class ReferenceCalculator:
         # MACECalculator stores Voigt; ASE's get_stress(voigt=False) expands it again.
         stress = voigt_6_to_full_3x3_stress(full_3x3_to_voigt_6_stress(stress))
         return energy, np.asarray(forces, dtype=np.float64), np.asarray(stress, dtype=np.float64)
+
+    def _with_charge_spin(self, atoms):
+        """``atoms`` with the loaded model's total charge and spin in ``info``, where MACE's calculator reads them,
+        as the production force field sets them (``MACEForceField``): a configuration rebuilt from numbers and
+        positions (the gate's copies and sample moves) carries none, and the calculator then took charge 0 and
+        its default spin (found by 3-T11 on a charged model). Keys already set are kept."""
+        loaded = self.loaded
+        charge = getattr(loaded, "charge", None)
+        spin = getattr(loaded, "spin_multiplicity", None)
+        if charge is None and spin is None:
+            return atoms
+        keys = getattr(self.calculator, "info_keys", {}) or {}
+        wanted = {keys.get("total_charge", "charge"): charge, keys.get("total_spin", "spin"): spin}
+        missing = {key: value for key, value in wanted.items() if value is not None and key not in atoms.info}
+        if not missing:
+            return atoms
+        atoms = atoms.copy()
+        atoms.info.update(missing)
+        return atoms
 
     def rebase(self, atoms):
         """Size the PolarMACE k-space state for ``atoms``' cell (another structure); no-op otherwise."""
