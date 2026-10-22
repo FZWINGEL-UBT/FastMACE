@@ -34,8 +34,8 @@ class ForceField:
       is unknown or already contains dispersion); an explicit record whose functional differs from
       the training one is kept with a warning in ``dispersion_warnings``. The complete record is
       ``dispersion`` and part of the identity. Refused (``PlanRefused``): the ATM term
-      (``d3-three-body``) and PolarMACE (``d3-polar``, decision 41). Plans with D3 are refused
-      until plan task 3b-T04 (``d3-phase-3b``).
+      (``d3-three-body``) and PolarMACE (``d3-polar``, decision 41). Plans carry the record and put
+      the D3 term into their force field (``fastmace.model.dispersed``, 3b-T04).
     """
 
     def __init__(self, model: Any, atoms: Any = None, *, precision: Literal["float32", "float64"] = "float32",
@@ -239,17 +239,6 @@ def _dispersion(dispersion, model):
     if reasons:
         raise PlanRefused.from_reasons(reasons)
     return record, tuple(warnings)
-
-
-def refuse_until_integrated(force_field):
-    """``PlanRefused`` (``d3-phase-3b``) for a force field with D3: no plan runs it until 3b-T04."""
-    record = getattr(force_field, "dispersion", None)
-    if record is not None:
-        from fastmace.errors import PlanRefused, Reason
-        from fastmace.longrange import d3
-
-        raise PlanRefused.from_reasons([Reason(f"D3: phase 3b; the record is {d3.describe(record)} (SPEC §11.2)",
-                                               code="d3-phase-3b")])
 
 
 def _is_label(name):

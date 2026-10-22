@@ -133,6 +133,14 @@ class ReferenceCalculator:
                 raise ValueError(f"atomic_energies has shape {tuple(table.shape)}, the model's E0 table {expected}")
             self.e0_table = table
         self.patches = tuple(record_.name for record_ in _patches.applied())
+        # 5. D3 (optional physics, 3b-T04): torch-dftd on the record's numbers, summed with MACE's results.
+        self.d3 = d3_record(record)
+        self._d3_calculator = None
+        if self.d3 is not None:
+            from fastmace.reference import d3 as d3_reference
+
+            device = str(next(model.parameters()).device)
+            self._d3_calculator = d3_reference.torch_dftd3_calculator(self.d3, dtype="float64", device=device)
         self.require_active()
 
     # ------------------------------------------------------------------ construction
@@ -213,7 +221,17 @@ class ReferenceCalculator:
         stress = out["stress"].detach()[0].cpu().numpy() * (energy_unit / calc.length_units_to_A ** 3)
         # MACECalculator stores Voigt; ASE's get_stress(voigt=False) expands it again.
         stress = voigt_6_to_full_3x3_stress(full_3x3_to_voigt_6_stress(stress))
-        return energy, np.asarray(forces, dtype=np.float64), np.asarray(stress, dtype=np.float64)
+        forces, stress = np.asarray(forces, dtype=np.float64), np.asarray(stress, dtype=np.float64)
+        if self._d3_calculator is not None:  # MACE + torch-dftd, as ASE's SumCalculator sums them
+            energy_d3, forces_d3, stress_d3 = self._evaluate_d3(atoms)
+            energy, forces, stress = energy + energy_d3, forces + forces_d3, stress + stress_d3
+        return energy, forces, stress
+
+    def _evaluate_d3(self, atoms):
+        copy = atoms.copy()
+        copy.calc = self._d3_calculator
+        return (float(copy.get_potential_energy()), np.array(copy.get_forces(), dtype=np.float64),
+                np.array(copy.get_stress(voigt=False), dtype=np.float64))
 
     def _with_charge_spin(self, atoms):
         """``atoms`` with the loaded model's total charge and spin in ``info``, where MACE's calculator reads them,
@@ -280,8 +298,29 @@ class ReferenceCalculator:
             "patches": list(self.patches),
             "corrections_active": self.corrections_active(),
             "optional_physics": [entry["name"] for entry in self.record.optional_physics],
+            "stock": self.record.is_stock,
             "polar": self.polar_info,
+            "dispersion": None if self.d3 is None else _describe_d3(self.d3),
         }
+
+
+def d3_record(record):
+    """The ``fm.D3`` of a reference record's ``d3`` optional-physics entry, or None."""
+    for entry in record.optional_physics:
+        if entry["name"] == "d3":
+            import dataclasses
+
+            from fastmace.longrange.d3 import D3
+
+            names = {f.name for f in dataclasses.fields(D3)}
+            return D3(**{key: value for key, value in entry["parameters"].items() if key in names})
+    return None
+
+
+def _describe_d3(record):
+    from fastmace.longrange import d3
+
+    return d3.describe(record) + ", non-stock (MACE plus torch-dftd, SPEC §12.1)"
 
 
 def finite_difference_stress(reference, atoms, h=FD_STRAIN):
@@ -312,20 +351,22 @@ def load(source, atoms, *, dtype="float64", device="cuda:0", head=None, family=N
     """A reference calculator from a checkpoint, as its record states (``fastmace.model.loading.load``).
 
     ``family``: the record family (default: the label's, else "polar" or "unlabelled");
-    ``polar``: a ``PolarConfig`` (PR 1762 options); ``d3``: refused until phase 3b. On the CPU
-    the cuEquivariance model takes MACE's naive kernels (the CPU float64 references of 1a-T15).
+    ``polar``: a ``PolarConfig`` (PR 1762 options); ``d3``: an ``fm.D3`` record, whose torch-dftd term is
+    added to MACE's results (SPEC §12.1, the record's ``d3`` entry). On the CPU the cuEquivariance model
+    takes MACE's naive kernels (the CPU float64 references of 1a-T15).
     """
     from fastmace.model import loading
 
     version = records.mace_version()
     if d3 is not None:
-        records.record_for(version, family or "unlabelled", d3=d3)  # raises before any model is loaded
+        records.record_for(version, family or "unlabelled", d3=d3)  # refusals before any model is loaded
     stock = records.STOCK
     loaded = loading.load(source, head, backend=stock["backend"], dtype=dtype, device=device,
                           cueq_conv_fusion=stock["cueq_conv_fusion"], sha256=sha256, trusted=trusted,
                           allow_naive_cueq=str(device).startswith("cpu"), charge=charge,
                           spin_multiplicity=spin_multiplicity, environ=environ)
-    record = records.record_for(version, records.family_of(loaded.model, family or loaded.family), polar=polar)
+    record = records.record_for(version, records.family_of(loaded.model, family or loaded.family), polar=polar,
+                                d3=d3)
     return ReferenceCalculator(loaded.calculator, record, atoms, loaded=loaded)
 
 

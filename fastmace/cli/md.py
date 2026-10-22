@@ -3,7 +3,7 @@
 Each §7.5 flag is one ``fm.md`` argument (``md_arguments``); a flag not given is left to
 ``fm.md``'s default, so the CLI has no defaults of its own. ``--dispersion d3bj`` is passed as
 ``"d3bj"``, which ``fm.md`` expands from the head's training functional; with ``--d3-functional``
-the CLI builds the explicit ``fm.D3`` record instead. Both are refused at plan time until phase 3b.
+the CLI builds the explicit ``fm.D3`` record instead. Either goes into the force field (MACE plus D3).
 
 Schedules, MC moves, explicit integrators and the full D3 record go through ``fastmace init`` and
 ``fastmace run``. A ``ValueError`` in the arguments is a usage error (exit 2); a ``FastMACEError``
@@ -63,7 +63,7 @@ def add_arguments(parser, *, required=True):
     run.add_argument("--timestep", type=float, metavar="FS", help="timestep in fs (default 0.5)")
     run.add_argument("--steps", type=int, help="number of MD steps")
     run.add_argument("--dispersion", choices=DISPERSION_CHOICES,
-                     help="D3(BJ) dispersion: expanded from the head's functional, refused until phase 3b")
+                     help="D3(BJ) dispersion: expanded from the head's training functional (SPEC §7.7)")
     run.add_argument("--d3-functional", metavar="NAME", help="the D3 parameter set, with --dispersion d3bj")
     run.add_argument("--seed", type=int, help="noise seed (default: drawn and recorded)")
     run.add_argument("--check", choices=CHECK_CHOICES, help="gate on the structure (default skip; opt-in: gate)")

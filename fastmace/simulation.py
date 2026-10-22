@@ -1048,6 +1048,8 @@ class Simulation:
             gate=None if self._gate.status == "skipped" and self._gate.move_energy is None else self._gate,
             setup_s=self._setup_s,
             outputs=outputs, charge_spin=(model.charge, model.spin_multiplicity) if reads_charge else None,
+            dispersion=getattr(self.force_field, "dispersion", None),
+            warnings=tuple(getattr(self.force_field, "dispersion_warnings", ())),
             cell_heights_A=tuple(float(h) for h in heights), cutoff_A=self.force_field.traits.r_max,
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,
             start_step=int(self._engine.state.step) if start_step is None else start_step)
@@ -1147,9 +1149,7 @@ class Simulation:
             "simulation_record_version": SIMULATION_RECORD_VERSION,
             "model": {"label": model.label, "path": str(model.path), "head": model.head, "sha256": model.sha256,
                       "trust": model.trust, "charge": model.charge, "spin_multiplicity": model.spin_multiplicity},
-            "force_field": {"precision": self.force_field.precision, "species": list(self.force_field.species),
-                            "rewrites": "auto" if self.force_field.rewrites == "auto"
-                            else dataclasses.asdict(self.force_field.rewrites)},
+            "force_field": self._force_field_record(),
             "integrator": {"class": type(self.integrator).__name__, "fields": integrator},
             "workload": workload,
             "output": output,
@@ -1163,6 +1163,16 @@ class Simulation:
             "restart_points": list(self._restart_points),
             "mc": self._mc_simulation_record(),
         }
+
+    def _force_field_record(self):
+        """``simulation.json``'s force field: precision, species, rewrites, and the D3 record when there is one
+        (absent without D3, so D3-free records are unchanged; 3b-T04)."""
+        field = self.force_field
+        record = {"precision": field.precision, "species": list(field.species),
+                  "rewrites": "auto" if field.rewrites == "auto" else dataclasses.asdict(field.rewrites)}
+        if getattr(field, "dispersion", None) is not None:
+            record["dispersion"] = dataclasses.asdict(field.dispersion)
+        return record
 
     @classmethod
     def resume(cls, directory: Any, *, allow_plan_change: bool = False, check: Check = "skip") -> Simulation:
@@ -1561,7 +1571,7 @@ def _same_reference(first, second):
 
 def _record_force_field(record):
     """The ``ForceField`` of a ``simulation.json`` record: its model loaded again (by SHA-256), precision,
-    rewrites and species."""
+    rewrites, species and the D3 record (3b-T04)."""
     from fastmace.model.forcefield import ForceField
 
     rewrites = record["force_field"]["rewrites"]
@@ -1569,8 +1579,13 @@ def _record_force_field(record):
         from fastmace.config import RewriteConfig
 
         rewrites = RewriteConfig(**rewrites)
+    dispersion = record["force_field"].get("dispersion")
+    if dispersion is not None:
+        from fastmace.longrange.d3 import D3
+
+        dispersion = D3(**dispersion)
     return ForceField(_load_model(record["model"]), precision=record["force_field"]["precision"], rewrites=rewrites,
-                      species=record["force_field"]["species"])
+                      species=record["force_field"]["species"], dispersion=dispersion)
 
 
 def _restart_atoms(structure, stored):

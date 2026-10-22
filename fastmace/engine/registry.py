@@ -112,6 +112,11 @@ POLICIES = (
     # Neighbour list: the copy of the current cell, then everything a rebuild makes.
     _policy("force_field.neighbours.cell", "neighbours", "derived", "ForceField.set_cell"),
     _policy("force_field.neighbours.*", "neighbours", "reset", "ForceField.rebuild"),
+    # The D3 term (3b-T04): its list's copy of the current cell and its shifts in it, then everything a D3
+    # build makes (the list and the kernels' CSR buffers).
+    *(_policy(f"force_field.d3.list.{name}", "neighbours", "derived", "ForceField.set_cell")
+      for name in ("cell", "shift_vectors")),
+    _policy("force_field.d3.*", "neighbours", "reset", "ForceField.rebuild"),
     # Model inputs the cell and positions feed.
     *(_policy(f"force_field.{name}", "force_field", "derived", "ForceField.set_cell")
       for name in ("cell", "volume", "rcell")),

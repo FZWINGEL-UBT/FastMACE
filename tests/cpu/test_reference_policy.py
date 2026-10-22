@@ -174,13 +174,18 @@ def test_pr1762_is_optional_physics_and_labels_the_record_non_stock():
         records.record_for("0.3.16", "mh1", polar=options)
 
 
-def test_d3_is_declared_and_refused_until_phase_3b():
+def test_d3_is_accepted_optional_physics_and_refused_for_polar():
+    """3b-T04: MACE plus torch-dftd on the record's numbers, a non-stock entry; PolarMACE + D3 refused (decision 41)."""
+    from fastmace.longrange import d3
     from fastmace.longrange.d3 import D3
 
-    with pytest.raises(records.ReferencePolicyError, match="3b") as caught:
-        records.record_for("0.3.16", "mh1", d3=D3(functional="r2scan"))
+    record = records.record_for("0.3.16", "mh1", d3=D3(functional="r2scan"))
+    assert [entry["name"] for entry in record.optional_physics] == ["d3"] and not record.is_stock
+    assert record.optional_physics[0]["parameters"] == d3.identity_entry(D3(functional="r2scan"))
+    assert records.OPTIONAL_PHYSICS["d3"]["status"] == "accepted"
+    with pytest.raises(records.ReferencePolicyError, match="PolarMACE") as caught:
+        records.record_for("0.3.16", "polar", d3=D3(functional="r2scan"))
     assert isinstance(caught.value, FastMACEError)
-    assert "d3" in records.OPTIONAL_PHYSICS and records.OPTIONAL_PHYSICS["d3"]["status"] == "refused until phase 3b"
 
 
 def test_unqualified_mace_version_polar_and_unknown_family_are_refused():

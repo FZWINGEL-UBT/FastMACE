@@ -694,7 +694,8 @@ class GraphEngine(Engine):
             moved |= polar_moved
             if overflowed:
                 self.polar_overflow_steps.append(state.step)
-        moved |= bool(field.rebuild(state.positions))
+        # Every list, D3's too, whatever its own test says (DispersedForceField.rebuild_all; 3b-T04).
+        moved |= bool(getattr(field, "rebuild_all", field.rebuild)(state.positions))
         if moved:
             self.invalidate_graphs("the canonical rebuild moved buffers")
         field.compact(state.positions)  # as the build does: eager, then the exact count

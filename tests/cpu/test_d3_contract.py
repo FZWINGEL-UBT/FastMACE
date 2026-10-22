@@ -178,7 +178,8 @@ def test_forcefield_polar_with_d3_is_refused(loaded, monkeypatch):
     ForceField(loaded, species=[11, 17])  # PolarMACE without D3 is unchanged
 
 
-def test_plans_with_d3_are_refused_until_integration(loaded, monkeypatch):
+def test_plans_with_d3_carry_the_record(loaded, monkeypatch):
+    """3b-T04 lifted the d3-phase-3b refusal: plans carry the record (tests/cpu/test_d3_integration.py)."""
     from _support.mc_fixtures import cpu_planner
     from _support.structures import nacl
     from fastmace import integrators
@@ -189,12 +190,12 @@ def test_plans_with_d3_are_refused_until_integration(loaded, monkeypatch):
     planner = cpu_planner(monkeypatch)
     field = ForceField(loaded, species=[11, 17], dispersion=D3(functional="r2scan"))
     atoms = nacl(1)
-    with pytest.raises(PlanRefused, match="phase 3b") as raised:
-        integrator = integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.01)
-        planner.plan(field, atoms, integrator.to_config(seed=1), Workload(max_temperature_K=300.0))
-    assert raised.value.reasons[0].code == "d3-phase-3b"
-    with pytest.raises(PlanRefused, match="phase 3b"):
-        field.evaluate(atoms)
+    integrator = integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.01)
+    plan = planner.plan(field, atoms, integrator.to_config(seed=1), Workload(max_temperature_K=300.0))
+    assert plan.dispersion == D3(functional="r2scan")
+    assert "d3-phase-3b" not in [code for _, _, reason in plan.decisions for code in [getattr(reason, "code", None)]]
+    with pytest.raises(PlanRefused):  # still refused at construction: ATM
+        ForceField(loaded, species=[11, 17], dispersion=D3(functional="r2scan", three_body=True))
 
 
 # --------------------------------------------------------------------------- DispersionTerm
