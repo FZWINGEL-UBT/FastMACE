@@ -122,8 +122,10 @@ class D3Kernel:
         count = tables["rcov"].shape[0]
         if not isinstance(numbers, torch.Tensor):
             numbers = torch.as_tensor(np.asarray(numbers, dtype=np.int64), device=self.device)
-        if numbers.device != self.device or numbers.dtype not in (torch.int32, torch.int64) or numbers.ndim != 1:
+        if numbers.device.type != self.device.type or numbers.dtype not in (torch.int32, torch.int64) \
+                or numbers.ndim != 1:
             raise ValueError(f"numbers must be a 1-d integer tensor on {self.device}")
+        self.device = numbers.device  # "cuda" resolved to the tensor's own index
         if numbers.numel() and (int(numbers.min()) < 1 or int(numbers.max()) >= count):
             raise ValueError(f"D3 has reference data for Z = 1 to {count - 1}")
         references = np.zeros((count, count, REFERENCES, 3))
