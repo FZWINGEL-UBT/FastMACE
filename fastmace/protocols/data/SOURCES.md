@@ -17,3 +17,21 @@
 - The swap-MC annealing protocol of D3 (plan task 3-T14), for `fastmace run`.
 - The short variant has the same stages and settings with a schedule about a tenth as long. It is
   the validation run for a paid GPU (the Modal L4), not a production protocol.
+
+## `NbCl5_R2SCAN.cif`
+
+- NbCl5 (C2/m), the cell of the R2SCAN benchmark set, for the NPT melt-quench protocol of owner
+  decision D1 (SPEC §18 decision 40).
+- Copied byte for byte (LF line endings) from the ResearchModule repository:
+  `G:/Margraf/ResearchModule/Structures/Benchmark/R2SCAN/NbCl5.cif`, at tag
+  `research-engine-baseline-20261017` (blob `f872cdc8d28ce6689060de3ae28766b155645a82`; the file was
+  last changed in commit `6f079e7f`, 24 September 2026). SHA-256 of the copy:
+  `1d662303cbc693ec1beb1b0af9adccbf0392d0919cddfe4628c5dc5dc1f8ae99`.
+- 72 atoms, Nb12Cl60 (a = 18.964 Å, b = 18.178 Å, c = 6.007 Å, β = 90.47°); a 3×3×3 supercell has
+  1944 atoms.
+
+## `npt_anneal_NbCl5.toml` and `npt_anneal_NbCl5_short.toml`
+
+- The NPT melt-quench protocol of D1 (plan task 3b-T07), for `fastmace run`.
+- The short variant has the same stages and settings with a schedule a tenth as long. It is the
+  smoke run, not a production protocol.

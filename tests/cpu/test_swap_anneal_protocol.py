@@ -353,6 +353,11 @@ def test_a_tiny_protocol_in_pieces_equals_one_go(model_path, cpu_planner, tmp_pa
     second = json.loads((pieces / runner.PROTOCOL_RECORD).read_text(encoding="utf-8"))
     assert first["status"] == second["status"] == "complete"
     assert [(p["first_step"], p["last_step"]) for p in second["pieces"]] == [(0, 5), (5, 14), (14, 24)]
+    # Each piece's engine counters (a fresh engine per piece), and their sums over the whole run (3b-T07).
+    for record in (first, second):
+        rebuilds = [piece["counters"]["neighbour_rebuilds"] for piece in record["pieces"]]
+        assert all(isinstance(count, int) and count >= 0 for count in rebuilds), rebuilds
+        assert record["counters"] == {"neighbour_rebuilds": sum(rebuilds)}
     assert first["relaxation"]["energy_eV_atom"] == second["relaxation"]["energy_eV_atom"]
     for (n1, x1, p1), (n2, x2, p2) in zip(_frames(whole), _frames(pieces), strict=True):
         assert np.array_equal(n1, n2) and np.array_equal(x1, x2) and np.array_equal(p1, p2)

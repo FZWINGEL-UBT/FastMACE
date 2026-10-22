@@ -17,8 +17,10 @@ The stages, in the run's output directory:
 3. after the last MD step, the quench (``quench.quench_run``) with the model of the run.
 
 Every piece ends with a restart at its last step, so a long protocol runs as pieces of bounded
-wall time. ``protocol.json`` records the stages, the pieces, the relaxation and the quench summary;
-``metadata.json`` is the run's, with the plan, gate and ``counters.mc``.
+wall time. ``protocol.json`` records the stages, the pieces, the relaxation and the quench summary,
+and the engine counters of ``PIECE_COUNTERS`` per piece (each piece builds a new engine) with their
+sums over the run in ``counters``; ``metadata.json`` is the run's, with the plan, gate and
+``counters.mc``.
 """
 
 from __future__ import annotations
@@ -41,6 +43,9 @@ RELAX_KEYS = ("fmax", "optimizer", "max_steps")
 STAGES = ("relax", "quench")
 RELAXATION_LOG, RELAXED = "relaxation.log", "relaxed.extxyz"
 _LOAD_KEYS = ("head", "sha256", "trusted", "charge", "spin_multiplicity")
+# The engine counters (``Engine.info()``) a protocol run sums over its pieces: the MACE neighbour list's
+# rebuilds (3b-T06's cost cross-check reads them from the full ramp).
+PIECE_COUNTERS = ("neighbour_rebuilds",)
 
 
 def protocol_names() -> tuple[str, ...]:
@@ -164,7 +169,8 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
               "repeat": list(repeat), "atoms": len(atoms), "timestep_fs": timestep_fs, "relax": relax,
               "relaxation": None, "quench": quench, "quench_result": None,
               "mc": None if mc is None else [move_record(move) for move in mc],
-              "min_mc_temperature_K": options.get("min_mc_temperature_K"), "pieces": [], "status": "relax"}
+              "min_mc_temperature_K": options.get("min_mc_temperature_K"), "pieces": [], "counters": None,
+              "status": "relax"}
     _write(directory, record)
     if relax is not None:
         calc = FastMACECalculator(model)
@@ -234,7 +240,9 @@ def _end_piece(sim, directory, record, first, started, log):
     step = int(sim.committed().step)
     if step > first or not record["pieces"]:
         sim.save_restart(directory)
-        record["pieces"].append({"first_step": first, "last_step": step, "wall_s": time.perf_counter() - started})
+        record["pieces"].append({"first_step": first, "last_step": step, "wall_s": time.perf_counter() - started,
+                                 "counters": _piece_counters(sim)})
+        record["counters"] = _sum_counters(record["pieces"])
     position = sim.schedule
     if position is not None and not position.finished:
         sim.flush_output()
@@ -262,6 +270,19 @@ def _end_piece(sim, directory, record, first, started, log):
     record["status"] = "complete"
     _write(directory, record)
     return record
+
+
+def _piece_counters(sim):
+    """``PIECE_COUNTERS`` of this piece's engine (``None`` where the engine does not report one)."""
+    info = (sim.metadata().get("counters") or {}).get("engine") or {}
+    return {key: info.get(key) for key in PIECE_COUNTERS}
+
+
+def _sum_counters(pieces):
+    """The sums of the pieces' counters; ``None`` for a counter some piece lacks."""
+    counts = [piece.get("counters") or {} for piece in pieces]
+    return {key: None if any(c.get(key) is None for c in counts) else sum(c[key] for c in counts)
+            for key in PIECE_COUNTERS}
 
 
 def _log_counters(directory, log):
