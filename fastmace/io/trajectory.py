@@ -119,13 +119,15 @@ class OutputWriter:
             self._handle.flush()  # a chunk opened at a restart point is complete on disk
 
     def write(self, values: Mapping[str, Any], sample: Sequence[Any] | None = None,
-              frame: bool = False) -> tuple[Any, ...] | None:
+              frame: bool = False, *, tail: Sequence[Any] = ()) -> tuple[Any, ...] | None:
         """Write one step's row and/or frame from host output values.
 
         ``sample`` is the row's leading columns (step, time in ps, phase, target temperature), or
         ``None`` for no row; the row adds temperature, potential, kinetic and total energy per atom
-        and, for variable-cell values, volume per atom and pressure. Returns the row. Nonfinite
-        observables raise ``RuntimeError`` before anything is written.
+        and, for variable-cell values, volume per atom and pressure, then ``tail`` (the MC counters of
+        a run with MC moves, 3-T15). Returns the row. Nonfinite observables raise ``RuntimeError``
+        before anything is written. A frame takes the step's species and masses from ``numbers`` and
+        ``masses`` when the values carry them (after a composition change, 3-T15).
         """
         values = {key: _host(value) for key, value in values.items()}
         variable_cell = "cell" in values and "stress" in values
@@ -135,7 +137,7 @@ class OutputWriter:
             if not np.isfinite(result).all():
                 raise RuntimeError(f"Nonfinite MD observables at step {sample[0]}")
             temperature, epot, ekin = result[:3]
-            row = (*sample, temperature, epot, ekin, epot + ekin, *result[3:])
+            row = (*sample, temperature, epot, ekin, epot + ekin, *result[3:], *tail)
             self._csv.writerow(row)
             self._handle.flush()
         if frame:
@@ -150,6 +152,10 @@ class OutputWriter:
             from ase.stress import full_3x3_to_voigt_6_stress
             atoms.set_cell(values["cell"])
             extra["stress"] = full_3x3_to_voigt_6_stress(values["stress"])
+        if "numbers" in values and not np.array_equal(atoms.numbers, values["numbers"]):
+            atoms.numbers = values["numbers"]
+        if "masses" in values and not np.array_equal(atoms.get_masses(), values["masses"]):
+            atoms.set_masses(values["masses"])
         atoms.set_positions(values["positions"])
         atoms.set_momenta(values["momenta"])
         atoms.calc = SinglePointCalculator(atoms, energy=float(values["energy"][0]), forces=values["forces"],

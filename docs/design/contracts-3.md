@@ -85,7 +85,12 @@ ASE (tested in a fresh interpreter).
 
 Notes on the records:
 - **Species stay as given:** symbols or atomic numbers ≥ 1. The driver maps them to atomic numbers.
-- **`Simulation.run(mc=…)` reads them already:** `_refuse_mc` reads `.move`, `.pairs` and `.species`, so the workload, temperature and superset checks apply to the real records today. The call still ends in the `mc-phase-3` refusal until T15.
+- **`Simulation.run(mc=…)` runs them (3-T15):** it takes `fm.mc` records only (`TypeError` otherwise; an empty set is a `ValueError`), checks the move set that will be attached (given, or kept with `mc=...`) against the workload over every step of the call (`mc-move-not-declared`, `mc-below-min-temperature`, `species-not-in-superset`), then attaches it through `MCDriver(moves, seed=sim.seed).attach(engine)`.
+  - A block runs right after the MD step it is due at, before that step's output and restart, with `Simulation._mc_block_active` set.
+  - Detaching (`mc=None`) keeps the driver's `state_dict()`; a later attach loads it into the new driver with the new moves (`simulation._carried_mc_record`, then T09's `load_state_dict(record, other_moves=True)`: streams, cycle position and cumulative counters carry over). A restart holds the attached set (`mc`) or, detached, `simulation.json`'s `mc` entry.
+  - Move records as data: T09's `mc.driver.move_record` and `move_from_record`, through `simulation.move_record` and `simulation.move_from_record`, which also names an unknown field and takes `mu` and `formal_charges` as TOML tables (restart `mc.moves`, CLI `[[mc]]` tables, the child runner).
+  - Thermo: `mc_<move>_attempted` and `mc_<move>_accepted` per `Workload.mc_moves` entry (`simulation.mc_columns`), as of the last block; none without MC moves. `counters.mc` and the report's `mc:` line and `report.mc` metadata block (moves, ranges, blocks, device time). The cost per attempt is the device time over the attempts of the timed blocks: each attach's first block, whose time includes the attempts' captures, is left out (`timed_attempts`).
+  - `fm.md(mc=…)` adds the move set's species to the superset and, with a schedule, attaches it only over the steps at or above `min_mc_temperature_K` (`quick.mc_ranges`).
 - **`configurational_mu` formula:** Δμ_s^conf = Δμ_s^full + (3/2) k_B T ln(m_s / m_ref), with k_B = 8.617333262 × 10⁻⁵ eV/K. The reference's own Δμ must be 0. `masses=None` takes ASE's standard atomic masses.
 
 ## Errors (`errors.py`, new classes only)
@@ -243,9 +248,11 @@ compatibility promise: a restart record's (seed, offset) must give the same numb
   `baseline_eV`, `energy_eV` (the baseline after the last acceptance), `accepted`, `device_ms` (CUDA events;
   `None` on the CPU). `None` when no move is due.
 - `counters` (cumulative, per move type, `MC_COUNTER_KEYS`) and `offsets` (per stream): host values,
-  updated once per block. `state_dict()` is the restart's `mc` record (`MC_RECORD_KEYS`; `cycle_position`
-  is the step of the last block, `delta_A` empty for swaps and transmutations); `load_state_dict` restores
-  it. `attach` and `run_block` also put it into `engine.state.mc`.
+  updated once per block. `state_dict()` is the restart's `mc` record (moves as `{"move", **fields}`, tuples as lists;
+  `driver.move_from_record` reads an entry back) (`MC_RECORD_KEYS`; `cycle_position`
+  is the step of the last block, `delta_A` empty for swaps and transmutations); `load_state_dict(record, *, other_moves=False)`
+  restores it; `other_moves=True` lets another move set continue a record's streams, counters and cycle
+  position (a re-attach). `attach` and `run_block` also put it into `engine.state.mc`.
 - **Checks** (`planner.minimal.check_mc_moves(moves, *, superset, charge_inputs, fixcm)`, called by
   `attach`; raises `PlanRefused` with every reason):
   - rule 2: a species outside the superset (`species-not-in-superset`, `SpeciesNotInSuperset`);
@@ -357,10 +364,10 @@ Since 3-T08 the writer is at `FORMAT_VERSION = NEXT_FORMAT_VERSION = 3`. Version
 | `test_restart.py::test_the_1b_fields_are_in_the_state` | `FIELDS_ADDED_IN_1B == {"mc"}` | T08 |
 | `test_interfaces.py::test_state_fields_of_phase_1a` (`FIELDS_ADDED_IN_1B`) | the same fact | T08 |
 | `test_ase_md.py::test_forbidden_observer_changes_raise_with_their_reason` (numbers, masses, charges) | "phase 3" | T13 |
-| `test_simulation.py::test_a_valid_mc_block_is_refused_with_mc_phase_3` and the `mc=` section after it | `mc-phase-3` | T15 |
-| `test_quick.py::test_mc_is_checked_then_refused_phase_3` and `test_every_refusal_at_once` | `mc-phase-3` | T15 |
-| `test_cli.py::test_run_mc_is_checked_then_refused` | "MC: phase 3" | T15 |
-| `test_metadata_schema.py` `LATER_PHASES` (`counters.mc`) | `counters.mc` null | T15 |
+| `test_simulation.py::test_a_valid_mc_block_is_refused_with_mc_phase_3` and the `mc=` section after it | `mc-phase-3` | T15 (flipped) |
+| `test_quick.py::test_mc_is_checked_then_refused_phase_3` and `test_every_refusal_at_once` | `mc-phase-3` | T15 (flipped) |
+| `test_cli.py::test_run_mc_is_checked_then_refused` (now `test_run_mc_tables_become_move_records`) | "MC: phase 3" | T15 (flipped) |
+| `test_metadata_schema.py` `LATER_PHASES` (`counters.mc`) | `counters.mc` null | T15 (flipped) |
 
 The plan counts the `mc=` sections of `test_simulation.py` and `test_quick.py` as one each. The
 table has eleven rows because `test_interfaces.py` pins the same fact as `test_restart.py`.
@@ -409,4 +416,4 @@ open questions of its prestart report and record them here.
 7. **The move records and `configurational_mu` are complete, not stubs.** They are pure, torch-free and validated, so T12 and T15 can build against them now.
 8. **Swaps admit all four momentum treatments.** §10.4 restricts only `exchange`, to swaps. The `fixcm` refusals of `rescale` and `redraw` are T09's planner check, not record validation.
 9. **`set_species` changes masses.** The new species' standard masses apply unless `set_masses` follows, so a host species change needs no second call. `set_friction` takes 1/fs, the unit of the public integrator records.
-10. **`MCConfig` reaches the driver as `MCDriver(config=)`.** It is not yet a `Simulation` or `fm.md` option. T15 decides whether it becomes one; it would be a new keyword-only parameter, pinned in `test_contracts.py`.
+10. **`MCConfig` reaches the driver as `MCDriver(config=)`.** It is not yet a `Simulation` or `fm.md` option. T15 decides whether it becomes one; it would be a new keyword-only parameter, pinned in `test_contracts.py`. T15: not yet; `Simulation` attaches with the default `MCConfig`.

@@ -3,8 +3,8 @@
 Tiny MH-1-class models in float64 (and float32 where a model is passed), NaCl, the minimal planner
 on the CPU without compilation (eager stages). Covers: the constructor's refusals and defaults
 (owner decisions D1, D7), ``run`` along schedules (every check before the first step, the state
-unchanged on a refusal), ``mc=`` checks and the phase-3 refusal, output through the chunked writer,
-``NonFiniteError``, ``committed()``, the frame hook, the report and ``metadata.json``.
+unchanged on a refusal), ``mc=`` attach and detach with its checks (T09's driver faked), output
+through the chunked writer, ``NonFiniteError``, ``committed()``, the frame hook, the report and ``metadata.json``.
 """
 
 from __future__ import annotations
@@ -365,19 +365,27 @@ def test_schedule_must_be_a_schedule(loaded):
         sim.run(schedule=[300.0, 200.0], steps=1)
 
 
-# --------------------------------------------------------------------------- mc= (duck-typed; MC is phase 3)
+# --------------------------------------------------------------------------- mc= (§7.6; T09's driver, observed)
 
 
-@dataclasses.dataclass
-class Swap:
-    pairs: tuple
-    every: int = 10
-    attempts: int = 5
+def Swap(pairs, every=2, attempts=5, **fields):
+    from fastmace.mc import Swap as record
+
+    return record(pairs=pairs, every=every, attempts=attempts, **fields)
 
 
-@dataclasses.dataclass
-class Displace:
-    every: int = 10
+def Displace(every=2, attempts=5):
+    from fastmace.mc import Displace as record
+
+    return record(delta_A=0.1, every=every, attempts=attempts)
+
+
+@pytest.fixture
+def drivers(monkeypatch):
+    """T09's MCDriver, observed (tests/_support/fake_mc.py's spy); the drivers made, in order."""
+    from _support import fake_mc
+
+    return fake_mc.spy(monkeypatch)
 
 
 def _mc_workload(**changes):
@@ -386,58 +394,184 @@ def _mc_workload(**changes):
     return Workload(**fields)
 
 
-def test_a_valid_mc_block_is_refused_with_mc_phase_3(loaded):
+def test_a_move_set_attaches_and_stays_attached_until_mc_none(loaded, drivers, monkeypatch):
+    from _support import fake_mc
+
+    sim = _simulation(loaded, workload=_mc_workload())
+    monkeypatch.setattr(fake_mc, "flag", lambda: sim._mc_block_active)
+    sim.run(steps=4, mc=Swap(pairs=(("Na", "Cl"),)))
+    (driver,) = drivers
+    assert driver.engine is sim._engine and driver.seed == sim.seed
+    assert driver.spied == [(2, True), (4, True)]  # after the MD steps of each block, with the restart guard set
+    assert not sim._mc_block_active
+    sim.run(steps=2)  # still attached (§7.6)
+    assert [step for step, _ in driver.spied] == [2, 4, 6]
+    sim.run(steps=2, mc=None)  # detached
+    assert [step for step, _ in driver.spied] == [2, 4, 6] and sim.committed().step == 8
+    sim.run(steps=2)  # nothing attached
+    assert len(drivers) == 1 and sim.committed().step == 10
+
+
+def test_reattaching_resumes_the_streams_and_counters(loaded, drivers):
+    sim = _simulation(loaded, workload=_mc_workload())
+    sim.run(steps=2, mc=Swap(pairs=(("Na", "Cl"),)))
+    first = drivers[0].state_dict()
+    sim.run(steps=2, mc=None)
+    sim.run(steps=2, mc=Swap(pairs=(("Na", "Cl"),), attempts=7))
+    second = drivers[1]
+    (loaded_record,) = second.loaded
+    assert loaded_record["streams"] == first["streams"] and loaded_record["counters"] == first["counters"]
+    assert loaded_record["cycle_position"] == 2
+    assert loaded_record["moves"] == second.state_dict()["moves"]  # the new move set
+    assert second.counters["swap"]["attempted"] == 5 + 7  # cumulative per move type
+
+
+def test_a_new_move_set_replaces_the_attached_one(loaded, drivers):
+    sim = _simulation(loaded, workload=_mc_workload())
+    sim.run(steps=2, mc=Swap(pairs=(("Na", "Cl"),)))
+    sim.run(steps=2, mc=[Swap(pairs=(("Na", "Cl"),), every=1)])
+    assert len(drivers) == 2 and [step for step, _ in drivers[1].spied] == [3, 4]
+    assert drivers[1].loaded[0]["streams"] == drivers[0].state_dict()["streams"]
+
+
+def test_mc_must_be_move_records(loaded, drivers):
+    sim = _simulation(loaded, workload=_mc_workload())
+    with pytest.raises(TypeError, match="fm.mc"):
+        sim.run(steps=2, mc=dataclasses.make_dataclass("Swap", ["pairs"])(pairs=(("Na", "Cl"),)))
+    with pytest.raises(ValueError, match="empty"):
+        sim.run(steps=2, mc=[])
+    assert not drivers and sim.committed().step == 0
+
+
+def test_mc_with_an_undeclared_move_type(loaded, drivers):
     sim = _simulation(loaded, workload=_mc_workload())
     before = _positions(sim)
     with pytest.raises(PlanRefused) as caught:
-        sim.run(steps=2, mc=Swap(pairs=(("Na", "Cl"),)))
-    assert caught.value.codes == ("mc-phase-3",)
-    assert "MC: phase 3" in str(caught.value)
-    _unchanged(sim, before)
-    sim.run(steps=1, mc=None)  # detach: runs
-    sim.run(steps=1)  # nothing attached: runs
-    assert sim.committed().step == 2
-
-
-def test_mc_with_an_undeclared_move_type(loaded):
-    sim = _simulation(loaded, workload=_mc_workload())
-    with pytest.raises(PlanRefused) as caught:
         sim.run(steps=2, mc=Displace())
-    assert caught.value.codes == ("mc-move-not-declared", "mc-phase-3")
+    assert caught.value.codes == ("mc-move-not-declared",)
+    _unchanged(sim, before)
+    assert not drivers
 
 
-def test_mc_with_no_declared_moves(loaded):
+def test_mc_with_no_declared_moves(loaded, drivers):
     sim = _simulation(loaded)
     with pytest.raises(PlanRefused) as caught:
         sim.run(steps=2, mc=Swap(pairs=(("Na", "Cl"),)))
     assert "mc-move-not-declared" in caught.value.codes
 
 
-def test_mc_below_the_minimum_mc_temperature_over_every_step(loaded):
+def test_mc_below_the_minimum_mc_temperature_over_every_step(loaded, drivers):
     sim = _simulation(loaded, workload=_mc_workload())
     schedule = ramp(300.0, 240.0, ps=0.006)  # 290, 280, ..., 240 K
     with pytest.raises(PlanRefused) as caught:
         sim.run(schedule=schedule, mc=Swap(pairs=(("Na", "Cl"),)))
-    assert caught.value.codes == ("mc-below-min-temperature", "mc-phase-3")
-    with pytest.raises(PlanRefused) as caught:  # the first 4 steps stay at or above 250 K
-        sim.run(schedule=schedule, steps=4, mc=Swap(pairs=(("Na", "Cl"),)))
-    assert caught.value.codes == ("mc-phase-3",)
-    assert sim.schedule is None and sim.committed().step == 0
+    assert caught.value.codes == ("mc-below-min-temperature",)
+    assert sim.schedule is None and sim.committed().step == 0 and not drivers
+    sim.run(schedule=schedule, steps=4, mc=Swap(pairs=(("Na", "Cl"),)))  # the first 4 steps stay at or above 250 K
+    assert sim.committed().step == 4
+    with pytest.raises(PlanRefused) as caught:  # the attached set is checked over every step of a later run too
+        sim.run()
+    assert caught.value.codes == ("mc-below-min-temperature",)
+    assert sim.committed().step == 4
+    sim.run(mc=None)  # without MC the rest of the schedule runs
+    assert sim.committed().step == 6
 
 
-def test_mc_naming_a_species_outside_the_superset(loaded):
+def test_mc_naming_a_species_outside_the_superset(loaded, drivers):
     sim = _simulation(loaded, workload=_mc_workload())
     with pytest.raises(SpeciesNotInSuperset) as caught:
         sim.run(steps=2, mc=Swap(pairs=(("Na", "Nb"),)))
-    assert caught.value.codes == ("species-not-in-superset", "mc-phase-3")
+    assert caught.value.codes == ("species-not-in-superset",)
     assert 2 in caught.value.rules
 
 
-def test_mc_refusals_come_before_the_schedule_attaches(loaded):
+def test_mc_refusals_come_before_the_schedule_attaches(loaded, drivers):
     sim = _simulation(loaded, workload=_mc_workload())
     with pytest.raises(PlanRefused):
-        sim.run(schedule=hold(300.0, ps=0.003), mc=Swap(pairs=(("Na", "Cl"),)))
+        sim.run(schedule=hold(300.0, ps=0.003), mc=Displace())
     assert sim.schedule is None
+
+
+def test_mc_thermo_columns_counters_and_report(loaded, drivers, tmp_path):
+    sim = _simulation(loaded, workload=_mc_workload(), output=Output(str(tmp_path / "run"), trajectory_every=None,
+                                                                    thermo_every=1, restart_every=None))
+    assert sim.metadata()["counters"]["mc"] is None  # never attached
+    sim.run(steps=4, mc=Swap(pairs=(("Na", "Cl"),)))
+    sim.close()
+    header, rows = output_io.read_thermo(tmp_path / "run")
+    assert header[-2:] == ["mc_swap_attempted", "mc_swap_accepted"]
+    attempted = [int(row[-2]) for row in rows]
+    assert attempted == [0, 0, 5, 5, 10]  # cumulative, as of the last completed block (blocks at 2 and 4)
+    metadata = json.loads((tmp_path / "run" / "metadata.json").read_text(encoding="utf-8"))
+    counters = drivers[0].counters
+    assert metadata["counters"]["mc"] == counters and counters["swap"]["attempted"] == 10
+    accepted = [int(row[-1]) for row in rows]
+    assert accepted[-1] == counters["swap"]["accepted"] and accepted == sorted(accepted)
+    text = sim.report.text()
+    assert "swap Na-Cl every 2, 5 attempts" in text and f"accepted {counters['swap']['accepted']}/10" in text
+    assert "2 blocks" in text and "MC: experimental" in text  # no device time on the CPU
+
+
+def test_md_only_thermo_has_no_mc_columns(loaded, tmp_path):
+    sim = _simulation(loaded, output=Output(str(tmp_path / "run"), trajectory_every=None, thermo_every=1,
+                                            restart_every=None))
+    sim.run(steps=1)
+    sim.close()
+    header, _ = output_io.read_thermo(tmp_path / "run")
+    assert not [name for name in header if name.startswith("mc_")]
+    assert "\nmc:" not in sim.report.text()
+
+
+def test_a_restart_in_a_block_step_carries_the_move_set(loaded, drivers, tmp_path):
+    from fastmace.simulation import Simulation
+
+    directory = tmp_path / "run"
+    sim = _simulation(loaded, workload=_mc_workload(), output=Output(str(directory), trajectory_every=None,
+                                                                    thermo_every=2, restart_every=4))
+    sim.run(steps=4, mc=Swap(pairs=(("Na", "Cl"),)))  # the restart at step 4 comes after that step's block
+    record = drivers[0].state_dict()
+    sim.close()
+    resumed = Simulation.resume(directory)
+    assert len(drivers) == 2
+    assert drivers[1].loaded == [record] and drivers[1].moves == drivers[0].moves
+    resumed.run(steps=2)  # the move set stays attached across the resume (§7.6)
+    assert [step for step, _ in drivers[1].spied] == [6]
+    resumed.close()
+
+
+def test_a_detached_move_set_keeps_its_streams_across_a_resume(loaded, drivers, tmp_path):
+    from fastmace.simulation import Simulation
+
+    directory = tmp_path / "run"
+    sim = _simulation(loaded, workload=_mc_workload(), output=Output(str(directory), trajectory_every=None,
+                                                                    thermo_every=2, restart_every=None))
+    sim.run(steps=2, mc=Swap(pairs=(("Na", "Cl"),)))
+    record = drivers[0].state_dict()
+    sim.run(steps=2, mc=None)
+    sim.save_restart(directory)
+    sim.close()
+    resumed = Simulation.resume(directory)
+    assert len(drivers) == 1  # nothing attached
+    resumed.run(steps=2, mc=Swap(pairs=(("Na", "Cl"),)))
+    assert drivers[1].loaded[0]["streams"] == record["streams"]
+    resumed.close()
+
+
+def test_frames_carry_the_current_species(loaded, tmp_path):
+    from ase.io import read
+
+    directory = tmp_path / "run"
+    sim = _simulation(loaded, output=Output(str(directory), trajectory_every=1, thermo_every=1, restart_every=None))
+    sim.run(steps=1)
+    species = sim.committed().species.copy()
+    species[0], species[1] = species[1], species[0]  # one Na and one Cl change places
+    sim.set_species(species)
+    sim.run(steps=1)
+    sim.close()
+    frames = read(str(directory / "trajectory.0.traj"), index=":")
+    assert list(frames[1].numbers) != list(frames[2].numbers)
+    assert list(frames[2].numbers) == list(species)
+    assert np.allclose(frames[2].get_masses(), sim.committed().masses)
 
 
 # --------------------------------------------------------------------------- non-finite energies (§9.6)
