@@ -1,0 +1,50 @@
+# The swap-MC annealing protocol of swap_anneal_NaNbOCl4.toml with a schedule about a tenth as long:
+# 0 -> 1000 K in 2 ps, then 30 K/ps to 250 K (27,000 steps at 1 fs). Every stage and setting is the
+# same. It is the validation run on a paid GPU (plan task 3-T14), not a production protocol.
+
+structure = "NaNbOCl4_I4m_Ma2026.cif"
+model = "mh1"
+head = "matpes_r2scan"
+repeat = [3, 3, 3]
+timestep_fs = 1.0
+min_mc_temperature_K = 250.0
+
+[[schedule]]
+kind = "ramp"
+start_K = 0.0
+end_K = 1000.0
+ps = 2.0
+
+[[schedule]]
+kind = "ramp"
+start_K = 1000.0
+end_K = 250.0
+rate_K_per_ps = -30.0
+
+[engine]
+backend = "hybrid"
+
+[output]
+trajectory_every = 10
+thermo_every = 10
+restart_every = 10000
+
+[[mc]]
+move = "swap"
+pairs = [["O", "Cl"]]
+every = 100
+attempts = 50
+velocities = "exchange"
+
+[relax]
+fmax = 0.01
+optimizer = "LBFGS"
+max_steps = 5000
+
+[quench]
+min_K = 500.0
+bin_K = 100.0
+per_bin = 2
+fmax = 0.01
+optimizer = "LBFGS"
+max_steps = 5000
