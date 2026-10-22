@@ -578,3 +578,15 @@ def test_import_fastmace_does_not_import_mace():
                             text=True, timeout=300, check=False)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().splitlines()[-1] == "[]"
+
+
+def test_a_head_label_without_its_own_entry_finds_the_same_head_again():  # 3-T11: the MH-1 omol head
+    from fastmace.model import labels
+
+    entry = labels.find("mh1", "omol")
+    assert entry.label == "mh-1:omol" and entry.head == "omol"
+    again = labels.find(entry.label)
+    assert (again.label, again.head, again.checkpoint) == (entry.label, "omol", entry.checkpoint)
+    assert labels.find(entry.label, "omol").head == "omol"
+    with pytest.raises(ValueError, match="is head 'omol'"):
+        labels.find(entry.label, "spice_wB97M")
