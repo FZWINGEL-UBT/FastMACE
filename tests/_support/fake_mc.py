@@ -37,8 +37,9 @@ class FakeDriver:
         self.evaluator = None
         FakeDriver.made.append(self)
 
-    def attach(self, engine, *, evaluator=None):
+    def attach(self, engine, *, evaluator=None, max_displacement_A=None):
         self.engine = engine
+        self.max_displacement_A = max_displacement_A
         self.evaluator = evaluator
         engine.state.mc = self.state_dict()
 

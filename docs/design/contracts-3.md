@@ -20,6 +20,7 @@ unchanged. `tests/cpu/test_research_surface.py` is unchanged.
 | `Workload.max_displacement_A` | `None` | the largest displacement δ (Å) any `Displace` may use; required when `"displace"` is in `mc_moves`; rule 11 adds 2δ to the skin, and T10 refuses a larger `delta_A` (`planner/workload.py`) | T05 |
 | `MCConfig.max_attempts_per_block` | `10_000` | attempts of one move per block | T09 |
 | `MCConfig.max_move_sets` | `8` | move records attached at once | T09 |
+| `IntegratorConfig.fixcm_projection` | `"ase"` | how `fixcm` projects the Langevin noise: `"ase"` is ASE's, bit for bit (noise-stream equivalence; right for equal masses only); `"mass_weighted"` is the Gaussian conditioned on a fixed centre of mass (mass-weighted means, no √(N/(N−1)) factor; canonical over 3N − 3 degrees of freedom, per species too; the PyTorch stage only, not the fused one). Added by the conductor's approval; the default is the owner's checkpoint 2b. The public `fm.integrators` records don't expose it yet | T22 (docs/design/fixcm-projection.md) |
 
 Constants and functions:
 - `DEFAULT_SKIN_A = 0.3`;
@@ -327,6 +328,50 @@ Added by 3-T11 under the conductor's answers (`plans/phase-3.md`, "3-T11 move-en
 - **When.** MC plans always run it, also under `check="skip"` (decision 35). `Simulation` calls it
   after T15 (second editor of `simulation.py`).
 
+### Displacements (T10)
+
+`fastmace/mc/displace.py` (owner T10, second editor of `fastmace/mc/` after T09):
+- **Numbers per attempt** (a restart compatibility promise like the swap's): `PROPOSAL_COUNT = 5` proposal numbers
+  from `base + 5k` (number 0 as a uniform: the atom `min(⌊u·N⌋, N − 1)`; numbers 1–3 as normals: the direction;
+  number 4 as a uniform: the radius `δ·u^(1/3)`), one acceptance number at `base + k`, no velocity number
+  (`attempt_counts(N)`). Acceptance as for swaps: `ln u < −ΔE/kT`, `u = 0` accepts. `decode_displace(u, g, N, delta)`.
+- **`check_displace(move, *, max_displacement_A, variable_cell)`**: `PlanRefused` with every reason, codes
+  `displace-variable-cell` (answer 3) and `displace-beyond-max-displacement` (`delta_A` above
+  `Workload.max_displacement_A`, or none declared).
+- **`DisplaceAttempt(move, engine, evaluator, block_streams)`**, built by `moves.build_attempt` for a `Displace`: the
+  shape of T09's `Attempt` (`bound(stage, trial)`, `run()`, `tensors()`, `counters` `[3]`, `accepted`, `counts`,
+  `block_velocity_count = 0`, `velocities = None`; `accept` binds `moves.metropolis` when built), plus `halted`,
+  `trial_energy`, `delta` (device), `poll() -> (index, halted)`, `host_attempt() -> rebuilt`, `set_delta(delta_A, *,
+  record=True)`, `adapt(accepted, attempted)`, `delta_A`, `delta_history`, `trial_rebuilds` (host, cumulative) and
+  `max_displacement_A`.
+- **Paths:** the captured attempt (key `("mc.displace", driver id, index, precision, edges)`, T09's scheme) is valid
+  only when the rebuild test passes and the count fits the active edges; otherwise it restores itself, leaves the
+  attempt index and sets `halted`, the later replays do nothing, and the host runs that attempt again with the same
+  numbers: the committed list saved, a trial build around the trial geometry when needed, edges sized for the trial,
+  the captured energy graph, then accept (keep the trial list) or reject (restore the position and the list).
+- **In `MCDriver`:**
+  - `attach(engine, *, evaluator=None, max_displacement_A=None)`: `check_displace` for every `Displace`, with the
+    workload's maximum (T15 passes `Workload.max_displacement_A`) and the engine's `variable_cell`.
+  - `run_block`: after a displacement move's replays, `_finish_displacements(index)` reads its attempt index and
+    `halted` (one host read), runs a halted attempt on the host and replays the rest; one more read per halted
+    attempt (answer 1). Moves due in the block still run in attached order.
+  - The block record's displacement entry adds `trial_rebuilds` (answer 4; a run counter, not restart state, since
+    the restart's counters are exactly `MC_COUNTER_KEYS`), `delta_A` (the δ the block used) and, with `adaptive`,
+    `adapted_delta_A`.
+  - Adaptive δ (answer 2) at the end of each block: δ ← δ·clamp(acc/0.3, 0.5, 2), at most `delta_A` and
+    `Workload.max_displacement_A`. The restart's `delta_A` holds each displacement move's current δ by
+    `"displace:<index>"`; `load_state_dict` restores it before or after attach. `info()["displacements"]` gives
+    δ, its history and the trial builds per move.
+
+Beside it:
+- `SkinNeighbourList.save_list(into=None) -> dict` and `restore_list(saved)`: copies of `buffers()` and the candidate
+  count, kept by the caller (not reachable from the engine, so `check_against` is unaffected); `restore_list` refuses
+  once the capacity moved. Fixed cell only.
+- `GraphEngine.trial_rebuild() -> grew` (in place at the trial positions; a growth drops the graphs and is redone
+  as an overflow), `use_trial_edges() -> edges` (compact, one host sync, the padded count), `adopt_trial_list()`
+  (the pipeline's padded sizes follow an accepted trial list), `record_mc_overflow(word)` (counts in
+  `overflows_redone`, clears the flags); `GraphEngine.trial_rebuilds` counts the trial builds.
+
 ## Restart version 3 (`io/restart.py`; owner T08)
 
 Since 3-T08 the writer is at `FORMAT_VERSION = NEXT_FORMAT_VERSION = 3`. Version 0, 1 and 2 files keep loading.
@@ -340,6 +385,25 @@ Since 3-T08 the writer is at `FORMAT_VERSION = NEXT_FORMAT_VERSION = 3`. Version
   - `delta_A`: adaptive displacement step sizes.
 - **`mc_record(restart)`**: stub, T08.
 - **Restart writes** happen only at committed steps: never inside an MC block, never from an overflowed step.
+
+## Protocol runs (`fastmace/protocols/`; owner T14)
+
+Added by 3-T14 under the conductor's answers (`plans/phase-3.md`, "3-T14 swap-MC annealing protocol").
+
+| Name | Signature | Meaning |
+| --- | --- | --- |
+| `protocols.quench.relax` | `relax(atoms, calc, fmax, max_steps=5000, logfile=None, optimizer="LBFGS") -> (Atoms, summary)` | ASE LBFGS or BFGS at fixed cell (`langevin/quench.py:relax`) |
+| `protocols.quench.select_frames` | `select_frames(frames, min_K, bin_K, per_bin, peak_K)` | the research function, unchanged |
+| `protocols.quench.picks` | `picks(resolved, frame_every, settings)` | `select_frames` over a run's frames (step 0, every `frame_every`), then the final frame |
+| `protocols.quench.quench_run` | `quench_run(directory, calc, resolved, frame_every, timestep_fs, settings, *, log=print) -> summary` | `<run>/quench/`: `captured.traj`, `quenched.traj`, `quench.csv` (per frame; an interrupted quench continues), `quench.json` (last) |
+| `protocols.runner.start` | `start(structure, options, *, relax=None, quench=None, steps=None, source=None, log=print) -> record` | relaxation, then `fm.md` for at most `steps` steps, a restart, and the quench once the schedule is done |
+| `protocols.runner.resume` | `resume(directory, *, steps=None, log=print) -> record` | `Simulation.resume`, at most `steps` more steps with the move set attached as `fm.md` attaches it, a restart, the quench at the end |
+| `protocols.runner.split_stages` | `split_stages(data) -> ({"relax", "quench"}, rest)` | the `[relax]` (`RELAX_KEYS = ("fmax", "optimizer", "max_steps")`) and `[quench]` (`profiles.QUENCH_KEYS`) tables of a protocol |
+| `protocols.runner.protocol_names`, `protocol_file`, `DATA` | | the shipped protocols: `fastmace/protocols/data/*.toml`, by stem |
+| `fastmace run` | `fastmace run [CONFIG \| NAME] [--steps N] [--output DIR]`, `fastmace run --resume RUN_DIR [--steps N]` | a file with `[relax]`/`[quench]`, or `--steps`, is a protocol run; otherwise `fm.md` as before |
+
+- `protocol.json` (`PROTOCOL_RECORD_VERSION = 1`) in the run directory: source, structure, repeat, atoms, stages, relaxation summary, move records, `min_mc_temperature_K`, pieces (`first_step`, `last_step`, `wall_s`), status (`relax`, `md`, `quench`, `complete`) and the quench summary.
+- `fm.md` with `steps=` and a schedule sizes `max_temperature_K` by the whole schedule (SPEC §7.7), so the rest of the schedule runs later on the same plan (3-T14; before, by the steps of the call).
 
 ## The ten refusal-pinning tests and the task that flips each
 

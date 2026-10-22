@@ -86,23 +86,28 @@ class MCDriver:
         self.attempts: list = []
         self.streams = None
         self._replays: dict = {}
+        self._delta_A: dict = {}  # restart record's δ by move key, until attach (3-T10)
         self.id = next(_IDS)
 
     # ------------------------------------------------------------------ setup
 
-    def attach(self, engine: Any, *, evaluator: Any = None) -> None:
+    def attach(self, engine: Any, *, evaluator: Any = None, max_displacement_A: float | None = None) -> None:
         """Bind to a built engine: the move checks, the device tables, streams and counters, and the attempts
         (captured at their first replay). ``evaluator``: the MC evaluator (``fastmace.mc.evaluator.MCEvaluator``);
-        ``None`` evaluates in the force precision."""
+        ``None`` evaluates in the force precision. ``max_displacement_A``: the workload's
+        (``Workload.max_displacement_A``), required with ``Displace`` moves, which are refused above it and
+        under a variable cell (``fastmace.mc.displace.check_displace``; 3-T10)."""
         from fastmace.mc import moves as moves_module
+        from fastmace.mc.displace import check_displace
         from fastmace.mc.evaluator import MCEvaluator
         from fastmace.mc.moves import build_attempt
         from fastmace.mc.streams import BlockStreams
         from fastmace.planner.minimal import check_mc_moves
 
-        displacements = [move for move in self.moves if isinstance(move, Displace)]
-        if displacements:
-            raise NotImplementedError("MC attempts of Displace: plan task 3-T10")
+        for move in self.moves:
+            if isinstance(move, Displace):
+                check_displace(move, max_displacement_A=max_displacement_A,
+                               variable_cell=bool(getattr(engine, "variable_cell", False)))
         field, state = engine.force_field, engine.state
         superset = getattr(field, "superset", None)
         if superset is None:
@@ -118,6 +123,12 @@ class MCDriver:
         self.evaluator = MCEvaluator(engine) if evaluator is None else evaluator
         self.streams = BlockStreams(self.seeds, state.positions.device)
         self.attempts = [build_attempt(move, engine, self.evaluator, self.streams, fixcm=fixcm) for move in self.moves]
+        for attempt, move in zip(self.attempts, self.moves, strict=True):
+            if isinstance(move, Displace):
+                attempt.max_displacement_A = float(max_displacement_A)
+                delta = self._delta_A.get(self._delta_key(self.moves.index(move)))
+                if delta is not None:  # a restart record loaded before attach
+                    attempt.set_delta(delta, record=False)
         self.fixcm = fixcm
         self._replays = {}
         # The per-atom charges the force field had at attach; a block that moved the total charge puts them
@@ -169,6 +180,8 @@ class MCDriver:
             start, stop = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
             start.record()
         before_counts = torch.stack([attempt.counters for attempt in self.attempts]).clone()
+        self._block_trial_rebuilds = {index: getattr(attempt, "trial_rebuilds", 0)
+                                      for index, attempt in enumerate(self.attempts)}
         indices, redraw_all = [], {}
         offsets = dict(self.offsets)
         for index in due:
@@ -177,6 +190,8 @@ class MCDriver:
             replay = self._replay(index)
             for _ in range(move.attempts):
                 replay()
+            if isinstance(move, Displace):
+                self._finish_displacements(index)
             indices.append(streams.index.clone())
             # The host knows the fixed counts; the device index says how many attempts completed (read below).
             for stream in MC_STREAMS:
@@ -209,8 +224,15 @@ class MCDriver:
             attempted, impossible, accepted = delta[index]
             for key, value in zip(COUNTER_KEYS, (attempted, impossible, accepted), strict=True):
                 self.counters[move.move][key] += int(value)
-            moves_out.append({"move": move.move, "attempts": move.attempts, "attempted": int(attempted),
-                              "impossible": int(impossible), "accepted": int(accepted)})
+            entry = {"move": move.move, "attempts": move.attempts, "attempted": int(attempted),
+                     "impossible": int(impossible), "accepted": int(accepted)}
+            if isinstance(move, Displace):  # 3-T10: trial builds, the δ used and, with adaptive, the next one
+                attempt = self.attempts[index]
+                entry.update(trial_rebuilds=attempt.trial_rebuilds - self._block_trial_rebuilds[index],
+                             delta_A=attempt.delta_A)
+                if move.adaptive:
+                    entry["adapted_delta_A"] = attempt.adapt(int(accepted), int(attempted))
+            moves_out.append(entry)
             if accepted:
                 accepted_moves.append(index)
         if accepted_moves:
@@ -223,6 +245,20 @@ class MCDriver:
                            "temperature_K": temperature}
         state.mc = self.state_dict()
         return self.last_block
+
+    def _finish_displacements(self, index: int) -> None:
+        """A displacement move's replays may have halted at an attempt that needs a trial build or more edges
+        (``DisplaceAttempt``): run that attempt on the host with the same numbers, then replay the rest. One
+        host read after the move's replays, plus one per halted attempt (3-T10 answer 1)."""
+        attempt, move = self.attempts[index], self.moves[index]
+        while True:
+            done, halted = attempt.poll()
+            if not halted:
+                return
+            attempt.host_attempt()
+            replay = self._replay(index)  # the edges may have changed
+            for _ in range(move.attempts - done - 1):
+                replay()
 
     def _replay(self, index: int):
         """The attempt's replay; its first capture runs without effect on the state and the driver's tensors."""
@@ -304,7 +340,7 @@ class MCDriver:
                 "counters": {move: dict(values) for move, values in self.counters.items()},
                 "streams": {stream: {"seed": int(self.seeds[stream]), "offset": int(self.offsets[stream])}
                             for stream in MC_STREAMS},
-                "delta_A": {}}
+                "delta_A": self._deltas()}
 
     def load_state_dict(self, record: Mapping[str, Any], *, other_moves: bool = False) -> None:
         """Restore the move set's position, counters, stream positions and δ from a restart record.
@@ -325,8 +361,24 @@ class MCDriver:
         for move in self.moves:
             self.counters.setdefault(move.move, dict.fromkeys(COUNTER_KEYS, 0))
         self.cycle_position = int(record["cycle_position"])
+        self._delta_A = {str(key): float(value) for key, value in record.get("delta_A", {}).items()}
+        for index, attempt in enumerate(self.attempts):  # 3-T10: each displacement move's δ
+            delta = self._delta_A.get(self._delta_key(index))
+            if isinstance(self.moves[index], Displace) and delta is not None:
+                attempt.set_delta(delta, record=False)
         if self.engine is not None:
             self.engine.state.mc = self.state_dict()
+
+    @staticmethod
+    def _delta_key(index: int) -> str:
+        return f"displace:{index}"
+
+    def _deltas(self) -> dict[str, float]:
+        """The restart's ``delta_A``: each displacement move's current δ by ``displace:<index>``."""
+        if not self.attempts:
+            return dict(self._delta_A)
+        return {self._delta_key(index): float(attempt.delta_A) for index, attempt in enumerate(self.attempts)
+                if isinstance(self.moves[index], Displace)}
 
     def info(self) -> dict[str, Any]:
         """For provenance and the report: the moves, the evaluator, the decisions and the counters."""
@@ -334,7 +386,12 @@ class MCDriver:
                 "velocities": [attempt.velocities for attempt in self.attempts],
                 "evaluator": None if self.evaluator is None else self.evaluator.info(),
                 "decisions": [list(decision) for decision in self.decisions], "counters": self.counters,
-                "offsets": dict(self.offsets), "blocks": self.blocks, "last_block": self.last_block}
+                "offsets": dict(self.offsets), "blocks": self.blocks, "last_block": self.last_block,
+                "displacements": {self._delta_key(index): {"delta_A": attempt.delta_A,
+                                                           "delta_history": list(attempt.delta_history),
+                                                           "trial_rebuilds": attempt.trial_rebuilds}
+                                  for index, attempt in enumerate(self.attempts)
+                                  if isinstance(self.moves[index], Displace)}}
 
 
 __all__ = ["COUNTER_KEYS", "MCDriver", "move_from_record", "move_record"]

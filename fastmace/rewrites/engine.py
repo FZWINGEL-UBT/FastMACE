@@ -253,6 +253,32 @@ def strain_problems(function):
 # dict without that name (NameError; 2-T23, OMOL-0, plan task 2-T19b). So each (function, strain
 # function) gets one rebound function with its own code object (_rebound), reused by every build.
 _REBOUND: dict = {}
+# The copied globals of every rebound function, by the module they copy ("mace.modules.utils" ->
+# [namespace, ...]). A process patch installed or undone after a copy was taken reaches it through
+# follow_patch (3-T04b): the copy is the module at bind time except the names it replaces on purpose.
+_SNAPSHOTS: dict = {}
+
+
+def _snapshot(function):
+    """A copy of ``function``'s globals that follows later process patches (``follow_patch``)."""
+    namespace = dict(function.__globals__)
+    _SNAPSHOTS.setdefault(function.__globals__.get("__name__", ""), []).append(namespace)
+    return namespace
+
+
+def follow_patch(target, old, new):
+    """``_patches`` replaced ``"module:attribute"`` (``old`` by ``new``): update every copy that still holds ``old``.
+
+    A copy holding something else replaced that name on purpose (the strain function of a variant, the
+    ``prepare_graph`` of a forward) and keeps it. The strain patch never reaches a copy: an "off"
+    variant keeps MACE's own strain function while the reference calculators' patch is in force.
+    """
+    if target in _patches.SOURCE_PINS["single_graph_strain"]:
+        return
+    module, attribute = target.split(":", 1)
+    for namespace in _SNAPSHOTS.get(module, ()):
+        if attribute in namespace and namespace[attribute] is old:
+            namespace[attribute] = new
 
 
 def _rebound(function, namespace):
@@ -279,7 +305,8 @@ def strain_prepare_graph(one_graph):
 
     The same code, with a copy of ``mace.modules.utils``' globals taken at the first call; only
     ``get_symmetric_displacement`` differs, and MACE's own is the original even while the
-    reference calculators' process patch is in force. Made once per process for each choice
+    reference calculators' process patch is in force. Other process patches installed or undone
+    later reach the copy (``follow_patch``). Made once per process for each choice
     (``_REBOUND``), so all builds share it under torch.compile.
     """
     utils = _mace_utils()
@@ -292,7 +319,7 @@ def strain_prepare_graph(one_graph):
     key = (utils.prepare_graph, strain)
     found = _REBOUND.get(key)
     if found is None:
-        namespace = dict(vars(utils))
+        namespace = _snapshot(utils.prepare_graph)
         namespace["get_symmetric_displacement"] = strain
         found = _REBOUND[key] = _rebound(utils.prepare_graph, namespace)
     return found
@@ -312,7 +339,7 @@ def strain_forward(function, one_graph):
     key = (function, prepare_graph)
     found = _REBOUND.get(key)
     if found is None:
-        namespace = dict(function.__globals__)
+        namespace = _snapshot(function)
         namespace["prepare_graph"] = prepare_graph
         found = _REBOUND[key] = _rebound(function, namespace)
     return found

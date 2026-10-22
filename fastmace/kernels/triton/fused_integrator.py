@@ -176,6 +176,8 @@ def applicable(engine) -> str | None:
         return "variable cell (LangevinBAOAB keeps the PyTorch stage)"
     if type(engine.integrator) is not Langevin:
         return f"integrator {type(engine.integrator).__name__}, not Langevin"
+    if engine.integrator.fix_com and engine.integrator.mass_weighted_com:
+        return "fixcm_projection='mass_weighted' (the fused kernels implement ASE's projection)"
     if not isinstance(getattr(engine.force_field, "neighbours", None), SkinNeighbourList):
         return "no skin neighbour list"
     if engine.state.positions.dtype != torch.float64 or engine.state.forces.dtype != torch.float64:

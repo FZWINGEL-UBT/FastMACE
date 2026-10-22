@@ -758,7 +758,8 @@ class Simulation:
         if self._mc is not None:
             self._mc.detach()  # its captured attempts go with it (3-T09 follow-up)
         driver = mc_driver.MCDriver(moves, seed=self.seed)
-        driver.attach(self._engine, evaluator=self._mc_evaluator())
+        driver.attach(self._engine, evaluator=self._mc_evaluator(),
+                      max_displacement_A=self.workload.max_displacement_A)
         if previous is not None:
             driver.load_state_dict(_carried_mc_record(previous, driver.state_dict()), other_moves=True)
         self._mc, self._mc_moves, self._mc_untimed = driver, tuple(moves), driver
@@ -795,7 +796,8 @@ class Simulation:
 
         moves = tuple(move_from_record(entry) for entry in record["moves"])
         driver = mc_driver.MCDriver(moves, seed=self.seed)
-        driver.attach(self._engine, evaluator=self._mc_evaluator())
+        driver.attach(self._engine, evaluator=self._mc_evaluator(),
+                      max_displacement_A=self.workload.max_displacement_A)
         driver.load_state_dict(record)
         self._mc, self._mc_moves, self._mc_untimed = driver, moves, driver
         self._mc_record = driver.state_dict()

@@ -173,7 +173,9 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
         position = ScheduleState(schedule, timestep_fs)
         count = position.steps_to_run(steps)
         start = float(integrator.temperature_K) if integrator is not None else float(position.target_K)
-        highest = max(start, position.max_target(count))
+        # The whole schedule's maximum (§7.7), also when steps= runs only part of it: a run continued
+        # later (run() or a resume, 3-T14) keeps the plan its skin and buckets were sized for.
+        highest = max(start, position.max_target())
     else:
         if temperature_K is None and integrator is None:
             raise ValueError("fm.md needs temperature_K= or schedule= (SPEC §7.7)")

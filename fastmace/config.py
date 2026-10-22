@@ -343,6 +343,11 @@ class IntegratorConfig:
     seed: int = 20261001
     # Remove the centre-of-mass motion (ASE Langevin fixcm).
     fixcm: bool = True
+    # How fixcm projects the random terms (3-T22, docs/design/fixcm-projection.md). "ase": ASE's, bit for bit
+    # (its noise stream; right for equal masses only): plain mean of the displacements, P/(N m_i) of the
+    # velocities, both scaled by sqrt(N/(N-1)). "mass_weighted": the Gaussian conditioned on a fixed centre
+    # of mass, mass-weighted means, no scale factor: canonical with 3N-3 degrees of freedom, per species too.
+    fixcm_projection: Literal["ase", "mass_weighted"] = "ase"
     # Steps of random numbers drawn and copied to the GPU at once; same numbers and order (NOISE_BATCH).
     noise_batch: int = 256
     # NPT: external pressure (ASE externalstress = -pressure).

@@ -109,6 +109,46 @@ def test_snapshot_is_taken_at_bind_time():
 
 
 @pytest.mark.parametrize("one_graph", [True, False])
+def test_the_snapshot_follows_patches_installed_or_undone_after_it(one_graph):
+    """A process patch installed or undone after a variant was built reaches its copied globals (3-T04b);
+    the strain functions, which a variant replaces on purpose, never do."""
+    from mace.modules import models, utils
+
+    variant = engine.strain_prepare_graph(one_graph)
+    forward = engine.strain_forward(models.MACE.forward, one_graph)
+    strain = variant.__globals__["get_symmetric_displacement"]
+    models_strain = forward.__globals__.get("get_symmetric_displacement")
+    _patches.set_first_derivative_only(True)
+    assert variant.__globals__["compute_forces"] is utils.compute_forces is engine.first_derivative_forces
+    assert variant.__globals__["compute_forces_virials"] is engine.first_derivative_forces_virials
+    _patches.set_single_graph_strain(True)
+    assert variant.__globals__["get_symmetric_displacement"] is strain
+    assert forward.__globals__.get("get_symmetric_displacement") is models_strain
+    assert forward.__globals__["prepare_graph"] is variant
+    _patches.restore("single_graph_strain")
+    _patches.set_first_derivative_only(False)
+    for name in ("compute_forces", "compute_forces_virials"):
+        assert variant.__globals__[name] is getattr(utils, name) is _patches._original(utils, name)
+    assert variant.__globals__["get_symmetric_displacement"] is strain
+
+
+def test_a_variant_built_under_a_patch_matches_the_module_after_it_is_undone():
+    """The order-dependent failure of 3-T14's trial merge: the variant first built while
+    first_derivative_only was in force kept the patched functions after it was undone."""
+    from mace.modules import utils
+
+    engine._REBOUND.clear()
+    try:
+        _patches.set_first_derivative_only(True)
+        variant = engine.strain_prepare_graph(False)
+        _patches.set_first_derivative_only(False)
+        module = vars(utils)
+        assert [name for name in _module_names(module) if variant.__globals__[name] is not module[name]] == []
+    finally:
+        engine._REBOUND.clear()
+
+
+@pytest.mark.parametrize("one_graph", [True, False])
 def test_rebound_forward_differs_from_its_module_only_in_prepare_graph(one_graph):
     from mace.modules import models
 
