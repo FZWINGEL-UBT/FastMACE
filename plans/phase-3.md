@@ -887,7 +887,12 @@ Files: `tools/` and `bench/` (new entry points), and `docs/validation/3-T20.md`.
 
 #### 3-T21 Acceptance runs and report (L, GPU, conductor-scheduled) — after all except T16b and T18
 
-- **Items 1–11** on the RTX 5060 Ti and one Ada GPU (D4).
+- **Items 1–11** on the RTX 5060 Ti. The Ada GPU of D4 is one spot check: the
+  GPU acceptance tier on leeloo (owner, 22 October 2026, SPEC decision 39). No
+  L4 runs.
+  - Item 9 is the short protocol at the freeze, citing 3-T14's full runs.
+  - Timing items repeat only as much as the size of the effect needs: item 1
+    uses the 4 main swap-back runs, items 2 and rule 9 one block per case.
 - **The no-regression A/B** against main at the freeze.
 - **Report:** `docs/validation/phase-3.md`, with pass or fail per item, run
   IDs, hardware, environments, costs (Modal) and open findings.
@@ -1426,9 +1431,9 @@ idle.
 | T14 | $1 |
 | T16 | $0.50 |
 | T20 | $2 |
-| T21 | $4, raised to $6 by the conductor (22 October 2026): item 9's and item 1's Ada legs moved to the L4, because their leeloo runs were made on trees whose `fastmace/` differs from the freeze |
+| T21 | $4, briefly raised to $6, then not needed: since SPEC decision 39 (22 October 2026), the Ada leg is the leeloo spot check, with no L4 runs |
 
-That is at most $14.50 (originally $12.50). The month stood at $7.86 metered after 3-T20's L4 job. This month $3.65 is metered so far (22 October), so
+The month stood at $7.86 metered after 3-T20's L4 job. This month $3.65 is metered so far (22 October), so
 the total stays inside the $27 limit.
 
 ## Open findings from merged tasks (for 3-T21's report)
@@ -1585,6 +1590,27 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   CPU-only suites and for `timeout`-prefixed queued jobs (fixed in fc1af61
   and b6a45f6). The Modal guard's import failed every job at container
   start, and its ledger was per checkout (fixed in d42fa82).
+- **For the phase 4 plan (conductor, 22 October 2026, after the owner asked
+  how to go faster).** Waiting cost more than testing: permission refusals of
+  GPU launches, one local GPU for four workers, and decision checkpoints.
+  Decided: risk-tiered acceptance (SPEC decision 39). Proposed, not yet
+  decided:
+  - small, low-risk tasks (CLI, docs, tooling, reports) skip the prestart
+    report, the separate validation document and GPU checks, unless they
+    touch kernels, graphs or integrators;
+  - the slowest statistical tests (the χ² and hybrid MD/MC tests) move from
+    the merge tier to a nightly or acceptance tier, so a trial takes about
+    10 min instead of 15;
+  - fewer, larger tasks, since each task costs about 30–60 min of fixed
+    overhead;
+  - the conductor adopts measured, performance-only defaults without a
+    checkpoint (like rule 9). This needs the owner's decision, while physics
+    and protocol defaults stay with the owner;
+  - GPU launches without refusals:
+    - an allow rule for a fixed local-GPU launcher, never for
+      `ssh <workstation>`;
+    - or GPU CI on self-hosted runners, but on a workstation only with a
+      pre-job check against other users' GPU use and active jobs.
 
 ## Checkpoints for the owner
 

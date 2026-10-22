@@ -2197,8 +2197,8 @@ This is today's provenance block, made complete and schema-versioned.
 
 ## 16. Migration plan and milestones
 
-Each phase ends with its acceptance criteria met on the RTX 5060 Ti and one
-workstation GPU.
+Each phase ends with its acceptance criteria met on the RTX 5060 Ti, plus one
+Ada spot check: the GPU acceptance tier on an Ada GPU (decision 39).
 
 | Phase | Content | Acceptance | Estimate (1 developer) |
 | --- | --- | --- | --- |
@@ -2425,6 +2425,20 @@ Open decisions for the owner:
      included, keep the graph tier. 3-T06 measured the compiled tier 4.3–4.7×
      slower than graph on NaCl and 1.3–1.5× slower on NbCl5, with a callback
      every 1, 5 or 10 steps (MH-1 hybrid float32, RTX 5060 Ti) (38).
+39. Decided (user, 22 October 2026, before phase 3's acceptance runs):
+   acceptance is tested according to risk. This amends decision 34 for the
+   phase 3 acceptance; the owner's words: "Apply all three: leeloo's
+   acceptance tier is the one Ada spot check (no L4 runs), item 9 as the short
+   protocol at the freeze citing 3-T14's full runs, and fewer timing repeats
+   where the effect is large".
+   - The workstation GPU of §16 is one Ada spot check per phase: the GPU
+     acceptance tier on an Ada GPU. Not every item runs on Ada. Items run in
+     full on the RTX 5060 Ti.
+   - An end-to-end protocol item may run its short protocol at the freeze. It
+     cites full-length runs made earlier in the phase, together with the code
+     difference between those runs and the freeze.
+   - Timing items repeat only as often as the effect's size needs. A 4×
+     difference needs one block; a 1 % one needs the full alternating design.
 
 ---
 
