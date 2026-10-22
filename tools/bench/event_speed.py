@@ -17,8 +17,10 @@ number of events. Both sides are built and warmed up first, then 12 blocks of ea
 (``fastmace.bench.ab.run_ab``; build order ``--order``, pattern ``--pattern``). The result is the rate
 ratio median(fixed) / median(events), and the run passes at >= 0.90 (SPEC §16 row 3). It is invalid when
 anything compiled, any graph was captured (``engine.info()["recapture_log"]``) or another process used the
-GPU while timed. ``--superset`` gives both sides that species superset (``fm.ForceField(species=)``).
-The skin each side used is recorded (rule 11 sets it once 3-T05 is in).
+GPU while timed; ``--settle N`` keeps warming up (untimed, at most ``--settle-max`` steps) until N chunks in a
+row add no capture, since at 1500 K new edge sizes keep appearing. ``--superset`` gives both sides that species
+superset (``fm.ForceField(species=)``). Each side's skin and headroom (rule 11, 3-T05: it sizes the events
+side, which declares species changes) and edge sizes are recorded.
 
 Writes ``<output>.json``. Use an otherwise idle GPU.
 """
@@ -100,6 +102,30 @@ def source_commit(environ=os.environ):
     return ab_step_time.fastmace_commit() or environ.get("FASTMACE_SOURCE_COMMIT") or None
 
 
+def settle(sides, captures, *, quiet, limit):
+    """Untimed chunks on every side until ``quiet`` chunks in a row add no graph capture (``captures()`` gives
+    {side: captures logged}), at most ``limit`` chunks; returns the chunks run. At 1500 K the edge count keeps
+    growing past a short warm-up, and a capture while timed invalidates the run (3-T20 breakdown)."""
+    if quiet <= 0:
+        return 0
+    last, calm, chunks = captures(), 0, 0
+    while calm < quiet and chunks < limit:
+        for side in sides.values():
+            side.step()
+        chunks += 1
+        now = captures()
+        calm, last = (calm + 1, last) if now == last else (0, now)
+    return chunks
+
+
+def neighbour_record(engine):
+    """The skin and headroom the plan gave the engine (rule 11, 3-T05) and its edge sizes."""
+    neighbours, config = engine.force_field.neighbours, engine.neighbour_config
+    return dict(skin_A=float(neighbours.skin), capacity_headroom=neighbours.headroom,
+                edge_bucket_fraction=config.edge_bucket_fraction, edge_bucket=int(engine.edge_bucket),
+                edge_capacity=int(engine.force_field.edge_capacity), recapture_budget=engine.recapture_budget)
+
+
 def chunk_protocol(args):
     """The timing protocol in chunks of ``args.every`` steps."""
     from fastmace.bench.step_time import TimingProtocol
@@ -143,9 +169,14 @@ def parse_args(argv=None):
     p.add_argument("--pattern", choices=("abab", "abba"), default="abab")
     p.add_argument("--order", choices=("ab", "ba"), default="ab", help="Build order: ab = fixed first")
     p.add_argument("--seed", type=int, default=20261022)
+    p.add_argument("--settle", type=int, default=0, metavar="CHUNKS",
+                   help="After --warmup, keep warming up until this many chunks in a row add no graph capture")
+    p.add_argument("--settle-max", type=int, default=3000, metavar="STEPS", help="At most this many settle steps")
     args = p.parse_args(argv)
     if args.every < 1 or args.block % args.every or args.warmup % args.every or args.block < args.every:
         p.error(f"--warmup and --block must be whole multiples of --every ({args.every})")
+    if args.settle < 0 or args.settle_max % args.every:
+        p.error(f"--settle must be >= 0 and --settle-max a whole multiple of --every ({args.every})")
     return args
 
 
@@ -157,7 +188,7 @@ def _side_record(sim):
     masses = committed.masses
     kinetic = 0.5 * float((committed.momenta ** 2 / masses[:, None]).sum())
     from ase import units
-    return dict(skin_A=float(engine.force_field.neighbours.skin), recaptures=info["recaptures"],
+    return dict(**neighbour_record(engine), recaptures=info["recaptures"],
                 captures_logged=len(info["recapture_log"]), neighbour_rebuilds=info["neighbour_rebuilds"],
                 canonical_points=info["canonical_points"], edge_sizes_used=info["edge_sizes_used"],
                 overflows_redone=info["overflows_redone"], step=committed.step,
@@ -196,7 +227,8 @@ def main(argv=None):
                 precision="float32", backend="hybrid", cuda_allocator=allocator,
                 integrator=dataclasses.asdict(integrator),
                 superset=args.superset, every=args.every, seed=args.seed,
-                protocol=dict(warmup_steps=args.warmup, block_steps=args.block, blocks=args.blocks),
+                protocol=dict(warmup_steps=args.warmup, block_steps=args.block, blocks=args.blocks,
+                              settle_chunks=args.settle, settle_max_steps=args.settle_max),
                 pattern=args.pattern, order=order, load=list(os.getloadavg()), structures={})
     for spec in args.structures:
         name, base = ab_step_time.read_structure(spec, None)
@@ -216,7 +248,13 @@ def main(argv=None):
         from fastmace.bench import step_time
         for side in order:  # warm up outside the compile-counter window (new edge sizes compile here)
             step_time.warm_up(sides[side], protocol.warmup)
-        captures = {side: len(sims[side]._engine.info()["recapture_log"]) for side in SIDES}
+
+        def logged():
+            return {side: len(sims[side]._engine.info()["recapture_log"]) for side in SIDES}
+
+        settled = settle({side: sides[side] for side in order}, logged, quiet=args.settle,
+                         limit=args.settle_max // args.every)
+        captures = logged()
         counted = ab_step_time.compile_counters(counters)
         events_before = sides["events"].events
         result = ab.run_ab(sides, dataclasses.replace(protocol, warmup=0), pattern=args.pattern)
@@ -227,7 +265,8 @@ def main(argv=None):
         medians = {side: result.statistics[side].median_ms for side in SIDES}
         summary = summarise(medians, every=args.every)
         blocks = {side: result.statistics[side].block_ms for side in SIDES}
-        entry = dict(natoms=len(base), kinds=list(kinds), ab=result.as_dict(), **summary,
+        entry = dict(natoms=len(base), kinds=list(kinds), settle_steps=settled * args.every, ab=result.as_dict(),
+                     **summary,
                      pair_rate_ratios=[f / e for f, e in zip(blocks["fixed"], blocks["events"])],
                      events_timed=sides["events"].events - events_before, events_total=sides["events"].events,
                      setup_s=setup, compile_during_timing=dict(changes=changes, recompiled=recompiled),

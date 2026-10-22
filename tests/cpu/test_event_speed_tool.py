@@ -101,6 +101,37 @@ def test_summary_reports_per_step_times_the_rate_ratio_and_the_verdict():
     assert tool.summarise({"fixed": 300.0, "events": 340.0}, every=100, threshold=0.9)["pass"] is False
 
 
+class CountingSide:
+    def __init__(self, captures):
+        self.captures = list(captures)  # captures logged after each step
+        self.steps = 0
+
+    def step(self):
+        self.steps += 1
+
+
+def test_settle_warms_up_until_enough_chunks_pass_without_a_new_capture():
+    a, b = CountingSide([]), CountingSide([])
+    logs = {"a": [1, 2, 2, 2, 2, 2, 2], "b": [0, 0, 1, 1, 1, 1, 1]}
+
+    def captures():
+        return {"a": logs["a"][a.steps - 1] if a.steps else 0, "b": logs["b"][b.steps - 1] if b.steps else 0}
+
+    chunks = tool.settle({"a": a, "b": b}, captures, quiet=3, limit=10)
+    assert chunks == 6 and a.steps == b.steps == 6  # b's capture in chunk 3, then 3 quiet chunks
+    assert tool.settle({"a": a, "b": b}, captures, quiet=0, limit=10) == 0
+    noisy = {"a": CountingSide([]), "b": CountingSide([])}
+    count = iter(range(100))
+    assert tool.settle(noisy, lambda: {"a": next(count), "b": 0}, quiet=2, limit=4) == 4  # capped
+
+
+def test_settle_arguments():
+    args = tool.parse_args(["--output", "o", "--checkpoint", "c", "--settle", "3", "--settle-max", "2000"])
+    assert (args.settle, args.settle_max) == (3, 2000)
+    with pytest.raises(SystemExit):
+        tool.parse_args(["--output", "o", "--checkpoint", "c", "--settle-max", "250"])
+
+
 def test_a_recapture_or_compile_while_timed_invalidates_the_run():
     before = {"fixed": 2, "events": 5}
     assert tool.validity(before, {"fixed": 2, "events": 5}, recompiled=False, others=[]) == (True, [])

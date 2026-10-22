@@ -195,7 +195,7 @@ def main(argv=None):
         per_event, calls = timers.table(args.repeats)
         steady_ms = _median([r["chunk_before_ms"] for r in rounds]) / args.every
         entry = dict(
-            natoms=len(base), kinds=list(kinds), skin_A=float(engine.force_field.neighbours.skin),
+            natoms=len(base), kinds=list(kinds), **event_speed.neighbour_record(engine),
             steady_ms_per_step=steady_ms,
             event_ms_median=_median([r["event_ms"] for r in rounds]),
             event_in_steps=_median([r["event_ms"] for r in rounds]) / steady_ms,
