@@ -10,8 +10,9 @@ and all workers were prestarted. Merged so far: 3-T01 (8dfd9f0), 3-T08
 and its review fixes (f582186), 3-T15 (22c1e73), 3-T14 (7b26cc8), 3-T04b (53fbbfb),
 3-T10 (ecdc164), 3-T22 (eb64374), 3-T11 (963f478), 3-T12 (a031b96) and 3-T22b
 (f2f2258); in ResearchModule 3-T16a (90a1e7b1). Owner checkpoints 2b and 2c were
-decided the same day (SPEC decisions 37 and 38). 3-T06b is merged (397da85), and
-3-T22c is running. 3-T11 started with 3-T09, because its gate
+decided the same day (SPEC decisions 37 and 38). 3-T06b (397da85) and 3-T22c
+(3c3e871) are merged, and so is 3-T22c's ResearchModule part (21165421, `main.py
+--fixcm-projection`). 3-T11 started with 3-T09, because its gate
 needs T07's evaluator and T03's transactions, not T09's driver. The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
