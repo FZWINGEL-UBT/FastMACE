@@ -1,0 +1,50 @@
+# The NPT melt-quench protocol for the chlorides (owner decision D1, SPEC §18 decision 40; plan task
+# 3b-T07). Run it with
+#
+#   fastmace run npt_anneal_NbCl5 [--output DIR] [--steps N]
+#   fastmace run --resume DIR [--steps N]
+#
+# Stages: an LBFGS relaxation at fixed cell to fmax 0.01 eV/Å, then hydrostatic NPT at 0 GPa along the
+# anneal schedule at 1 fs (0 -> 1000 K in 20 ps, then 3 K/ps to 250 K: 270,000 steps) with the
+# library's barostat defaults (P_tau = 20 T_tau, mass factor 1), then the quench of the anneal
+# profile, each frame relaxed at its own NPT cell with the cell fixed. MH-1 matpes_r2scan with D3-BJ
+# (the r2scan set). The physical outcome is recorded, not judged (SPEC §18 decision 6).
+#
+# The structure is NbCl5 (C2/m, the R2SCAN benchmark cell, SOURCES.md), 3x3x3 = 1944 atoms.
+
+structure = "NbCl5_R2SCAN.cif"
+model = "mh1"
+head = "matpes_r2scan"
+dispersion = "d3bj"
+repeat = [3, 3, 3]
+timestep_fs = 1.0
+schedule = "anneal"
+ensemble = "NPT"
+pressure_GPa = 0.0
+cell_mode = "hydrostatic"
+
+[engine]
+backend = "hybrid"  # hybrid float32 (the force field's default precision)
+
+# Thermo rows (with the volume) every 10 fs, a restart every 10 ps. Frames every 100 fs, not main.py's
+# 10 fs (decision 36), on purpose: 2,701 frames of 1944 atoms stay a few hundred MB instead of about
+# 4 GB, and a 100 K quench bin still spans about 330 frames.
+[output]
+trajectory_every = 100
+thermo_every = 10
+restart_every = 10000
+
+# The anneal profile's initial relaxation (fm.protocols.PROFILES["anneal"]).
+[relax]
+fmax = 0.01
+optimizer = "LBFGS"
+max_steps = 5000
+
+# The anneal profile's quench: 2 frames per 100 K bin from 500 K on each ramp, and the final frame.
+[quench]
+min_K = 500.0
+bin_K = 100.0
+per_bin = 2
+fmax = 0.01
+optimizer = "LBFGS"
+max_steps = 5000
