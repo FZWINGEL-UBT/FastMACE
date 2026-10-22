@@ -132,11 +132,16 @@ class MCEvaluator:
             raise ValueError(f"MC energies in {precision} below the {self.force_precision} force precision are not "
                              "offered: evaluate them in float64")
         self.engine, self.precision = engine, precision
+        # A graph engine evaluates through its energy-only graph (captured on CUDA, key "E"); others directly.
+        self.graph = callable(getattr(engine, "add_energy_field", None))
+        existing = engine.energy_fields.get(precision) if self.graph else None
         if precision == self.force_precision:
             if copy is not None or model is not None:
                 raise ValueError(f"a {precision} evaluator of a {self.force_precision} engine uses the engine's own "
                                  "force field: pass no model or copy")
             self.field = force_field
+        elif existing is not None and copy is None and model is None:
+            self.field = existing  # the engine's copy of another evaluator: one per precision
         elif copy is not None:
             if precision_of(copy.dtype) != precision or copy.info().get("follows") is None:
                 raise ValueError(f"the copy must be a {precision} force field that follows the engine's (float64_copy)")
@@ -146,6 +151,10 @@ class MCEvaluator:
         else:
             raise ValueError(f"a {precision} evaluator of a {self.force_precision} engine needs the float64 model "
                              "(float64_copy)")
+        if self.graph and existing is None:
+            engine.add_energy_field(self.field)
+        elif self.graph and existing is not self.field:
+            raise ValueError(f"the engine already has a {precision} energy force field; pass no model or copy")
         self.name = f"mc-evaluator-{next(_IDS)}"
         self.cache = EnergyCache()
         self.evaluations = 0
@@ -172,12 +181,16 @@ class MCEvaluator:
     def evaluate(self):
         """The float64 energy [1] of the engine's committed state on its current edges, forward only.
 
-        A device tensor; no forces, no ``grad_fn``. Uncaptured here (any engine mode, CPU or CUDA).
+        A device tensor; no forces, no ``grad_fn``. On a graph engine it is the energy-only graph's output
+        buffer (``GraphEngine.energy``: captured on CUDA, overwritten by the next evaluation, and flagged
+        when an evaluation overflows); on other engines the force field's forward runs directly.
         """
         engine = self.engine
+        self.evaluations += 1
+        if self.graph:
+            return engine.energy(precision=self.precision)
         if not self.own_field:
             self.field.use_edges(int(engine.force_field.data["edge_index"].shape[1]))
-        self.evaluations += 1
         return self.field.energy_only(engine.state.positions)
 
     def baseline(self):
@@ -221,7 +234,8 @@ class MCEvaluator:
         """The evaluator's choices for provenance: precision, backend, whether it is captured, its memory."""
         return {
             "precision": self.precision, "force_precision": self.force_precision, "backend": self.field.backend,
-            "copy": not self.own_field, "compile_mode": self.field.compile_mode, "captured": False,
+            "copy": not self.own_field, "compile_mode": self.field.compile_mode,
+            "captured": self.graph and bool(getattr(self.engine, "capture", False)),
             "memory_bytes": self.memory_bytes(), "evaluations": self.evaluations,
         }
 

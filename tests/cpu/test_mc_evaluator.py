@@ -268,9 +268,10 @@ def mace_engine(tmp_path, monkeypatch):
 
 
 def fresh_energy(make, engine):
-    """The energy of a freshly built float64 force field at the engine's committed positions (eager)."""
+    """The energy of a freshly built float64 force field at the engine's committed positions and species."""
     atoms = make.built["atoms"].copy()
     atoms.positions = engine.state.positions.detach().cpu().numpy()
+    atoms.numbers = engine.state.species.detach().cpu().numpy()
     ff = MACEForceField(make.load("float64"), atoms, neighbours=make.built["plan"].neighbours, engine=EAGER)
     return ff.energy_only(positions_of(atoms))
 
@@ -364,3 +365,44 @@ def test_mc_cost_rotates_and_mirrors_the_block_order():
     summary = tool.summarise({"md": [10.0, 12.0], "energy_float32": [2.0, 3.0]}, ("md", "energy_float32"))
     assert summary["energy_float32"]["over_md_per_round"] == [0.2, 0.25]
     assert summary["energy_float32"]["over_md_median"] == pytest.approx(0.225)
+
+
+def test_energy_graph_keys_and_the_copy_in_the_derived_registry(mace_engine):
+    from fastmace.engine.graph import ENERGY_KEY
+    from fastmace.mc.evaluator import MCEvaluator
+
+    engine = mace_engine("float32")
+    with pytest.raises(ValueError, match="float64 force field"):
+        engine.energy(precision="float64")
+    evaluator = MCEvaluator(engine, precision="float64", model=mace_engine.load("float64"))
+    assert "energy.float64.node_attrs" in engine.derived
+    assert set(engine.energy_fields) == {"float32", "float64"}
+    assert MCEvaluator(engine, precision="float64").field is evaluator.field  # one copy per engine and precision
+    with pytest.raises(ValueError, match="already"):
+        engine.add_energy_field(evaluator.field)
+    energy = engine.energy(precision="float64")
+    assert energy is engine.energy(precision="float64") and energy.grad_fn is None
+    assert engine.overflowed() == 0
+    info = engine.info()["energy_graphs"]
+    assert info["float64"]["copy"] and info["float64"]["compile_mode"] == "none" and not info["float32"]["copy"]
+    assert ENERGY_KEY == "E"
+
+
+def test_float64_baseline_follows_a_species_transaction(mace_engine):
+    from fastmace.events import Event, Transaction
+    from fastmace.mc.evaluator import MCEvaluator
+
+    engine = mace_engine("float32")
+    evaluator = MCEvaluator(engine, precision="float64", model=mace_engine.load("float64"))
+    single = MCEvaluator(engine)
+    for _ in range(3):
+        engine.step()
+    before = evaluator.tag()
+    evaluator.baseline()
+    numbers = engine.state.species.detach().cpu().numpy().copy()
+    numbers[[0, 1]] = numbers[[1, 0]]
+    assert Transaction(engine, [Event("species", values=numbers)]).run() == "accepted"
+    assert evaluator.tag() != before and evaluator.current() is None  # the cache does not carry over
+    np.testing.assert_allclose(evaluator.baseline().cpu().numpy(), fresh_energy(mace_engine, engine).numpy(),
+                               rtol=1e-12, atol=0)
+    np.testing.assert_allclose(single.baseline().cpu().numpy(), evaluator.current().cpu().numpy(), rtol=1e-5)

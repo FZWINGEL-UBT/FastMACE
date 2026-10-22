@@ -163,10 +163,29 @@ Added by 3-T02 under the conductor's answers (`plans/phase-3.md`, "3-T02 species
 - The fallback's mode dimension (`planner/fallback.py`, T06): when eager passes the reduced gate, a graph plan tries compiled first, then eager (§9.4 step 2). The terminal sequence is unchanged.
 - `engine/graph.py`:
   - `ENERGY_KEY = "E"` and `ENGINE_KEYS = ("A", "AC", "ACB", "ACP", "ACPB", "B", "C", "E")`;
-  - `GraphEngine.energy(*, precision=None)`: the energy-only graph. Stub, T07;
+  - `GraphEngine.energy(*, precision=None)`: the energy-only graph. It returns a fixed-address float64 `[1]` buffer that the next call overwrites. Its key is `(ENERGY_KEY, precision, edges)`: one variant per edge size, captured at the first call. It reads the current positions and active edges, and sets `EDGE_OVERFLOW` when the count passes them. Without capture it runs directly. Complete (T07);
+  - `GraphEngine.add_energy_field(field)`: the energy-only graph's force field in another precision, the float64 MC copy that follows the engine's force field. Its derived buffers join `GraphEngine.derived` as `energy.<precision>.*`. One per precision. `GraphEngine.energy_fields`: `{precision: force field}`. Complete (T07);
   - `GraphEngine.captured(key, fn) -> replay`: captures `fn`, which takes no arguments and has fixed shapes and addresses, with the engine's warm-up, registry restore and re-capture policy (variant cap, budget, log). It refuses `ENGINE_KEYS`, which are the engine's own, and tuple keys whose first element is one. The graph is captured at the first replay and again after an invalidation or eviction; without capture the replay calls `fn`. A tuple key's first element is its family, so `("mc.swap", bucket)` keys are variants of one key. Complete (T04), for T09's attempt graph.
   - `GraphEngine.invalidate_graphs(reason, keys=None)`: drops the captured graphs (all of them, which also retires the pool, or those of `keys`) and logs the reason. The next capture of a dropped key counts as a re-capture. T03 calls it for friction events. Complete (T04).
   - `GraphEngine.uncommitted() -> bool`: true while a pipelined or speculative step is unvalidated, or an overflowed evaluation is being redone. T08's restart write guard reads it. Complete (T04).
+
+### Energy-only evaluation and the MC evaluator (T07)
+
+- `MACEForceField.energy_only(positions)`: the float64 energy `[1]` from a forward pass under `torch.no_grad()`, with forces, stress and `training` off. It is the force path's float64 sum and has no `grad_fn`. A compiled model compiles it as its own variant, because grad mode and `training` are guarded. That variant is accepted (conductor answer 2).
+- `MACEForceField.follow(leader)`: a copy in another precision reads the leader's compacted edge index and its unit shifts. It rebuilds the shifts in its own precision from the float64 cell, and shares the leader's species, charge and total-charge sources. `use_edges(n)` then takes the leader's padded count. `info()["follows"]` names the leader's precision.
+- `fastmace/mc/evaluator.py` (owner T07):
+  - `PRECISIONS = ("float32", "float64")`;
+  - `float64_model(force_field, plan, backend=None)`: the plan's checkpoint in float64 (`ForceField.execution_model`), in the plan's backend or the one given;
+  - `float64_copy(force_field, model, *, neighbours=None, polar=None, check=True)`: an eager float64 `MACEForceField` that follows a float32 one. It takes that force field's rewrites, superset, charge, spin and E0 table;
+  - `EnergyCache`: one float64 energy, tagged `(evaluator, precision, state version)`: `get(tag)`, `store(tag, energy)`, `clear()`;
+  - `MCEvaluator(engine, precision=None, *, model=None, copy=None, polar=None)`. `precision=None` means the force precision, and nothing below it is offered. `"auto"` is refused, because the planner resolves it (T11).
+    - `evaluate()` goes through `GraphEngine.energy` on a graph engine, otherwise through the force field directly.
+    - `baseline()` is always a fresh evaluation, cached under `tag()`, and never the MD energy.
+    - `accept(energy)` stores the trial's energy as the new baseline; `reject()` keeps the old one.
+    - `current()` returns the cached baseline, or None once the state version has moved.
+    - `info()` gives the precision, force precision, backend, copy, compile mode, captured, memory bytes and evaluations.
+  - `tag()` uses `GraphEngine.state_version`. An engine without one uses `("step", state.step)`.
+- `tools/bench/mc_cost.py`: energy-only cost as a fraction of one MD step. T09, T10 and T20 add their rows as further sides.
 
 ### Overflow before commit (T04)
 

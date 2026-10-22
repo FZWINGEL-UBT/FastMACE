@@ -131,6 +131,11 @@ def _kind(key) -> Any:
     return key[0] if isinstance(key, tuple) else key
 
 
+def _precision(field) -> str:
+    """``"float32"`` or ``"float64"``: a force field's precision."""
+    return str(field.dtype).removeprefix("torch.")
+
+
 def _device(name: str) -> torch.device:
     device = torch.device(name)
     if device.type == "cuda" and device.index is None:
@@ -263,6 +268,10 @@ class GraphEngine(Engine):
         self._dropped = {}  # key -> why it was dropped (its next capture is a re-capture)
         self._kinds_seen = set()  # key families captured at least once in this engine
         self._external = {}  # captured(key, fn): other modules' stage functions
+        # The energy-only graph (3-T07): the force field per MC energy precision (the engine's own in its
+        # precision, a float64 copy beside it, add_energy_field) and each precision's output buffer.
+        self._energy_fields = {_precision(force_field): force_field}
+        self._energy_out = {}
         # What stage A produces and stage B changes (Langevin v; BAOAB v, p_eps), saved inside the
         # pipelined and speculative graphs so that a failed step can redo stage B alone.
         self._mids = tuple(torch.zeros_like(tensor) for tensor in integrator.mid_step_tensors(state))
@@ -340,9 +349,11 @@ class GraphEngine(Engine):
 
     @staticmethod
     def _key_edges(key) -> int | None:
-        """The edge count a stage key's replay reads (B, ACB and ACPB keys), or None (AC, ACP, C)."""
+        """The edge count a stage key's replay reads (B, ACB, ACPB and E keys), or None (AC, ACP, C)."""
         if isinstance(key, tuple) and key[0] in ("B", "ACB", "ACPB"):
             return int(key[1])
+        if isinstance(key, tuple) and key[0] == ENERGY_KEY:
+            return int(key[2])
         return None
 
     def _active_edges(self) -> int | None:
@@ -392,8 +403,59 @@ class GraphEngine(Engine):
     def energy(self, *, precision: str | None = None) -> torch.Tensor:
         """The potential energy of the committed state from the forward-only energy graph (key ``ENERGY_KEY``,
         under ``torch.no_grad()``, float64 accumulation; SPEC §8.1), in ``precision`` (``"float32"``,
-        ``"float64"``; ``None``: the force precision). A device scalar; no forces, no ``grad_fn``."""
-        raise NotImplementedError("the energy-only graph: plan task 3-T07")
+        ``"float64"``; ``None``: the force precision). A device scalar; no forces, no ``grad_fn``.
+
+        The graph reads the current positions and the edges the force field reads now; its key is
+        ``(ENERGY_KEY, precision, edges)``, one variant per edge size, captured at the first call like the
+        force stage (warm-up, registry restore, re-capture policy). A precision other than the force
+        precision needs its force field first (``add_energy_field``). The returned buffer has a fixed
+        address and is overwritten by the next call. The evaluation flags an edge count beyond the active
+        edges (``flag_edge_overflow``; PolarMACE's k-vector flag is set by its forward), so a caller decides
+        nothing from it before ``overflowed()`` or ``redo_on_overflow`` (SPEC §8.1 "Overflow before commit").
+        Without capture (CPU, eager) the stage runs directly, with the same result.
+        """
+        precision = _precision(self.force_field) if precision is None else precision
+        field = self._energy_fields.get(precision)
+        if field is None:
+            raise ValueError(f"no {precision} force field for the energy-only graph (have "
+                             f"{', '.join(self._energy_fields)}); add one with add_energy_field")
+        edges = self._active_edges()
+        if field is not self.force_field:
+            field.use_edges(edges)
+        if precision not in self._energy_out:
+            self._energy_out[precision] = torch.zeros(1, dtype=torch.float64, device=self.device)
+        self._run((ENERGY_KEY, precision, edges))
+        return self._energy_out[precision]
+
+    @property
+    def energy_fields(self) -> Mapping[str, Any]:
+        """The energy-only graph's force field per precision (a copy of the mapping)."""
+        return dict(self._energy_fields)
+
+    def add_energy_field(self, field) -> None:
+        """Give the energy-only graph a force field in another precision: the MC energy copy that follows this
+        engine's force field (``fastmace.mc.evaluator.float64_copy``; SPEC §10.4 "Energy precision").
+
+        Its species- and charge-derived buffers join the derived-state registry (``energy.<precision>.*``),
+        so every transaction refreshes them with the force field's own (3-T03).
+        """
+        precision = _precision(field)
+        if precision in self._energy_fields:
+            raise ValueError(f"the energy-only graph already has a {precision} force field")
+        if getattr(field, "_leader", None) is not self.force_field:
+            raise ValueError("the energy force field must follow this engine's force field (MACEForceField.follow)")
+        field.register_derived(self.derived, self.state, prefix=f"energy.{precision}")
+        self._energy_fields[precision] = field
+
+    def _stage_energy(self, key):
+        _, precision, edges = key
+        field, out = self._energy_fields[precision], self._energy_out[precision]
+
+        def stage():
+            out.copy_(field.energy_only(self.state.positions))
+            self.flag_edge_overflow(self.force_field.edge_count, edges)
+
+        return stage
 
     def captured(self, key: str, fn: Callable[[], Any]) -> Callable[[], None]:
         """Capture ``fn`` (no arguments, fixed shapes and addresses) as a CUDA graph under ``key`` with the
@@ -530,6 +592,10 @@ class GraphEngine(Engine):
             "pipelined_rebuild_redos": self.pipelined_rebuild_redos,
             "pipelined_early_rebuilds": self.pipelined_early_rebuilds, "canonical_points": self.canonical_points,
             "polar_overflow_steps": list(self.polar_overflow_steps), "process": dict(self.process),
+            "energy_graphs": {precision: {"copy": field is not self.force_field,
+                                          "backend": getattr(field, "backend", None),
+                                          "compile_mode": getattr(field, "compile_mode", None)}
+                              for precision, field in self._energy_fields.items()},
             "overflow_check": "per step" if self.polar_check else "edges", "overflows_redone": self.overflows_redone,
             "overflow_log": [dict(entry) for entry in self.overflow_log], "recaptures": self.recaptures,
             "recapture_budget": self.recapture_budget,
@@ -938,6 +1004,8 @@ class GraphEngine(Engine):
         external = self._external.get(key)
         if external is not None:
             return external
+        if _kind(key) == ENERGY_KEY:
+            return self._stage_energy(key)
         if isinstance(key, tuple) and key[0] == "ACB":
             slot = key[2]
 
