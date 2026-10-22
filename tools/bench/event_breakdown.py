@@ -44,7 +44,9 @@ TREE = {
     "event": ("committed", "update"),
     "update": ("Transaction.quiesce", "Transaction.snapshot", "Transaction.apply", "Transaction.refresh",
                "Transaction.accept", "Transaction.resume"),
-    "Transaction.resume": ("canonicalise", "derived.refresh"),
+    # Transaction.resume's own derived.refresh (forces, stress) is in its rest: derived.refresh is also
+    # Transaction.refresh's one call, and the timers do not tell the two callers apart.
+    "Transaction.resume": ("canonicalise",),
     "canonicalise": ("flush", "rebuild", "compact", "_force_stage", "integrator.start", "invalidate_graphs"),
 }
 
@@ -132,7 +134,7 @@ def main(argv=None):
     meta = dict(tool="tools/bench/event_breakdown.py", task="3-T20 item 1 breakdown",
                 created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 gpu=torch.cuda.get_device_name(), torch=torch.__version__,
-                fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, checkpoint_sha256=sha,
+                fastmace_commit=event_speed.source_commit(), model=args.model, checkpoint_sha256=sha,
                 precision="float32", backend="hybrid", cuda_allocator=allocator,
                 integrator=dataclasses.asdict(integrator), superset=args.superset, every=args.every,
                 warmup=args.warmup, repeats=args.repeats, seed=args.seed, structures={})

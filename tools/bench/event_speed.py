@@ -94,6 +94,12 @@ class SimulationSide:
             self.torch.cuda.synchronize()
 
 
+def source_commit(environ=os.environ):
+    """This checkout's commit: ``ab_step_time.fastmace_commit``, else ``$FASTMACE_SOURCE_COMMIT`` (an app
+    worktree on a Windows drive, whose ``.git`` file names a Windows path that WSL's git cannot follow)."""
+    return ab_step_time.fastmace_commit() or environ.get("FASTMACE_SOURCE_COMMIT") or None
+
+
 def chunk_protocol(args):
     """The timing protocol in chunks of ``args.every`` steps."""
     from fastmace.bench.step_time import TimingProtocol
@@ -186,7 +192,7 @@ def main(argv=None):
     meta = dict(tool="tools/bench/event_speed.py", task="3-T20 item 1",
                 created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                 gpu=torch.cuda.get_device_name(), torch=torch.__version__,
-                fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, checkpoint_sha256=sha,
+                fastmace_commit=source_commit(), model=args.model, checkpoint_sha256=sha,
                 precision="float32", backend="hybrid", cuda_allocator=allocator,
                 integrator=dataclasses.asdict(integrator),
                 superset=args.superset, every=args.every, seed=args.seed,
