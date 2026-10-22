@@ -24,7 +24,10 @@ rejected and the state stays the MD side's:
 - ``displace_graph``: δ as given, the captured attempt (no trial rebuild unless the MD drift and δ pass
   skin/2);
 - ``displace_trial``: δ equal to the skin, so that most attempts move an atom beyond skin/2 and take the
-  host path (a trial build around the trial geometry, then the captured energy graph).
+  host path (a trial build around the trial geometry, then the captured energy graph). One attempt per
+  call by default (``--displace-trial-attempts``): in a block of m attempts, a halted attempt k also
+  costs the m − k − 1 replays launched after it, which do nothing; that waste is the block's, not the
+  host path's.
 Recorded per side: the time per attempt, its ratio to an MD step, and the fraction of attempts that took
 a trial rebuild; ``trial_rebuild_ms`` estimates one host-path attempt from the two sides.
 """
@@ -67,7 +70,9 @@ def parse_args(argv=None):
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--displace-delta-A", type=float, default=None,
                    help="add the displacement rows (3-T10), planned for this Workload.max_displacement_A")
-    p.add_argument("--displace-attempts", type=int, default=10, help="attempts per timed displacement call")
+    p.add_argument("--displace-attempts", type=int, default=10, help="attempts per timed call, graph side")
+    p.add_argument("--displace-trial-attempts", type=int, default=1,
+                   help="attempts per timed call, trial side (1: no replays wasted after a halted attempt)")
     return p.parse_args(argv)
 
 
@@ -231,15 +236,17 @@ def main(argv=None):
 
             skin = float(engine.force_field.neighbours.skin)
             meta["displace"] = dict(skin_A=skin, attempts_per_call=args.displace_attempts,
+                                    trial_attempts_per_call=args.displace_trial_attempts,
                                     max_displacement_A=args.displace_delta_A)
+            counts = {"displace_graph": args.displace_attempts, "displace_trial": args.displace_trial_attempts}
             own = evaluators["energy_" + precision]
             for index, (side, delta) in enumerate((("displace_graph", args.displace_delta_A),
                                                    ("displace_trial", skin))):
-                move = Displace(delta_A=delta, every=1, attempts=args.displace_attempts)
+                move = Displace(delta_A=delta, every=1, attempts=counts[side])
                 # The trial side's delta is the skin, beyond the workload's maximum on purpose (to force builds).
                 attempts = DisplaceAttempts(move, engine, own, seeds=mc_stream_seeds(args.seed + index),
                                             max_displacement_A=max(delta, args.displace_delta_A), index=index)
-                sides[side] = DisplaceSide(attempts, own, args.displace_attempts, args.temperature_K, torch)
+                sides[side] = DisplaceSide(attempts, own, counts[side], args.temperature_K, torch)
                 step_time.warm_up(sides[side], 3)
                 meta["sides"][side] = dict(delta_A=delta)
         names = tuple(sides)
@@ -251,7 +258,7 @@ def main(argv=None):
         displaced = [name for name in names if name.startswith("displace_")]
         for name in displaced:
             side, timing = sides[name], meta["timing"][name]
-            per_attempt = timing["median_ms"] / args.displace_attempts
+            per_attempt = timing["median_ms"] / side.count
             timing.update(per_attempt_ms=per_attempt,
                           per_attempt_over_md=per_attempt / meta["timing"]["md"]["median_ms"],
                           trial_rebuild_fraction=side.trial_rebuilds / max(side.attempted, 1))
