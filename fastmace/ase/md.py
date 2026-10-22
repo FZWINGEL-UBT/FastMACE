@@ -15,8 +15,10 @@ through the minimal planner (SPEC §5). The setup report is printed then.
 ``attach`` rule: every ``interval`` steps from step 0, or once at step ``|interval|`` for
 ``interval <= 0``). Before the observers of a step the committed state is written into ``atoms``
 with a single-point results cache as ``atoms.calc``; after them, changed positions or momenta
-become host writes through ``Simulation.set_positions``/``set_momenta`` (owner decision D4), and
-any other change raises ``PlanRefused`` with its reason. ``trajectory=`` and ``logfile=`` keep
+changed species, masses, initial charges, positions or momenta become one event through
+``Simulation.update`` (SPEC §8.5; species in the superset), and any other change raises
+``PlanRefused`` with its reason. The shortest observer interval is the workload's
+``host_callbacks_every`` (rule 9). ``trajectory=`` and ``logfile=`` keep
 their ASE meaning (one ASE ``Trajectory``, ASE's ``MDLogger`` format) and are written from the
 ``Simulation``'s asynchronous snapshots; every other file goes to ``output``.
 """
@@ -46,8 +48,8 @@ REPORT_NAME = "report.txt"
 METADATA_NAME = "metadata.json"
 # atoms.info keys the force field reads (MACE's calculator: total charge and spin).
 PLAN_INFO_KEYS = ("charge", "spin", "total_charge", "total_spin", "spin_multiplicity")
-OBSERVER_WARNING = ("observers: the run stops at every observer call for a host sync (rule 9 kept on the graph "
-                    "tier, owner decision D6); trajectory= and logfile= do not stop it")
+OBSERVER_WARNING = ("observers: the run stops at every observer call for a host sync (the shortest interval is "
+                    "the workload's host_callbacks_every, rule 9); trajectory= and logfile= do not stop it")
 
 
 def _refuse(text, code):
@@ -280,7 +282,7 @@ class _Dynamics:
         # Thermo rows and restart files at the production cadences; ASE's trajectory is written here.
         output = Output(self.output, trajectory_every=None)
         self._sim = sim = simulation.Simulation(self.atoms, self._model, integrator=self.integrator, seed=self.seed,
-                                                output=output, check=self.check)
+                                                workload=self._workload(), output=output, check=self.check)
         if self._has_files():
             sim.add_sink(self._write_frame, self.loginterval)  # in the step loop, behind the GPU
         report = sim.report
@@ -291,6 +293,15 @@ class _Dynamics:
             report.add_warning(OBSERVER_WARNING)
         print(report.setup_text())
         return sim
+
+    def _workload(self):
+        """``Simulation``'s default workload, with the shortest observer interval as the host callbacks
+        (rule 9, SPEC §7.7); a one-off observer (``interval <= 0``) is no cadence."""
+        from fastmace.planner.workload import Workload
+
+        intervals = [interval for _, interval, _, _ in self.observers if interval > 0]
+        return Workload(max_temperature_K=float(self.integrator.temperature_K),
+                        host_callbacks_every=min(intervals) if intervals else None)
 
     def _print_speed(self):
         report = self._sim.report
@@ -377,6 +388,7 @@ class _Dynamics:
 
         committed = self._sim.committed()
         atoms = self.atoms
+        self._write_composition(atoms, committed)
         atoms.set_cell(committed.cell)
         atoms.set_positions(committed.positions, apply_constraint=False)
         atoms.set_momenta(committed.momenta, apply_constraint=False)
@@ -386,8 +398,22 @@ class _Dynamics:
         atoms.calc = self._cache
         return committed
 
+    @staticmethod
+    def _write_composition(atoms, committed):
+        """The committed species, masses and charges into ``atoms``, each only where the engine's differ,
+        so that ASE's implicit masses stay implicit."""
+        import numpy as np
+
+        if not np.array_equal(atoms.numbers, committed.species):
+            atoms.numbers = committed.species
+        if not np.array_equal(atoms.get_masses(), committed.masses):
+            atoms.set_masses(committed.masses)
+        if committed.charges is not None and not np.array_equal(atoms.get_initial_charges(), committed.charges):
+            atoms.set_initial_charges(committed.charges)
+
     def _apply(self, before):
-        """Compare ``atoms`` with what was written; apply positions and momenta (D4), refuse the rest."""
+        """Compare ``atoms`` with what was written; apply species, masses, charges, positions and momenta as
+        one event (``Simulation.update``), refuse the rest."""
         import numpy as np
 
         atoms = self.atoms
@@ -410,16 +436,37 @@ class _Dynamics:
         if info != before.info:
             raise _refuse("an observer changed atoms.info keys the force field reads (charge, spin): that "
                           "invalidates the plan (SPEC §7.7)", code="observer-info")
-        for name, now, then in (("species", atoms.numbers, before.numbers),
-                                ("masses", atoms.get_masses(), before.masses),
-                                ("charges", atoms.get_initial_charges(), before.charges)):
-            if not np.array_equal(now, then):
-                raise _refuse(f"an observer changed the {name}: in-place events are phase 3 (owner decision D4); "
-                              "positions and momenta may change", code=f"observer-{name}")
+        # What atoms reports after the observers: ASE decides whether the masses follow the numbers
+        # (implicit masses follow, explicit ones stay), and the momenta are ASE's.
+        numbers, masses, charges = atoms.numbers, atoms.get_masses(), atoms.get_initial_charges()
+        momenta = atoms.get_momenta()
+        changes = {}
+        if not np.array_equal(numbers, before.numbers):
+            outside = sorted({int(z) for z in numbers} - set(self._sim.force_field.superset_for(atoms)))
+            if outside:
+                from ase.data import chemical_symbols
+
+                raise _refuse(f"an observer set species {', '.join(chemical_symbols[z] for z in outside)}, which "
+                              "are not in the ForceField's declared superset; declare them in "
+                              "fm.ForceField(species=...) (SPEC §7.7, §9.3 rule 2)", code="observer-species")
+            changes["species"] = numbers.copy()
+            changes["masses"] = masses  # given, so that Simulation.update keeps ASE's masses
+        if not np.array_equal(masses, before.masses):
+            changes["masses"] = masses
+        if not np.array_equal(charges, before.charges):
+            if self._sim.committed().charges is None:
+                raise _refuse("an observer changed the initial charges, and this model takes no per-atom charges "
+                              "(SPEC §7.7)", code="observer-charges")
+            changes["charges"] = charges
         if not np.array_equal(atoms.positions, before.positions):
-            self._sim.set_positions(atoms.positions)
-        if not np.array_equal(atoms.get_momenta(), before.momenta):
-            self._sim.set_momenta(atoms.get_momenta())
+            changes["positions"] = atoms.positions.copy()
+        if not np.array_equal(momenta, before.momenta):
+            changes["momenta"] = momenta
+        if not changes:
+            return
+        self._sim.update(**changes)  # one transaction with one force evaluation (SPEC §8.5)
+        if {"species", "masses", "charges"} & set(changes):
+            self._write_composition(self._frame, self._sim.committed())  # update drained the earlier frames
 
     # ------------------------------------------------------------------ files
 
