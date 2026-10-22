@@ -1,0 +1,100 @@
+== acceptance-rest coraline NVIDIA RTX A4000, 595.84 source cd43463 2026-10-22T13:40:20Z
+== deadline in 3460s
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /mnt/homes/zwingel/fastmace-cache/3-T21-coraline/inductor, triton /mnt/homes/zwingel/fastmace-cache/3-T21-coraline/triton
+rootdir: /mnt/homes/zwingel/fastmace-t21-cd43463
+configfile: pyproject.toml
+plugins: platformdirs-4.12.4, xdist-3.8.0
+collected 21 items / 8 deselected / 13 selected
+
+tests/gpu/test_planner_gpu.py ..                                         [ 15%]
+tests/gpu/test_selfcheck_gpu.py ..                                       [ 30%]
+tests/gpu/test_reproducible_gpu.py .....                                 [ 69%]
+tests/gpu/test_subprocess_worker_gpu.py ..                               [ 84%]
+tests/gpu/test_subprocess_runner_gpu.py ..                               [100%]
+
+==================================== PASSES ====================================
+___________________ test_gate_passes_in_graph_mode[omol0-xl] ___________________
+----------------------------- Captured stdout call -----------------------------
+
+omol0-xl: hybrid float32 on NVIDIA RTX A4000, 216 atoms: passed (2 rattled (0.05 Å); energy 0.0021449533825809203 meV/atom, force 0.0008265644673719486 eV/Å, stress None eV/Å^3; captured replay of stages C, B); seconds {'references': 39.7537536919117, 'build': 73.60606277128682, 'production': 26.973561361897737}
+{"case": "omol0-xl", "backend": "hybrid", "dtype": "float32", "capture": true, "atoms": 216, "gpu": "NVIDIA RTX A4000", "gate": {"status": "passed", "check": "gate", "reason": null, "copies": "2 rattled (0.05 \u00c5)", "energy_meV_per_atom": 0.0021449533825809203, "force_eV_per_A": 0.0008265644673719486, "stress_eV_per_A3": null, "quantities": {"energy_meV_per_atom": {"production": 0.0021449533825809203, "yardstick": 0.0009404805799325308, "ratio": 2.280699281142836, "floor": 0.01, "limit": 0.01, "passed": true}, "force_eV_per_A": {"production": 0.0008265644673719486, "yardstick": 0.0006786176765065655, "ratio": 1.2180119911214127, "floor": 1e-05, "limit": 0.001357235353013131, "passed": true}, "stress_eV_per_A3": {"passed": true, "note": "stress: not in plan"}}, "nonfinite": [], "mode": "captured replay of stages C, B", "references": {"ran": "child process", "record_id": "fastmace.reference/0.3.16/omol/fb04d91bc2a91209", "oeq_runtime": "prepared", "reference": {"record_id": "fastmace.reference/0.3.16/omol/fb04d91bc2a91209", "role": "reference", "dtype": "float64", "float64_energy": false, "energy_bound": "float64 accumulation", "e0_table": null, "backend": "cueq", "cueq_conv_fusion": false, "model": {"path": "/mnt/homes/zwingel/ResearchModule/Models/MACE-omol-0-extra-large-1024.model", "sha256": "9b64b4fd5153ca578c694abc57806d8111050de6ff652e695c9b525bc4d36469", "label": "omol0-xl", "head": "omol"}, "patches": ["oeq_runtime", "single_graph_strain"], "corrections_active": [], "optional_physics": [], "polar": null}, "yardstick": {"record_id": "fastmace.reference/0.3.16/omol/fb04d91bc2a91209", "role": "yardstick", "dtype": "float32", "float64_energy": true, "energy_bound": "float64 accumulation", "e0_table": "checkpoint", "backend": "cueq", "cueq_conv_fusion": false, "model": {"path": "/mnt/homes/zwingel/ResearchModule/Models/MACE-omol-0-extra-large-1024.model", "sha256": "9b64b4fd5153ca578c694abc57806d8111050de6ff652e695c9b525bc4d36469", "label": "omol0-xl", "head": "omol"}, "patches": ["oeq_runtime", "single_graph_strain"], "corrections_active": [], "optional_physics": [], "polar": null}, "process": "child"}, "seconds": {"references_s": 39.7537536919117, "production_s": 26.973045436898246, "step_1_s": 39.74697006307542}, "notes": ["the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"], "device": "cuda:0", "reduced_cell": null, "steps": [{"device": "cuda:0", "cell": "production", "repeat": null, "atoms": 216, "outcome": "ran", "reason": null, "process": "child"}], "replay": null, "move_energy": null, "mc_energy_precision": null}, "seconds": {"references": 39.7537536919117, "build": 73.60606277128682, "production": 26.973561361897737}, "fresh_references": {"reference": {"energy_eV": 0.0, "forces_eV_per_A": 2.580158309228864e-13, "stress_eV_per_A3": 1.582067810090848e-15}, "yardstick": {"energy_eV": 2.3365020751953125e-05, "forces_eV_per_A": 0.00011402368545532227, "stress_eV_per_A3": 6.780028343200684e-07}}}
+___________________________ test_gate_time_on_nbcl5 ____________________________
+----------------------------- Captured stdout call -----------------------------
+
+mh1-r2scan-nbcl5: hybrid float32 on NVIDIA RTX A4000, 288 atoms: passed (2 rattled (0.05 Å); energy 0.00018337134280146632 meV/atom, force 2.7801446690345344e-05 eV/Å, stress None eV/Å^3; captured replay of stages C, B); seconds {'references': 23.044679798185825, 'build': 46.80287847481668, 'production': 27.717485742876306}
+{"case": "mh1-r2scan-nbcl5", "backend": "hybrid", "dtype": "float32", "capture": true, "atoms": 288, "gpu": "NVIDIA RTX A4000", "gate": {"status": "passed", "check": "gate", "reason": null, "copies": "2 rattled (0.05 \u00c5)", "energy_meV_per_atom": 0.00018337134280146632, "force_eV_per_A": 2.7801446690345344e-05, "stress_eV_per_A3": null, "quantities": {"energy_meV_per_atom": {"production": 0.00018337134280146632, "yardstick": 0.0003808710384115936, "ratio": 0.4814525766154567, "floor": 0.01, "limit": 0.01, "passed": true}, "force_eV_per_A": {"production": 2.7801446690345344e-05, "yardstick": 3.0045701109759904e-05, "ratio": 0.9253053070315758, "floor": 1e-05, "limit": 6.009140221951981e-05, "passed": true}, "stress_eV_per_A3": {"passed": true, "note": "stress: not in plan"}}, "nonfinite": [], "mode": "captured replay of stages C, B", "references": {"ran": "child process", "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c", "oeq_runtime": "prepared", "reference": {"record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c", "role": "reference", "dtype": "float64", "float64_energy": false, "energy_bound": "float64 accumulation", "e0_table": null, "backend": "cueq", "cueq_conv_fusion": false, "model": {"path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model", "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47", "label": "mh1-r2scan", "head": "matpes_r2scan"}, "patches": ["oeq_runtime", "single_graph_strain"], "corrections_active": [], "optional_physics": [], "polar": null}, "yardstick": {"record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c", "role": "yardstick", "dtype": "float32", "float64_energy": true, "energy_bound": "float64 accumulation", "e0_table": "checkpoint", "backend": "cueq", "cueq_conv_fusion": false, "model": {"path": "/mnt/homes/zwingel/ResearchModule/Models/mace-mh-1.model", "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47", "label": "mh1-r2scan", "head": "matpes_r2scan"}, "patches": ["oeq_runtime", "single_graph_strain"], "corrections_active": [], "optional_physics": [], "polar": null}, "process": "child"}, "seconds": {"references_s": 23.044679798185825, "production_s": 27.716991025954485, "step_1_s": 23.041394281899557}, "notes": [], "device": "cuda:0", "reduced_cell": null, "steps": [{"device": "cuda:0", "cell": "production", "repeat": null, "atoms": 288, "outcome": "ran", "reason": null, "process": "child"}], "replay": null, "move_energy": null, "mc_energy_precision": null}, "seconds": {"references": 23.044679798185825, "build": 46.80287847481668, "production": 27.717485742876306}}
+______ test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float64] ______
+----------------------------- Captured stdout call -----------------------------
+NaCl float64: 3 x 500 steps and a resume at 250; energy -1479.6790294292 eV; seconds [130.1, 91.4, 90.6, 69.1]; NVIDIA RTX A4000
+______ test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32] ______
+----------------------------- Captured stdout call -----------------------------
+NaCl float32: 3 x 500 steps and a resume at 250; energy -1479.6790704727 eV; seconds [74.5, 35.9, 34.5, 42.3]; NVIDIA RTX A4000
+_____ test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float64] ______
+----------------------------- Captured stdout call -----------------------------
+NbCl5 float64: 3 x 500 steps and a resume at 250; energy -3048.3927182441 eV; seconds [138.5, 100.2, 99.7, 74.4]; NVIDIA RTX A4000
+_____ test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float32] ______
+----------------------------- Captured stdout call -----------------------------
+NbCl5 float32: 3 x 500 steps and a resume at 250; energy -3048.3928160667 eV; seconds [73.9, 35.8, 34.6, 42.2]; NVIDIA RTX A4000
+______ test_the_worker_equals_fresh_children_bitwise_and_releases_the_gpu ______
+----------------------------- Captured stdout call -----------------------------
+worker: setup 28.8 s, calls [12.6, 12.2, 12.2] s; fresh: setup 31.5 s, calls [43.5, 54.7, 54.5] s; free memory after close +0 MiB; NVIDIA RTX A4000
+_____________ test_a_killed_parent_releases_the_workers_gpu_memory _____________
+----------------------------- Captured stderr call -----------------------------
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/homes/zwingel/fastmace-t21-cd43463/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fastmace-t21-cd43463/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/homes/zwingel/fastmace-t21-cd43463/fastmace/model/loading.py:748: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+_____ test_plain_cueq_float64_after_a_hybrid_runs_in_a_child_within_1e_12 ______
+----------------------------- Captured stdout call -----------------------------
+plain cuEq float64 in a child vs a fresh process: 2.29e-13 Å; setup 35.9 s; runs [12.0, 11.7, 11.7] s; NVIDIA RTX A4000
+- generated xml file: /mnt/homes/zwingel/fastmace-runs/3-T21-coraline-20261022/acceptance-rest/junit.xml -
+============================= slowest 30 durations =============================
+428.85s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float64]
+398.02s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float64]
+293.86s call     tests/gpu/test_planner_gpu.py::test_mh1_plain_cueq_float64_planned_is_as_fast_as_hand_built
+264.49s call     tests/gpu/test_subprocess_worker_gpu.py::test_the_worker_equals_fresh_children_bitwise_and_releases_the_gpu
+202.36s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]
+201.69s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float32]
+189.65s call     tests/gpu/test_subprocess_runner_gpu.py::test_plain_cueq_float64_after_a_hybrid_runs_in_a_child_within_1e_12
+173.27s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[omol0-xl]
+169.79s call     tests/gpu/test_planner_gpu.py::test_mh1_hybrid_float32_planned_is_as_fast_as_hand_built
+130.47s call     tests/gpu/test_subprocess_runner_gpu.py::test_hybrid_after_a_plain_cueq_runs_in_a_child
+105.31s call     tests/gpu/test_selfcheck_gpu.py::test_gate_time_on_nbcl5
+92.24s call     tests/gpu/test_reproducible_gpu.py::test_reproducible_after_cuda_started_runs_in_a_child_bitwise
+72.65s call     tests/gpu/test_subprocess_worker_gpu.py::test_a_killed_parent_releases_the_workers_gpu_memory
+
+(17 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+PASSED tests/gpu/test_planner_gpu.py::test_mh1_plain_cueq_float64_planned_is_as_fast_as_hand_built
+PASSED tests/gpu/test_planner_gpu.py::test_mh1_hybrid_float32_planned_is_as_fast_as_hand_built
+PASSED tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[omol0-xl]
+PASSED tests/gpu/test_selfcheck_gpu.py::test_gate_time_on_nbcl5
+PASSED tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float64]
+PASSED tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]
+PASSED tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float64]
+PASSED tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float32]
+PASSED tests/gpu/test_reproducible_gpu.py::test_reproducible_after_cuda_started_runs_in_a_child_bitwise
+PASSED tests/gpu/test_subprocess_worker_gpu.py::test_the_worker_equals_fresh_children_bitwise_and_releases_the_gpu
+PASSED tests/gpu/test_subprocess_worker_gpu.py::test_a_killed_parent_releases_the_workers_gpu_memory
+PASSED tests/gpu/test_subprocess_runner_gpu.py::test_plain_cueq_float64_after_a_hybrid_runs_in_a_child_within_1e_12
+PASSED tests/gpu/test_subprocess_runner_gpu.py::test_hybrid_after_a_plain_cueq_runs_in_a_child
+================ 13 passed, 8 deselected in 2723.74s (0:45:23) =================
+== exit 0 2026-10-22T14:25:46Z

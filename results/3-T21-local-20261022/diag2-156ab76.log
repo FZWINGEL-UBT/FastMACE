@@ -1,0 +1,413 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for '3-T21 B-graph diagnosis npt+hybrid 156ab76 (untimed)' (pid 338785)
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/3-T21/inductor, triton /home/fzwin/fastmace-cache/3-T21/triton
+rootdir: /home/fzwin/fastmace-3-T21/diag-156ab76
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 18 items / 16 deselected / 2 selected
+
+tests/gpu/test_engine_gpu.py FF                                          [100%]
+
+=================================== FAILURES ===================================
+_________ test_mh1_plain_cueq_float64_npt_against_the_research_engine __________
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_mh1_baseline
+    def test_mh1_plain_cueq_float64_npt_against_the_research_engine():
+        options = spec("cueq", ensemble="npt", modes=[("checked", 500), ("pipelined", 500)])
+        ours = fastmace_run(options)
+        theirs = baseline_run(options)
+        modes, base = ours["modes"], theirs["modes"]
+        summary = {mode: {"baseline_500": deviation(modes[mode]["positions"], base[mode]["positions"]),
+                          "kernels": same_kernels(modes[mode]["kinds"], base[mode]["kinds"]),
+                          "ms_per_step": [modes[mode]["ms_per_step"], base[mode]["ms_per_step"]],
+                          "builds": [modes[mode]["info"]["neighbour_rebuilds"] + 1, base[mode]["rebuilds"]],
+                          "edge_sizes": [modes[mode]["info"]["edge_sizes_used"], base[mode]["edge_sizes_used"]]}
+                   for mode in ("checked", "pipelined")}
+        summary["pipelined_vs_checked_500"] = deviation(modes["pipelined"]["positions"], modes["checked"]["positions"])
+        report("1a-T13-mh1-cueq-float64-npt", summary)
+        assert all(out["async_equal"] for out in modes.values())
+        assert summary["pipelined_vs_checked_500"] <= FLOAT64_LIMIT
+        for mode in ("checked", "pipelined"):
+            assert summary[mode]["baseline_500"] <= FLOAT64_LIMIT, (mode, summary[mode])
+>           assert all(equal for _, _, equal in summary[mode]["kernels"].values()), summary[mode]["kernels"]
+E           AssertionError: {'C': (28, 28, True), "('B', 7168)": (297, 295, False), 'AC': (229, 229, True)}
+E           assert False
+E            +  where False = all(<generator object test_mh1_plain_cueq_float64_npt_against_the_research_engine.<locals>.<genexpr> at 0x7f7fa43c9a10>)
+
+tests/gpu/test_engine_gpu.py:640: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-cueq-float64-npt: {
+ "checked": {
+  "baseline_500": 8.881784197001252e-15,
+  "kernels": {
+   "C": [
+    28,
+    28,
+    true
+   ],
+   "('B', 7168)": [
+    297,
+    295,
+    false
+   ],
+   "AC": [
+    229,
+    229,
+    true
+   ]
+  },
+  "ms_per_step": [
+   79.0859718399588,
+   79.47791896993294
+  ],
+  "builds": [
+   15,
+   15
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined": {
+  "baseline_500": 7.105427357601002e-15,
+  "kernels": {
+   "ACP": [
+    354,
+    354,
+    true
+   ],
+   "('B', 7168)": [
+    297,
+    295,
+    false
+   ]
+  },
+  "ms_per_step": [
+   79.10525302009773,
+   78.99942543997895
+  ],
+  "builds": [
+   18,
+   18
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined_vs_checked_500": 7.105427357601002e-15
+}
+_____________ test_mh1_hybrid_float32_against_the_research_engine ______________
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_oeq
+    @needs_mh1_baseline
+    def test_mh1_hybrid_float32_against_the_research_engine():
+        ours = fastmace_run(spec("hybrid", modes=[("eager", 200), ("checked", 500), ("repeat", 500), ("pipelined", 500),
+                                                  ("speculative", 200)], warmups=True), python=HYBRID_PYTHON)
+        first = baseline_run(spec("hybrid", modes=[("checked", 500)]), python=HYBRID_PYTHON)
+        second = baseline_run(spec("hybrid", modes=[("checked", 500)]), python=HYBRID_PYTHON)
+        modes = ours["modes"]
+        reference = first["modes"]["checked"]["positions"]
+        scatter = deviation(second["modes"]["checked"]["positions"], reference)
+        summary = {
+            "replay_vs_eager_200": deviation(modes["checked"]["positions"], modes["eager"]["positions"], 4),
+            "fastmace_repeat_500": deviation(modes["repeat"]["positions"], modes["checked"]["positions"]),
+            "pipelined_vs_checked_500": deviation(modes["pipelined"]["positions"], modes["checked"]["positions"]),
+            "speculative_vs_pipelined_200": deviation(modes["speculative"]["positions"], modes["pipelined"]["positions"],
+                                                      4),
+            "baseline_scatter_500": scatter,
+            "baseline_checked_500": deviation(modes["checked"]["positions"], reference),
+            "baseline_scatter_per_record": [deviation([a], [b]) for a, b in
+                                            zip(second["modes"]["checked"]["positions"], reference)],
+            "fastmace_per_record": [deviation([a], [b]) for a, b in zip(modes["checked"]["positions"], reference)],
+            "kernels": same_kernels(modes["checked"]["kinds"], first["modes"]["checked"]["kinds"]),
+            "ms_per_step": {"fastmace": {mode: out["ms_per_step"] for mode, out in modes.items()},
+                            "baseline": [first["modes"]["checked"]["ms_per_step"],
+                                         second["modes"]["checked"]["ms_per_step"]]},
+            "info": {mode: out["info"] for mode, out in modes.items()},
+            "baseline_builds": [first["modes"]["checked"]["rebuilds"], second["modes"]["checked"]["rebuilds"]],
+            "streaming": modes["checked"]["force_field"]["streaming_interactions"], "warmups": ours["warmups"],
+        }
+        report("1a-T13-mh1-hybrid-float32-nvt", summary)
+        assert summary["streaming"] > 0 and modes["checked"]["info"]["neighbour_rebuilds"] >= 1
+        assert all(out["async_equal"] for out in modes.values())
+        assert not any(ours["warmups"].values()), ours["warmups"]
+        # Statistical: float32 rounding differs between eager and compiled-graph kernels and between runs;
+        # trajectories from one seed stay within the run-to-run scatter of the research engine.
+        limit = max(3 * scatter, 1e-6)
+        for name in ("replay_vs_eager_200", "fastmace_repeat_500", "pipelined_vs_checked_500",
+                     "speculative_vs_pipelined_200", "baseline_checked_500"):
+            assert summary[name] <= limit, (name, summary[name], limit)
+>       assert all(equal for _, _, equal in summary["kernels"].values()), summary["kernels"]
+E       AssertionError: {'C': (23, 23, True), "('B', 7168)": (314, 317, True), 'AC': (8, 64, False)}
+E       assert False
+E        +  where False = all(<generator object test_mh1_hybrid_float32_against_the_research_engine.<locals>.<genexpr> at 0x7f7f5e26fd10>)
+
+tests/gpu/test_engine_gpu.py:684: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-hybrid-float32-nvt: {
+ "replay_vs_eager_200": 3.753078736679072e-08,
+ "fastmace_repeat_500": 8.793239913984507e-08,
+ "pipelined_vs_checked_500": 9.423918179152224e-08,
+ "speculative_vs_pipelined_200": 3.455293295928641e-08,
+ "baseline_scatter_500": 1.0708121678248972e-07,
+ "baseline_checked_500": 8.410017748872178e-08,
+ "baseline_scatter_per_record": [
+  5.347043696701803e-09,
+  1.9154937191956378e-08,
+  3.2767729862825945e-08,
+  3.5145429677641005e-08,
+  5.002740977033682e-08,
+  6.047789646856927e-08,
+  6.250295925269711e-08,
+  6.923733586461367e-08,
+  9.064873829345288e-08,
+  1.0708121678248972e-07
+ ],
+ "fastmace_per_record": [
+  5.512935441487343e-09,
+  1.4026531131028364e-08,
+  3.051796682029817e-08,
+  3.787137181632261e-08,
+  5.024918792173594e-08,
+  6.396798291063988e-08,
+  8.410017748872178e-08,
+  6.882404157693145e-08,
+  7.597611073606458e-08,
+  8.315741695241741e-08
+ ],
+ "kernels": {
+  "C": [
+   23,
+   23,
+   true
+  ],
+  "('B', 7168)": [
+   314,
+   317,
+   true
+  ],
+  "AC": [
+   8,
+   64,
+   false
+  ]
+ },
+ "ms_per_step": {
+  "fastmace": {
+   "eager": 11.761085620091762,
+   "checked": 3.6953957699006423,
+   "repeat": 3.66191097011324,
+   "pipelined": 3.487154980102787,
+   "speculative": 3.787523780047195
+  },
+  "baseline": [
+   3.6777103200438432,
+   3.637098920007702
+  ]
+ },
+ "info": {
+  "eager": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": false,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  },
+  "checked": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "AC"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  },
+  "repeat": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "AC"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  },
+  "pipelined": {
+   "rebuilds_beside": 18,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 18,
+   "graphs": [
+    "ACP",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 18,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  },
+  "speculative": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "speculative",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "('ACB', 7168, 0)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 200,
+   "speculative_rollbacks": 5,
+   "speculative_rebuild_rollbacks": 5,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   }
+  }
+ },
+ "baseline_builds": [
+  15,
+  15
+ ],
+ "streaming": 2,
+ "warmups": {
+  "checked": [],
+  "pipelined": [],
+  "speculative": []
+ }
+}
+=========================== short test summary info ============================
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+================= 2 failed, 16 deselected in 386.90s (0:06:26) =================

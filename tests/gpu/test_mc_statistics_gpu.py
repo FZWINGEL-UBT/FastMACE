@@ -265,9 +265,13 @@ def hybrid(kind, velocities, fixcm, unchanged, pair, spec):
         driver = MCDriver([move], seed=spec["seed"])
         driver.attach(engine)
     natoms = engine.state.natoms
-    # ASE's convention: with fixcm the Langevin noise is scaled by sqrt(N / (N - 1)), so the thermostat holds
-    # sum m v^2 at 3 N kT.
-    dof = 3 * natoms
+    # The degrees of freedom the thermostat fills. ASE's projection (fixcm_projection="ase"): the fixcm noise is
+    # scaled by sqrt(N / (N - 1)), so it holds sum m v^2 at 3 N kT. The mass-weighted projection (decision 37, the
+    # NVT fixcm default since 3-T22c) holds the zero-momentum subspace, (3N - 3) kT, and atom i carries
+    # 3 (1 - m_i / M) kT of it on average, so species s carries (3 n_s - 3 M_s / M) kT.
+    projection = sim.plan.decision("IntegratorConfig.fixcm_projection")[1]
+    mass_weighted = bool(fixcm and projection == "mass_weighted")
+    dof = 3 * natoms - (3 if mass_weighted else 0)
     samples = {"total": [], **{name: [] for name in symbols.values()}, "split": []}
     largest_momentum = 0.0
     scale = math.sqrt(natoms * float(engine.state.masses.mean()) * K_B_EV_PER_K * spec["temperature"])
@@ -282,7 +286,10 @@ def hybrid(kind, velocities, fixcm, unchanged, pair, spec):
             for number, name in symbols.items():
                 mask = state.species == number
                 if bool(mask.any()):
-                    per_species[name] = float(twice[mask].sum()) / (3 * int(mask.sum()) * K_B_EV_PER_K)
+                    species_dof = 3 * int(mask.sum())
+                    if mass_weighted:
+                        species_dof -= 3 * float(state.masses[mask].sum() / state.masses.sum())
+                    per_species[name] = float(twice[mask].sum()) / (species_dof * K_B_EV_PER_K)
                     samples[name].append(per_species[name])
             if len(per_species) == 2:  # T(second) - T(first): zero in equilibrium, no common mode
                 samples["split"].append(per_species[symbols[second]] - per_species[symbols[first]])
@@ -291,7 +298,7 @@ def hybrid(kind, velocities, fixcm, unchanged, pair, spec):
         if fixcm:
             momentum = (engine.state.masses * engine.state.velocities).sum(dim=0)
             largest_momentum = max(largest_momentum, float(momentum.abs().max()) / scale)
-    return dict(stats={name: ref.batch_mean(values) for name, values in samples.items()
+    return dict(fixcm_projection=projection, stats={name: ref.batch_mean(values) for name, values in samples.items()
                        if len(values) >= spec["blocks"] // 2},
                 counters=None if driver is None else driver.counters, momentum=largest_momentum,
                 seconds=time.perf_counter() - started, backend=sim.plan.engine.backend, dtype=sim.plan.precision.dtype)
@@ -418,14 +425,10 @@ HYBRID_RUNS = {  # (move, momenta, fixcm, velocities unchanged, cation pair)
 }
 
 
-# Open for acceptance item 5 (conductor, 22 October 2026): with fixcm, redraw_all draws the correct
-# zero-momentum Maxwell-Boltzmann state, sum m v^2 = (3N - 3) kT, while the fixcm Langevin's sqrt(N / (N - 1))
-# noise factor (ASE's convention) holds 3N kT, so every accepted block lowers the kinetic energy by (N - 1)/N
-# and the runs sit below MC off (16 atoms: 3.5 and 5.5 sigma). A non-strict expected failure until 3-T22's
-# corrected projection; then the check must pass and this goes.
-FIXCM_REDRAW_ALL = ("swap_redraw_all", "transmute_redraw_all")
-FIXCM_REDRAW_ALL_REASON = ("3-T22: redraw_all draws (3N-3) kT in the zero-momentum subspace, the fixcm Langevin's "
-                           "sqrt(N/(N-1)) holds 3N kT")
+# With fixcm, redraw_all draws the zero-momentum Maxwell-Boltzmann state, sum m v^2 = (3N - 3) kT. Under ASE's
+# projection the fixcm Langevin holds 3N kT, so those runs sat 3.5 and 5.5 sigma below MC off (3-T12); under the
+# mass-weighted projection, the NVT fixcm default since 3-T22c (decision 37), both hold (3N - 3) kT and the
+# check is strict (3-T21: swap_redraw_all 0.58 sigma, transmute_redraw_all 0.35 sigma from MC off).
 
 
 @functools.cache
@@ -461,7 +464,6 @@ def test_mh1_kinetic_temperature_with_mc_on_and_off(names):
         summary[name]["deviations_sigma"] = ref.deviations(result[name]["stats"], off)
     ENGINE.report(f"3-T12-mh1-hybrid-{off_name}", {**summary, "hybrid": HYBRID, "gpu": result["gpu"],
                                                    "fastmace": result["fastmace"]})
-    known = []
     for name in names[1:]:
         on = result[name]["stats"]
         kind = HYBRID_RUNS[name][0]
@@ -469,13 +471,9 @@ def test_mh1_kinetic_temperature_with_mc_on_and_off(names):
         assert counters["accepted"] > 0.02 * counters["attempted"], (name, counters)
         if name == "negative_unchanged":
             assert not hybrid_agrees(on, off, HYBRID["temperature"]), (name, on, off)
-        elif name in FIXCM_REDRAW_ALL and not hybrid_agrees(on, off, HYBRID["temperature"]):
-            known.append(name)
         else:
             assert hybrid_agrees(on, off, HYBRID["temperature"]), (name, on, off)
         if HYBRID_RUNS[name][2]:
             assert result[name]["momentum"] <= 1e-5, (name, result[name]["momentum"])
     assert ref.agree(tuple(off["total"]), (HYBRID["temperature"], 0.0)), off
-    if known:  # every other check of the group has passed
-        pytest.xfail(f"{known}: {FIXCM_REDRAW_ALL_REASON}")
 

@@ -209,20 +209,24 @@ def test_ddmin_finds_the_broken_rewrites(case):
         assert off_now == fields, off_now
 
 
+# The fallback's mode dimension since 3-T06 (docs/design/contracts-3.md, "Decisions made in 3-T06"): when eager
+# passes the reduced gate, a graph plan tries compiled first, then eager (SPEC §9.4 step 2). The diagnosis (the
+# reduced gate in eager) is unchanged; the plan it activates is the compiled tier.
 def test_a_broken_capture_drops_the_graph_mode():
     out = _run("capture")
     _common(out)
-    assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
+    assert out["tier"] == "compiled" and out["reason"].startswith("fallback: mode compiled: ")
     assert out["gate"]["mode"] == "eager stages C, B"
 
 
 @pytest.mark.parametrize("check", ["skip", "gate"])
-def test_a_capture_error_before_the_first_step_falls_back_to_eager(check):
+def test_a_capture_error_before_the_first_step_falls_back_to_compiled(check):
     """A host sync inside the capture (``torch.nonzero``, as an unhashed MACE block does; 2-T15b): the
-    first step's graphs are captured before it, so the fallback takes the plan to eager."""
+    first step's graphs are captured before it, so the fallback takes the plan to the compiled tier (no CUDA
+    graphs), which 3-T06's mode order tries before eager."""
     out = _run("capture_error", check=check)
     _common(out)
-    assert out["tier"] == "eager" and out["reason"].startswith("fallback: mode eager: ")
+    assert out["tier"] == "compiled" and out["reason"].startswith("fallback: mode compiled: ")
     assert "captur" in out["reason"].lower()
     assert [t["outcome"] for t in out["tried"]] == ["passed", "activated"]
 

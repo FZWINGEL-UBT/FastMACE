@@ -557,10 +557,77 @@ def kernel_sequence(kinds):
     return out
 
 
-def same_kernels(ours, theirs):
-    """Per graph key: (our node count, theirs, equal kernel sequences after kernel_sequence)."""
+# The integrator stage's graphs. With EngineConfig.fused_integrator (OPT3-T03; the default since ab09b51, before
+# phase 3) NVT runs them as FastMACE's own Triton kernels, which the research engine does not have (8 nodes
+# against its 64 for AC, 8 against 73 for ACP, at phase 3's acceptance): their kernel sequences are not compared.
+# The trajectories, which they produce, still are.
+INTEGRATOR_KEYS = ("AC", "ACP")
+
+
+def fused_integrator_keys(info):
+    """The graph keys left out of the kernel comparison for a run whose ``info()`` is ``info``."""
+    return INTEGRATOR_KEYS if info.get("fused_integrator") else ()
+
+
+# The known differences of the force graph B from the research engine's (phase 3 acceptance, 3-T21; the kernel
+# names of both engines are in results/3-T21-local-20261022/diag*/results/kinds-*.json). Each is named here; no
+# other difference passes.
+# - Inductor numbers its generated Triton kernels in the order it emits them (``triton_poi_fused_..._37``), so a
+#   kernel's number is not part of its identity.
+# - Plain cuEq float64, NVT and NPT: Inductor emits three fused pointwise kernels and two cutlass float64 GEMMs of
+#   the same group in a different order in the two engines. The same kernels, in the same place; present at
+#   phase-3-baseline 156ab76 already (before phase 3), on the RTX 5060 Ti and the RTX 4000 Ada.
+# - MH-1 hybrid: the first interaction's reassociation takes its species rows from the superset's identity basis
+#   (3-T02, f045a3e; SPEC §8.5), where the research engine gathers "the first atom of each species": an argmax
+#   reduction and an index gather fused into the next kernel. Without them, that next kernel can run earlier.
+INDUCTOR_COUNTER = re.compile(r"(triton_(?:poi|per|red)_fused_\w+?)_\d+")
+CUEQ_FLOAT64_REORDERED = re.compile(
+    r"triton_poi_fused_(?:_unsafe_view_)?add_cat_(?:clone_)?div_mul_slice(?:_view)?"
+    r"|_ZN7cutlass7Kernel2I49cutlass_80_tensorop_d884gemm_64x32_16x4_nn_align1EEvNT_6ParamsE")
+FIRST_ATOM_GATHER = {"triton_red_fused_argmax_index_slice": None,
+                     "triton_poi_fused_cat_clone_index_mul_slice_t_unsqueeze":
+                         "triton_poi_fused_cat_clone_mul_slice_t_unsqueeze"}
+
+
+def known_b_differences(sequence, research):
+    """A B graph's kernel_sequence with the known differences above taken out (``research``: the research engine's)."""
+    out, run, moved = [], [], []
+    for name in sequence:
+        match = INDUCTOR_COUNTER.fullmatch(name)
+        name = match.group(1) if match else name
+        if research and name in FIRST_ATOM_GATHER:
+            name = FIRST_ATOM_GATHER[name]
+            if name is None:
+                continue
+        if name in FIRST_ATOM_GATHER.values():  # its place moves with the gather: compared by count
+            moved.append(name)
+            continue
+        if CUEQ_FLOAT64_REORDERED.fullmatch(name):
+            run.append(name)
+            continue
+        if run:
+            out.append(tuple(sorted(run)))
+            run = []
+        out.append(name)
+    if run:
+        out.append(tuple(sorted(run)))
+    return out + sorted(moved)
+
+
+def _equal_kernels(key, ours, theirs):
+    if key.startswith("('B'"):
+        return known_b_differences(kernel_sequence(ours), False) == known_b_differences(kernel_sequence(theirs), True)
+    return kernel_sequence(ours) == kernel_sequence(theirs)
+
+
+def same_kernels(ours, theirs, skip=()):
+    """Per graph key: (our node count, theirs, equal kernel sequences after kernel_sequence); ``skip`` keys left out.
+
+    The B graph is compared with its known differences taken out (``known_b_differences``)."""
+    ours = {key: kinds for key, kinds in ours.items() if key not in skip}
+    theirs = {key: kinds for key, kinds in theirs.items() if key not in skip}
     out = {key: (len(kinds), len(theirs[key]) if key in theirs else None,
-                 key in theirs and kernel_sequence(kinds) == kernel_sequence(theirs[key]))
+                 key in theirs and _equal_kernels(key, kinds, theirs[key]))
            for key, kinds in ours.items()}
     out.update({key: (None, len(kinds), False) for key, kinds in theirs.items() if key not in ours})
     return out
@@ -597,7 +664,9 @@ def test_mh1_plain_cueq_float64_against_the_research_engine():
         "speculative_vs_pipelined_200": deviation(modes["speculative"]["positions"], pipelined["positions"], 4),
         "baseline_checked_500": deviation(checked["positions"], base["checked"]["positions"]),
         "baseline_pipelined_500": deviation(pipelined["positions"], base["pipelined"]["positions"]),
-        "kernels": {mode: same_kernels(modes[mode]["kinds"], base[mode]["kinds"]) for mode in ("checked", "pipelined")},
+        "kernels": {mode: same_kernels(modes[mode]["kinds"], base[mode]["kinds"],
+                                       skip=fused_integrator_keys(modes[mode]["info"]))
+                    for mode in ("checked", "pipelined")},
         "ms_per_step": {mode: {"fastmace": modes[mode]["ms_per_step"], "baseline": base[mode]["ms_per_step"]}
                         for mode in ("checked", "pipelined")},
         "info": {mode: out["info"] for mode, out in modes.items()},
@@ -628,7 +697,8 @@ def test_mh1_plain_cueq_float64_npt_against_the_research_engine():
     theirs = baseline_run(options)
     modes, base = ours["modes"], theirs["modes"]
     summary = {mode: {"baseline_500": deviation(modes[mode]["positions"], base[mode]["positions"]),
-                      "kernels": same_kernels(modes[mode]["kinds"], base[mode]["kinds"]),
+                      "kernels": same_kernels(modes[mode]["kinds"], base[mode]["kinds"],
+                                              skip=fused_integrator_keys(modes[mode]["info"])),
                       "ms_per_step": [modes[mode]["ms_per_step"], base[mode]["ms_per_step"]],
                       "builds": [modes[mode]["info"]["neighbour_rebuilds"] + 1, base[mode]["rebuilds"]],
                       "edge_sizes": [modes[mode]["info"]["edge_sizes_used"], base[mode]["edge_sizes_used"]]}
@@ -665,7 +735,8 @@ def test_mh1_hybrid_float32_against_the_research_engine():
         "baseline_scatter_per_record": [deviation([a], [b]) for a, b in
                                         zip(second["modes"]["checked"]["positions"], reference)],
         "fastmace_per_record": [deviation([a], [b]) for a, b in zip(modes["checked"]["positions"], reference)],
-        "kernels": same_kernels(modes["checked"]["kinds"], first["modes"]["checked"]["kinds"]),
+        "kernels": same_kernels(modes["checked"]["kinds"], first["modes"]["checked"]["kinds"],
+                                skip=fused_integrator_keys(modes["checked"]["info"])),
         "ms_per_step": {"fastmace": {mode: out["ms_per_step"] for mode, out in modes.items()},
                         "baseline": [first["modes"]["checked"]["ms_per_step"],
                                      second["modes"]["checked"]["ms_per_step"]]},

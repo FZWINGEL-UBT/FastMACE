@@ -1,0 +1,157 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/3-T21/inductor, triton /home/fzwin/fastmace-cache/3-T21/triton
+rootdir: /home/fzwin/fastmace-3-T21/src-676a8a3
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 340 items / 269 deselected / 71 selected
+
+tests/gpu/test_ase_calculator_gpu.py ..                                  [  2%]
+tests/gpu/test_canonical_restart_gpu.py .                                [  4%]
+tests/gpu/test_combo_kernels_cuda.py .                                   [  5%]
+tests/gpu/test_compiled_gpu.py ..                                        [  8%]
+tests/gpu/test_eager_gpu.py ..                                           [ 11%]
+tests/gpu/test_engine_gpu.py ..                                          [ 14%]
+tests/gpu/test_fixed_costs_gpu.py F                                      [ 15%]
+tests/gpu/test_forces_gpu.py ...                                         [ 19%]
+tests/gpu/test_fused_integrator_gpu.py ...
+
+=================================== FAILURES ===================================
+_________ test_the_fixed_cost_options_are_bitwise_equal_to_the_default _________
+
+    def test_the_fixed_cost_options_are_bitwise_equal_to_the_default():
+        runs = {name: ENGINE.run_fresh(DRIVER.format(spec={"engine": engine, "steps": 600}))
+                for name, engine in CASES.items()}
+        summary = {name: {k: v for k, v in run.items() if k not in ("positions", "momenta")} for name, run in runs.items()}
+        ENGINE.report("opt2-T04-fixed-costs-mh1-nacl", summary)
+        default = runs["default"]
+        assert default["pipelined"] and default["tier"] == "graph" and default["early_rebuilds"] > 0, summary
+>       assert default["beside"] is None, summary
+E       AssertionError: {'default': {'step': 600, 'energy': -1461.4094561957781, 'pipelined': True, 'early_rebuilds': 118, ...}, 'overlap_rebu...uilds': 118, ...}, 'both': {'step': 600, 'energy': -1461.4094561957781, 'pipelined': True, 'early_rebuilds': 118, ...}}
+E       assert 118 is None
+
+tests/gpu/test_fixed_costs_gpu.py:73: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+opt2-T04-fixed-costs-mh1-nacl: {
+ "default": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "overlap_rebuild": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "step_graph": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "('ACPB', 7168)",
+   "C",
+   "('B', 7680)",
+   "('ACPB', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "both": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "('ACPB', 7168)",
+   "C",
+   "('B', 7680)",
+   "('ACPB', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ }
+}
+=============================== warnings summary ===============================
+../../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+  /home/fzwin/fastmace-3-T21/src-676a8a3/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+  /home/fzwin/fastmace-3-T21/src-676a8a3/fastmace/model/loading.py:748: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /home/fzwin/fastmace-acceptance/3-T21-local-20261022/slow-tier/junit.xml -
+============================= slowest 60 durations =============================
+457.63s call     tests/gpu/test_fixed_costs_gpu.py::test_the_fixed_cost_options_are_bitwise_equal_to_the_default
+395.73s call     tests/gpu/test_fused_integrator_gpu.py::test_trajectories_are_bitwise_equal_with_the_option[nvt]
+204.83s call     tests/gpu/test_canonical_restart_gpu.py::test_mh1_plain_cueq_float64_resumes_within_1e_12
+105.26s call     tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_plain_cueq
+105.06s call     tests/gpu/test_compiled_gpu.py::test_mh1_hybrid_compiled_equals_graph_within_float32_noise
+97.96s call     tests/gpu/test_compiled_gpu.py::test_mp0_compiled_equals_graph_within_float32_noise
+92.51s call     tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_hybrid
+87.04s call     tests/gpu/test_eager_gpu.py::test_mh1_hybrid_eager_equals_graph_within_float32_noise
+66.70s call     tests/gpu/test_ase_calculator_gpu.py::test_lbfgs_with_fm_calc_reaches_maces_minimum[pytest]
+57.88s call     tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+52.12s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float64-default]
+48.24s call     tests/gpu/test_ase_calculator_gpu.py::test_lbfgs_with_fm_calc_reaches_maces_minimum[hybrid]
+37.76s call     tests/gpu/test_fused_integrator_gpu.py::test_the_fused_stage_writes_the_pytorch_stage_bytes[False]
+36.97s call     tests/gpu/test_fused_integrator_gpu.py::test_the_fused_stage_writes_the_pytorch_stage_bytes[True]
+30.38s call     tests/gpu/test_eager_gpu.py::test_polar1_s_plain_cueq_runs_gated_in_eager_mode
+26.10s call     tests/gpu/test_forces_gpu.py::test_mh1_agrees_with_maceforces[cueq-float64-eager-plain]
+15.58s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float64-none]
+
+(35 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+FAILED tests/gpu/test_fixed_costs_gpu.py::test_the_fixed_cost_options_are_bitwise_equal_to_the_default
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/selectors.py:416: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+==== 1 failed, 16 passed, 269 deselected, 6 warnings in 2065.50s (0:34:25) =====

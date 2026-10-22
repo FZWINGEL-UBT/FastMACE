@@ -14,6 +14,11 @@ does. Rows every --every steps hold the temperature, the potential energy per at
 
     python tools/trajectory_versions.py run --side 2 --backend cueq --output DIR --checkpoint mh1.model ...
     python tools/trajectory_versions.py compare --release DIR_1b --current DIR_2 [--repeat DIR_2b]
+
+Phase 3 (3-T21, item 10) runs it against main before phase 3 with ``run --against p3b --side p3b|3``
+(``tools/ab_fastmace.py``'s release p3b; side 3 pins ``fixcm_projection="ase"``), and asks for bitwise
+equality: ``--device cpu`` (CPU float64, the plan's backend) or ``--reproducible`` (the reproducible plan on
+the GPU), then ``compare --bitwise``: positions, energies and temperatures equal at every row.
 """
 
 from __future__ import annotations
@@ -47,13 +52,19 @@ def parse_args(argv=None):
     sub = p.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="One version's runs in this process")
     run.add_argument("--output", required=True, type=Path, help="Fresh directory")
-    run.add_argument("--side", required=True, choices=("1b", "2"), help="1b: the release copy; 2: this checkout")
-    run.add_argument("--renamed", type=Path, help="Directory holding the exported fastmace_1b (for --side 1b)")
-    run.add_argument("--expected-commit", default=ab_fastmace.RELEASES["1b"].commit)
+    run.add_argument("--against", choices=("1b", "p3b"), default="1b",
+                     help="The earlier version (tools/ab_fastmace.py's releases): 1b (sides 1b, 2) or p3b (p3b, 3)")
+    run.add_argument("--side", required=True, choices=("1b", "2", "p3b", "3"),
+                     help="The release copy (1b, p3b) or this checkout (2, 3)")
+    run.add_argument("--renamed", type=Path, help="Directory holding the exported release package (release side)")
+    run.add_argument("--expected-commit", default=None, help="Commit (prefix) of the release copy (default: its own)")
+    run.add_argument("--device", choices=("cuda", "cpu"), default="cuda",
+                     help="cpu: hide the GPUs before torch starts (CPU float64 with --backend auto)")
+    run.add_argument("--reproducible", action="store_true", help="Plan with Workload(reproducible=True)")
     run.add_argument("--model", default="mh1-r2scan")
     run.add_argument("--checkpoint", required=True, type=Path)
     run.add_argument("--structure", default="NaCl", help="Benchmark name (under FASTMACE_STRUCTURES) or PATH@NxNxN")
-    run.add_argument("--backend", choices=("hybrid", "cueq"), default="hybrid")
+    run.add_argument("--backend", choices=("hybrid", "cueq", "auto"), default="hybrid")
     run.add_argument("--steps", type=int, default=20_000)
     run.add_argument("--every", type=int, default=20)
     run.add_argument("--seeds", type=int, nargs="+", default=[20261001, 20261101])
@@ -65,10 +76,18 @@ def parse_args(argv=None):
     compare.add_argument("--repeat", type=Path, help="A second run of this checkout (the plain cuEq floor)")
     compare.add_argument("--allow-option-changes", nargs="*", default=[], metavar="OPTION",
                          help="Plan options whose difference between the versions is expected")
+    compare.add_argument("--bitwise", action="store_true",
+                         help="Positions (recorded), energies and temperatures equal at every row (3-T21)")
     args = p.parse_args(argv)
-    if args.command == "run" and args.side == "1b" and args.renamed is None:
-        p.error("--side 1b needs --renamed DIR (python -m fastmace.bench.versions export --ref fastmace-1b "
-                "--name fastmace_1b --destination DIR)")
+    if args.command == "run":
+        release = ab_fastmace.RELEASES[args.against]
+        if args.side not in (args.against, release.current):
+            p.error(f"--against {args.against} takes --side {args.against} or {release.current}")
+        if args.side == args.against and args.renamed is None:
+            p.error(f"--side {args.side} needs --renamed DIR (python -m fastmace.bench.versions export --ref "
+                    f"{release.tag} --name {release.renamed} --destination DIR)")
+        if args.expected_commit is None:
+            args.expected_commit = release.commit
     return args
 
 
@@ -78,14 +97,17 @@ def target(step, steps, targets):
 
 
 def run(args):
+    if getattr(args, "device", "cuda") == "cpu":
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
     from ase import units
-    release = ab_fastmace.RELEASES["1b"]
+    against = getattr(args, "against", "1b")
+    release = ab_fastmace.RELEASES[against]
     hybrid = args.backend == "hybrid"
     from fastmace import _patches
     from fastmace.model import loading
     oeq_runtime = str(loading.prepare_hybrid()) if hybrid else None
     package, source, shared = fastmace, None, None
-    if args.side == "1b":
+    if args.side == against:
         package, source = versions.load_renamed(args.renamed, release.renamed, args.expected_commit)
         import importlib
         for name in ("config", "planner.fixed", "planner.minimal", "model.loading", "model.forcefield",
@@ -93,17 +115,24 @@ def run(args):
             importlib.import_module(f"{release.renamed}.{name}")
         if hybrid:
             shared = versions.share_record(_patches, package._patches, "oeq_runtime")
-    if ab_step_time.gpu_processes():
+    if getattr(args, "device", "cuda") == "cuda" and ab_step_time.gpu_processes():
         raise RuntimeError("GPU must be idle")
     args.output.mkdir(parents=True, exist_ok=False)
     checkpoint = args.checkpoint.expanduser().resolve(strict=True)
-    # ab_fastmace.Version reads these fields: this checkout is side "2" against release 1b.
-    side_args = argparse.Namespace(current="2", release="1b", planner_1b="minimal", model=args.model,
+    # ab_fastmace.Version reads these fields: this checkout is side release.current against the release, with
+    # the release's integrator pins (p3b: fixcm_projection="ase").
+    side_args = argparse.Namespace(current=release.current, release=against, planner_1b="minimal", model=args.model,
                                    backend=args.backend, ensemble="nvt", cell_mode="hydrostatic", seed=None,
-                                   temperature_K=args.targets[0], max_temperature_K=max(args.targets))
+                                   temperature_K=args.targets[0], max_temperature_K=max(args.targets),
+                                   integrator_options=dict(ab_fastmace.RELEASE_INTEGRATOR_PINS.get(against, {})),
+                                   reproducible=getattr(args, "reproducible", False),
+                                   device=getattr(args, "device", "cuda"))
     meta = dict(tool="trajectory_versions", status="running", created_utc=datetime.now(timezone.utc).isoformat(),
                 host=os.uname().nodename, python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(),
-                side=args.side, release_source=source, oeq_runtime=oeq_runtime, oeq_runtime_shared=shared,
+                side=args.side, against=against, device=getattr(args, "device", "cuda"),
+                reproducible=side_args.reproducible,
+                integrator_options=side_args.integrator_options if args.side == release.current else {},
+                release_source=source, oeq_runtime=oeq_runtime, oeq_runtime_shared=shared,
                 model=args.model, checkpoint=str(checkpoint), backend=args.backend, structure=args.structure,
                 steps=args.steps, every=args.every, targets=list(args.targets), seeds=list(args.seeds), runs={})
     path = args.output / "trajectory.json"
@@ -120,7 +149,8 @@ def run(args):
         version = ab_fastmace.Version(args.side, side_args, package)
         version.prepare()
         meta["load"] = version.load(checkpoint)
-        meta["gpu"], meta["torch"] = torch.cuda.get_device_name(0), torch.__version__
+        meta["gpu"] = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
+        meta["torch"] = torch.__version__
         for seed in args.seeds:
             side_args.seed = seed
             started = time.perf_counter()
@@ -145,7 +175,8 @@ def run(args):
             save()
             del engine
             gc.collect()
-            torch.cuda.empty_cache()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
         meta["patches_applied"] = [str(record) for record in version.module("_patches").applied()]
         meta["status"] = "complete"
     except Exception as exc:
@@ -192,8 +223,16 @@ def _load(directory):
     return meta
 
 
-def compare(release, current, repeat=None, allowed=()):
-    """The verdict record of two (or three) ``run`` outputs with the same backend, steps and seeds."""
+def bitwise(rows, reference):
+    """Rows equal in every recorded number: energy, temperature and (when recorded) positions."""
+    return all(x["step"] == y["step"] and x["energy"] == y["energy"] and x["temperature"] == y["temperature"]
+               and x.get("positions") == y.get("positions") for x, y in zip(rows, reference, strict=True))
+
+
+def compare(release, current, repeat=None, allowed=(), exact=False):
+    """The verdict record of two (or three) ``run`` outputs with the same backend, steps and seeds.
+
+    ``exact`` (3-T21): every row equal bitwise, with positions recorded on both sides."""
     a, b = _load(release), _load(current)
     for key in ("backend", "steps", "every", "seeds", "targets", "structure", "model"):
         if a[key] != b[key]:
@@ -210,6 +249,15 @@ def compare(release, current, repeat=None, allowed=()):
                                for seed in seeds},
                   plans_equal={seed: a["runs"][seed]["plan"]["options"] == b["runs"][seed]["plan"]["options"]
                                for seed in seeds})
+    if exact:
+        recorded = all(row.get("positions") is not None for meta in (a, b) for seed in seeds
+                       for row in meta["runs"][seed]["rows"])
+        result["bitwise"] = {seed: bitwise(b["runs"][seed]["rows"], a["runs"][seed]["rows"]) for seed in seeds}
+        result["positions_max_A"] = ({seed: max_deviation(b["runs"][seed]["rows"], a["runs"][seed]["rows"])
+                                      for seed in seeds} if recorded else None)
+        result["passed"] = (recorded and all(check["as_expected"] for check in result["plan_checks"].values())
+                            and all(result["bitwise"].values()))
+        return result
     if a["backend"] == "cueq":
         result["positions_max_A"] = {seed: max_deviation(b["runs"][seed]["rows"], a["runs"][seed]["rows"])
                                      for seed in seeds}
@@ -238,7 +286,7 @@ def main(argv=None):
     args = parse_args(argv)
     if args.command == "run":
         return run(args)
-    result = compare(args.release, args.current, args.repeat, args.allow_option_changes)
+    result = compare(args.release, args.current, args.repeat, args.allow_option_changes, exact=args.bitwise)
     print(json.dumps({key: value for key, value in result.items() if key != "statistics"}, indent=2))
     return result
 

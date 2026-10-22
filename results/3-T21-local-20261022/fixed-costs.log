@@ -1,0 +1,115 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for '3-T21 fixed-costs rerun (untimed)' (pid 327451)
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/3-T21/inductor, triton /home/fzwin/fastmace-cache/3-T21/triton
+rootdir: /home/fzwin/fastmace-3-T21/src-57d924b
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 1 item
+
+tests/gpu/test_fixed_costs_gpu.py .                                      [100%]
+
+==================================== PASSES ====================================
+_________ test_the_fixed_cost_options_are_bitwise_equal_to_the_default _________
+----------------------------- Captured stdout call -----------------------------
+
+opt2-T04-fixed-costs-mh1-nacl: {
+ "default": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "no_overlap": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": null,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "overlap_rebuild": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "step_graph": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "('ACPB', 7168)",
+   "C",
+   "('B', 7680)",
+   "('ACPB', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "both": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "('ACPB', 7168)",
+   "C",
+   "('B', 7680)",
+   "('ACPB', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ }
+}
+- generated xml file: /home/fzwin/fastmace-acceptance/3-T21-local-20261022/fixed-costs/junit.xml -
+=========================== short test summary info ============================
+PASSED tests/gpu/test_fixed_costs_gpu.py::test_the_fixed_cost_options_are_bitwise_equal_to_the_default
+======================== 1 passed in 498.03s (0:08:18) =========================
