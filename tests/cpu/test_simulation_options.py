@@ -19,7 +19,6 @@ from _support.tiny_models import FAMILIES, tiny_mace_model
 from fastmace import integrators
 from fastmace.config import EngineConfig, FallbackConfig, GateConfig, NeighbourConfig, RunnerConfig
 from fastmace.engine import constraints
-from fastmace.errors import PlanRefused
 from fastmace.planner import minimal
 
 pytestmark = [pytest.mark.filterwarnings("ignore::UserWarning")]
@@ -80,11 +79,16 @@ def test_engine_and_neighbours_reach_the_planner(loaded, cpu_planner):
     assert cpu_planner.engine == CPU and cpu_planner.neighbours == NeighbourConfig()  # not changed in place
 
 
-@pytest.mark.parametrize("mode", ["compiled"])
-def test_modes_other_than_graph_reach_the_planner(loaded, mode):
-    with pytest.raises(PlanRefused) as refused:  # the compiled MD tier: phase 3
-        _simulation(loaded, mode=mode)
-    assert f"mode-{mode}" in refused.value.codes
+def test_compiled_mode_reaches_the_planner(loaded):  # 3-T06
+    assert _simulation(loaded, mode="compiled").plan.tier == "compiled"
+
+
+def test_mode_defaults_to_none_and_is_recorded(loaded):  # 3-T06: the planner picks the tier
+    from fastmace.simulation import PlannerOptions, planner_options
+
+    assert PlannerOptions().mode is None and planner_options().mode is None
+    assert PlannerOptions.from_record(PlannerOptions().to_record()).mode is None
+    assert _simulation(loaded).plan.tier == "graph"
 
 
 def test_eager_mode_reaches_the_planner(loaded):  # 2-T02
@@ -112,7 +116,7 @@ def test_options_are_recorded_and_resume_replans_with_them(loaded, tmp_path):
     sim.save_restart(tmp_path / "restart.npz")
     record = json.loads((tmp_path / SIMULATION_NAME).read_text(encoding="utf-8"))
     options = record["planner_options"]
-    assert options["mode"] == "graph" and options["allow_reference"] is False
+    assert options["mode"] is None and options["allow_reference"] is False
     assert options["fallback"]["fallback"] == "refuse" and options["gate"]["reduced_cell"] == "off"
     assert options["runner"]["environment"] == [["A", "1"]]
     assert options["engine"]["pipelined"] == "off" and options["neighbours"]["edge_multiple"] == 128

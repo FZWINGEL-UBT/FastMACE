@@ -88,13 +88,14 @@ class PlannerOptions:
     """The planner inputs of ``Simulation`` and ``fm.md`` (plan task 2-T01), validated, recorded in
     ``simulation.json`` and used again by ``Simulation.resume``.
 
-    - ``mode``: the execution mode (``config.Mode``, §9.3); ``allow_reference``: rule 1's flag;
+    - ``mode``: the execution mode (``config.Mode``, §9.3), or ``None`` (the default): the planner picks the
+      graph tier, or the compiled tier by rule 4 or rule 9 (3-T06); ``allow_reference``: rule 1's flag;
     - ``fallback``, ``gate``, ``runner``: the safety records of phase 2 (§9.4, §12.3, §8.7);
     - ``engine``, ``neighbours``: the planner-level options; ``None`` keeps the default planner's
       (``planner.minimal.default_planner``: CUDA if available, else the CPU without compilation).
     """
 
-    mode: Mode = "graph"
+    mode: Mode | None = None
     allow_reference: bool = False
     fallback: FallbackConfig = field(default_factory=FallbackConfig)
     gate: GateConfig = field(default_factory=GateConfig)
@@ -128,19 +129,19 @@ class PlannerOptions:
                 return None
             return kind(**{key: _from_json(value) for key, value in values.items()})
 
-        return planner_options(mode=record.get("mode", "graph"), allow_reference=record.get("allow_reference", False),
+        return planner_options(mode=record.get("mode"), allow_reference=record.get("allow_reference", False),
                                fallback=part("fallback", FallbackConfig), gate=part("gate", GateConfig),
                                runner=part("runner", RunnerConfig), engine=part("engine", EngineConfig),
                                neighbours=part("neighbours", NeighbourConfig))
 
 
-def planner_options(mode: Any = "graph", allow_reference: Any = False, fallback: Any = None, gate: Any = None,
+def planner_options(mode: Any = None, allow_reference: Any = False, fallback: Any = None, gate: Any = None,
                     runner: Any = None, engine: Any = None, neighbours: Any = None) -> PlannerOptions:
     """The validated ``PlannerOptions``: ``ValueError`` or ``TypeError`` before anything is loaded."""
     from fastmace.config import MODES
 
-    if not isinstance(mode, str) or mode not in MODES:
-        raise ValueError(f"mode={mode!r} is not one of {MODES} (SPEC §9.3)")
+    if mode is not None and (not isinstance(mode, str) or mode not in MODES):
+        raise ValueError(f"mode={mode!r} is not None or one of {MODES} (SPEC §9.3)")
     if not isinstance(allow_reference, bool):
         raise TypeError(f"allow_reference must be a bool, got {allow_reference!r}")
     parts = {}
@@ -213,7 +214,7 @@ class Simulation:
     """MD on the graph engine with a plan, an optional gate, schedules and complete restarts.
 
     ``Simulation(atoms, force_field, *, species=None, integrator, workload=None, output=None, seed,
-    check="skip", allow_naive_cueq=False, mode="graph", allow_reference=False, fallback=None, gate=None,
+    check="skip", allow_naive_cueq=False, mode=None, allow_reference=False, fallback=None, gate=None,
     runner=None, engine=None, neighbours=None)``:
 
     - ``atoms``: ASE ``Atoms``, full 3D PBC (§4.4); copied, the caller's object is never changed;
@@ -228,7 +229,8 @@ class Simulation:
     - ``seed``: the integrator's noise seed, recorded;
     - ``check``: one of ``CHECK_MODES``;
     - ``allow_naive_cueq``: accept cuEquivariance's naive kernels (§9.2), recorded;
-    - the planner inputs (``PlannerOptions``, recorded in ``simulation.json``): ``mode`` (§9.3),
+    - the planner inputs (``PlannerOptions``, recorded in ``simulation.json``): ``mode`` (§9.3; ``None``
+      lets the planner choose),
       ``allow_reference`` (rule 1), ``fallback`` (``FallbackConfig``, §9.4), ``gate``
       (``GateConfig``, §12.3 "Resources"; the record is ``sim.gate_config``, the result
       ``sim.gate``), ``runner`` (``RunnerConfig``, §8.7), ``engine`` (``EngineConfig``) and
@@ -241,7 +243,7 @@ class Simulation:
 
     def __init__(self, atoms: Any, force_field: Any, *, species: Any = None, integrator: Any,
                  workload: Workload | None = None, output: Output | None = None, seed: int,
-                 check: Check = "skip", allow_naive_cueq: bool = False, mode: Mode = "graph",
+                 check: Check = "skip", allow_naive_cueq: bool = False, mode: Mode | None = None,
                  allow_reference: bool = False, fallback: FallbackConfig | None = None,
                  gate: GateConfig | None = None, runner: RunnerConfig | None = None,
                  engine: EngineConfig | None = None, neighbours: NeighbourConfig | None = None):

@@ -664,8 +664,8 @@ def diagnose(plan: Any, failure: BaseException | Failure | None, *, test: Callab
     """The failing dimension (§9.4 step 2): ``"mode"`` if eager passes, else ``"rewrites"``.
 
     ``test(mode, enabled)`` is True when the reduced gate fails in ``mode`` with the switches
-    ``enabled`` on. Eager on the full rewrite set passes: ``"mode"`` (a graph plan; for an eager plan
-    the reduced gate cannot see the fault: ``None``). Eager fails and the empty set passes:
+    ``enabled`` on. Eager on the full rewrite set passes: ``"mode"`` (a graph or compiled plan; for an
+    eager plan the reduced gate cannot see the fault: ``None``). Eager fails and the empty set passes:
     ``"rewrites"``. The empty set fails too: ``None``, the fault is not in the rewrites.
     """
     units = frozenset(enabled_rewrites(plan))
@@ -716,10 +716,11 @@ class Fallback:
     - ``failure``: a ``Failure``.
 
     The loop keeps (mode, rewrites off) and, per round, reacts to the last failure: rule 13 for a
-    self-check failure; otherwise ``diagnose``: the mode (eager), or ddmin over the eager rewrite set,
-    whose minimal failing set and its dependants go off; then the candidate is validated
-    (``activate``). Every round changes the mode or switches rewrites off, so the loop ends. When the
-    diagnosis cannot locate the fault or its budget is spent, the terminal sequence runs.
+    self-check failure; otherwise ``diagnose``: the mode (compiled for a graph plan, then eager), or
+    ddmin over the eager rewrite set, whose minimal failing set and its dependants go off; then the
+    candidate is validated (``activate``). Every round changes the mode or switches rewrites off, so
+    the loop ends. When the diagnosis cannot locate the fault or its budget is spent, the terminal
+    sequence runs.
     """
 
     def __init__(self, planner: Any, force_field: Any, atoms: Any, integrator: Any, references: Any,
@@ -979,6 +980,12 @@ class Fallback:
             return None
         dimension = diagnose(current, last, test=self._test)
         if dimension == "mode":
+            # §9.4 step 2: compiled without graphs first, then eager (3-T06). A compiled candidate that is
+            # refused or fails makes the next round, which tries eager.
+            if mode == "graph":
+                activation = self._validate("compiled", off, f"{MODE_WHY}; compiled first ({_text(last.error)})")
+                if activation is not None:
+                    return "compiled", off, activation
             return "eager", off, self._validate("eager", off, f"{MODE_WHY} ({_text(last.error)})")
         if dimension != "rewrites":
             return None

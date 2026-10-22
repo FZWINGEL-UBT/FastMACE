@@ -59,13 +59,17 @@ from .plan import Hardware, Plan, SelfCheck, SoftwareTraits
 
 MODES = ("graph", "compiled", "eager", "reference")
 # Modes the minimal planner does not have for MD, and the phase that brings each (SPEC §16; owner decision D6).
-MODE_REFUSALS = {
-    "compiled": "mode 'compiled' for MD is not in 1b: the compiled MD tier comes in phase 3 (SPEC §16, owner "
-                "decision D6)",
-}
+# Empty since 3-T06 brought the compiled MD tier.
+MODE_REFUSALS: dict[str, str] = {}
+# Rule 9 (SPEC §9.3, "< ~10 steps"): host callbacks more often than every this many steps break graph replays
+# up, so a plan without a mode runs on the compiled tier (3-T06).
+RULE_9_HOST_CALLBACKS = 10
 # The modes with an MD tier, and their mode decision.
 MODE_TIERS = {
     "graph": Reason("molecular dynamics on the graph tier (SPEC §8.1)", code="mode-graph"),
+    "compiled": Reason("molecular dynamics on the compiled tier (mode='compiled'): the graph plan's backend, "
+                       "rewrites and precision on the compiled model, without CUDA graphs (SPEC §8.2)",
+                       code="mode-compiled-tier"),
     "eager": Reason("molecular dynamics on the eager tier: the graph plan's backend, rewrites and precision, "
                     "without CUDA graphs or compilation (SPEC §8.3)", code="mode-eager-tier"),
     "reference": Reason("molecular dynamics on the reference tier: MACE's calculator with the reference record's "
@@ -73,6 +77,7 @@ MODE_TIERS = {
                         code="mode-reference"),
 }
 EAGER_CAPTURE = "eager tier: no CUDA graphs"
+COMPILED_CAPTURE = "compiled tier: no CUDA graphs"
 REFERENCE_TIER = "reference"
 # The reference tier's reasons (plan task 2-T03; SPEC §8.4).
 REFERENCE_REASONS = {
@@ -89,8 +94,9 @@ REFERENCE_LIFTS = ("inexact-padding", "polar-plain-compiled-cueq")
 # 1b's wording of refusals that FixedPlanner phrases for 1a.
 TEXTS = {
     "inexact-padding": lambda text: text.replace("so the graph tier is refused (SPEC §9.3 rule 4)",
-                                                 "so the graph tier is refused (SPEC §9.3 rule 4); compiled MD "
-                                                 "tier: phase 3 (owner decision D6)"),
+                                                 "so the graph tier is refused (SPEC §9.3 rule 4); pass "
+                                                 'mode="compiled", or no mode, for the compiled tier with exact '
+                                                 "edge counts"),
     "constraints": lambda text: text.replace("refused in 1a", "refused in 1b"),
 }
 
@@ -406,9 +412,11 @@ class MinimalPlanner:
 
     def plan(self, force_field, atoms, integrator: IntegratorConfig, workload, hardware: Hardware | None = None, *,
              variable_cell: bool | None = None, allow_naive_cueq: bool = False, allow_reference: bool = False,
-             mode: str = "graph") -> Plan:
+             mode: str | None = None) -> Plan:
         """The MD plan for ``force_field`` (an ``fm.ForceField``), ``atoms``, ``integrator`` and ``workload``.
 
+        ``mode`` (default ``None``) is the execution mode; without one the planner picks the graph tier,
+        or the compiled tier where rule 4 (inexact padding) or rule 9 (frequent host callbacks) says so.
         ``variable_cell`` (default: the integrator's) says whether the run changes the cell. Raises
         ``PlanRefused`` (``SpeciesNotInSuperset``) with every reason, ``ModelElementError``, or
         ``ProcessConstraintError``; nothing is loaded onto the GPU or compiled. A reproducible plan that
@@ -431,7 +439,7 @@ class MinimalPlanner:
     def plan_traits(self, traits, atoms, integrator: IntegratorConfig, workload, hardware: Hardware, *,
                     precision: str, rewrites: Any = "auto", species=None, loaded=None,
                     variable_cell: bool | None = None, allow_naive_cueq: bool = False,
-                    allow_reference: bool = False, mode: str = "graph") -> Plan:
+                    allow_reference: bool = False, mode: str | None = None) -> Plan:
         """``plan`` from model ``traits`` (``capabilities.ModelTraits``) and the ForceField's facts.
 
         ``precision``, ``rewrites`` and ``species`` are the ForceField's; ``loaded`` is its model, if
@@ -439,14 +447,15 @@ class MinimalPlanner:
         """
         from fastmace.planner.workload import Workload
 
-        if mode not in MODES:
-            raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
+        if mode is not None and mode not in MODES:
+            raise ValueError(f"mode must be None or one of {MODES}, got {mode!r}")
         if not isinstance(workload, Workload):
             raise TypeError(f"workload must be an fm.Workload, got {type(workload).__name__}")
         software = self.software or detect_software(self.engine.device)
         book = fixed._Book()
         reference = mode == REFERENCE_TIER
-        mode_reason = MODE_TIERS.get(mode) or Reason(MODE_REFUSALS[mode], code=f"mode-{mode}")
+        given = mode is not None
+        mode, mode_reason = self._mode(mode, traits, workload)
         capture = versions.capture_support(traits)
         if mode == "graph" and not capture.supported:
             # 2-T04b: no capture-safe readout mask on this MACE, so a multi-head model runs eager from revision 0.
@@ -475,7 +484,7 @@ class MinimalPlanner:
             backend = self._backend(book, software, engine, workload.reproducible)
         superset, precision, requested = self._common(book, traits, atoms, species, precision, software, backend[0],
                                                       allow_naive_cueq, loaded)
-        self._workload_decisions(book, workload)
+        self._workload_decisions(book, workload, mode, given)
         if reference:
             parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend)
         else:
@@ -484,6 +493,8 @@ class MinimalPlanner:
                                                                       reproducible=workload.reproducible)
         if mode == "eager":
             self._eager(book, parts, traits)
+        elif mode == fixed.COMPILED_TIER:
+            self._compiled(book, parts, traits, mode_reason)
         book.raise_refusals()
         parts["requested"] = parts["requested"] + requested
         allowances = tuple(name for name, used in (("allow_naive_cueq", allow_naive_cueq),
@@ -527,11 +538,34 @@ class MinimalPlanner:
             requested=self._fixed(rewrites, precision)._requested())
         return parts
 
+    @staticmethod
+    def _mode(mode, traits, workload):
+        """``(mode, reason)``: the given mode, or without one the graph tier unless rule 4 or rule 9 plans the
+        compiled tier (3-T06). An explicit ``"graph"`` is the user's: rule 9, a preference, does not move it,
+        and rule 4, a hard rule, refuses it in ``_resolve``."""
+        if mode is not None:
+            return mode, MODE_TIERS.get(mode) or Reason(MODE_REFUSALS[mode], code=f"mode-{mode}")
+        if not traits.padding_is_exact:
+            return fixed.COMPILED_TIER, Reason(
+                "no mode given: padded edges would change this model's energies, so the compiled tier with exact "
+                "edge counts (SPEC §9.3 rule 4, §8.2)", rule=4, code="mode-compiled-rule-4")
+        every = workload.host_callbacks_every
+        if every is not None and every < RULE_9_HOST_CALLBACKS and not workload.reproducible:
+            # (reproducible=True is qualified on the graph and eager tiers only: rule 9 keeps the graph tier.)
+            return fixed.COMPILED_TIER, Reason(
+                f"no mode given: host callbacks every {every} steps, fewer than {RULE_9_HOST_CALLBACKS}, would break "
+                "graph replays up, so the compiled tier (SPEC §9.3 rule 9, §8.2)", rule=9, code="mode-compiled-rule-9")
+        return "graph", MODE_TIERS["graph"]
+
     def _mode_engine(self, mode):
-        """The planner's ``EngineConfig`` for ``mode``: the eager tier compiles nothing and captures no graphs."""
-        if mode != "eager":
-            return self.engine
-        return dataclasses.replace(self.engine, compile_mode="none", speculative_graph=False)
+        """The planner's ``EngineConfig`` for ``mode``: the eager tier compiles nothing and captures no graphs;
+        the compiled tier captures no graphs and, when it compiles, marks the edge dimension dynamic."""
+        if mode == "eager":
+            return dataclasses.replace(self.engine, compile_mode="none", speculative_graph=False)
+        if mode == fixed.COMPILED_TIER:
+            return dataclasses.replace(self.engine, speculative_graph=False,
+                                       dynamic_edges=self.engine.compile_mode != "none")
+        return self.engine
 
     def _eager(self, book, parts, traits):
         """The graph tier's decisions made eager (2-T02): tier, capture, and rule 4 lifted (exact edge counts).
@@ -558,17 +592,52 @@ class MinimalPlanner:
                      requested=tuple(entry for entry in parts["requested"]
                                      if entry in own or not entry[0].startswith("EngineConfig.")))
 
-    def _workload_decisions(self, book, workload):
+    def _compiled(self, book, parts, traits, mode_reason):
+        """The graph tier's decisions on the compiled tier (3-T06): tier, capture, dynamic edges, and rule 4
+        lifted (exact edge counts). ``parts`` as ``_resolve`` left them; the requested options stay the caller's."""
+        book.refusals = [reason for reason in book.refusals if getattr(reason, "code", None) != "inexact-padding"]
+        why = {"mode-compiled-rule-4": "rule 4: padded edges would change this model's energies",
+               "mode-compiled-rule-9": "rule 9: frequent host callbacks would break graph replays up"}.get(
+            getattr(mode_reason, "code", None), "mode='compiled'")
+        replaced = {
+            "tier": (fixed.COMPILED_TIER, "the graph engine on the compiled model without CUDA graphs, exact edge "
+                                          "counts (SPEC §8.2)"),
+            "capture": ("off", f"{COMPILED_CAPTURE} ({why}; SPEC §8.2)"),
+            "EngineConfig.speculative_graph": ("off", "compiled tier: speculative combined graphs need CUDA graphs"),
+        }
+        book.decisions = [(key, *replaced[key]) if key in replaced else (key, choice, reason)
+                          for key, choice, reason in book.decisions]
+        dynamic = parts["engine"].dynamic_edges
+        book.decide("EngineConfig.dynamic_edges", "on" if dynamic else "off",
+                    "exact edge counts: the edge dimension is dynamic from the first call, so a neighbour rebuild "
+                    "with a new edge count does not compile again (2-T13)" if dynamic else
+                    "nothing is compiled (compile_mode='none'): exact edge counts on the uncompiled model")
+        if not traits.padding_is_exact:
+            book.decide("padding", "exact edge counts", Reason(
+                "edge padding is not exact for this model; the compiled tier uses exact edge counts, so rule 4 "
+                "does not apply (SPEC §9.3 rule 4)", rule=4, code="compiled-exact-edges"))
+        own = set(self._fixed("auto", "float32")._requested())
+        parts.update(tier=fixed.COMPILED_TIER, decisions=tuple(book.decisions),
+                     requested=tuple(entry for entry in parts["requested"]
+                                     if entry in own or not entry[0].startswith("EngineConfig.")))
+
+    def _workload_decisions(self, book, workload, mode="graph", given=True):
         book.decide("workload.max_temperature_K", f"{workload.max_temperature_K:g} K", Reason(
             "recorded (rule 11); skin and edge buckets as in phase 1a: adaptive skin and headroom are phase 3",
             code="max-temperature-recorded"))
         every = workload.host_callbacks_every
         if every is None:
             book.decide("workload.host_callbacks_every", "none", Reason("no host callbacks", code="no-host-callbacks"))
+        elif mode == fixed.COMPILED_TIER:
+            book.decide("workload.host_callbacks_every", f"compiled, host callbacks every {every} steps", Reason(
+                "rule 9: the compiled tier launches every step from the host, so a callback breaks no graph replay "
+                f"(compiled below {RULE_9_HOST_CALLBACKS} steps)", rule=9, code="host-callbacks-compiled"))
         else:
-            book.decide("workload.host_callbacks_every", f"graph, host sync every {every} steps", Reason(
-                "rule 9 (owner decision D6): the graph tier stays, with a host sync at each callback; the compiled "
-                "tier is phase 3", code="host-callbacks-graph-sync"))
+            override = (f"; mode={mode!r} was given, so rule 9's compiled tier (below {RULE_9_HOST_CALLBACKS} steps) "
+                        "does not apply" if given and every < RULE_9_HOST_CALLBACKS else "")
+            book.decide("workload.host_callbacks_every", f"{mode}, host sync every {every} steps", Reason(
+                f"rule 9: the {mode} tier stays, with a host sync at each callback{override}",
+                code="host-callbacks-graph-sync"))
         moves = ", ".join(workload.mc_moves) or "none"
         book.decide("workload.mc_moves", moves, Reason(
             "no MC" if not workload.mc_moves else "MC: phase 3; Simulation.run refuses mc= blocks",
@@ -632,15 +701,17 @@ class MinimalPlanner:
 
     def build(self, plan: Plan, force_field, atoms, *, compile_cache=None, check: bool = True,
               temperature_K: float | None = None):
-        """The ready ``GraphEngine`` of the MD ``plan``: an execution copy of the ForceField's model, its
-        force field, state, integrator (at ``temperature_K``, default the integrator's target or 0) and
-        engine. The only place 1b's public API gets an engine from (SPEC §5). A reference-tier plan gets
-        its ``ReferenceForceField`` on an uncaptured, unpadded ``GraphEngine`` (``build_reference``)."""
+        """The ready ``GraphEngine`` of the MD ``plan`` (a ``CompiledEngine`` on the compiled tier): an
+        execution copy of the ForceField's model, its force field, state, integrator (at ``temperature_K``,
+        default the integrator's target or 0) and engine. The only place 1b's public API gets an engine
+        from (SPEC §5). A reference-tier plan gets its ``ReferenceForceField`` on an uncaptured, unpadded
+        ``GraphEngine`` (``build_reference``)."""
         if plan.tier == REFERENCE_TIER:
             return self.build_reference(plan, force_field, atoms, temperature_K=temperature_K)
-        if plan.tier not in (fixed.TIER, fixed.EAGER_TIER):
-            raise ValueError(f"MinimalPlanner.build builds tier {fixed.TIER!r} and {fixed.EAGER_TIER!r} plans, "
-                             f"not {plan.tier!r}; "
+        tiers = (fixed.TIER, fixed.COMPILED_TIER, fixed.EAGER_TIER)
+        if plan.tier not in tiers or (plan.tier == fixed.COMPILED_TIER and plan.workload is None):
+            raise ValueError(f"MinimalPlanner.build builds MD plans of tiers {tiers}, not {plan.tier!r}"
+                             f"{' without a workload' if plan.workload is None else ''}; "
                              "use build_evaluation for an evaluation plan")
         self._check_atoms(plan, atoms)
         reproducible = plan.workload is not None and plan.workload.reproducible
@@ -654,7 +725,7 @@ class MinimalPlanner:
             temperature_K = plan.integrator.temperature_K or 0.0
         engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
             plan, model, atoms, temperature_K=temperature_K, compile_cache=compile_cache, constraints=self.process,
-            check=check, capture=False if plan.tier == fixed.EAGER_TIER else None)
+            check=check, capture=False if plan.tier in (fixed.EAGER_TIER, fixed.COMPILED_TIER) else None)
         if reproducible:
             self._check_reproducible(engine)
         # The built plan with its per-record self-checks (SPEC §6.4, 2-T04); the caller records it.

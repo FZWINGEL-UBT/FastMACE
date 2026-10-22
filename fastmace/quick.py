@@ -71,7 +71,7 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
        pressure_GPa: float = 0.0, cell_mode: str = "hydrostatic", timestep_fs: float = 0.5,
        steps: int | None = None, mc: Any = None, min_mc_temperature_K: float | None = None,
        dispersion: Any = None, repeat: tuple[int, int, int] = (1, 1, 1), output: Any = None,
-       seed: int | None = None, check: str = "skip", integrator: Any = None, mode: str = "graph",
+       seed: int | None = None, check: str = "skip", integrator: Any = None, mode: str | None = None,
        allow_reference: bool = False, fallback: Any = None, gate: Any = None, runner: Any = None,
        engine: Any = None, neighbours: Any = None) -> RunResult:
     """Run MD on ``structure`` (path or ``Atoms``) with ``model`` and return a ``RunResult``.

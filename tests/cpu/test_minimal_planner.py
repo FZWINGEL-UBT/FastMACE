@@ -5,7 +5,7 @@
   rewrite set and engine options equal ``FixedPlanner``'s, refusals included.
 - Each hard rule of §9.3 refuses with its rule and code; several give one ``PlanRefused`` with every
   reason; rule 2 gives ``SpeciesNotInSuperset``. Owner decisions D3 (superset = structure species)
-  and D6 (no reference tier, no compiled MD tier; host callbacks keep the graph tier) are tested.
+  and D6 are tested; 3-T06 plans the compiled MD tier for rule 4 and rule 9 when no mode is given.
 - The backend rule (hybrid when OEq builds and MACE was not imported first) and the process family
   (§8.7) are enforced at plan time.
 - ``Plan.revise`` keeps the chain; ``Plan.to_restart`` is JSON with the edge and capacity buckets.
@@ -153,11 +153,17 @@ def test_rule_3_polar_on_plain_compiled_cueq():
 
 
 def test_rule_4_inexact_padding_refuses_the_graph_tier():
+    """3-T06: without a mode, inexact padding plans the compiled tier (exact edge counts); an explicit
+    ``mode="graph"`` is refused, naming ``mode="compiled"`` (rule 4 is hard)."""
     record = dataclasses.replace(tp.traits("mh1-r2scan"), padding_is_exact=False)
     with pytest.raises(PlanRefused) as caught:
-        minimal().plan_traits(record, nacl(), IntegratorConfig(), WORKLOAD, GPU, precision="float32")
+        minimal().plan_traits(record, nacl(), IntegratorConfig(), WORKLOAD, GPU, precision="float32", mode="graph")
     assert codes(caught.value) == ["inexact-padding"] and caught.value.reasons[0].rule == 4
-    assert "compiled MD tier: phase 3" in caught.value.reasons[0]
+    assert 'mode="compiled"' in caught.value.reasons[0] and "phase 3" not in caught.value.reasons[0]
+    plan = minimal().plan_traits(record, nacl(), IntegratorConfig(), WORKLOAD, GPU, precision="float32")
+    assert plan.tier == "compiled"
+    choice, reason = plan.decision("mode")[1:]
+    assert choice == "compiled" and reason.code == "mode-compiled-rule-4" and reason.rule == 4
     # The one-off evaluation uses exact edge counts: allowed.
     plan = minimal().plan_evaluation_traits(record, nacl(), GPU, precision="float32")
     assert plan.tier == "compiled"
@@ -206,11 +212,9 @@ def test_superset_beyond_the_structure_is_planned_by_rule_8():
     assert plan_label("mh1-r2scan", species=[17, 11]).superset == NA_CL
 
 
-@pytest.mark.parametrize(("mode", "phase"), [("compiled", "phase 3")])  # eager: 2-T02, reference: 2-T03
-def test_other_modes_are_refused_with_their_phase(mode, phase):
-    with pytest.raises(PlanRefused) as caught:
-        plan_label("mh1-r2scan", mode=mode)
-    assert codes(caught.value) == [f"mode-{mode}"] and phase in caught.value.reasons[0]
+def test_mode_compiled_plans_the_compiled_tier():  # 3-T06 lifted the phase 3 refusal
+    plan = plan_label("mh1-r2scan", mode="compiled")
+    assert plan.tier == "compiled" and plan.decision("mode")[2].code == "mode-compiled-tier"
 
 
 @pytest.mark.parametrize("label", tp.LABELS)
@@ -232,11 +236,25 @@ def test_unknown_mode_is_a_value_error():
 # --------------------------------------------------------------------------- preferences in 1b
 
 
-def test_rule_9_host_callbacks_keep_the_graph_tier_with_a_sync():
-    plan = plan_label("mh1-r2scan", workload=Workload(max_temperature_K=300.0, host_callbacks_every=2))
-    assert plan.tier == "graph"
-    key, choice, reason = plan.decision("workload.host_callbacks_every")
+def test_rule_9_frequent_host_callbacks_plan_the_compiled_tier():
+    """3-T06: below ``RULE_9_HOST_CALLBACKS`` steps between callbacks, a plan without a mode is compiled;
+    an explicit ``mode="graph"`` overrides the preference and keeps the graph tier with a host sync."""
+    from fastmace.planner import minimal as minimal_module
+
+    assert minimal_module.RULE_9_HOST_CALLBACKS == 10
+    frequent = Workload(max_temperature_K=300.0, host_callbacks_every=2)
+    plan = plan_label("mh1-r2scan", workload=frequent)
+    assert plan.tier == "compiled"
+    mode = plan.decision("mode")
+    assert mode[2].code == "mode-compiled-rule-9" and mode[2].rule == 9 and "10" in mode[2]
+    assert plan.decision("workload.host_callbacks_every")[2].code == "host-callbacks-compiled"
+    graph = plan_label("mh1-r2scan", workload=frequent, mode="graph")
+    assert graph.tier == "graph"
+    key, choice, reason = graph.decision("workload.host_callbacks_every")
     assert choice == "graph, host sync every 2 steps" and reason.code == "host-callbacks-graph-sync"
+    for every in (10, 1000):
+        rare = plan_label("mh1-r2scan", workload=Workload(max_temperature_K=300.0, host_callbacks_every=every))
+        assert rare.tier == "graph" and rare.decision("mode")[2].code == "mode-graph"
 
 
 def test_rule_10_stress_and_headroom_follow_the_integrator():

@@ -99,8 +99,10 @@ def test_the_failed_engine_is_collected_before_each_next_build_in_simulation(pri
 
 def test_every_failed_candidate_is_collected_before_the_next_build(pristine, monkeypatch):
     """Diagnosis runs and validations that fail inside the search (not only the first failure): the
-    graph tier fails too, so ddmin's graph candidate fails its validation and eager follows."""
-    probe = Probe(monkeypatch, fails=lambda plan: plan.tier == "graph" or _broken("grouped_linear")(plan))
+    graph and compiled tiers fail too, so the mode dimension's compiled candidate (3-T06) and ddmin's
+    graph candidate fail their validations and eager follows."""
+    probe = Probe(monkeypatch, fails=lambda plan: plan.tier in ("graph", "compiled")
+                  or _broken("grouped_linear")(plan))
     atoms = nacl(repeat=1, rattle=0.05, seed=3)
     from fastmace.model.forcefield import ForceField
 
