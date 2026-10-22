@@ -10,6 +10,7 @@ moves "auto" to the float64 copy.
 import importlib.util
 from pathlib import Path
 
+import pytest
 import torch
 
 from _support.tiny_models import FAMILIES, tiny_mace_model
@@ -76,10 +77,11 @@ print(json.dumps(out, default=str))
 """
 
 
+@pytest.mark.slow  # 64 s on the local RTX 5060 Ti (fresh process, reference child); the logic is in the CPU tests
 def test_move_energy_gate_captured_tiny_plain_cueq(tmp_path):
     out = ENGINE.run_fresh(f"SPEC = {{'path': {tiny_mh1(tmp_path)!r}}}\n" + CHILD)
     part = out["part"]
-    print({key: part[key] for key in ("status", "precision", "moves", "tried", "mode")})
+    print({key: part.get(key) for key in ("status", "precision", "reason", "moves", "tried", "mode", "references")})
     assert out["ran"] == "child process" and out["capture"]
     assert part["status"] == "passed" and part["precision"] == "float32", part["tried"]
     assert part["mode"] == "captured energy-only graph"

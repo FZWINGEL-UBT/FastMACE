@@ -371,3 +371,14 @@ def test_the_fallback_tries_float64_mc_energies_first(pristine, no_engines_yet, 
     assert result.tried[0].dimension == "mc_energy" and result.tried[0].outcome == "activated"
     assert result.gate.move_energy["status"] == "passed"
     assert [entry["precision"] for entry in result.gate.move_energy["tried"]] == ["float64"]
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_move_references_in_a_child_process_equal_in_process(pristine, no_engines_yet):
+    engine, moves, plan, ff = built(pristine)  # in-process: no production engine existed yet
+    assert moves.ran == "in-process"
+    child = selfcheck.move_references(plan, ff, structure(), workload(), seed=3)
+    assert child.ran == "child process" and child.unavailable is None
+    np.testing.assert_allclose(child.energies, moves.energies, rtol=0, atol=1e-10)
+    record = selfcheck.move_gate(engine, child, plan=plan, force_field=ff)
+    assert record.move_energy["status"] == "passed"

@@ -1205,8 +1205,10 @@ def _read_result(path):
     with np.load(path, allow_pickle=False) as data:
         info = json.loads(str(data["info"]))
         count = 1 + max((int(key.split("/")[0]) for key in data.files if key != "info"), default=-1)
+        # The roles the child evaluated: both of ROLES, or the move-energy gate's reference alone (3-T11).
         values = [{role: (float(data[f"{index}/{role}/energy"]), data[f"{index}/{role}/forces"].copy(),
-                          data[f"{index}/{role}/stress"].copy()) for role, _ in ROLES} for index in range(count)]
+                          data[f"{index}/{role}/stress"].copy()) for role, _ in ROLES
+                   if f"{index}/{role}/energy" in data.files} for index in range(count)]
     return values, info
 
 
