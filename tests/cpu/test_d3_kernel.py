@@ -186,6 +186,15 @@ def test_the_shipped_tables_are_torch_dftds():
         assert theirs.read_bytes() == data
 
 
+def test_the_tables_are_package_data():
+    """pyproject.toml ships the tables, their licence and notice with ``fastmace.longrange`` (no [d3] needed)."""
+    pyproject = (Path(__file__).resolve().parents[2] / "pyproject.toml").read_text(encoding="utf-8")
+    line = next(line for line in pyproject.splitlines() if line.startswith('"fastmace.longrange" = '))
+    for name in ("data/dftd3_params.npz", "data/LICENSE", "data/NOTICE.md"):
+        assert f'"{name}"' in line
+        assert (kernel_module.TABLES.parent.parent / name).is_file()
+
+
 def test_other_tables_are_refused(monkeypatch):
     monkeypatch.setattr(d3, "REFERENCE_TABLES", "torch-dftd-0.5.1:dftd3_params.npz:sha256=" + "0" * 64)
     with pytest.raises(RuntimeError, match="reinstall FastMACE"):
