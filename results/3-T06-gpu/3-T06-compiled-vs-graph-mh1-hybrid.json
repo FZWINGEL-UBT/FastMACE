@@ -1,0 +1,199 @@
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "compiled": {
+  "tier": "compiled",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "compile_mode": "default",
+  "dynamic_edges": true,
+  "capture": false,
+  "gate": "passed",
+  "edge_sizes_used": [
+   6912,
+   6914,
+   6918,
+   6920,
+   6922,
+   6926,
+   6932,
+   6934,
+   6938,
+   6940,
+   6944,
+   6948,
+   6950,
+   6954,
+   6956,
+   6960,
+   6962,
+   6964,
+   6970,
+   6972,
+   6974,
+   6976,
+   6978,
+   6980,
+   6982,
+   6984,
+   6996,
+   7000,
+   7002,
+   7004,
+   7008,
+   7012,
+   7016,
+   7018,
+   7022,
+   7024,
+   7028
+  ],
+  "neighbour_rebuilds": 12,
+  "unique_graphs": [
+   3,
+   3,
+   3,
+   3,
+   3,
+   3,
+   3,
+   3,
+   3,
+   3
+  ]
+ },
+ "graph": {
+  "tier": "graph",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "compile_mode": "default",
+  "capture": true
+ },
+ "gate_record": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 1.5600536303113416e-05,
+  "force_eV_per_A": 2.737092701349253e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 1.5600536303113416e-05,
+    "yardstick": 0.0006966387923478544,
+    "ratio": 0.022394010317076288,
+    "floor": 0.01,
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 2.737092701349253e-06,
+    "yardstick": 2.6178834117984717e-06,
+    "ratio": 1.0455365158790189,
+    "floor": 1e-05,
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "nonfinite": [],
+  "mode": "eager stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+   "oeq_runtime": "prepared",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/home/fzwin/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "polar": null
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 43.191397848990164,
+   "production_s": 0.03217149499687366,
+   "step_1_s": 43.16184806599631
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null,
+  "move_energy": null,
+  "mc_energy_precision": null
+ },
+ "compiled_vs_graph_A": 2.2408858413314192e-07,
+ "repeat_vs_graph_A": 3.037553639728685e-07,
+ "compiled_vs_graph_energy_meV_per_atom": 3.311369223268912e-05,
+ "repeat_vs_graph_energy_meV_per_atom": 4.4151589051466544e-05,
+ "speed_compiled": {
+  "status": "whole-run mean",
+  "seconds_per_step": 0.021667559939960484,
+  "first_step": 1,
+  "last_step": 100
+ },
+ "speed_graph": {
+  "status": "whole-run mean",
+  "seconds_per_step": 0.004163886960595846,
+  "first_step": 1,
+  "last_step": 100
+ },
+ "report_compiled": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    compiled, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)\nwhy:     compiled tier: no CUDA graphs (mode='compiled', SPEC \u00a78.2); correct but slower\ngate:    passed (2 rattled (0.05 \u00c5); 1.6e-05 meV/atom, 2.7e-06 eV/\u00c5; floors \u00a712.3)\nsetup:   99 s (plan 0.11 s, build 55 s, gate 43 s, provenance 0.11 s)\nspeed:   21.7 ms/step, whole-run mean over steps 1\u2013100\noutput:  none\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+}
