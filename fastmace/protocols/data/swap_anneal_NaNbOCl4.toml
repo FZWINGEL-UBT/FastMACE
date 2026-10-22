@@ -1,0 +1,51 @@
+# The swap-MC annealing protocol: O <-> Cl anion swaps in NaNbOCl4 (SPEC §10.5; owner decision D3,
+# SPEC §18 decision 33; plan task 3-T14). Run it with
+#
+#   fastmace run swap_anneal_NaNbOCl4 [--output DIR] [--steps N]
+#   fastmace run --resume DIR [--steps N]
+#
+# Stages: an LBFGS relaxation at fixed cell to fmax 0.01 eV/Å, then MD along the anneal schedule at
+# 1 fs (0 -> 1000 K in 20 ps, then 3 K/ps to 250 K: 270,000 steps) with the swap block attached
+# wherever the target is at or above 250 K, then the quench of the anneal profile. The physical
+# outcome is recorded, not judged: it is a model result.
+#
+# The structure is the Ma 2026 I4/m polymorph (SOURCES.md), 3x3x3 = 756 atoms.
+
+structure = "NaNbOCl4_I4m_Ma2026.cif"
+model = "mh1"
+head = "matpes_r2scan"
+repeat = [3, 3, 3]
+timestep_fs = 1.0
+schedule = "anneal"
+min_mc_temperature_K = 250.0
+
+[engine]
+backend = "hybrid"  # hybrid float32 (the force field's default precision)
+
+# Physical intervals at 1 fs (D6): frames and thermo rows every 10 fs, a restart every 10 ps.
+[output]
+trajectory_every = 10
+thermo_every = 10
+restart_every = 10000
+
+[[mc]]
+move = "swap"
+pairs = [["O", "Cl"]]
+every = 100
+attempts = 50
+velocities = "exchange"
+
+# The anneal profile's initial relaxation (fm.protocols.PROFILES["anneal"]).
+[relax]
+fmax = 0.01
+optimizer = "LBFGS"
+max_steps = 5000
+
+# The anneal profile's quench: 2 frames per 100 K bin from 500 K on each ramp, and the final frame.
+[quench]
+min_K = 500.0
+bin_K = 100.0
+per_bin = 2
+fmax = 0.01
+optimizer = "LBFGS"
+max_steps = 5000

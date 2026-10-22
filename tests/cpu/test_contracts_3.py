@@ -520,3 +520,20 @@ def test_displacement_names():  # §10.4 displacements (3-T10)
     for name in ("trial_rebuild", "use_trial_edges", "adopt_trial_list"):
         assert _parameters(getattr(GraphEngine, name)) == ["self"]
     assert _parameters(GraphEngine.record_mc_overflow) == ["self", "word"]
+
+
+# --------------------------------------------------------------------------- protocol runs
+
+
+def test_protocol_run_names():  # §10.5 (3-T14)
+    from fastmace.protocols import quench, runner
+
+    assert _parameters(quench.relax) == ["atoms", "calc", "fmax", "max_steps", "logfile", "optimizer"]
+    assert _parameters(quench.select_frames) == ["frames", "min_K", "bin_K", "per_bin", "peak_K"]
+    assert _parameters(quench.picks) == ["resolved", "frame_every", "settings"]
+    assert _parameters(quench.quench_run) == ["directory", "calc", "resolved", "frame_every", "timestep_fs",
+                                              "settings", "log"]
+    assert _keyword_only(runner.start) == ["relax", "quench", "steps", "source", "log"]
+    assert _parameters(runner.resume) == ["directory", "steps", "log"]
+    assert runner.RELAX_KEYS == ("fmax", "optimizer", "max_steps") and runner.PROTOCOL_RECORD == "protocol.json"
+    assert "swap_anneal_NaNbOCl4" in runner.protocol_names()
