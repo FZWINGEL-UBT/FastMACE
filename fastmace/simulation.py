@@ -734,6 +734,8 @@ class Simulation:
         from fastmace.mc import driver as mc_driver
 
         previous = self._mc.state_dict() if self._mc is not None else self._mc_record
+        if self._mc is not None:
+            self._mc.detach()  # its captured attempts go with it (3-T09 follow-up)
         driver = mc_driver.MCDriver(moves, seed=self.seed)
         driver.attach(self._engine)
         if previous is not None:
@@ -747,6 +749,7 @@ class Simulation:
         """Detach the attached move set (``run(mc=None)``); its state stays for a later re-attach."""
         if self._mc is not None:
             self._mc_record = self._mc.state_dict()
+            self._mc.detach()  # its captured attempts go with it (3-T09 follow-up)
         self._mc = None
         self._mc_moves = None
         if self._engine is not None:

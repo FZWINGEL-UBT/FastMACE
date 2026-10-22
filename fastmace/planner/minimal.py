@@ -194,6 +194,8 @@ def species_numbers(species) -> tuple[int, ...]:
 def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool) -> tuple[tuple[str, str, str], ...]:
     """Check swap and transmutation records against the force field and the integrator (SPEC §10.4; 3-T09).
 
+    - Every species once: a swap's two species and a transmutable set's members differ as atomic numbers
+      (code ``mc-same-species``).
     - Rule 2: every species a move names is in ``superset`` (atomic numbers), code
       ``species-not-in-superset`` (``SpeciesNotInSuperset``).
     - ``fixcm`` (the integrator removes the centre-of-mass noise): the single-atom ``rescale`` and ``redraw``
@@ -215,6 +217,10 @@ def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool) -> tupl
             continue
         named = ([species_number(item) for pair in move.pairs for item in pair] if kind == "swap"
                  else [species_number(item) for item in move.species])
+        if len(set(named)) != len(named) or (kind == "swap" and any(
+                species_number(a) == species_number(b) for a, b in move.pairs)):
+            reasons.append(Reason(f"the {kind} move names one species twice ({_symbols(set(named))}); a swap needs two "
+                                  "species and a transmutable set distinct ones (SPEC §10.4)", code="mc-same-species"))
         outside = sorted(set(named) - superset)
         if outside:
             reasons.append(Reason(f"the {kind} move names {_symbols(outside)}, outside the ForceField's superset "
