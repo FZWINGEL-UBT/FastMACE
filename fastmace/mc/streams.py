@@ -26,6 +26,7 @@ synchronisation, so it runs inside a captured CUDA graph.
 from __future__ import annotations
 
 import math
+
 PHILOX_ROUNDS = 10
 PHILOX_M0 = 0xD2511F53
 PHILOX_M1 = 0xCD9E8D57
