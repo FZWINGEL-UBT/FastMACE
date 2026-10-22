@@ -416,6 +416,45 @@ def test_invalid_profile_data_raises(data):
         profile_from_data(data)
 
 
+def test_profiles_default_to_nvt_without_dispersion():
+    for profile in PROFILES.values():
+        assert (profile.ensemble, profile.pressure_GPa, profile.dispersion) == ("NVT", None, "none")
+        assert profile.md_options() == {"schedule": profile.schedule, "ensemble": "NVT"}
+
+
+def test_npt_profile_fields():
+    schedule = ramp(0, 1000, ps=1)
+    profile = Profile("npt", schedule, ensemble="npt", dispersion="d3bj")
+    assert (profile.ensemble, profile.pressure_GPa, profile.dispersion) == ("NPT", 0.0, "d3bj")
+    assert profile.md_options() == {"schedule": schedule, "ensemble": "NPT", "pressure_GPa": 0.0,
+                                    "dispersion": "d3bj"}
+    assert Profile("npt", schedule, ensemble="NPT", pressure_GPa=0.1).pressure_GPa == 0.1
+    assert profile != Profile("npt", schedule, ensemble="NPT")
+
+
+@pytest.mark.parametrize("options, match", [
+    ({"ensemble": "NVE"}, "ensemble"),
+    ({"ensemble": 3}, "ensemble"),
+    ({"pressure_GPa": 0.0}, "NPT"),
+    ({"ensemble": "NPT", "pressure_GPa": math.nan}, "pressure_GPa"),
+    ({"ensemble": "NPT", "pressure_GPa": True}, "pressure_GPa"),
+    ({"ensemble": "NPT", "pressure_GPa": [{"kind": "hold", "GPa": 0, "ps": 1}]}, "schedule"),
+    ({"dispersion": "d3zero"}, "dispersion"),
+    ({"dispersion": None}, "dispersion"),
+])
+def test_invalid_ensemble_pressure_or_dispersion_raises(options, match):
+    with pytest.raises(ValueError, match=match):
+        Profile("bad", ramp(0, 100, ps=1), **options)
+
+
+def test_npt_profile_from_toml(tmp_path):
+    path = tmp_path / "npt_anneal.toml"
+    path.write_text('ensemble = "NPT"\npressure_GPa = 0.0\ndispersion = "d3bj"\n' + ANNEAL_TOML)
+    profile = load_profile(path)
+    assert (profile.ensemble, profile.pressure_GPa, profile.dispersion) == ("NPT", 0.0, "d3bj")
+    assert profile.schedule.resolve(1.0).boundaries == PROFILES["anneal"].schedule.resolve(1.0).boundaries
+
+
 def test_unknown_profile_suffix(tmp_path):
     path = tmp_path / "p.json"
     path.write_text("{}")
