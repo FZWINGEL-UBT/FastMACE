@@ -1386,6 +1386,19 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   agree with one another. The owner then allowed them ("I allow the gpu jobs
   in their own session", 22 October 2026), and they run in this order: the
   short jobs (T02, T06, T14's smoke), then T20's series, then T14's full run.
+  At 09:07 UTC 3-T02's check still refused its launch, so it waits for the
+  owner's reply in its own session.
+- **Leeloo for the Ada legs** (owner, 22 October 2026: "you can also use
+  leeloo its idle rn"; D4 prefers a workstation for timing):
+  - first, 3-T20's item-1 Ada series;
+  - then 3-T14's smoke and its full item-9 run, in pieces;
+  - everything ends by 16:00 UTC that day, when the workstations stop for
+    the power outage. A piece that doesn't fit stops at a boundary with its
+    restart files and resumes when the workstations are back;
+  - files only under `/mnt/homes/zwingel`, with source snapshots in
+    `fastmace-t20-*` and `fastmace-t14-*`, never the NAS checkout;
+  - the GPU must be empty before each run;
+  - 3-T20's L4 job then carries items 2–3 only.
 - **3-T03:**
   - The friction refreshes copy host floats to the device, so they are not
     capturable. This is harmless: a friction event drops the graphs anyway.
