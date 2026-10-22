@@ -148,7 +148,7 @@ def main(argv=None):
         print(name, " ".join(f"{s} {medians[s]:.4f} ms skin {records[s]['skin_A']:g} rebuilds "
                              f"{during[s]['neighbour_rebuilds']}" for s in sides),
               f"b/a {entry['ratio_b_over_a']:.4f}", "valid" if entry["valid"] else "INVALID", flush=True)
-        args.output.with_suffix(".json").write_text(json.dumps(meta, indent=2, default=str) + "\n")
+        args.output.with_name(args.output.name + ".json").write_text(json.dumps(meta, indent=2, default=str) + "\n")
         sides = None
         torch.cuda.empty_cache()
 
