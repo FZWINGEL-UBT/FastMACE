@@ -346,6 +346,45 @@ class SkinNeighbourList:
             out["build_cell"] = self.build_cell
         return out
 
+    # ------------------------------------------------------------------ trial lists (MC displacements)
+
+    def save_list(self, into: dict | None = None) -> dict:
+        """Copy the list (``buffers()`` and the candidate count) for a trial build that may be rejected.
+
+        A displacement beyond the skin test is evaluated on a list built around the trial geometry, in place
+        at the buffers' addresses, so the captured graphs that read them stay valid (SPEC §8.5 step 4,
+        §10.4 "Graph capture"). ``into``, a dict an earlier call returned, is reused when its shapes still
+        match (no allocation per attempt). The copy belongs to the caller: kept here, it would be a tensor a
+        fresh construction lacks (``fastmace.events.check_against``). Fixed cell only (3-T10 answer 3).
+        """
+        if self.variable_cell:
+            raise RuntimeError("trial lists are for fixed-cell runs (displacements under a variable cell are refused)")
+        saved = {} if into is None else into
+        with torch.no_grad():
+            for name, tensor in self.buffers().items():
+                copy = saved.get(name)
+                if copy is None or copy.shape != tensor.shape or copy.dtype != tensor.dtype:
+                    saved[name] = tensor.detach().clone()
+                else:
+                    copy.copy_(tensor)
+        saved["num_candidates"] = self.num_candidates
+        saved["capacity"] = self.capacity
+        return saved
+
+    def restore_list(self, saved: dict) -> None:
+        """Copy a ``save_list`` copy back in place: a rejected trial leaves the committed list (§8.5).
+
+        Refused once the capacity has moved since the copy (a grown trial build): the caller then rebuilds
+        at the committed positions instead.
+        """
+        if saved.get("capacity") != self.capacity:
+            raise RuntimeError(f"the neighbour capacity moved from {saved.get('capacity')} to {self.capacity} since "
+                               "the list was saved; rebuild at the committed positions instead")
+        with torch.no_grad():
+            for name, tensor in self.buffers().items():
+                tensor.copy_(saved[name])
+        self.num_candidates = saved["num_candidates"]
+
     # ------------------------------------------------------------------ graph-capturable
 
     def set_cell(self, cell: torch.Tensor) -> None:

@@ -13,7 +13,8 @@ backend, and the energies of both precisions against the MD energy.
         --checkpoint ~/models/mace-mh-1.model --structure NaCl --output results/3-T07-<machine>-<date>/NaCl
 
 Hybrid float32 by default. Use an otherwise idle GPU. Output: <output>/metadata.json. Later tasks add
-their rows (displacements with and without a trial rebuild: 3-T10) as further sides.
+their rows (swap and transmutation attempts: 3-T09; displacements with and without a trial rebuild:
+3-T10) as further sides.
 
 3-T09's rows (``--swap A-B``, default the structure's two lightest species): one captured swap attempt
 (propose, apply, refresh, energy, accept mask, restore; ``fastmace.mc.MCDriver``) per evaluator precision,
@@ -21,6 +22,21 @@ timed like the others. The decisions are forced to reject while timing (the same
 stays). Afterwards one real block of ``--block-attempts`` swaps per precision at the run's temperature
 records its device time (CUDA events) and counters. ``--transmute A-B`` adds B to the superset (so the MD
 plan is the MC plan, not the default one) and runs two real transmutation blocks per precision.
+
+3-T10's rows (``--displace-delta-A``): the plan is made for a displacement workload
+(``Workload(mc_moves=("displace",), max_displacement_A=delta)``, so rule 11 sizes the skin for it, and the
+MD and energy rows are at that skin). Two displacement sides then time blocks of
+``--displace-attempts`` attempts against a baseline far below every trial, so that every attempt is
+rejected and the state stays the MD side's:
+- ``displace_graph``: δ as given, the captured attempt (no trial rebuild unless the MD drift and δ pass
+  skin/2);
+- ``displace_trial``: δ equal to the skin, so that most attempts move an atom beyond skin/2 and take the
+  host path (a trial build around the trial geometry, then the captured energy graph). One attempt per
+  call by default (``--displace-trial-attempts``): in a block of m attempts, a halted attempt k also
+  costs the m − k − 1 replays launched after it, which do nothing; that waste is the block's, not the
+  host path's.
+Recorded per side: the time per attempt, its ratio to an MD step, and the fraction of attempts that took
+a trial rebuild; ``trial_rebuild_ms`` estimates one host-path attempt from the two sides.
 """
 
 from __future__ import annotations
@@ -63,6 +79,11 @@ def parse_args(argv=None):
     p.add_argument("--block-attempts", type=int, default=50)
     p.add_argument("--transmute", default=None,
                    help="A-B: also run real transmutation blocks A <-> B (B joins the superset; the MD plan changes)")
+    p.add_argument("--displace-delta-A", type=float, default=None,
+                   help="add the displacement rows (3-T10), planned for this Workload.max_displacement_A")
+    p.add_argument("--displace-attempts", type=int, default=10, help="attempts per timed call, graph side")
+    p.add_argument("--displace-trial-attempts", type=int, default=1,
+                   help="attempts per timed call, trial side (1: no replays wasted after a halted attempt)")
     return p.parse_args(argv)
 
 
@@ -85,6 +106,52 @@ class EnergySide:
         self.torch.cuda.synchronize()
 
 
+class DisplaceSide:
+    """A displacement move's captured attempts (``MCDriver``'s replay) as a timed engine: one "step" is ``count``
+    replays and the move's halted attempts on the host (``MCDriver._finish_displacements``). The decisions are
+    forced to reject (``moves.metropolis`` patched at attach), so the MD side's state is unchanged."""
+
+    def __init__(self, driver, engine, count, torch):
+        self.driver, self.engine, self.count, self.torch = driver, engine, count, torch
+        self.ready = False
+        self.calls = 0
+
+    def prepare_block(self):
+        # Untimed: the block's baseline and stream start, as SwapSide.
+        from ase.units import kB
+
+        driver, engine = self.driver, self.engine
+        engine.flush()
+        driver.streams.kT.fill_(kB * float(engine.integrator.temperature_K))
+        driver.streams.baseline.copy_(driver.evaluator.baseline().reshape(1))
+        driver.streams.start(driver.offsets)
+        self.ready = True
+
+    def step(self):
+        if not self.ready:  # warm_up runs steps without prepare_block
+            self.prepare_block()
+        replay = self.driver._replay(0)
+        for _ in range(self.count):
+            replay()
+        self.driver._finish_displacements(0)
+        self.driver.streams.start(self.driver.offsets)  # the next call's attempt index 0 (host, between replays)
+        self.calls += 1
+
+    @property
+    def attempted(self):
+        return self.calls * self.count
+
+    @property
+    def trial_rebuilds(self):
+        return self.driver.attempts[0].trial_rebuilds
+
+    def finish_block(self):
+        pass
+
+    def synchronize(self):
+        self.torch.cuda.synchronize()
+
+
 class SwapSide:
     """One captured swap attempt (``MCDriver``'s replay) as a ``TimedEngine``: one "step" is one attempt."""
 
@@ -97,11 +164,11 @@ class SwapSide:
 
     def prepare_block(self):
         # Untimed: the block's baseline and stream start; the attempt for the current edges (captured once).
-        from fastmace.mc.driver import K_B_EV_PER_K
+        from ase.units import kB
 
         driver, engine = self.driver, self.engine
         engine.flush()
-        driver.streams.kT.fill_(K_B_EV_PER_K * float(engine.integrator.temperature_K))
+        driver.streams.kT.fill_(kB * float(engine.integrator.temperature_K))
         driver.streams.baseline.copy_(driver.evaluator.baseline().reshape(1))
         driver.streams.start(driver.offsets)
         self.replay = driver._replay(0)
@@ -190,9 +257,11 @@ def main(argv=None):
             meta["superset"] = superset
         force_field = ForceField(loaded, base, precision=precision, species=superset)
         integrator = config.IntegratorConfig(seed=args.seed, temperature_K=args.temperature_K)
-        workload = (Workload(max_temperature_K=args.temperature_K) if not args.transmute else
-                    Workload(max_temperature_K=args.temperature_K, species_changes=True,
-                             min_mc_temperature_K=args.temperature_K, mc_moves=("swap", "transmute")))
+        moves = (("swap", "transmute") if args.transmute else ()) + (("displace",) if args.displace_delta_A else ())
+        workload = (Workload(max_temperature_K=args.temperature_K) if not moves else
+                    Workload(max_temperature_K=args.temperature_K, species_changes=bool(args.transmute),
+                             min_mc_temperature_K=args.temperature_K, mc_moves=moves,
+                             max_displacement_A=args.displace_delta_A))
         plan = planner.plan(force_field, base, integrator, workload, hardware)
         started = time.perf_counter()
         engine = planner.build(plan, force_field, base.copy(), temperature_K=args.temperature_K)
@@ -262,12 +331,48 @@ def main(argv=None):
                                        info=driver.info())
             save()
         mc_moves.metropolis = metropolis
+        if args.displace_delta_A is not None:
+            import fastmace.mc.moves as mc_moves
+            from fastmace.mc import Displace, MCDriver
+
+            skin = float(engine.force_field.neighbours.skin)
+            meta["displace"] = dict(skin_A=skin, attempts_per_call=args.displace_attempts,
+                                    trial_attempts_per_call=args.displace_trial_attempts,
+                                    max_displacement_A=args.displace_delta_A)
+            counts = {"displace_graph": args.displace_attempts, "displace_trial": args.displace_trial_attempts}
+            own = evaluators["energy_" + precision]
+            metropolis = mc_moves.metropolis
+            mc_moves.metropolis = lambda u, excess, kT: torch.zeros_like(u, dtype=torch.bool)
+            for index, (side, delta) in enumerate((("displace_graph", args.displace_delta_A),
+                                                   ("displace_trial", skin))):
+                driver = MCDriver([Displace(delta_A=delta, every=1, attempts=counts[side])], seed=args.seed + index)
+                # The trial side's delta is the skin, beyond the workload's maximum on purpose (to force builds).
+                driver.attach(engine, evaluator=own, max_displacement_A=max(delta, args.displace_delta_A))
+                sides[side] = DisplaceSide(driver, engine, counts[side], torch)
+                step_time.warm_up(sides[side], 3)
+                meta["sides"][side] = dict(delta_A=delta)
+            mc_moves.metropolis = metropolis
         names = tuple(sides)
         blocks = {name: [] for name in names}
         for index in range(args.rounds):
             for name in round_order(names, index):
                 blocks[name].append(step_time.time_block(sides[name], args.block))
         meta["timing"] = summarise(blocks, names)
+        displaced = [name for name in names if name.startswith("displace_")]
+        for name in displaced:
+            side, timing = sides[name], meta["timing"][name]
+            per_attempt = timing["median_ms"] / side.count
+            timing.update(per_attempt_ms=per_attempt,
+                          per_attempt_over_md=per_attempt / meta["timing"]["md"]["median_ms"],
+                          trial_rebuild_fraction=side.trial_rebuilds / max(side.attempted, 1))
+        if len(displaced) == 2:
+            # Per attempt t = (1 - f) t_graph + f t_host on both sides: solve for the two costs.
+            (t1, f1), (t2, f2) = ((meta["timing"][name]["per_attempt_ms"],
+                                   meta["timing"][name]["trial_rebuild_fraction"]) for name in displaced)
+            if f2 > f1:
+                extra = (t2 - t1) / (f2 - f1)
+                meta["timing"]["graph_attempt_ms"] = t1 - f1 * extra
+                meta["timing"]["trial_rebuild_ms"] = t1 - f1 * extra + extra
         md.finish_block()
         md_energy = float(engine.state.energy[0])
         meta["energies_after_md"] = {"md_eV": md_energy, **{
@@ -307,7 +412,10 @@ def main(argv=None):
         raise
     finally:
         save()
-    print(json.dumps({side: dict(ms=value["median_ms"], over_md=value.get("over_md_median"))
+    print(json.dumps({side: dict(ms=value["median_ms"], over_md=value.get("over_md_median"),
+                                 per_attempt_ms=value.get("per_attempt_ms"),
+                                 trial_rebuild_fraction=value.get("trial_rebuild_fraction"))
+                      if isinstance(value, dict) else value
                       for side, value in meta.get("timing", {}).items()}, indent=1))
 
 

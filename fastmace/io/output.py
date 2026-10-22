@@ -219,9 +219,9 @@ class ChunkedOutput:
                                     trajectory_name=trajectory.name)
 
     def write(self, values: Mapping[str, Any], sample: Sequence[Any] | None = None,
-              frame: bool = False) -> tuple[Any, ...] | None:
+              frame: bool = False, *, tail: Sequence[Any] = ()) -> tuple[Any, ...] | None:
         """``OutputWriter.write`` into the current chunk; counts the row and the frame."""
-        row = self._writer.write(values, sample, frame)
+        row = self._writer.write(values, sample, frame, tail=tail)
         self.rows += row is not None
         self.frames += bool(frame)
         return row

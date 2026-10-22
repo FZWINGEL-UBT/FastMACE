@@ -59,10 +59,14 @@ def check_ensemble(config: IntegratorConfig, ensemble: str, name: str) -> None:
 class Langevin(Integrator):
     """``ase.md.langevin.Langevin`` with the state on the device.
 
-    ``config`` gives the timestep (fs), the friction (inverse ASE time units), ``fixcm`` and
-    ``noise_batch``. Random numbers come from ``state.rng`` ``noise_batch`` steps at a time, in ASE's
-    order (per step ``xi``, then ``eta``, each ``(N, 3)``): a ``(k, 2, N, 3)`` draw gives the same
-    numbers as k pairs of ``(N, 3)`` draws. The generator therefore ends up further advanced than
+    ``config`` gives the timestep (fs), the friction (inverse ASE time units), ``fixcm``, its
+    ``fixcm_projection`` and ``noise_batch``. ``fixcm_projection="ase"`` is ASE's projection bit for bit;
+    ``"mass_weighted"`` removes the mass-weighted mean of both random terms without ASE's scale factor,
+    which is canonical at fixed centre of mass for unequal masses too (docs/design/fixcm-projection.md).
+
+    Random numbers come from ``state.rng`` ``noise_batch`` steps at a time, in ASE's order (per step
+    ``xi``, then ``eta``, each ``(N, 3)``): a ``(k, 2, N, 3)`` draw gives the same numbers as k pairs of
+    ``(N, 3)`` draws. The generator therefore ends up further advanced than
     ASE's, but every step uses ASE's numbers.
     """
 
@@ -73,6 +77,7 @@ class Langevin(Integrator):
         self.config = config
         self.dt = config.timestep_fs * units.fs
         self.fix_com = config.fixcm
+        self.mass_weighted_com = config.fixcm_projection == "mass_weighted"
         self.natoms = state.natoms
         self.noise_batch = config.noise_batch
         masses = state.masses
@@ -146,7 +151,13 @@ class Langevin(Integrator):
         sqrt_kT = self.sqrt_kT
         rnd_pos = (self.c5_unit * sqrt_kT) * self.eta
         rnd_vel = (self.c3_unit * sqrt_kT) * self.xi - (self.c4_unit * sqrt_kT) * self.eta
-        if self.fix_com:
+        if self.fix_com and self.mass_weighted_com:
+            # The noise conditioned on a fixed centre of mass: both terms have covariance proportional to
+            # 1/m_i per atom, so the conditional mean is the same mass-weighted mean for every atom.
+            total = masses.sum()
+            rnd_pos = rnd_pos - (rnd_pos * masses).sum(dim=0) / total
+            rnd_vel = rnd_vel - (rnd_vel * masses).sum(dim=0) / total
+        elif self.fix_com:
             n = self.natoms
             factor = math.sqrt(n / (n - 1.0))
             rnd_pos = (rnd_pos - rnd_pos.sum(dim=0) / n) * factor

@@ -127,6 +127,7 @@ How to read the tables:
 | `--friction` | `IntegratorConfig.friction` | `0.02` | — | integrator |
 | `--seed` | `IntegratorConfig.seed` | `20261001` | — | integrator |
 | `GPULangevin(fixcm=True)` (set in `GPUEngine.__init__`) | `IntegratorConfig.fixcm` | `True` | — | integrator |
+| ASE's projection, hard-coded in `GPULangevin._stage_a` (no flag; 3-T22) | `IntegratorConfig.fixcm_projection` | `"ase"` | — | integrator (`"mass_weighted"`: the canonical projection for unequal masses, docs/design/fixcm-projection.md; the default is the owner's checkpoint 2b) |
 | `NOISE_BATCH` (also `GPULangevin(noise_batch=...)`) | `IntegratorConfig.noise_batch` | `256` | — | integrator (§3.2 hard-coded protocol choice) |
 | `--pressure-GPa` | `IntegratorConfig.pressure_GPa` | `0.0` | — | integrator |
 | `--cell-mode` | `IntegratorConfig.cell_mode` | `"hydrostatic"` | — | integrator |

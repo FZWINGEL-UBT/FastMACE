@@ -4,7 +4,7 @@
 loaded, so this module imports neither torch nor MACE nor ASE. They are checked against the
 workload and the superset by ``Simulation.run(mc=...)`` (§7.6). Species stay as given (symbols
 or atomic numbers); the driver maps them to atomic numbers. ``build_attempt`` builds the captured
-attempt of a move: 3-T09 (swaps, transmutations), 3-T10 (displacements).
+attempt of a move: 3-T09 (swaps, transmutations), 3-T10 (displacements, ``fastmace.mc.displace``).
 """
 
 from __future__ import annotations
@@ -17,8 +17,6 @@ from typing import Any, ClassVar
 from fastmace.config import SWAP_VELOCITIES, TRANSMUTE_VELOCITIES
 
 MOVE_TYPES = ("swap", "transmute", "displace")
-# Boltzmann constant in eV/K (CODATA 2018, as ase.units.kB).
-K_B_EV_PER_K = 8.617333262e-5
 
 
 def _species(value: Any, where: str) -> Any:
@@ -26,6 +24,26 @@ def _species(value: Any, where: str) -> Any:
             isinstance(value, int) and value < 0):
         raise ValueError(f"{where}: a species is a symbol or an atomic number >= 1, got {value!r}")
     return value
+
+
+def _key(species: Any) -> Any:
+    """A species as compared between records: its atomic number. Symbols are looked up in ASE only when a
+    record mixes symbols and numbers, so building a record of symbols (or of numbers) imports nothing."""
+    if isinstance(species, int):
+        return species
+    from ase.data import atomic_numbers
+
+    return atomic_numbers.get(species, species)
+
+
+def _distinct(items: tuple) -> bool:
+    """True when no species repeats, symbols and atomic numbers compared as atomic numbers ("Na" is 11)."""
+    if len(set(items)) != len(items):
+        return False
+    if all(isinstance(item, str) for item in items) or all(isinstance(item, int) for item in items):
+        return True
+    keys = [_key(item) for item in items]
+    return len(set(keys)) == len(keys)
 
 
 def _count(value: Any, where: str) -> int:
@@ -79,7 +97,7 @@ class Swap:
             if len(pair) != 2 or isinstance(pair, str):
                 raise ValueError(f"Swap.pairs: each pair names two species, got {pair!r}")
             first, second = (_species(item, "Swap.pairs") for item in pair)
-            if first == second:
+            if not _distinct((first, second)):
                 raise ValueError(f"Swap.pairs: a pair needs two different species, got {pair!r}")
         object.__setattr__(self, "pairs", pairs)
         _count(self.every, "Swap.every")
@@ -112,7 +130,7 @@ class Transmute:
         if isinstance(self.species, (str, bytes)):
             raise ValueError(f"Transmute.species must be a set of species, got {self.species!r}")
         species = tuple(_species(item, "Transmute.species") for item in self.species)
-        if len(species) < 2 or len(set(species)) != len(species):
+        if len(species) < 2 or not _distinct(species):
             raise ValueError(f"Transmute.species needs at least two different species, got {self.species!r}")
         object.__setattr__(self, "species", species)
         _count(self.every, "Transmute.every")
@@ -178,8 +196,10 @@ def configurational_mu(mu_full: Mapping[Any, float], temperature_K: float, refer
             raise ValueError(f"configurational_mu: no mass for {species!r}")
         return float(masses[species])
 
+    from ase.units import kB  # the thermostat's constant (the integrators' set_temperature)
+
     reference_mass = mass(reference)
-    k_t = K_B_EV_PER_K * float(temperature_K)
+    k_t = kB * float(temperature_K)
     return {species: 0.0 if species == reference
             else float(value) + 1.5 * k_t * math.log(mass(species) / reference_mass)
             for species, value in mu_full.items()}
@@ -372,13 +392,16 @@ class Attempt:
 
 
 def build_attempt(move: Swap | Transmute | Displace, engine: Any, evaluator: Any, streams: Any, *,
-                  fixcm: bool = False) -> Attempt:
+                  fixcm: bool = False) -> Any:
     """The attempt of ``move`` (propose → apply → refresh → energy → accept mask → restore, §10.4 "Graph
     capture") on ``engine``, with the MC ``evaluator`` (3-T07) and the block's device ``streams``
     (``streams.BlockStreams``); ``Attempt.run`` is what the driver captures. ``fixcm``: the integrator
-    fixes the centre of mass, which sets a transmutation's default treatment. Imports torch."""
+    fixes the centre of mass, which sets a transmutation's default treatment. A ``Displace`` gives a
+    ``fastmace.mc.displace.DisplaceAttempt`` (3-T10), which moves no momentum. Imports torch."""
     if isinstance(move, Displace):
-        raise NotImplementedError("MC attempts of Displace: plan task 3-T10")
+        from fastmace.mc.displace import DisplaceAttempt
+
+        return DisplaceAttempt(move, engine, evaluator, streams)
     if not isinstance(move, (Swap, Transmute)):
-        raise TypeError(f"build_attempt takes a Swap or a Transmute, got {type(move).__name__}")
+        raise TypeError(f"build_attempt takes a Swap, a Transmute or a Displace, got {type(move).__name__}")
     return Attempt(move, engine, evaluator, streams, fixcm=fixcm)
