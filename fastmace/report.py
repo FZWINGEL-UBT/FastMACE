@@ -95,15 +95,13 @@ DOWNGRADES = {
     "backend-cueq-process-family": "plain cuEq, not hybrid: this process already compiled the other backend "
                                    "family (§8.7); run in a fresh process",
     "backend-cueq-requested": "plain cuEq as requested (backend='cueq'); auto would choose hybrid where it builds",
-    "host-callbacks-graph-sync": "host callbacks: graph tier with a host sync at each callback (rule 9); correct "
-                                 "but slower when they are frequent",
+    "host-callbacks-graph-sync": "host callbacks: graph tier with a host sync at each callback (rule 9, decision "
+                                 "38); the compiled tier was 1.3-4.7x slower even with a callback every step",
     "mode-eager-tier": "eager tier: no CUDA graphs, no compilation (mode='eager', SPEC §8.3); correct but slower",
     # The compiled tier (3-T06; SPEC §8.2): no CUDA graphs, so every step is launched from the host.
     "mode-compiled-tier": "compiled tier: no CUDA graphs (mode='compiled', SPEC §8.2); correct but slower",
     "mode-compiled-rule-4": "compiled tier: no CUDA graphs, because padded edges would change this model's "
                             "energies (rule 4, SPEC §8.2); exact edge counts, correct but slower",
-    "mode-compiled-rule-9": "compiled tier: no CUDA graphs, because host callbacks come too often for graph "
-                            "replays (rule 9, SPEC §8.2); pass mode='graph' to keep the graph tier",
     "precision-promoted-unqualified-energy": "float64 forces, promoted from float32: this MACE is not the "
                                              "qualified 0.3.16 and its float64 energy forward does not hash, so a "
                                              "float64 model sums the energy (SPEC §18 decision 2)",

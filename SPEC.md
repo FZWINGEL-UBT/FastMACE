@@ -801,8 +801,8 @@ print(dyn.summary)                 # the same report as fm.md
   transaction contract (§8.5; species must be in the superset, rule 2). A
   change of atom count, PBC, cell (except through a barostat), constraints,
   `info` keys the plan reads (charge, spin) or `atoms.calc` raises, since
-  each would invalidate the plan. Observers every few steps make the
-  planner choose the compiled tier (rule 9), and the report says so.
+  each would invalidate the plan. Observers every few steps keep the graph
+  tier (rule 9, decision 38). The report states their interval.
 - Constraints follow §4.4: `FixAtoms` is refused until the integrators
   support it in phase 4, with that reason; no other tier is substituted.
 
@@ -848,7 +848,7 @@ warn:    none
   `allow_reference=True`, or MACE's calculator); a constraint (refused until
   phase 4); OEq unavailable (plain cuEq; `fastmace doctor` names the
   missing piece); a model outside the rewrite registry (plain or reference
-  path); frequent host callbacks (compiled tier); a failed rewrite
+  path); padded edges that are not exact (compiled tier, rule 4); a failed rewrite
   self-check (that rewrite off); a fallback after a failed gate (§9.4).
 - NPT, MC and D3 carry an "experimental: not yet qualified" line until their
   qualification studies are recorded (§10.2, §10.4, §11.2). `reproducible`
@@ -1333,7 +1333,7 @@ Rules 13–15 are **reactions** to checks.
 | 6 | hard | cuEquivariance's fused kernels do not load (§9.2) | refuse unless `allow_naive_cueq=True` |
 | 7 | hard | `atom_count_changes=True` | refuse: not in 1.0 (§8.6, §17) |
 | 8 | preference | `species_changes`, graph mode still allowed | graph mode; species-dependent rewrites built for the superset |
-| 9 | preference | `host_callbacks_every` small (< ~10 steps) | compiled mode (graph replays would be broken up anyway) |
+| 9 | preference | `host_callbacks_every` set, `fastmace.ase` observers included | graph mode stays. A replay per callback interval is cheap: in 3-T06's measurement a callback every step added 25 % on NaCl and 3 % on NbCl5, while compiled mode was 1.3–4.7× slower. Compiled mode only under rule 4 or with an explicit `mode="compiled"` (decision 38) |
 | 10 | preference | the integrator or optimiser and its cell mode (§9.2) | a barostat integrator or a cell-filtered optimiser (FIRE/LBFGS, never an NPT integrator for a relaxation) enables the stress path and the deformation-aware neighbour test; polar: k-vector headroom |
 | 11 | preference | `max_temperature_K` high; `"displace"` in `mc_moves`; D3 on | larger skin and bucket headroom (scaled from expected displacement per rebuild interval); a skin that keeps displacement trial rebuilds rare (§10.4); the D3 list's own skin (§11.2); re-capture budget |
 | 12 | preference | GPU memory insufficient for estimated edge bucket × feature width | drop memory-heavy rewrites or warn (e.g. generic-only POLAR-1-L NPT on NbCl5 ran out of memory on 20 GB) |
@@ -1561,6 +1561,18 @@ all velocities. An MC move must not change the total momentum behind its
 back. `exchange` conserves it exactly. With `fixcm` on, the single-atom
 `rescale` and `redraw` are refused, and `redraw_all` restores zero total
 momentum exactly (it is a Gibbs step in the zero-momentum subspace).
+
+The projection of the noise is mass-weighted by default, for MD and for MC
+(decision 37): `IntegratorConfig.fixcm_projection="auto"` resolves to
+`"mass_weighted"` under NVT `fixcm`. Every species then holds the target
+temperature, and the reported kinetic temperature counts 3N − 3 degrees of
+freedom. ASE's projection subtracts P/(N mᵢ) per atom and scales by
+√(N/(N−1)), which is right only for equal masses. It stays available as the
+explicit `"ase"`: for ASE noise-stream equivalence, for A/Bs against the
+research engine (which uses it), and for the phase 3 no-regression A/B.
+- `"ase"` keeps ASE's temperature over 3N degrees of freedom.
+- A resumed run keeps the projection its record holds. A record from before
+  the option exists reads as `"ase"`.
 
 Keeping velocities unchanged with an energy criterion on the potential alone
 is not offered. It changes the kinetic energy (masses (1, 4) and velocities
@@ -2397,6 +2409,22 @@ Open decisions for the owner:
      the `init` template for inorganic crystals suggests 1 fs.
      ResearchModule's `main.py` keeps physical output intervals: frames
      every 10 fs, restarts and quench bins in time (36).
+37–38. Decided (user, 22 October 2026, phase 3's owner checkpoints 2b and
+   2c, the recommendation of each; `plans/phase-3.md`):
+   - **The `fixcm` projection.** Under NVT `fixcm`, MD as well as MC uses
+     the mass-weighted centre-of-mass projection by default, and the
+     temperature output counts 3N − 3 degrees of freedom (§10.4).
+     - Why: ASE's projection runs light species hot when the masses differ.
+       3-T22 measured at most 0.2 % per species in the 3×3×3 production
+       crystals, but Li +233 K in a 16-atom Li/Cs cell at 600 K. The
+       mass-weighted projection costs nothing measurable (3-T22b: 0.09 % on
+       NaCl).
+     - `"ase"` stays as an explicit option for ASE and research-engine
+       comparisons. ResearchModule's `--engine gpu` keeps it (37).
+   - **Rule 9 is amended** (§9.3): host callbacks, `fastmace.ase` observers
+     included, keep the graph tier. 3-T06 measured the compiled tier 4.3–4.7×
+     slower than graph on NaCl and 1.3–1.5× slower on NbCl5, with a callback
+     every 1, 5 or 10 steps (MH-1 hybrid float32, RTX 5060 Ti) (38).
 
 ---
 

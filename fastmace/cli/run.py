@@ -18,6 +18,8 @@ records in Python are TOML values or tables:
   ``directory`` defaults to ``fm.md``'s, ``./<structure stem>.fastmace/``);
 - ``repeat``: an array of three ints.
 
+A ``.yaml``/``.yml`` file is read as YAML with ``safe_load`` only (SPEC §10.5), with the same keys.
+
 Protocols (SPEC §10.5, plan task 3-T14): ``CONFIG`` may also name a protocol shipped with FastMACE
 (``fastmace.protocols.runner.protocol_names``), whose relative structure path is a file shipped with
 it. A file with a ``[relax]`` or ``[quench]`` table, or a run with ``--steps``, is a protocol run
@@ -58,6 +60,27 @@ def _tomllib():
 def parse_toml(text):
     """The mapping of a TOML text; ``ValueError`` (``TOMLDecodeError``) if it is not TOML."""
     return _tomllib().loads(text)
+
+
+def parse_config(name, text):
+    """The mapping of a config: YAML (``safe_load`` only, SPEC §10.5) for a ``.yaml``/``.yml`` name, else TOML.
+
+    ``ValueError`` if it is not valid, or not a mapping.
+    """
+    if Path(name).suffix.lower() not in (".yaml", ".yml"):
+        return parse_toml(text)
+    try:
+        import yaml
+    except ImportError:
+        raise ValueError("reading a YAML config needs PyYAML (pip install pyyaml); TOML configs need nothing "
+                         "extra") from None
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as error:
+        raise ValueError(f"not valid YAML for safe_load: {error}") from None
+    if not isinstance(data, dict):
+        raise ValueError(f"a config must be a mapping, got {type(data).__name__}")
+    return data
 
 
 def _md_parameters():
@@ -224,7 +247,7 @@ def run(args):
     try:
         from fastmace.protocols import runner
 
-        data = parse_toml(text)
+        data = parse_config(name, text)
         if shipped is not None and "structure" in data and not Path(data["structure"]).is_absolute():
             data["structure"] = str(shipped / data["structure"])
         if "output" in data or args.output is not None:

@@ -5,12 +5,51 @@ Plan task 3-T22, 22 October 2026. Found by 3-T12
 [validation/3-T22-fixcm.md](../validation/3-T22-fixcm.md).
 
 `IntegratorConfig.fixcm_projection` chooses how `fixcm` removes the centre-of-mass part of the
-Langevin noise. There are two choices:
-- `"ase"`, the default, is ASE's projection bit for bit. The ASE noise-stream equivalence tests need it;
-- `"mass_weighted"` is the projection derived below.
+Langevin noise:
+- `"mass_weighted"`, the projection derived below. It is the default under NVT `fixcm`, for MD and MC
+  (decision 37, 3-T22c; SPEC §10.4);
+- `"ase"`, ASE's projection bit for bit. It stays as an explicit option for ASE noise-stream equivalence,
+  for A/Bs against the research engine, which uses it, and for the phase 3 no-regression A/B;
+- `"auto"`, the field's default, which the planner resolves (below).
 
-Whether the default changes is the owner's decision (plan checkpoint 2b). The fused Triton stage
-implements only `"ase"`, so `"mass_weighted"` runs the PyTorch stage.
+**`"auto"`.** The planner resolves it in every plan and records the decision
+`IntegratorConfig.fixcm_projection`:
+- `"mass_weighted"` under NVT `fixcm`: code `fixcm-projection-md` for MD, `fixcm-projection-mc` when the
+  workload declares MC moves. MC's `redraw_all` draws (3N − 3) kT, which only this projection holds;
+- `"ase"` (code `fixcm-projection-ase`) for NPT, where `LangevinBAOAB` has no `fixcm`, and for `fixcm`
+  off. Neither changes anything;
+- an explicit value is kept (`fixcm-projection-given`).
+
+Outside a plan (a bare `Langevin`, the reference integrators), `"auto"` reads as `"ase"`. `MCDriver.attach`
+refuses `redraw_all` under `fixcm` with any other projection (code `mc-redraw-all-ase-projection`).
+
+**Reported temperatures** (3-T22c). Every kinetic temperature FastMACE reports comes from
+`fastmace.io.trajectory.kinetic_temperature`, over `degrees_of_freedom(natoms, integrator)`:
+- 3N − 3 under NVT `fixcm` with `"mass_weighted"`;
+- 3N otherwise, which includes `"ase"`, as `Atoms.get_temperature` counts it.
+
+`Simulation.degrees_of_freedom` gives a run's count from its plan. The thermo rows (`temperature_K`)
+use it. The report and the CLI only show what the rows hold.
+
+`fastmace.ase.Langevin` follows the default. Its log, ASE's `MDLogger`, reads a copy of each frame that
+carries ASE's `FixCom`, so the logged temperature counts 3N − 3 as well. The trajectory frames stay
+unconstrained, because a stored `FixCom` would change the momenta read back. `fixcm_projection="ase"` is
+ASE's `Langevin` exactly. The thermostat's target is unchanged.
+
+**Resume.** A run keeps the projection it ran with:
+- a record from before the option has no field and reads as `"ase"`. That covers the `simulation.json`
+  integrator record and the plan in the restart file;
+- an `"auto"` record whose stored plan resolved to `"ase"` (an MD run from 3-T22b) keeps `"ase"`;
+- an `"auto"` record that resolves to what it ran with stays as it is.
+
+**The fused Triton stage** implements both projections bit for bit against the PyTorch stage (3-T22b).
+For `"mass_weighted"`:
+- the noise kernel also stores rnd_pos·m;
+- the two centre-of-mass sums stay PyTorch reductions, in `Langevin.first_half`'s order;
+- the drift kernel subtracts sum/M, one float64 division each, with M the registered derived buffer
+  `fused.total_mass`.
+
+The public `fm.integrators.Langevin` record and `fastmace.ase.Langevin` take `fixcm_projection` too.
 
 ## The scheme
 

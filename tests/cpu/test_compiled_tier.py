@@ -3,12 +3,12 @@
 ``mode="compiled"`` plans the graph plan's backend, rewrite set, precision, neighbours and integrator
 with the planner's ``compile_mode``, without CUDA graphs: tier ``"compiled"``, ``capture`` off, no
 speculative graphs, exact edge counts (``dynamic_edges`` on when something is compiled). Without a
-mode the planner picks it for inexact padding (rule 4, which lifts the refusal) and for frequent host
-callbacks (rule 9). ``MinimalPlanner.build`` builds a ``CompiledEngine``, the ``GraphEngine`` uncaptured
-and unpadded. On the CPU (tiny models, float64) compiled steps equal graph steps bitwise over 50 steps
-with ``compile_mode="none"`` on both sides; with Inductor on both sides (slow) they agree to float64
-rounding. ``Simulation(..., mode="compiled", check="gate")`` passes the gate, records the plan, and
-resumes compiled.
+mode the planner picks it only for inexact padding (rule 4, which lifts the refusal); host callbacks
+keep the graph tier (rule 9, decision 38). ``MinimalPlanner.build`` builds a ``CompiledEngine``, the
+``GraphEngine`` uncaptured and unpadded. On the CPU (tiny models, float64) compiled steps equal graph
+steps bitwise over 50 steps with ``compile_mode="none"`` on both sides; with Inductor on both sides
+(slow) they agree to float64 rounding. ``Simulation(..., mode="compiled", check="gate")`` passes the
+gate, records the plan, and resumes compiled.
 """
 
 from __future__ import annotations
@@ -94,12 +94,12 @@ def test_rule_4_is_lifted_for_the_compiled_tier():
         assert choice == "exact edge counts" and "rule 4" in reason
 
 
-def test_rule_9_and_rule_4_name_their_reasons():
+def test_host_callbacks_plan_compiled_only_when_asked():
+    """Decision 38: frequent host callbacks keep the graph tier; ``mode="compiled"`` is the user's."""
     frequent = Workload(max_temperature_K=300.0, host_callbacks_every=1)
-    plan = tm.plan_label("mh1-r2scan", workload=frequent)
-    assert plan.tier == "compiled" and plan.decision("mode")[2].rule == 9
+    assert tm.plan_label("mh1-r2scan", workload=frequent).tier == "graph"
     assert tm.plan_label("mh1-r2scan", workload=frequent, mode="compiled").decision("mode")[2].code == \
-        "mode-compiled-tier"  # an explicit mode is the user's, not rule 9's
+        "mode-compiled-tier"
 
 
 def test_polar_plain_cueq_stays_refused_on_the_compiled_tier():

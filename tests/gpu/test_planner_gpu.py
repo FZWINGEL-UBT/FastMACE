@@ -96,7 +96,8 @@ from fastmace.rewrites import registry as reg
 from fastmace.state import SimulationState
 
 SPEC["steps"] = 500
-integrator = IntegratorConfig(timestep_fs=0.5, friction=0.02, seed=SPEC["seed"])
+# The hand-built 1a-T13 engine runs ASE's projection; the plans pin it (3-T22c).
+integrator = IntegratorConfig(timestep_fs=0.5, friction=0.02, seed=SPEC["seed"], fixcm_projection="ase")
 plan = planner.plan(loaded, structure(), integrator, hardware)
 fixed_cache = fc.CompiledModelCache()
 
@@ -131,7 +132,8 @@ neighbours = NeighbourConfig(skin=0.3, sort_receivers="on" if "sort_receivers" i
 field = MACEForceField(loaded, atoms, rewrites=rewrites, engine=EngineConfig(compile_mode="default"),
                        neighbours=neighbours, compile_cache=fc.CompiledModelCache())
 state = SimulationState.from_atoms(atoms, "cuda:0", SPEC["seed"])
-dyn = Langevin(state, IntegratorConfig(timestep_fs=0.5, friction=0.02), temperature_K=SPEC["temperature"])
+dyn = Langevin(state, IntegratorConfig(timestep_fs=0.5, friction=0.02, fixcm_projection="ase"),
+               temperature_K=SPEC["temperature"])
 engine = GraphEngine(EngineConfig(compile_mode="default", pipelined="on"), field, dyn, state, pad_edges=True)
 result["hand_built"] = measure(engine)
 del engine, field, state, dyn
@@ -146,7 +148,7 @@ minimal_hardware = minimal_planner.hardware()
 atoms = structure()
 force_field = ForceField(pristine, atoms, precision=SPEC["precision"])
 minimal_integrator = IntegratorConfig(timestep_fs=0.5, friction=0.02, seed=SPEC["seed"],
-                                      temperature_K=SPEC["temperature"])
+                                      temperature_K=SPEC["temperature"], fixcm_projection="ase")
 minimal_plan = minimal_planner.plan(force_field, atoms, minimal_integrator,
                                     Workload(max_temperature_K=SPEC["temperature"]), minimal_hardware)
 engine = minimal_planner.build(minimal_plan, force_field, atoms, temperature_K=SPEC["temperature"])

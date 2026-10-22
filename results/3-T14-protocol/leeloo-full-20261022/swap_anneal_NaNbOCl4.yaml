@@ -1,0 +1,48 @@
+{
+ "structure": "/mnt/homes/zwingel/fastmace-t14-ed55026/fastmace/protocols/data/NaNbOCl4_I4m_Ma2026.cif",
+ "model": "mh1",
+ "head": "matpes_r2scan",
+ "repeat": [
+  3,
+  3,
+  3
+ ],
+ "timestep_fs": 1.0,
+ "schedule": "anneal",
+ "min_mc_temperature_K": 250.0,
+ "engine": {
+  "backend": "hybrid"
+ },
+ "output": {
+  "trajectory_every": 10,
+  "thermo_every": 10,
+  "restart_every": 10000
+ },
+ "mc": [
+  {
+   "move": "swap",
+   "pairs": [
+    [
+     "O",
+     "Cl"
+    ]
+   ],
+   "every": 100,
+   "attempts": 50,
+   "velocities": "exchange"
+  }
+ ],
+ "relax": {
+  "fmax": 0.01,
+  "optimizer": "LBFGS",
+  "max_steps": 5000
+ },
+ "quench": {
+  "min_K": 500.0,
+  "bin_K": 100.0,
+  "per_bin": 2,
+  "fmax": 0.01,
+  "optimizer": "LBFGS",
+  "max_steps": 5000
+ }
+}

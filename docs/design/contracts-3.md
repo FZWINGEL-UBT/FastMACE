@@ -20,7 +20,7 @@ unchanged. `tests/cpu/test_research_surface.py` is unchanged.
 | `Workload.max_displacement_A` | `None` | the largest displacement δ (Å) any `Displace` may use; required when `"displace"` is in `mc_moves`; rule 11 adds 2δ to the skin, and T10 refuses a larger `delta_A` (`planner/workload.py`) | T05 |
 | `MCConfig.max_attempts_per_block` | `10_000` | attempts of one move per block | T09 |
 | `MCConfig.max_move_sets` | `8` | move records attached at once | T09 |
-| `IntegratorConfig.fixcm_projection` | `"ase"` | how `fixcm` projects the Langevin noise: `"ase"` is ASE's, bit for bit (noise-stream equivalence; right for equal masses only); `"mass_weighted"` is the Gaussian conditioned on a fixed centre of mass (mass-weighted means, no √(N/(N−1)) factor; canonical over 3N − 3 degrees of freedom, per species too; the PyTorch stage only, not the fused one). Added by the conductor's approval; the default is the owner's checkpoint 2b. The public `fm.integrators` records don't expose it yet | T22 (docs/design/fixcm-projection.md) |
+| `IntegratorConfig.fixcm_projection` | `"auto"` | how `fixcm` projects the Langevin noise. `"mass_weighted"`: the Gaussian conditioned on a fixed centre of mass (mass-weighted means, no √(N/(N−1)) factor; canonical over 3N − 3 degrees of freedom, per species too; the PyTorch and the fused stage, bitwise alike). `"ase"`: ASE's, bit for bit (noise-stream equivalence, research-engine A/Bs). `"auto"` resolves in every plan with the decision `IntegratorConfig.fixcm_projection`: `"mass_weighted"` under NVT `fixcm` for MD (`fixcm-projection-md`, decision 37, 3-T22c) and MC (`fixcm-projection-mc`), `"ase"` for NPT and `fixcm` off (`fixcm-projection-ase`), an explicit value kept (`fixcm-projection-given`); outside a plan it reads as `"ase"`. `MCDriver.attach` refuses `redraw_all` under `fixcm` unless the projection is `"mass_weighted"` (`mc-redraw-all-ase-projection`). Also a field of `fm.integrators.Langevin` and `fastmace.ase.Langevin` (default `"auto"`). Reported temperatures: `io.trajectory.degrees_of_freedom` (3N − 3 under `"mass_weighted"`, else 3N), `io.trajectory.kinetic_temperature`, `Simulation.degrees_of_freedom`. Resume keeps the projection a run ran with; a record without the field reads as `"ase"` | T22, T22b, T22c (docs/design/fixcm-projection.md) |
 
 Constants and functions:
 - `DEFAULT_SKIN_A = 0.3`;
@@ -35,18 +35,22 @@ refusal.
 
 **`mode` defaults to `None`** (3-T06, conductor answer 1) in `Simulation`, `fm.md`, `PlannerOptions`,
 `planner_options` and `MinimalPlanner.plan`/`plan_traits`; `simulation.json` records `None`. Without a
-mode the planner picks the graph tier, or the compiled tier where:
-- rule 4: `padding_is_exact` is false (decision code `mode-compiled-rule-4`);
-- rule 9: `host_callbacks_every < minimal.RULE_9_HOST_CALLBACKS` (10), unless `reproducible=True`,
-  whose qualified tiers are graph and eager (code `mode-compiled-rule-9`).
+mode the planner picks the graph tier, or the compiled tier where rule 4 applies: `padding_is_exact` is
+false (decision code `mode-compiled-rule-4`).
 
-An explicit mode is the user's (code `mode-compiled-tier` for `"compiled"`). An explicit `"graph"` keeps
-the graph tier under rule 9 (`host-callbacks-graph-sync`, the reason says the override), and is refused
-under rule 4 (`inexact-padding`, the reason names `mode="compiled"`). The compiled tier's decisions:
+**Rule 9 as amended by decision 38** (3-T06b, 22 October 2026): host callbacks, `fastmace.ase` observers
+included, keep the graph tier at every interval, with a host sync at each callback. The decision
+`workload.host_callbacks_every` is `"graph, host sync every n steps"` (`host-callbacks-graph-sync`, rule
+9), and its reason (`minimal.RULE_9_REASON`) names decision 38 and 3-T06's measurement (compiled
+1.3-4.7x slower than graph with a callback every 1-10 steps). 3-T06's `RULE_9_HOST_CALLBACKS` and the
+code `mode-compiled-rule-9` are gone.
+
+An explicit mode is the user's (code `mode-compiled-tier` for `"compiled"`). An explicit `"graph"` is
+refused under rule 4 (`inexact-padding`, the reason names `mode="compiled"`). The compiled tier's decisions:
 `capture` off ("compiled tier: no CUDA graphs" and why), `EngineConfig.speculative_graph` off,
 `EngineConfig.dynamic_edges` on when `compile_mode` is not `"none"`, `padding` "exact edge counts"
-(`compiled-exact-edges`) for an inexact model, and `workload.host_callbacks_every`
-`host-callbacks-compiled`. `planner.fixed.COMPILED_TIER = "compiled"`; `FixedPlanner.build` builds it
+(`compiled-exact-edges`) for an inexact model, and, with host callbacks, `workload.host_callbacks_every`
+`host-callbacks-compiled` (the compiled tier was chosen by rule 4 or `mode="compiled"`). `planner.fixed.COMPILED_TIER = "compiled"`; `FixedPlanner.build` builds it
 with `capture=False`.
 
 Every plan resolves the four new `"auto"` fields, each with a decision `auto (<rule>)`
@@ -130,7 +134,7 @@ Notes on the records:
   - `check_against(fresh)`: the names whose buffers differ bit for bit from a fresh registry (or engine), or that only one side has.
 - **Where the registry lives (T03):** `GraphEngine.derived`, built after the state, force field and integrator. The engine calls `register_derived(registry, state)` on the force field (if it has one; T02's `MACEForceField.register_derived`), then on the integrator, then on the fused integrator. Every derived tensor is also in the runtime-state registry, under its owner's name or as `derived.<name>` (policy `derived.*`: restart "derived", captured).
 - **Refresh functions** take no arguments and read the committed inputs from the state: `state.species` (int64 atomic numbers), `state.masses` `(N, 1)`, `state.charges`, `state.total_charge`. They write in place at fixed addresses. Those that depend on species, masses or charges are capturable (no host sync, no new buffer; temporaries inside a graph are fine), tested in `tests/gpu/test_events_gpu.py`. A friction refresh may copy host floats: a friction event drops the graphs anyway.
-- **Registered by T03:** Langevin `integrator.c3_unit`, `c4_unit`, `c5_unit` (masses, friction); BAOAB `integrator.inv_sqrt_masses` (masses) and `integrator.force_eps` (masses, momenta, forces, stress, cell); the fused integrator's `fused.coefficients` (friction).
+- **Registered by T03:** Langevin `integrator.c3_unit`, `c4_unit`, `c5_unit` (masses, friction); BAOAB `integrator.inv_sqrt_masses` (masses) and `integrator.force_eps` (masses, momenta, forces, stress, cell); the fused integrator's `fused.coefficients` (friction) and `fused.total_mass` (masses; 3-T22b's mass-weighted projection).
 - **`Transaction(engine, events, *, evaluate=None, registry=None)`**: `run()`, `quiesce()`, `snapshot()`, `apply()`, `refresh()`, `accept()`, `reject()` and `resume()`; `host_writes` (callables `write(state)` run after the events: `Simulation.update`'s positions and momenta); `changed` and `outcome`.
   - It validates every event when it is made, before anything is written. The host kinds are species, masses, charges and friction; `swap` and `transmute` raise `NotImplementedError` naming 3-T09, `displace` 3-T10, `barostat` (no host API in phase 3).
   - Values: `masses` amu and `species` atomic numbers or symbols, one per atom of `atoms`; `charges` an array or `{"charges", "total_charge"}`; `friction` in inverse ASE time units.

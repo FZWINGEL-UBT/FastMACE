@@ -6,8 +6,14 @@ D1-D6 and prestart all phase 3 workers"). They are SPEC §18 decisions 31–36,
 and all workers were prestarted. Merged so far: 3-T01 (8dfd9f0), 3-T08
 (d73e8b7), 3-T02 (344d221), 3-T04 (623238d), 3-T06 (5a98a51), 3-T03
 (467123b), 3-T13 (77c8403), 3-T17 (2c0c63b), 3-T12's reference helper (49e20b1),
-3-T05 (cda1801), 3-T07 (40ce297), 3-T20's item-1 tools (2a42aa2) and 3-T09 (1ad78cb); in
-ResearchModule 3-T16a (90a1e7b1). 3-T11 started with 3-T09, because its gate
+3-T05 (cda1801), 3-T07 (40ce297), 3-T20's item-1 tools (2a42aa2), 3-T09 (1ad78cb)
+and its review fixes (f582186), 3-T15 (22c1e73), 3-T14 (7b26cc8), 3-T04b (53fbbfb),
+3-T10 (ecdc164), 3-T22 (eb64374), 3-T11 (963f478), 3-T12 (a031b96) and 3-T22b
+(f2f2258); in ResearchModule 3-T16a (90a1e7b1). Owner checkpoints 2b and 2c were
+decided the same day (SPEC decisions 37 and 38). 3-T06b (397da85) and 3-T22c
+(3c3e871) are merged, and so is 3-T22c's ResearchModule part (21165421, `main.py
+--fixcm-projection`). 3-T14 is merged too (266b641; item 9 end to end on both GPUs),
+and 3-T16b started. 3-T11 started with 3-T09, because its gate
 needs T07's evaluator and T03's transactions, not T09's driver. The binding answers to the prestart reports are in "Conductor answers to the
 prestart reports" below. Spec: [SPEC.md](../SPEC.md)
 §16 row "3. Dynamic topology and MC", and the sections it cites:
@@ -821,6 +827,49 @@ The task:
 
 A default change is the owner's decision (checkpoint 2b below). Worker: 3-T03's session.
 
+#### 3-T22c The mass-weighted fixcm projection as the MD default (S–M, CPU, a short GPU check) — owner decision 37, 22 October 2026
+
+- **Planner:** under NVT `fixcm`, `"auto"` resolves to `"mass_weighted"` for MD as well as for MC, with
+  a decision code of its own. An explicit value is kept. NPT and `fixcm` off are unchanged.
+- **Temperature:** under `"mass_weighted"`, every kinetic temperature FastMACE reports counts 3N − 3
+  degrees of freedom: thermo rows, the report, `Simulation`'s outputs and the CLI. Form it in one
+  helper. `"ase"` keeps 3N. The thermostat's target is unchanged.
+- **Resume:** a run keeps the projection its record holds. A record without the field reads as `"ase"`.
+- **Tests:**
+  - every bit-for-bit comparison with ASE's Langevin or with the research engine pins
+    `fixcm_projection="ase"`;
+  - new tests for the MD default, the 3N − 3 temperature and the resume of an older record.
+- **Docs:** `docs/design/fixcm-projection.md`, `docs/design/contracts-3.md`, and a validation note
+  `docs/validation/3-T22c.md`.
+- **GPU:** one short reservation. Run the fused-projection fast tier with the default plan, plus a
+  per-species temperature check on NaCl and Li/Cs under the default: every species at the target, over
+  3N − 3.
+- **ResearchModule:** `main.py` already records the plan's decisions in `run.json`
+  (`langevin/fastmace_engine.py`), so its runs are labelled. Research results from before carry ASE's
+  projection. The ResearchModule part goes to 3-T16's session, on branch `fastmace/3-T22c-rm`, and the
+  conductor merges it right after 3-T22c:
+  - a `main.py --fixcm-projection auto|ase|mass_weighted` option. `--engine gpu` and `--engine ase`
+    refuse `mass_weighted`, and engine A/Bs pass `ase`;
+  - `run.json` records the option, and resume keeps it;
+  - CPU tests;
+  - the protocol-change entry in `docs/protocol.md`, plus `docs/configuration.md` and AGENTS.md.
+
+Worker: 3-T03's session. Merge order: after 3-T06b where both edit the same tests.
+
+#### 3-T06b Rule 9 amended: host callbacks keep the graph tier (S, CPU) — owner decision 38, 22 October 2026
+
+- **Planner** (`planner/minimal.py`): `host_callbacks_every` no longer selects the compiled tier.
+  - With no mode given, the planner keeps graph and records why: rule 9, decision 38 and the measured
+    ratios.
+  - The compiled tier is chosen only under rule 4 or with `mode="compiled"`.
+  - `RULE_9_HOST_CALLBACKS` and the decision code `host-callbacks-compiled` go or change meaning.
+- **Tests:** flip the rule-9 tests. `fastmace.ase` observers keep graph.
+- **Docs:** `docs/validation/3-T06.md`, `docs/design/contracts-3.md`, and every doc that says observers
+  or callbacks choose the compiled tier.
+- **GPU:** none. The timing is 3-T06's, and 3-T21 measures the Ada leg.
+
+Worker: 3-T06's session.
+
 ### Wave 4: acceptance
 
 #### 3-T20 Phase 3 benchmarks (M, GPU: local timing; Ada) — after T09, T10, T11
@@ -1316,6 +1365,15 @@ idle.
 1. Judge the host path: `Simulation.update` swapping two atoms' species, one
    event every 100 steps. Add the captured path as a second row only if T09
    has one.
+   - **Amended by the conductor** (22 October 2026), after 3-T20's first
+     runs: the item-1 row uses `event_speed.py --swap-back`. On odd events
+     the previous pair swaps back.
+   - **Why:** random swaps that are always accepted drift the configuration
+     (NaCl at 1500 K: +0.25–0.29 eV/atom, padded edge sizes of 9216 that
+     the fixed side never reaches). That mixes the event's cost with a
+     changing system, and it puts first-visit captures into timed blocks.
+   - The random-swap rows stay as a labelled second row.
+   - The swap-back Ada leg runs in 3-T21 at the freeze.
 2. Yes, plus the canonical rebuild.
 3. Yes, add a {Na, Nb, O, Cl} row.
 4. Yes.
@@ -1332,6 +1390,9 @@ idle.
      decisions, which resolve to today's values. The T02 table is allowed
      too, if I accept it under T02's answer 3.
    - Trajectories are bitwise on CPU float64 and in reproducible mode.
+   - After decision 37, the A side pins `fixcm_projection="ase"`, because
+     the baseline has ASE's projection. After decision 38, MD with host
+     callbacks plans graph on both sides.
 2. Yes, long reservations with the PC kept quiet. I pause other GPU work.
 3. Up to $4. Reuse T14's and T20's L4 results where `git diff` shows the
    measured paths unchanged.
@@ -1348,8 +1409,8 @@ idle.
 | `simulation.py` | T03, T08, T15, T11 |
 | `report.py` | T06 (one line, if needed), T15, T11 |
 | `engine/subprocess.py` | T03, T08, T15 |
-| `planner/minimal.py` | T02, T06, T05, T09, T11, T17 |
-| `planner/fixed.py` | T01, T04, T06, T05, T11 |
+| `planner/minimal.py` | T02, T06, T05, T09, T11, T17, T22b, T06b, T22c |
+| `planner/fixed.py` | T01, T04, T06, T05, T11, T22b, T22c |
 | `planner/workload.py` | T05 |
 | `io/trajectory.py` | T15 |
 | `tools/bench/mc_cost.py` | T07, T09, T10, T20 |
@@ -1381,7 +1442,73 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
   - 3-T14: the protocol smoke and the full local run (item 9).
 
   Single runs in other workers' sessions were allowed, so the checks don't
-  agree with one another.
+  agree with one another. The owner then allowed them ("I allow the gpu jobs
+  in their own session", 22 October 2026), and they run in this order: the
+  short jobs (T02, T06, T14's smoke), then T20's series, then T14's full run.
+  At 09:07 UTC 3-T02's check still refused its launch, so it waits for the
+  owner's reply in its own session.
+- **Leeloo for the Ada legs** (owner, 22 October 2026: "you can also use
+  leeloo its idle rn"; D4 prefers a workstation for timing):
+  - first, 3-T20's item-1 Ada series;
+  - then 3-T14's smoke and its full item-9 run, in pieces;
+  - everything ends by 16:00 UTC that day, when the workstations stop for
+    the power outage. A piece that doesn't fit stops at a boundary with its
+    restart files and resumes when the workstations are back;
+  - files only under `/mnt/homes/zwingel`, with source snapshots in
+    `fastmace-t20-*` and `fastmace-t14-*`, never the NAS checkout;
+  - the GPU must be empty before each run, and no other user may have active
+    jobs on the machine. Idle leftover sessions are fine (owner, 22 October
+    2026; ResearchModule AGENTS.md f375b9d7);
+  - 3-T20's L4 job then carries items 2–3 only.
+  - 3-T20's swap-back series on leeloo (4a1dfa8): all 8 runs valid. Rates
+    fixed/events: NaCl 0.946–0.960, NbCl5 0.988–0.990.
+  - **3-T21's Ada leg started early on leeloo** (about 12:00 UTC, main
+    cd43463): the GPU acceptance and slow tiers, item 9's protocol, then the
+    rule-9 timing, until 16:00 UTC.
+    - Why early: the remaining merges don't touch `fastmace/`. At the freeze,
+      3-T21 cites these runs if `git diff cd43463..<freeze> -- fastmace/` is
+      empty, and otherwise reruns them on the L4.
+    - Murphy and leto were busy with other users' GPU jobs.
+- **3-T06's GPU jobs** passed (merged at 10c67ae). The compiled tier equals graph within float32 noise:
+  MH-1 hybrid 2.2e-7 Å against a graph repeat of 3.0e-7 Å, and MP-0 2.8e-7 Å against 2.2e-7 Å. The gate
+  passes, and nothing recompiles over 37–40 edge counts. The rule-9 timing is owner checkpoint 2c.
+- **3-T14's local smoke** passed every stage (fastmace/3-T14 at 2f1cfee).
+  - MD: NaNbOCl4, 756 atoms, 8.78 ms/step.
+  - MC: 4.35 ms per attempt. 0 of 2,700 O↔Cl swaps were accepted between
+    250 and 1000 K.
+  - The full run takes about 1 h. The full run's report gives the acceptance
+    per 100 K bin and the attempted ΔE in kT, so the owner can judge D3 if
+    acceptance stays near zero.
+  - **Early D3 finding** (smoke frames, `swap_statistics.py`): an unrelaxed
+    O↔Cl swap costs about 9–11 eV, at least 107 kT in every bin from 250 to
+    1000 K, because Cl lands about 1.9 Å from Nb. Acceptance stays at zero,
+    and the swap block costs about 10 min per run without sampling any anion
+    disorder.
+  - **The owner (22 October 2026):** "just having this functionality is fine
+    as long as the code works which species to try/what to do is another
+    project".
+    - D3 stays as specified, and item 9 judges that the protocol's code works
+      end to end, not the acceptance rate.
+    - The Nb↔Ta estimate and the GPU swap statistics were dropped.
+    - Choosing swap species and moves (Nb↔Ta, relaxed anion swaps) is a
+      separate project, outside phase 3.
+- **The NAS `mace_cueq_oeq` has no `tomli`.** FastMACE declares it for
+  Python 3.10, but runs from a checkout on `PYTHONPATH` install nothing.
+  The NAS `mace_cueq_latest` has it only through pytest. So `fastmace run`
+  can't read TOML in the NAS hybrid environment.
+  - 3-T14 used YAML; its branch makes `fastmace run` read `.yaml`/`.yml`
+    with `safe_load`.
+  - **Done** (22 October 2026, after the leeloo runs): `tomli==2.5.0` is
+    installed in the NAS `mace_cueq_oeq`. The dry run changed nothing else,
+    and `pip check` is clean. ResearchModule's AGENTS.md (15ada866) records
+    it.
+- **3-T14's full runs** are complete on both GPUs, with every stage passing.
+  - Local: 8.97–9.27 ms/step.
+  - leeloo (RTX 4000 Ada): 10.7 ms/step; gate 0.00061 and 0.0016 kT.
+  - Both runs accepted 0 of 132,550 swaps, and the quench converged 21 of
+    21 frames.
+  - Final energies: −10.241204 eV/atom (local) and −10.240948 eV/atom
+    (leeloo).
 - **3-T03:**
   - The friction refreshes copy host floats to the device, so they are not
     capturable. This is harmless: a friction event drops the graphs anyway.
@@ -1465,6 +1592,17 @@ Recorded by the conductor at each merge; 3-T21 carries the ones still open into
    not a new decision.
 2b. After 3-T22's measurement: whether `fixcm` uses the mass-weighted projection by default. That would
    change thermostat results slightly for crystals with unequal masses, in FastMACE and in `main.py`.
+   **Decided (user, 22 October 2026):** mass-weighted by default, with temperatures over 3N − 3. SPEC
+   decision 37; task 3-T22c.
+2c. After 3-T06's GPU timing (merged at 10c67ae): whether rule 9 is amended. Today a host callback every
+   fewer than 10 steps, an `fm.ase` observer included (SPEC §10), makes the planner choose the compiled tier.
+   - **Measured:** with MH-1 hybrid float32 on the RTX 5060 Ti, the compiled tier is 4.3–4.7× slower than
+     graph on NaCl (216 atoms) and 1.3–1.5× slower on NbCl5 (1944 atoms), at a callback every 1, 5 and
+     10 steps. A callback every step costs the graph tier 25 % on NaCl and 3 % on NbCl5.
+   - **Proposed:** host callbacks keep the graph tier, and the compiled tier is chosen only where capture
+     is not possible (rule 4) or when it is asked for. Until then, `mode="graph"` overrides rule 9.
+   - The Ada leg is measured in 3-T21.
+   - **Decided (user, 22 October 2026):** amended as proposed. SPEC decision 38; task 3-T06b.
 3. After T21: the acceptance report, and the tag `fastmace-3`.
 
 ## Owner decisions

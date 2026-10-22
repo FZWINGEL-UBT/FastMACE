@@ -432,7 +432,7 @@ def test_mode_defaults_to_none():  # §9.3: the planner picks graph, or compiled
     assert inspect.signature(Simulation).parameters["mode"].default is None
     assert inspect.signature(fm.md).parameters["mode"].default is None
     assert inspect.signature(minimal.MinimalPlanner.plan).parameters["mode"].default is None
-    assert minimal.RULE_9_HOST_CALLBACKS == 10
+    assert not hasattr(minimal, "RULE_9_HOST_CALLBACKS")  # decision 38: host callbacks keep graph (3-T06b)
 
 
 def test_graph_engine_energy_and_captured_names():  # §8.1 energy-only graph (3-T07), captured (3-T04)
@@ -563,6 +563,17 @@ def test_protocol_run_names():  # §10.5 (3-T14)
 
 
 def test_fixcm_projection_field():  # 3-T22 (docs/design/fixcm-projection.md); the default is checkpoint 2b
-    assert config.IntegratorConfig().fixcm_projection == "ase"
+    assert config.IntegratorConfig().fixcm_projection == "auto"  # 3-T22b: the planner's rule
     assert typing.get_args(typing.get_type_hints(config.IntegratorConfig)["fixcm_projection"]) == (
-        "ase", "mass_weighted")
+        "auto", "ase", "mass_weighted")
+
+
+def test_the_public_langevin_record_takes_the_projection():  # 3-T22b
+    from fastmace import integrators
+
+    record = integrators.Langevin(temperature_K=300.0, friction_per_fs=0.02)
+    assert record.fixcm_projection == "auto" and record.to_config(seed=1).fixcm_projection == "auto"
+    weighted = integrators.Langevin(temperature_K=300.0, friction_per_fs=0.02, fixcm_projection="mass_weighted")
+    assert weighted.to_config(seed=1).fixcm_projection == "mass_weighted"
+    with pytest.raises(ValueError, match="fixcm_projection"):
+        integrators.Langevin(temperature_K=300.0, friction_per_fs=0.02, fixcm_projection="plain")

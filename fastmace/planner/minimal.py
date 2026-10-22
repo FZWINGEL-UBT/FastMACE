@@ -63,9 +63,10 @@ MODES = ("graph", "compiled", "eager", "reference")
 # Modes the minimal planner does not have for MD, and the phase that brings each (SPEC §16; owner decision D6).
 # Empty since 3-T06 brought the compiled MD tier.
 MODE_REFUSALS: dict[str, str] = {}
-# Rule 9 (SPEC §9.3, "< ~10 steps"): host callbacks more often than every this many steps break graph replays
-# up, so a plan without a mode runs on the compiled tier (3-T06).
-RULE_9_HOST_CALLBACKS = 10
+# Rule 9 as amended by decision 38 (3-T06b): host callbacks keep the graph tier. 3-T06 measured, on the local
+# RTX 5060 Ti with MH-1 hybrid float32, compiled 1.3-4.7x slower than graph with a callback every 1, 5 or 10 steps.
+RULE_9_REASON = ("rule 9 (decision 38): host callbacks keep the graph tier, with a host sync at each callback; with "
+                 "a callback every 1-10 steps the compiled tier was 1.3-4.7x slower (3-T06, NaCl and NbCl5)")
 # The modes with an MD tier, and their mode decision.
 MODE_TIERS = {
     "graph": Reason("molecular dynamics on the graph tier (SPEC §8.1)", code="mode-graph"),
@@ -191,7 +192,8 @@ def species_numbers(species) -> tuple[int, ...]:
     return tuple(sorted(out))
 
 
-def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool) -> tuple[tuple[str, str, str], ...]:
+def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool,
+                   projection: str = "mass_weighted") -> tuple[tuple[str, str, str], ...]:
     """Check swap and transmutation records against the force field and the integrator (SPEC §10.4; 3-T09).
 
     - Every species once: a swap's two species and a transmutable set's members differ as atomic numbers
@@ -199,7 +201,10 @@ def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool) -> tupl
     - Rule 2: every species a move names is in ``superset`` (atomic numbers), code
       ``species-not-in-superset`` (``SpeciesNotInSuperset``).
     - ``fixcm`` (the integrator removes the centre-of-mass noise): the single-atom ``rescale`` and ``redraw``
-      would change the total momentum behind its back, so they are refused (code ``mc-velocities-fixcm``).
+      would change the total momentum behind its back, so they are refused (code ``mc-velocities-fixcm``);
+      ``redraw_all`` draws (3N - 3) kT, so it needs the integrator's ``projection`` (``fixcm_projection``) to
+      be ``"mass_weighted"``: with ``"ase"`` (or ``"auto"`` outside a plan, which reads as ``"ase"``) it is
+      refused (code ``mc-redraw-all-ase-projection``; 3-T22b).
     - Charge and spin, only when the model or head takes charge or spin inputs (``charge_inputs``): every
       pair of a transmutable set needs ΔZ − Δq even (code ``transmute-charge-parity``,
       ``ChargeParityRefused``); otherwise the decision records "parity: not applicable".
@@ -232,6 +237,12 @@ def check_mc_moves(moves, *, superset, charge_inputs: bool, fixcm: bool) -> tupl
                 f"the {kind} move's velocities={velocities!r} change the total momentum, and the integrator fixes "
                 "the centre of mass (fixcm); use 'redraw_all' (or 'exchange' for swaps) (SPEC §10.4 \"Centre of "
                 "mass\")", code="mc-velocities-fixcm"))
+        if fixcm and velocities == "redraw_all" and projection != "mass_weighted":
+            reasons.append(Reason(
+                f"the {kind} move's velocities='redraw_all' draw (3N - 3) kT at zero momentum, and the integrator's "
+                f"fixcm_projection={projection!r} holds 3N kT, so every accepted block would take 1/N of the kinetic "
+                "energy; use fixcm_projection='mass_weighted' (the plan's choice for MC under fixcm) or 'exchange' "
+                "for swaps (docs/design/fixcm-projection.md)", code="mc-redraw-all-ase-projection"))
         if kind == "transmute" and charge_inputs:
             charges = {species_number(species): value for species, value in move.formal_charges}
             for index, first in enumerate(named):
@@ -481,7 +492,8 @@ class MinimalPlanner:
         """The MD plan for ``force_field`` (an ``fm.ForceField``), ``atoms``, ``integrator`` and ``workload``.
 
         ``mode`` (default ``None``) is the execution mode; without one the planner picks the graph tier,
-        or the compiled tier where rule 4 (inexact padding) or rule 9 (frequent host callbacks) says so.
+        or the compiled tier where rule 4 (inexact padding) says so; host callbacks keep the graph tier
+        (rule 9, decision 38).
         ``variable_cell`` (default: the integrator's) says whether the run changes the cell. Raises
         ``PlanRefused`` (``SpeciesNotInSuperset``) with every reason, ``ModelElementError``, or
         ``ProcessConstraintError``; nothing is loaded onto the GPU or compiled. A reproducible plan that
@@ -519,7 +531,6 @@ class MinimalPlanner:
         software = self.software or detect_software(self.engine.device)
         book = fixed._Book()
         reference = mode == REFERENCE_TIER
-        given = mode is not None
         mode, mode_reason = self._mode(mode, traits, workload)
         capture = versions.capture_support(traits)
         if mode == "graph" and not capture.supported:
@@ -550,7 +561,7 @@ class MinimalPlanner:
         superset, precision, requested = self._common(book, traits, atoms, species, precision, software, backend[0],
                                                       allow_naive_cueq, loaded)
         rule_11 = self._rule_11(traits, atoms, superset, integrator, workload)
-        self._workload_decisions(book, workload, rule_11, mode, given)
+        self._workload_decisions(book, workload, rule_11, mode)
         if reference:
             parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend,
                                           rule_11, mc=(workload.mc_moves, workload.mc_energy_precision))
@@ -612,21 +623,15 @@ class MinimalPlanner:
 
     @staticmethod
     def _mode(mode, traits, workload):
-        """``(mode, reason)``: the given mode, or without one the graph tier unless rule 4 or rule 9 plans the
-        compiled tier (3-T06). An explicit ``"graph"`` is the user's: rule 9, a preference, does not move it,
-        and rule 4, a hard rule, refuses it in ``_resolve``."""
+        """``(mode, reason)``: the given mode, or without one the graph tier unless rule 4 plans the compiled
+        tier (3-T06). Host callbacks keep the graph tier (rule 9, decision 38). An explicit ``"graph"`` with
+        inexact padding is refused by rule 4, a hard rule, in ``_resolve``."""
         if mode is not None:
             return mode, MODE_TIERS.get(mode) or Reason(MODE_REFUSALS[mode], code=f"mode-{mode}")
         if not traits.padding_is_exact:
             return fixed.COMPILED_TIER, Reason(
                 "no mode given: padded edges would change this model's energies, so the compiled tier with exact "
                 "edge counts (SPEC §9.3 rule 4, §8.2)", rule=4, code="mode-compiled-rule-4")
-        every = workload.host_callbacks_every
-        if every is not None and every < RULE_9_HOST_CALLBACKS and not workload.reproducible:
-            # (reproducible=True is qualified on the graph and eager tiers only: rule 9 keeps the graph tier.)
-            return fixed.COMPILED_TIER, Reason(
-                f"no mode given: host callbacks every {every} steps, fewer than {RULE_9_HOST_CALLBACKS}, would break "
-                "graph replays up, so the compiled tier (SPEC §9.3 rule 9, §8.2)", rule=9, code="mode-compiled-rule-9")
         return "graph", MODE_TIERS["graph"]
 
     def _mode_engine(self, mode):
@@ -668,8 +673,7 @@ class MinimalPlanner:
         """The graph tier's decisions on the compiled tier (3-T06): tier, capture, dynamic edges, and rule 4
         lifted (exact edge counts). ``parts`` as ``_resolve`` left them; the requested options stay the caller's."""
         book.refusals = [reason for reason in book.refusals if getattr(reason, "code", None) != "inexact-padding"]
-        why = {"mode-compiled-rule-4": "rule 4: padded edges would change this model's energies",
-               "mode-compiled-rule-9": "rule 9: frequent host callbacks would break graph replays up"}.get(
+        why = {"mode-compiled-rule-4": "rule 4: padded edges would change this model's energies"}.get(
             getattr(mode_reason, "code", None), "mode='compiled'")
         replaced = {
             "tier": (fixed.COMPILED_TIER, "the graph engine on the compiled model without CUDA graphs, exact edge "
@@ -712,7 +716,7 @@ class MinimalPlanner:
                         max_displacement_A=workload.max_displacement_A)
         return bool(workload.mc_moves or workload.species_changes), sized
 
-    def _workload_decisions(self, book, workload, rule_11, mode="graph", given=True):
+    def _workload_decisions(self, book, workload, rule_11, mode="graph"):
         applies, sized = rule_11
         if applies:
             why = Reason(f"rule 11 sizes the skin and headroom: {sized.text()}", rule=11,
@@ -726,14 +730,11 @@ class MinimalPlanner:
             book.decide("workload.host_callbacks_every", "none", Reason("no host callbacks", code="no-host-callbacks"))
         elif mode == fixed.COMPILED_TIER:
             book.decide("workload.host_callbacks_every", f"compiled, host callbacks every {every} steps", Reason(
-                "rule 9: the compiled tier launches every step from the host, so a callback breaks no graph replay "
-                f"(compiled below {RULE_9_HOST_CALLBACKS} steps)", rule=9, code="host-callbacks-compiled"))
+                "the compiled tier (rule 4 or mode='compiled') launches every step from the host, so a callback "
+                "costs no graph break (rule 9, decision 38)", rule=9, code="host-callbacks-compiled"))
         else:
-            override = (f"; mode={mode!r} was given, so rule 9's compiled tier (below {RULE_9_HOST_CALLBACKS} steps) "
-                        "does not apply" if given and every < RULE_9_HOST_CALLBACKS else "")
-            book.decide("workload.host_callbacks_every", f"{mode}, host sync every {every} steps", Reason(
-                f"rule 9: the {mode} tier stays, with a host sync at each callback{override}",
-                code="host-callbacks-graph-sync"))
+            book.decide("workload.host_callbacks_every", f"{mode}, host sync every {every} steps",
+                        Reason(RULE_9_REASON, rule=9, code="host-callbacks-graph-sync"))
         moves = ", ".join(workload.mc_moves) or "none"
         book.decide("workload.mc_moves", moves, Reason(
             "no MC" if not workload.mc_moves else "MC moves are attached through Simulation.run(mc=...) (SPEC §7.6)",

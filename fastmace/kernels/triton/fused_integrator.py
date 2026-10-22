@@ -37,10 +37,10 @@ def _kernels():
     import triton.language as tl
 
     @triton.jit
-    def noise_kernel(xi_ptr, eta_ptr, c3_ptr, c4_ptr, c5_ptr, kt_ptr, m_ptr, rp_ptr, rv_ptr, q_ptr, max_ptr, n,
-                     BLOCK: tl.constexpr):
-        """rnd_pos = (c5 sqrt_kT) eta, rnd_vel = (c3 sqrt_kT) xi - (c4 sqrt_kT) eta and q = rnd_vel m (fix_com);
-        program 0 also clears the displacement maximum."""
+    def noise_kernel(xi_ptr, eta_ptr, c3_ptr, c4_ptr, c5_ptr, kt_ptr, m_ptr, rp_ptr, rv_ptr, q_ptr, qp_ptr, max_ptr,
+                     n, MASS_WEIGHTED: tl.constexpr, BLOCK: tl.constexpr):
+        """rnd_pos = (c5 sqrt_kT) eta, rnd_vel = (c3 sqrt_kT) xi - (c4 sqrt_kT) eta and q = rnd_vel m (fix_com),
+        with MASS_WEIGHTED also qp = rnd_pos m; program 0 also clears the displacement maximum."""
         i = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
         live = i < n
         atom = i // 3
@@ -54,15 +54,20 @@ def _kernels():
         rv = s3 * xi - s4 * eta
         tl.store(rp_ptr + i, rp, mask=live)
         tl.store(rv_ptr + i, rv, mask=live)
-        tl.store(q_ptr + i, rv * tl.load(m_ptr + atom, mask=live), mask=live)
+        m = tl.load(m_ptr + atom, mask=live)
+        tl.store(q_ptr + i, rv * m, mask=live)
+        if MASS_WEIGHTED:
+            tl.store(qp_ptr + i, rp * m, mask=live)
         if tl.program_id(0) == 0:
             tl.store(max_ptr, 0)
 
     @triton.jit
-    def drift_kernel(x_ptr, v_ptr, f_ptr, m_ptr, rp_raw_ptr, rv_raw_ptr, sp_ptr, sq_ptr, coef_ptr, rp_ptr, rv_ptr,
-                     xold_ptr, mid_ptr, ref_ptr, max_ptr, natoms, FIX_COM: tl.constexpr, SAVE_MID: tl.constexpr,
-                     BLOCK: tl.constexpr):
-        """Per atom: the centre-of-mass correction, v += c1 f/m - c2 v + rnd_vel, x_old = x,
+    def drift_kernel(x_ptr, v_ptr, f_ptr, m_ptr, rp_raw_ptr, rv_raw_ptr, sp_ptr, sq_ptr, total_ptr, coef_ptr, rp_ptr,
+                     rv_ptr, xold_ptr, mid_ptr, ref_ptr, max_ptr, natoms, FIX_COM: tl.constexpr,
+                     MASS_WEIGHTED: tl.constexpr, SAVE_MID: tl.constexpr, BLOCK: tl.constexpr):
+        """Per atom: the centre-of-mass correction (ASE's, or with MASS_WEIGHTED the mass-weighted means
+        sp / M and sq / M, a float64 division as PyTorch's tensor / tensor, no factor; 3-T22b),
+        v += c1 f/m - c2 v + rnd_vel, x_old = x,
         x += dt v + rnd_pos, v = (x - x_old - rnd_pos) / dt, the saved velocity, and the squared
         displacement from the reference positions into the maximum."""
         a = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
@@ -83,7 +88,11 @@ def _kernels():
             k = a * 3 + c
             rp = tl.load(rp_raw_ptr + k, mask=live)
             rv = tl.load(rv_raw_ptr + k, mask=live)
-            if FIX_COM:
+            if FIX_COM and MASS_WEIGHTED:
+                total = tl.load(total_ptr)
+                rp = rp - tl.load(sp_ptr + c) / total
+                rv = rv - tl.load(sq_ptr + c) / total
+            elif FIX_COM:
                 rp = (rp - tl.load(sp_ptr + c) * inv_n) * factor
                 rv = (rv - tl.load(sq_ptr + c) / den) * factor
             tl.store(rp_ptr + k, rp, mask=live)
@@ -176,8 +185,6 @@ def applicable(engine) -> str | None:
         return "variable cell (LangevinBAOAB keeps the PyTorch stage)"
     if type(engine.integrator) is not Langevin:
         return f"integrator {type(engine.integrator).__name__}, not Langevin"
-    if engine.integrator.fix_com and engine.integrator.mass_weighted_com:
-        return "fixcm_projection='mass_weighted' (the fused kernels implement ASE's projection)"
     if not isinstance(getattr(engine.force_field, "neighbours", None), SkinNeighbourList):
         return "no skin neighbour list"
     if engine.state.positions.dtype != torch.float64 or engine.state.forces.dtype != torch.float64:
@@ -205,6 +212,8 @@ class FusedIntegrator:
                                        dtype=torch.float64, device=device)
         self.cutoff2 = torch.tensor([neighbours.cutoff ** 2], dtype=torch.float64, device=device)
         self.largest = torch.zeros((), dtype=torch.int64, device=device)
+        # The total mass of the mass-weighted projection, as Langevin.first_half forms it (masses.sum()).
+        self.total_mass = engine.state.masses.sum().reshape(1)
 
     def _coefficients(self, device):
         integrator = self.engine.integrator
@@ -221,6 +230,9 @@ class FusedIntegrator:
         registry.register("fused.coefficients", self.coefficients,
                           lambda: self.coefficients.copy_(self._coefficients(self.coefficients.device)),
                           depends_on=("friction",))
+        masses = self.engine.state.masses
+        registry.register("fused.total_mass", self.total_mass, lambda: self.total_mass.copy_(masses.sum().reshape(1)),
+                          depends_on=("masses",))
 
     def stage(self, pipelined: bool) -> None:
         triton, noise_kernel, drift_kernel, inside_kernel, scatter_kernel = _kernels()
@@ -232,19 +244,23 @@ class FusedIntegrator:
         rp_raw = torch.empty_like(state.positions)
         rv_raw = torch.empty_like(state.positions)
         q = torch.empty_like(state.positions)
+        weighted = bool(integrator.fix_com and integrator.mass_weighted_com)
+        qp = torch.empty_like(state.positions) if weighted else q
         noise_kernel[(triton.cdiv(n3, BLOCK),)](
             integrator.xi, integrator.eta, integrator.c3_unit, integrator.c4_unit, integrator.c5_unit,
-            integrator.sqrt_kT, state.masses, rp_raw, rv_raw, q, self.largest, n3, BLOCK=BLOCK,
-            enable_fp_fusion=False)
-        if integrator.fix_com:  # PyTorch's own reductions: their order is the baseline's
+            integrator.sqrt_kT, state.masses, rp_raw, rv_raw, q, qp, self.largest, n3, MASS_WEIGHTED=weighted,
+            BLOCK=BLOCK, enable_fp_fusion=False)
+        if weighted:  # PyTorch's own reductions, as Langevin.first_half: (rnd_pos * masses).sum(dim=0)
+            sp, sq = qp.sum(dim=0), q.sum(dim=0)
+        elif integrator.fix_com:  # PyTorch's own reductions: their order is the baseline's
             sp, sq = rp_raw.sum(dim=0), q.sum(dim=0)
         else:
             sp = sq = rp_raw
         drift_kernel[(triton.cdiv(natoms, BLOCK),)](
-            state.positions, state.velocities, state.forces, state.masses, rp_raw, rv_raw, sp, sq,
+            state.positions, state.velocities, state.forces, state.masses, rp_raw, rv_raw, sp, sq, self.total_mass,
             self.coefficients, integrator.rnd_pos, integrator.rnd_vel, integrator.x_old, engine._mids[0],
             neighbours.reference_positions, self.largest, natoms, FIX_COM=bool(integrator.fix_com),
-            SAVE_MID=pipelined, BLOCK=BLOCK, enable_fp_fusion=False)
+            MASS_WEIGHTED=weighted, SAVE_MID=pipelined, BLOCK=BLOCK, enable_fp_fusion=False)
         capacity = neighbours.capacity
         inside = torch.empty(capacity, dtype=torch.int64, device=state.positions.device)
         inside_kernel[(triton.cdiv(capacity, BLOCK),)](

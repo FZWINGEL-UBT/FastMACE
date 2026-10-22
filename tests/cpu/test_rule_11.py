@@ -131,7 +131,8 @@ def test_the_fused_integrator_thresholds_follow_the_planned_skin():
                                    sort_receivers=True, gpu_build=False)
     config = EngineConfig()
     integrator = SimpleNamespace(natoms=len(atoms), fix_com=True, c1=0.9, c2=0.1, dt=1.0)
-    state = SimpleNamespace(positions=torch.zeros(len(atoms), 3, dtype=torch.float64))
+    state = SimpleNamespace(positions=torch.zeros(len(atoms), 3, dtype=torch.float64),
+                            masses=torch.tensor(atoms.get_masses(), dtype=torch.float64))
     engine = SimpleNamespace(integrator=integrator, state=state, config=config,
                              force_field=SimpleNamespace(neighbours=neighbours))
     fused = FusedIntegrator(engine)

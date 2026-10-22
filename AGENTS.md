@@ -35,7 +35,9 @@ took longer than the app's five-minute start limit (SPEC §18 decision 1).
 - **ResearchModule's `AGENTS.md` still governs everything outside this
   repository:** environments (which Python on which machine; no installs into
   the NAS environments without its dry-run procedure), workstation rules
-  (idle GPU first, files only under `/mnt/homes/zwingel`, no `/tmp`), WSL
+  (never while another user is on the GPU or has active jobs, checked right
+  before every job; idle leftover sessions are fine; files only under
+  `/mnt/homes/zwingel`, no `/tmp`), WSL
   rules (detached launches, 15 GB RAM), and the NAS sync procedure. Read its
   sections "Workstation environment", "NAS checkout" and "Local PC" before
   any run on a GPU or a workstation.

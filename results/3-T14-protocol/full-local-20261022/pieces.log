@@ -1,0 +1,60 @@
+=== 2026-10-22T09:59:48Z fastmace run /home/fzwin/fastmace-t14/full-local-20261022.protocol.yaml --output /home/fzwin/fastmace-t14/full-local-20261022 --steps 135000 (FastMACE 2f1cfee6a48577f8615b92371b93de01ba8b1b20)
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+compatibility tier: compiled, no CUDA graphs; use `fm.md` or `fastmace.ase` integrators for full speed
+relaxation: LBFGS at fixed cell, -10.248026 -> -10.250177 eV/atom in 19 steps (36.1 s), fmax 0.0082 eV/Å
+FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl432Na108Nb108O108, 756 atoms (1×1×1), 3D PBC, NVT Langevin 1 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)
+gate:    not run (opt-in: check="gate")
+mc ΔE:   float32; move-energy gate passed (worst ΔE error in k_B T_min: swap 0.00082; limit 0.01 k_B T_min at T_min 250 K; 13 configurations)
+mc:      swap O-Cl every 100, 50 attempts (exchange); accepted 0/65050; 4.53 ms/attempt over 1,301 blocks (device time; each attach's first block, with its captures, left out); attached over steps 4,999–135,000
+setup:   70 s (plan 0.015 s, build 24 s, capture 15 s, move_energy_gate 31 s, provenance 0.057 s)
+speed:   9.27 ms/step, whole-run mean over steps 1–135,000; MD only; MC blocks: see mc
+output:  /home/fzwin/fastmace-t14/full-local-20261022
+licence: ASL (non-commercial), from the label table (§4.3)
+paused at step 135000 of 270000; continue with fastmace run --resume /home/fzwin/fastmace-t14/full-local-20261022
+=== 2026-10-22T10:27:54Z fastmace run --resume /home/fzwin/fastmace-t14/full-local-20261022 --steps 135000 (FastMACE 2f1cfee6a48577f8615b92371b93de01ba8b1b20)
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+W1022 12:28:56.068000 257349 torch/_inductor/utils.py:1806] [0/0_1] Not enough SMs to use max_autotune_gemm mode
+FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl432Na108Nb108O108, 756 atoms (3×3×3), 3D PBC, NVT Langevin 1 fs
+physics: no dispersion; charge/spin not used by this model
+plan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 6 off (reasons in run.plan)
+gate:    not run (opt-in: check="gate")
+mc ΔE:   float32; move-energy gate passed (worst ΔE error in k_B T_min: swap 0.00064; limit 0.01 k_B T_min at T_min 250 K; 13 configurations)
+mc:      swap O-Cl every 100, 50 attempts (exchange); accepted 0/132550; 4.46 ms/attempt over 2,651 blocks (device time; each attach's first block, with its captures, left out); attached over steps 4,999–270,000
+setup:   90 s (plan 0.04 s, build 53 s, move_energy_gate 38 s, provenance 0.036 s)
+speed:   8.97 ms/step, whole-run mean over steps 135,001–270,000; MD only; MC blocks: see mc
+output:  /home/fzwin/fastmace-t14/full-local-20261022
+licence: ASL (non-commercial), from the label table (§4.3)
+mc swap: 132550 attempted, 0 impossible, 0 accepted
+compatibility tier: compiled, no CUDA graphs; use `fm.md` or `fastmace.ase` integrators for full speed
+quench 1/21: heating 525 K -> -10.250177 eV/atom in 118 steps (27.7 s)
+quench 2/21: heating 574 K -> -10.250180 eV/atom in 144 steps (3.5 s)
+quench 3/21: heating 625 K -> -10.249846 eV/atom in 148 steps (3.6 s)
+quench 4/21: heating 674 K -> -10.250180 eV/atom in 142 steps (3.5 s)
+quench 5/21: heating 725 K -> -10.249549 eV/atom in 166 steps (4.0 s)
+quench 6/21: heating 774 K -> -10.249702 eV/atom in 154 steps (3.9 s)
+quench 7/21: heating 825 K -> -10.249846 eV/atom in 166 steps (4.5 s)
+quench 8/21: heating 874 K -> -10.247111 eV/atom in 178 steps (4.4 s)
+quench 9/21: heating 925 K -> -10.246547 eV/atom in 195 steps (4.4 s)
+quench 10/21: heating 975 K -> -10.245883 eV/atom in 312 steps (7.3 s)
+quench 11/21: cooling 975 K -> -10.238001 eV/atom in 601 steps (14.4 s)
+quench 12/21: cooling 925 K -> -10.236870 eV/atom in 427 steps (10.2 s)
+quench 13/21: cooling 875 K -> -10.237713 eV/atom in 432 steps (10.2 s)
+quench 14/21: cooling 825 K -> -10.237781 eV/atom in 373 steps (9.5 s)
+quench 15/21: cooling 775 K -> -10.237494 eV/atom in 434 steps (10.5 s)
+quench 16/21: cooling 725 K -> -10.237546 eV/atom in 384 steps (9.3 s)
+quench 17/21: cooling 675 K -> -10.237916 eV/atom in 320 steps (7.7 s)
+quench 18/21: cooling 625 K -> -10.238471 eV/atom in 261 steps (6.2 s)
+quench 19/21: cooling 575 K -> -10.238427 eV/atom in 459 steps (11.0 s)
+quench 20/21: cooling 525 K -> -10.238411 eV/atom in 255 steps (5.8 s)
+quench 21/21: final 250 K -> -10.241204 eV/atom in 193 steps (4.6 s)
+quench: 21 frames, final quenched -10.241204 eV/atom, 0 not converged (/home/fzwin/fastmace-t14/full-local-20261022/quench)

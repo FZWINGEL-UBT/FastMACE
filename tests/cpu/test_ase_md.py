@@ -645,6 +645,9 @@ def test_observers_declare_the_shortest_interval_as_host_callbacks(loaded):
     dyn.run(1)
     assert dyn.simulation.workload.host_callbacks_every == 3
     _plans_equal(dyn.plan, _simulation(loaded, host_callbacks_every=3).plan)
+    # Decision 38 (3-T06b): observers keep the graph tier, with a host sync at each call.
+    assert dyn.plan.tier == "graph"
+    assert dyn.plan.decision("workload.host_callbacks_every")[2].code == "host-callbacks-graph-sync"
     plain = _langevin(loaded, output="plain")
     plain.run(1)
     assert plain.simulation.workload.host_callbacks_every is None
@@ -810,12 +813,16 @@ def test_append_trajectory_keeps_frames_as_ase(loaded):
     assert len(read("run.traj", index=":")) == 2
 
 
-def test_the_log_file_is_ases_format(loaded):
+@pytest.mark.parametrize("projection", ["auto", "ase"])
+def test_the_log_file_is_ases_format(loaded, projection):
+    """ASE's MDLogger over the trajectory's frames gives the log; under the default mass-weighted projection
+    (decision 37) with ASE's FixCom, so its temperature counts 3N - 3 (3-T22c), with "ase" over 3N."""
     from ase.calculators.singlepoint import SinglePointCalculator
+    from ase.constraints import FixCom
     from ase.io import read
     from ase.md.logger import MDLogger
 
-    dyn = _langevin(loaded, trajectory="run.traj", logfile="run.log", loginterval=2)
+    dyn = _langevin(loaded, trajectory="run.traj", logfile="run.log", loginterval=2, fixcm_projection=projection)
     dyn.run(4)
     dyn.close()
 
@@ -828,11 +835,14 @@ def test_the_log_file_is_ases_format(loaded):
     clock = Clock()
     frames = read("run.traj", index=":")
     atoms = frames[0].copy()
+    if projection == "auto":
+        atoms.set_constraint(FixCom())
     with MDLogger(clock, atoms, "expected.log", mode="w") as logger:
         for i, frame in enumerate(frames):
             clock.step = 2 * i
-            atoms.positions, atoms.cell = frame.positions, frame.cell
-            atoms.set_momenta(frame.get_momenta())
+            atoms.set_positions(frame.positions, apply_constraint=False)
+            atoms.cell = frame.cell
+            atoms.set_momenta(frame.get_momenta(), apply_constraint=False)
             atoms.calc = SinglePointCalculator(atoms, energy=frame.get_potential_energy())
             logger()
     with open("run.log") as got, open("expected.log") as expected:

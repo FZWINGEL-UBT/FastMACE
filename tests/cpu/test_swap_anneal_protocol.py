@@ -388,3 +388,21 @@ def test_md_with_steps_plans_for_the_whole_schedule(model_path, cpu_planner, tmp
     assert sim.workload.max_temperature_K == 600.0 and sim.schedule.step == 2
     sim.run()
     assert sim.schedule.finished
+
+
+def test_a_yaml_config_reads_as_its_toml(tmp_path):
+    # SPEC §10.5: protocols are TOML or YAML (safe_load only). The hybrid environment's Python 3.10 has
+    # PyYAML but no tomli, so run.sh hands it the protocol as YAML (JSON is YAML).
+    pytest.importorskip("yaml")
+    path, _ = runner.protocol_file("swap_anneal_NaNbOCl4")
+    data = run_command.parse_toml(path.read_text(encoding="utf-8"))
+    for suffix, text in ((".yaml", json.dumps(data)), (".yml", "structure: a.cif\nrepeat: [3, 3, 3]\n")):
+        config = tmp_path / f"protocol{suffix}"
+        config.write_text(text, encoding="utf-8")
+        assert run_command.parse_config(config.name, config.read_text(encoding="utf-8")) == \
+            (data if suffix == ".yaml" else {"structure": "a.cif", "repeat": [3, 3, 3]})
+    with pytest.raises(ValueError, match="mapping"):
+        run_command.parse_config("x.yaml", "- 1\n- 2\n")
+    with pytest.raises(ValueError):
+        run_command.parse_config("x.yaml", "!!python/object:os.system {}\n")  # safe_load refuses tags
+    assert run_command.parse_config("x.toml", "a = 1\n") == {"a": 1}
