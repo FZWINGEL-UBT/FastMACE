@@ -93,7 +93,7 @@ print(json.dumps(out))
 def _run(directory, family, **spec):
     path = directory / f"tiny-{family}.model"
     torch.save(tiny_mace_model([11, 17], **FAMILIES[family]), path)
-    spec = dict(path=str(path), steps=30, pipelined=None, integrator={}, **spec)
+    spec = {"path": str(path), "steps": 30, "pipelined": None, "integrator": {}, **spec}
     return ENGINE.run_fresh(f"SPEC = {spec!r}\n" + CHILD)
 
 
@@ -121,8 +121,9 @@ def test_a_kvector_overflow_is_caught_in_its_own_step(tmp_path, pipelined):
     assert out["capture"]
     assert out["overflow_check"] == "per step"
     assert "overflow check" in out["decisions"]
-    assert out["overflows_redone"] == 1
-    assert out["overflow_log"][0]["step"] == 9 and out["overflow_log"][0]["kinds"] == ["k-vectors"]
+    kvectors = [entry["step"] for entry in out["overflow_log"] if "k-vectors" in entry["kinds"]]
+    assert kvectors == [9]
+    assert out["overflows_redone"] == len(out["overflow_log"])  # pipelined: edge-count redos too
     assert out["polar_overflow_steps"] == [9]
     assert out["canonical_points"] == 0
     assert out["max_dx"] < 1e-9

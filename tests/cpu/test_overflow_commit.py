@@ -140,22 +140,24 @@ def test_an_overflow_with_a_rebuild_counts_once_as_a_rebuild_redo(monkeypatch):
 # --------------------------------------------------------------------------- polar k-vector overflow
 
 
-def inject_polar_overflow(engine, monkeypatch, at_call):
-    """Set the sticky polar flag inside the ``at_call``-th force call (counted from now)."""
-    field = engine.force_field
-    flag = engine.registry.tensors()["force_field.polar.overflow"]
-    original = type(field).__call__
-    calls = []
+def inject_polar_overflow(engine, monkeypatch, step):
+    """Set the sticky polar flag inside the force stage that step ``step`` launches after its own stage A,
+    never inside a redo (which runs before the next stage A, and which a real k-vector overflow cannot
+    reach). Returns the force stages run, as (state.step, key)."""
+    original = engine._run
+    calls, armed = [], []
 
-    def call(self, positions):
-        out = original(self, positions)
-        if self is field:
+    def run(key):
+        original(key)
+        if key in ("AC", "ACP"):
+            armed[:] = [engine.state.step == step - 1]
+        elif isinstance(key, tuple) and key[0] == "B":
             calls.append(engine.state.step)
-            if len(calls) == at_call:
-                flag.fill_(True)
-        return out
+            if armed and armed[0]:
+                armed[:] = []
+                engine.force_field._polar_state().overflow.fill_(True)
 
-    monkeypatch.setattr(type(field), "__call__", call)
+    monkeypatch.setattr(engine, "_run", run)
     return calls
 
 
@@ -169,20 +171,20 @@ def test_a_kvector_overflow_is_caught_in_its_own_step(mace_builder, monkeypatch,
     assert engine.info()["overflow_check"] == "per step"
     plan = mace_builder.plans[-1]
     assert any(item == "overflow check" for item, _, _ in plan.decisions)
-    calls = inject_polar_overflow(engine, monkeypatch, at_call=4)
-    flag = engine.registry.tensors()["force_field.polar.overflow"]
+    calls = inject_polar_overflow(engine, monkeypatch, step=4)
     for _ in range(4):
         reference.step()
         engine.step()
     engine.flush()
     reference.flush()
-    assert not bool(flag)  # cleared by the step's own check, with no canonical point
+    assert not bool(engine.force_field._polar_state().overflow)  # cleared by the step's own check, no canonical point
     info = engine.info()
     assert info["canonical_points"] == 0
     assert info["polar_overflow_steps"] == [4]
-    assert info["overflows_redone"] == 1
-    assert info["overflow_log"] == [{"step": 4, "kinds": ["k-vectors"], "mode": engine.mode}]
-    assert len(calls) == 5  # four steps, one redone
+    kvectors = [entry for entry in info["overflow_log"] if "k-vectors" in entry["kinds"]]
+    assert [(entry["step"], entry["mode"]) for entry in kvectors] == [(4, engine.mode)]
+    assert info["overflows_redone"] == len(info["overflow_log"])  # pipelined: edge-count redos too
+    assert len(calls) >= 5  # four force stages and the redo of step 4
     got, want = engine.sync(), reference.sync()
     for key in want:
         np.testing.assert_allclose(got[key], want[key], rtol=1e-9, atol=1e-10, err_msg=key)
