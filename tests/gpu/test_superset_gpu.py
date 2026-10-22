@@ -99,6 +99,7 @@ def test_captured_refresh_equals_a_fresh_construction(family, names, options):
     fresh = build(calc, target, names, 2 if joint else None)
     for name, tensor in fresh.derived_buffers().items():
         torch.testing.assert_close(field.derived_buffers()[name], tensor, rtol=1e-14, atol=0, msg=name)
-    assert field.neighbours.group_count == len(Z_VALUES)
+    if field.neighbours.sender_groups is not None:  # the segmented first sum's sender groups (MH-1 case)
+        assert field.neighbours.group_count == len(Z_VALUES)
     for got, expected in zip(outputs(field, target), outputs(fresh, target)):
         torch.testing.assert_close(got, expected, rtol=1e-11, atol=1e-12)

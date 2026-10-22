@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="2" time="18.363" timestamp="2026-10-22T13:45:44.399374+02:00" hostname="Fabi-PC"><testcase classname="tests.gpu.test_superset_gpu" name="test_captured_refresh_equals_a_fresh_construction[mh1]" time="14.091" /><testcase classname="tests.gpu.test_superset_gpu" name="test_captured_refresh_equals_a_fresh_construction[residual]" time="1.080"><failure message="assert 1 == 4&#10; +  where 1 = &lt;fastmace.neighbors.skin.SkinNeighbourList object at 0x7df76ff8fb80&gt;.group_count&#10; +    where &lt;fastmace.neighbors.skin.SkinNeighbourList object at 0x7df76ff8fb80&gt; = &lt;fastmace.model.forces.MACEForceField object at 0x7df77424ecb0&gt;.neighbours&#10; +  and   4 = len([8, 11, 17, 26])">family = 'residual'
+names = ('generic_species_skip', 'generic_reassociate', 'generic_fused_radial_backward')
+options = {'embedding_specs': {'total_spin': {'type': 'categorical', 'per': 'graph', 'in_dim': 1, 'emb_dim': 4, ...}, 'total_charge': {'type': 'categorical', 'per': 'graph', 'in_dim': 1, 'emb_dim': 4, ...}}}
+
+    @pytest.mark.parametrize("family, names, options", CASES, ids=[case[0] for case in CASES])
+    def test_captured_refresh_equals_a_fresh_construction(family, names, options):
+        from _support.tiny_models import FAMILIES, tiny_mace_calculator
+    
+        calc = tiny_mace_calculator(Z_VALUES, device="cuda", **{**FAMILIES[family], **options,
+                                                                "atomic_energies": np.array([-1.25, -2.5, -3.75, -5.125])})
+        joint = "embedding_specs" in options
+        atoms = structure()
+        field = build(calc, atoms, names, 0 if joint else None)
+        registry = DerivedStateRegistry()
+        field.register_derived(registry)
+        outputs(field, atoms)
+        addresses = {name: registry[name].buffer.data_ptr() for name in registry.names()}
+    
+        stream = torch.cuda.Stream()
+        stream.wait_stream(torch.cuda.current_stream())
+        with torch.cuda.stream(stream):  # warm-up outside the capture, as the engine does
+            for name in registry.names():
+                registry[name].refresh()
+        torch.cuda.current_stream().wait_stream(stream)
+        graph = torch.cuda.CUDAGraph()
+        with torch.cuda.graph(graph):
+            for name in registry.names():
+                registry[name].refresh()
+    
+        target = atoms.copy()
+        numbers = target.numbers.copy()
+        numbers[0], numbers[1] = atoms.numbers[1], atoms.numbers[0]
+        numbers[[5, 9]] = 26  # the absent, last superset species
+        target.numbers = numbers
+        charges = np.zeros(len(atoms))
+        if joint:
+            charges[[2, 7]] = 1.0
+            target.set_initial_charges(charges)
+        field.check_species(target.numbers)
+        field.atomic_numbers.copy_(torch.as_tensor(target.numbers))
+        field.charges.copy_(torch.as_tensor(charges))
+        graph.replay()
+        torch.cuda.synchronize()
+        assert {name: registry[name].buffer.data_ptr() for name in registry.names()} == addresses
+    
+        fresh = build(calc, target, names, 2 if joint else None)
+        for name, tensor in fresh.derived_buffers().items():
+            torch.testing.assert_close(field.derived_buffers()[name], tensor, rtol=1e-14, atol=0, msg=name)
+&gt;       assert field.neighbours.group_count == len(Z_VALUES)
+E       assert 1 == 4
+E        +  where 1 = &lt;fastmace.neighbors.skin.SkinNeighbourList object at 0x7df76ff8fb80&gt;.group_count
+E        +    where &lt;fastmace.neighbors.skin.SkinNeighbourList object at 0x7df76ff8fb80&gt; = &lt;fastmace.model.forces.MACEForceField object at 0x7df77424ecb0&gt;.neighbours
+E        +  and   4 = len([8, 11, 17, 26])
+
+tests/gpu/test_superset_gpu.py:102: AssertionError</failure></testcase></testsuite></testsuites>

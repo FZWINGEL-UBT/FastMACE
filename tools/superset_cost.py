@@ -60,7 +60,9 @@ def _sha256(path):
 def main(argv=None):
     args = parse_args(argv)
     protocol = step_time.TimingProtocol(warmup=args.warmup, block=args.block, blocks=args.blocks)
+    from fastmace.model import compile as compiling
     from fastmace.model import loading
+    allocator = compiling.configure_allocator()  # before the first CUDA allocation (the engine checks it)
     oeq_runtime = str(loading.prepare_hybrid()) if args.backend == "hybrid" else None
     if ab_step_time.gpu_processes():
         raise RuntimeError("GPU must be idle")
@@ -78,7 +80,7 @@ def main(argv=None):
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, checkpoint=str(checkpoint),
                 checkpoint_sha256=_sha256(checkpoint), backend=args.backend,
                 dtype="float32" if args.backend == "hybrid" else "float64", temperature_K=args.temperature_K,
-                protocol=protocol.as_dict(), pattern=args.pattern, oeq_runtime=oeq_runtime,
+                protocol=protocol.as_dict(), pattern=args.pattern, oeq_runtime=oeq_runtime, cuda_allocator=allocator,
                 gpu=torch.cuda.get_device_name(0), torch=torch.__version__, sides={})
     path = args.output / "metadata.json"
 
