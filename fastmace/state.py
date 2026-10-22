@@ -24,11 +24,9 @@ if TYPE_CHECKING:
     import torch
 
 # SPEC §10.6 state that SimulationState does not carry yet, with where it is instead. Plan task
-# 1b-T05 added the rest (charges, total charge, spin, PBC, constraints, barostat, protocol, force-field
-# identity and plan revision); the MC state comes with MC in phase 3.
-FIELDS_ADDED_IN_1B = {
-    "mc": "MC move set, cycle position, counters and step sizes (phase 3)",
-}
+# 1b-T05 added charges, total charge, spin, PBC, constraints, barostat, protocol, force-field identity
+# and plan revision; plan task 3-T08 the MC state (``mc``). Nothing is missing.
+FIELDS_ADDED_IN_1B: dict[str, str] = {}
 
 IDENTITY_SCHEMA = "fastmace.identity/1"
 FORCE_PRECISIONS = ("float32", "float64")
@@ -213,7 +211,9 @@ class SimulationState:
     - ``protocol``: the schedule with its position and target, an object with ``to_restart()``
       (a JSON-safe dict) and a ``from_restart(dict)`` class method (plan task 1b-T07), or ``None``;
     - ``plan_revision``: the active plan revision (§9.5);
-    - ``force_field_identity``: the ``ForceFieldIdentity`` of the force field, or ``None``.
+    - ``force_field_identity``: the ``ForceFieldIdentity`` of the force field, or ``None``;
+    - ``mc``: the attached move set's state, a JSON-safe dict with ``io.restart.MC_RECORD_KEYS``
+      (``MCDriver.state_dict()``, plan tasks 3-T09 and 3-T10), or ``None`` without MC (plan task 3-T08).
     """
 
     positions: torch.Tensor
@@ -236,6 +236,7 @@ class SimulationState:
     protocol: Any = None
     plan_revision: int = 0
     force_field_identity: ForceFieldIdentity | None = None
+    mc: dict[str, Any] | None = None
 
     @classmethod
     def from_atoms(cls, atoms: Any, device: Any, seed: int, compute_stress: bool = False) -> SimulationState:
