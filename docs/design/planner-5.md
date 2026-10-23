@@ -26,10 +26,10 @@ planner decision, tier, rewrite, size or step changes with this task.
 | 5 | hard | — | `reproducible-tier`, `reproducible-family-not-qualified`, `reproducible-backend`, `reproducible-conv-fusion`, `reproducible-cueq-version`, `reproducible-kernel-not-deterministic`, `reproducible-qualified`, `reproducible-environment`, `backend-cueq-reproducible` |
 | 6 | hard | `allow_naive_cueq` | `naive-cueq`, `fused-cueq`, `allow-naive-cueq` |
 | 7 | hard | — | `atom-count-changes` |
-| 8 | preference | — | `superset` |
+| 8 | preference | — | `superset`, `species-changes` (5-T02) |
 | 9 | preference | — | `host-callbacks-graph-sync`, `host-callbacks-compiled`, `no-host-callbacks` |
 | 10 | preference | — | `rule-10-optimizer` |
-| 11 | preference | — | `rule-11`, `rule-11-fixed`, `rule-11-md-only`, `rule-11-optimizer`, `rule-11-d3`, `rule-11-d3-given` |
+| 11 | preference | — | `rule-11`, `rule-11-fixed`, `rule-11-md-only`, `rule-11-optimizer`, `rule-11-d3` (an explicit value is an `override`, 5-T02) |
 | 12 | preference | — | `rule-12-d3`, `rule-12-d3-memory`, `rule-12-d3-warn`, `rule-12-memory` (reserved for 5-T03's estimate) |
 | 13 | reaction | — | `selfcheck-failed`, `selfcheck-dependant` |
 | 14 | reaction | — | `fallback-exhausted`, `fallback-rewrite-off`, `fallback-rewrite-on`, `runner-subprocess-fallback` |
@@ -70,6 +70,18 @@ failure that passes fails the suite, so neither list can go stale.
 
 `pytest.mark.rule(n)` (`pyproject.toml`): the test checks rule n. A test may carry several. The meta-test
 finds them statically in `tests/`.
+
+`pytest.mark.precedence(a, b)` (5-T02): the test checks that rule `a` wins over `b`, a later rule,
+`"override"` (a user's explicit value) or an `allow_*` flag. `test_rules_meta.PAIRS` lists 5-T02's matrix;
+the meta-test checks that every pair has a marked test and every marked pair is listed. 5-T03 (rule 5
+against the MACE model's rule 12) and 5-T07 (rule 5 against adaptation) add their pairs.
+
+**After 5-T02:** `NUMBERLESS` is empty; `UNTESTED` holds rule 15 until 5-T04 emits and tests it. The suite is
+`tests/cpu/test_rules_{hard,preferences,reactions,precedence}.py`; `tests/_support/rule_cases.assert_conforms`
+runs `check_reason` on every reason of a plan or refusal, which covers reasons built elsewhere and passed
+through `_Book.refuse` (the static scan cannot read those). The overrides of rule 11 (skin, headroom,
+re-capture budget, D3 skin) use `rules.override`; an explicit `mode="compiled"` keeps `mode-compiled-tier`,
+which the report reads, and says that it was requested.
 
 ## Overrides (choice 4)
 

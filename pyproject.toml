@@ -79,6 +79,7 @@ markers = [
     "acceptance: phase-acceptance test (statistics, timings, research-engine comparisons); also slow",
     "compat: GPU compatibility tier (tests/_support/tiers.py: the fast GPU tier and the listed slow tests)",
     "rule(n): checks SPEC §9.3 rule n (fastmace/planner/rules.py); tests/cpu/test_rules_meta.py counts them",
+    "precedence(a, b): checks that rule a wins over rule b (SPEC §9.3 order); test_rules_meta.py checks its PAIRS",
 ]
 # Deprecations raised inside third-party packages (MACE/e3nn TorchScript, matplotlib's pyparsing
 # calls, torch's pynvml import); warnings from our own code stay visible.

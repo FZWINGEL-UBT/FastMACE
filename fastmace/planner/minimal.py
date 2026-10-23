@@ -60,7 +60,7 @@ from fastmace.config import EngineConfig, IntegratorConfig, NeighbourConfig, Pol
 from fastmace.errors import ModelElementError, PlanRefused, Reason, SpeciesNotInSuperset
 from fastmace.rewrites import versions
 
-from . import fixed
+from . import fixed, rules
 from . import reproducible as reproducible_mode
 from .plan import Hardware, Plan, SelfCheck, SoftwareTraits
 
@@ -75,8 +75,10 @@ RULE_9_REASON = ("rule 9 (decision 38): host callbacks keep the graph tier, with
 # The modes with an MD tier, and their mode decision.
 MODE_TIERS = {
     "graph": Reason("molecular dynamics on the graph tier (SPEC §8.1)", code="mode-graph"),
-    "compiled": Reason("molecular dynamics on the compiled tier (mode='compiled'): the graph plan's backend, "
-                       "rewrites and precision on the compiled model, without CUDA graphs (SPEC §8.2)",
+    # An explicit mode= overrides the tier rules 4 and 9 would choose; it keeps its own code (5-T02).
+    "compiled": Reason("molecular dynamics on the compiled tier (mode='compiled', requested; without it rules 4 and "
+                       "9 would give the graph tier unless padding is inexact): the graph plan's backend, rewrites "
+                       "and precision on the compiled model, without CUDA graphs (SPEC §8.2)",
                        code="mode-compiled-tier"),
     "eager": Reason("molecular dynamics on the eager tier: the graph plan's backend, rewrites and precision, "
                     "without CUDA graphs or compilation (SPEC §8.3)", code="mode-eager-tier"),
@@ -350,7 +352,7 @@ class MinimalPlanner:
             if request == "hybrid":
                 return "hybrid", Reason("requested 'hybrid'", code="backend-hybrid")  # refused by rule 5
             return "cueq", Reason("reproducible=True: plain cuEq, the only qualified backend (SPEC §9.3 rule 5)",
-                                  code="backend-cueq-reproducible")
+                                  rule=5, code="backend-cueq-reproducible")
         compiled = engine.compile_mode != "none"
         family = self.process.family
         if self._device_type() != "cuda":
@@ -410,7 +412,7 @@ class MinimalPlanner:
                          rule=8, code="superset")
         else:
             why = Reason("the structure's species" if species is None else "declared (species=), equal to the "
-                         "structure's", code="superset")
+                         "structure's", rule=8, code="superset")
         book.decide("superset", _symbols(superset), why)
         effective, promoted = versions.effective_precision(precision, polar_model=traits.polar,
                                                            float64_energy=self.precision.float64_energy)
@@ -441,7 +443,7 @@ class MinimalPlanner:
             ("allowed: " + "; ".join(problems)) if problems and allow_naive_cueq else
             ("requested; the fused kernels load" if allow_naive_cueq else "not needed: no naive cuEq kernel")
             if not problems else "refused: naive cuEq kernels",
-            code="allow-naive-cueq" if problems else "fused-cueq"))
+            rule=6, code="allow-naive-cueq" if problems else "fused-cueq"))
         return superset, effective, requested
 
     def _qualify(self, plan, traits):
@@ -572,7 +574,7 @@ class MinimalPlanner:
         book.decide("allow_reference", "on" if allow_reference else "off", Reason(
             "allowed (SPEC §9.3 rule 1); the reference tier runs FastMACE's integrators, so it lifts no refusal of "
             "§4.4 (3D PBC, no constraints, a barostat for a variable cell)" if allow_reference else "not requested",
-            code="allow-reference" if allow_reference else "no-allow-reference"))
+            rule=1, code="allow-reference" if allow_reference else "no-allow-reference"))
         npt = optimizer.variable_cell if optimizer is not None else integrator.ensemble == "npt"
         if variable_cell and not npt:
             book.refuse(f"a variable cell needs a barostat integrator, got ensemble={integrator.ensemble!r} "
@@ -772,14 +774,13 @@ class MinimalPlanner:
         sized = rule_11_d3(max_temperature_K=workload.max_temperature_K, lightest_mass_u=min(masses),
                            timestep_fs=integrator.timestep_fs, natoms=len(atoms), cutoff_A=cutoff_A,
                            strain_rate_per_fs=rate)
-        if self.neighbours.d3_skin == "auto":
-            skin = sized.skin_A
+        skin = sized.skin_A if self.neighbours.d3_skin == "auto" else float(self.neighbours.d3_skin)
+        if skin == sized.skin_A:  # "auto", or a requested value equal to the rule's: no override (choice 4)
             why = Reason(fixed._why("auto", fixed.AUTO_RULES["NeighbourConfig.d3_skin"], sized.text()), rule=11,
                          code="rule-11-d3")
         else:
-            skin = float(self.neighbours.d3_skin)
-            why = Reason(f"{skin:g} A kept as given (rule 11 is a preference); rule 11 would give {sized.text()}",
-                         rule=11, code="rule-11-d3-given")
+            why = rules.override(11, f"{sized.skin_A:g} A", detail=f"NeighbourConfig.d3_skin={skin:g} A kept as "
+                                 f"given; the rule: {sized.text()}")
         book.decisions[:] = [entry for entry in book.decisions if entry[0] != "NeighbourConfig.d3_skin"]
         book.decide("NeighbourConfig.d3_skin", f"{skin:g} A", why)
         memory = rule_12_d3(natoms=len(atoms), volume_A3=float(atoms.get_volume()), radius_A=cutoff_A + skin,
@@ -821,7 +822,8 @@ class MinimalPlanner:
         book.decide("workload.max_temperature_K", f"{workload.max_temperature_K:g} K", why)
         every = workload.host_callbacks_every
         if every is None:
-            book.decide("workload.host_callbacks_every", "none", Reason("no host callbacks", code="no-host-callbacks"))
+            book.decide("workload.host_callbacks_every", "none", Reason("no host callbacks", rule=9,
+                                                                        code="no-host-callbacks"))
         elif mode == fixed.COMPILED_TIER:
             book.decide("workload.host_callbacks_every", f"compiled, host callbacks every {every} steps", Reason(
                 "the compiled tier (rule 4 or mode='compiled') launches every step from the host, so a callback "
@@ -833,8 +835,11 @@ class MinimalPlanner:
         book.decide("workload.mc_moves", moves, Reason(
             "no MC" if not workload.mc_moves else "MC moves are attached through Simulation.run(mc=...) (SPEC §7.6)",
             code="no-mc" if not workload.mc_moves else "mc-moves"))
-        book.decide("workload.species_changes", "on" if workload.species_changes else "off",
-                    "rule 8 is not in 1b: species-dependent rewrites are built for the structure's species")
+        book.decide("workload.species_changes", "on" if workload.species_changes else "off", Reason(
+            "graph mode stays allowed; species-dependent rewrites and tables are built for the superset (SPEC §9.3 "
+            "rule 8, 3-T02)" if workload.species_changes else
+            "no species changes: species-dependent rewrites are built for the superset (SPEC §9.3 rule 8)",
+            rule=8, code="species-changes"))
         book.decide("workload.needs_per_atom", ", ".join(sorted(workload.needs_per_atom)) or "none", "recorded")
 
     def plan_evaluation(self, force_field, atoms, hardware: Hardware | None = None, *,

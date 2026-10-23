@@ -278,12 +278,13 @@ def decisions(qualification: Qualification, versions: Mapping[str, str | None]) 
               f"; cuequivariance_ops {version or 'none'} (no uniform_1d kernel in use)")
     verdict = Reason(f"plain cuEq {qualification.family}, unfused convolution, deterministic flags; "
                      f"{len(qualification.entries)} components on the allow-list" + pinned,
-                     code="reproducible-qualified")
+                     rule=5, code="reproducible-qualified")
     environment = " ".join(f"{name}={value}" for name, value in PROCESS_ENVIRONMENT.items())
     return (("reproducible", f"qualified ({qualification.backend}, {qualification.family})", verdict),
             ("reproducible.environment", environment,
              Reason("set together with torch.use_deterministic_algorithms(True) before CUDA starts (SPEC §8.7, "
-                    "owner decision 14); passed to the subprocess runner's children", code="reproducible-environment")))
+                    "owner decision 14); passed to the subprocess runner's children", rule=5,
+                    code="reproducible-environment")))
 
 
 # --------------------------------------------------------------------------- the process

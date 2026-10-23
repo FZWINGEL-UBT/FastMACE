@@ -68,12 +68,12 @@ RULES: tuple[Rule, ...] = (
     Rule(6, "hard", "cuEquivariance's fused kernels do not load", ("naive-cueq", "fused-cueq", "allow-naive-cueq"),
          allow="allow_naive_cueq"),
     Rule(7, "hard", "atom-count changes: not in 1.0", ("atom-count-changes",)),
-    Rule(8, "preference", "species changes keep graph mode; superset build", ("superset",)),
+    Rule(8, "preference", "species changes keep graph mode; superset build", ("superset", "species-changes")),
     Rule(9, "preference", "host callbacks keep the graph tier (decision 38)", (
         "host-callbacks-graph-sync", "host-callbacks-compiled", "no-host-callbacks")),
     Rule(10, "preference", "stress path and k-headroom from the integrator or optimiser", ("rule-10-optimizer",)),
     Rule(11, "preference", "skin, headroom and re-capture budget; D3 and displacement skins", (
-        "rule-11", "rule-11-fixed", "rule-11-md-only", "rule-11-optimizer", "rule-11-d3", "rule-11-d3-given")),
+        "rule-11", "rule-11-fixed", "rule-11-md-only", "rule-11-optimizer", "rule-11-d3")),
     # 5-T03 adds the MACE model's estimate ("rule-12-memory") and the action's codes once D1 is decided.
     Rule(12, "preference", "GPU memory: drop memory-heavy rewrites or warn", (
         "rule-12-d3", "rule-12-d3-memory", "rule-12-d3-warn", "rule-12-memory")),
