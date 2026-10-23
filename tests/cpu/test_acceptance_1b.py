@@ -462,6 +462,47 @@ def test_library_gate_args_and_record():
     json.dumps(record)
 
 
+def _gate_runner(cases):
+    """A stand-in for subprocess.run: per ensemble, (status in the RESULT line or None for no line, exit code)."""
+    def run(argv, stdout, **kwargs):
+        status, code = cases[argv[argv.index("case") + 1]]
+        if status is not None:
+            stdout.write("RESULT " + json.dumps({"ensemble": argv[argv.index("case") + 1], "status": status}) + "\n")
+        else:
+            stdout.write("FileNotFoundError: checkpoint MACE-POLAR-1-S.model not found\n")
+        return types.SimpleNamespace(returncode=code)
+
+    return run
+
+
+@pytest.mark.parametrize("cases,status", [
+    ({"nvt": ("passed", 0), "npt": ("passed", 0)}, 0),
+    ({"nvt": ("passed", 0), "npt": ("failed", 0)}, 1),          # a gate that ran and failed
+    ({"nvt": ("passed", 0), "npt": (None, 1)}, 2),               # a case that errored (missing checkpoint)
+    ({"nvt": ("passed", 3), "npt": ("passed", 0)}, 2),           # a child that crashed after its result line
+], ids=["passed", "gate-failed", "case-error", "child-exit"])
+def test_library_gate_exit_status_is_red_unless_every_case_passed(tmp_path, cases, status):
+    """4-T12: a run whose cases errored (the first Modal try: no checkpoint on the volume) exited 0."""
+    argv = ["--output", str(tmp_path / "out"), "--model", "polar1-s", "--structure", "NaCl"]
+    meta = library_gate.main(argv, runner=_gate_runner(cases))
+    assert library_gate.exit_status(meta) == status
+    assert meta["passed"] == (status == 0)
+    assert library_gate.exit_status({"cases": {}}) == 2  # nothing ran is not a pass
+
+
+def test_library_gate_exits_non_zero_without_the_checkpoint(tmp_path):
+    """The real tool, end to end on the CPU: no checkpoint under FASTMACE_MODELS, so every case errors."""
+    env = dict(os.environ, FASTMACE_MODELS=str(tmp_path / "no-models"), CUDA_VISIBLE_DEVICES="",
+               PYTHONPATH=os.pathsep.join([str(TOOLS.parent), os.environ.get("PYTHONPATH", "")]))
+    done = subprocess.run([sys.executable, str(TOOLS / "library_gate.py"), "--output", str(tmp_path / "out"),
+                           "--model", "polar1-s", "--structure", "NaCl", "--ensembles", "nvt"],
+                          env=env, capture_output=True, text=True, timeout=600, check=False)
+    assert done.returncode == 2, done.stdout + done.stderr
+    meta = json.loads((tmp_path / "out" / "metadata.json").read_text())
+    assert meta["cases"]["nvt"]["status"] == "error" and not meta["passed"]
+    assert "not found" in (tmp_path / "out" / "nvt.log").read_text()
+
+
 class _FakeSimulation:
     def __init__(self):
         from fastmace.planner import selfcheck

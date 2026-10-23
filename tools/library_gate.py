@@ -9,7 +9,9 @@ process of this tool, so the gate's references run in-process before any product
 
 The acceptance criterion is ``status == "passed"`` for every label on one counting structure (plan
 1b, acceptance item 1). Output: <output>/metadata.json with each case's gate record, plan, setup times
-and the child's log.
+and the child's log. Exit status (``exit_status``): 0 only when every case passed; 1 when a gate ran and did
+not pass; 2 when a case errored (no result, e.g. a missing checkpoint, or a non-zero child exit) or none ran.
+4-T12: before, a run whose cases all errored exited 0.
 """
 
 from __future__ import annotations
@@ -114,14 +116,25 @@ def main(argv=None, runner=subprocess.run):
         lines = [line for line in log.read_text().splitlines() if line.startswith("RESULT ")]
         case = json.loads(lines[-1][7:]) if lines else dict(ensemble=ensemble, status="error")
         case.update(exit_code=done.returncode, log=str(log))
+        if done.returncode != 0:
+            case["status"] = "error"
         meta["cases"][ensemble] = case
         save()
-    meta["passed"] = all(case.get("status") == "passed" for case in meta["cases"].values())
+    meta["passed"] = exit_status(meta) == 0
     meta["status"] = "complete"
     meta["finished_utc"] = datetime.now(timezone.utc).isoformat()
     save()
     return meta
 
 
+def exit_status(meta):
+    """0 when every case passed; 2 when any case errored or none ran; 1 otherwise (a gate that did not pass)."""
+    cases = list(meta["cases"].values())
+    if not cases or any(case.get("status") == "error" for case in cases):
+        return 2
+    return 0 if all(case.get("status") == "passed" for case in cases) else 1
+
+
 if __name__ == "__main__":
-    main()
+    result = main()
+    sys.exit(exit_status(result) if "cases" in result else 0)

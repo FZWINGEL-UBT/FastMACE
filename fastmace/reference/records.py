@@ -9,15 +9,21 @@ entries of §12.1, and a fifth list for the numerical treatment of the yardstick
   ``cuda:0``) and MACE PR 1498's one-graph strain, the stress formula of the production path;
 - ``upstream_fixes``: defects upstream fixed after the pinned version, each with its independent
   validation. Today one: the PolarMACE stress (MACE issue 1642, PR 1718), validated by finite
-  differences of the reference energy on NaCl 3x3x3. It is required for every PolarMACE record
-  on MACE 0.3.16, and retired by the record of a MACE that contains it;
+  differences of the reference energy with the k-set frozen, on NaCl and NbCl5 3x3x3. It is
+  required for every PolarMACE record on MACE 0.3.16, and retired by the record of a MACE that
+  contains it;
 - ``optional_physics``: opt-in model changes, applied to the reference too and labelling the
   results non-stock. PR 1762 (Fukui regularisation, dipole cap) and D3 (MACE plus torch-dftd on the
   ``fm.D3`` record's numbers, 3b-T04) are accepted;
 - ``integrator_corrections``: today the full-cell BAOAB drag, with 1b-T09's qualification
   (``fastmace.reference.integrators.QUALIFICATION``);
 - ``numerical``: float64 accumulation of the yardstick's energy (§12.1 "Energy accumulation in
-  the references"), a treatment of the reference, not of the model.
+  the references"), a treatment of the reference, not of the model; for PolarMACE also the gate's
+  stress floor of 5e-7 eV/A^3 (§12.3, decision 49), a treatment of the comparison.
+
+A qualified record's entries are fixed: a change is a new record, and the old id goes into
+``SUPERSEDED`` with the reason (4-T12: the PolarMACE record of 1b, by the stress floor and the
+restated issue 1642 validation).
 
 The record id is ``fastmace.reference/<mace version>/<family>/<digest>``, the digest a SHA-256 of
 the canonical JSON of every field, so any change of any entry changes it. It enters the
@@ -65,11 +71,10 @@ STOCK = {
     "source": "1a-T19's gate references (run 1a-T19-gate-leto-20261018)",
 }
 
-# The entry's text enters the qualified record's id (restart files and metadata carry it), so it stays as
-# 1b qualified it. Its validation is now wider than it says: since 4-T11, check_stress_fix holds the
-# unstrained cell's k-set and runs on any structure, and the open NbCl5 finding is resolved (3b-T08: the
-# finite-difference reference stepped where a k-vector crossed the hard k-space cutoff; the stress is
-# exact, 8.3e-9 eV/A^3 with the k-set frozen). A new qualified record version would restate both.
+# Restated in 4-T11/4-T12's record version (the 1b text is in tests/cpu/test_versioned_registry.py): the
+# self-test holds the unstrained cell's k-set since 4-T11, so it validates the stress on any structure, and
+# 3b-T08 resolved the NbCl5 finding (the finite-difference reference stepped where a k-vector crossed the hard
+# k-space cutoff; the stress itself is exact).
 POLAR_STRESS_FIX = {
     "name": "polar_kspace_stress",
     "issue": "MACE issue 1642",
@@ -78,16 +83,20 @@ POLAR_STRESS_FIX = {
     "implementation": "fastmace.longrange.polar: enable() before the first evaluation, the class-level forward "
                       "active (no instance forward stored)",
     "validation": {
-        "method": "central finite differences of the reference energy",
-        "structure": "NaCl 3x3x3",
+        "method": "central finite differences of the reference energy, with the unstrained cell's included k-set "
+                  "held fixed (fastmace.longrange.polar.frozen_kset, 4-T11)",
+        "structures": ["NaCl 3x3x3", "NbCl5 3x3x3"],
         "strain": 1e-4,
         "tolerance_eV_per_A3": 1e-6,
-        "result": "corrected reference <= 8.1e-9 eV/A^3, MACE 0.3.16's own stress 2e-5 eV/A^3 off (1a-T19)",
-        "probe": "ResearchModule studies/other_models/probes/polar_stress_probe.py",
+        "result": "corrected float64 reference against finite differences: NaCl 3x3x3 6.9e-9 eV/A^3 (1a-T19: <= "
+                  "8.1e-9), NbCl5 3x3x3 (1944 atoms, the gate's hydrostatic-0 configuration) 8.3e-9 (4-T11); MACE "
+                  "0.3.16's own stress 2e-5 eV/A^3 off on NaCl (1a-T19)",
+        "probe": "ReferenceCalculator.check_stress_fix (fastmace.reference.calculators), on the run's own structure; "
+                 "first ResearchModule studies/other_models/probes/polar_stress_probe.py",
     },
-    "open_findings": [
-        "NbCl5 3x3x3: the corrected float64 POLAR-1-S stress differs from finite differences by 4.4e-4 eV/A^3 "
-        "(about 3%); validated on NaCl 3x3x3 only, to be resolved in phase 3b before PolarMACE NPT is recommended",
+    "resolved_findings": [
+        "NbCl5 3x3x3: 4.4e-4 eV/A^3 against live finite differences was a step of the energy where a Bragg "
+        "k-vector crosses the hard k-space cutoff, not a stress defect; 8.3e-9 with the k-set frozen (3b-T08, 4-T11)",
     ],
     "retire_when": "the pinned MACE contains PR 1718; the record then states plain stock equivalence",
 }
@@ -148,8 +157,9 @@ POLAR_GATE_FLOOR = {
 SUPERSEDED = {
     "fastmace.reference/0.3.16/polar/8e216bde0c3515e9":
         "the PolarMACE record of phases 1b-3b, superseded in 4-T12 by "
-        "fastmace.reference/0.3.16/polar/55cffb303c6d2e25, which adds the gate's PolarMACE stress floor "
-        "(polar_float32_stress_floor, SPEC §18 decision 49) and nothing else",
+        "fastmace.reference/0.3.16/polar/1b78dc6383d5150e, which adds the gate's PolarMACE stress floor "
+        "(polar_float32_stress_floor, SPEC §18 decision 49) and restates the issue 1642 validation (NaCl and "
+        "NbCl5 with the k-set frozen, the NbCl5 finding resolved by 3b-T08 and 4-T11)",
 }
 
 
