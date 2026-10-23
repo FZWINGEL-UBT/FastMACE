@@ -44,6 +44,13 @@ MC (plan task 3-T15, SPEC §7.6): ``run(mc=…)`` attaches a move set to the sim
 that step's output and restart, with ``_mc_block_active`` set for the restart guard. The streams,
 counters and cycle position carry across a detach and re-attach, and across a restart (attached:
 the restart's ``mc`` record; detached: ``simulation.json``).
+
+Runtime monitor (plan task 5-T06, SPEC §9.6): ``_observe`` reads the engine's counters into
+``planner.adapt.Monitor`` after each restart write, MC block and host write (canonical points) and at the
+end of each ``run()`` call, moments that synchronise anyway; the first ``run()`` takes the baseline, so
+the setup's captures are not counted. ``counters.segments`` and ``counters.neighbour_lists`` record it,
+and the report's ``runtime`` line appears once re-captures or overflows happened. Under the subprocess
+runner the child's monitor reports each call's segments to the parent's.
 """
 
 from __future__ import annotations
@@ -477,6 +484,9 @@ class Simulation:
         self._host_writes = 0
         self._sinks = []  # (interval, sink): add_sink
         self._runner = None  # the subprocess runner of a plan that runs in a child (2-T07)
+        from fastmace.planner import adapt
+
+        self._monitor = adapt.Monitor(options.adaptation)  # the runtime monitor (5-T06), empty on a resume
         setup = {}
 
         planner = _planner(minimal.default_planner(ff), options)
@@ -918,6 +928,7 @@ class Simulation:
             self._mc_block_s += self._synchronised_time() - started
         if block is None:
             return
+        self._observe("mc-block")  # the block ended at a canonical point, synchronised just above
         self._mc_blocks += 1
         if self._mc_untimed is driver:  # its first block's time includes the attempts' captures (T09)
             self._mc_untimed = None
@@ -1007,6 +1018,8 @@ class Simulation:
                 self._submit_output(0, row=True, frame=frame_every is not None)
         self._status = "running"
         self._run_started = time.perf_counter()
+        if not self._monitor.started:  # counted from the first step: the setup's captures are not in it
+            self._monitor.start(self._monitor_info(), step=int(engine.state.step), wall_s=self._loop_s)
         resolved = position.resolved if position is not None else None
         driver = self._mc
         if driver is not None:  # the steps of this call, run with the move set attached
@@ -1052,6 +1065,7 @@ class Simulation:
         except NonFiniteError:
             self._status = "non-finite"
             self._stop_clock(synchronised_clock, count_steps=engine.state.step)
+            self._observe("run-end", canonical=False)
             if self._writer is not None:
                 self._writer.flush()
             self._write_metadata()
@@ -1059,6 +1073,7 @@ class Simulation:
         except CellDivergedError:
             self._status = "cell-diverged"
             self._stop_clock(synchronised_clock, count_steps=engine.state.step)
+            self._observe("run-end", canonical=False)
             if output is not None and not self._mc_block_active and not engine.uncommitted():
                 self.save_restart(Path(output.directory) / RESTART_NAME)  # the state at the stop (also metadata)
             else:
@@ -1068,6 +1083,7 @@ class Simulation:
             raise
         self._stop_clock(synchronised_clock, count_steps=engine.state.step)
         self._status = "paused"
+        self._observe("run-end", canonical=False)
         if self._mc_record is not None or self._mc is not None:
             if self._mc is not None:
                 self._mc_record = self._mc.state_dict()
@@ -1084,6 +1100,45 @@ class Simulation:
         self._loop_s = clock()
         self._run_started = None
         self._steps_run = count_steps - self._report.start_step
+
+    # ------------------------------------------------------------------ runtime monitor (§9.6; 5-T06)
+
+    def _loop_clock(self):
+        """The run's loop time so far, without a synchronisation: read only where one just happened."""
+        if self._run_started is None:
+            return self._loop_s
+        return self._loop_s + (time.perf_counter() - self._run_started)
+
+    def _monitor_info(self):
+        """The engine's cumulative counters for the monitor, with the D3 term's under ``"d3"``."""
+        engine = self._engine
+        counters = getattr(engine, "runtime_counters", None)
+        info = dict(counters() if counters is not None else engine.info())
+        d3 = getattr(engine.force_field, "d3", None)
+        if d3 is not None and callable(getattr(d3, "counters", None)):
+            info["d3"] = d3.counters()
+        return info
+
+    def _observe(self, reason, canonical=True):
+        """Close the monitor's segment at the committed step (module docstring). Called right after a moment
+        that synchronised: a restart write, an MC block, a host write's re-evaluation (canonical points, at a
+        committed step outside an MC block), or the end of ``run()`` (``canonical=False``)."""
+        from fastmace.planner import adapt
+
+        if self._engine is None:  # a plan run in a child: the child's monitor observes, the runner absorbs
+            return
+        monitor = self._monitor
+        monitor.observe(self._monitor_info(), step=int(self._engine.state.step), wall_s=self._loop_clock(),
+                        reason=reason, canonical=canonical)
+        request = monitor.decide(monitor.window())  # noqa: F841  (5-T07 acts on it, at a canonical point)
+        self._report.runtime = adapt.report_line(monitor.totals(), getattr(self._engine, "recapture_budget", None))
+
+    def _monitor_counters(self):
+        """``counters.segments`` and ``counters.neighbour_lists`` from the monitor (``None`` before a segment)."""
+        neighbours = self._plan.neighbours if self._plan is not None else None
+        skins = {} if neighbours is None else {"mace_skin_A": neighbours.skin, "d3_skin_A": neighbours.d3_skin}
+        skins = {key: value if isinstance(value, (int, float)) else None for key, value in skins.items()}
+        return {"segments": self._monitor.records(), "neighbour_lists": self._monitor.neighbour_lists(**skins)}
 
     # ------------------------------------------------------------------ output
 
@@ -1228,7 +1283,8 @@ class Simulation:
         return provenance.metadata_record(
             checkpoint=self.force_field.model, identity=self.force_field.identity, plan=plan, seed=self.seed,
             generators={"integrator": state.rng.generator}, cursors={"integrator": int(state.rng.cursor)},
-            schedule=self._schedule, gate=self._gate, counters={"mc": self._mc_counters()},
+            schedule=self._schedule, gate=self._gate,
+            counters={"mc": self._mc_counters(), **self._monitor_counters()},
             engine_info=self._engine.info(),
             restart_points=self._restart_points, setup=self._setup_s, timing=timing, report=self._report,
             device=str(self._engine.device), force_field=self._engine.force_field)
@@ -1312,6 +1368,7 @@ class Simulation:
             if not self._restart_points or self._restart_points[-1] != point:
                 self._restart_points.append(point)
         _write_json(path.parent / SIMULATION_NAME, self._simulation_record(path.parent))
+        self._observe("restart")  # after the write: the engine is canonical and synchronised
         self._write_metadata()
 
     def _check_restart_point(self):
@@ -1429,7 +1486,8 @@ class Simulation:
                      workload=_workload(record["workload"]), output=None, seed=record["seed"], check=check,
                      allow_naive_cueq=record["allow_naive_cueq"], mode=options.mode,
                      allow_reference=options.allow_reference, fallback=options.fallback, gate=options.gate,
-                     runner=options.runner, engine=options.engine, neighbours=options.neighbours)
+                     runner=options.runner, engine=options.engine, neighbours=options.neighbours,
+                     adaptation=options.adaptation)
         del sim._resuming
         sim.__dict__.pop("_resume_plan", None)
         sim._resume(stored, record, output, allow_plan_change, versions, source=directory)
@@ -1649,6 +1707,7 @@ class Simulation:
             if not self._host_writes:
                 self._report.add_warning(HOST_WRITE_WARNING)
             self._host_writes += 1
+        self._observe("host-write")  # the transaction ended at a canonical point (re-evaluated)
 
     def _record_friction(self, friction_per_fs):
         """The public integrator record, its config and the plan's follow a friction change (restart records)."""

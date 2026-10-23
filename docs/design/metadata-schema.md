@@ -78,7 +78,7 @@ Top-level keys, in order. "Source" is the input of `metadata_record`.
 | `integrator` | integrator parameters | `integrator`, default the plan's `IntegratorConfig` |
 | `schedule` | the schedule and its position | `schedule`: a mapping or `to_restart()` (T07) |
 | `gate` | `status`, `reason`, `selfchecks`, `device`, `reduced_cell`, `steps`, and the rest of the gate record (2-T05: `copies`, `quantities`, `references`, `seconds`, `replay`, …). `selfchecks` defaults to the plan's per-record self-checks (2-T04 `SelfCheck`: `name`, `passed`, `max_relative_error`, `threshold`, `modules`, `dtype`, `detail`) | `gate`; default `{"status": "skipped", "reason": "opt-in: check=\"gate\"", ...}` (D1), with `device` and `reduced_cell` `null` and `steps` `[]` |
-| `counters` | `recaptures`, `neighbour_lists` (`{name: {rebuilds, build_time_s, skin_A}}` for MACE and D3), `overflows_redone`; `mc` (3-T15: `{move: {attempted, impossible, accepted}}`, plus `trial_rebuilds` for `displace`; `null` when no move set was ever attached); `tier_switches` (5-T01: a list of `{step, from, to, reason, revision}`, `[]` without a switch; 5-T07 fills it); `engine` (the engine's `info()`) | `counters`, `engine_info` |
+| `counters` | `recaptures`, `neighbour_lists` (`{name: {rebuilds, build_time_s, skin_A}}` for MACE and D3; 5-T06 fills it from the runtime monitor's totals, MACE's `build_time_s` `null` (its build overlaps on a side stream); `null` before the first `run()`), `overflows_redone`; `mc` (3-T15: `{move: {attempted, impossible, accepted}}`, plus `trial_rebuilds` for `displace`; `null` when no move set was ever attached); `tier_switches` (5-T01: a list of `{step, from, to, reason, revision}`, `[]` without a switch; 5-T07 fills it); `segments` (5-T06: the runtime monitor's last 1,000 segments, `provenance.SEGMENT_KEYS`: `{first_step, last_step, reason, canonical, wall_s, recaptures, recapture_s, captures, capture_s, overflows_redone, budget_exceeded_at, lists}`, `[]` without one); `engine` (the engine's `info()`) | `counters`, `engine_info` |
 | `restart_points` | `[{step, output_chunk, output_rows, output_frames, ...}]` (T06's indices, §10.6) | `restart_points` |
 | `timing` | `setup_s` (`{stage: seconds}`), `setup_total_s`, then the timing summary | `setup`, `timing` |
 | `report` | the run report | `report`: T15's `to_metadata()` or a mapping |
@@ -90,7 +90,8 @@ further: load, plan, rewrites, self-checks, model copy, first compiled call, cap
 record keeps whatever stage names it is given. Values must be seconds ≥ 0.
 
 `counters` takes only the keys listed. `tier_switches` takes `planner.plan.TierSwitch` records or
-mappings with exactly `provenance.TIER_SWITCH_KEYS`. `counters.mc` is checked: known move types only, exactly
+mappings with exactly `provenance.TIER_SWITCH_KEYS`, and `segments` `planner.adapt.Segment` records or
+mappings with exactly `provenance.SEGMENT_KEYS`. `counters.mc` is checked: known move types only, exactly
 those keys.
 
 ## SPEC §13 item by item
@@ -160,6 +161,7 @@ A self-check result marked "cached" is not recorded, because 2-T19 added no qual
 | calibration record | `plan.calibration` | 5-T09 |
 | adaptation limits | `plan.adaptation` | 5-T07 |
 | tier switches | `counters.tier_switches` (no longer `null`) | 5-T07 |
+| runtime monitor segments (within minor 1) | `counters.segments`; `counters.neighbour_lists` filled | 5-T06 |
 
 ## Not in version 1
 

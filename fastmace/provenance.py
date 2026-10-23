@@ -13,6 +13,8 @@ treatments, the gate's device, reduced cell and resource steps, the runner and i
 Phase 5 (plan task 5-T01) adds keys and changes none, so the schema stays version 1 and its minor
 version (``SCHEMA_MINOR``, key ``schema_minor``) becomes 1: ``counters.tier_switches`` is a list
 (``TIER_SWITCH_KEYS``; empty without a switch), and the plan records ``calibration`` and ``adaptation``.
+Plan task 5-T06 adds, within minor 1, the runtime monitor's ``counters.segments`` (``SEGMENT_KEYS``; empty
+without a segment) and fills ``counters.neighbour_lists`` from its totals.
 
 Phase 1a's blocks stay as they were, so that ``main.py`` on FastMACE (1a-T17) writes the same files:
 
@@ -481,6 +483,7 @@ SPEC_13_KEYS = (
     ("schema minor version (5-T01)", "schema_minor"),
     ("calibration record (5-T09)", "plan.calibration"),
     ("adaptation limits (5-T07)", "plan.adaptation"),
+    ("runtime monitor segments (5-T06)", "counters.segments"),
 )
 # Integration is always float64 (SPEC §7.3); only the force precision is a choice.
 INTEGRATION_PRECISION = "float64"
@@ -495,7 +498,7 @@ CHECKPOINT_KEYS = ("path", "sha256", "head", "licence", "label", "trust")
 SUBPROCESS_KEYS = ("python", "reason", "directory", "children", "calls", "persistent", "seconds", "failed", "last")
 SUBPROCESS_CHILD_KEYS = ("action", "stage", "pid", "exit_code", "seconds", "steps")
 # Counters the caller fills; tier_switches (phase 5, §9.6) is a list of TIER_SWITCH_KEYS records, [] without one.
-COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone", "mc", "tier_switches")
+COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone", "mc", "tier_switches", "segments")
 # Counters the engine's info() carries (the graph engine's re-capture policy and overflow redos, 3-T04),
 # taken from it when the caller gives none.
 ENGINE_COUNTER_KEYS = ("recaptures", "overflows_redone")
@@ -503,6 +506,11 @@ ENGINE_COUNTER_KEYS = ("recaptures", "overflows_redone")
 LATER_COUNTER_KEYS = ()
 # One tier switch (planner.plan.TierSwitch.record(); 5-T07): its step, the tiers, the reason and the revision.
 TIER_SWITCH_KEYS = ("step", "from", "to", "reason", "revision")
+# One runtime-monitor segment (planner.adapt.Segment.record(); 5-T06): the steps it covers, where it ended,
+# its loop wall time, re-captures and captures with their host time, overflows redone, the step the
+# re-capture budget was exceeded at, and per neighbour list {rebuilds, build_time_s}.
+SEGMENT_KEYS = ("first_step", "last_step", "reason", "canonical", "wall_s", "recaptures", "recapture_s", "captures",
+                "capture_s", "overflows_redone", "budget_exceeded_at", "lists")
 # counters.mc (3-T15): per move type the driver's cumulative counts (io.restart.MC_COUNTER_KEYS), and for
 # displacements also the trial neighbour-list rebuilds (3-T10); null when no move set was ever attached.
 MC_TRIAL_REBUILDS = "trial_rebuilds"
@@ -783,6 +791,7 @@ def _counters(counters, engine_info):
     if given.get("mc") is not None:
         given["mc"] = _mc_counters(given["mc"])
     given["tier_switches"] = _tier_switches(given.get("tier_switches"))
+    given["segments"] = _segments(given.get("segments"))
     for key in ENGINE_COUNTER_KEYS:
         if given.get(key) is None and isinstance(engine_info, Mapping) and engine_info.get(key) is not None:
             given[key] = engine_info[key]
@@ -808,6 +817,22 @@ def _tier_switches(switches):
             if isinstance(switch[key], bool) or not isinstance(switch[key], int) or switch[key] < 0:
                 raise ValueError(f"counters.tier_switches[{index}].{key} must be an integer >= 0, got {switch[key]!r}")
         out.append({key: _plain(switch[key], f"counters.tier_switches[{index}].{key}") for key in TIER_SWITCH_KEYS})
+    return out
+
+
+def _segments(segments):
+    """``counters.segments``: ``planner.adapt.Segment`` records or mappings with exactly ``SEGMENT_KEYS``."""
+    if segments is None:
+        return []
+    if not isinstance(segments, (list, tuple)):
+        raise ValueError(f"counters.segments must be a list of monitor segments, got {segments!r}")
+    out = []
+    for index, segment in enumerate(segments):
+        if callable(getattr(segment, "record", None)):
+            segment = segment.record()
+        if not isinstance(segment, Mapping) or set(segment) != set(SEGMENT_KEYS):
+            raise ValueError(f"counters.segments[{index}] must have the keys {SEGMENT_KEYS}, got {segment!r}")
+        out.append({key: _plain(segment[key], f"counters.segments[{index}].{key}") for key in SEGMENT_KEYS})
     return out
 
 

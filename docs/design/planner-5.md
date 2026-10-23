@@ -194,6 +194,48 @@ characters. A section with nothing to say is one line ("none") or left out where
 
 5-T05 writes the golden files; 5-T03, 5-T07 and 5-T09 update their sections.
 
+## Runtime monitor (5-T06; `planner/adapt.py`)
+
+`Monitor(adaptation)` keeps the counters of one process's engine per **segment**: from one reading to the
+next. `Simulation._observe(reason, canonical=True)` reads at moments that synchronise anyway, so the step
+path gains no synchronisation (conductor's answers to 5-T06, 23 October 2026):
+
+| `reason` | Where | Canonical |
+| --- | --- | --- |
+| `restart` | after a restart write (`save_restart`, in or out of `run()`) | yes |
+| `mc-block` | after an MC block that ran | yes |
+| `host-write` | after a host write's transaction (`update`, `set_*`) | yes |
+| `run-end` | at the end of each `run()` call, also when it stops (non-finite, cell diverged) | no |
+
+The first `run()` takes the baseline, so the setup's captures are not in any segment; a reading without
+a baseline takes it. A reading at the same step as the previous one closes nothing.
+
+`Segment` (`counters.segments`, `provenance.SEGMENT_KEYS`): `first_step`, `last_step`, `reason`,
+`canonical`, `wall_s` (the run's loop clock between the readings), `recaptures` and `recapture_s` (the
+captures counted against the budget, and their host time), `captures` and `capture_s` (all of them),
+`overflows_redone`, `budget_exceeded_at` (cumulative), and `lists`: `{"mace": {rebuilds, build_time_s:
+null}}`, plus `"d3"` with its measured build time when the force field has the D3 term. MACE's list is
+rebuilt on a side stream (`overlap_rebuild`), so its host time is not its build time; no CUDA events are
+added for it.
+
+The graph engine times each capture on the host, from the synchronisation in `_capture` that ends the
+step's queued work to the one that ends the capture (`capture_seconds`, `recapture_seconds`,
+`recapture_log[...]["s"]`), and `runtime_counters()` returns what the monitor reads (cheaper than
+`info()`). Other engines' counters read as 0.
+
+API for 5-T07: `observe(info, *, step, wall_s, reason, canonical=True) -> Segment | None`;
+`decide(window) -> None` (5-T07's trigger; `_observe` keeps its return value as `request`); `mark(step)`
+starts the window; `window(since_step=None)` sums the kept segments since the mark (or `since_step`);
+`totals()`, `segments` (the last `SEGMENT_LIMIT` = 1,000), `records()`, `neighbour_lists(...)`;
+`start(info, *, step, wall_s)` re-baselines (a new engine). A switch may act only on a canonical reading.
+
+The monitor starts empty in every process: a resume starts a new one (restart format 4, choice 5), and
+takes `AdaptationConfig` from the recorded `PlannerOptions`. Under the subprocess runner the child's
+monitor `export(cursor)`s each call's segments with their sum, the parent `absorb`s them, and the
+parent's `metadata.json` has every call's segments. The report's `runtime` line appears only when
+re-captures or overflows happened: `re-captures N (S s, P % of the loop; budget B exceeded at step K);
+overflows redone M`. The step-time effect of the host timestamps is measured in 5-T11 (item 5).
+
 ## What this unblocks
 
 - **5-T02** (conformance suite): the table, the marker, the meta-test's two lists.

@@ -269,6 +269,9 @@ class SubprocessRunner:
         if isinstance(timing, dict):
             timing["status"] = simulation._status
         record["report"] = simulation._report.to_metadata()
+        counters = record.get("counters")
+        if isinstance(counters, dict):  # every call's segments, not only the last child's (5-T06)
+            counters.update(simulation._monitor_counters())
         from fastmace import provenance
 
         record["subprocess"] = provenance.subprocess_block(self)
@@ -547,6 +550,7 @@ class SubprocessRunner:
 
             sim._report.mc = {**result["mc"], "moves": tuple(move_from_record(m) for m in result["mc"]["moves"])}
         sim._restart_points = [dict(point) for point in result["restart_points"]]
+        sim._monitor.absorb(result.get("monitor"))
         sim._status = result["simulation_status"]
         sim._steps_run = result["steps_run"]
         sim._loop_s = result["loop_s"]
@@ -569,6 +573,9 @@ class SubprocessRunner:
         for text in result["extra_warnings"]:
             if text not in report.extra_warnings:
                 report.add_warning(text)
+        from fastmace.planner import adapt
+
+        report.runtime = adapt.report_line(sim._monitor.totals(), result.get("recapture_budget"))
         sim._write_metadata()
 
     def _replay_sinks(self, sim, stage):
@@ -940,6 +947,7 @@ def _child(directory, request, heartbeat, worker=None):
             worker.stage = request["source"]
         worker.simulation = sim
     sim._sinks = []  # this call's sinks only
+    cursor = sim._monitor.cursor()  # the runtime monitor's segments of this call go to the parent (5-T06)
     heartbeat.simulation = sim
     heartbeat.mark("running")
     if not request["started"]:
@@ -1011,6 +1019,8 @@ def _child(directory, request, heartbeat, worker=None):
         "extra_warnings": list(sim.report.extra_warnings),
         "metadata": sim.metadata(),
         "mc": _mc_summary(sim),
+        "monitor": sim._monitor.export(cursor),
+        "recapture_budget": getattr(engine, "recapture_budget", None),
     }
 
 
