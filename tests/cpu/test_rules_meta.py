@@ -4,10 +4,12 @@
   and every code belongs to one rule.
 - ``rules.check_reason`` and the override record (choice 4) behave as docs/design/planner-5.md says.
 - Every reason the library emits with a rule number uses a code of that rule (a static scan of ``fastmace/``).
-- A rule's code never appears without its number: the rules that still emit one are expected failures
-  (``NUMBERLESS``) until plan task 5-T02 numbers them.
-- Every rule has at least one test marked ``pytest.mark.rule(n)``: the rules without one are expected failures
-  (``UNTESTED``) until 5-T02's conformance suite marks them. 5-T02 empties both lists.
+- A rule's code never appears without its number (``NUMBERLESS`` lists the exceptions; 5-T02 emptied it).
+- Every rule has at least one test marked ``pytest.mark.rule(n)`` (``UNTESTED`` lists the exceptions: rule 15
+  until plan task 5-T04 emits and tests it).
+- Every precedence pair of 5-T02's matrix (``PAIRS``) has a test marked ``pytest.mark.precedence(a, b)``, and
+  every marked pair is listed. Later tasks add their pairs here with their tests (5-T03: rule 5 against the
+  MACE model's rule 12; 5-T07: rule 5 against runtime adaptation).
 """
 
 import ast
@@ -23,10 +25,20 @@ SOURCE = REPO / "fastmace"
 TESTS = REPO / "tests"
 # Helpers that wrap Reason with a fixed rule: (module, function) -> (rule, index of the code argument).
 HELPERS = {("integrators/registry.py", "_reason"): (1, 1), ("planner/reproducible.py", "block"): (5, 2)}
-# Rules whose codes the library still emits without the number (5-T02 numbers them, then removes the rule here).
-NUMBERLESS = {1, 5, 6, 8, 9, 14}
-# Rules without a test marked rule(n) yet (5-T02's conformance suite marks them, then removes the rule here).
-UNTESTED = set(rules.NUMBERS)
+# Rules whose codes the library still emits without the number (5-T02 numbered them all).
+NUMBERLESS = set()
+# Rules without a test marked rule(n) yet: rule 15 until 5-T04 emits its decisions and marks its test.
+UNTESTED = {15}
+# The precedence matrix of plan task 5-T02 (SPEC §9.3's strict order): (a, b) means rule a wins over b, where b is
+# a later rule, "override" (a user's explicit value) or an allow_* flag. tests/cpu/test_rules_precedence.py.
+PAIRS = {
+    (4, 8), (4, 9), (4, "override"),
+    (3, "override"),
+    (5, 9), (5, 11), (5, 12), (5, "override"),
+    (1, "allow_reference"),
+    (11, 12),
+    (13, 14),
+}
 
 
 # --------------------------------------------------------------------------- the static scan
@@ -107,6 +119,19 @@ def marked_rules():
                     and isinstance(node.func.value, ast.Attribute) and node.func.value.attr == "mark"
                     and node.args and isinstance(node.args[0], ast.Constant)):
                 found.add(node.args[0].value)
+    return found
+
+
+def marked_pairs():
+    """The ``(a, b)`` of every ``pytest.mark.precedence(a, b)`` in ``tests/``."""
+    found = set()
+    for path in TESTS.rglob("test_*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "precedence"
+                    and isinstance(node.func.value, ast.Attribute) and node.func.value.attr == "mark"):
+                assert len(node.args) == 2 and all(isinstance(arg, ast.Constant) for arg in node.args), (
+                    f"{path.name}:{node.lineno}: precedence(a, b) takes two literals")
+                found.add((node.args[0].value, node.args[1].value))
     return found
 
 
@@ -196,3 +221,25 @@ def test_every_rule_has_a_marked_test(number, request):
     if number in UNTESTED:
         request.applymarker(pytest.mark.xfail(strict=True, reason="5-T02's conformance suite marks it"))
     assert number in marked_rules(), f"no test is marked pytest.mark.rule({number})"
+
+
+def test_the_precedence_pairs_follow_the_order():
+    """In every pair the winner comes first in §9.3's order; ``b`` is a later rule, an override or a flag."""
+    flags = {rules.allow_flag(n) for n in rules.NUMBERS} - {None}
+    for a, b in PAIRS:
+        assert a in rules.NUMBERS, (a, b)
+        if isinstance(b, int):
+            assert b in rules.NUMBERS and a < b, (a, b)
+        elif b == "override":
+            assert rules.kind(a) == "hard", (a, b)  # a user override replaces a preference, never a hard rule
+        else:
+            assert b in flags and rules.kind(a) == "hard", (a, b)  # a flag never lifts more than it names
+
+
+@pytest.mark.parametrize("pair", sorted(PAIRS, key=str), ids=str)
+def test_every_precedence_pair_has_a_marked_test(pair):
+    assert pair in marked_pairs(), f"no test is marked pytest.mark.precedence{pair}"
+
+
+def test_every_marked_pair_is_listed():
+    assert marked_pairs() <= PAIRS, f"marked but not in PAIRS: {sorted(marked_pairs() - PAIRS, key=str)}"
