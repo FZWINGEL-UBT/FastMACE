@@ -87,8 +87,9 @@ def test_cache_key_follows_capability_and_stack():
 
 def test_requirements_take_the_overrides():
     text = "# comment\nase==3.27.0\ncertifi==2026.7.22\n"
-    out = fc.requirements_text(text, {"certifi": "2026.10.19"})
+    out = fc.requirements_text(text, {"certifi": "2026.10.19"}, ())
     assert "certifi==2026.10.19" in out and "certifi==2026.7.22" not in out and "ase==3.27.0" in out
+    assert fc.requirements_text(text, {}, ("dftd3==1.6.0",)).splitlines()[-1] == "dftd3==1.6.0"
 
 
 def test_ledger_header_once_and_rows(tmp_path):

@@ -65,7 +65,8 @@ from fastmace.errors import OEqRuntimeError  # noqa: F401 (re-exported: the 1a n
 
 RUNTIME_LIBRARIES = ("cudart", "nvrtc", "cublasLt", "cublas")  # soname major 13, as oeq_no_nvcc.sh
 DRIVER_CANDIDATES = ("/usr/lib/wsl/lib/libcuda.so.1", "/lib/x86_64-linux-gnu/libcuda.so.1",
-                     "/usr/lib/x86_64-linux-gnu/libcuda.so.1", "/usr/lib64/libcuda.so.1")
+                     "/usr/lib/x86_64-linux-gnu/libcuda.so.1", "/usr/lib64/libcuda.so.1",
+                     "/usr/lib64-nvidia/libcuda.so.1")  # the last: Google Colab VMs
 SYSTEM_LIBRARY_DIRECTORIES = ("/usr/lib/x86_64-linux-gnu", "/usr/lib64")
 SENTINEL = """#!/bin/sh
 printf 'nvcc invocation blocked: %s\\n' "$*" >> "${OEQ_NVCC_ATTEMPTS:?}"

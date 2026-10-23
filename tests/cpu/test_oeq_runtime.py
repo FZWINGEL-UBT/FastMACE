@@ -113,6 +113,12 @@ def test_find_driver(tmp_path):
         runtime_module.find_driver({}, (str(tmp_path / "no"),))
 
 
+def test_colab_driver_is_a_candidate():
+    # Colab VMs keep the driver in /usr/lib64-nvidia; without it OEq failed and the planner fell back to
+    # plain cuEq (A100 pilot, 23 October 2026).
+    assert "/usr/lib64-nvidia/libcuda.so.1" in runtime_module.DRIVER_CANDIDATES
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="symbolic links and sh sentinel are POSIX")
 def test_materialize_is_idempotent(tmp_path):
     plan, runtime, driver, cache = make_plan(tmp_path)

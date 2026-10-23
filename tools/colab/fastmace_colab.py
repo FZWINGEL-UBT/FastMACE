@@ -60,6 +60,8 @@ PYTHON = "3.10"
 REQUIREMENTS = ROOT / "tools" / "modal" / "requirements-hybrid.txt"
 # certifi raised to the 22 October 2026 floor (eMudhra/emSign incident), as ~/environments/mace_cueq_oeq.
 OVERRIDES = {"certifi": "2026.10.19"}
+# simple-dftd3's Python API, the second D3 reference of tests/gpu/test_d3_kernel_gpu.py (16 tests skip without it).
+EXTRAS = ("dftd3==1.6.0",)
 # The compatibility tier's checkpoints (tests/_support/tiers.py: MH-1, MP-0 medium, POLAR-1-S).
 DEFAULT_MODELS = "mh-1,medium,polar-1-s"
 DEFAULT_REPO = "/mnt/d/Margraf/FastMACE"  # the main checkout sees every pushed branch
@@ -157,11 +159,13 @@ def next_part_name(parts):
     return f"{int(parts[-1].name[:3]) + 1:03d}.tar.gz" if parts else "000.tar.gz"
 
 
-def requirements_text(text, overrides=OVERRIDES):
+def requirements_text(text, overrides=OVERRIDES, extras=EXTRAS):
     out = []
     for line in text.splitlines():
         name = re.split(r"[=<>~ @]", line.strip(), maxsplit=1)[0].lower()
         out.append(f"{name}=={overrides[name]}" if name in overrides and not line.startswith("#") else line)
+    if extras:
+        out += ["# Colab only (tools/colab/fastmace_colab.EXTRAS)", *extras]
     return "\n".join(out) + "\n"
 
 
