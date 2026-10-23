@@ -325,12 +325,12 @@ def test_profiles_carry_the_research_settings(name):
     assert profile.schedule == ramp(0, peak, ps=heat_ps) + ramp(peak, final, ps=cool_ps)
     assert (profile.sample_interval, profile.trajectory_interval) == (interval, interval)
     assert profile.relax_fmax == fmax
-    assert profile.relax_optimizer == "LBFGS"
+    assert profile.relax_optimizer == "ase-LBFGS"  # the research engine's: ASE LBFGS (4-T09 names)
 
 
 def test_anneal_quench_settings_are_data():
     quench = PROFILES["anneal"].quench
-    assert quench == {"min_K": 500.0, "bin_K": 100.0, "per_bin": 2, "fmax": 0.01, "optimizer": "LBFGS",
+    assert quench == {"min_K": 500.0, "bin_K": 100.0, "per_bin": 2, "fmax": 0.01, "optimizer": "ase-LBFGS",
                       "max_steps": 5000}
     assert PROFILES["slow"].quench is None
 

@@ -19,12 +19,27 @@ from typing import Any
 
 from fastmace.protocols.schedule import Schedule, ramp
 
-OPTIMIZERS = ("LBFGS", "BFGS")
+# The optimizers of a relaxation or quench (SPEC §10.3; plan task 4-T09): ASE's on ``fm.calc``'s calculator, or
+# ``fm.optimize``'s on the graph engine. Bare "LBFGS" and "BFGS" keep meaning ASE's, so existing protocol files are
+# unchanged (conductor, 23 October 2026); records hold the resolved name (``resolve_optimizer``).
+ASE_OPTIMIZERS = ("ase-LBFGS", "ase-BFGS")
+GPU_OPTIMIZERS = ("gpu-LBFGS", "gpu-FIRE")
+OPTIMIZER_ALIASES = {"LBFGS": "ase-LBFGS", "BFGS": "ase-BFGS"}
+OPTIMIZERS = (*OPTIMIZER_ALIASES, *ASE_OPTIMIZERS, *GPU_OPTIMIZERS)
+# Decision 47: "gpu-LBFGS" once plan task 4-T08 has passed.
+DEFAULT_OPTIMIZER = "ase-LBFGS"
 QUENCH_KEYS = ("min_K", "bin_K", "per_bin", "fmax", "optimizer", "max_steps")
 ENSEMBLES = ("NVT", "NPT")  # NVE comes with its integrator (phase 4)
 DISPERSIONS = ("none", "d3bj")
 _PROFILE_KEYS = {"name", "segments", "sample_interval", "trajectory_interval", "relax_fmax", "relax_optimizer",
                  "quench", "ensemble", "pressure_GPa", "dispersion"}
+
+
+def resolve_optimizer(name: Any) -> str:
+    """The resolved name of an optimizer in ``OPTIMIZERS`` (``"LBFGS"`` -> ``"ase-LBFGS"``); ``ValueError`` else."""
+    if not isinstance(name, str) or name not in OPTIMIZERS:
+        raise ValueError(f"optimizer must be one of {OPTIMIZERS}, got {name!r}")
+    return OPTIMIZER_ALIASES.get(name, name)
 
 
 def _interval(value: Any, name: str) -> int:
@@ -45,7 +60,8 @@ class Profile:
 
     ``relax_fmax`` 0 means no initial relaxation (fixed cell, eV/Å). ``quench`` is ``None`` or a
     mapping with ``QUENCH_KEYS`` (frames per ``bin_K`` bin of the target from ``min_K``, quenched to
-    ``fmax`` with ``optimizer``, at most ``max_steps``). Relaxation and quench keep the cell fixed;
+    ``fmax`` with ``optimizer``, at most ``max_steps``). Optimizer names are resolved
+    (``resolve_optimizer``). Relaxation and quench keep the cell fixed;
     after NPT each frame is quenched at its own cell.
 
     ``ensemble`` is ``"NVT"`` or ``"NPT"`` (``fm.md``'s; any case). ``pressure_GPa`` is NPT's
@@ -59,7 +75,7 @@ class Profile:
     sample_interval: int = 100
     trajectory_interval: int = 100
     relax_fmax: float = 0.0
-    relax_optimizer: str = "LBFGS"
+    relax_optimizer: str = DEFAULT_OPTIMIZER
     quench: Mapping[str, Any] | None = None
     ensemble: str = "NVT"
     pressure_GPa: float | None = None
@@ -73,8 +89,10 @@ class Profile:
         _interval(self.sample_interval, "sample_interval")
         _interval(self.trajectory_interval, "trajectory_interval")
         object.__setattr__(self, "relax_fmax", _nonnegative(self.relax_fmax, "relax_fmax"))
-        if self.relax_optimizer not in OPTIMIZERS:
-            raise ValueError(f"relax_optimizer must be one of {OPTIMIZERS}, got {self.relax_optimizer!r}")
+        try:
+            object.__setattr__(self, "relax_optimizer", resolve_optimizer(self.relax_optimizer))
+        except ValueError as error:
+            raise ValueError(f"relax_{error}") from None
         if self.quench is not None:
             object.__setattr__(self, "quench", MappingProxyType(_quench(self.quench)))
         if not isinstance(self.ensemble, str) or self.ensemble.upper() not in ENSEMBLES:
@@ -120,9 +138,10 @@ def _quench(data: Any) -> dict[str, Any]:
         raise ValueError("quench bin_K and fmax must be positive")
     quench["per_bin"] = _interval(data["per_bin"], "quench per_bin")
     quench["max_steps"] = _interval(data["max_steps"], "quench max_steps")
-    if data["optimizer"] not in OPTIMIZERS:
-        raise ValueError(f"quench optimizer must be one of {OPTIMIZERS}, got {data['optimizer']!r}")
-    quench["optimizer"] = data["optimizer"]
+    try:
+        quench["optimizer"] = resolve_optimizer(data["optimizer"])
+    except ValueError as error:
+        raise ValueError(f"quench {error}") from None
     return {key: quench[key] for key in QUENCH_KEYS}
 
 

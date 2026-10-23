@@ -150,6 +150,29 @@ sim = run.simulation               # the Simulation, to run on or restart
 `fm.md`, `fastmace md` and `fastmace run` build the same `Simulation`. For
 the same inputs they give the same plan, gate and trajectory.
 
+## 6. Relaxations and quenches: `fastmace relax` and `fastmace quench`
+
+```bash
+fastmace relax NaCl.cif --model mh1 --head matpes_r2scan --optimizer gpu-LBFGS --fmax 0.01
+fastmace relax NaCl.cif --model mh1 --head matpes_r2scan --optimizer gpu-FIRE --cell-filter frechet --pressure 0
+fastmace quench run/ --into gpu --optimizer gpu-LBFGS
+```
+
+The optimizers are `gpu-LBFGS` and `gpu-FIRE` on the graph engine, and
+`ase-LBFGS` and `ase-BFGS`, ASE's on `fm.calc`. Bare `LBFGS` and `BFGS` mean
+ASE's, so existing protocol files keep their meaning. The default is
+`ase-LBFGS` until the annealing-benchmark minima pass on the GPU (plan task
+4-T08). The same names go into a protocol's `[relax]` and `[quench]` tables,
+and the records hold the name that ran.
+
+`fastmace relax` writes the relaxed structure (`--output`, default
+`<stem>.relaxed.extxyz`) with its `.json` summary and `.log`. `fastmace quench
+RUN_DIR` quenches the frames of any finished run with a schedule, trajectory
+frames and a restart, as a protocol's quench picks them. Each frame keeps its
+own cell. `--into NAME` writes `RUN_DIR/quench-NAME/`, so one run can be
+quenched with several optimizers side by side. A GPU quench relaxes all its
+frames on one engine.
+
 ## For CI: the install check
 
 The CPU CI checks that a fresh environment resolves `[full]` and that

@@ -8,13 +8,15 @@ shipped with FastMACE are the ``.toml`` files of ``DATA``, named by their stem
 
 The stages, in the run's output directory:
 
-1. ``start``: the relaxation with ``fm.calc``'s calculator on the model and in the force field's
-   precision (``relaxation.log``, ``relaxed.extxyz``), then ``fm.md`` on the relaxed structure,
+1. ``start``: the relaxation with its optimizer (``profiles.OPTIMIZERS``: ASE's on ``fm.calc``'s
+   calculator, or ``fm.optimize``'s on the graph engine; ``quench.relaxer``) on the model and in the
+   force field's precision (``relaxation.log``, ``relaxed.extxyz``), then ``fm.md`` on the relaxed structure,
    for at most ``steps`` steps of the schedule;
 2. ``resume``: ``Simulation.resume`` and the next at most ``steps`` steps. The move set is attached
    over the steps whose target is at or above ``min_mc_temperature_K`` (``quick.mc_ranges``), as
    ``fm.md`` attaches it; an attached set stays attached across a resume (§7.6);
-3. after the last MD step, the quench (``quench.quench_run``) with the model of the run.
+3. after the last MD step, the quench (``quench.quench_run``) with the model of the run, its precision,
+   D3 record and engine options; a GPU quench relaxes every frame on one engine (4-T09).
 
 Every piece ends with a restart at its last step, so a long protocol runs as pieces of bounded
 wall time. ``protocol.json`` records the stages, the pieces, the relaxation and the quench summary,
@@ -39,7 +41,7 @@ from typing import Any
 from fastmace.errors import CellDivergedError
 from fastmace.longrange import d3
 from fastmace.protocols import quench as quench_stage
-from fastmace.protocols.profiles import OPTIMIZERS, _quench
+from fastmace.protocols.profiles import DEFAULT_OPTIMIZER, _quench, resolve_optimizer
 
 DATA = Path(__file__).resolve().parent / "data"
 PROTOCOL_RECORD = "protocol.json"
@@ -73,12 +75,14 @@ def protocol_file(name_or_path: str | Path) -> tuple[Path, bool]:
 def _relax(data: Any) -> dict[str, Any]:
     if not isinstance(data, Mapping) or "fmax" not in data or set(data) - set(RELAX_KEYS):
         raise ValueError(f"relax needs fmax and takes {', '.join(RELAX_KEYS)}, got {data!r}")
-    fmax, optimizer = data["fmax"], data.get("optimizer", "LBFGS")
+    fmax, optimizer = data["fmax"], data.get("optimizer", DEFAULT_OPTIMIZER)
     max_steps = data.get("max_steps", quench_stage.QUENCH_MAX_STEPS)
     if isinstance(fmax, bool) or not isinstance(fmax, (int, float)) or not fmax > 0:
         raise ValueError(f"relax fmax must be a positive number (eV/Å), got {fmax!r}")
-    if optimizer not in OPTIMIZERS:
-        raise ValueError(f"relax optimizer must be one of {OPTIMIZERS}, got {optimizer!r}")
+    try:
+        optimizer = resolve_optimizer(optimizer)
+    except ValueError as error:
+        raise ValueError(f"relax {error}") from None
     if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps < 1:
         raise ValueError(f"relax max_steps must be a positive int, got {max_steps!r}")
     return {"fmax": float(fmax), "optimizer": optimizer, "max_steps": max_steps}
@@ -140,7 +144,6 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
     result); ``relax`` and ``quench`` the stage settings (``split_stages``).
     """
     from fastmace import quick
-    from fastmace.ase.calculator import FastMACECalculator
     from fastmace.model.loading import LoadedModel, load_pristine
     from fastmace.simulation import mc_moves, move_record
 
@@ -183,10 +186,13 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
               "status": "relax"}
     _write(directory, record)
     if relax is not None:
-        calc = FastMACECalculator(model, dispersion=options.get("dispersion"))
-        atoms, summary = quench_stage.relax(atoms, calc, relax["fmax"], relax["max_steps"],
-                                            logfile=directory / RELAXATION_LOG, optimizer=relax["optimizer"])
-        del calc
+        relaxer = quench_stage.relaxer(relax["optimizer"], model, dispersion=options.get("dispersion"),
+                                       engine=options.get("engine"))
+        try:
+            atoms, summary = relaxer(atoms, relax["fmax"], relax["max_steps"], logfile=directory / RELAXATION_LOG)
+        finally:
+            relaxer.close()
+        del relaxer
         _release_device_memory()
         atoms.write(directory / RELAXED)
         record["relaxation"] = summary
@@ -273,6 +279,7 @@ def _end_piece(sim, directory, record, first, started, log):
     resolved = None if position is None else position.resolved
     frame_every = sim.output.trajectory_every
     model, precision, dispersion = sim.force_field.model, sim.force_field.precision, sim.force_field.dispersion
+    engine = sim.options.engine
     sim.close()
     _log_counters(directory, log)
     if record["quench"] is not None:
@@ -280,11 +287,13 @@ def _end_piece(sim, directory, record, first, started, log):
         _write(directory, record)
         del sim
         _release_device_memory()
-        from fastmace.ase.calculator import FastMACECalculator
-
-        calc = FastMACECalculator(model, precision=precision, dispersion=dispersion)
-        result = quench_stage.quench_run(directory, calc, resolved, frame_every, record["timestep_fs"],
-                                         record["quench"], log=log)
+        relaxer = quench_stage.relaxer(record["quench"]["optimizer"], model, precision=precision,
+                                       dispersion=dispersion, engine=engine)
+        try:
+            result = quench_stage.quench_run(directory, relaxer, resolved, frame_every, record["timestep_fs"],
+                                             record["quench"], log=log)
+        finally:
+            relaxer.close()
         record["quench_result"] = result
         log(f"quench: {result['frames']} frames, final quenched {result['final_quenched_eV_atom']:.6f} eV/atom, "
             f"{result['not_converged']} not converged ({directory / quench_stage.QUENCH_DIRECTORY})")
