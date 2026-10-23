@@ -1710,6 +1710,19 @@ definition of continuation the library promises.
 - **Integrator and protocol state:** integrator parameters and internal
   state, step, schedule and position in it, thermostat target, and the
   protocol recorded at start (today's `LEGACY_PROTOCOL` behaviour).
+  Format 4 (phase 4, 4-T01) records the integrator scheme, its
+  degree-of-freedom convention and its parameters in the integrator record,
+  and the FixAtoms indices in the physical record. A resume with a different
+  set of fixed atoms is refused. Each scheme's own state is its `state_dict`,
+  whose keys must equal the `state_keys` of the scheme's registry record:
+  - NHC: `eta` and `p_eta`;
+  - MTK: the cell momenta and the barostat chain;
+  - CSVR: the transferred energy (its noise rows and cursor are the random
+    state below);
+  - NVE and Berendsen: nothing.
+
+  Files of versions 0–3 load unchanged, as Langevin or BAOAB runs without
+  fixed atoms.
 - **Random state:** every generator (device and host) of the integrator and
   the MC driver, *and* the random numbers already drawn ahead with their
   cursor. Today's restart stores `_noise` and `_noise_next` for exactly this

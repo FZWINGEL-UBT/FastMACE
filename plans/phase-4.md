@@ -540,6 +540,32 @@ Wave 4   T13 acceptance
   - The new integrator records `NoseHooverChain` and `MTK` also take `fixcm` and `dof`, following
     D2 (a)'s "the new integrators"; choice 1 listed them only for NVE, CSVR and Berendsen.
   - FIRE's `dt` and `dtmax` stay in ASE time units, as in ASE (choice 1: ASE's names otherwise).
+  - Merged as `352b33c` (from `fastmace/4-T01-rebased` at `bc40c19`, 23 October 2026). SPEC §10.6's
+    format 4 paragraph is applied.
+  - **SPEC wording held until D1, D2 and D5 are decided.** 4-T01 proposed the text below, written for
+    the recommended options. The conductor applies it once the owner decides, and adjusts it if the
+    decision differs.
+    - §4.4, the paragraph under the heading: "Support is declared per scheme: each integrator,
+      optimiser and cell filter has a record in fastmace.integrators.registry that lists its
+      ensembles, cell modes and constraint rows (fixcm, fix_atoms), with a reason for each row it
+      lacks. Rule 1 (§9.3) reads these records and refuses anything outside them at plan time, before
+      any compilation, with a reason and a stable code. FixAtoms is held in the state as a device mask
+      and host indices. Every other ASE constraint is refused, and so are MC moves with any constraint
+      (decision 10)."
+    - §4.4, the FixAtoms row (D1): "NVE, Langevin, CSVR and NVT Berendsen, and FIRE and LBFGS at fixed
+      cell; refused for NHC, MTK and every variable cell (BAOAB, MTK, NPT Berendsen, cell filters), and
+      with fixcm=True". Fixed centre of mass row: "all 1.0 integrators".
+    - §4.4, degrees of freedom (D2): "Temperatures and thermostat targets count 3N − 3 degrees of
+      freedom under fixcm and 3(N − n_fixed) with FixAtoms (dof="auto"), or the scheme's ASE count
+      with dof="ase". Langevin and BAOAB keep their counts (decision 37)."
+    - §7.7 (D5): "Phase 4 maps VelocityVerlet, Bussi, NoseHooverChainNVT, IsotropicMTKNPT, MTKNPT,
+      NVTBerendsen, NPTBerendsen and Inhomogeneous_NPTBerendsen with ASE 3.27's arguments and units.
+      Each argument list is held as data and checked against inspect.signature. rng is refused in
+      favour of seed=. fastmace.ase.LBFGS and FIRE take ASE 3.27's arguments: use_line_search=True and
+      position_reset_callback are refused, and the deprecated maxmove too. They take Atoms or
+      ase.filters.FrechetCellFilter, and the other cell filters are refused with the reason. In
+      Simulation the same optimisers are fm.optimize.LBFGS and FIRE, and FrechetCellFilter is
+      fm.optimize.FrechetCell."
 
 ## Checkpoints for the owner
 
