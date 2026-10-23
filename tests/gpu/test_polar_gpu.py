@@ -82,10 +82,13 @@ def test_fixed_k_vectors_on_cuda(dtype):
         k, n2, batch, k0 = polar.compute_k_vectors_fixed(polar._Call(state), cutoff, cell_t, rcell_t)
         included = batch == 0
         assert int(included.sum()) == len(k_ref) and float(k0[0]) == 1.0
-        # float64 bit for bit; float32 to rounding (the GPU's einsum sums in another order, 17 October 2026)
+        # float64: k bit for bit, n2 = |k|^2 within 2 ulp (on an A100, sm_80, 16 of 88 differed by 1 ulp: the two
+        # kernels contract the sum of squares differently there; 4-T13's pilot, 23 October 2026); float32 to
+        # rounding (the GPU's einsum sums in another order, 17 October 2026)
         exact = dict(rtol=0, atol=0) if dtype == torch.float64 else dict(rtol=1e-6, atol=1e-6)
+        squares = dict(rtol=2 * torch.finfo(torch.float64).eps, atol=0) if dtype == torch.float64 else exact
         torch.testing.assert_close(k[included], k_ref, **exact)
-        torch.testing.assert_close(n2[included], n2_ref, **exact)
+        torch.testing.assert_close(n2[included], n2_ref, **squares)
         assert not bool(state.overflow)
 
 
