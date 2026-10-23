@@ -78,6 +78,16 @@ Sources: SPEC §16 row 4, §7.7, §10.2–§10.3, §10.6, §12.2 ("ASE equivalen
   by the same pass rules and are labelled with GPU and provider.
 - **Every result is labelled** with GPU and provider (local, colab), as the driver's `compat.json` and the job
   logs record them.
+- **The A100 pilot** (conductor's helper; Colab A100-SXM4-40GB, sm_80, FastMACE fbbbf86): smoke, the hybrid gate,
+  `library_gate` and the statistical restart passed; the fast tier had 324 passed, 2 failed, 18 skipped (16 D3
+  tests without `dftd3`, which fm-ops-colab adds; OEq needs `OEQ_CUDA_DRIVER_LIBRARY=/usr/lib64-nvidia/libcuda.so.1`).
+  The two failures are rounding-level expectations that sm_80 breaks, judged here as architecture differences and
+  corrected test-side for every GPU (each in its own commit; they still pass on sm_120 in the local `compat` job):
+  - `test_polar_gpu::test_fixed_k_vectors_on_cuda[float64]`: 16 of 88 `n2 = |k|^2` values 1 ulp off graph_longrange's
+    kernel on the same GPU; `n2` within 2 ulp in float64, `k` still bitwise;
+  - `test_energy_gpu::test_float64_energy_replays_and_keeps_forces[default-dtype0]` (float32): the two fields
+    differed by 1.6e-9 eV/Å with almost no scatter noise (7.5e-10); the bound's relative floor follows the precision
+    (1e-8 in float32, 1e-12 in float64), and the 1e-6 eV/Å negative control still fails it.
 - **Timed jobs first, alone, on a quiet PC:** no other GPU job (the reservation) and no heavy CPU job (checked and
   recorded at each job's start). No CPU suite of the conductor's during the timed jobs (the conductor is told the
   window).
