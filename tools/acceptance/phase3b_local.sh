@@ -87,8 +87,8 @@ case "$job" in
   d3-cost)  # item 3: 3b-T06's A/B, D3 on against off in one process, ABBA blocks of 1000 steps, builds in the clock.
     # NVT: the dense phase (heat 0 -> 1000 K in 5 ps, then 8 ps at 1000 K), 3b-T06's route; NPT: the anneal route at
     # D3_COST_PRESSURE_GPA (default 0, the runbook's; the owner's D1 answer may add 0.1).
-    run d3-cost-nvt "$hybrid" tools/bench/d3_cost.py ab --ensemble nvt --route "heat:0:1000:5000,peak:1000:976:8000" \
-      --output "$root/d3-cost-nvt" --checkpoint "$checkpoint"
+    [ "${D3_COST_NVT:-1}" = 0 ] || run d3-cost-nvt "$hybrid" tools/bench/d3_cost.py ab --ensemble nvt \
+      --route "heat:0:1000:5000,peak:1000:976:8000" --output "$root/d3-cost-nvt" --checkpoint "$checkpoint"
     p=${D3_COST_PRESSURE_GPA:-0.0}
     run d3-cost-npt-${p}GPa "$hybrid" tools/bench/d3_cost.py ab --ensemble npt --pressure-GPa "$p" \
       --output "$root/d3-cost-npt-${p}GPa" --checkpoint "$checkpoint"
@@ -123,8 +123,26 @@ case "$job" in
       done
     done
     ;;
-  protocol)  # item 4: waits for the owner's D1 pressure answer (0 or 0.1 GPa); filled in then
-    echo "protocol: waiting for the owner's D1 pressure answer" >&2; exit 3 ;;
+  protocol-start|protocol-resume)  # item 4: the full D1 protocol at PROTOCOL_PRESSURE_GPA (owner, 23 October 2026:
+    # D1 alternative (b), 0.1 GPa), in pieces of PIECE_STEPS (default 90000) through 3-T14's run.sh. The config is the
+    # shipped npt_anneal_NbCl5.toml with only pressure_GPa replaced and its structure path made absolute; no protocol
+    # file changes. protocol-start: the relaxation and the first piece; protocol-resume: the next piece (the quench
+    # after the last).
+    p=${PROTOCOL_PRESSURE_GPA:-0.1}; steps=${PIECE_STEPS:-90000}
+    dir=$root/protocol-${p}GPa/full
+    export FASTMACE_COMMIT=$FASTMACE_SOURCE_COMMIT
+    if [ "$job" = protocol-start ]; then
+      config=$root/protocol-${p}GPa/npt_anneal_NbCl5_${p}GPa.toml
+      mkdir -p "$(dirname "$config")"
+      sed -e "s|^pressure_GPa = .*|pressure_GPa = $p  # owner, 23 October 2026: D1 alternative (b) (3b-T10)|" \
+        -e "s#^structure = \"NbCl5_R2SCAN.cif\"#structure = \"$src/fastmace/protocols/data/NbCl5_R2SCAN.cif\"#" \
+        "$src/fastmace/protocols/data/npt_anneal_NbCl5.toml" > "$config"
+      diff "$src/fastmace/protocols/data/npt_anneal_NbCl5.toml" "$config" >> "$log"
+      run protocol-${p}GPa-start bash results/3-T14-protocol/run.sh start "$dir" "$config" "$steps"
+    else
+      run protocol-${p}GPa-resume-$(date -u +%H%M) bash results/3-T14-protocol/run.sh resume "$dir" "$steps"
+    fi
+    ;;
   preflight)  # the GPU tests whose covered code changed after they last ran (runbook, "stale expectations"):
     # the slow and acceptance tests of the files that cover BAOAB, the planner, restart and the engine graph
     if [ $# -gt 0 ]; then pytest_job preflight -rA -m "slow or acceptance" "$@"
