@@ -131,7 +131,9 @@ The two keywords come after `neighbours`, so `Simulation`'s planner inputs stay 
 parameters, as phase 2's contract pins. `test_contracts_2.test_simulation_takes_the_planner_inputs` now
 checks phase 2's list followed by `PHASE_5_PLANNER_OPTIONS`, and `contracts-2.md` says so. Putting them
 before `mode` would have left the old test as it was, but it would have split the planner inputs. `fm.md`
-takes them in 5-T09, so its contract test is unchanged.
+takes them in 5-T09, so its contract test is unchanged. `test_contracts.test_simulation_signature`, which
+pins the whole keyword-only list, lists them last as well. `contracts-1b.md` shows only 1b's signature, so
+it needs no note.
 
 **Placeholders.** `planner_options` raises `PlanRefused` (`simulation.phase_5_pending`, codes in
 `PHASE_5_PENDING_CODES`):
