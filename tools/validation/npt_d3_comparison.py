@@ -17,10 +17,10 @@ thermostat on. Each run starts from the source cell with Maxwell-Boltzmann veloc
 with its kinetic part, (2 KE - V Tr sigma) / 3V (the research engine's ``npt_observables``), and the cell.
 
 ``analyse`` (the pass rule of 3b-T10's runbook, item 2): per temperature and engine, the seeds' production
-samples are cut into blocks of at least twice the integrated autocorrelation time of the volume (the
-slowest observable, pooled over runs and engines); the standard error of each mean is that of the block
-means pooled over the seeds, and that of the volume fluctuation (the standard deviation of V) a jackknife
-over the same blocks. An observable passes when |difference| <= 3 combined standard errors.
+samples are cut into blocks of at least twice the longest integrated autocorrelation time of V, P and PE
+(over runs and engines; at 300 K that is PE's, about the thermostat's T_tau); the standard error of each
+mean is that of the block means pooled over the seeds, and that of the volume fluctuation (the standard
+deviation of V) a jackknife over the same blocks. An observable passes when |difference| <= 3 combined standard errors.
 
 Stationarity: each run's V drift is the slope of a line through its production samples. A temperature is
 **non-stationary** when, for either engine, |mean drift| times the production time exceeds the standard
@@ -341,10 +341,14 @@ def analyse(runs, sigmas=SIGMAS, min_block_tau=MIN_BLOCK_TAU):
             (record, data))
     result = {}
     for temperature, engines in sorted(by_temperature.items()):
-        taus = [integrated_time(data["volume_A3_atom"]) for runs_ in engines.values() for _, data in runs_]
+        # Blocks of at least twice the slowest observable's time: at 300 K that is PE (about the thermostat's
+        # T_tau), not V (3b-T05: blocks sized on tau(V) alone underestimated the PE standard error).
+        taus = {name: max(integrated_time(data[name]) for runs_ in engines.values() for _, data in runs_)
+                for name in OBSERVABLES}
         shortest = min(len(data["volume_A3_atom"]) for runs_ in engines.values() for _, data in runs_)
-        length = max(1, math.ceil(min_block_tau * max(taus)))
-        entry = {"block_samples": length, "tau_volume_samples": max(taus), "engines": {}}
+        length = max(1, math.ceil(min_block_tau * max(taus.values())))
+        entry = {"block_samples": length, "tau_samples": taus, "tau_volume_samples": taus["volume_A3_atom"],
+                 "engines": {}}
         if shortest // length < 2:
             entry["error"] = f"too few blocks: {shortest} samples per run, blocks of {length}"
             result[f"{temperature:g}K"] = entry
@@ -389,8 +393,8 @@ def analyse(runs, sigmas=SIGMAS, min_block_tau=MIN_BLOCK_TAU):
 
 def command_analyse(args):
     runs = [read_run(directory) for directory in args.runs]
-    result = dict(rule=f"|difference| <= {SIGMAS:g} combined SE; blocks >= {MIN_BLOCK_TAU:g} tau(V), pooled over "
-                       "seeds; V fluctuation by jackknife over the same blocks", settings=SETTINGS,
+    result = dict(rule=f"|difference| <= {SIGMAS:g} combined SE; blocks >= {MIN_BLOCK_TAU:g} max tau(V, P, PE), "
+                       "pooled over seeds; V fluctuation by jackknife over the same blocks", settings=SETTINGS,
                   runs=[str(directory) for directory in args.runs], temperatures=analyse(runs))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + "\n")
