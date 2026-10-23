@@ -551,11 +551,12 @@ def test_displacement_names():  # §10.4 displacements (3-T10)
 def test_protocol_run_names():  # §10.5 (3-T14)
     from fastmace.protocols import quench, runner
 
-    assert _parameters(quench.relax) == ["atoms", "calc", "fmax", "max_steps", "logfile", "optimizer"]
+    # 4-T09: ASE's cell filter in relax, and a relaxer (or an ASE calculator) and a directory name in quench_run.
+    assert _parameters(quench.relax) == ["atoms", "calc", "fmax", "max_steps", "logfile", "optimizer", "cell_filter"]
     assert _parameters(quench.select_frames) == ["frames", "min_K", "bin_K", "per_bin", "peak_K"]
     assert _parameters(quench.picks) == ["resolved", "frame_every", "settings"]
-    assert _parameters(quench.quench_run) == ["directory", "calc", "resolved", "frame_every", "timestep_fs",
-                                              "settings", "log"]
+    assert _parameters(quench.quench_run) == ["directory", "relaxer", "resolved", "frame_every", "timestep_fs",
+                                              "settings", "name", "log"]
     assert _keyword_only(runner.start) == ["relax", "quench", "steps", "source", "log"]
     assert _parameters(runner.resume) == ["directory", "steps", "log"]
     assert runner.RELAX_KEYS == ("fmax", "optimizer", "max_steps") and runner.PROTOCOL_RECORD == "protocol.json"

@@ -97,7 +97,7 @@ def test_stage_tables_are_checked():
     with pytest.raises(ValueError, match="quench"):
         runner.split_stages({"quench": {"min_K": 500.0}})
     stages, _ = runner.split_stages({"relax": {"fmax": 0.05}})
-    assert stages["relax"] == {"fmax": 0.05, "optimizer": "LBFGS", "max_steps": quench.QUENCH_MAX_STEPS}
+    assert stages["relax"] == {"fmax": 0.05, "optimizer": "gpu-LBFGS", "max_steps": quench.QUENCH_MAX_STEPS}
 
 
 # --------------------------------------------------------------------------- frame selection
@@ -145,7 +145,7 @@ def test_relax_lowers_the_energy_at_fixed_cell():
     relaxed, summary = quench.relax(atoms, _lj(atoms), fmax=0.01, max_steps=500)
     assert summary["converged"] and summary["fmax_eV_A"] <= 0.01
     assert summary["energy_eV_atom"] < summary["initial_eV_atom"]
-    assert summary["optimizer"] == "LBFGS" and summary["fixed_cell"]
+    assert summary["optimizer"] == "ase-LBFGS" and summary["fixed_cell"]
     assert np.array_equal(relaxed.cell, atoms.cell) and relaxed.calc is None
     assert not np.any(relaxed.get_momenta())
     with pytest.raises(ValueError, match="optimizer"):

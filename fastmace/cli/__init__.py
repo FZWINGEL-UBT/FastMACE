@@ -25,6 +25,8 @@ COMMANDS = {
     "md": "fastmace.cli.md",
     "init": "fastmace.cli.init",
     "run": "fastmace.cli.run",
+    "relax": "fastmace.cli.relax",
+    "quench": "fastmace.cli.quench",
 }
 
 
