@@ -633,7 +633,7 @@ class FixedPlanner:
             integrator = _dof(book, integrator)
 
         phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
-                                       evaluation=evaluation, mc=mc)
+                                       evaluation=evaluation, mc=mc, optimizer=optimizer)
         return dict(
             tier="compiled" if evaluation else TIER,
             rewrites=dataclasses.replace(rewrites, **rewrite_values),
@@ -652,7 +652,8 @@ class FixedPlanner:
             auto_options_off=tuple(values["_auto_off"].items()),
         )
 
-    def _phase_3_fields(self, book, dtype, rule_11=None, *, polar=False, npt=False, evaluation=False, mc=None):
+    def _phase_3_fields(self, book, dtype, rule_11=None, *, polar=False, npt=False, evaluation=False, mc=None,
+                        optimizer=None):
         """The phase 3 "auto" fields (plan task 3-T01): rule 11's skin and headroom (3-T05), the re-capture
         budget (3-T04) and the MC energy precision (3-T11, which changes it only for MC plans).
 
@@ -672,13 +673,25 @@ class FixedPlanner:
         Workload.mc_energy_precision)``. Without MC moves it is the force precision, which nothing reads.
         For an MC plan, "auto" is the force precision pending the move-energy gate, which keeps it if the
         gate passes and revises the plan to float64 otherwise (``fallback.mc_energy_revision``); an
-        explicit precision is gated as it is, and float32 below a float64 force precision is refused."""
+        explicit precision is gated as it is, and float32 below a float64 force precision is refused.
+
+        A relaxation (``optimizer``, 4-T05) sizes the "auto" skin from the optimiser's largest step instead
+        (``neighbors.adaptive.optimizer_skin``): its atoms move up to ``maxstep_A`` per step, not thermally."""
         n, e, p = self.neighbours, self.engine, self.precision
         applies, sized = rule_11 if rule_11 is not None else (False, None)
         neighbours = {}
         if n.skin != "auto":
             skin, why = n.skin, _why(n.skin, AUTO_RULES["NeighbourConfig.skin"], "kept as given (rule 11 is a "
                                      "preference)")
+        elif optimizer is not None:
+            from fastmace.neighbors.adaptive import OPTIMIZER_SKIN_STEPS, optimizer_skin
+
+            maxstep = float(optimizer.parameter("maxstep_A", 0.2))
+            skin = optimizer_skin(maxstep)
+            why = Reason(_why("auto", AUTO_RULES["NeighbourConfig.skin"],
+                              f"relaxation: {OPTIMIZER_SKIN_STEPS:g} x maxstep {maxstep:g} A, at least "
+                              f"{DEFAULT_SKIN_A:g} A (at least 1.5 full steps between rebuilds)"),
+                         rule=11, code="rule-11-optimizer")
         elif applies:
             skin, why = sized.skin_A, Reason(_why("auto", AUTO_RULES["NeighbourConfig.skin"], sized.text()),
                                              rule=11, code="rule-11")

@@ -76,6 +76,22 @@ def lockstep(loaded, fixed=None):
     return relaxed, worst
 
 
+@pytest.mark.parametrize("record, skin", [(optimize.LBFGS(), 0.6), (optimize.LBFGS(maxstep_A=0.05), 0.3),
+                                          (optimize.LBFGS(maxstep_A=0.5), 1.5)], ids=["default", "floor", "large"])
+def test_rule_11_sizes_the_skin_from_maxstep(loaded, record, skin):
+    plan = relaxation(loaded, record=record).plan
+    assert plan.neighbours.skin == pytest.approx(skin)
+    _, choice, reason = plan.decision("NeighbourConfig.skin")
+    assert choice == f"{skin:g} A" and reason.code == "rule-11-optimizer" and reason.rule == 11
+
+
+def test_an_explicit_skin_is_kept(loaded):
+    from fastmace.config import NeighbourConfig
+
+    plan = relaxation(loaded, neighbours=NeighbourConfig(skin=0.45)).plan
+    assert plan.neighbours.skin == 0.45
+
+
 def test_positions_match_ase_at_every_step(loaded):
     relaxed, worst = lockstep(loaded)
     assert worst < POSITION_ATOL, worst
