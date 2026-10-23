@@ -21,6 +21,11 @@ Phase 3 (plan task 3-T01, ``docs/design/contracts-3.md``) adds rule 11's skin an
 Phase 4 (plan task 4-T01, ``docs/design/physics.md``) adds the integrator ``scheme``, its ``dof`` convention
 and scheme ``parameters`` to ``IntegratorConfig``, the ``"nve"`` ensemble, and ``OptimizerConfig``.
 
+Phase 5 (plan task 5-T01, ``docs/design/planner-5.md``) adds ``AdaptationConfig`` (SPEC §9.6) and
+``CalibrationConfig`` (§9.1). The fields whose meaning an open owner decision of ``plans/phase-5.md``
+fixes (D2, D3, D5) default to ``PENDING``; ``Simulation`` refuses any other value until the task that
+implements the decision lands.
+
 This module holds no state: no caches, no registries, no switches.
 """
 
@@ -545,6 +550,103 @@ class MCConfig:
     def __post_init__(self):
         _count(self, "max_attempts_per_block", minimum=1)
         _count(self, "max_move_sets", minimum=1)
+
+
+# A field whose meaning an open owner decision of plans/phase-5.md fixes (D2, D3, D5). Simulation refuses
+# any other value until the task implementing the decision lands (5-T07, 5-T09).
+PENDING = "pending"
+# Which monitor triggers a tier switch (owner decision D2): "recapture-time", the re-capture budget exceeded
+# and the time spent re-capturing above ``recapture_time_fraction`` (D2 (a), (b)); "recapture-budget", the
+# budget alone (D2 (c)); "none", no automatic switch (D2 (d); mid-run fallbacks stay).
+ADAPTATION_TRIGGERS = ("recapture-time", "recapture-budget", "none")
+
+
+def _flag_or_pending(instance, name):
+    value = getattr(instance, name)
+    if value != PENDING and not isinstance(value, bool):
+        raise ValueError(f"{type(instance).__name__}.{name}: {value!r} is not a bool or {PENDING!r}")
+
+
+def _count_or_pending(instance, name, minimum):
+    if getattr(instance, name) not in (None, PENDING):
+        _count(instance, name, minimum)
+
+
+@dataclass(frozen=True)
+class AdaptationConfig:
+    """Runtime adaptation (SPEC §9.6; plan task 5-T01, docs/design/planner-5.md): what the monitor may change
+    between segments, at a canonical restart point, as a new plan revision (§9.5).
+
+    The trigger's shape (D2) and the limits (D3) are ``PENDING`` until the owner decides them; the threshold
+    carries the plan's recommended value, which only the triggers that use it read. Mid-run fallbacks are
+    ``FallbackConfig``'s (§9.4 step 5, D4), not this record's.
+    """
+
+    # "auto": adapt as §9.6 and the fields below say (until 5-T07: record only); "off": the monitor records,
+    # nothing switches.
+    adapt: Literal["auto", "off"] = "auto"
+    # The trigger (D2): one of ADAPTATION_TRIGGERS, or PENDING.
+    trigger: Literal["pending", "recapture-time", "recapture-budget", "none"] = PENDING
+    # D2 (a), (b): the share of wall time spent re-capturing, over the segments since the last switch, above
+    # which an exceeded re-capture budget switches tiers. Measured in the run, so no per-GPU number.
+    recapture_time_fraction: float = 0.2
+    # D2 (b): rule 11 re-planned with the measured rebuild rate when a list rebuilds more often than every
+    # n*/2 steps (a re-capture follows).
+    skin_replan: bool | Literal["pending"] = PENDING
+    # D3: tier switches one run may make, a resume counting those in its revision chain; None: no limit.
+    max_switches: int | None | Literal["pending"] = PENDING
+    # D3 (b): back to the graph tier after this many quiet segments (no re-capture); None: one way.
+    switch_back_after: int | None | Literal["pending"] = PENDING
+    # D3 (d): canonical restart points between two switches; None: no minimum.
+    min_points_between: int | None | Literal["pending"] = PENDING
+    # D3 (c): switches under reproducible=True, with a deterministic trigger only.
+    reproducible: bool | Literal["pending"] = PENDING
+
+    def __post_init__(self):
+        _check_choices(self)
+        _positive(self, "recapture_time_fraction")
+        if self.recapture_time_fraction >= 1:
+            raise ValueError(f"AdaptationConfig.recapture_time_fraction must be below 1, "
+                             f"got {self.recapture_time_fraction!r}")
+        _flag_or_pending(self, "skin_replan")
+        _flag_or_pending(self, "reproducible")
+        _count_or_pending(self, "max_switches", 0)
+        _count_or_pending(self, "switch_back_after", 1)
+        _count_or_pending(self, "min_points_between", 1)
+
+    def decided(self) -> tuple[str, ...]:
+        """The fields an owner decision fixes that are set to something other than ``PENDING``, in field order."""
+        return tuple(name for name in ADAPTATION_DECISION_FIELDS if getattr(self, name) != PENDING)
+
+
+# The AdaptationConfig fields an open owner decision fixes: D2's trigger and skin re-plan, D3's limits.
+ADAPTATION_DECISION_FIELDS = ("trigger", "skin_replan", "max_switches", "switch_back_after", "min_points_between",
+                              "reproducible")
+
+
+@dataclass(frozen=True)
+class CalibrationConfig:
+    """The optional calibration of SPEC §9.1 (plan task 5-T01; 5-T09 under owner decision D5): off by default,
+    it measures candidate plans the rules rank equal on this run's structure, and nothing it measures is ever
+    persisted or read by another run."""
+
+    # Off by default (§9.1). True is refused until 5-T09 implements D5.
+    calibrate: bool = False
+    # Measured steps per candidate, after warm-up (§9.1: about 50).
+    steps: int = 50
+    # D5 (a): another candidate replaces the rules' choice only when faster by more than this share in every
+    # pair (above the 3 % cross-process noise); unused if D5 decides that calibration only reports.
+    margin: float = 0.05
+    # D5: True, the measurement may change the plan (a); False, it is recorded only (b).
+    choose: bool | Literal["pending"] = PENDING
+
+    def __post_init__(self):
+        _check_choices(self)
+        _count(self, "steps", minimum=1)
+        _positive(self, "margin")
+        if self.margin >= 1:
+            raise ValueError(f"CalibrationConfig.margin must be below 1, got {self.margin!r}")
+        _flag_or_pending(self, "choose")
 
 
 @dataclass(frozen=True)

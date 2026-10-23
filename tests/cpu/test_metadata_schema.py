@@ -15,6 +15,9 @@ Plan task 2-T17 (phase 2) extends the map: the fallbacks tried and the revision 
 device, reduced cell and resource steps (2-T05), the runner and its child records (2-T07), the
 strain path the force field bound (2-T08b), dynamic edges (2-T13) and the reproducible flag
 (2-T16). A run that takes those paths leaves none of them null.
+
+Plan task 5-T01 (phase 5) adds the minor version ``schema_minor``, the plan's ``calibration`` and
+``adaptation``, and ``counters.tier_switches`` as a list (empty without a switch).
 """
 
 import fastmace  # noqa: F401  (before torch: it switches PyTorch's file locks, SPEC §14)
@@ -115,8 +118,14 @@ PHASE_2 = (
     ("compiled with dynamic edges (2-T13)", "plan.engine.dynamic_edges"),
     ("reproducible mode (2-T16)", "plan.workload.reproducible"),
 )
-# Filled by a later phase: an explicit null until then (tier switches: phase 5, §9.6). MC counters: 3-T15.
-LATER_PHASES = ("counters.tier_switches",)
+# What phase 5 adds (plan task 5-T01): null (the plan's records) until the task that fills them.
+PHASE_5 = (
+    ("schema minor version (5-T01)", "schema_minor"),
+    ("calibration record (5-T09)", "plan.calibration"),
+    ("adaptation limits (5-T07)", "plan.adaptation"),
+)
+# Filled by a later phase: an explicit null until then. Since phase 5 (tier switches, 5-T01) none is left.
+LATER_PHASES = ()
 
 IDENTITY = ForceFieldIdentity(checkpoint_sha256="b" * 64, head="matpes_r2scan", species=(11, 17),
                               force_precision="float64", physics={"charge": None, "spin": None},
@@ -174,9 +183,9 @@ def _full_record(**changes):
 
 
 def test_every_spec_13_item_maps_to_a_key():
-    assert dict(provenance.SPEC_13_KEYS) == dict(SPEC_13 + PLAN_1B + PHASE_2)
+    assert dict(provenance.SPEC_13_KEYS) == dict(SPEC_13 + PLAN_1B + PHASE_2 + PHASE_5)
     full, empty = _full_record(), provenance.metadata_record()
-    for item, path in SPEC_13 + PLAN_1B + PHASE_2:
+    for item, path in SPEC_13 + PLAN_1B + PHASE_2 + PHASE_5:
         _get(full, path, null_parent=(item, path) in PHASE_2)  # present, null or not; no force_field= here
         _get(empty, path, null_parent=True)  # without a plan, "plan" is null
 
@@ -185,6 +194,7 @@ def test_schema_version_is_the_first_key():
     record = provenance.metadata_record()
     assert provenance.SCHEMA == "fastmace.metadata/1"
     assert next(iter(record)) == "schema" and record["schema"] == provenance.SCHEMA
+    assert list(record)[1] == "schema_minor" and record["schema_minor"] == provenance.SCHEMA_MINOR == 1  # 5-T01
 
 
 def test_later_phase_items_are_an_explicit_null():
@@ -293,6 +303,22 @@ def test_gate_report_counters_and_engine_info():
     assert gate["selfchecks"] == []  # the plan's (2-T04): this plan was never built
 
 
+def test_tier_switches_are_a_list_of_switch_records():  # 5-T01 (SPEC §9.6; 5-T07 fills them)
+    from fastmace.planner.plan import TierSwitch
+
+    assert provenance.metadata_record()["counters"]["tier_switches"] == []
+    assert _full_record()["counters"]["tier_switches"] == []
+    switch = TierSwitch(step=20000, from_tier="graph", to_tier="compiled", reason="re-capture storm", revision=1)
+    entry = {"step": 20000, "from": "graph", "to": "compiled", "reason": "re-capture storm", "revision": 1}
+    assert provenance.TIER_SWITCH_KEYS == ("step", "from", "to", "reason", "revision")
+    assert _full_record(counters={"tier_switches": [switch]})["counters"]["tier_switches"] == [entry]
+    assert _full_record(counters={"tier_switches": [entry]})["counters"]["tier_switches"] == [entry]
+    with pytest.raises(ValueError, match="keys"):
+        _full_record(counters={"tier_switches": [{"step": 1, "to": "compiled"}]})
+    with pytest.raises(ValueError, match="step"):
+        _full_record(counters={"tier_switches": [{**entry, "step": -1}]})
+
+
 def test_mc_counters_are_null_without_mc_and_per_move_type_with_it():  # 3-T15
     assert provenance.metadata_record()["counters"]["mc"] is None
     assert _full_record()["counters"]["mc"] is None
@@ -309,7 +335,7 @@ def test_mc_counters_are_null_without_mc_and_per_move_type_with_it():  # 3-T15
 
 def test_unknown_counter_and_gate_without_status_are_refused():
     with pytest.raises(ValueError, match="tier_switches"):
-        _full_record(counters={"tier_switches": 1})  # phase 5 (§9.6): not settable in phase 2
+        _full_record(counters={"tier_switches": 1})  # a list of switches (5-T01), never a count
     with pytest.raises(ValueError, match="status"):
         _full_record(gate={"selfchecks": {}})
 

@@ -58,6 +58,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from fastmace.config import (
+    AdaptationConfig,
+    CalibrationConfig,
     EngineConfig,
     FallbackConfig,
     GateConfig,
@@ -110,7 +112,10 @@ class PlannerOptions:
       ``allow_reference``: rule 1's flag;
     - ``fallback``, ``gate``, ``runner``: the safety records of phase 2 (§9.4, §12.3, §8.7);
     - ``engine``, ``neighbours``: the planner-level options; ``None`` keeps the default planner's
-      (``planner.minimal.default_planner``: CUDA if available, else the CPU without compilation).
+      (``planner.minimal.default_planner``: CUDA if available, else the CPU without compilation);
+    - ``adaptation``, ``calibration``: runtime adaptation (§9.6) and the optional calibration (§9.1) of
+      phase 5 (plan task 5-T01). Their fields that an open owner decision fixes stay ``config.PENDING``, and
+      ``calibrate=True`` is refused, until 5-T07 and 5-T09 land (``phase_5_pending``).
     """
 
     mode: Mode | None = None
@@ -120,6 +125,8 @@ class PlannerOptions:
     runner: RunnerConfig = field(default_factory=RunnerConfig)
     engine: EngineConfig | None = None
     neighbours: NeighbourConfig | None = None
+    adaptation: AdaptationConfig = field(default_factory=AdaptationConfig)
+    calibration: CalibrationConfig = field(default_factory=CalibrationConfig)
 
     def to_record(self) -> dict[str, Any]:
         """A JSON-safe mapping (``simulation.json``'s ``planner_options``)."""
@@ -132,11 +139,13 @@ class PlannerOptions:
 
         return {"mode": self.mode, "allow_reference": self.allow_reference, "fallback": part(self.fallback),
                 "gate": part(self.gate), "runner": part(self.runner), "engine": part(self.engine),
-                "neighbours": part(self.neighbours)}
+                "neighbours": part(self.neighbours), "adaptation": part(self.adaptation),
+                "calibration": part(self.calibration)}
 
     @classmethod
     def from_record(cls, record: Mapping[str, Any] | None) -> PlannerOptions:
-        """The options of a ``to_record`` mapping; ``None`` (a version 1 record) gives the defaults."""
+        """The options of a ``to_record`` mapping; ``None`` (a version 1 record) gives the defaults, and so
+        does a missing part (records from before phase 5 have no ``adaptation`` or ``calibration``)."""
         if record is None:
             return cls()
         from fastmace.planner.plan import _from_json
@@ -150,12 +159,40 @@ class PlannerOptions:
         return planner_options(mode=record.get("mode"), allow_reference=record.get("allow_reference", False),
                                fallback=part("fallback", FallbackConfig), gate=part("gate", GateConfig),
                                runner=part("runner", RunnerConfig), engine=part("engine", EngineConfig),
-                               neighbours=part("neighbours", NeighbourConfig))
+                               neighbours=part("neighbours", NeighbourConfig),
+                               adaptation=part("adaptation", AdaptationConfig),
+                               calibration=part("calibration", CalibrationConfig))
+
+
+# The refusals of phase 5's placeholders (plan task 5-T01): a field an open owner decision fixes, set before the
+# task implementing it lands. 5-T07 (D2, D3) and 5-T09 (D5) remove them.
+PHASE_5_PENDING_CODES = {"adaptation": "adaptation-pending", "calibration": "calibration-pending"}
+
+
+def phase_5_pending(adaptation: AdaptationConfig, calibration: CalibrationConfig) -> list[Any]:
+    """The ``Reason`` for each phase 5 option that asks for behaviour an open owner decision fixes."""
+    from fastmace.config import PENDING
+    from fastmace.errors import Reason
+
+    reasons = []
+    decided = adaptation.decided()
+    if decided:
+        reasons.append(Reason(f"AdaptationConfig({', '.join(f'{name}=...' for name in decided)}): the trigger and the "
+                              "limits of runtime adaptation wait for owner decisions D2 and D3 (plans/phase-5.md, "
+                              "task 5-T07); leave them 'pending', or pass adapt='off'",
+                              code=PHASE_5_PENDING_CODES["adaptation"]))
+    if calibration.calibrate or calibration.choose != PENDING:
+        reasons.append(Reason("CalibrationConfig(calibrate=True) or choose=...: the optional calibration waits for "
+                              "owner decision D5 (plans/phase-5.md, task 5-T09)",
+                              code=PHASE_5_PENDING_CODES["calibration"]))
+    return reasons
 
 
 def planner_options(mode: Any = None, allow_reference: Any = False, fallback: Any = None, gate: Any = None,
-                    runner: Any = None, engine: Any = None, neighbours: Any = None) -> PlannerOptions:
-    """The validated ``PlannerOptions``: ``ValueError`` or ``TypeError`` before anything is loaded."""
+                    runner: Any = None, engine: Any = None, neighbours: Any = None, adaptation: Any = None,
+                    calibration: Any = None) -> PlannerOptions:
+    """The validated ``PlannerOptions``: ``ValueError`` or ``TypeError`` before anything is loaded, and
+    ``PlanRefused`` for a phase 5 option that waits for an owner decision (``phase_5_pending``)."""
     from fastmace.config import MODES
 
     if mode is not None and (not isinstance(mode, str) or mode not in MODES):
@@ -167,13 +204,20 @@ def planner_options(mode: Any = None, allow_reference: Any = False, fallback: An
                                        ("gate", gate, GateConfig, GateConfig),
                                        ("runner", runner, RunnerConfig, RunnerConfig),
                                        ("engine", engine, EngineConfig, None),
-                                       ("neighbours", neighbours, NeighbourConfig, None)):
+                                       ("neighbours", neighbours, NeighbourConfig, None),
+                                       ("adaptation", adaptation, AdaptationConfig, AdaptationConfig),
+                                       ("calibration", calibration, CalibrationConfig, CalibrationConfig)):
         if value is None:
             parts[name] = None if default is None else default()
         elif isinstance(value, kind):
             parts[name] = value
         else:
             raise TypeError(f"{name} must be a fastmace.config.{kind.__name__} or None, got {type(value).__name__}")
+    pending = phase_5_pending(parts["adaptation"], parts["calibration"])
+    if pending:
+        from fastmace.errors import PlanRefused
+
+        raise PlanRefused.from_reasons(pending)
     return PlannerOptions(mode=mode, allow_reference=allow_reference, **parts)
 
 
@@ -299,7 +343,7 @@ class Simulation:
 
     ``Simulation(atoms, force_field, *, species=None, integrator, workload=None, output=None, seed,
     check="skip", allow_naive_cueq=False, mode=None, allow_reference=False, fallback=None, gate=None,
-    runner=None, engine=None, neighbours=None)``:
+    runner=None, engine=None, neighbours=None, adaptation=None, calibration=None)``:
 
     - ``atoms``: ASE ``Atoms``, full 3D PBC (§4.4); copied, the caller's object is never changed;
     - ``force_field``: a ``fm.ForceField``, an ``fm.load`` result or a label; a model is wrapped in
@@ -319,8 +363,9 @@ class Simulation:
       ``allow_reference`` (rule 1), ``fallback`` (``FallbackConfig``, §9.4), ``gate``
       (``GateConfig``, §12.3 "Resources"; the record is ``sim.gate_config``, the result
       ``sim.gate``), ``runner`` (``RunnerConfig``, §8.7), ``engine`` (``EngineConfig``) and
-      ``neighbours`` (``NeighbourConfig``). ``None`` takes the defaults, and for ``engine`` and
-      ``neighbours`` the default planner's.
+      ``neighbours`` (``NeighbourConfig``), ``adaptation`` (``AdaptationConfig``, §9.6) and ``calibration``
+      (``CalibrationConfig``, §9.1; both phase 5, plan task 5-T01). ``None`` takes the defaults, and for
+      ``engine`` and ``neighbours`` the default planner's.
     """
 
     # True while an MC block runs (T15's block hook sets it): restart writes are refused then (§10.6).
@@ -332,10 +377,12 @@ class Simulation:
                  check: Check = "skip", allow_naive_cueq: bool = False, mode: Mode | None = None,
                  allow_reference: bool = False, fallback: FallbackConfig | None = None,
                  gate: GateConfig | None = None, runner: RunnerConfig | None = None,
-                 engine: EngineConfig | None = None, neighbours: NeighbourConfig | None = None):
+                 engine: EngineConfig | None = None, neighbours: NeighbourConfig | None = None,
+                 adaptation: AdaptationConfig | None = None, calibration: CalibrationConfig | None = None):
         check_mode(check)
         options = planner_options(mode=mode, allow_reference=allow_reference, fallback=fallback, gate=gate,
-                                  runner=runner, engine=engine, neighbours=neighbours)
+                                  runner=runner, engine=engine, neighbours=neighbours, adaptation=adaptation,
+                                  calibration=calibration)
         from fastmace import integrators as records
         from fastmace import optimize as optimizers
         from fastmace.errors import PlanRefused, Reason

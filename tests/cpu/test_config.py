@@ -32,6 +32,8 @@ CLASSES = (
     config.GateConfig,
     config.RunnerConfig,
     config.MCConfig,
+    config.AdaptationConfig,
+    config.CalibrationConfig,
 )
 
 # Every field that can be "auto", with the named rule that resolves it. 1a-T15 implements
@@ -81,6 +83,7 @@ AUTO_RULES = {
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
     "GateConfig.reduced_cell": "largest_smaller_supercell_at_least_min_height",
     "FallbackConfig.fallback": "fallback_search_on_failure",
+    "AdaptationConfig.adapt": "adapt_between_segments",
 }
 
 # Research-engine switches that SPEC §6.2 or the research engine's own records reject;
@@ -217,6 +220,17 @@ def test_rejected_switches_have_no_field():
         (config.IntegratorConfig, {"ensemble": "nph"}),  # "nve" is valid since 4-T01
         (config.IntegratorConfig, {"dof": "3n"}),
         (config.IntegratorConfig, {"barostat_tau_fs": -1.0}),
+        (config.AdaptationConfig, {"adapt": "on"}),  # 5-T01
+        (config.AdaptationConfig, {"trigger": "rebuild-rate"}),
+        (config.AdaptationConfig, {"recapture_time_fraction": 1.0}),
+        (config.AdaptationConfig, {"max_switches": -1}),
+        (config.AdaptationConfig, {"max_switches": True}),
+        (config.AdaptationConfig, {"switch_back_after": 0}),
+        (config.AdaptationConfig, {"reproducible": "yes"}),
+        (config.CalibrationConfig, {"calibrate": 1}),
+        (config.CalibrationConfig, {"steps": 0}),
+        (config.CalibrationConfig, {"margin": 0.0}),
+        (config.CalibrationConfig, {"choose": "auto"}),
     ],
 )
 def test_invalid_values_are_refused(cls, kwargs):
