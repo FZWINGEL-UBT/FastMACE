@@ -1,0 +1,91 @@
+{
+  "schema": 4,
+  "task": "4-T05/4-T06/4-T07",
+  "side": "ase",
+  "optimizer": "fire",
+  "cell_filter": "frechet",
+  "pressure_GPa": 0.0,
+  "dispersion": "none",
+  "structure_settings": {
+    "root": "/data/baseline/1a-T18",
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "strain": 0.02,
+    "rattle_A": 0.02,
+    "seed": 0,
+    "seed_rule": "seed + crc32(name)"
+  },
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T09:47:01+00:00",
+  "fastmace_commit": null,
+  "machine": "modal",
+  "gpu": "NVIDIA L4",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/cache/L4/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NaCl": {
+      "traj": "/data/baseline/1a-T18/Structures/Benchmark/R2SCAN/NaCl.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 43,
+          "seconds": 65.37873344800002,
+          "initial_eV_atom": -6.882520345626054,
+          "energy_eV_atom": -6.887616209409855,
+          "fmax_eV_A": 0.0041218015207196085,
+          "ms_per_step": 1520.4356615813958,
+          "switch_flips": 1,
+          "cell_lengths_A": [
+            16.837645666583953,
+            16.83770225788257,
+            16.83764809646504
+          ],
+          "cell_angles_deg": [
+            90.00005960708994,
+            89.9999827212816,
+            89.99997132157783
+          ],
+          "volume_A3": 4773.595551726253
+        }
+      }
+    },
+    "NbCl5": {
+      "traj": "/data/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl5.cif",
+      "frames": {
+        "0": {
+          "converged": false,
+          "steps": 5000,
+          "seconds": 367.330104736,
+          "initial_eV_atom": -10.603163163848375,
+          "energy_eV_atom": -10.623757843863327,
+          "fmax_eV_A": 0.010312593368042277,
+          "ms_per_step": 73.46602094720001,
+          "switch_flips": 447,
+          "cell_lengths_A": [
+            57.64608732774484,
+            55.11381488031607,
+            18.155570570687363
+          ],
+          "cell_angles_deg": [
+            89.99995819304708,
+            90.39300429011747,
+            90.00001019685676
+          ],
+          "volume_A3": 57680.62981327258
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T09:54:13+00:00"
+}

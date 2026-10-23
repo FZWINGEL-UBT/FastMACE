@@ -19,6 +19,7 @@ per-step energies and max forces and the engine's rebuild and re-capture counts.
 
 from __future__ import annotations
 
+import math
 import time
 from collections.abc import Mapping
 from typing import Any
@@ -58,6 +59,7 @@ class OptimizerStepper(Integrator):
         self.optimizer.update()
 
     def start(self, state) -> None:
+        self.dof.refresh()  # the cell filter's x and gradient at the first (or re-evaluated) forces, 4-T07
         self.optimizer.start()
 
     def mid_step_tensors(self, state) -> tuple:
@@ -95,12 +97,14 @@ def relax(engine, *, fmax: float, steps: int) -> dict[str, Any]:
     optimizer.set_fmax(fmax)
     optimizer.recheck()
     converged, force, energy = engine.read_optimizer_status()  # host sync
+    _check_finite(optimizer, force)
     energies, forces = [energy], [force]
     taken = 0
     while not converged and taken < steps:
         engine.step()
         if taken:  # the status this step read is the state before it; the start's is recorded already
             _, force, energy = engine.optimizer_status()
+            _check_finite(optimizer, force)
             energies.append(energy)
             forces.append(force)
         if engine.halted:
@@ -110,15 +114,33 @@ def relax(engine, *, fmax: float, steps: int) -> dict[str, Any]:
     else:
         if taken:  # stopped by the step limit (or a converged last step): its state has not been read
             converged, force, energy = engine.read_optimizer_status()
+            _check_finite(optimizer, force)
             energies.append(energy)
             forces.append(force)
     record = engine.integrator.config
-    return {"optimizer": record.scheme, "fixed_cell": not optimizer.variable_cell, "fmax_target_eV_A": float(fmax),
-            "max_steps": int(steps), "converged": bool(converged), "steps": taken,
-            "seconds": time.perf_counter() - started, "initial_eV_atom": energies[0] / natoms,
-            "energy_eV_atom": energies[-1] / natoms, "fmax_eV_A": forces[-1], "energies_eV": energies,
-            "fmax_history_eV_A": forces, "neighbour_rebuilds": engine.rebuilds - rebuilds,
-            "recaptures": engine.recaptures - recaptures}
+    summary = {"optimizer": record.scheme, "fixed_cell": not optimizer.variable_cell, "fmax_target_eV_A": float(fmax),
+               "max_steps": int(steps), "converged": bool(converged), "steps": taken,
+               "seconds": time.perf_counter() - started, "initial_eV_atom": energies[0] / natoms,
+               "energy_eV_atom": energies[-1] / natoms, "fmax_eV_A": forces[-1], "energies_eV": energies,
+               "fmax_history_eV_A": forces, "neighbour_rebuilds": engine.rebuilds - rebuilds,
+               "recaptures": engine.recaptures - recaptures}
+    if optimizer.variable_cell:  # 4-T07: the relaxed cell; with a scalar pressure the energies are E + p V (ASE's)
+        import numpy as np
+        from ase import units
+
+        state = engine.state
+        cell = state.cell.detach().cpu().numpy()
+        summary.update({"cell_A": cell.tolist(), "volume_A3": abs(float(np.linalg.det(cell))),
+                        "stress_GPa": (state.stress.detach().cpu().numpy() / units.GPa).tolist(),
+                        "scalar_pressure_GPa": float(record.cell_filter_parameter("scalar_pressure_GPa", 0.0))})
+    return summary
+
+
+def _check_finite(optimizer, force: float) -> None:
+    """A NaN max force stops the relaxation with the DOF view's reason (the cell filter's range guard)."""
+    if not math.isfinite(force):
+        reason = getattr(optimizer.dof, "failure_reason", lambda: "a non-finite force or gradient")()
+        raise FloatingPointError(f"the relaxation stopped: {reason}")
 
 
 __all__ = ["OptimizerStepper", "relax"]

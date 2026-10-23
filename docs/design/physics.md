@@ -38,6 +38,22 @@ SPEC §4.4's support table is data: one record per scheme, in
 Registered today: `langevin` and `baoab`, which declare `fixcm` only. 4-T04 adds their
 `fix_atoms` row after D1.
 
+**Shared buffer names (4-T01b).** A buffer name is per owner: `integrator.`, `optimizer.` or
+`dof.`. Two schemes of one owner may declare the same name only if it means the same thing in
+both: the same quantity, units and shape, and the same restart policy. Only one scheme runs per
+engine, but restart, capture and the gate read the policy by name alone.
+
+- **Different restart policies:** discovery refuses the pair with `RegistryError`, naming both
+  schemes and the buffer. Rename the buffer in one of the records. For example, Berendsen's
+  pressure target and MTK's barostat state cannot both be `integrator.pressure`.
+- **Same restart policy, different `recompute` functions:** this is allowed. The runtime-state
+  registry keeps one policy whose `recompute` lists both functions, sorted and joined with
+  ` | `. Example: LBFGS and FIRE's `optimizer.fmax` and `optimizer.status`.
+- **A name `engine.registry.POLICIES` already holds:** the table is matched first, by name or by
+  pattern, so the scheme must declare the table's restart policy. For example, a record with
+  `integrator.eta` must declare Langevin's `"derived"`. A different policy raises
+  `RegistryError`, naming the buffer, the scheme and the table entry with its owner.
+
 ## Constructors and dispatch
 
 Only the planner builds schemes (SPEC §5), through:
@@ -149,8 +165,28 @@ now asks the record.
 
 - **`PositionsDOF(state)`:** fixed cell. `x` is a view of `state.positions`; `FixAtoms` comes
   in through `state.free_mask`.
-- **4-T07's `FrechetCellFilter`:** implements the same view, so FIRE and LBFGS run unchanged on
-  it.
+- **4-T07's `FrechetCellFilter`** (`fastmace/optimize/cell.py`): implements the same view, so FIRE
+  and LBFGS run unchanged on it.
+  - `x` is ASE's (N + 3) × 3 vector: positions in the original cell, then the cell rows
+    `ecf · logm(cf · F)`. ASE folds `UnitCellFilter`'s `cell_factor` cf = N into the log, so
+    the cell rows carry a constant `ecf · ln(N) · I`. FastMACE evaluates both directions in a
+    shifted form: `expm(X / ecf − ln(cf) I)`, and the log of F itself. Same values, but on
+    matrices of norm ~|log F| instead of ~ln N. Against 40-digit mpmath, ASE's own form costs
+    2e-14 relative in F; the shifted form is exact to 1e-17.
+  - Device matrix functions, no host syncs and no LAPACK:
+    - `expm_3x3` from `integrators/baoab.py`, now for any square size;
+    - `logm_3x3`, by inverse scaling and squaring. It is used only with a `mask`; without one,
+      log F is `X / ecf − ln(cf) I` itself;
+    - ASE's nine `expm_frechet` calls as one 6 × 6 exponential: the adjoint of `L_exp(A, ·)`
+      is `L_exp(Aᵀ, ·)`;
+    - 3 × 3 inverses by cofactors.
+  - `refresh` runs after each force call and in `OptimizerStepper.start`. It computes `x`'s
+    atom rows, the gradient (ASE's `get_forces`) and the energy E + pV.
+  - `set_x` moves positions and cell. It does nothing for a move to the current `x` (a
+    converged step) or for one outside |log F| ≤ 0.5 per element. In the second case
+    `cell_ok` drops, `max_force` becomes NaN, and `driver.relax` raises `FloatingPointError`
+    with the filter's `failure_reason`.
+  - `FixAtoms` and non-periodic cells are refused (D1).
 
 The `Optimizer(dof, config)` methods:
 

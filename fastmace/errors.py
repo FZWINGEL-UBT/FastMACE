@@ -366,6 +366,14 @@ class SelfCheckError(RewriteError):
 
 # --------------------------------------------------------------------------- benchmarks
 
+class RegistryError(FastMACEError, RuntimeError):
+    """A persistent buffer without a policy, a restore whose buffer moved (SPEC §8.1), or two scheme records that
+    give one buffer different restart policies (4-T01b). ``fastmace.engine.registry`` re-exports it."""
+
+    default_next_step = ("This is a FastMACE bug: report it with the buffer name. The policy table is "
+                         "fastmace.engine.registry.POLICIES, plus the scheme records' buffers.")
+
+
 class BaselineExportError(FastMACEError):
     """A baseline directory is not a usable export of the research engine."""
 
@@ -385,4 +393,4 @@ __all__ = ["FastMACEError", "Reason", "PlanRefused", "SpeciesNotInSuperset", "Pr
            "GateFailed", "GateUnavailable", "ModelElementError", "RestartMismatch", "CheckpointTrustError",
            "NonFiniteError", "HybridUnavailableError", "BackendError", "NaiveCueqError", "PolarUnavailableError",
            "OEqRuntimeError", "CacheLocationError", "RewriteError", "RewriteRefusedError", "SelfCheckError",
-           "BaselineExportError", "ModelLicenceWarning"]
+           "BaselineExportError", "ModelLicenceWarning", "RegistryError"]
