@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "L4",
+  "source_commit": "3066709aba2e93f56cfd7120962f33836dd3cb2b",
+  "command": "nvidia-smi -L; OMP_NUM_THREADS=2 FASTMACE_COMMIT=3066709 python tools/bench/optimizer_frames.py --side ase --optimizer lbfgs --checkpoint /data/models/mace-mh-1.model --traj NaTaCl6=/data/anneal-minima/NaTaCl6/captured.traj --frames 0 1 2 3 4 5 6 7 8 9 10 11 12 --modes graph --skins auto --output $OUT/ase-replay1 > $OUT/ase-replay1.log 2>&1; echo replay1 exit $?; grep 'frame 12 ' $OUT/ase-replay1.log; OMP_NUM_THREADS=2 FASTMACE_COMMIT=3066709 python tools/bench/optimizer_frames.py --side ase --optimizer lbfgs --checkpoint /data/models/mace-mh-1.model --traj NaTaCl6=/data/anneal-minima/NaTaCl6/captured.traj --frames 0 1 2 3 4 5 6 7 8 9 10 11 12 --modes graph --skins auto --output $OUT/ase-replay2 > $OUT/ase-replay2.log 2>&1; echo replay2 exit $?; grep 'frame 12 ' $OUT/ase-replay2.log;",
+  "nvidia_smi": "NVIDIA L4, 610.57.04, 23034 MiB, 8.9",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 424.3215055465698,
+  "estimated_gpu_cost_usd": 0.09429366789923775
+}
