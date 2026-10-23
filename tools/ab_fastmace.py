@@ -235,6 +235,11 @@ class Version:
             self.planner = self.module("planner.minimal").MinimalPlanner(engine=engine)
         else:
             self.planner = self.module("planner.fixed").FixedPlanner(engine=engine)
+        if getattr(self.args, "reproducible", False):
+            # A reproducible plan needs its process prepared before CUDA starts (SPEC §8.7), and hardware() starts
+            # it: claim the process first, as the planner's build would (3b-T10, tools/trajectory_versions.py).
+            self.module("planner.reproducible").prepare_process(self.planner.process,
+                                                                 owner="a reproducible MD plan (trajectory_versions)")
         self.hardware = self.planner.hardware()
 
     def load(self, checkpoint):
