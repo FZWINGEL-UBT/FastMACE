@@ -3,7 +3,7 @@
 #   bash /content/fm/remote.sh <stage> [arg]
 # Stages: probe | setup | restore | run <n> | pack
 # Expects /content/fm/payload.tar (gzipped source, baseline export, requirements, models list) from the driver,
-# and for `restore` /content/fm/cache-in.tar.gz. Records go to /content/fm/out (downloaded by the driver).
+# and for `restore` the store's cache parts /content/fm/cache-in-<nnn>.tar.gz. Records go to /content/fm/out (downloaded by the driver).
 # Mirrors tools/modal/fastmace_modal.py: Python 3.10 (uv-managed), requirements-hybrid.txt with the cu130
 # torch index, g++ for the OEq host extension (no nvcc), TORCHINDUCTOR_COMPILE_THREADS=4, caches under one root.
 set -uo pipefail
@@ -116,9 +116,10 @@ EOF
 restore)
   # Compile caches from an earlier run on the same capability and stack; the listing tells `pack` what changed.
   t0=$(now)
-  if [ -f cache-in.tar.gz ]; then tar -xzf cache-in.tar.gz -C "$CACHE" && rm -f cache-in.tar.gz; fi
-  find "$CACHE" -type f -printf '%P %s %T@\n' | sort > "$FM/cache-before.txt"
-  echo "restored $(wc -l < "$FM/cache-before.txt") files, $(du -sh "$CACHE" | cut -f1), $(since "$t0") s"
+  # The store's parts in order (the first run's caches, then each later run's new files).
+  for part in $(ls cache-in-*.tar.gz 2>/dev/null | sort); do tar -xzf "$part" -C "$CACHE" && rm -f "$part"; done
+  find "$CACHE" -type f -printf '%s %T@ %P\0' > "$FM/cache-before.lst"
+  echo "restored $(du -sh "$CACHE" | cut -f1), $(since "$t0") s"
   ;;
 run)
   n=${2:?command number}
@@ -130,12 +131,23 @@ run)
   ;;
 pack)
   t0=$(now)
-  find "$CACHE" -type f -printf '%P %s %T@\n' | sort > "$FM/cache-after.txt"
+  # Only the files that are new or changed since `restore` go back, as the store's next part.
   rm -f cache-out.tar.gz
-  if cmp -s "$FM/cache-before.txt" "$FM/cache-after.txt"; then
-    echo "caches unchanged"
+  find "$CACHE" -type f -printf '%s %T@ %P\0' > "$FM/cache-after.lst"
+  python3 - "$FM/cache-before.lst" "$FM/cache-after.lst" "$FM/cache-delta.lst" <<'EOF'
+import sys
+def entries(path):
+    return set(open(path, "rb").read().split(b"\0")) - {b""}
+new = entries(sys.argv[2]) - entries(sys.argv[1])
+with open(sys.argv[3], "wb") as f:
+    f.write(b"".join(entry.split(b" ", 2)[2] + b"\0" for entry in sorted(new)))
+print(f"{len(new)} new or changed cache files")
+EOF
+  if [ -s "$FM/cache-delta.lst" ]; then
+    tar -czf cache-out.tar.gz -C "$CACHE" --null -T "$FM/cache-delta.lst" \
+      && echo "caches changed: $(du -sh cache-out.tar.gz | cut -f1)"
   else
-    tar -czf cache-out.tar.gz -C "$CACHE" . && echo "caches changed: $(du -sh cache-out.tar.gz | cut -f1)"
+    echo "caches unchanged"
   fi
   tar -czf out.tar.gz -C "$FM" out
   echo "pack $(since "$t0") s"

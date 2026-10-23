@@ -16,7 +16,7 @@ The driver:
    venv (about a minute; the venv is kept on a kept session), fetches the released checkpoints from their
    official URLs with the label table's SHA-256, restores the compile caches for this GPU capability and
    stack, runs each ``--command`` from the source root with ``$OUT`` as its results directory, and packs the
-   caches (only when they changed) and the records;
+   new or changed cache files (the store's next part) and the records;
 5. downloads the records to ``<out>/out/`` and the changed caches to the store;
 6. stops the VM, also on an error and on Ctrl-C (``--keep`` excepted);
 7. writes ``<out>/colab.json`` and a row in the ledger: GPU, capability, driver, versions, commit, setup and
@@ -24,7 +24,7 @@ The driver:
 
 Why no Google Drive: ``colab drivemount`` asks for the owner's browser consent on every new VM (checked
 23 October 2026: a second VM got HTTP 400 without a fresh consent), so it cannot run unattended. The store is
-local instead (``FASTMACE_COLAB_STATE``, default ``~/.fastmace-colab``): ``caches/<key>.tar.gz`` with
+local instead (``FASTMACE_COLAB_STATE``, default ``~/.fastmace-colab``): ``caches/<key>/<nnn>.tar.gz`` with
 ``key = sm<capability>-py310-<sha256 of the requirements>``, ``manifests/<stack>.json`` (the environment's
 ``pip freeze`` and its sha256, from ``--build-env``) and ``colab-ledger.csv``.
 """
@@ -146,6 +146,15 @@ def stack_key(requirements):
 
 def cache_key(capability, stack):
     return f"sm{capability.replace('.', '')}-py{PYTHON.replace('.', '')}-{stack}"
+
+
+def cache_parts(directory):
+    """The store's parts for one key, in order: the first run's caches, then each later run's new files."""
+    return sorted(Path(directory).glob("[0-9][0-9][0-9].tar.gz")) if Path(directory).is_dir() else []
+
+
+def next_part_name(parts):
+    return f"{int(parts[-1].name[:3]) + 1:03d}.tar.gz" if parts else "000.tar.gz"
 
 
 def requirements_text(text, overrides=OVERRIDES):
@@ -344,12 +353,13 @@ def run_job(args, colab=run_colab):
         timings["setup_step_s"] = seconds
         if code != 0:
             raise RuntimeError(f"setup failed (exit {code}):\n{log[-3000:]}")
-        cache = job.store / "caches" / f"{key}.tar.gz"
-        record["cache_hit"] = cache.exists()
+        cache = job.store / "caches" / key
+        parts = cache_parts(cache)
+        record["cache_hit"] = bool(parts)
         t = time.time()
-        if cache.exists():
-            job.upload(cache, f"{STAGING}cache-in.tar.gz")
-            record["cache_bytes_in"] = cache.stat().st_size
+        for part in parts:
+            job.upload(part, f"{STAGING}cache-in-{part.name}")
+        record["cache_bytes_in"] = sum(part.stat().st_size for part in parts)
         code, seconds, log = job.step("restore", "restore", timeout_s=900)
         timings["cache_restore_s"] = round(time.time() - t, 1)
         record["setup_s"] = round(time.time() - started, 1)
@@ -366,9 +376,12 @@ def run_job(args, colab=run_colab):
         changed = "caches changed" in log
         job.download(f"{REMOTE}/out.tar.gz", job.work / "out.tar.gz")
         if changed and not args.dry_run:
-            part = cache.with_suffix(".part")
-            job.download(f"{REMOTE}/cache-out.tar.gz", part)
-            part.replace(cache)
+            cache.mkdir(parents=True, exist_ok=True)
+            part = cache / next_part_name(parts)
+            partial = part.with_suffix(".part")
+            job.download(f"{REMOTE}/cache-out.tar.gz", partial)
+            partial.replace(part)
+            record["cache_bytes_out"] = part.stat().st_size
         record["cache_saved"] = changed
         timings["pack_download_s"] = round(time.time() - t, 1)
         if not args.dry_run:

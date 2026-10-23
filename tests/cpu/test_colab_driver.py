@@ -217,7 +217,7 @@ def test_job_runs_stages_in_order_and_stops(tmp_path):
     assert saved["provider"] == "colab" and saved["commands"][0]["command"] == "echo one"
     assert (tmp_path / "out" / "out" / "cmd1" / "command.log").exists()
     key = record["cache_key"]
-    assert (tmp_path / "store" / "caches" / f"{key}.tar.gz").exists()
+    assert (tmp_path / "store" / "caches" / key / "000.tar.gz").exists()
     assert list(csv.DictReader((tmp_path / "ledger.csv").open()))[0]["session"] == "t1"
 
 
@@ -228,7 +228,7 @@ def test_warm_cache_is_uploaded_and_an_unchanged_one_not_downloaded(tmp_path):
     record = fc.run_job(args, colab)
     assert record["cache_hit"] is True and record["cache_saved"] is False
     uploads = [c for c in colab.calls if c[1] == "upload"]
-    assert any(c[-1] == "/content/fm_cache-in.tar.gz" for c in uploads)
+    assert [c[-1] for c in uploads if "cache-in" in c[-1]] == ["/content/fm_cache-in-000.tar.gz"]
     downloads = [c for c in colab.calls if c[1] == "download"]
     assert not any(c[-2].endswith("cache-out.tar.gz") for c in downloads)
 
@@ -275,3 +275,15 @@ def test_transfers_are_retried(tmp_path, monkeypatch):
 
     record = fc.run_job(_job_args(tmp_path), flaky)
     assert record["exit"] == 0 and failures["n"] == 2
+
+
+def test_changed_caches_add_a_part_and_all_parts_go_up(tmp_path):
+    args = _job_args(tmp_path)
+    first = fc.run_job(args, FakeColab())
+    fc.run_job(args, FakeColab(cache_changed=True))
+    parts = fc.cache_parts(tmp_path / "store" / "caches" / first["cache_key"])
+    assert [p.name for p in parts] == ["000.tar.gz", "001.tar.gz"]
+    colab = FakeColab(cache_changed=False)
+    fc.run_job(args, colab)
+    assert [c[-1] for c in colab.calls if c[1] == "upload" and "cache-in" in c[-1]] == [
+        "/content/fm_cache-in-000.tar.gz", "/content/fm_cache-in-001.tar.gz"]
