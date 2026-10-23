@@ -200,7 +200,7 @@ def test_rule_12_sizes_reach_traits_that_carry_them(monkeypatch):
         def from_record(cls, record):
             return ("dims", record["probe"])
 
-    monkeypatch.setattr(corpus_labels, "model_dims", lambda label: {"probe": label})
+    monkeypatch.setattr(corpus.corpus_labels, "model_dims", lambda label: {"probe": label})
     monkeypatch.setattr(corpus, "_module", lambda package, name: types.SimpleNamespace(ModelDims=ModelDims))
     assert corpus._with_dims("fastmace", Traits(), "mh1-r2scan").dims == ("dims", "mh1-r2scan")
     # Traits without the field (the baseline's) stay as they are.
