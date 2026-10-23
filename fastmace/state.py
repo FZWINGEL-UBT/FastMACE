@@ -204,7 +204,11 @@ class SimulationState:
     - ``charges`` ``(N,)`` float64 per-atom charges for models that take them, else ``None``;
       ``total_charge`` (float) and ``spin_multiplicity`` (int), host, ``None`` when the model
       takes none;
-    - ``pbc``: three bools, host; ``constraints``: a tuple, always empty until phase 4 (§4.4);
+    - ``pbc``: three bools, host; ``constraints``: a tuple of the other constraints, always empty (only
+      ``FixAtoms`` is supported, §4.4);
+    - ``fixed_indices``: the ``FixAtoms`` indices, host, sorted and unique (plan task 4-T01), and
+      ``free_mask``: float64 ``(N, 1)``, 1 for free atoms and 0 for fixed ones, ``None`` without fixed
+      atoms. Integrators multiply velocities and displacements by it; ``n_fixed`` counts them;
     - ``p_eps``, ``force_eps``: the barostat momentum and cell force, float64, shape ``()``
       (hydrostatic) or ``(3, 3)`` (full cell); ``None`` for fixed-cell integrators. The
       variable-cell integrator allocates them, as it allocates ``rng.batch``;
@@ -237,24 +241,36 @@ class SimulationState:
     plan_revision: int = 0
     force_field_identity: ForceFieldIdentity | None = None
     mc: dict[str, Any] | None = None
+    fixed_indices: tuple[int, ...] = ()
+    free_mask: torch.Tensor | None = None
 
     @classmethod
     def from_atoms(cls, atoms: Any, device: Any, seed: int, compute_stress: bool = False) -> SimulationState:
         """Build the state from an ASE ``Atoms`` (positions, velocities, masses, cell, numbers, PBC).
 
         Forces and energy start as zeros; the engine fills them with the initial evaluation.
-        ``compute_stress`` allocates ``stress``. Refuses constraints (SPEC §4.4). The noise batch is
-        left to the integrator, whose layout it is; charges, total charge and spin to the planner,
-        because whether they are inputs depends on the model.
+        ``compute_stress`` allocates ``stress``. ``FixAtoms`` becomes ``fixed_indices`` and ``free_mask``;
+        any other constraint raises (SPEC §4.4). Whether the integrator takes fixed atoms is rule 1's
+        (``fastmace.integrators.registry``). The noise batch is left to the integrator, whose layout it is;
+        charges, total charge and spin to the planner, because whether they are inputs depends on the model.
         """
-        if atoms.constraints:
-            raise ValueError("Constraints are not supported (SPEC §4.4)")
+        from fastmace.integrators.registry import constraint_names
+
+        fixed, other = constraint_names(atoms)
+        if other:
+            raise ValueError(f"Constraints other than FixAtoms are not supported ({', '.join(other)}; SPEC §4.4)")
         import numpy as np  # here, so that importing the interfaces stays cheap (no torch)
         import torch
 
         f64 = dict(dtype=torch.float64, device=device)
         positions = torch.tensor(atoms.get_positions(), **f64)
+        free_mask = None
+        if fixed:
+            free_mask = torch.ones((len(atoms), 1), **f64)
+            free_mask[list(fixed)] = 0.0
         return cls(
+            fixed_indices=fixed,
+            free_mask=free_mask,
             positions=positions,
             velocities=torch.tensor(atoms.get_velocities(), **f64),
             masses=torch.tensor(atoms.get_masses()[:, None], **f64),
@@ -271,6 +287,11 @@ class SimulationState:
     def natoms(self) -> int:
         """Number of atoms N."""
         return self.positions.shape[0]
+
+    @property
+    def n_fixed(self) -> int:
+        """Number of ``FixAtoms`` atoms."""
+        return len(self.fixed_indices)
 
     @property
     def momenta(self) -> torch.Tensor:
