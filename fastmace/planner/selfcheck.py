@@ -20,9 +20,10 @@ around the build (``docs/design/contracts-1b.md``):
 
 The rule is §12.2's ratio rule: for each quantity the production path's largest error against the
 float64 reference, over all copies, is at most twice the yardstick's, or at most the quantity's
-floor (``FLOORS``). Any NaN or inf fails before a maximum is taken: Python's ``max`` can drop a NaN
-depending on order, and an infinite yardstick would make the limit infinite. An NVT plan has no
-stress path; its stress is recorded as "stress: not in plan".
+floor (``FLOORS``; a reference record may raise a floor for its family, ``effective_floors``:
+PolarMACE's stress floor is 5e-7 eV/Å³, decision 49). Any NaN or inf fails before a maximum is
+taken: Python's ``max`` can drop a NaN depending on order, and an infinite yardstick would make the
+limit infinite. An NVT plan has no stress path; its stress is recorded as "stress: not in plan".
 
 References and process state. Production engines patch process-wide state that moved a float64
 reference by up to 7.8e-7 eV/Å (1a "after T10"). So the references run in this process only while
@@ -85,6 +86,7 @@ QUANTITIES = ("energy_meV_per_atom", "force_eV_per_A", "stress_eV_per_A3")
 # (largest stress component, about 16 kPa).
 FLOORS = MappingProxyType({"energy_meV_per_atom": 0.01, "force_eV_per_A": 1e-5, "stress_eV_per_A3": 1e-7})
 NO_STRESS = "stress: not in plan"
+FLOOR_SOURCES = ("SPEC §12.3", "reference record")
 _NAMES = MappingProxyType({"energy_meV_per_atom": "energy per atom", "force_eV_per_A": "force",
                            "stress_eV_per_A3": "stress"})
 _UNITS = MappingProxyType({"energy_meV_per_atom": "meV/atom", "force_eV_per_A": "eV/Å", "stress_eV_per_A3": "eV/Å^3"})
@@ -146,6 +148,8 @@ class GateRecord:
     force_eV_per_A: float | None = None
     stress_eV_per_A3: float | None = None
     quantities: Mapping[str, Any] = dataclasses.field(default_factory=dict)
+    # 4-T12: the floors the rule used, FLOORS with the reference record's (PolarMACE: stress 5e-7, decision 49).
+    floors: Mapping[str, float] | None = None
     nonfinite: tuple[str, ...] = ()
     mode: str | None = None
     references: Mapping[str, Any] | None = None
@@ -219,13 +223,31 @@ def _nonfinite(rows, quantities=QUANTITIES):
     return bad
 
 
-def verdict(rows, ratio: float = RATIO, quantities=QUANTITIES) -> dict[str, Any]:
+def effective_floors(raised=None) -> dict[str, float]:
+    """``FLOORS`` with the floors a reference record raises (``records.gate_floors``; SPEC §12.3, decision 49).
+
+    A record may only raise a known quantity's floor: an unknown quantity or a lower floor is a ``ValueError``.
+    """
+    floors = dict(FLOORS)
+    for quantity, value in (raised or {}).items():
+        if quantity not in FLOORS:
+            raise ValueError(f"unknown gate floor {quantity!r}; the floors are {tuple(FLOORS)}")
+        if not value >= FLOORS[quantity]:
+            raise ValueError(f"a reference record's {quantity} floor {value!r} is below SPEC §12.3's "
+                             f"{FLOORS[quantity]:g}: a record may raise a floor, never lower it")
+        floors[quantity] = float(value)
+    return floors
+
+
+def verdict(rows, ratio: float = RATIO, quantities=QUANTITIES, floors=None) -> dict[str, Any]:
     """The ratio rule over the copies' errors (``copy_errors`` per path): per quantity and overall.
 
     Each quantity passes when the production path's largest error is at most
     ``max(ratio x the yardstick's largest error, floor)``. A non-finite error anywhere fails first.
-    ``quantities`` selects the quantities judged (T15's reduced gate judges the failing one).
+    ``quantities`` selects the quantities judged (T15's reduced gate judges the failing one);
+    ``floors`` defaults to ``FLOORS`` (``effective_floors`` for a record's).
     """
+    floors = FLOORS if floors is None else floors
     selected = tuple(quantities)
     unknown = [quantity for quantity in selected if quantity not in QUANTITIES]
     if unknown:
@@ -241,9 +263,11 @@ def verdict(rows, ratio: float = RATIO, quantities=QUANTITIES) -> dict[str, Any]
             continue
         worst = max(production)
         yardstick = max(row["yardstick"][quantity] for row in rows if row["yardstick"][quantity] is not None)
-        limit = max(ratio * yardstick, FLOORS[quantity])
+        limit = max(ratio * yardstick, floors[quantity])
+        source = FLOOR_SOURCES[floors[quantity] != FLOORS[quantity]]
         quantities[quantity] = {"production": worst, "yardstick": yardstick, "ratio": worst / yardstick if yardstick
-                                else None, "floor": FLOORS[quantity], "limit": limit, "passed": bool(worst <= limit)}
+                                else None, "floor": floors[quantity], "floor_source": source, "limit": limit,
+                                "passed": bool(worst <= limit)}
     return {"passed": all(q["passed"] for q in quantities.values()), "nonfinite": [], "quantities": quantities}
 
 
@@ -1351,7 +1375,7 @@ def _replay(engine, copies, *, direct: bool = False):
     return outputs, notes
 
 
-def _replay_check(replayed, directs, natoms, quantities, limits):
+def _replay_check(replayed, directs, natoms, quantities, limits, floors=FLOORS):
     """The captured replay against a direct evaluation of the same force field, per quantity within ``limits``.
 
     The direct evaluation is ``MACEForceField.evaluate``: the same (compiled) model function,
@@ -1374,7 +1398,7 @@ def _replay_check(replayed, directs, natoms, quantities, limits):
         values = [row[quantity] for row in rows if row[quantity] is not None]
         if not values:
             continue
-        limit = limits.get(quantity, FLOORS[quantity])
+        limit = limits.get(quantity, floors[quantity])
         if not all(math.isfinite(value) for value in values):
             result["quantities"][quantity] = {"difference": None, "limit": limit, "passed": False}
             passed = False
@@ -1446,10 +1470,11 @@ def production(engine, references: References, *, check: str, quantities=None) -
             yardstick = (yardstick[0], yardstick[1], None)
         rows.append({"production": copy_errors(reference, output, natoms),
                      "yardstick": copy_errors(reference, yardstick, natoms)})
-    result = verdict(rows, quantities=quantities)
+    floors = effective_floors((references.info.get("reference") or {}).get("gate_floors"))
+    result = verdict(rows, quantities=quantities, floors=floors)
     if replay is not None:
         limits = {quantity: q["limit"] for quantity, q in result["quantities"].items() if "limit" in q}
-        replay = _replay_check(*replay, len(references.copies[0].atoms), quantities, limits)
+        replay = _replay_check(*replay, len(references.copies[0].atoms), quantities, limits, floors)
     worst = {quantity: result["quantities"].get(quantity, {}).get("production") for quantity in QUANTITIES}
     if result["nonfinite"]:
         reasons = ["non-finite values: " + ", ".join(result["nonfinite"])]
@@ -1470,7 +1495,8 @@ def production(engine, references: References, *, check: str, quantities=None) -
         mode = f"eager force field on the reduced cell; {mode} on the production cell"
     record = GateRecord(
         status=status, check=check, reason="; ".join(reasons) or None,
-        copies=references.description, quantities=result["quantities"], nonfinite=tuple(result["nonfinite"]),
+        copies=references.description, quantities=result["quantities"], floors=floors,
+        nonfinite=tuple(result["nonfinite"]),
         mode=mode, references={"ran": references.ran, "record_id": references.info["reference"]["record_id"],
                                **references.info},
         seconds={"references_s": references.seconds, "production_s": time.perf_counter() - started,
@@ -1927,12 +1953,13 @@ def move_gate(engine, references: MoveReferences | None, *, plan, force_field, r
                          "than about 1 % (the §9.4 fallback acts on this error)", gate_record=failed)
 
 
-__all__ = ["CHECK_MODES", "FLOORS", "MOVE_FRACTION", "MOVE_SAMPLES", "GateCopy", "GateRecord", "MoveConfiguration",
-           "MoveReferences", "MoveSample", "MoveSet", "ReducedCell", "References", "calibration_boxes", "check_mode",
-           "configuration_atoms", "copy_errors", "cpu_job", "describe_copies", "edge_count", "estimate_cost",
-           "evaluate_references", "heights", "is_out_of_memory", "make_copies", "move_gate", "move_references",
-           "move_rows", "move_threshold", "move_verdict", "primitive_repeat", "production", "reduced_cell",
-           "reduced_cells", "references", "run_child", "sample_moves", "skipped_record", "verdict"]
+__all__ = ["CHECK_MODES", "FLOORS", "FLOOR_SOURCES", "MOVE_FRACTION", "MOVE_SAMPLES", "GateCopy", "GateRecord",
+           "MoveConfiguration", "MoveReferences", "MoveSample", "MoveSet", "ReducedCell", "References",
+           "calibration_boxes", "check_mode", "configuration_atoms", "copy_errors", "cpu_job", "describe_copies",
+           "edge_count", "effective_floors", "estimate_cost", "evaluate_references", "heights", "is_out_of_memory",
+           "make_copies", "move_gate", "move_references", "move_rows", "move_threshold", "move_verdict",
+           "primitive_repeat", "production", "reduced_cell", "reduced_cells", "references", "run_child",
+           "sample_moves", "skipped_record", "verdict"]
 
 
 if __name__ == "__main__":

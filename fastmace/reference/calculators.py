@@ -304,6 +304,7 @@ class ReferenceCalculator:
             "patches": list(self.patches),
             "corrections_active": self.corrections_active(),
             "optional_physics": [entry["name"] for entry in self.record.optional_physics],
+            "gate_floors": records.gate_floors(self.record),
             "stock": self.record.is_stock,
             "polar": self.polar_info,
             "dispersion": None if self.d3 is None else _describe_d3(self.d3),
