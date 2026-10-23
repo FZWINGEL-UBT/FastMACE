@@ -123,8 +123,21 @@ def ase_calculator(checkpoint, device="cuda"):
     return SumCalculator([mace, d3])
 
 
-def run_ase(atoms, calculator, temperature_K, seed, steps, sample_every, sink, settings=SETTINGS):
-    """ASE ``LangevinBAOAB`` from ``atoms`` (velocities drawn here) for ``steps``; ``sink(row)`` per sample."""
+EXTRA_COLUMNS = ("step", "kinetic_from_momenta_eV", "com_kinetic_eV")
+
+
+def kinetic_extras(step, masses, momenta):
+    """The estimator check (``extras.csv``): the kinetic energy recomputed from the sampled momenta, and the
+    centre-of-mass part of it, |sum p|^2 / 2M (eV). The sample's own kinetic energy must equal the first."""
+    masses = np.asarray(masses, dtype=float).reshape(-1)
+    momenta = np.asarray(momenta, dtype=float).reshape(-1, 3)
+    total = momenta.sum(axis=0)
+    return (step, float((momenta ** 2 / (2.0 * masses[:, None])).sum()), float(total @ total / (2.0 * masses.sum())))
+
+
+def run_ase(atoms, calculator, temperature_K, seed, steps, sample_every, sink, settings=SETTINGS, extra=None):
+    """ASE ``LangevinBAOAB`` from ``atoms`` (velocities drawn here) for ``steps``; ``sink(row)`` per sample, and
+    ``extra(kinetic_extras row)`` if given."""
     from ase import units
     from ase.md.langevinbaoab import LangevinBAOAB
     from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
@@ -147,11 +160,16 @@ def run_ase(atoms, calculator, temperature_K, seed, steps, sample_every, sink, s
         if step % sample_every == 0:
             sink(sample_row(step, settings["timestep_fs"], atoms, atoms.get_potential_energy(),
                             atoms.get_stress(voigt=False)))
+            if extra is not None:
+                extra(kinetic_extras(step, atoms.get_masses(), atoms.get_momenta()))
     return atoms
 
 
-def fastmace_side(checkpoint, atoms, temperature_K, seed, steps, sample_every, sink, settings=SETTINGS):
-    """``fm.Simulation`` (default planner) from ``atoms`` (velocities drawn here, as ``run_ase``); returns it."""
+def fastmace_side(checkpoint, atoms, temperature_K, seed, steps, sample_every, sink, settings=SETTINGS, extra=None,
+                  precision="float32"):
+    """``fm.Simulation`` (default planner) from ``atoms`` (velocities drawn here, as ``run_ase``); returns it.
+
+    ``precision`` is the force precision (``"float32"``: production; ``"float64"``: the control plan)."""
     from ase import units
     from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 
@@ -161,7 +179,7 @@ def fastmace_side(checkpoint, atoms, temperature_K, seed, steps, sample_every, s
         warnings.simplefilter("ignore")
         MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K, rng=np.random.default_rng(seed))
     model = fm.load(str(checkpoint), head=settings["head"], trusted=True)
-    force_field = fm.ForceField(model, atoms, precision="float32", dispersion=d3_record())
+    force_field = fm.ForceField(model, atoms, precision=precision, dispersion=d3_record())
     integrator = fm.integrators.LangevinBAOAB(
         timestep_fs=settings["timestep_fs"], temperature_K=temperature_K,
         friction_per_fs=settings["friction_per_ase_time"] * units.fs, pressure_GPa=settings["pressure_GPa"],
@@ -171,12 +189,15 @@ def fastmace_side(checkpoint, atoms, temperature_K, seed, steps, sample_every, s
     simulation = fm.Simulation(atoms, force_field, integrator=integrator, seed=seed,
                                workload=fm.Workload(max_temperature_K=temperature_K))
     natoms = len(atoms)
+    masses = atoms.get_masses()
 
     def frame(step, values):
         host = {key: np.asarray(value, dtype=float) for key, value in values.items()
-                if key in ("cell", "kinetic", "energy", "stress")}
+                if key in ("cell", "kinetic", "energy", "stress", "momenta")}
         sink(observables_row(step, settings["timestep_fs"], natoms, host["cell"], float(host["kinetic"].sum()),
                              float(host["energy"].reshape(-1)[0]), host["stress"]))
+        if extra is not None:
+            extra(kinetic_extras(step, masses, host["momenta"]))
 
     simulation.submit_frame(frame)
     simulation.add_sink(frame, sample_every)
@@ -218,9 +239,13 @@ def command_run(args):
     calculator = ase_calculator(args.checkpoint, args.device) if args.engine == "ase" else None
     started = time.perf_counter()
     steady = {}  # the first sample at or after 10 % of the steps: the rate without start-up and first calls
-    with open(args.output / "samples.csv", "w", newline="") as handle:
+    record["precision"] = args.precision if args.engine == "fastmace" else "float32 MACE, float64 torch-dftd"
+    with open(args.output / "samples.csv", "w", newline="") as handle, \
+            open(args.output / "extras.csv", "w", newline="") as extras_handle:
         writer = csv.writer(handle)
         writer.writerow(COLUMNS)
+        extras = csv.writer(extras_handle)
+        extras.writerow(EXTRA_COLUMNS)
 
         def sink(row):
             writer.writerow(row)
@@ -229,10 +254,11 @@ def command_run(args):
                 steady.update(step=row[0], time=time.perf_counter())
 
         if args.engine == "ase":
-            final = run_ase(atoms, calculator, args.temperature_K, args.seed, steps, args.sample_every, sink)
+            final = run_ase(atoms, calculator, args.temperature_K, args.seed, steps, args.sample_every, sink,
+                            extra=extras.writerow)
         else:
             simulation = fastmace_side(args.checkpoint, atoms, args.temperature_K, args.seed, steps,
-                                       args.sample_every, sink)
+                                       args.sample_every, sink, extra=extras.writerow, precision=args.precision)
             record["simulation"] = json.loads(json.dumps(simulation.metadata(), default=str))
     record["wall_s"] = time.perf_counter() - started
     # Only now: touching CUDA before the plan would fix the allocator before FastMACE configures it.
@@ -434,6 +460,8 @@ def _run_arguments(run):
     run.add_argument("--production-ps", type=float, default=20.0)
     run.add_argument("--sample-every", type=int, default=10)
     run.add_argument("--device", default="cuda")
+    run.add_argument("--precision", choices=("float32", "float64"), default="float32",
+                     help="run-fastmace: the force precision (float64: the control plan)")
     run.add_argument("--machine", help="the machine's name for the record (e.g. 'Modal L4')")
 
 

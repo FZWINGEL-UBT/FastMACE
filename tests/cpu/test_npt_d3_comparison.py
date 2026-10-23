@@ -205,3 +205,44 @@ def test_a_drifting_volume_is_judged_on_its_drift():
 def test_stationary_runs_are_judged_on_their_means():
     entry = tool.analyse(synthetic_runs(np.random.default_rng(7)))["300K"]
     assert entry["stationary"] and entry["judged_on"] == "stationary means"
+
+
+def test_kinetic_extras_split_off_the_centre_of_mass():
+    masses = np.array([1.0, 3.0])
+    momenta = np.array([[2.0, 0.0, 0.0], [6.0, 0.0, 0.0]])  # both move at v = 2: all kinetic energy is COM
+    step, kinetic, com = tool.kinetic_extras(5, masses, momenta)
+    assert step == 5 and kinetic == pytest.approx(8.0) and com == pytest.approx(8.0)
+    _, kinetic, com = tool.kinetic_extras(0, masses, np.array([[3.0, 0.0, 0.0], [-3.0, 0.0, 0.0]]))
+    assert kinetic == pytest.approx(4.5 + 1.5) and com == pytest.approx(0.0)
+
+
+def test_both_sides_report_extras_equal_to_their_kinetic_energy(tmp_path, monkeypatch):
+    """The estimator check: on both sides the sampled kinetic energy is the momenta's (same point, same sum)."""
+    pytest.importorskip("cuequivariance_torch")
+    pytest.importorskip("torch_dftd")
+    import torch
+    from ase.calculators.mixing import SumCalculator
+
+    from _support.mc_fixtures import cpu_planner, tiny_loaded
+    from _support.structures import nacl
+    from _support.tiny_models import FAMILIES, tiny_mace_model
+    from fastmace.reference.d3 import torch_dftd3_calculator
+
+    cpu_planner(monkeypatch)
+    path = tmp_path / "tiny-mh1-11-17.model"
+    torch.save(tiny_mace_model([11, 17], **FAMILIES["mh1"]), path)
+    settings = {**tool.SETTINGS, "head": None}
+    for side in ("ase", "fastmace"):
+        rows, extras = [], []
+        atoms = nacl(1, rattle=0.05, seed=3)
+        if side == "ase":
+            loaded = tiny_loaded(tmp_path, (11, 17))
+            calculator = SumCalculator([loaded.calculator, torch_dftd3_calculator(tool.d3_record())])
+            tool.run_ase(atoms, calculator, 300.0, 5, 10, 5, rows.append, settings=settings, extra=extras.append)
+        else:
+            tool.fastmace_side(path, atoms, 300.0, 5, 10, 5, rows.append, settings=settings, extra=extras.append,
+                               precision="float64")
+        assert [row[0] for row in extras] == [row[0] for row in rows] == [0, 5, 10]
+        for row, extra in zip(rows, extras, strict=True):
+            kinetic = row[tool.COLUMNS.index("kinetic_eV_atom")] * len(atoms)
+            assert extra[1] == pytest.approx(kinetic, rel=1e-9), side
