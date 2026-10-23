@@ -22,9 +22,10 @@ from fastmace.integrators import registry as reg
 
 def test_discovery_finds_phase_1a_schemes_and_imports_no_torch():
     code = ("import sys; from fastmace.integrators import registry as r; s = r.registry(); "
-            "print(s.schemes('integrator'), 'torch' in sys.modules)")
-    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout
-    assert "('baoab', 'langevin')" in out and out.strip().endswith("False")
+            "print('torch' in sys.modules); print(*s.schemes('integrator'), sep='\\n')")
+    torch_loaded, *schemes = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                                            check=True).stdout.split()
+    assert {"baoab", "langevin"} <= set(schemes) and torch_loaded == "False"  # later tasks add schemes
 
 
 def test_the_public_namespaces():
@@ -159,9 +160,8 @@ def test_the_planner_takes_rule_1_from_the_registry():
     from fastmace.errors import PlanRefused
 
     with pytest.raises(PlanRefused) as caught:
-        plan_label("mh1-r2scan", integrator=integrators.CSVR(timestep_fs=1, temperature_K=300,
-                                                              tau_fs=100).to_config(seed=1))
-    assert codes(caught.value) == ["scheme-unknown"]  # until 4-T02 registers csvr
+        plan_label("mh1-r2scan", integrator=IntegratorConfig(scheme="no-such-scheme"))
+    assert codes(caught.value) == ["scheme-unknown"]
     atoms = nacl()
     atoms.set_constraint(FixAtoms(indices=[0]))
     with pytest.raises(PlanRefused) as caught:
@@ -198,7 +198,7 @@ def test_langevin_keeps_its_count():
     assert degrees_of_freedom(8, IntegratorConfig()) == 24  # "auto" outside a plan reads as ASE's projection
     assert degrees_of_freedom(8, IntegratorConfig(fixcm_projection="mass_weighted")) == 21
     assert degrees_of_freedom(8, IntegratorConfig(ensemble="npt", fixcm_projection="mass_weighted")) == 24
-    assert degrees_of_freedom(8, integrators.NVE(timestep_fs=1).to_config(seed=0)) == 24  # unregistered: 3N
+    assert degrees_of_freedom(8, IntegratorConfig(scheme="no-such-scheme")) == 24  # unregistered: 3N
 
 
 # --------------------------------------------------------------------------- configs and records
