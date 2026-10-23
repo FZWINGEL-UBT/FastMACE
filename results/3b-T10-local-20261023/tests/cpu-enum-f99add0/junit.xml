@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="8" time="515.283" timestamp="2026-10-23T10:28:12.217372+02:00" hostname="Fabi-PC"><testcase classname="tests.cpu.test_mc_enumeration" name="test_kinetic_temperature_with_mc_on_and_off[swap-exchange-False-LiCs]" time="273.060" /><testcase classname="tests.cpu.test_mc_enumeration" name="test_kinetic_temperature_with_mc_on_and_off[swap-exchange-True-NaK]" time="268.358"><failure message="AssertionError: ({'total': (555.5789430455841, 7.09780218785222), 'Na': (550.2624506707804, 10.505744955722212), 'K': (556.93666271130..., 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})&#10;assert False&#10; +  where False = hybrid_agrees({'total': (555.5789430455841, 7.09780218785222), 'Na': (550.2624506707804, 10.505744955722212), 'K': (556.9366627113092, 12.859632451876495), 'split': (6.674212040528758, 15.006874740035991)}, {'total': (554.8421232762344, 6.882866502546405), 'Na': (553.1835345705696, 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})">loaded = LoadedModel(calculator=&lt;mace.calculators.mace.MACECalculator object at 0x7e221e6d4dc0&gt;, path=PosixPath('/tmp/pytest-of...icity=None, patches=(), atomic_energies=tensor([0., 0., 0.]), oeq_runtime='skipped: OpenEquivariance is not installed')
+light_heavy = LoadedModel(calculator=&lt;mace.calculators.mace.MACECalculator object at 0x7e221e463460&gt;, path=PosixPath('/tmp/pytest-of...icity=None, patches=(), atomic_energies=tensor([0., 0., 0.]), oeq_runtime='skipped: OpenEquivariance is not installed')
+kind = 'swap', velocities = 'exchange', fixcm = True, pair = 'NaK'
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @pytest.mark.parametrize(("kind", "velocities", "fixcm", "pair"), HYBRID_CASES)
+    def test_kinetic_temperature_with_mc_on_and_off(loaded, light_heavy, kind, velocities, fixcm, pair):
+        model = loaded if pair == "NaK" else light_heavy
+        on, counters = hybrid_run(model, pair, hybrid_move(kind, velocities, pair, pair_mu(pair)), fixcm)
+        off = _md_only(model, pair, fixcm)
+        print(dict(kind=kind, velocities=velocities, fixcm=fixcm, pair=pair, on=on, off=off, counters=counters,
+                   deviations=ref.deviations(on, off)))
+        assert counters[kind]["accepted"] &gt; 0.1 * counters[kind]["attempted"]
+&gt;       assert hybrid_agrees(on, off), (on, off)
+E       AssertionError: ({'total': (555.5789430455841, 7.09780218785222), 'Na': (550.2624506707804, 10.505744955722212), 'K': (556.93666271130..., 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})
+E       assert False
+E        +  where False = hybrid_agrees({'total': (555.5789430455841, 7.09780218785222), 'Na': (550.2624506707804, 10.505744955722212), 'K': (556.9366627113092, 12.859632451876495), 'split': (6.674212040528758, 15.006874740035991)}, {'total': (554.8421232762344, 6.882866502546405), 'Na': (553.1835345705696, 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})
+
+tests/cpu/test_mc_enumeration.py:513: AssertionError</failure></testcase><testcase classname="tests.cpu.test_mc_enumeration" name="test_kinetic_temperature_with_mc_on_and_off[swap-redraw_all-True-NaK]" time="271.713"><failure message="AssertionError: ({'total': (560.6058587777562, 3.700998689893655), 'Na': (575.9231362288067, 10.317878839323962), 'K': (556.1901467622..., 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})&#10;assert False&#10; +  where False = hybrid_agrees({'total': (560.6058587777562, 3.700998689893655), 'Na': (575.9231362288067, 10.317878839323962), 'K': (556.1901467622826, 7.855574619827406), 'split': (-19.732989466524113, 14.775041897277958)}, {'total': (554.8421232762344, 6.882866502546405), 'Na': (553.1835345705696, 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})">loaded = LoadedModel(calculator=&lt;mace.calculators.mace.MACECalculator object at 0x7e74b3d5ebf0&gt;, path=PosixPath('/tmp/pytest-of...icity=None, patches=(), atomic_energies=tensor([0., 0., 0.]), oeq_runtime='skipped: OpenEquivariance is not installed')
+light_heavy = LoadedModel(calculator=&lt;mace.calculators.mace.MACECalculator object at 0x7e74b3d07940&gt;, path=PosixPath('/tmp/pytest-of...icity=None, patches=(), atomic_energies=tensor([0., 0., 0.]), oeq_runtime='skipped: OpenEquivariance is not installed')
+kind = 'swap', velocities = 'redraw_all', fixcm = True, pair = 'NaK'
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @pytest.mark.parametrize(("kind", "velocities", "fixcm", "pair"), HYBRID_CASES)
+    def test_kinetic_temperature_with_mc_on_and_off(loaded, light_heavy, kind, velocities, fixcm, pair):
+        model = loaded if pair == "NaK" else light_heavy
+        on, counters = hybrid_run(model, pair, hybrid_move(kind, velocities, pair, pair_mu(pair)), fixcm)
+        off = _md_only(model, pair, fixcm)
+        print(dict(kind=kind, velocities=velocities, fixcm=fixcm, pair=pair, on=on, off=off, counters=counters,
+                   deviations=ref.deviations(on, off)))
+        assert counters[kind]["accepted"] &gt; 0.1 * counters[kind]["attempted"]
+&gt;       assert hybrid_agrees(on, off), (on, off)
+E       AssertionError: ({'total': (560.6058587777562, 3.700998689893655), 'Na': (575.9231362288067, 10.317878839323962), 'K': (556.1901467622..., 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})
+E       assert False
+E        +  where False = hybrid_agrees({'total': (560.6058587777562, 3.700998689893655), 'Na': (575.9231362288067, 10.317878839323962), 'K': (556.1901467622826, 7.855574619827406), 'split': (-19.732989466524113, 14.775041897277958)}, {'total': (554.8421232762344, 6.882866502546405), 'Na': (553.1835345705696, 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})
+
+tests/cpu/test_mc_enumeration.py:513: AssertionError</failure></testcase><testcase classname="tests.cpu.test_mc_enumeration" name="test_kinetic_temperature_with_mc_on_and_off[swap-redraw-False-LiCs]" time="273.823" /><testcase classname="tests.cpu.test_mc_enumeration" name="test_kinetic_temperature_with_mc_on_and_off[swap-rescale-False-LiCs]" time="269.456" /><testcase classname="tests.cpu.test_mc_enumeration" name="test_kinetic_temperature_with_mc_on_and_off[transmute-redraw_all-True-NaK]" time="272.003"><failure message="AssertionError: ({'total': (559.7521750465704, 4.327349080819697), 'Na': (573.7878174018426, 5.260677534995059), 'K': (549.21071815454..., 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})&#10;assert False&#10; +  where False = hybrid_agrees({'total': (559.7521750465704, 4.327349080819697), 'Na': (573.7878174018426, 5.260677534995059), 'K': (549.210718154541, 18.469435432356388), 'split': (-26.594290065758532, 23.65242943871495)}, {'total': (554.8421232762344, 6.882866502546405), 'Na': (553.1835345705696, 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})">loaded = LoadedModel(calculator=&lt;mace.calculators.mace.MACECalculator object at 0x723e6a669510&gt;, path=PosixPath('/tmp/pytest-of...icity=None, patches=(), atomic_energies=tensor([0., 0., 0.]), oeq_runtime='skipped: OpenEquivariance is not installed')
+light_heavy = LoadedModel(calculator=&lt;mace.calculators.mace.MACECalculator object at 0x723e68d75270&gt;, path=PosixPath('/tmp/pytest-of...icity=None, patches=(), atomic_energies=tensor([0., 0., 0.]), oeq_runtime='skipped: OpenEquivariance is not installed')
+kind = 'transmute', velocities = 'redraw_all', fixcm = True, pair = 'NaK'
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @pytest.mark.parametrize(("kind", "velocities", "fixcm", "pair"), HYBRID_CASES)
+    def test_kinetic_temperature_with_mc_on_and_off(loaded, light_heavy, kind, velocities, fixcm, pair):
+        model = loaded if pair == "NaK" else light_heavy
+        on, counters = hybrid_run(model, pair, hybrid_move(kind, velocities, pair, pair_mu(pair)), fixcm)
+        off = _md_only(model, pair, fixcm)
+        print(dict(kind=kind, velocities=velocities, fixcm=fixcm, pair=pair, on=on, off=off, counters=counters,
+                   deviations=ref.deviations(on, off)))
+        assert counters[kind]["accepted"] &gt; 0.1 * counters[kind]["attempted"]
+&gt;       assert hybrid_agrees(on, off), (on, off)
+E       AssertionError: ({'total': (559.7521750465704, 4.327349080819697), 'Na': (573.7878174018426, 5.260677534995059), 'K': (549.21071815454..., 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})
+E       assert False
+E        +  where False = hybrid_agrees({'total': (559.7521750465704, 4.327349080819697), 'Na': (573.7878174018426, 5.260677534995059), 'K': (549.210718154541, 18.469435432356388), 'split': (-26.594290065758532, 23.65242943871495)}, {'total': (554.8421232762344, 6.882866502546405), 'Na': (553.1835345705696, 15.690983520190269), 'K': (541.6678331077436, 11.55396987789231), 'split': (-11.51570146282599, 19.549232905473144)})
+
+tests/cpu/test_mc_enumeration.py:513: AssertionError</failure></testcase><testcase classname="tests.cpu.test_mc_enumeration" name="test_kinetic_temperature_with_mc_on_and_off[transmute-rescale-False-LiCs]" time="242.511" /><testcase classname="tests.cpu.test_mc_enumeration" name="test_kinetic_temperature_negative_control_fails" time="241.475" /></testsuite></testsuites>
