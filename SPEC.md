@@ -2549,6 +2549,18 @@ Open decisions for the owner:
      reference record, for the stress part only. The energy and force floors
      stay.
 
+50. Decided (user, 23 October 2026, 4-T12b's option (c)): the planner refuses
+   PolarMACE with a variable-cell optimiser (`cell_filter="FrechetCell"`,
+   code `polar-variable-cell-optimizer`) on the graph and reference tiers.
+   Fixed-cell PolarMACE relaxations and other models' cell relaxations still
+   plan; ASE's own optimisers on `fm.calc` are not refused. 4-T07's divergence
+   on POLAR-1-S NbCl5 comes from the model's own surface (forces up to
+   120 eV/Å in the float64 reference, about 70× MH-1's), not from the k-set
+   or the stress (`docs/validation/4-T12b.md`). PolarMACE NPT is not refused
+   and stays experimental. Lifting the refusal needs a converged reference
+   cell relaxation on a sane structure, NaCl first; freezing the k-set per
+   rebuild and a smooth cutoff were not chosen.
+
 ---
 
 ## 19. Revision history
