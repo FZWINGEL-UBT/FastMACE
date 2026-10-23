@@ -591,3 +591,93 @@ anything:
   container's `dumb-init` (`results/modal-opt-T08-L4-3e5decd/pid-check.txt`). `tools/ab_step_time.gpu_processes()`
   therefore drops PID 1 inside a container (`MODAL_IS_REMOTE`, `MODAL_TASK_ID` or `/.dockerenv`). Runs before that
   fix, such as `modal-opt-T08-L4-3e5decd`, show `INVALID` for this reason only.
+
+## Google Colab
+
+Plan task ops-colab (23 October 2026): FastMACE jobs on Colab GPUs through the `colab` CLI (0.7.5, in WSL,
+signed in as the owner). The GPUs are G4 (RTX PRO 6000 Blackwell, sm_120, 96 GB), A100 and L4. The owner
+does not cap Colab compute units ("Dont cap anything for colab"), but every VM is stopped when its job ends,
+and every job records the units it used. Timed A/B comparisons stay on the local GPU (SPEC decision 39,
+amended). Label every Colab result "Colab <GPU>".
+
+The code is in `tools/colab/`:
+- `fastmace_colab.py`: the driver, run from WSL with the system `python3` (standard library only);
+- `remote.sh`: the VM side, in stages (probe, setup, restore, run, pack);
+- `remote_step.py`: runs one stage detached on the VM, so that `colab exec` can reattach to a long command.
+
+**One job:**
+
+```bash
+python3 tools/colab/fastmace_colab.py --gpu G4 --commit <sha> --out ~/fastmace-acceptance/colab-<run> --command 'python tools/acceptance/compat.py --provider colab --label "Colab G4" --output $OUT'
+```
+
+- **Commands:** `--command` is repeatable, and the commands run one after another on the same VM. Each runs
+  from the source root, with `$OUT` as its own results directory (`out/cmd<n>/`). A failing command does not
+  stop the next one; the job's exit code is the first non-zero one.
+- **The VM:** `--session NAME` names it. The default name is unique per call: GPU, UTC time and a random
+  suffix. Two 4-T13 jobs started in the same second once got the same name, and `colab stop` then stopped
+  only one of their VMs. The driver refuses a name that is already live (exit 2) and leaves that VM alone;
+  `--reuse` runs on it instead. `--keep` leaves the VM running for such a call, and its venv is kept too.
+  Without `--keep` the driver always runs `colab stop` on a VM it allocated or reused, also after an error,
+  Ctrl-C, SIGTERM or SIGHUP. If all three stop attempts fail, it prints the command to run.
+- **Orphaned VMs:** a VM without a local name shows as `[?] <endpoint>` in `colab sessions`, and `colab stop`
+  cannot reach it. Release it with
+  `python3 tools/colab/fastmace_colab.py stop-endpoint <endpoint>`, which runs what `colab stop` runs after
+  its name lookup (`state.client.unassign(endpoint)` in the CLI's own interpreter). The command is refused for
+  an endpoint that a named session owns (it prints the `colab stop -s` to use instead) and for one that is
+  not live.
+- **Source:** a `git -c core.autocrlf=false archive` of `--commit` from `--repo` (default: the main checkout,
+  which sees every pushed branch) with `.source_commit`. The repository is private, so the VM does not clone
+  it.
+- **Environment:** a uv-managed Python 3.10 venv with `tools/modal/requirements-hybrid.txt` (the
+  `mace_cueq_oeq` pins). certifi is raised to 2026.10.19 as in the local environment (`OVERRIDES`). OEq builds
+  its host extension with `g++`, without `nvcc`, and `OEQ_CUDA_DRIVER_LIBRARY` points at Colab's
+  `/usr/lib64-nvidia/libcuda.so.1`. The commands run in a clean environment, without the Colab kernel's
+  variables (`MPLBACKEND`, `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD`).
+- **Models:** `--models` takes checkpoint names from `fastmace.model.labels` (default `mh-1,medium,polar-1-s`,
+  the compatibility tier's). The VM downloads them from their official URLs and accepts each one only if its
+  SHA-256 matches the label table. Nothing large is uploaded from the PC.
+- **Structures:** `--baseline` (default `~/fastmace-baseline/1a-T18`, under 1 MB) goes up with the source as
+  `FASTMACE_STRUCTURES` and `FASTMACE_BASELINE`.
+- **Results:** `<out>/out/` holds `probe.json` (GPU, capability, driver, CPUs, RAM), `setup.json` (Python,
+  package versions, the `pip freeze` sha256, setup times), `pip-freeze.txt` and `cmd<n>/`. `<out>/colab.json`
+  records the provider, GPU, capability, driver, versions, commit, commands and exit codes, the setup and
+  wall times, the cache key, and the compute units before and after (`colab usage`).
+- **Ledger:** every call, a failed one too, appends a row to `~/.fastmace-colab/colab-ledger.csv`
+  (`--ledger` to change it). Like the Modal ledger, the conductor commits copies to
+  `results/colab-ledger.csv`.
+
+**No Google Drive.** `colab drivemount` needs the owner's browser consent on every new VM: on 23 October
+2026 a second VM got HTTP 400 without a fresh consent. A Drive-backed environment therefore cannot run
+unattended. The driver keeps everything else in a local store, `~/.fastmace-colab`
+(`FASTMACE_COLAB_STATE`):
+- **Environment:** installed on every new VM. It takes about a minute, because uv fetches the wheels at
+  datacenter speed. `--build-env` sets up the environment without a command and writes
+  `manifests/<stack>.json`, the `pip freeze` and its sha256. Every later job compares its own freeze against
+  it (`env_matches_manifest` in `colab.json`).
+- **Compile caches:** Triton, Inductor, FastMACE's cache root with the OEq extension builds, MACE's compile
+  cache and the CUDA cache, under one root on the VM. The store keeps them per key
+  `sm<capability>-py310-<stack>`, where `<stack>` is the sha256 of the requirements and the capability comes
+  from the VM's `nvidia-smi`, not from a table. Each key is a directory of parts, `000.tar.gz` (the first
+  run's caches) and then one part per later run with only the files that run added or changed. The driver
+  uploads every part before the commands. Most of the volume is Inductor's FX graph cache: about 1.5 GB, or
+  513 MB gzipped, after the compatibility tier on a G4.
+- **Large uploads:** `colab upload` sends a file as one base64 JSON request, which fails above the Jupyter
+  server's request limit (a 513 MB file did). The driver uploads files over 48 MiB in chunks (64 MiB went up, 80 MiB failed with HTTP 400), and
+  `remote_step.py` joins them on the VM.
+- **Colab-only packages:** `EXTRAS` adds `dftd3==1.6.0` (simple-dftd3, the `[d3-reference]` extra), so that the
+  16 simple-dftd3 cross-check tests run instead of skipping.
+- **Driver library:** Colab keeps `libcuda.so.1` in `/usr/lib64-nvidia`. It is among OEq's driver candidates
+  (`fastmace/kernels/_oeq_runtime.py`), and `remote.sh` also sets `OEQ_CUDA_DRIVER_LIBRARY`. Without it, OEq
+  failed on the A100 pilot and the planner fell back to plain cuEq.
+- **Batch the tiers:** a cold tier is several times slower than a warm local one (A100 pilot: 43.5 min for
+  the fast tier, against 7.9 min locally warm). Give one call several `--command`s rather than one VM per
+  tier.
+
+**Measured on a G4** (23 October 2026, `docs/validation/ops-colab-g4-20261023.md`):
+- **Setup:** a VM is ready to run commands about a minute after the call starts (56 s cold, 81 s for the
+  environment build). With the compile caches it takes 204 s, because uploading the 513 MB cache takes 154 s.
+- **The compatibility tier:** 40.8 min of tests cold and 36.6 min warm. The caches save about 10 %, about
+  100 s net of the upload: most of the tier is runtime, not compilation.
+- **Compute units:** 9.4 CU for the cold job (about 13 CU/h). `cu_used` is the change in the account's
+  balance, so it includes every other VM that was active (`active_before`, `active_after` in `colab.json`).
