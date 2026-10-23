@@ -5,7 +5,8 @@ Tests import helpers as ``from _support import ...``: pytest puts this directory
 
 Test tiers (plan tasks 1b-T24, 1b-T27, ``_support.tiers``, ``docs/development.md``): fast
 ``-m "not slow and not acceptance"`` (workers), full ``-m "not acceptance"`` (merges) and
-``-m acceptance`` (phase acceptance). An acceptance test must also be ``slow``
+``-m acceptance`` (phase acceptance), and ``-m compat`` (the GPU compatibility check on every production
+GPU type). An acceptance test must also be ``slow``
 (``tests/cpu/test_tiers.py`` checks it), and a ``-m`` that selects acceptance tests stops the run
 without the research engine, the hybrid Python or the models.
 """
@@ -85,11 +86,17 @@ def pytest_report_header(config):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Mark everything under tests/gpu as `gpu`, and skip `gpu` tests when CUDA is absent."""
+    """Mark everything under tests/gpu as `gpu` and the compatibility tier's tests as `compat`
+    (``_support.tiers.in_compat``), and skip `gpu` tests when CUDA is absent."""
+    from _support import tiers
+
     cuda = None
     for item in items:
         if _GPU_DIR in item.path.parents:
             item.add_marker(pytest.mark.gpu)
+            nodeid = item.path.relative_to(_GPU_DIR).as_posix() + item.nodeid[len(item.nodeid.split("::")[0]):]
+            if tiers.in_compat(nodeid, {mark.name for mark in item.iter_markers()}):
+                item.add_marker(pytest.mark.compat)
         if item.get_closest_marker("gpu") is None:
             continue
         if cuda is None:
