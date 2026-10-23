@@ -1782,6 +1782,11 @@ def _restart_atoms(structure, stored):
     cell = stored["cell_state"] if "cell_state" in stored else stored["cell"]
     atoms = Atoms(numbers=numbers, positions=stored["positions"], cell=cell, pbc=structure["pbc"])
     atoms.set_masses(masses)
+    # The restart's momenta too: the engine is built from these Atoms before the restart state is loaded, and an
+    # integrator that checks its start (CSVR refuses to start at rest, as ASE's Bussi) must see the run's state,
+    # not a structure at rest (4-T13). Loading the restart then writes the same velocities bitwise.
+    if "momenta" in stored:
+        atoms.set_momenta(stored["momenta"])
     fixed = restart.fixed_atoms(stored)
     if fixed:
         atoms.set_constraint(FixAtoms(indices=list(fixed)))
