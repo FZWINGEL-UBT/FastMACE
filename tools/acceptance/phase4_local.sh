@@ -71,9 +71,10 @@ asserted_ase() {  # the runbook's environment check: ASE 3.27 in both environmen
     case $v in 3.27.*) ;; *) echo "ASE $v in $python: the runbook needs 3.27" >&2; exit 2 ;; esac
   done
 }
-# The preflight's files (the stale-expectation reruns and the two coverage-gap files, runbook); the tiers then leave
-# them out, so nothing runs twice. Amended at the freeze from the runbook's listing.
-PREFLIGHT_FILES=(tests/gpu/test_schemes_engine_ase_gpu.py tests/gpu/test_reproducible_schemes_gpu.py
+# The preflight's files (the stale-expectation reruns and the restart coverage-gap file, runbook); the tiers then
+# leave them out, so nothing runs twice. At the freeze the engine-vs-ASE file (about 2 h) moved to the acceptance
+# tier, after the timed stretch: a defect it finds cannot change the Langevin and BAOAB timings.
+PREFLIGHT_FILES=(tests/gpu/test_reproducible_schemes_gpu.py
   tests/gpu/test_subprocess_worker_gpu.py tests/gpu/test_canonical_restart_gpu.py tests/gpu/test_reproducible_gpu.py
   tests/gpu/test_planner_gpu.py tests/gpu/test_simulation_gpu.py tests/gpu/test_selfcheck_gpu.py
   tests/gpu/test_gate_resources_gpu.py tests/gpu/test_isolation_gpu.py tests/gpu/test_fused_integrator_gpu.py

@@ -148,8 +148,10 @@ test from its branch unchanged.
    τ 20 fs), 2 ps equilibration, then 400 kinetic-energy samples every 100 fs, one-sample KS against
    Gamma(N_f/2, k_B T); NVT Berendsen as the negative control (the same test must reject it).
 
-The GPU files are written on `fastmace/4-T13`, CPU-collected, and run first in `preflight` at the freeze; a
-failure there is triaged as above. The CPU file runs in `cpu-acceptance`.
+The GPU files are written on `fastmace/4-T13` and CPU-collected. Gap 2's runs first in `preflight` at the
+freeze; gap 1's (about 2 h) runs in the acceptance tier after the timed stretch (changed at the freeze for speed: a
+defect it finds cannot change the Langevin and BAOAB timings). A failure is triaged as above. The CPU file runs in
+`cpu-acceptance`.
 
 ## Jobs
 
