@@ -568,6 +568,15 @@ Wave 4   T13 acceptance
       ase.filters.FrechetCellFilter, and the other cell filters are refused with the reason. In
       Simulation the same optimisers are fm.optimize.LBFGS and FIRE, and FrechetCellFilter is
       fm.optimize.FrechetCell."
+- **4-T03 and 4-T03b** (branches `fastmace/4-T03-rebased`, `fastmace/4-T03b`;
+  [docs/validation/4-T03.md](../docs/validation/4-T03.md), [4-T03b.md](../docs/validation/4-T03b.md)):
+  - The task's "the chain updates are device scalar operations, unrolled at capture" now reads
+    **"fused"**: on CUDA with Triton, each chain half and MTK's 3 × 3 exp/exprel run as one Triton
+    program each, bitwise the PyTorch stage (4-T03b, accepted by the conductor on 23 October 2026).
+    The CPU keeps the PyTorch stage, within 1e-9 Å of ASE over 300 steps.
+  - D2 (a) for NHC and MTK: N_f replaces ASE's 3N in every coupling term (conductor, 23 October).
+  - MTK has no `eigh`: exp and exprel of the symmetric cell momentum as a matrix series.
+  - The MTK record's `state_keys` serve both cell modes; the full cell's `eps` stays 0.
 
 ## Checkpoints for the owner
 
