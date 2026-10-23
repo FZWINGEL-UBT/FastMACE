@@ -1,0 +1,63 @@
+{
+  "protocol_record_version": 1,
+  "source": "/tmp/fastmace-src/inputs/npt_anneal_NbCl5_short_gpu.yaml",
+  "structure": "fastmace/protocols/data/NbCl5_R2SCAN.cif",
+  "repeat": [
+    3,
+    3,
+    3
+  ],
+  "atoms": 1944,
+  "timestep_fs": 1.0,
+  "relax": {
+    "fmax": 0.01,
+    "optimizer": "gpu-LBFGS",
+    "max_steps": 5000
+  },
+  "relaxation": {
+    "optimizer": "gpu-LBFGS",
+    "fixed_cell": true,
+    "fmax_target_eV_A": 0.01,
+    "max_steps": 5000,
+    "converged": true,
+    "steps": 17,
+    "seconds": 0.5904354940000189,
+    "initial_eV_atom": -10.715681455250897,
+    "energy_eV_atom": -10.715860689674477,
+    "fmax_eV_A": 0.00866830795396698,
+    "neighbour_rebuilds": 0,
+    "recaptures": 0
+  },
+  "quench": {
+    "min_K": 500.0,
+    "bin_K": 100.0,
+    "per_bin": 2,
+    "fmax": 0.01,
+    "optimizer": "gpu-LBFGS",
+    "max_steps": 5000
+  },
+  "quench_result": null,
+  "mc": null,
+  "min_mc_temperature_K": null,
+  "dispersion": "D3(functional=r2scan, damping=bj, pair_cutoff_bohr=40.0, cn_cutoff_bohr=40.0, three_body=False, smoothing=none, precision=float64, autoang=0.52917726, autoev=27.21138505, s6=1.0, s8=0.7898, a1=0.4948, a2=5.7308)",
+  "pieces": [
+    {
+      "first_step": 0,
+      "last_step": 27000,
+      "wall_s": 939.4254848580001,
+      "counters": {
+        "neighbour_rebuilds": 3486,
+        "d3_builds": 456,
+        "d3_rebuilds": 455,
+        "d3_build_s": 2.8017566269990937
+      }
+    }
+  ],
+  "counters": {
+    "neighbour_rebuilds": 3486,
+    "d3_builds": 456,
+    "d3_rebuilds": 455,
+    "d3_build_s": 2.8017566269990937
+  },
+  "status": "quench"
+}

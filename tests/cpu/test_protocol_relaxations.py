@@ -201,6 +201,30 @@ def test_one_gpu_relaxer_relaxes_each_frame_as_a_fresh_one(model_path, cpu_plann
     assert log[0].split() == ["Step", "Energy", "fmax"] and len(log) == results[0][1]["steps"] + 2
 
 
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_one_gpu_relaxer_with_d3_takes_each_frame_cell(model_path, cpu_planner):
+    """With D3 the new cell reaches the D3 list too (the 4-T09 Modal smoke: ``D3Term`` had no ``reset_cell``)."""
+    from fastmace.longrange.d3 import D3
+
+    model = _model(model_path)
+    frames = [_frame(3), _frame(5, 1.03)]
+    shared = quench.relaxer("gpu-LBFGS", model, precision="float64", dispersion=D3(functional="r2scan"))
+    try:
+        results = [shared(frame, 0.5, 30) for frame in frames]
+    finally:
+        shared.close()
+    assert shared.builds == 1
+    alone = quench.relaxer("gpu-LBFGS", model, precision="float64", dispersion=D3(functional="r2scan"))
+    try:
+        fresh, expected = alone(frames[1], 0.5, 30)
+    finally:
+        alone.close()
+    relaxed, summary = results[1]
+    assert summary["steps"] == expected["steps"]
+    assert summary["initial_eV_atom"] == pytest.approx(expected["initial_eV_atom"], abs=1e-12)
+    np.testing.assert_allclose(relaxed.positions, fresh.positions, rtol=0, atol=1e-12)
+
+
 def test_the_gpu_relaxer_reaches_the_ase_minimum(model_path, cpu_planner):
     from fastmace.ase.calculator import FastMACECalculator
 
