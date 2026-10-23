@@ -12,8 +12,8 @@ Plan revision 0, tier graph (molecular dynamics on the graph tier)
   kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes
   memory (rule 12): not estimated; GPU NVIDIA GeForce RTX 5060 Ti
   workload: Langevin NVT, fixcm=True; 64 atoms, 3D PBC, no constraints; up to 300 K; MC swap from 300 K; species changes
-  rules 8-11: superset Na Cl K (8), max_temperature_K 300 K (11), host_callbacks_every none (9), skin 0.3 A (11),
-      headroom fixed (11)
+  rules 8-11: superset Na Cl K (8), max_temperature_K 300 K (11), host_callbacks_every none (9), species_changes on (8),
+      skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)
   fallbacks: none
   calibration: none
   revisions: 0 minimal plan (phase 1b)
