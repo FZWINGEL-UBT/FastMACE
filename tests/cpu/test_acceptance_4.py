@@ -33,4 +33,4 @@ def test_every_job_of_the_runbook_has_a_case():
         cases.update(line.split("|"))
     assert {"regression", "regression-npt", "ase-speed", "preflight", "optimisers", "minima", "protocol-start",
             "protocol-resume", "nve-drift", "trajectories-cpu", "trajectories-reproducible", "restart-across",
-            "cpu-acceptance", "acceptance-tier", "slow-tier", "targeted"} <= cases
+            "cpu-acceptance", "acceptance-tier", "slow-tier", "targeted", "compat"} <= cases

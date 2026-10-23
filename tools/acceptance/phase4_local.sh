@@ -13,7 +13,8 @@
 #     ase-speed (recorded: stock ASE against fastmace.ase, and each new integrator's step time)
 #   untimed: preflight [TEST...], optimisers [PART...] (item 1), minima (item 2, only if the runbook requires it),
 #     protocol-start / protocol-resume (item 2's production path), nve-drift, trajectories-cpu,
-#     trajectories-reproducible, restart-across (item 5), cpu-acceptance, acceptance-tier, slow-tier, targeted TEST...
+#     trajectories-reproducible, restart-across (item 5), compat (the compatibility tier, needs fastmace/4-T13-compat),
+#     cpu-acceptance, acceptance-tier, slow-tier, targeted TEST...
 # pytest jobs run through 3b-T10's stoppable_pytest.sh: results.jsonl per finished test, junit.xml also when stopped.
 # Stop one with kill -INT "$(cat <root>/<job>/pytest.pid)", never by killing this script's shell or the reservation.
 # regression, regression-npt, trajectories-* and restart-across need the release-3b tooling (tools/ab_fastmace.py
@@ -259,6 +260,10 @@ torch.save(tiny_mace_model([11, 17], **FAMILIES['mh1']), sys.argv[1])" "$tiny")
       resume-across --against 3b --expected-commit "$base" --renamed "$versions" --device cpu --backend auto \
       --output "$root/restart-across" --model "$tiny" --checkpoint "$tiny" --structure NaCl@2x2x2 --steps 100 \
       --restart-step 50 --seeds 20261023
+    ;;
+  compat)  # the GPU compatibility check on this Blackwell GPU (SPEC decision 39, amended; tests/_support/tiers.py)
+    PYTEST_PYTHON=${PYTEST_PYTHON:-$hybrid}
+    run compat "$PYTEST_PYTHON" tools/acceptance/compat.py --provider local --label "RTX 5060 Ti (local)"       --output "$root/compat"
     ;;
   cpu-acceptance)  # recorded: the sampling checks (choice 8), CPU, in the GPU environment's ASE 3.27
     PYTEST_ENV="CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=2" pytest_job cpu-acceptance -rA tests/cpu -m acceptance

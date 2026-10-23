@@ -8,9 +8,11 @@ already exist are the tasks' own runs; every rule below is fixed before any run 
 `phase-4.md` and `results/4-T13-*/`. 4-T13 changes no library code; its tool and test changes are labelled
 tool-side or test-side. Nothing runs before the freeze.
 
-**Review (23 October 2026):** the conductor accepted revision 2. It relayed the owner's approval of the soft-cell
-re-relaxation, FIRE with the cell filter judged on NaCl only, and the Ada spot check on Modal. The Modal launch
-spends the owner's money, so it is confirmed by the owner in the 4-T13 session itself before it starts (below).
+**Review (23 October 2026):** the conductor accepted revision 2 and relayed the owner's approval of the soft-cell
+re-relaxation and of FIRE with the cell filter judged on NaCl only. **Revision 3**, the same evening: decision 39 is
+amended (ff6b4ec; owner, relayed by the conductor). Acceptance splits into the full acceptance on the RTX 5060 Ti
+and the GPU compatibility check (`-m compat`) on every production GPU type. The Ada spot check becomes the
+compatibility check on a Colab L4, and the Modal launch is dropped. An A100 leg may take the untimed runs.
 
 Sources: SPEC §16 row 4, §7.7, §10.2–§10.3, §10.6, §12.2 ("ASE equivalence", "Restart"), §18 decisions 6, 37,
 39 and 44–50; `plans/phase-4.md` (choices 1–10, task 4-T13); the task reports `4-T02.md` to `4-T12b.md`;
@@ -31,6 +33,11 @@ Sources: SPEC §16 row 4, §7.7, §10.2–§10.3, §10.6, §12.2 ("ASE equivalen
 - **50** PolarMACE with a variable-cell optimiser is refused (`polar-variable-cell-optimizer`).
 - **Owner, 23 October 2026 (8fe335e):** the GPU slow tier at this freeze also stands in for phase 3b's, which was
   dropped.
+- **39, amended (ff6b4ec):** full acceptance once per phase on the reference GPU (the RTX 5060 Ti): the acceptance
+  and slow tiers, the physics comparisons and the timed A/Bs; its untimed runs may run elsewhere (a Colab A100).
+  The GPU compatibility check (`-m compat`, about 30–60 min) on every production GPU type: Ada (a Colab L4 stands
+  in, for correctness only), Blackwell (the local PC), and the Colab A100 if its check passes. 4-T13 defines the
+  tier (branch `fastmace/4-T13-compat`, merged before the freeze).
 
 ## Freeze, baseline and copies
 
@@ -52,18 +59,25 @@ Sources: SPEC §16 row 4, §7.7, §10.2–§10.3, §10.6, §12.2 ("ASE equivalen
 
 ## Hardware and budget
 
-- **Everything else runs on the local RTX 5060 Ti** (workstations off), after 3b-T10's queued jobs drain: through `tools/ci/local_gpu.py run
-  --wait-minutes 600` from the pinned copy, as background tasks of the 4-T13 session. The queue is FIFO; 3b-T10's
-  queued jobs run first, and no other session's job is stopped.
-- **The Ada spot check** (decision 39, choice 9): `pytest tests/gpu -m acceptance` on the Modal L4 (sm_89) at the
-  freeze, the phase 4 acceptance tests first, with a function timeout whose worst case is at most $3. October's
-  budget is nearly spent (the owner's ceiling $29; $24.21 metered at the relay), above the guard's $27, so the launch
-  needs `--limit-usd 29` and an owner override. `modal billing summary` is read and recorded first, and the owner
-  confirms the launch in the 4-T13 session; if that session refuses it, 4-T13 stops and reports. Without it, the Ada
-  leg is recorded as not run (as phase 3's open finding 3) and the local acceptance tier runs in full. The tasks'
-  L4 runs (4-T04, 4-T07, 4-T08, 4-T09) stay context, each at its own commit.
-- **If the Ada check runs and passes at the freeze,** the local leg reruns only the tests corrected at acceptance,
-  the GPU slow tier and the items' own runs (decision 39's last clause).
+- **The full acceptance runs on the local RTX 5060 Ti** (workstations off), after 3b-T10's queued jobs drain:
+  through `tools/ci/local_gpu.py run --wait-minutes 600` from the pinned copy, as background tasks of the 4-T13
+  session. The queue is FIFO; 3b-T10's queued jobs run first, and no other session's job is stopped. The local
+  compatibility check (`compat` job) runs here too, since Blackwell is a production type.
+- **The compatibility check on a Colab L4** (Ada, sm_89, standing in for the workstations, correctness only):
+  `tools/acceptance/compat.py --provider colab --label "Colab L4"` at the freeze, through the `colab` CLI in WSL
+  (`colab run --gpu L4`, or `colab new` / `exec -f` / `stop` for a longer session, always stopped afterwards), with
+  the setup script of the conductor's A100 pilot adapted to the L4. The owner set no cap on Colab compute units. No
+  Modal job runs in phase 4. The tasks' Modal L4 runs (4-T04, 4-T07, 4-T08, 4-T09) stay context, each at its own
+  commit.
+- **The Colab A100 leg**, only if the conductor's A100 pilot shows the stack working on sm_80: the compatibility
+  check there (A100 then becomes a production type), and the untimed parts of the full acceptance to finish
+  sooner: `acceptance-tier` and `slow-tier` split between the A100 and the local GPU by file, `optimisers`,
+  `minima` (if required), `protocol`, `trajectories-reproducible` (both versions on the same A100). Timed jobs
+  (`regression`, `regression-npt`, `ase-speed`, the step-time assertions of the acceptance tier) stay on the RTX
+  5060 Ti; a step-time assertion that runs on the A100 is reported, not judged. Results from the A100 are judged
+  by the same pass rules and are labelled with GPU and provider.
+- **Every result is labelled** with GPU and provider (local, colab), as the driver's `compat.json` and the job
+  logs record them.
 - **Timed jobs first, alone, on a quiet PC:** no other GPU job (the reservation) and no heavy CPU job (checked and
   recorded at each job's start). No CPU suite of the conductor's during the timed jobs (the conductor is told the
   window).
@@ -156,12 +170,15 @@ Local RTX 5060 Ti, run ID `4-T13-local-<date>`, `python3 <copy>/tools/ci/local_g
 | `trajectories-cpu` | 5 | no | `tools/trajectory_versions.py --against 3b`, CPU float64, tiny MH-1-class model, NaCl 2×2×2, 100 steps, every 10, Langevin NVT and BAOAB NPT, D3 off and on; `compare --bitwise` | 15 min |
 | `trajectories-reproducible` | 5 | no | the same, reproducible plan, plain cuEq float64 on the GPU, MH-1 NaCl, 500 steps, every 50, NVT and NPT, D3 off | 20 min |
 | `restart-across` | 5 | no | a Langevin restart written by `fastmace_3b` (v3, step 50) resumed at the freeze to step 100, CPU float64, tiny model; bitwise against `fastmace_3b`'s uninterrupted run (tool-side `--resume-across`) | 10 min |
+| `compat` | – | no | `tools/acceptance/compat.py --provider local --label "RTX 5060 Ti"`: the compatibility tier on Blackwell | 30 min |
 | `cpu-acceptance` | rec. | no | `pytest tests/cpu -m acceptance`: the sampling checks (choice 8, gap 3) and the CPU acceptance tests already there | 20 min |
 | `acceptance-tier` | 1–4 | (step-time assertions) | `pytest tests/gpu -m acceptance` | 5–6 h |
 | `slow-tier` | – | no | `pytest tests/gpu -m "slow and not acceptance"`, also for phase 3b | 2–3 h |
 
 Order: `preflight`; the timed jobs (`regression`, `regression-npt`, `ase-speed`) in one quiet
-stretch; then the rest, the acceptance and slow tiers overnight. About 18–20 h of GPU in all.
+stretch; then the rest, the acceptance and slow tiers overnight. About 18–20 h of local GPU in all, less with the
+A100 leg. Colab, in parallel from the freeze: the L4 compatibility check (Colab run ID `4-T13-colab-l4-<date>`),
+and the A100's (`4-T13-colab-a100-<date>`) with its untimed share.
 
 ## Timing design (decision 39: repeats sized to the effect)
 
@@ -288,7 +305,8 @@ stretch; then the rest, the acceptance and slow tiers overnight. About 18–20 h
   NbCl5 is a model question, recorded, not a FastMACE finding.
 
 **Tests:** every acceptance and slow GPU test passes on the RTX 5060 Ti at the freeze or at a corrected copy
-(corrections listed with reasons); the tests the Ada check reached, if it runs, pass on sm_89.
+(corrections listed with reasons; tests of the split tiers on the A100, if that leg runs, count there); the
+compatibility check passes on the RTX 5060 Ti and the Colab L4 (and on the A100 if that leg runs).
 
 ## The CPU flake from 4-T10's trial
 
