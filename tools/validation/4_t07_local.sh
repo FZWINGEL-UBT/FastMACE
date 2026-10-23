@@ -25,8 +25,8 @@ declare -A JOBS=(
   [gpu-lbfgs-b]="gpu lbfgs MH1 $B"
   [ase-lbfgs-d3]="ase lbfgs MH1 NbCl5 --dispersion d3bj"
   [gpu-lbfgs-d3]="gpu lbfgs MH1 NbCl5 --dispersion d3bj"
-  [ase-fire]="ase fire MH1 NaCl NbCl5"
-  [gpu-fire]="gpu fire MH1 NaCl NbCl5"
+  [ase-fire]="ase fire MH1 NaCl"
+  [gpu-fire]="gpu fire MH1 NaCl"
   [ase-polar]="ase lbfgs POLAR NbCl5"
   [gpu-polar]="gpu lbfgs POLAR NbCl5"
 )
