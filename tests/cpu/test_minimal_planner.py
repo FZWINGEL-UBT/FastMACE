@@ -144,6 +144,24 @@ def test_each_hard_rule_refuses_with_its_reason(rule, code, kwargs):
     assert isinstance(caught.value, SpeciesNotInSuperset) == (rule == 2)
 
 
+@pytest.mark.parametrize("mode", [None, "reference"])
+def test_polar_with_a_variable_cell_optimiser_is_refused(mode):
+    """4-T12b: PolarMACE's k-space energy is not smooth in the cell (4-T07's diverging cell relaxation)."""
+    from fastmace import optimize
+
+    cell = optimize.LBFGS(cell_filter=optimize.FrechetCell()).to_config()
+    with pytest.raises(PlanRefused) as caught:
+        plan_label("polar1-s", optimizer=cell, mode=mode)
+    assert codes(caught.value) == ["polar-variable-cell-optimizer"] and caught.value.reasons[0].rule == 1
+    assert "k-vector" in str(caught.value) and "fixed cell" in str(caught.value)
+    fire = optimize.FIRE(cell_filter=optimize.FrechetCell()).to_config()
+    with pytest.raises(PlanRefused):
+        plan_label("polar1-m", optimizer=fire, mode=mode)
+    # A fixed-cell PolarMACE relaxation and a variable-cell relaxation of another family still plan.
+    assert plan_label("polar1-s", optimizer=optimize.LBFGS().to_config(), mode=mode).optimizer is not None
+    assert plan_label("mh1-r2scan", optimizer=cell, mode=mode).optimizer.variable_cell
+
+
 def test_rule_3_polar_on_plain_compiled_cueq():
     with pytest.raises(PlanRefused) as caught:
         plan_label("polar1-s", planner=minimal(engine=EngineConfig(backend="cueq")))
