@@ -98,9 +98,16 @@ def spread(samples, index):
     return max(float((x - y).abs().max()) for i, x in enumerate(values) for y in values[i + 1:])
 
 
-def within_noise(cross, noise, scale):
-    """True when every cross-field difference is within the noise bound (plus 1e-12 relative)."""
-    return max(cross) <= NOISE_FACTOR * noise + 1e-12 * scale
+# The relative floor under the noise bound, by force-field precision. The two fields are different graphs, so they
+# also differ by rounding that no spread within one field shows: on an A100 (sm_80; 4-T13's pilot, 23 October 2026)
+# the float32 scatters were almost repeatable (noise 7.5e-10 eV/A) and the fields differed by 1.6e-9 eV/A. 1e-8 of
+# the largest force is still well under float32's resolution, and far under the 1e-6 eV/A shift that must fail.
+FLOOR = {torch.float32: 1e-8, torch.float64: 1e-12}
+
+
+def within_noise(cross, noise, scale, dtype=torch.float64):
+    """True when every cross-field difference is within the noise bound (plus ``FLOOR[dtype]`` relative)."""
+    return max(cross) <= NOISE_FACTOR * noise + FLOOR[dtype] * scale
 
 
 @pytest.mark.parametrize("dtype", [torch.float32, torch.float64])
@@ -136,7 +143,7 @@ def test_float64_energy_replays_and_keeps_forces(dtype, compile_mode):
         cross = [float((a[index] - b[index]).abs().max()) for a, b in zip(replays[True], replays[False])]
         scale = float(replayed[False][index].abs().max())
         print({"output": index, "noise": noise, "cross": max(cross)})
-        assert within_noise(cross, noise, scale), (max(cross), noise)
+        assert within_noise(cross, noise, scale, dtype), (max(cross), noise)
     # The bound still catches a real change: 1e-6 eV/Å on the force component where the two fields
     # agree best (so the shift is not helped by the noise).
     difference = (replays[True][0][1] - replays[False][0][1]).abs()
@@ -145,7 +152,7 @@ def test_float64_energy_replays_and_keeps_forces(dtype, compile_mode):
     shifted = [float((a[1] + shift - b[1]).abs().max()) for a, b in zip(replays[True], replays[False])]
     noise = max(spread(replays[flag] + eager_calls[flag], 1) for flag in (True, False))
     print({"shifted": max(shifted), "bound": NOISE_FACTOR * noise})
-    assert not within_noise(shifted, noise, float(replayed[False][1].abs().max())), (max(shifted), noise)
+    assert not within_noise(shifted, noise, float(replayed[False][1].abs().max()), dtype), (max(shifted), noise)
     reference = MACEForceField(cueq_calculator(model, torch.float64), atoms, neighbours=NEIGHBOURS)
     expected = float(evaluate(reference, positions)[0][0])
     error, stock_error = abs(float(eager[True][0][0]) - expected), abs(float(eager[False][0][0]) - expected)
