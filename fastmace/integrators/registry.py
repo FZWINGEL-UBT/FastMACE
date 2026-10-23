@@ -30,7 +30,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
-from fastmace.errors import Reason
+from fastmace.errors import Reason, RegistryError
 
 if TYPE_CHECKING:
     from fastmace.config import IntegratorConfig, OptimizerConfig
@@ -54,6 +54,9 @@ ASE_DOF = ("constraints", "3n")
 # D1 (recommended (a)): FixAtoms pins the frame already, and ASE's fixcm displacement moves fixed atoms
 # before the constraint resets them. Changing D1 here lifts the refusal for every scheme.
 FIX_ATOMS_WITH_FIXCM = "refused"
+
+# Whose attribute a record's ``buffers`` are, in the runtime-state registry's names (``engine.registry``).
+BUFFER_OWNERS = {"integrator": "integrator", "optimizer": "optimizer", "cell_filter": "dof"}
 
 _PACKAGES = {"integrator": "fastmace.integrators.schemes", "optimizer": "fastmace.optimize.schemes",
              "cell_filter": "fastmace.optimize.schemes"}
@@ -258,8 +261,26 @@ class Registry:
         key = (record.kind, record.scheme)
         if key in self._records and self._records[key] != record:
             raise ValueError(f"{record.kind} scheme {record.scheme!r} is registered twice")
+        self._check_buffers(record)
         self._records[key] = record
         return record
+
+    def _check_buffers(self, record: SchemeRecord) -> None:
+        """4-T01b: two schemes of one owner may name the same buffer only with the same restart policy. Their
+        ``recompute`` names may differ (one scheme runs per engine); ``engine.registry.scheme_policies`` joins
+        them."""
+        owner = BUFFER_OWNERS[record.kind]
+        for other in self._records.values():
+            if other.scheme == record.scheme and other.kind == record.kind or BUFFER_OWNERS[other.kind] != owner:
+                continue
+            theirs = {name: restart for name, restart, _ in other.buffers}
+            for name, restart, _ in record.buffers:
+                if name in theirs and theirs[name] != restart:
+                    raise RegistryError(
+                        f"the buffer {owner}.{name} has restart policy {theirs[name]!r} in {other.kind} scheme "
+                        f"{other.scheme!r} and {restart!r} in {record.kind} scheme {record.scheme!r}",
+                        why="A runtime buffer has one restart policy (SPEC §8.1); rename one of them in its "
+                            "scheme record.")
 
     def get(self, kind: str, scheme: str | None) -> SchemeRecord | None:
         return self._records.get((kind, scheme))

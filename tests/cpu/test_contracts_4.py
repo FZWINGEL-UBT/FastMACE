@@ -374,6 +374,37 @@ def test_scheme_records_declare_their_buffer_policies(monkeypatch):
         runtime.policy_for("integrator.p_eta")
 
 
+def test_two_schemes_may_not_give_one_buffer_different_policies():  # 4-T01b
+    from fastmace.engine.registry import RegistryError
+
+    derived = _record(scheme="toy_a", buffers=(("pressure", "derived", "Toy.set_pressure"),))
+    saved = _record(scheme="toy_b", buffers=(("pressure", "save", None),))
+    with pytest.raises(RegistryError, match=r"integrator\.pressure.*toy_a.*toy_b"):
+        reg.Registry([derived, saved])
+    other_owner = reg.OptimizerRecord(scheme="toy_o", implementation="x:Y", buffers=(("pressure", "save", None),))
+    assert len(reg.Registry([derived, other_owner]).records()) == 2  # optimizer.pressure is another buffer
+
+
+def test_one_buffer_of_two_schemes_lists_both_recompute_functions(monkeypatch):  # 4-T01b
+    from fastmace.engine import registry as runtime
+
+    a = _record(scheme="toy_a", buffers=(("chain_r", "reset", "ToyA.start"),))
+    b = _record(scheme="toy_b", buffers=(("chain_r", "reset", "ToyB.start"),))
+    records = reg.Registry([*reg.registry().records(), b, a])
+    monkeypatch.setattr(reg, "registry", lambda: records)
+    policy = runtime.policy_for("integrator.chain_r")
+    assert (policy.restart, policy.recompute) == ("reset", "ToyA.start | ToyB.start")
+
+
+def test_the_registered_schemes_have_no_buffer_clash():  # 4-T01b: the real records, every phase 4 task's
+    records = reg.discover()  # raises RegistryError on a clash
+    seen = {}
+    for record in records.records():
+        for name, restart, _ in record.buffers:
+            seen.setdefault((reg.BUFFER_OWNERS[record.kind], name), set()).add(restart)
+    assert {key: policies for key, policies in seen.items() if len(policies) > 1} == {}
+
+
 # --------------------------------------------------------------------------- restart format 4
 
 

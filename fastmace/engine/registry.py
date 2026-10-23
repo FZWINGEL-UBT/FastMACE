@@ -30,20 +30,13 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Literal
 
-from fastmace.errors import FastMACEError
+from fastmace.errors import RegistryError
 
 if TYPE_CHECKING:
     import torch
 
 RestartPolicy = Literal["save", "reset", "derived"]
 RESTART_POLICIES = ("save", "reset", "derived")
-
-
-class RegistryError(FastMACEError, RuntimeError):
-    """A persistent buffer without a policy, or a restore whose buffer moved (SPEC §8.1)."""
-
-    default_next_step = ("This is a FastMACE bug: report it with the buffer name. The policy table is "
-                         "fastmace.engine.registry.POLICIES.")
 
 
 @dataclass(frozen=True)
@@ -147,11 +140,19 @@ POLICIES = (
 def scheme_policies() -> tuple[RegisteredBuffer, ...]:
     """The policies the integrator and optimiser scheme records declare (``SchemeRecord.buffers``, 4-T01), after
     ``POLICIES``: a scheme adds its buffers with its record, not here."""
-    from fastmace.integrators.registry import registry
+    from fastmace.integrators.registry import BUFFER_OWNERS, registry
 
-    owners = {"integrator": "integrator", "optimizer": "optimizer", "cell_filter": "dof"}
-    return tuple(_policy(f"{owners[record.kind]}.{name}", owners[record.kind], restart, recompute)
-                 for record in registry().records() for name, restart, recompute in record.buffers)
+    # One policy per buffer: the registry refuses two restart policies for one name (4-T01b); schemes that share a
+    # name with the same policy (LBFGS and FIRE's optimizer.fmax) list their recompute functions together.
+    merged: dict[str, tuple[str, str, set]] = {}
+    for record in registry().records():
+        owner = BUFFER_OWNERS[record.kind]
+        for name, restart, recompute in record.buffers:
+            entry = merged.setdefault(f"{owner}.{name}", (owner, restart, set()))
+            if recompute is not None:
+                entry[2].add(recompute)
+    return tuple(_policy(name, owner, restart, " | ".join(sorted(recomputes)) or None)
+                 for name, (owner, restart, recomputes) in merged.items())
 
 
 def policy_for(name: str) -> RegisteredBuffer:
