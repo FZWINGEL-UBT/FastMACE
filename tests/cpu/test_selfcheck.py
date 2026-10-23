@@ -76,6 +76,44 @@ def test_floors_hold_where_the_yardstick_is_nearly_exact():
         assert not selfcheck.verdict([row(prod=tuple(prod), yard=tiny)])["passed"], index
 
 
+POLAR_FLOORS = {"stress_eV_per_A3": 5e-7}  # SPEC decision 49, the PolarMACE record's entry (4-T12)
+
+
+def test_a_record_floor_raises_only_its_quantity():
+    floors = selfcheck.effective_floors(POLAR_FLOORS)
+    assert floors == {**selfcheck.FLOORS, "stress_eV_per_A3": 5e-7}
+    assert selfcheck.effective_floors({}) == selfcheck.FLOORS and selfcheck.effective_floors(None) == selfcheck.FLOORS
+    tiny = (0.0, 0.0, 0.0)
+    rows = [row(prod=(0.0, 0.0, 3e-7), yard=tiny)]
+    assert not selfcheck.verdict(rows)["passed"]
+    stress = selfcheck.verdict(rows, floors=floors)["quantities"]["stress_eV_per_A3"]
+    assert stress["passed"] and stress["floor"] == 5e-7 and stress["limit"] == 5e-7
+    assert stress["floor_source"] == "reference record"
+    assert selfcheck.verdict(rows)["quantities"]["stress_eV_per_A3"]["floor_source"] == "SPEC §12.3"
+    # A stress error above the PolarMACE floor is still caught, and the ratio rule still binds above it.
+    assert not selfcheck.verdict([row(prod=(0.0, 0.0, 5.1e-7), yard=tiny)], floors=floors)["passed"]
+    assert selfcheck.verdict([row(prod=(0.0, 0.0, 8e-7), yard=(0.0, 0.0, 4e-7))], floors=floors)["passed"]
+    assert not selfcheck.verdict([row(prod=(0.0, 0.0, 8.1e-7), yard=(0.0, 0.0, 4e-7))], floors=floors)["passed"]
+    # The energy and force floors stay the general ones.
+    assert not selfcheck.verdict([row(prod=(0.011, 0.0, 0.0), yard=tiny)], floors=floors)["passed"]
+    assert not selfcheck.verdict([row(prod=(0.0, 1.1e-5, 0.0), yard=tiny)], floors=floors)["passed"]
+    assert selfcheck.FLOORS["stress_eV_per_A3"] == 1e-7  # the module's floors are unchanged
+
+
+def test_the_1b_t23_nacl_rounding_case_passes_under_the_polar_floor():
+    # 1b-T23: POLAR-1-S on NaCl 3x3x3, hybrid stress 1.2e-7 eV/Å^3 against a 3-4e-8 float32 yardstick.
+    rows = [row(prod=(0.0, 0.0, 1.2e-7), yard=(0.0, 0.0, 4e-8))]
+    assert not selfcheck.verdict(rows)["passed"]
+    assert selfcheck.verdict(rows, floors=selfcheck.effective_floors(POLAR_FLOORS))["passed"]
+
+
+def test_a_record_may_only_raise_a_known_floor():
+    with pytest.raises(ValueError, match="unknown"):
+        selfcheck.effective_floors({"pressure_GPa": 1.0})
+    with pytest.raises(ValueError, match="below"):
+        selfcheck.effective_floors({"stress_eV_per_A3": 1e-8})
+
+
 @pytest.mark.parametrize("path", ["production", "yardstick"])
 @pytest.mark.parametrize("quantity", ["energy_meV_per_atom", "force_eV_per_A", "stress_eV_per_A3"])
 @pytest.mark.parametrize("bad", [math.nan, math.inf])
@@ -282,6 +320,47 @@ def test_a_species_constant_energy_offset_fails_on_energy_alone(pristine, no_eng
     assert record.to_metadata()["energy_meV_per_atom"] == pytest.approx(0.5, rel=1e-6)
     assert "energy" in str(raised.value) and "check" not in record.reason
     assert isinstance(raised.value, FastMACEError)
+
+
+def _stress_offset(monkeypatch, offset):
+    """Production's stress off by ``offset`` eV/Å^3 in xx: a deliberate stress error, nothing else changed."""
+    original = selfcheck._read_outputs
+
+    def shifted(engine_, stress):
+        energy, forces, values = original(engine_, stress)
+        values = values.copy()
+        values[0, 0] += offset
+        return energy, forces, values
+
+    monkeypatch.setattr(selfcheck, "_read_outputs", shifted)
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+@pytest.mark.parametrize("offset,floors,passes", [(3e-7, None, False), (3e-7, POLAR_FLOORS, True),
+                                                  (6e-7, POLAR_FLOORS, False)],
+                         ids=["general-3e-7", "polar-3e-7", "polar-6e-7"])
+def test_the_gate_reads_the_stress_floor_from_the_reference_record(pristine, no_engines_yet, monkeypatch,
+                                                                    offset, floors, passes):
+    """SPEC decision 49: the record's floors reach the gate through the reference's info, and are recorded."""
+    engine, references, _ = gated(pristine, NPT)
+    if floors is not None:
+        references.info["reference"]["gate_floors"] = dict(floors)
+    _stress_offset(monkeypatch, offset)
+    if passes:
+        record = selfcheck.production(engine, references, check="gate")
+    else:
+        with pytest.raises(GateFailed) as raised:
+            selfcheck.production(engine, references, check="gate")
+        record = raised.value.gate_record
+        assert f"floor {(floors or selfcheck.FLOORS)['stress_eV_per_A3']:g}" in record.reason
+    metadata = record.to_metadata()
+    assert metadata["status"] == ("passed" if passes else "failed")
+    assert metadata["floors"] == {**selfcheck.FLOORS, **(floors or {})}
+    stress = metadata["quantities"]["stress_eV_per_A3"]
+    assert stress["floor"] == metadata["floors"]["stress_eV_per_A3"]
+    assert stress["floor_source"] == ("reference record" if floors else "SPEC §12.3")
+    assert stress["production"] == pytest.approx(offset, rel=0.05)
+    assert metadata["quantities"]["force_eV_per_A"]["floor"] == selfcheck.FLOORS["force_eV_per_A"]
 
 
 @pytest.mark.filterwarnings("ignore::UserWarning")

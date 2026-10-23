@@ -220,6 +220,19 @@ def _label_of(model, head, sha256):
     return None
 
 
+def _floors_text(floors):
+    """"floors §12.3", plus each floor a reference record raised (4-T12: PolarMACE's stress, decision 49)."""
+    from fastmace.planner.selfcheck import FLOORS
+
+    raised = [f"{_GATE_NAMES[key]} {value:g} {unit}" for key, unit in _GATE_UNITS
+              if (value := (floors or {}).get(key, FLOORS[key])) != FLOORS[key]]
+    return "floors §12.3" + (f", {', '.join(raised)} from the reference record" if raised else "")
+
+
+_GATE_UNITS = (("energy_meV_per_atom", "meV/atom"), ("force_eV_per_A", "eV/Å"), ("stress_eV_per_A3", "eV/Å³"))
+_GATE_NAMES = {"energy_meV_per_atom": "energy", "force_eV_per_A": "force", "stress_eV_per_A3": "stress"}
+
+
 def gate_line(gate) -> str:
     """The report's gate line from a gate record (mapping); the not-run text for none or ``skipped``.
 
@@ -246,7 +259,7 @@ def gate_line(gate) -> str:
     elif len(steps) > 1 and gate.get("device"):
         where = f"reference on {gate['device']} after {steps[0].get('outcome')}"
     parts = [part for part in (where, gate.get("copies"), ", ".join(numbers)) if part]
-    detail = "; ".join(parts + ["floors §12.3"])
+    detail = "; ".join(parts + [_floors_text(gate.get("floors"))])
     yardstick = (gate.get("references") or {}).get("yardstick") or {}
     if str(yardstick.get("energy_bound", "")).startswith("looser"):  # 2-T04: unqualified MACE
         detail = f"{detail}; energy bound {yardstick['energy_bound']}"

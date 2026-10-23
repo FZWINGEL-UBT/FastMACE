@@ -40,9 +40,32 @@ SETTERS = {"capture_safe_mask_head": _patches.set_capture_safe_mask_head,
            "unfuse_full_addmm": _patches.set_unfuse_full_addmm,
            "cueq_conv_fusion": _patches.set_cueq_conv_fusion}
 WRONG = "0" * 64
-# The 0.3.16 reference record ids of 1b (main at b0f24d5).
+# The 0.3.16 reference record ids of 1b (main at b0f24d5); PolarMACE's since 4-T12 (SPEC decision 49).
 MH1_ID = "fastmace.reference/0.3.16/mh1/763155208cd1ef8c"
-POLAR_ID = "fastmace.reference/0.3.16/polar/8e216bde0c3515e9"
+POLAR_ID_1B = "fastmace.reference/0.3.16/polar/8e216bde0c3515e9"
+POLAR_ID = "fastmace.reference/0.3.16/polar/1b78dc6383d5150e"
+# The issue 1642 entry as 1b qualified it (POLAR_ID_1B). 4-T12 restated its validation and findings.
+POLAR_STRESS_FIX_1B = {
+    "name": "polar_kspace_stress",
+    "issue": "MACE issue 1642",
+    "fixed_upstream": "MACE PR 1718, after 0.3.16",
+    "defect": "PolarMACE's stress misses the k-space energy's dependence on the cell",
+    "implementation": "fastmace.longrange.polar: enable() before the first evaluation, the class-level forward "
+                      "active (no instance forward stored)",
+    "validation": {
+        "method": "central finite differences of the reference energy",
+        "structure": "NaCl 3x3x3",
+        "strain": 1e-4,
+        "tolerance_eV_per_A3": 1e-6,
+        "result": "corrected reference <= 8.1e-9 eV/A^3, MACE 0.3.16's own stress 2e-5 eV/A^3 off (1a-T19)",
+        "probe": "ResearchModule studies/other_models/probes/polar_stress_probe.py",
+    },
+    "open_findings": [
+        "NbCl5 3x3x3: the corrected float64 POLAR-1-S stress differs from finite differences by 4.4e-4 eV/A^3 "
+        "(about 3%); validated on NaCl 3x3x3 only, to be resolved in phase 3b before PolarMACE NPT is recommended",
+    ],
+    "retire_when": "the pinned MACE contains PR 1718; the record then states plain stock equivalence",
+}
 
 
 @pytest.fixture(autouse=True)
@@ -396,6 +419,25 @@ def test_the_qualified_records_are_unchanged():
     assert records.record_for("0.3.16", "mh1").id == MH1_ID
     assert records.record_for("0.3.16", "polar").id == POLAR_ID
     assert records.record_for("0.3.16", "mh1").qualified
+
+
+def test_the_polar_record_of_1b_is_superseded_by_the_floor_and_the_restated_fix():
+    """4-T12: a new PolarMACE record version, not an edit. What changed against the 1b record: one gate entry
+    (the stress floor, decision 49) and the issue 1642 entry's validation and findings (3b-T08, 4-T11)."""
+    import dataclasses
+
+    from fastmace.reference import records
+
+    record = records.record_for("0.3.16", "polar")
+    assert record.numerical[-1]["name"] == "polar_float32_stress_floor"
+    (fix,) = record.upstream_fixes
+    changed = {key for key in fix.keys() | POLAR_STRESS_FIX_1B.keys() if fix.get(key) != POLAR_STRESS_FIX_1B.get(key)}
+    assert changed == {"validation", "open_findings", "resolved_findings"}
+    as_1b = dataclasses.replace(record, numerical=record.numerical[:-1], upstream_fixes=(POLAR_STRESS_FIX_1B,))
+    assert as_1b.id == POLAR_ID_1B
+    reason = records.superseded(POLAR_ID_1B)
+    assert "decision 49" in reason and POLAR_ID in reason
+    assert records.superseded(POLAR_ID) is None and records.superseded(MH1_ID) is None
 
 
 def test_an_unqualified_version_gets_stock_equivalence_only():

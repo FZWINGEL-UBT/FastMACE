@@ -13,6 +13,6 @@ RECORDS = (
                      ensembles=("nvt", "npt"), cell_modes=("fixed", "hydrostatic", "full"), constraints=("fixcm", "fix_atoms"),
                      ase_class="ase.md.nvtberendsen.NVTBerendsen", non_canonical=True,
                      buffers=(("target_temperature", "derived", "Integrator.set_temperature"),
-                              ("pressure", "derived", "Berendsen.restore_externalstress")),
+                              ("berendsen_pressure", "derived", "Berendsen.restore_externalstress")),
                      report="non-canonical: equilibration only"),
 )
