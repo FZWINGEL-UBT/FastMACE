@@ -97,7 +97,7 @@ REFERENCE_REASONS = {
     "compile": "reference tier: MACE's uncompiled model (SPEC §8.4)",
     "pipelined": "reference tier: every step checked (the reference evaluates on a host copy of the positions)",
 }
-# 4-T12b: a safe default, not a known defect. No PolarMACE cell relaxation is qualified: 4-T07's reference (ASE
+# 4-T12b, SPEC §18 decision 50 (owner: refusal kept): a safe default, not a known defect. No PolarMACE cell relaxation is qualified: 4-T07's reference (ASE
 # LBFGS with FrechetCellFilter on fm.calc, POLAR-1-S, NbCl5 3x3x3) diverged on the model's own forces (the float64
 # reference's too, and at fixed cell as well), and the k-space energy steps where a k-vector crosses the hard
 # cutoff (3b-T08). FastMACE's forces and stress match the energy there (4-T12b). Fixed-cell relaxations plan.
@@ -105,7 +105,7 @@ POLAR_VARIABLE_CELL_OPTIMIZER = (
     "PolarMACE with a variable-cell optimiser (cell_filter=FrechetCell) is refused: no PolarMACE cell relaxation "
     "is qualified against a reference (4-T07's diverged on POLAR-1-S's own forces, 4-T12b), and the k-space "
     "energy is not smooth in the cell, stepping where a k-vector crosses the hard cutoff (3b-T08); relax at "
-    "fixed cell (no cell_filter) (SPEC §9.3 rule 1)")
+    "fixed cell (no cell_filter) (SPEC §9.3 rule 1, §18 decision 50)")
 # Refusals of the graph tier that do not apply to the reference tier: it has no padding and no compiled model.
 REFERENCE_LIFTS = ("inexact-padding", "polar-plain-compiled-cueq")
 # 1b's wording of refusals that FixedPlanner phrases for 1a.
