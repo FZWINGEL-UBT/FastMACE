@@ -18,9 +18,15 @@ so the captured kernels are the research engine's, in the same order. Every tens
 step reads or writes lives at a fixed address, allocated when the integrator is built; targets
 such as the temperature are device scalars filled between replays.
 
-Constructors are not part of the contract: the planner builds each integrator from its
-``IntegratorConfig``, the timestep and the ``SimulationState`` (whose masses fix the
-coefficients and whose ``rng.batch`` it allocates).
+Constructors: ``Class(state, config, *, temperature_K=None, **keywords)``, with the keywords of the
+scheme's record (``fastmace.integrators.registry``, plan task 4-T01). Only the planner builds integrators
+(``registry.build_integrator``), from the ``IntegratorConfig`` and the ``SimulationState`` (whose masses fix
+the coefficients and whose ``rng.batch`` it allocates). ``self.config`` is the config.
+
+Phase 4 (4-T01) adds what every scheme declares through its record: ``constraint_support`` (SPEC §4.4),
+``degrees_of_freedom`` (owner decision D2) and the conserved quantity, ``output_values()["conserved"]``
+(``CONSERVED_KEY``): NVE E_kin + E_pot; CSVR that plus the energy the thermostat took out, as ASE's
+``Bussi``; NHC and MTK the extended energy. Langevin and BAOAB have none.
 """
 
 from __future__ import annotations
@@ -32,15 +38,35 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import torch
 
+    from fastmace.integrators.registry import IntegratorRecord
     from fastmace.state import SimulationState
+
+# The output value of the conserved quantity, eV, shape (1,), for schemes that have one.
+CONSERVED_KEY = "conserved"
 
 
 class Integrator(abc.ABC):
     """One integrator instance per run, bound to one SimulationState.
 
-    Constraint support (SPEC §4.4): none in 1.0; the planner refuses constraints before an
-    integrator exists.
+    Constraint support (SPEC §4.4): the scheme record's ``constraints``; the planner refuses everything
+    else before an integrator exists (rule 1).
     """
+
+    @property
+    def record(self) -> IntegratorRecord:
+        """The registry record of ``self.config.scheme``."""
+        from fastmace.integrators.registry import registry
+
+        return registry().integrator(self.config.scheme)
+
+    @property
+    def constraint_support(self) -> tuple[str, ...]:
+        """The §4.4 rows the scheme supports: ``"fixcm"``, ``"fix_atoms"``."""
+        return self.record.constraints
+
+    def degrees_of_freedom(self, state: SimulationState) -> int:
+        """The kinetic degrees of freedom of the targets and temperatures under ``self.config`` (D2's ``dof``)."""
+        return self.record.degrees_of_freedom(self.config, state.natoms, state.n_fixed)
 
     @property
     @abc.abstractmethod
@@ -129,16 +155,20 @@ class Integrator(abc.ABC):
     @abc.abstractmethod
     def output_values(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
         """Device tensors for one output row: positions, momenta, forces, energy, kinetic energy;
-        variable-cell integrators add cell and stress. Fresh tensors or state views; the engine
-        copies them to pinned host memory asynchronously (``Engine.snapshot``)."""
+        variable-cell integrators add cell and stress, schemes with a conserved quantity
+        ``CONSERVED_KEY``. Fresh tensors or state views; the engine copies them to pinned host memory
+        asynchronously (``Engine.snapshot``)."""
         raise NotImplementedError
 
     @abc.abstractmethod
     def state_dict(self) -> dict[str, Any]:
         """Internal state for a restart (host arrays) that ``SimulationState`` does not hold.
 
-        Empty for both integrators since 1b: the noise stream is in ``SimulationState.rng`` and
-        BAOAB's barostat state (``p_eps``, ``force_eps``) in ``SimulationState`` (SPEC §10.6).
+        Empty for Langevin and BAOAB since 1b: the noise stream is in ``SimulationState.rng`` and
+        BAOAB's barostat state (``p_eps``, ``force_eps``) in ``SimulationState`` (SPEC §10.6). From
+        format 4 the keys are exactly the record's ``state_keys`` (NHC ``eta``, ``p_eta``; MTK the cell
+        momenta and the barostat chain; CSVR the transferred energy; its noise rows and cursor are
+        ``SimulationState.rng``'s).
         """
         raise NotImplementedError
 

@@ -1,4 +1,4 @@
-"""The restart file: the complete simulation state, format version 3 (SPEC §10.6, §9.5).
+"""The restart file: the complete simulation state, format version 4 (SPEC §10.6, §9.5).
 
 One ``.npz`` per run directory (plain arrays and JSON text, no pickles), written durably and
 atomically (``io.durable``: fsynced temporary file, rename, directory fsync) at committed steps
@@ -28,6 +28,14 @@ Version 2 (plan task 1b-T05) holds every §10.6 item except the MC state; versio
   swap, transmutation or host change: ``Simulation.resume`` builds the engine from them
   (``composition``), not from the initial structure in ``simulation.json``. Version 2 files hold
   the same keys and resume the same way.
+- version 4's (plan task 4-T01): the phase 4 schemes. The integrator record's config holds the
+  ``scheme`` (and its ``dof`` and ``parameters``); each scheme's own device state is its
+  ``state_dict`` under ``integrator_keys``, exactly the keys its registry record declares
+  (``IntegratorRecord.state_keys``: NHC ``eta``, ``p_eta``; MTK the cell momenta and the barostat
+  chain; CSVR its transferred energy, its noise rows and cursor being ``noise``/``noise_next``; NVE
+  and Berendsen none). The physical record adds ``fixed_atoms``, the ``FixAtoms`` indices
+  (``fixed_atoms``). Versions 0 to 3 load as before: their scheme is the ensemble's default
+  (Langevin or BAOAB) and they have no fixed atoms.
 
 ``main.py``'s adapter writes ``state_arrays`` without identity and plan: such files have no
 ``identity``. ``check_identity`` (``Simulation.resume``) refuses them, as it refuses 1a
@@ -67,7 +75,9 @@ RESTART_NAME = "restart.npz"
 # Version 3 (SPEC §10.6; contracts: plan task 3-T01, writer and resume: 3-T08). The composition keys,
 # already written since versions 1 and 2, are the resumed state (before 3-T08 resume rebuilt the Atoms
 # from the initial structure); the JSON record "mc" holds the attached move set's state (3-T09, 3-T10).
-NEXT_FORMAT_VERSION = 3
+# Version 4 (plan task 4-T01): the scheme's state keys checked against its record, and the fixed atoms in
+# the physical record.
+NEXT_FORMAT_VERSION = 4
 FORMAT_VERSION = NEXT_FORMAT_VERSION
 V3_KEYS = ("mc",)
 COMPOSITION_KEYS = ("species", "masses", "charges", "physical")
@@ -164,6 +174,27 @@ def _integrator_json(integrator: Any) -> str:
     return _json(record, "integrator")
 
 
+def _physical(state: SimulationState) -> dict[str, Any]:
+    """The physical record of ``state``: total charge, spin, PBC, other constraints and the fixed atoms."""
+    return {"total_charge": state.total_charge, "spin_multiplicity": state.spin_multiplicity,
+            "pbc": [bool(periodic) for periodic in state.pbc], "constraints": list(state.constraints),
+            "fixed_atoms": [int(index) for index in state.fixed_indices]}
+
+
+def _check_scheme_keys(integrator: Any, integrator_state: Mapping[str, Any]) -> None:
+    """Format 4: a registered scheme's ``state_dict`` holds exactly its record's ``state_keys``."""
+    config = getattr(integrator, "config", None)
+    scheme = getattr(config, "scheme", None)
+    if scheme is None:
+        return
+    from fastmace.integrators.registry import registry
+
+    record = registry().get("integrator", scheme)
+    if record is not None and set(integrator_state) != set(record.state_keys):
+        raise ValueError(f"the {scheme} integrator's state_dict has keys {sorted(integrator_state)}, its scheme "
+                         f"record declares {sorted(record.state_keys)} (restart format 4)")
+
+
 def state_arrays(state: SimulationState, engine: str, integrator_state: Mapping[str, Any] | None = None,
                  variable_cell: bool = False, *, integrator: Any = None, plan: Mapping[str, Any] | None = None,
                  outputs: Mapping[str, int] | None = None) -> dict[str, Any]:
@@ -179,6 +210,8 @@ def state_arrays(state: SimulationState, engine: str, integrator_state: Mapping[
     if integrator_state is None and integrator is not None:
         integrator_state = integrator.state_dict()
     integrator_state = dict(integrator_state or {})
+    if integrator is not None:
+        _check_scheme_keys(integrator, integrator_state)
     reserved = _STATE_KEYS | (set(BAROSTAT_KEYS) if state.p_eps is not None else set())
     clash = reserved & integrator_state.keys()
     if clash:
@@ -198,9 +231,7 @@ def state_arrays(state: SimulationState, engine: str, integrator_state: Mapping[
         energy=_numpy(state.energy),
         fastmace_restart=FORMAT_VERSION,
         plan_revision=_count(state.plan_revision, "plan_revision"),
-        physical=_json({"total_charge": state.total_charge, "spin_multiplicity": state.spin_multiplicity,
-                        "pbc": [bool(periodic) for periodic in state.pbc],
-                        "constraints": list(state.constraints)}, "physical"),
+        physical=_json(_physical(state), "physical"),
     )
     if state.rng.batch is not None:
         arrays["noise"] = _numpy(state.rng.batch)
@@ -318,7 +349,7 @@ def read_restart(path: str | Path, engine: str | None = None) -> dict[str, np.nd
 # -- the records of a file read by read_restart --
 
 def format_version(restart: Mapping[str, Any]) -> int:
-    """The FastMACE format version: 3, 2 (fastmace-2), 1 (phase 1a) or 0 (a research-engine file)."""
+    """The FastMACE format version: 4, 3 (fastmace-3), 2 (fastmace-2), 1 (phase 1a) or 0 (a research-engine file)."""
     return int(restart["fastmace_restart"]) if "fastmace_restart" in restart else 0
 
 
@@ -354,8 +385,26 @@ def composition(restart: Mapping[str, Any]) -> dict[str, Any] | None:
 
 
 def physical_record(restart: Mapping[str, Any]) -> dict[str, Any] | None:
-    """Total charge, spin, PBC and constraints, or ``None`` before version 2."""
+    """Total charge, spin, PBC, constraints and (version 4) the fixed atoms, or ``None`` before version 2."""
     return _record(restart, "physical")
+
+
+def fixed_atoms(restart: Mapping[str, Any]) -> tuple[int, ...]:
+    """The ``FixAtoms`` indices of the run (version 4), ``()`` without fixed atoms or in older files."""
+    return tuple(int(index) for index in (physical_record(restart) or {}).get("fixed_atoms", ()))
+
+
+def scheme(restart: Mapping[str, Any]) -> str | None:
+    """The integrator scheme of the run: the stored config's (version 4), else its ensemble's default
+    (``config.DEFAULT_SCHEMES``: versions 2 and 3 ran Langevin or BAOAB); ``None`` without an integrator
+    record."""
+    from fastmace.config import DEFAULT_SCHEMES
+
+    record = integrator_record(restart)
+    if record is None:
+        return None
+    config = record.get("config") or {}
+    return config.get("scheme") or DEFAULT_SCHEMES.get(config.get("ensemble", "nvt"))
 
 
 def integrator_record(restart: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -451,9 +500,8 @@ def _check_physical(restart: Mapping[str, Any], state: SimulationState) -> None:
     physical = physical_record(restart)
     if physical is None:
         return
-    current = {"total_charge": state.total_charge, "spin_multiplicity": state.spin_multiplicity,
-               "pbc": [bool(periodic) for periodic in state.pbc], "constraints": list(state.constraints)}
-    for key, value in current.items():
+    physical = {"fixed_atoms": [], **physical}  # versions 2 and 3 have no fixed atoms
+    for key, value in _physical(state).items():
         if physical.get(key) != value:
             raise ValueError(f"the restart file has {key}={physical.get(key)!r}, the state {value!r}")
 
