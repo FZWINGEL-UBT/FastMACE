@@ -1,9 +1,11 @@
 """Step time of the fused Nose-Hoover chain stage against the PyTorch stage (plan task 4-T03b).
 
-    FASTMACE_MODELS=~/models python tools/nhc_fused_timing.py --out results/4-T03b/timing.json
+    python tools/nhc_fused_timing.py --part stages --out results/4-T03b/stages.json
+    FASTMACE_MODELS=~/models python tools/nhc_fused_timing.py --part mh1 --out results/4-T03b/mh1.json
 
-Two parts, each in one process with alternating blocks (fused, PyTorch, then PyTorch, fused, ...) after a
-warm-up; the median per-step time per stage is reported:
+Two parts, each in its own process (a Simulation needs the allocator configured before CUDA is touched),
+with alternating blocks (fused, PyTorch, then PyTorch, fused, ...) after a warm-up; the median per-step
+time per stage is reported:
 
 1. **Stages A + B** of ``NoseHooverChainNVT`` and ``MTK`` (hydrostatic, full), captured as CUDA graphs with a
    harmonic stand-in force field (``tests/gpu/test_nose_hoover_mtk_gpu.py``'s), NaCl 3 x 3 x 3 (216 atoms),
@@ -152,11 +154,21 @@ def main(argv=None):
     parser.add_argument("--blocks", type=int, default=10)
     parser.add_argument("--stage-block", type=int, default=1000)
     parser.add_argument("--block", type=int, default=300)
-    parser.add_argument("--skip-mh1", action="store_true")
+    parser.add_argument("--part", choices=("stages", "mh1"), required=True)
     args = parser.parse_args(argv)
     result = dict(gpu=torch.cuda.get_device_name(), torch=torch.__version__, fastmace=fm.__version__,
                   atoms=216, stages={}, mh1={})
 
+    if args.part == "stages":
+        stages(args, result)
+    else:
+        mh1(args, result)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(result, indent=2))
+
+
+def stages(args, result):
     dyn, graphs = stage_graphs("langevin", None)
     result["stages"]["langevin"] = alternate({"langevin": lambda n: replay(graphs, dyn, n)}, 2,
                                              args.stage_block)[0]["langevin"] * 1e6
@@ -171,23 +183,21 @@ def main(argv=None):
               flush=True)
     print(f"stages langevin     {result['stages']['langevin']:8.1f} us", flush=True)
 
-    if not args.skip_mh1:
-        model = fm.load("mh1-r2scan")
-        for name in ("nhc", "full"):
-            sims = {stage: simulation(model, name, stage == "fused") for stage in STAGES}
-            for sim in sims.values():
-                sim.run(steps=args.block)  # warm-up: captures, buckets
-            medians, blocks = alternate({stage: timed_run(sims[stage]) for stage in STAGES}, args.blocks, args.block)
-            result["mh1"][name] = {stage: medians[stage] * 1e3 for stage in STAGES}
-            result["mh1"][name]["blocks_ms"] = {stage: [t * 1e3 for t in blocks[stage]] for stage in STAGES}
-            print(f"MH-1 {name:5s} " + "  ".join(f"{stage} {medians[stage] * 1e3:7.3f} ms" for stage in STAGES),
-                  flush=True)
-            del sims
-            torch.cuda.empty_cache()
 
-    out = Path(args.out)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(result, indent=2))
+
+def mh1(args, result):
+    model = fm.load("mh1-r2scan")
+    for name in ("nhc", "full"):
+        sims = {stage: simulation(model, name, stage == "fused") for stage in STAGES}
+        for sim in sims.values():
+            sim.run(steps=args.block)  # warm-up: captures, buckets
+        medians, blocks = alternate({stage: timed_run(sims[stage]) for stage in STAGES}, args.blocks, args.block)
+        result["mh1"][name] = {stage: medians[stage] * 1e3 for stage in STAGES}
+        result["mh1"][name]["blocks_ms"] = {stage: [t * 1e3 for t in blocks[stage]] for stage in STAGES}
+        print(f"MH-1 {name:5s} " + "  ".join(f"{stage} {medians[stage] * 1e3:7.3f} ms" for stage in STAGES),
+              flush=True)
+        del sims
+        torch.cuda.empty_cache()
 
 
 if __name__ == "__main__":
