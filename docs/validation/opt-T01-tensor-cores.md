@@ -168,3 +168,43 @@ used about 1.2 compute units.
 - the integration cost: a torch custom op inside compiled graphs, `addmm` epilogues, and backward transposes;
 - the cancellation and real-operand accuracy tests;
 - a model-level A/B with the force gate and NVE drift.
+
+## 6. BF16×6 stage-1 screen (Colab A100, G4, L4; 23 October 2026)
+
+This is stage 1 of the 23 October research answer: Triton `tl.dot(input_precision=...)` modes with the bench's 7
+fixed configurations, against cuBLAS. Setup: torch 2.14.1+cu130, Triton 3.8.0, driver 580.82.07. The raw data is
+in `results/opt-T01-gemm-precision-20261020/colab-bf16x6/{a100,g4,l4}/`.
+
+TFLOPS at 4096³, then K = N = 512 at M = 13608 and at M = 216:
+
+| Mode | A100 (sm_80) | G4, RTX PRO 6000 (sm_120) | L4 (sm_89) |
+| --- | --- | --- | --- |
+| cuBLAS IEEE | 19.0 / 17.5 / 3.25 | 74.0 / 57.0 / 7.69 | 12.5 / 12.5 / 2.57 |
+| cuBLAS TF32 | 133 / 82.9 / 3.25 | 194 / 112 / 9.05 | 27.0 / 21.8 / 3.46 |
+| cuBLAS BF16, dense | 260 / 134 / 4.10 | 368 / 198 / 11.8 | 78.8 / 41.7 / 3.95 |
+| Triton IEEE | 18.3 / 15.9 / 1.81 | 67.1 / 52.2 / 5.20 | 9.77 / 10.1 / 2.13 |
+| Triton tf32x3 | 16.8 / 14.8 / 1.47 | 43.7 / 35.1 / 4.39 | 6.30 / 7.32 / 2.01 |
+| Triton bf16x3 | 29.4 / 23.7 / 1.70 | 65.0 / 49.6 / 4.76 | 8.86 / 9.87 / 2.13 |
+| Triton bf16x6 | 19.2 / 17.4 / 1.49 | 42.8 / 34.1 / 3.67 | 5.77 / 6.60 / 1.81 |
+
+- **BF16 dense against 6× FP32, at 4096³:** A100 2.29, G4 0.83, L4 1.05.
+- **BF16×6 never beats cuBLAS IEEE at K = 512.** On the A100 at M = 13608 it ties (17.37 against 17.51).
+- **Verdict:**
+  - G4 and L4 are rejected.
+  - The A100 would need a better BF16×6 kernel than Triton's, a CUTLASS-class kernel as in section 5.
+  - The RTX 5060 Ti and RTX 4000 Ada are not run. Their 3×TF32 economics already exclude them, and BF16×6 needs
+    BF16 dense ≥ 6× FP32.
+- **Accuracy, worst over the three GPUs:** errors are max relative / Frobenius / cancellation-scaled, the
+  cancellation-scaled one being |c − c64| / Σ|a·b|.
+
+  | Operand set | IEEE | tf32x3 | bf16x6 | bf16x3 |
+  | --- | --- | --- | --- | --- |
+  | random | 2.7e-6 / 1.2e-6 / 4.2e-7 | 8.1e-7 / 3.1e-7 / 1.3e-7 | 7.1e-7 / 2.9e-7 / 9.6e-8 | 5.3e-6 / 4.5e-6 / 1.8e-6 |
+  | cancellation | 4.8e-5 / 4.6e-5 / 6.5e-9 | **1.9e-4 / 1.7e-4 / 2.6e-8** | 3.1e-5 / 3.0e-5 / 4.9e-9 | 1.0e-2 / 7.8e-3 / 1.3e-6 |
+
+  The cancellation set is A[:, 2k+1] = −A[:, 2k]·(1 + 1e-3·u), B[2k+1, :] = B[2k, :].
+- **3×TF32 is about 4× less accurate than IEEE FP32 under cancellation,** though better on random operands.
+  BF16×6 stays at least as accurate as IEEE, and BF16×3 is not FP32-class.
+- **This applies to section 5's CUTLASS 3×TF32,** which uses the same three-product split. Its Gaussian-only
+  accuracy result therefore does not settle accuracy. Before any A100 adoption, it needs this cancellation set,
+  real MACE operands and the force gate. A corrected kernel, as in Ootomo and Yokota, may be needed.
