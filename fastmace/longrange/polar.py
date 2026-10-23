@@ -256,6 +256,8 @@ class PolarState:
         self.overflow = torch.zeros((), dtype=torch.bool, device=device)
         self.bounds_t = torch.tensor(self.bounds, dtype=torch.int64, device=device)
         self.headroom = headroom
+        # The included set held fixed by ``frozen_kset`` (a reference's finite differences), else None.
+        self.frozen_included = None
 
     def buffers(self):
         """The device tensors a CUDA graph reads (for the force field's buffer list).
@@ -340,6 +342,22 @@ def compute_k_vectors_fixed(call, cutoff, cell_vectors, r_cell_vectors):
         # PR 1718 the same way): use the strained cell, its reciprocal cell and volume.
         cell_vectors = _strained_cell(call, cell_vectors)
         r_cell_vectors, call.volume = _reciprocal(cell_vectors)
+    k_vectors, k_norm2, included, max_ns = _included(state, cutoff, cell_vectors, r_cell_vectors)
+    state.overflow |= (max_ns > state.bounds_t).any()
+    deformation = torch.matmul(state.inverse_cell0, cell_vectors[0]) - torch.eye(3, dtype=cell_vectors.dtype,
+                                                                               device=cell_vectors.device)
+    state.overflow |= torch.linalg.vector_norm(deformation) > state.headroom + 1e-5
+    if state.frozen_included is not None:
+        included = state.frozen_included
+    k_batch = (~included).to(torch.int64)
+    k_norm2 = torch.where(included, k_norm2, (cutoff * cutoff).to(k_norm2.dtype))
+    return k_vectors, k_norm2, k_batch, state.k0_mask
+
+
+def _included(state, cutoff, cell_vectors, r_cell_vectors):
+    """The superset's k-vectors, |k|^2, graph_longrange's included set (its bounds and |k| <= cutoff) and bounds."""
+    import torch
+
     norms = torch.norm(cell_vectors, dim=-1)
     normed = cell_vectors / norms.unsqueeze(-1)
     dots = torch.einsum("bij,bij->bi", r_cell_vectors, normed)
@@ -352,16 +370,9 @@ def compute_k_vectors_fixed(call, cutoff, cell_vectors, r_cell_vectors):
             state.part == 1, n3 < n3max, torch.where(
                 state.part == 2, (n2 < n2max) & within_3,
                 (n1 < n1max) & (n2 >= -n2max) & (n2 < n2max) & within_3)))
-    state.overflow |= (max_ns > state.bounds_t).any()
-    deformation = torch.matmul(state.inverse_cell0, cell_vectors[0]) - torch.eye(3, dtype=cell_vectors.dtype,
-                                                                               device=cell_vectors.device)
-    state.overflow |= torch.linalg.vector_norm(deformation) > state.headroom + 1e-5
     k_vectors = torch.einsum("ni,bij->bnj", state.coefficients.to(r_cell_vectors.dtype), r_cell_vectors)[0]
     k_norm2 = torch.einsum("ni,ni->n", k_vectors, k_vectors)
-    included = in_superset & k_norm2.le(cutoff * cutoff)
-    k_batch = (~included).to(torch.int64)
-    k_norm2 = torch.where(included, k_norm2, (cutoff * cutoff).to(k_norm2.dtype))
-    return k_vectors, k_norm2, k_batch, state.k0_mask
+    return k_vectors, k_norm2, in_superset & k_norm2.le(cutoff * cutoff), max_ns
 
 
 # --------------------------------------------------------------------------- long-range blocks
@@ -1018,6 +1029,34 @@ def reset_overflow(model):
 
 
 @contextlib.contextmanager
+def frozen_kset(model, cell):
+    """Hold the k-vectors included for ``cell`` as the included set of every call inside the block.
+
+    graph_longrange's hard cutoff (|k| <= kspace_cutoff, no taper) makes the energy step when a k-vector
+    crosses it under strain, and finite differences across a step go as 1/h (3b-T08: 4.4e-4 eV/A^3 on
+    NbCl5 3x3x3 at h = 1e-4). Inside the block every included k-vector still moves with the cell, so
+    the energy is smooth and its finite differences test the stress formula; the analytic stress of
+    ``cell`` itself is unchanged (the included set is not differentiable). The set is the one a call
+    with stress on ``cell`` includes. For references' self-tests (eager); the live set is back on exit.
+    """
+    import torch
+
+    state = get_state(model)
+    if state is None:
+        raise ValueError("frozen_kset needs an enabled PolarMACE instance (polar.enable)")
+    dtype, device = model.kspace_cutoff.dtype, model.kspace_cutoff.device
+    cell_vectors = torch.tensor(np.asarray(cell, dtype=np.float64)).to(dtype).to(device).view(1, 3, 3)
+    with torch.no_grad():
+        r_cell_vectors, _ = _reciprocal(cell_vectors)
+        included = _included(state, model.kspace_cutoff, cell_vectors, r_cell_vectors)[2]
+    previous, state.frozen_included = state.frozen_included, included
+    try:
+        yield int(included.sum())
+    finally:
+        state.frozen_included = previous
+
+
+@contextlib.contextmanager
 def no_sync_check():
     """Raise on any host synchronisation inside the block (torch sync debug mode)."""
     import torch
@@ -1034,7 +1073,7 @@ __all__ = [
     "FLOAT64_ENERGY_EDITS", "HOLDER_ATTRIBUTE", "PATCH_NAME", "PR1762_EDITS", "PROCESS_CONSTRAINTS", "SOURCE_HASHES",
     "ZERO_FORCE_REASON", "PolarHolder", "PolarState", "PolarUnavailableError", "cap_charge_dipole",
     "compute_k_vectors_fixed", "configure", "coulomb_energy_float64", "coulomb_energy_pbc", "disable", "enable",
-    "get_config", "get_state", "install", "installed", "is_polar", "no_sync_check", "normalise_fukui",
+    "frozen_kset", "get_config", "get_state", "install", "installed", "is_polar", "no_sync_check", "normalise_fukui",
     "overflowed", "polar_forward", "pr1762_forward", "require_route", "reset_overflow", "resolve_kspace_headroom",
     "route_support", "set_float64_energy", "set_single_graph_strain", "set_state", "source_digest",
     "source_problems", "stabilised",
