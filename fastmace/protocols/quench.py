@@ -31,7 +31,8 @@ QUENCH_MAX_STEPS = 5000
 QUENCH_DIRECTORY = "quench"
 CAPTURED, QUENCHED, ROWS, SUMMARY = "captured.traj", "quenched.traj", "quench.csv", "quench.json"
 ROW_FIELDS = ("phase", "bin", "frame", "step", "time_ps", "target_K", "md_temperature_K", "md_potential_eV_atom",
-              "singlepoint_eV_atom", "quenched_eV_atom", "converged", "optimizer_steps", "seconds", "fmax_eV_A")
+              "singlepoint_eV_atom", "quenched_eV_atom", "converged", "optimizer_steps", "seconds", "fmax_eV_A",
+              "volume_A3_atom")
 _INTEGER_FIELDS = ("frame", "step", "optimizer_steps")
 SELECTION = ("thermostat target temperature; each ramp separately; evenly spaced within each bin; plus the final "
              "frame")
@@ -275,12 +276,13 @@ def quench_run(directory: str | Path, calc, resolved, frame_every: int, timestep
                      "md_potential_eV_atom": sample["potential_eV_atom"] if sample else summary["initial_eV_atom"],
                      "singlepoint_eV_atom": summary["initial_eV_atom"], "quenched_eV_atom": summary["energy_eV_atom"],
                      "converged": summary["converged"], "optimizer_steps": summary["steps"],
-                     "seconds": summary["seconds"], "fmax_eV_A": summary["fmax_eV_A"]})
+                     "seconds": summary["seconds"], "fmax_eV_A": summary["fmax_eV_A"],
+                     "volume_A3_atom": atoms.get_volume() / len(atoms)})
         write_rows(out / ROWS, rows)
         log(f"quench {number}/{len(chosen)}: {pick['phase']} {pick['target_K']:.0f} K -> "
             f"{summary['energy_eV_atom']:.6f} eV/atom in {summary['steps']} steps ({summary['seconds']:.1f} s)"
             f"{'' if summary['converged'] else ' NOT CONVERGED'}")
-    result = {"settings": {**dict(settings), "fixed_cell": True, "selection": SELECTION},
+    result = {"settings": {**dict(settings), "fixed_cell": True, "cell": "frame", "selection": SELECTION},
               "frames": len(rows), "frame_every": int(frame_every), "trajectory_frames": total,
               "quench_wall_s": time.perf_counter() - started,
               "quench_seconds_sum": sum(r["seconds"] for r in rows),

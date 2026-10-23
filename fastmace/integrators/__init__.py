@@ -77,7 +77,13 @@ class LangevinBAOAB:
     - ``cell_mode``: ``"hydrostatic"`` (ASE ``hydrostatic=True``) or ``"full"``;
     - ``barostat_tau_fs``: ASE's ``P_tau``, ``None`` = ASE's default 20 ``T_tau``;
     - ``barostat_mass_factor``: ASE's ``P_mass_factor``;
-    - ``disable_cell_langevin``: as ASE.
+    - ``disable_cell_langevin``: as ASE;
+    - ``max_volume_ratio`` and ``max_cell_length_A``: the cell-divergence stop (3b-T07). A
+      ``Simulation`` stops with ``CellDivergedError`` (restart and metadata written first) once the
+      volume leaves [V0 / ratio, V0 ratio], V0 the run's starting volume, or a cell vector is longer
+      than ``max_cell_length_A`` (1000 Å: float32 coordinates still resolve 6e-5 Å there). A vapour at
+      a low pressure expands without bound otherwise, until the coordinates lose their precision.
+      ``None`` turns a limit off.
 
     The production drag term is the corrected one (SPEC §12.1, 1b-T09); ASE's own variant stays an
     ``IntegratorConfig`` option for comparisons with ASE.
@@ -93,9 +99,16 @@ class LangevinBAOAB:
     barostat_mass_factor: float = 1.0
     disable_cell_langevin: bool = False
     fixcm: bool = True
+    max_volume_ratio: float | None = 20.0
+    max_cell_length_A: float | None = 1000.0
 
     def __post_init__(self):
         _validate(self)
+        for field, low in (("max_volume_ratio", 1.0), ("max_cell_length_A", 0.0)):
+            value = getattr(self, field)
+            if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))
+                                      or not math.isfinite(value) or value <= low):
+                raise ValueError(f"LangevinBAOAB.{field} must be None or finite and above {low:g}, got {value!r}")
         object.__setattr__(self, "external_stress_GPa",
                            external_stress(self.external_stress_GPa, "LangevinBAOAB.external_stress_GPa"))
         # The remaining checks are IntegratorConfig's, so record and config cannot disagree.

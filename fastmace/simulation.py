@@ -368,6 +368,9 @@ class Simulation:
         self._atoms = atoms.copy()
         self._config = integrator.to_config(seed=seed)
         self._npt = self._config.ensemble == "npt"
+        # The cell-divergence stop's V0 (3b-T07): the starting volume, kept across a resume (simulation.json).
+        self._reference_volume = abs(float(atoms.get_volume())) if self._npt else None
+        self._diverged = False
         self._schedule = None
         self._mc = None  # the attached move set's MCDriver (3-T15), or None
         self._mc_moves = None  # its move records, also while a child runs the plan
@@ -893,7 +896,7 @@ class Simulation:
         """``count`` MD steps along the attached schedule (if any), with output and step timing."""
         import torch
 
-        from fastmace.errors import NonFiniteError
+        from fastmace.errors import CellDivergedError, NonFiniteError
 
         engine = self._engine
         position = self._schedule
@@ -956,12 +959,24 @@ class Simulation:
                 if not math.isfinite(energy):
                     raise NonFiniteError(f"non-finite potential energy ({energy}) at step {engine.state.step}",
                                          why="the run stops at a non-finite energy; it is never fixed (SPEC §9.6)")
+            if self._npt:
+                self._check_cell(engine.state.cell.detach().cpu().numpy(), int(engine.state.step))
         except NonFiniteError:
             self._status = "non-finite"
             self._stop_clock(synchronised_clock, count_steps=engine.state.step)
             if self._writer is not None:
                 self._writer.flush()
             self._write_metadata()
+            raise
+        except CellDivergedError:
+            self._status = "cell-diverged"
+            self._stop_clock(synchronised_clock, count_steps=engine.state.step)
+            if output is not None and not self._mc_block_active and not engine.uncommitted():
+                self.save_restart(Path(output.directory) / RESTART_NAME)  # the state at the stop (also metadata)
+            else:
+                if self._writer is not None:
+                    self._writer.flush()
+                self._write_metadata()
             raise
         self._stop_clock(synchronised_clock, count_steps=engine.state.step)
         self._status = "paused"
@@ -1027,6 +1042,45 @@ class Simulation:
                     raise NonFiniteError(f"non-finite {name} ({value}) at step {step}",
                                          why="the run stops at a non-finite energy; it is never fixed (SPEC §9.6)")
         self._writer.write(values, sample, frame, tail=tail)
+        if self._npt and "cell" in values:
+            self._check_cell(values["cell"], step)
+
+    @property
+    def reference_volume_A3(self) -> float | None:
+        """V0 of the cell-divergence stop: the NPT run's starting volume (Å³), kept across a resume."""
+        return self._reference_volume
+
+    def _check_cell(self, cell, step):
+        """Stop an NPT run whose cell left its integrator record's limits (``CellDivergedError``, 3b-T07)."""
+        if self._diverged:
+            return
+        import numpy as np
+
+        from fastmace.errors import CellDivergedError
+
+        ratio = getattr(self.integrator, "max_volume_ratio", None)
+        longest = getattr(self.integrator, "max_cell_length_A", None)
+        cell = np.asarray(cell, dtype=float).reshape(3, 3)
+        what = None
+        if ratio is not None and self._reference_volume:
+            volume = abs(float(np.linalg.det(cell)))
+            relative = volume / self._reference_volume
+            if not 1.0 / ratio <= relative <= ratio:  # also catches a non-finite volume
+                what = (f"V/V0 = {relative:.4g} at step {step} (V = {volume / len(self._atoms):.4g} Å³/atom, "
+                        f"V0 = {self._reference_volume / len(self._atoms):.4g}), outside [1/{ratio:g}, {ratio:g}]")
+        if what is None and longest is not None:
+            length = float(np.linalg.norm(cell, axis=1).max())
+            if not length <= longest:
+                what = f"a cell vector of {length:.4g} Å at step {step}, longer than max_cell_length_A = {longest:g} Å"
+        if what is not None:
+            self._diverged = True
+            error = CellDivergedError(
+                f"the NPT cell diverged: {what}",
+                why="past these limits the structure has left its condensed phase or the barostat diverged, and the "
+                    "float32 coordinates and the neighbour lists lose their precision; the run stops before a "
+                    "non-finite energy (3b-T07)")
+            error.step = int(step)
+            raise error
 
     # ------------------------------------------------------------------ report and metadata
 
@@ -1162,6 +1216,7 @@ class Simulation:
             "plan_revision": int(self._plan.revision),
             "restart_points": list(self._restart_points),
             "mc": self._mc_simulation_record(),
+            **({"reference_volume_A3": self._reference_volume} if self._npt else {}),
         }
 
     def _force_field_record(self):
@@ -1242,6 +1297,8 @@ class Simulation:
         from fastmace.io import restart
         from fastmace.protocols import ScheduleState
 
+        if record.get("reference_volume_A3") is not None:
+            self._reference_volume = float(record["reference_volume_A3"])
         engine = self._engine
         if engine is None:  # the plan runs in a child: it resumes this restart (2-T07)
             self._plan = self._resumed_plan(stored, int(stored["step"]), allow_plan_change, versions)
