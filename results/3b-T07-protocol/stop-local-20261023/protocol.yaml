@@ -1,0 +1,37 @@
+{
+ "structure": "/mnt/d/Margraf/FastMACE/.claude/worktrees/compassionate-kare-e71471/fastmace/protocols/data/NbCl5_R2SCAN.cif",
+ "model": "mh1",
+ "head": "matpes_r2scan",
+ "dispersion": "d3bj",
+ "repeat": [
+  3,
+  3,
+  3
+ ],
+ "timestep_fs": 1.0,
+ "schedule": "anneal",
+ "ensemble": "NPT",
+ "pressure_GPa": 0.0,
+ "cell_mode": "hydrostatic",
+ "engine": {
+  "backend": "hybrid"
+ },
+ "output": {
+  "trajectory_every": 100,
+  "thermo_every": 10,
+  "restart_every": 10000
+ },
+ "relax": {
+  "fmax": 0.01,
+  "optimizer": "LBFGS",
+  "max_steps": 5000
+ },
+ "quench": {
+  "min_K": 500.0,
+  "bin_K": 100.0,
+  "per_bin": 2,
+  "fmax": 0.01,
+  "optimizer": "LBFGS",
+  "max_steps": 5000
+ }
+}
