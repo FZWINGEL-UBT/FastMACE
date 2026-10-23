@@ -15,8 +15,14 @@ seed + crc32(name)) and records, on one ``FastMACECalculator`` (the compiled tie
 - ``fresh``: at the start and at the first rising step, the reused calculator against a fresh
   ``FastMACECalculator`` built at that configuration (energy, forces, stress), for stale state.
 
+``--part reference`` instead records the float64 reference (``fastmace.reference``, MACE's calculator with
+the record's corrections) at the start: energy, largest force and stress, so the scale of the production
+forces can be told from a defect. It runs in its own process, before any production engine (SPEC §12.3).
+``--part fixed-cell`` runs the same LBFGS without the cell filter, and records ``--compare-model``'s forces
+at the start (fm.calc) for scale.
+
 Usage (the local GPU through tools/ci/local_gpu.py run, mace_cueq_oeq):
-  python tools/validation/polar_cell_probe.py --output results/RUN/probe.json
+  python tools/validation/polar_cell_probe.py --output results/RUN/probe.json [--part reference|fixed-cell]
 """
 
 from __future__ import annotations
@@ -59,6 +65,8 @@ def parse_args(argv=None):
     p.add_argument("--force-step", type=float, default=1e-3)
     p.add_argument("--scan-max", type=float, default=2e-3)
     p.add_argument("--scan-points", type=int, default=21)
+    p.add_argument("--part", choices=("cell", "reference", "fixed-cell"), default="cell")
+    p.add_argument("--compare-model", default="mh1-r2scan")
     p.add_argument("--output", type=Path, required=True)
     return p.parse_args(argv)
 
@@ -132,8 +140,63 @@ def fresh_check(calc, atoms, factory):
             "max_stress_difference_eV_A3": float(np.abs(reused[2] - fresh[2]).max())}
 
 
+def force_summary(forces, stress=None):
+    norms = np.linalg.norm(forces, axis=1)
+    out = {"max_force_eV_A": float(norms.max()), "rms_force_eV_A": float(np.sqrt((norms ** 2).mean())),
+           "atoms_above_10_eV_A": int((norms > 10).sum())}
+    if stress is not None:
+        out["stress_eV_A3"] = np.asarray(stress).tolist()
+    return out
+
+
+def reference_part(args):
+    from fastmace.reference import calculators
+
+    atoms = start_atoms(args)
+    reference = calculators.load(args.model, atoms, dtype="float64", device="cuda:0")
+    energy, forces, stress = reference.evaluate(atoms)
+    return {"part": "reference", "natoms": len(atoms), "energy_eV": float(energy), **force_summary(forces, stress),
+            "reference": json.loads(json.dumps(reference.info(), default=str))}
+
+
+def fixed_cell_part(args):
+    from ase.optimize import LBFGS
+
+    from fastmace.ase.calculator import FastMACECalculator
+    from fastmace.model import loading
+
+    atoms = start_atoms(args)
+    out = {"part": "fixed-cell", "natoms": len(atoms)}
+    calc = FastMACECalculator(loading.load_pristine(args.model), precision=args.precision)
+    energy, forces, stress = evaluate(calc, atoms)
+    out["start"] = {"energy_eV": energy, **force_summary(forces, stress)}
+    relaxed = atoms.copy()
+    relaxed.calc = calc
+    run = LBFGS(relaxed, logfile=None)
+    steps, previous = [], None
+    for index, _ in enumerate(run.irun(fmax=0.01, steps=args.lbfgs_steps)):
+        energy = float(relaxed.get_potential_energy())
+        steps.append({"step": index, "energy_eV": energy, "min_distance_A": min_distance(relaxed),
+                      "fmax_eV_A": float(np.linalg.norm(relaxed.get_forces(), axis=1).max()),
+                      "rose": previous is not None and energy > previous})
+        previous = energy
+    out["lbfgs"] = {"steps": steps, "rises": sum(row["rose"] for row in steps)}
+    other = FastMACECalculator(loading.load_pristine(args.compare_model), precision=args.precision)
+    energy, forces, stress = evaluate(other, atoms)
+    out["compare_model"] = {"model": args.compare_model, "energy_eV": energy, **force_summary(forces, stress)}
+    return out
+
+
 def main(argv=None):
     args = parse_args(argv)
+    if args.part != "cell":
+        out = (reference_part if args.part == "reference" else fixed_cell_part)(args)
+        out.update(tool="tools/validation/polar_cell_probe.py", args={k: str(v) for k, v in vars(args).items()},
+                   fastmace_commit=os.environ.get("FASTMACE_SOURCE_COMMIT"))
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(out, indent=1) + "\n")
+        print(json.dumps({k: v for k, v in out.items() if k not in ("lbfgs", "reference")}, indent=1))
+        return 0
     from ase.filters import FrechetCellFilter
     from ase.optimize import LBFGS
 
