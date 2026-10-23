@@ -88,6 +88,15 @@ def test_model_dims_of_the_families():
     assert capabilities.model_traits(tiny_mace_model(list(Z), **FAMILIES["mh1"])).dims == mh1_dims
 
 
+def test_model_dims_record_round_trip():
+    """A capture of the released checkpoints (5-T11's plan corpus) stores ``record()``; ``from_record`` reads it."""
+    import json
+
+    for family in ("mh1", "density"):
+        dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES[family]))
+        assert capabilities.ModelDims.from_record(json.loads(json.dumps(dims.record()))) == dims
+
+
 def test_model_dims_of_a_stand_in_is_none():
     assert capabilities.model_dims(torch.nn.Linear(2, 2)) is None
 
