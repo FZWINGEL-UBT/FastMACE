@@ -845,7 +845,7 @@ def _fastmace_build(job, result):
             plan = planner.plan(loaded, base, config.IntegratorConfig(ensemble="npt", cell_mode=cell_mode, seed=0),
                                 hardware)
             engine = planner.build(plan, loaded, base.copy(), temperature_K=0.0, compile_cache=cache)
-            return engine, dict(describe=plan.describe(), enabled=list(enabled_options(plan)),
+            return engine, dict(describe=plan.describe(full=True), enabled=list(enabled_options(plan)),
                                 auto_options_off=auto_options_off(plan))
     else:
         from fastmace.model import loading
@@ -868,7 +868,7 @@ def _fastmace_build(job, result):
                                                                            seed=0, temperature_K=300.0),
                                 Workload(max_temperature_K=300.0), hardware)
             engine = planner.build(plan, force_field, base.copy(), temperature_K=0.0)
-            return engine, dict(describe=plan.describe(), enabled=list(enabled_options(plan)),
+            return engine, dict(describe=plan.describe(full=True), enabled=list(enabled_options(plan)),
                                 auto_options_off=auto_options_off(plan), backend=plan.engine.backend,
                                 float64_energy=plan.precision.float64_energy)
     result.update(load_s=time.perf_counter() - started, planner=job.get("planner", "fixed"),

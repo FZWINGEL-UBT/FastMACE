@@ -271,7 +271,7 @@ def fastmace_evaluator(args, atoms):
     def rebase(config):
         force_field.reset_polar(np.asarray(config.cell.array, float))
 
-    return evaluate, rebase, {"plan": plan.describe(), "polar": force_field.polar_info,
+    return evaluate, rebase, {"plan": plan.describe(full=True), "polar": force_field.polar_info,
                               "kspace": _kspace(force_field._polar_model)}
 
 

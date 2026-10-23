@@ -276,7 +276,7 @@ class Version:
                                         compile_cache=self.cache)
         options = {name: True for name in fixed.enabled_options(plan)}
         options.update({f"off:{name}": reason for name, reason in fixed.auto_options_off(plan).items()})
-        return engine, dict(describe=plan.describe(), options=options)
+        return engine, dict(describe=plan.describe(full=True), options=options)
 
 
 def main(argv=None):

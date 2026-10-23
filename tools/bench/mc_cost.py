@@ -267,7 +267,7 @@ def main(argv=None):
         engine = planner.build(plan, force_field, base.copy(), temperature_K=args.temperature_K)
         md = ab_step_time.FastMACESide(engine, torch)
         step_time.warm_up(md, args.warmup)
-        meta["sides"]["md"] = dict(setup_s=time.perf_counter() - started, describe=plan.describe())
+        meta["sides"]["md"] = dict(setup_s=time.perf_counter() - started, describe=plan.describe(full=True))
         sides = {"md": md}
         evaluators = {}
 

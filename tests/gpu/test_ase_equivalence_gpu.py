@@ -142,7 +142,7 @@ for step in range(1, SPEC["steps"] + 1):
 out = {"rows": rows, "positions": values["positions"].tolist(),
        "cell": values["cell"].tolist() if "cell" in values else atoms.cell.array.tolist(),
        "seconds": time.perf_counter() - start, "gpu": torch.cuda.get_device_name(), "mode": engine.mode,
-       "records": list(engine.force_field.resolution.enabled), "plan": plan.describe()}
+       "records": list(engine.force_field.resolution.enabled), "plan": plan.describe(full=True)}
 print(json.dumps(out, default=str))
 """
 

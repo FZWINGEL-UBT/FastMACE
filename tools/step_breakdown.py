@@ -202,7 +202,7 @@ def build_engine(args, base):
     engine = planner.build(plan, force_field, base.copy(), temperature_K=args.temperature_K)
     options = {name: True for name in fixed.enabled_options(plan)}
     options.update({f"off:{name}": reason for name, reason in fixed.auto_options_off(plan).items()})
-    return engine, dict(describe=plan.describe(), options=options, load_s=load_s,
+    return engine, dict(describe=plan.describe(full=True), options=options, load_s=load_s,
                         setup_s=time.perf_counter() - started, sha256=loaded.sha256)
 
 

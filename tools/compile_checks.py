@@ -148,7 +148,8 @@ def polar_npt(args):
     started = time.perf_counter()
     sim = Simulation(atoms, loaded, integrator=integrator, output=output, seed=args.seed)
     # The GPU's name only now: the planner sets the CUDA allocator before anything touches CUDA.
-    meta.update(setup_s=time.perf_counter() - started, plan=sim.plan.describe(), gpu=torch.cuda.get_device_name(0))
+    meta.update(setup_s=time.perf_counter() - started, plan=sim.plan.describe(full=True),
+                gpu=torch.cuda.get_device_name(0))
     sim.run(steps=args.warmup)
     restart = None
     for index in range(args.chunks):
@@ -226,7 +227,8 @@ def calc_compiles(args):
                                   changes=changes))
         print(f"call {index}: {meta['calls'][-1]['wall_s']:.2f} s compiled={recompiled}", flush=True)
     meta.update(gpu=torch.cuda.get_device_name(0),
-                plan=calculator.plan.describe() if calculator.plan is not None else None, notes=list(calculator.notes),
+                plan=calculator.plan.describe(full=True) if calculator.plan is not None else None,
+                notes=list(calculator.notes),
                 compiles=[call["index"] for call in meta["calls"] if call["compiled"]])
     return meta
 
