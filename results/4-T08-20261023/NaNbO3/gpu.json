@@ -1,0 +1,351 @@
+{
+  "schema": 3,
+  "task": "4-T05/4-T06/4-T08",
+  "side": "gpu",
+  "optimizer": "lbfgs",
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T12:46:02+00:00",
+  "fastmace_commit": "6eb0b76",
+  "machine": "modal",
+  "gpu": "NVIDIA L4",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/cache/L4/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NaNbO3": {
+      "traj": "/data/anneal-minima/NaNbO3/captured.traj",
+      "runs": {
+        "graph-skinauto": {
+          "setup_s": 171.99707001800004,
+          "tier": "graph",
+          "skin_A": "auto",
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 72,
+              "seconds": 2.281317833000003,
+              "initial_eV_atom": -11.81653779745102,
+              "energy_eV_atom": -11.878867912954755,
+              "fmax_eV_A": 0.009932130476300063,
+              "neighbour_rebuilds": 2,
+              "recaptures": 0,
+              "ms_per_step": 31.684969902777816,
+              "switch_flips": null,
+              "warm_up": true
+            },
+            "1": {
+              "converged": true,
+              "steps": 79,
+              "seconds": 2.468987733000006,
+              "initial_eV_atom": -11.807511230530562,
+              "energy_eV_atom": -11.87886861673108,
+              "fmax_eV_A": 0.009844202418235769,
+              "neighbour_rebuilds": 2,
+              "recaptures": 0,
+              "ms_per_step": 31.253009278481088,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "2": {
+              "converged": true,
+              "steps": 79,
+              "seconds": 2.478695169000048,
+              "initial_eV_atom": -11.800242739032816,
+              "energy_eV_atom": -11.878868923584621,
+              "fmax_eV_A": 0.009231796474097411,
+              "neighbour_rebuilds": 2,
+              "recaptures": 0,
+              "ms_per_step": 31.37588821519048,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "3": {
+              "converged": true,
+              "steps": 91,
+              "seconds": 3.0381275489999666,
+              "initial_eV_atom": -11.79252467751503,
+              "energy_eV_atom": -11.878870690972716,
+              "fmax_eV_A": 0.00935208257377644,
+              "neighbour_rebuilds": 3,
+              "recaptures": 1,
+              "ms_per_step": 33.38601702197766,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "4": {
+              "converged": true,
+              "steps": 93,
+              "seconds": 2.9348138670000026,
+              "initial_eV_atom": -11.786642277903027,
+              "energy_eV_atom": -11.878870657859025,
+              "fmax_eV_A": 0.008899562354144717,
+              "neighbour_rebuilds": 3,
+              "recaptures": 0,
+              "ms_per_step": 31.557138354838738,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "5": {
+              "converged": true,
+              "steps": 125,
+              "seconds": 3.9811373969999977,
+              "initial_eV_atom": -11.780032278211028,
+              "energy_eV_atom": -11.878463244217414,
+              "fmax_eV_A": 0.008881724708100669,
+              "neighbour_rebuilds": 3,
+              "recaptures": 0,
+              "ms_per_step": 31.84909917599998,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "6": {
+              "converged": true,
+              "steps": 146,
+              "seconds": 4.682972876000008,
+              "initial_eV_atom": -11.771845319094481,
+              "energy_eV_atom": -11.878355016531767,
+              "fmax_eV_A": 0.00964006299593671,
+              "neighbour_rebuilds": 7,
+              "recaptures": 0,
+              "ms_per_step": 32.075156684931564,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "7": {
+              "converged": true,
+              "steps": 119,
+              "seconds": 3.8279062049999766,
+              "initial_eV_atom": -11.764252753610965,
+              "energy_eV_atom": -11.877163133577064,
+              "fmax_eV_A": 0.00992926959066102,
+              "neighbour_rebuilds": 4,
+              "recaptures": 0,
+              "ms_per_step": 32.16727903361325,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "8": {
+              "converged": true,
+              "steps": 125,
+              "seconds": 4.050859806999938,
+              "initial_eV_atom": -11.762790728277631,
+              "energy_eV_atom": -11.877560122587063,
+              "fmax_eV_A": 0.009645462068376081,
+              "neighbour_rebuilds": 4,
+              "recaptures": 0,
+              "ms_per_step": 32.406878455999504,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "9": {
+              "converged": true,
+              "steps": 114,
+              "seconds": 3.7282554610000034,
+              "initial_eV_atom": -11.75834193914025,
+              "energy_eV_atom": -11.878103291988372,
+              "fmax_eV_A": 0.009861962136528575,
+              "neighbour_rebuilds": 4,
+              "recaptures": 0,
+              "ms_per_step": 32.703995271929855,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "10": {
+              "converged": true,
+              "steps": 101,
+              "seconds": 3.29025260100002,
+              "initial_eV_atom": -11.751450115663033,
+              "energy_eV_atom": -11.87705949721513,
+              "fmax_eV_A": 0.009831727305604651,
+              "neighbour_rebuilds": 3,
+              "recaptures": 0,
+              "ms_per_step": 32.576758425742774,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "11": {
+              "converged": true,
+              "steps": 110,
+              "seconds": 3.598813283000027,
+              "initial_eV_atom": -11.758636243034292,
+              "energy_eV_atom": -11.876320798308761,
+              "fmax_eV_A": 0.00901514888916794,
+              "neighbour_rebuilds": 5,
+              "recaptures": 0,
+              "ms_per_step": 32.716484390909336,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "12": {
+              "converged": true,
+              "steps": 86,
+              "seconds": 2.796554326999967,
+              "initial_eV_atom": -11.762540570894878,
+              "energy_eV_atom": -11.876222767211774,
+              "fmax_eV_A": 0.009644179789346459,
+              "neighbour_rebuilds": 4,
+              "recaptures": 0,
+              "ms_per_step": 32.51807356976706,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "13": {
+              "converged": true,
+              "steps": 87,
+              "seconds": 2.8181882630000246,
+              "initial_eV_atom": -11.770385647261584,
+              "energy_eV_atom": -11.876871653839395,
+              "fmax_eV_A": 0.00966994960997408,
+              "neighbour_rebuilds": 3,
+              "recaptures": 0,
+              "ms_per_step": 32.392968540230164,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "14": {
+              "converged": true,
+              "steps": 78,
+              "seconds": 2.5065863780000655,
+              "initial_eV_atom": -11.779516701786607,
+              "energy_eV_atom": -11.876667830679152,
+              "fmax_eV_A": 0.009899670023326012,
+              "neighbour_rebuilds": 3,
+              "recaptures": 0,
+              "ms_per_step": 32.135722794872635,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "15": {
+              "converged": true,
+              "steps": 99,
+              "seconds": 3.171196880000025,
+              "initial_eV_atom": -11.784835917640615,
+              "energy_eV_atom": -11.876647497547998,
+              "fmax_eV_A": 0.009271762166496477,
+              "neighbour_rebuilds": 3,
+              "recaptures": 0,
+              "ms_per_step": 32.03229171717197,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "16": {
+              "converged": true,
+              "steps": 147,
+              "seconds": 4.689767482999969,
+              "initial_eV_atom": -11.790488401386472,
+              "energy_eV_atom": -11.877199297039597,
+              "fmax_eV_A": 0.008692397339164944,
+              "neighbour_rebuilds": 4,
+              "recaptures": 0,
+              "ms_per_step": 31.903180156462373,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "17": {
+              "converged": true,
+              "steps": 88,
+              "seconds": 2.8028580950000332,
+              "initial_eV_atom": -11.796673170063231,
+              "energy_eV_atom": -11.8773160552537,
+              "fmax_eV_A": 0.008710993601527758,
+              "neighbour_rebuilds": 2,
+              "recaptures": 0,
+              "ms_per_step": 31.850660170454923,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "18": {
+              "converged": true,
+              "steps": 99,
+              "seconds": 3.1377588579999838,
+              "initial_eV_atom": -11.805492653670134,
+              "energy_eV_atom": -11.877836418372613,
+              "fmax_eV_A": 0.009110100345405329,
+              "neighbour_rebuilds": 3,
+              "recaptures": 0,
+              "ms_per_step": 31.694533919191755,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "19": {
+              "converged": true,
+              "steps": 82,
+              "seconds": 2.590181345999895,
+              "initial_eV_atom": -11.811774393364235,
+              "energy_eV_atom": -11.877998545213982,
+              "fmax_eV_A": 0.009967667636938793,
+              "neighbour_rebuilds": 2,
+              "recaptures": 0,
+              "ms_per_step": 31.58757739024262,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "20": {
+              "converged": true,
+              "steps": 74,
+              "seconds": 2.336039256000049,
+              "initial_eV_atom": -11.847200565426437,
+              "energy_eV_atom": -11.878504518005583,
+              "fmax_eV_A": 0.009592241001612095,
+              "neighbour_rebuilds": 2,
+              "recaptures": 0,
+              "ms_per_step": 31.56809805405472,
+              "switch_flips": null,
+              "warm_up": false
+            }
+          },
+          "planned_skin_A": 0.6000000000000001,
+          "engine": {
+            "edge_sizes_used": [
+              82688,
+              87040
+            ],
+            "neighbour_rebuilds": 68,
+            "graphs": [
+              "('B', 82688)",
+              "C",
+              "('B', 87040)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 1,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 87040)",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 7,
+                "key": "C",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 230,
+                "key": "('B', 82688)",
+                "reason": "new variant of B",
+                "counted": true
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T12:50:04+00:00"
+}
