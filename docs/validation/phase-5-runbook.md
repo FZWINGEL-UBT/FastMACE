@@ -83,12 +83,16 @@ Pytest jobs run through `tools/acceptance/stoppable_pytest.sh` (results per fini
 
 Choice 7 made checkable on the CPU: the same inputs planned by the baseline and by the freeze.
 
-- **Model inputs:** per label of `fastmace.model.labels` (19), the model's traits and the ForceField's facts the
-  planner reads (`ModelTraits`, precision, superset, `rewrites="auto"`, the D3 record where the label has one), and
-  the dimensions rule 12's estimate needs. Captured **once**, on the CPU in WSL, one label per process (the large
-  checkpoints load one at a time; free memory checked first; not during a timed stretch), into a JSON fixture under
-  `results/5-T11-corpus/traits/` with each checkpoint's sha256. Both sides plan from the fixture; a field one side's
-  `ModelTraits` lacks is filled with that side's default and listed.
+- **One tool with 5-T10** (conductor, 23 October 2026): `tools/plan_corpus.py` is 5-T10's under D6 (b) and
+  5-T11's under D6 (a); both use one format (cases with stable ids in named sets, a `package=` argument so the
+  renamed `fastmace_4` export plans the same cases, canonical JSON records, `dump` and `compare
+  --explain-codes`). 5-T11 adds the `"acceptance"` set.
+- **Model inputs:** per label of `fastmace.model.labels` (19), the stand-ins of `tests/cpu/test_planner.py`'s
+  `LABEL_FACTS` (read from the released checkpoints with `model_traits`), with the ForceField's facts the planner
+  reads (precision, superset, `rewrites="auto"`, the D3 record where it applies). The dimensions rule 12's
+  estimate needs (5-T03's names) are captured **once** from the checkpoints, on the CPU in WSL, one label per
+  process (free memory checked first; not during a timed stretch), into a JSON fixture with each checkpoint's
+  sha256. A field one side lacks is filled with that side's default and listed.
 - **Hardware and software (injected, documented):** `Hardware("NVIDIA GeForce RTX 5060 Ti", (12, 0), 16 GiB)` with
   12 GiB free (the desktop takes about 4 GiB; conductor, 23 October 2026), and `SoftwareTraits` with OEq, Triton,
   NVRTC and fused cuEq available. **One low-memory case** (a 4 GiB GPU, 3 GiB free) on the largest labels so that
