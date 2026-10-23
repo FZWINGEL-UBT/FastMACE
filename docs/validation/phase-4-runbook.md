@@ -57,6 +57,16 @@ Sources: SPEC §16 row 4, §7.7, §10.2–§10.3, §10.6, §12.2 ("ASE equivalen
   `matpes_r2scan` unless stated), the integrator or optimiser with every argument, the `dof` convention, and the
   commits of the freeze and the baseline.
 
+**A library fix after the freeze** (conductor, 23 October 2026). The preflight found that a CSVR run could not be
+resumed (`Simulation.resume` built the engine before loading the restart's momenta, and CSVR refuses to start at
+rest): `test_reproducible_schemes_gpu[csvr-float64, csvr-float32]` failed, the other 16 cases passed. The fix
+(`fastmace/4-T13-csvr-resume`, 79654e5: the restart's `Atoms` carry its momenta) changes only `_restart_atoms` in
+`fastmace/simulation.py`, on the resume path. After its merge the freeze moves to that merge commit, and these
+rerun there: the GPU resume tests (`test_reproducible_schemes_gpu`, `test_reproducible_gpu`,
+`test_canonical_restart_gpu`, the resume cases of the subprocess-runner and worker tests) and `restart-across`.
+Runs that do not resume are cited from the first freeze with the diff (the resume path only); the `protocol` job's
+resume is rerun if its run predates the merge.
+
 ## Hardware and budget
 
 - **The full acceptance runs on the local RTX 5060 Ti** (workstations off), after 3b-T10's queued jobs drain:
