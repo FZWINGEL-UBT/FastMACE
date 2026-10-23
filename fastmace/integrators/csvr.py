@@ -90,20 +90,6 @@ class CSVR(Integrator):
             draws[row, 1] = 2.0 * generator.standard_gamma(shape)
         return draws
 
-    def refresh_degrees_of_freedom(self, state: SimulationState) -> None:
-        """After an event that changes ``ndof`` (4-T04's ``FixAtoms``): the new count and target, and the rows
-        of the noise batch not used yet drawn again from the generator with the new gamma shape (conductor,
-        23 October 2026). The rows already used stay. Nothing changes if the count does not."""
-        ndof = self.degrees_of_freedom(state)
-        if ndof == self.ndof:
-            return
-        self.ndof = ndof
-        self.set_temperature(self.temperature_K)
-        rng = state.rng
-        if rng.cursor < self.noise_batch:
-            rows = self._draw(rng.generator, self.noise_batch - rng.cursor)
-            rng.batch[rng.cursor:].copy_(torch.from_numpy(rows))
-
     def start(self, state: SimulationState) -> None:
         if self.fix_com:
             remove_momentum(state)

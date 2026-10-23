@@ -331,31 +331,6 @@ def test_csvr_matches_ase_bussi(noise_batch):
     assert float(dyn.output_values(state)[CONSERVED_KEY][0]) == pytest.approx(conserved, abs=1e-10)
 
 
-def test_csvr_ndof_change_redraws_the_rows_from_the_cursor():
-    """4-T04's FixAtoms events change ndof: the rows not yet used are drawn again with the new gamma shape."""
-    atoms = nacl()
-    state = new_state(atoms)
-    dyn = build(CSVR_RECORD, state, noise_batch=7)
-    for _ in range(3):
-        dyn.prepare_step(state)
-    used = state.rng.batch[:3].clone()
-    reference = np.random.default_rng(SEED)
-    for _ in range(7):  # the first batch, drawn already
-        reference.standard_normal(), reference.standard_gamma(0.5 * (3 * len(atoms) - 1))
-    state.fixed_indices = (0, 1)  # what 4-T04's event changes; the count follows
-    dyn.refresh_degrees_of_freedom(state)
-    ndof = 3 * (len(atoms) - 2)
-    assert dyn.ndof == ndof
-    assert float(dyn.target_kinetic) == pytest.approx(0.5 * units.kB * 600.0 * ndof, rel=1e-15)
-    assert torch.equal(state.rng.batch[:3], used) and state.rng.cursor == 3
-    for row in range(3, 7):
-        assert float(state.rng.batch[row, 0]) == reference.standard_normal()
-        assert float(state.rng.batch[row, 1]) == 2.0 * reference.standard_gamma(0.5 * (ndof - 1))
-    unchanged = state.rng.batch.clone()
-    dyn.refresh_degrees_of_freedom(state)  # no change: nothing drawn
-    assert torch.equal(state.rng.batch, unchanged)
-
-
 # -------------------------------------------------------------------------- Berendsen
 
 def test_nvt_berendsen_matches_ase():
