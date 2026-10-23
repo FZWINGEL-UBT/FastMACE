@@ -287,8 +287,16 @@ class Plan:
             plan = plan.predecessor
         return tuple(reversed(out))
 
-    def describe(self) -> str:
-        """The human-readable plan (``str(plan)``), written into provenance (SPEC §13)."""
+    def describe(self, full: bool = False) -> str:
+        """The human-readable plan (``str(plan)``), written into provenance (SPEC §9.5, §13).
+
+        By default the plan by sections, at most about 30 lines (``planner.plan_text``, 5-T05); with
+        ``full=True`` every decision, one line each, in resolution order. Provenance stores both.
+        """
+        if not full:
+            from fastmace.planner import plan_text
+
+            return plan_text.text(self)
         lines = [f"Plan revision {self.revision}, tier {self.tier}: {self.reason}"
                  + ("" if self.step is None else f" (from step {self.step})")]
         lines += [f"  {item} = {choice}  ({reason})" for item, choice, reason in self.decisions]

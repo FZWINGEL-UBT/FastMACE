@@ -58,7 +58,7 @@ SIGNATURES = {
     ("fastmace.engine.base", "Snapshot", "wait"): (),
     ("fastmace.planner.plan", "Planner", "plan"): ("traits", "atoms", "integrator", "hardware"),
     ("fastmace.planner.plan", "Planner", "build"): ("plan", "model", "atoms"),
-    ("fastmace.planner.plan", "Plan", "describe"): (),
+    ("fastmace.planner.plan", "Plan", "describe"): ("full",),  # 5-T05
 }
 
 MODULES = sorted({module for module, _, _ in SIGNATURES})
@@ -120,7 +120,8 @@ def test_plan_describes_itself():
     # SimulationState.from_atoms is filled by 1a-T12 (tests/cpu/test_integrators.py), Plan.describe by
     # 1a-T15 (tests/cpu/test_planner.py).
     plan = Plan(tier="graph")
-    assert plan.describe() == str(plan) == "Plan revision 0, tier graph: initial plan"
+    assert plan.describe(full=True) == "Plan revision 0, tier graph: initial plan"
+    assert plan.describe() == str(plan) and str(plan).startswith("Plan revision 0, tier graph (initial plan)")
 
 
 def test_plan_is_a_frozen_record():

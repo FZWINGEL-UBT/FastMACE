@@ -555,7 +555,8 @@ def test_revise_keeps_the_chain_and_the_original():
     assert first.engine.pipelined == "off" and plan.engine.pipelined == "on"
     assert plan.revision == 0 and plan.predecessor is None
     assert plan.to_restart(edge_bucket=1024, neighbour_capacity=2048) == before
-    assert "predecessor: revision 1" in str(second)
+    assert "predecessor: revision 1" in second.describe(full=True)
+    assert "1 at step 500: pipelining off after a replay check;" in str(second)
     with pytest.raises(dataclasses.FrozenInstanceError):
         plan.revision = 3
     with pytest.raises(ValueError, match="revision"):
