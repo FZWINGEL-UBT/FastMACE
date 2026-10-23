@@ -2482,7 +2482,9 @@ Open decisions for the owner:
    and prestart the phase 3b workers"; `plans/phase-3b.md`):
    - **The acceptance melt–quench protocol** (40):
      - NbCl5 3×3×3 on MH-1 `matpes_r2scan` with D3-BJ (`r2scan`);
-     - hydrostatic NPT at 0 GPa;
+     - hydrostatic NPT at 0.1 GPa: the plan's alternative (b), chosen by the
+       owner on 23 October 2026 after the 0 GPa run vaporised (3b-T07);
+       the 0 GPa results are kept as context;
      - the anneal profile at 1 fs, with the library's barostat defaults;
      - relaxation and quench at fixed cell, the quench frames at their NPT
        cells;
