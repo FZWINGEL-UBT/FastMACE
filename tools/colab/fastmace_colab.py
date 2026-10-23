@@ -44,6 +44,7 @@ import os
 import re
 import secrets
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -515,7 +516,43 @@ def _manifest(job, record, stack):
     record["env_matches_manifest"] = json.loads(path.read_text())["pip_freeze_sha256"] == digest
 
 
+def parse_sessions(text):
+    """``colab sessions`` as {endpoint: name}; an assignment without a local name shows as ``[?]``."""
+    return {endpoint: name for name, endpoint in re.findall(r"^\[([^\]]+)\]\s+(\S+)", text, flags=re.M)}
+
+
+# What `colab stop` runs after looking the name up (colab_cli 0.7.5); the endpoint arrives as sys.argv[1].
+UNASSIGN = "import sys\nfrom colab_cli.common import state\nstate.client.unassign(sys.argv[1])\n"
+
+
+def colab_python():
+    """The colab CLI's own interpreter, from the shebang of ``colab`` on PATH."""
+    first = Path(shutil.which("colab") or "colab").read_text().splitlines()[0]
+    return first[2:].strip() if first.startswith("#!") else sys.executable
+
+
+def stop_endpoint(endpoint, colab=run_colab, run=subprocess.run, python=None):
+    """Release an orphaned VM that ``colab stop`` cannot name (two sessions once shared one name, and the
+    local mapping kept only one). Refused for an endpoint that a named session owns or that is not live."""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", endpoint):
+        raise SystemExit(f"stop-endpoint: not an endpoint: {endpoint!r}")
+    sessions = parse_sessions(colab(["colab", "sessions"], timeout=120))
+    if endpoint not in sessions:
+        raise SystemExit(f"stop-endpoint: {endpoint} is not among the live sessions")
+    if sessions[endpoint] != "?":
+        raise SystemExit(f"stop-endpoint: {endpoint} belongs to session {sessions[endpoint]!r}; "
+                         f"use: colab stop -s {sessions[endpoint]}")
+    run([python or colab_python(), "-c", UNASSIGN, endpoint], check=True, timeout=300)
+    _log(f"released {endpoint}")
+
+
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["stop-endpoint"]:
+        if len(argv) != 2:
+            raise SystemExit("usage: fastmace_colab.py stop-endpoint ENDPOINT")
+        stop_endpoint(argv[1])
+        return 0
     args = parse_args(argv)
 
     def interrupt(signum, frame):

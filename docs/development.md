@@ -610,6 +610,12 @@ python3 tools/colab/fastmace_colab.py --gpu G4 --commit <sha> --out ~/fastmace-a
   `--reuse` runs on it instead. `--keep` leaves the VM running for such a call, and its venv is kept too.
   Without `--keep` the driver always runs `colab stop` on a VM it allocated or reused, also after an error,
   Ctrl-C, SIGTERM or SIGHUP. If all three stop attempts fail, it prints the command to run.
+- **Orphaned VMs:** a VM without a local name shows as `[?] <endpoint>` in `colab sessions`, and `colab stop`
+  cannot reach it. Release it with
+  `python3 tools/colab/fastmace_colab.py stop-endpoint <endpoint>`, which runs what `colab stop` runs after
+  its name lookup (`state.client.unassign(endpoint)` in the CLI's own interpreter). The command is refused for
+  an endpoint that a named session owns (it prints the `colab stop -s` to use instead) and for one that is
+  not live.
 - **Source:** a `git -c core.autocrlf=false archive` of `--commit` from `--repo` (default: the main checkout,
   which sees every pushed branch) with `.source_commit`. The repository is private, so the VM does not clone
   it.

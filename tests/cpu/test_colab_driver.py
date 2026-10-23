@@ -361,3 +361,24 @@ def test_an_error_before_allocation_stops_nothing(tmp_path):
     with pytest.raises(subprocess.CalledProcessError):
         fc.run_job(args, colab)
     assert "stop" not in colab.subcommands()
+
+
+SESSIONS = """\
+[fm-g4-compat-warm] gpu-g4-s-ft-kkb-euw4a2-hct3ydixyi0m | Hardware: G4 | Shape: Standard | Variant: GPU
+[?] gpu-a100-s-usc1f0-1kxof2v4qlkf2 | Hardware: A100 | Shape: Standard | Variant: GPU
+"""
+
+
+def test_stop_endpoint_releases_only_an_unnamed_live_one():
+    assert fc.parse_sessions(SESSIONS) == {"gpu-g4-s-ft-kkb-euw4a2-hct3ydixyi0m": "fm-g4-compat-warm",
+                                           "gpu-a100-s-usc1f0-1kxof2v4qlkf2": "?"}
+    runs = []
+    listing = lambda argv, timeout=None: SESSIONS  # noqa: E731
+    run = lambda argv, **kw: runs.append(argv)  # noqa: E731
+    fc.stop_endpoint("gpu-a100-s-usc1f0-1kxof2v4qlkf2", colab=listing, run=run, python="/py")
+    assert runs == [["/py", "-c", fc.UNASSIGN, "gpu-a100-s-usc1f0-1kxof2v4qlkf2"]]
+    assert "state.client.unassign(sys.argv[1])" in fc.UNASSIGN
+    for refused in ("gpu-g4-s-ft-kkb-euw4a2-hct3ydixyi0m", "gpu-x-not-live", "a;rm -rf /", "-x"):
+        with pytest.raises(SystemExit):
+            fc.stop_endpoint(refused, colab=listing, run=run, python="/py")
+    assert len(runs) == 1
