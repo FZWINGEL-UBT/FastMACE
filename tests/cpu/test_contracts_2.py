@@ -216,16 +216,19 @@ def test_plan_runner_field():
 # --------------------------------------------------------------------------- planner inputs
 
 PLANNER_OPTIONS = ["mode", "allow_reference", "fallback", "gate", "runner", "engine", "neighbours"]
+# Phase 5 appends its planner inputs after phase 2's (5-T01, docs/design/planner-5.md); fm.md takes them in 5-T09.
+PHASE_5_PLANNER_OPTIONS = ["adaptation", "calibration"]
 
 
 def test_simulation_takes_the_planner_inputs():
     from fastmace.simulation import Simulation
 
     signature = inspect.signature(Simulation)
-    assert _keyword_only(signature)[-len(PLANNER_OPTIONS):] == PLANNER_OPTIONS
+    options = PLANNER_OPTIONS + PHASE_5_PLANNER_OPTIONS
+    assert _keyword_only(signature)[-len(options):] == options
     assert signature.parameters["mode"].default is None  # 3-T06: the planner picks the tier
     assert signature.parameters["allow_reference"].default is False
-    for name in ("fallback", "gate", "runner", "engine", "neighbours"):
+    for name in ("fallback", "gate", "runner", "engine", "neighbours", *PHASE_5_PLANNER_OPTIONS):
         assert signature.parameters[name].default is None
 
 

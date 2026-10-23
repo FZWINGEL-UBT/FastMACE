@@ -127,6 +127,12 @@ Under D5 (c) (no calibration in 1.0) 5-T09 removes the record and its switch-map
 `planner_options(adaptation=, calibration=)` and `Simulation(adaptation=, calibration=)`. `to_record` writes
 both into `simulation.json`; `from_record` reads a record without them as the defaults.
 
+The two keywords come after `neighbours`, so `Simulation`'s planner inputs stay its last keyword-only
+parameters, as phase 2's contract pins. `test_contracts_2.test_simulation_takes_the_planner_inputs` now
+checks phase 2's list followed by `PHASE_5_PLANNER_OPTIONS`, and `contracts-2.md` says so. Putting them
+before `mode` would have left the old test as it was, but it would have split the planner inputs. `fm.md`
+takes them in 5-T09, so its contract test is unchanged.
+
 **Placeholders.** `planner_options` raises `PlanRefused` (`simulation.phase_5_pending`, codes in
 `PHASE_5_PENDING_CODES`):
 - `adaptation-pending`: any field of `ADAPTATION_DECISION_FIELDS` other than `"pending"` (D2, D3; 5-T07
