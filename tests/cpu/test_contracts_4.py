@@ -396,6 +396,26 @@ def test_one_buffer_of_two_schemes_lists_both_recompute_functions(monkeypatch): 
     assert (policy.restart, policy.recompute) == ("reset", "ToyA.start | ToyB.start")
 
 
+def test_a_scheme_may_not_shadow_a_policy_table_buffer(monkeypatch):  # 4-T01b
+    from fastmace.engine import registry as runtime
+
+    shadow = _record(scheme="toy_s", buffers=(("eta", "save", None),))  # Langevin's integrator.eta is "derived"
+    records = reg.Registry([*reg.registry().records(), shadow])
+    monkeypatch.setattr(reg, "registry", lambda: records)
+    with pytest.raises(runtime.RegistryError, match=r"integrator\.eta.*toy_s.*derived"):
+        runtime.policy_for("integrator.eta")
+    same = _record(scheme="toy_s", buffers=(("eta", "derived", None),))  # the same policy is kept
+    records = reg.Registry([*reg.discover().records(), same])
+    monkeypatch.setattr(reg, "registry", lambda: records)
+    assert runtime.policy_for("integrator.eta").restart == "derived"
+
+
+def test_the_real_records_shadow_no_policy_table_buffer():  # 4-T01b
+    from fastmace.engine import registry as runtime
+
+    runtime.scheme_policies()  # raises RegistryError on a shadowing record
+
+
 def test_the_registered_schemes_have_no_buffer_clash():  # 4-T01b: the real records, every phase 4 task's
     records = reg.discover()  # raises RegistryError on a clash
     seen = {}

@@ -148,11 +148,27 @@ def scheme_policies() -> tuple[RegisteredBuffer, ...]:
     for record in registry().records():
         owner = BUFFER_OWNERS[record.kind]
         for name, restart, recompute in record.buffers:
-            entry = merged.setdefault(f"{owner}.{name}", (owner, restart, set()))
+            path = f"{owner}.{name}"
+            _check_shadow(path, restart, record)
+            entry = merged.setdefault(path, (owner, restart, set()))
             if recompute is not None:
                 entry[2].add(recompute)
     return tuple(_policy(name, owner, restart, " | ".join(sorted(recomputes)) or None)
                  for name, (owner, restart, recomputes) in merged.items())
+
+
+def _check_shadow(path: str, restart: str, record: Any) -> None:
+    """4-T01b: a scheme buffer that ``POLICIES`` already holds (by name or pattern) keeps that policy, so it must
+    declare the same restart policy; another one would be shadowed silently by the table."""
+    for entry in POLICIES:
+        if entry.name == path or fnmatch.fnmatchcase(path, entry.name):
+            if entry.restart != restart:
+                raise RegistryError(
+                    f"the buffer {path} of {record.kind} scheme {record.scheme!r} has restart policy {restart!r}, but "
+                    f"POLICIES already gives {entry.name} (owner {entry.owner!r}) restart policy {entry.restart!r}",
+                    why="POLICIES is matched first, so the scheme's policy would be ignored (SPEC §8.1); rename the "
+                        "buffer in the scheme record.")
+            return
 
 
 def policy_for(name: str) -> RegisteredBuffer:

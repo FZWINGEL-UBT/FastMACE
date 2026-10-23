@@ -49,6 +49,10 @@ engine, but restart, capture and the gate read the policy by name alone.
 - **Same restart policy, different `recompute` functions:** this is allowed. The runtime-state
   registry keeps one policy whose `recompute` lists both functions, sorted and joined with
   ` | `. Example: LBFGS and FIRE's `optimizer.fmax` and `optimizer.status`.
+- **A name `engine.registry.POLICIES` already holds:** the table is matched first, by name or by
+  pattern, so the scheme must declare the table's restart policy. For example, a record with
+  `integrator.eta` must declare Langevin's `"derived"`. A different policy raises
+  `RegistryError`, naming the buffer, the scheme and the table entry with its owner.
 
 ## Constructors and dispatch
 
