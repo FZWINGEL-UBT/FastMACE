@@ -187,7 +187,8 @@ def test_rule_6_refuses_naive_cueq_kernels():
     planner = tmp.minimal(soft=NAIVE, engine=EngineConfig(backend="cueq"))
     alone(refused(plan, planner=planner), 6, "naive-cueq")
     fused = plan()
-    assert fused.decision("allow_naive_cueq")[2].code == "fused-cueq" and fused.decision("allow_naive_cueq")[2].rule == 6
+    reason = fused.decision("allow_naive_cueq")[2]
+    assert (reason.rule, reason.code) == (6, "fused-cueq")
 
 
 @pytest.mark.rule(7)

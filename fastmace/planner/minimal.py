@@ -60,9 +60,8 @@ from fastmace.config import EngineConfig, IntegratorConfig, NeighbourConfig, Pol
 from fastmace.errors import ModelElementError, PlanRefused, Reason, SpeciesNotInSuperset
 from fastmace.rewrites import versions
 
-from . import fixed
+from . import fixed, rules
 from . import reproducible as reproducible_mode
-from . import rules
 from .plan import Hardware, Plan, SelfCheck, SoftwareTraits
 
 MODES = ("graph", "compiled", "eager", "reference")
