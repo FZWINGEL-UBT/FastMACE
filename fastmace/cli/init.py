@@ -37,7 +37,9 @@ SCALARS = (
     ("sha256", "A model file outside the label table needs its SHA-256, or trusted = true (it is unpickled).",
      '"' + "0" * 64 + '"'),
     ("trusted", "", "true"),
-    ("ensemble", '"NVT" is Langevin, "NPT" the LangevinBAOAB barostat; "NVE" is phase 4.', '"NVT"'),
+    ("ensemble", '"NVT" is Langevin, "NPT" the LangevinBAOAB barostat, "NVE" velocity Verlet from the '
+                 "structure's momenta (no temperature_K);\n# the other integrators are the [integrator] table below.",
+     '"NVT"'),
     ("temperature_K", "Target temperature in K; or a schedule, not both.", "300.0"),
     ("schedule", "A run profile instead of temperature_K (slow, fast, ultrafast, anneal), or [[schedule]] "
                  "segments below.", '"anneal"'),
@@ -63,8 +65,11 @@ TABLES = (
     ("Schedule segments: ramp (start_K, end_K, and ps or rate_K_per_ps) and hold (temperature_K, ps).",
      ('[[schedule]]', 'kind = "ramp"', "start_K = 0.0", "end_K = 1000.0", "ps = 20.0", "",
       '[[schedule]]', 'kind = "hold"', "temperature_K = 1000.0", "ps = 10.0")),
-    ("An explicit integrator (type Langevin or LangevinBAOAB, with the fields of fm.integrators); it wins over\n"
-     "# ensemble and the physics keys above. friction_per_fs defaults to fm.md's (0.02 per ASE time unit).",
+    ("An explicit integrator, with the fields of its fm.integrators record; it wins over ensemble and the\n"
+     "# physics keys above. type: Langevin, LangevinBAOAB, NVE, CSVR (Bussi), NoseHooverChain, MTK (cell_mode\n"
+     "# hydrostatic or full; experimental) or Berendsen (non-canonical: equilibration only; NPT with\n"
+     "# pressure_GPa, taup_fs and compressibility_per_GPa). Time constants have no defaults. A Langevin\n"
+     "# record's friction_per_fs defaults to fm.md's (0.02 per ASE time unit).",
      ("[integrator]", 'type = "LangevinBAOAB"', "temperature_K = 300.0", "pressure_GPa = 0.0",
       'cell_mode = "full"')),
     ("A full D3 record (the fields of fm.D3); its functional should be the model's training functional.\n"

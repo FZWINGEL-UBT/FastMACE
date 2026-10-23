@@ -8,8 +8,12 @@ runs. So ``fm.md`` and the equivalent ``Simulation`` get the same plan and gate 
 What ``md`` decides itself, before anything is loaded:
 
 - the integrator: ``ensemble="NVT"`` is ``fm.integrators.Langevin``, ``"NPT"`` is
-  ``LangevinBAOAB``, ``"NVE"`` is refused (phase 4). An explicit ``integrator=`` wins; a
-  conflicting non-default ``ensemble`` or argument raises ``ValueError``;
+  ``LangevinBAOAB``, ``"NVE"`` is ``NVE`` (4-T10). An explicit ``integrator=`` (any
+  ``fm.integrators`` record) wins; a conflicting non-default ``ensemble`` or argument raises
+  ``ValueError``;
+- NVE has no target: the momenta are the structure's (``fm.md`` draws no velocities),
+  ``temperature_K=``, ``schedule=`` and ``mc=`` raise ``ValueError``, and the workload's
+  ``max_temperature_K`` is ``nve_max_temperature_K`` of the structure (conductor's answer to 4-T10);
 - what it can infer from the whole run (an explicit argument always wins): the start target and
   ``max_temperature_K`` from ``temperature_K`` or the schedule, the MC moves, species changes,
   ``min_mc_temperature_K`` and the species superset (the structure's plus every species ``mc=``
@@ -20,8 +24,8 @@ What ``md`` decides itself, before anything is loaded:
   0.001965/fs), a drawn and recorded seed, the output directory ``./<structure stem>.fastmace/``
   (``./fastmace-run/`` for an in-memory ``Atoms``), and ``repeat=(1, 1, 1)``.
 
-Then the refusals, every reason at once in one ``PlanRefused``: NVE (phase 4). A D3 record goes into the
-``ForceField`` (``dispersion=``; 3b-T04), and the report and ``metadata.json`` show it.
+A D3 record goes into the ``ForceField`` (``dispersion=``; 3b-T04), and the report and ``metadata.json``
+show it.
 
 MC (3-T15): with a schedule, the move set is attached only over the step ranges whose target is at
 or above ``min_mc_temperature_K`` (``mc_ranges``), through ``Simulation.run(mc=…)`` and
@@ -41,6 +45,16 @@ DEFAULT_OUTPUT = "fastmace-run"  # the output directory for an in-memory Atoms
 OUTPUT_SUFFIX = ".fastmace"  # ./<structure stem>.fastmace/ for a structure file
 ENSEMBLES = ("NVE", "NVT", "NPT")
 _SEED_BOUND = 2**31
+NVE_MIN_TEMPERATURE_K = 1.0  # the floor of an NVE run's max_temperature_K (a start from rest)
+
+
+def nve_max_temperature_K(atoms: Any) -> float:
+    """An NVE run's ``Workload.max_temperature_K``: twice the structure's kinetic temperature (equipartition:
+    a start at a minimum shares the kinetic energy with the potential), at least ``NVE_MIN_TEMPERATURE_K``
+    (conductor's answer to 4-T10). ASE's ``Atoms.get_temperature`` count; ``metadata.json`` records the value
+    with the workload."""
+    temperature = float(atoms.get_temperature()) if len(atoms) else 0.0
+    return max(2.0 * temperature, NVE_MIN_TEMPERATURE_K)
 
 
 def default_friction_per_fs() -> float:
@@ -85,8 +99,9 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
 
     - ``model``: a label, path or URL, with ``head``, ``charge``, ``spin_multiplicity`` and
       ``sha256``/``trusted`` as ``fm.load``; or an ``fm.load`` result (then without those);
-    - ``ensemble``: ``"NVT"`` (Langevin) or ``"NPT"`` (BAOAB with ``pressure_GPa`` and
-      ``cell_mode``); ``"NVE"`` is refused (phase 4). ``integrator=`` chooses one explicitly;
+    - ``ensemble``: ``"NVT"`` (Langevin), ``"NPT"`` (BAOAB with ``pressure_GPa`` and ``cell_mode``)
+      or ``"NVE"`` (velocity Verlet from the structure's momenta, no ``temperature_K``).
+      ``integrator=`` chooses any ``fm.integrators`` record explicitly;
     - ``temperature_K`` or ``schedule`` (an ``fm.protocols`` schedule); ``steps`` (optional with a
       schedule: the whole schedule);
     - ``mc`` and ``min_mc_temperature_K``: one ``fm.mc`` record or a sequence of them, checked as §7.7
@@ -105,7 +120,6 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     Every ``ValueError`` and refusal comes before the model is loaded.
     """
     from fastmace import integrators
-    from fastmace.errors import PlanRefused, Reason
     from fastmace.longrange import d3
     from fastmace.model.loading import LoadedModel
     from fastmace.planner.workload import SPECIES_MOVES, Workload
@@ -141,28 +155,37 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
 
     # The integrator record: explicit, or from ensemble and the physics arguments.
     if integrator is not None:
-        if not isinstance(integrator, (integrators.Langevin, integrators.LangevinBAOAB)):
-            raise TypeError(f"integrator must be fm.integrators.Langevin or fm.integrators.LangevinBAOAB, got "
+        if type(integrator) not in integrators.RECORDS.values():
+            raise TypeError(f"integrator must be an fm.integrators record ({', '.join(integrators.RECORDS)}), got "
                             f"{type(integrator).__name__}")
-        npt = isinstance(integrator, integrators.LangevinBAOAB)
-        if ensemble != "NVT" and ensemble != ("NPT" if npt else "NVT"):
+        record_ensemble = integrator.to_config(seed=0).ensemble.upper()
+        if ensemble != "NVT" and ensemble != record_ensemble:
             raise ValueError(f"ensemble={ensemble!r} conflicts with integrator={type(integrator).__name__}; the "
                              "explicit integrator decides, so drop ensemble= (SPEC §7.7)")
+        ensemble = record_ensemble
         conflicts = []
-        if temperature_K is not None and temperature_K != integrator.temperature_K:
+        if temperature_K is not None and temperature_K != getattr(integrator, "temperature_K", None):
             conflicts.append(f"temperature_K={temperature_K!r}")
         if timestep_fs != 0.5 and timestep_fs != integrator.timestep_fs:
             conflicts.append(f"timestep_fs={timestep_fs!r}")
-        if pressure_GPa != 0.0 and (not npt or pressure_GPa != integrator.pressure_GPa):
+        if pressure_GPa != 0.0 and pressure_GPa != getattr(integrator, "pressure_GPa", None):
             conflicts.append(f"pressure_GPa={pressure_GPa!r}")
-        if cell_mode != "hydrostatic" and (not npt or cell_mode != integrator.cell_mode):
+        if cell_mode != "hydrostatic" and cell_mode != getattr(integrator, "cell_mode", None):
             conflicts.append(f"cell_mode={cell_mode!r}")
         if conflicts:
             raise ValueError(f"{', '.join(conflicts)} conflicts with the explicit integrator's fields; set them in "
                              f"the integrator record only (SPEC §7.7)")
         timestep_fs = integrator.timestep_fs
-    elif ensemble == "NVT" and (pressure_GPa != 0.0 or cell_mode != "hydrostatic"):
+    elif ensemble != "NPT" and (pressure_GPa != 0.0 or cell_mode != "hydrostatic"):
         raise ValueError("pressure_GPa and cell_mode are for ensemble='NPT' (SPEC §7.7)")
+    nve = ensemble == "NVE"
+    if nve:
+        given = [name for name, value in (("temperature_K", temperature_K), ("schedule", schedule), ("mc", mc))
+                 if value is not None]
+        if given:
+            raise ValueError(f"ensemble='NVE' has no target temperature, so {', '.join(given)} cannot apply; the "
+                             "momenta are the structure's (set them on the Atoms, for example with ASE's "
+                             "MaxwellBoltzmannDistribution) (SPEC §7.7)")
 
     # The temperature: the start target, the highest and (for MC) the lowest of the run.
     if schedule is not None:
@@ -178,13 +201,19 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
         # later (run() or a resume, 3-T14) keeps the plan its skin and buckets were sized for.
         highest = max(start, position.max_target())
     else:
-        if temperature_K is None and integrator is None:
+        if temperature_K is None and integrator is None and not nve:
             raise ValueError("fm.md needs temperature_K= or schedule= (SPEC §7.7)")
         if steps is None:
             raise ValueError("steps= is required without a schedule: nothing else fixes the run's length (SPEC §7.7)")
         _steps(steps)
-        start = float(integrator.temperature_K if integrator is not None else temperature_K)
+        start = None if nve else float(integrator.temperature_K if integrator is not None else temperature_K)
         highest = start
+
+    atoms = _structure(structure)
+    if repeat != (1, 1, 1):
+        atoms = atoms.repeat(repeat)
+    if nve:
+        highest = nve_max_temperature_K(atoms)
 
     # The workload: the highest target, and what mc= declares.
     workload_fields = {"max_temperature_K": highest, "min_mc_temperature_K": min_mc_temperature_K}
@@ -204,26 +233,17 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
 
     record, d3_warnings = d3.expand(dispersion, functional=functional, model=name)
 
-    # The refusals of 1b, every reason at once.
-    reasons = []
-    if ensemble == "NVE" and integrator is None:
-        reasons.append(Reason("NVE: phase 4; 1b runs NVT (Langevin) and NPT (LangevinBAOAB) (SPEC §16)",
-                              code="nve-phase-4"))
-    if reasons:
-        raise PlanRefused.from_reasons(reasons)
-
     if integrator is None:
         friction = default_friction_per_fs()
-        if ensemble == "NPT":
+        if nve:
+            integrator = integrators.NVE(timestep_fs=timestep_fs)
+        elif ensemble == "NPT":
             integrator = integrators.LangevinBAOAB(timestep_fs=timestep_fs, temperature_K=start,
                                                    friction_per_fs=friction, pressure_GPa=pressure_GPa,
                                                    cell_mode=cell_mode)
         else:
             integrator = integrators.Langevin(timestep_fs=timestep_fs, temperature_K=start, friction_per_fs=friction)
 
-    atoms = _structure(structure)
-    if repeat != (1, 1, 1):
-        atoms = atoms.repeat(repeat)
     output = _output(output, structure)
     if seed is None:
         import secrets

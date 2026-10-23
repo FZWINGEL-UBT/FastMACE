@@ -175,6 +175,34 @@ def describe_move(move):
     return text + (f" ({velocities})" if velocities else "")
 
 
+# The header's name of each integrator scheme (IntegratorConfig.scheme); MTK and Berendsen add the cell mode.
+SCHEME_NAMES = {"langevin": "NVT Langevin", "baoab": "NPT LangevinBAOAB", "nve": "NVE VelocityVerlet",
+                "csvr": "NVT CSVR (Bussi)", "nhc": "NVT Nose-Hoover chain", "mtk": "NPT MTK",
+                "berendsen": "Berendsen"}
+
+
+def _scheme_name(config):
+    """The header's integrator: ``SCHEME_NAMES`` by the config's scheme, with the MTK cell mode and the
+    Berendsen ensemble."""
+    scheme = getattr(config, "scheme", None)
+    name = SCHEME_NAMES.get(scheme, f"{str(config.ensemble).upper()} {scheme}")
+    if scheme == "mtk":
+        name = f"{name} {config.cell_mode}"
+    elif scheme == "berendsen":
+        name = f"{str(config.ensemble).upper()} {name}"
+    return name
+
+
+def _scheme_record(config):
+    """The registry record of the config's scheme, ``None`` if it is not registered."""
+    from fastmace.integrators import registry
+
+    try:
+        return registry.registry().integrator(config.scheme)
+    except KeyError:
+        return None
+
+
 def _mapping(record):
     """A gate or D3 record as a dict: a mapping, ``to_metadata()``/``to_dict()``, a dataclass, or attributes."""
     if record is None or isinstance(record, Mapping):
@@ -373,8 +401,7 @@ class Report:
         pbc = "3D PBC" if all(self.pbc) else "PBC " + "".join("T" if p else "F" for p in self.pbc)
         run = "integrator unknown"
         if self.integrator is not None:
-            npt = self.integrator.ensemble == "npt"
-            run = f"{'NPT LangevinBAOAB' if npt else 'NVT Langevin'} {self.integrator.timestep_fs:g} fs"
+            run = f"{_scheme_name(self.integrator)} {self.integrator.timestep_fs:g} fs"
         structure = f"{self.structure}, {self.n_atoms} atoms ({repeat}), {pbc}, {run}"
         return f"FastMACE {self.version}  |  {model}  |  {structure}"
 
@@ -476,6 +503,9 @@ class Report:
             if self.plan is not None and self.plan.polar is not None:
                 lines.append("PolarMACE NPT stress: experimental: validated against finite differences on "
                              "NaCl 3×3×3 only (phase 3b)")
+        record = None if self.integrator is None else _scheme_record(self.integrator)
+        if record is not None and record.non_canonical:
+            lines.append(f"{_scheme_name(self.integrator)}: non-canonical: equilibration only (§10.2)")
         if self.mc:
             lines.append("MC: experimental: not yet qualified (§10.4)")
         if self.dispersion:

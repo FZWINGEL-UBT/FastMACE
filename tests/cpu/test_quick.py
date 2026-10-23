@@ -3,7 +3,7 @@
 A tiny MH-1-class model, NaCl, the minimal planner on the CPU without compilation (as
 ``test_simulation.py``). ``fm.md`` builds a ``Simulation`` and nothing else, so its plan and gate
 equal the equivalent ``Simulation``'s; its inferences lose to explicit arguments; every
-``ValueError`` of §7.7 comes before anything is loaded; NVE is refused with its phase, D3 runs
+``ValueError`` of §7.7 comes before anything is loaded; NVE runs (4-T10), D3 runs
 (3b-T04: MACE plus D3, with the gate's reference MACE plus torch-dftd), and MC runs (on T09's
 driver); ``summary`` is the run report (1b-T15) and ``metadata`` the ``metadata.json`` record.
 """
@@ -290,16 +290,83 @@ def test_multi_head_label_without_head(tmp_path):
         md(_atoms(), model="mh1", temperature_K=300.0, steps=3, seed=1, output=tmp_path / "run")
 
 
-# --------------------------------------------------------------------------- refusals with their phase
+# --------------------------------------------------------------------------- NVE (4-T10)
 
 
-def test_nve_is_phase_4(tmp_path):
+def _moving():
+    """NaCl with momenta at about 300 K (fm.md draws no velocities)."""
+    import numpy as np
+    from ase import units
+
+    atoms = _atoms()
+    scale = np.sqrt(atoms.get_masses() * units.kB * 300)[:, None]
+    atoms.set_momenta(np.random.default_rng(5).standard_normal((len(atoms), 3)) * scale)
+    return atoms
+
+
+def test_nve_runs_velocity_verlet_from_the_structures_momenta(model_path, loaded, tmp_path):
+    from fastmace import quick
+    from fastmace.planner.workload import Workload
+    from fastmace.simulation import Simulation
+
+    atoms = _moving()
+    run = _md(model_path, tmp_path, ensemble="NVE", temperature_K=None, structure=atoms)
+    nve = integrators.NVE(timestep_fs=0.5)
+    assert run.simulation.integrator == nve
+    highest = quick.nve_max_temperature_K(atoms)
+    assert highest == pytest.approx(2 * atoms.get_temperature())
+    assert run.simulation.workload == Workload(max_temperature_K=highest)
+    def recorded(record):  # every max_temperature_K value in metadata.json
+        if isinstance(record, dict):
+            return [v for k, v in record.items() if k == "max_temperature_K"] + [
+                x for v in record.values() for x in recorded(v)]
+        return [x for v in record for x in recorded(v)] if isinstance(record, list) else []
+
+    assert recorded(run.metadata) and set(recorded(run.metadata)) == {highest}
+    sim = Simulation(atoms, loaded, integrator=nve, seed=5, workload=Workload(max_temperature_K=highest))
+    assert run.plan == sim.plan
+    assert "NVE VelocityVerlet 0.5 fs" in run.summary.splitlines()[0]
+
+
+def test_nve_from_rest_has_the_floor(model_path, tmp_path):
+    from fastmace import quick
+
+    run = _md(model_path, tmp_path, ensemble="NVE", temperature_K=None)
+    assert run.simulation.workload.max_temperature_K == quick.NVE_MIN_TEMPERATURE_K == 1.0
+
+
+def test_explicit_nve_integrator(model_path, tmp_path):
+    nve = integrators.NVE(timestep_fs=1.0, fixcm=False, dof="ase")
+    run = _md(model_path, tmp_path, integrator=nve, temperature_K=None, structure=_moving())
+    assert run.simulation.integrator == nve
+    assert run.plan.integrator.ensemble == "nve"
+
+
+@pytest.mark.parametrize("options, match", [
+    ({"temperature_K": 300.0}, "temperature_K"),
+    ({"temperature_K": None, "schedule": hold(300.0, ps=0.001), "steps": None}, "schedule"),
+    ({"temperature_K": None, "mc": SWAP}, "mc"),
+    ({"temperature_K": None, "pressure_GPa": 0.1}, "pressure_GPa"),
+])
+def test_nve_value_errors_before_anything_is_loaded(tmp_path, options, match):
     from fastmace.quick import md
 
-    with pytest.raises(PlanRefused, match="phase 4") as raised:
-        md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, ensemble="NVE", temperature_K=300.0,
-           steps=3, seed=1)
-    assert "nve-phase-4" in raised.value.codes
+    options = {"output": tmp_path / "run", "seed": 1, "steps": 3, **options}
+    with pytest.raises(ValueError, match=match):
+        md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, ensemble="NVE", **options)
+    assert not (tmp_path / "run").exists()
+
+
+def test_every_integrator_record_is_accepted(tmp_path):
+    """integrator= takes every fm.integrators record (4-T10); anything else is a TypeError naming them."""
+    from fastmace.quick import md
+
+    with pytest.raises(TypeError, match="NoseHooverChain"):
+        md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, integrator=object(), steps=3, seed=1)
+    nhc = integrators.NoseHooverChain(timestep_fs=0.5, temperature_K=300.0, tdamp_fs=50.0)
+    with pytest.raises(ValueError, match="ensemble"):
+        md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, integrator=nhc, ensemble="NPT", steps=3,
+           seed=1)
 
 
 def _r2scan(loaded):
@@ -429,10 +496,10 @@ def test_mc_is_no_longer_refused(tmp_path):
     assert not isinstance(raised.value, PlanRefused)
 
 
-def test_every_refusal_at_once(tmp_path):
+def test_no_refusal_is_left_in_fm_md(tmp_path):
+    """NVE (4-T10), D3 (3b-T04) and MC (3-T15) all run: no PlanRefused before the model is loaded."""
     from fastmace.quick import md
 
-    with pytest.raises(PlanRefused) as raised:
-        md(_atoms(), model="mh1-r2scan", ensemble="NVE", dispersion="d3bj", mc=_swap(), temperature_K=300.0, steps=3,
-           seed=1)
-    assert set(raised.value.codes) == {"nve-phase-4"}  # D3 runs since 3b-T04
+    with pytest.raises(Exception) as raised:
+        md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, ensemble="NVE", steps=3, seed=1)
+    assert not isinstance(raised.value, PlanRefused)

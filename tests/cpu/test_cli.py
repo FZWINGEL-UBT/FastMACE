@@ -143,10 +143,19 @@ def test_d3_reaches_fm_md_through_main(monkeypatch, capsys, extra, expected):
     assert calls[0]["dispersion"] == ("d3bj" if expected == "d3bj" else D3(functional="pbe"))
 
 
-def test_nve_is_refused_through_main(capsys):
+def test_nve_passes_through_and_refuses_a_temperature(monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    from fastmace import quick
+
     assert cli.main(["md", *REQUIRED, "--head", "matpes_r2scan", "--ensemble", "NVE", "--temperature", "300",
-                     "--steps", "10"]) == 1
-    assert "NVE: phase 4" in capsys.readouterr().err
+                     "--steps", "10"]) == 2  # a usage error: fm.md's ValueError before anything is loaded
+    assert "no target temperature" in capsys.readouterr().err
+    calls = []
+    monkeypatch.setattr(quick, "md", lambda structure, **options: calls.append(options) or SimpleNamespace(
+        summary="summary", output="run/"))
+    assert cli.main(["md", *REQUIRED, "--head", "matpes_r2scan", "--ensemble", "nve", "--steps", "10"]) == 0
+    assert calls[0]["ensemble"] == "NVE" and "temperature_K" not in calls[0]
 
 
 # --------------------------------------------------------------------------- init
@@ -330,8 +339,8 @@ def test_init_documents_mc_without_a_phase_refusal():
 def test_run_reads_standard_input(monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin", io.StringIO('structure = "a.xyz"\nmodel = "mh1"\nhead = "matpes_r2scan"\n'
                                                  'ensemble = "NVE"\ntemperature_K = 1.0\nsteps = 1\n'))
-    assert cli.main(["run", "-"]) == 1
-    assert "NVE: phase 4" in capsys.readouterr().err
+    assert cli.main(["run", "-"]) == 2  # fm.md's ValueError, before anything is loaded
+    assert "no target temperature" in capsys.readouterr().err
 
 
 def test_run_bad_toml_is_a_usage_error(tmp_path, capsys):
@@ -445,3 +454,26 @@ def test_run_with_mc_tables_runs_mc(model_path, cpu_planner, tmp_path, monkeypat
     assert [step for step, _ in drivers[0].spied] == [2, 4]
     metadata = json.loads((tmp_path / "run" / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["counters"]["mc"]["swap"]["attempted"] == 6
+
+
+def test_run_takes_every_integrator_record():
+    """``INTEGRATOR_TYPES`` is ``fm.integrators.RECORDS`` (4-T10); only a Langevin record gets fm.md's friction."""
+    from fastmace import integrators
+
+    assert set(run_command.INTEGRATOR_TYPES) == set(integrators.RECORDS)
+    data = _toml('structure = "a.xyz"\nmodel = "mh1"\n[integrator]\ntype = "NoseHooverChain"\n'
+                 'timestep_fs = 0.5\ntemperature_K = 300.0\ntdamp_fs = 50.0\n')
+    _, options = run_command.md_arguments(data)
+    assert options["integrator"] == integrators.NoseHooverChain(timestep_fs=0.5, temperature_K=300.0, tdamp_fs=50.0)
+    data = _toml('structure = "a.xyz"\nmodel = "mh1"\n[integrator]\ntype = "MTK"\ntimestep_fs = 0.5\n'
+                 'temperature_K = 300.0\npressure_GPa = 0.1\ntdamp_fs = 50.0\npdamp_fs = 500.0\ncell_mode = "full"\n')
+    _, options = run_command.md_arguments(data)
+    assert options["integrator"].cell_mode == "full"
+
+
+def test_init_lists_the_integrators():
+    text = _init_text()
+    assert "phase 4" not in text
+    for name in ("Langevin", "LangevinBAOAB", "NVE", "CSVR", "NoseHooverChain", "MTK", "Berendsen"):
+        assert name in text, name
+    assert "equilibration only" in text
