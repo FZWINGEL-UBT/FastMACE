@@ -122,10 +122,9 @@ def test_polar_record_carries_the_issue_1642_fix_and_its_validation():
     assert fix["fixed_upstream"] == "MACE PR 1718, after 0.3.16"
     validation = fix["validation"]
     assert validation["method"] == "central finite differences of the reference energy"
-    assert validation["structure"] == "the run's own structure" and validation["tolerance_eV_per_A3"] == 1e-6
-    assert "frozen" in validation["kset"] and "3b-T08" in validation["kset"]
-    # 3b-T08 resolved the NbCl5 finding (the reference's cutoff steps, not the stress), 4-T11 retired it.
-    assert "open_findings" not in fix
+    assert validation["structure"] == "NaCl 3x3x3" and validation["tolerance_eV_per_A3"] == 1e-6
+    # The qualified record's text is fixed (its id): 3b-T08 resolved this finding, the entry still states it.
+    assert "4.4e-4" in fix["open_findings"][0] and "phase 3b" in fix["open_findings"][0]
     # A fix is a correction of a defect, not non-stock physics.
     assert record.is_stock
 
