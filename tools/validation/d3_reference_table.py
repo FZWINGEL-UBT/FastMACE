@@ -10,7 +10,9 @@ tool records the deviations behind it for the report. On the six rattled and str
   (``CHAIN_CASES``) its force deviation must exceed the bound; NaCl's chain term vanishes (dE/dCN ~ 0), recorded only;
 - float32 against float64 on the same device, against the gate's floors.
 
-    PYTHONPATH=<checkout>:<checkout>/tests python tools/validation/d3_reference_table.py --output DIR [--devices cpu cuda]
+    PYTHONPATH=<checkout>:<checkout>/tests python tools/validation/d3_reference_table.py --output DIR
+
+(``--devices cpu cuda`` by default.)
 
 Writes DIR/d3_references.json and prints a table.
 """
@@ -32,8 +34,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests"))
 sys.path.insert(0, str(ROOT / "tests" / "cpu"))
 
-from _support.d3_cases import CASES, FLOORS, GATE, deviations, within  # noqa: E402
 from test_d3_kernel import CHAIN_CASES, RECORD, evaluate  # noqa: E402
+
+from _support.d3_cases import CASES, FLOORS, GATE, deviations, within  # noqa: E402
 
 
 def references():
@@ -75,7 +78,8 @@ def main(argv=None):
             ours = evaluate(atoms, device=device)
             single = evaluate(atoms, device=device, dtype=torch.float32)
             chainless = evaluate(atoms, device=device, chain=False)
-            row = dict(torch_dftd=deviations(ours, first, len(atoms)), simple_dftd3=deviations(ours, second, len(atoms)),
+            row = dict(torch_dftd=deviations(ours, first, len(atoms)),
+                       simple_dftd3=deviations(ours, second, len(atoms)),
                        no_chain_vs_torch_dftd=deviations(chainless, first, len(atoms)),
                        float32_vs_float64=deviations(single, ours, len(atoms)))
             row["pass_torch_dftd"] = within(row["torch_dftd"], agreement)
