@@ -5,11 +5,12 @@ Run from WSL with the system Python (standard library only) and the ``colab`` CL
     python3 tools/colab/fastmace_colab.py --gpu G4 --commit <sha> --out ~/fastmace-acceptance/colab-<run> \\
         --command 'python tools/acceptance/compat.py --provider colab --label "Colab G4" --output $OUT'
 
-One VM per call (``--session`` names it, ``--keep`` leaves it running for the next call with the same name).
+One VM per call. ``--session`` names it (default: GPU, time and a random suffix); the driver refuses a name
+that is already live unless ``--reuse`` is given, and ``--keep`` leaves the VM running for such a call.
 The driver:
 
 1. reads ``colab usage`` (compute units before);
-2. allocates the VM (``colab new``) unless ``--session`` names a live one;
+2. allocates the VM (``colab new``), or with ``--reuse`` takes the live one of that name;
 3. uploads one payload: a ``git archive`` of ``--commit`` with ``.source_commit`` (the repository is private,
    so no clone), the baseline export with the structures, the requirements, the model list and the commands;
 4. on the VM (``remote.sh``): probes the GPU, installs the pinned hybrid stack into a uv-managed Python 3.10
@@ -41,6 +42,7 @@ import io
 import json
 import os
 import re
+import secrets
 import shlex
 import signal
 import subprocess
@@ -83,7 +85,8 @@ def parse_args(argv=None):
     p.add_argument("--build-env", action="store_true",
                    help="set up the environment and record its manifest in the store (no command needed)")
     p.add_argument("--out", required=True, type=Path, help="local directory for colab.json and the records")
-    p.add_argument("--session", default=None, help="session name (default fm-<gpu>-<UTC time>); reused if live")
+    p.add_argument("--session", default=None, help="session name (default fm-<gpu>-<UTC time>-<random>)")
+    p.add_argument("--reuse", action="store_true", help="run on the live session --session names (else refused)")
     p.add_argument("--keep", action="store_true", help="leave the VM running afterwards (stop it yourself)")
     p.add_argument("--models", default=DEFAULT_MODELS, help="checkpoint names of fastmace.model.labels")
     p.add_argument("--baseline", default="~/fastmace-baseline/1a-T18", type=Path,
@@ -100,8 +103,10 @@ def parse_args(argv=None):
 
 
 def default_session(gpu, now=None):
+    """Unique per call: two jobs started in the same second got the same name, and `colab stop` then stopped
+    only one of their VMs (4-T13, 23 October 2026)."""
     now = now or datetime.now(timezone.utc)
-    return f"fm-{gpu.lower()}-{now:%Y%m%d-%H%M%S}"
+    return f"fm-{gpu.lower()}-{now:%Y%m%d-%H%M%S}-{secrets.token_hex(3)}"
 
 
 def new_args(gpu, session):
@@ -262,6 +267,10 @@ def build_payload(work, repo, commit, commands, models, baseline, requirements):
     return sha, payload
 
 
+class SessionExists(RuntimeError):
+    """``--session`` names a live session and ``--reuse`` was not given."""
+
+
 def run_colab(argv, timeout=None):
     """The real CLI: stdout on success, CalledProcessError (with the output) otherwise."""
     done = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, stdin=subprocess.DEVNULL)
@@ -342,10 +351,8 @@ class Job:
             print(out.rsplit("@@STEP", 1)[0][-800:], flush=True)
 
     def live_sessions(self):
-        try:
-            text = self.call(["colab", "sessions"], timeout=120)
-        except (subprocess.SubprocessError, OSError):
-            return set()
+        """Names of the live sessions; an unreadable listing stops the job before anything is allocated."""
+        text = self.call(["colab", "sessions"], timeout=120)
         return set(re.findall(r"^\[([^\]]+)\]", text, flags=re.M))
 
 
@@ -367,7 +374,7 @@ def run_job(args, colab=run_colab):
                   out=str(job.out), timings={})
     timings = record["timings"]
     job.out.mkdir(parents=True, exist_ok=True)
-    stopped = False
+    stopped, owned = False, False
     try:
         sha, payload = build_payload(job.work, Path(args.repo).expanduser(), args.commit, args.command, models,
                                      Path(args.baseline).expanduser(), requirements)
@@ -375,12 +382,18 @@ def run_job(args, colab=run_colab):
         before = job.usage()
         record["cu_before"], record["rate_per_h"] = before["balance"], before["rate_per_h"]
         t = time.time()
-        if job.session in job.live_sessions():
+        live = job.session in job.live_sessions()
+        if live and not args.reuse:
+            # Not ours: never stop it (owned stays False).
+            raise SessionExists(f"session {job.session} is already live; pass --reuse to run on it, or another name")
+        if live:
             _log(f"reusing live session {job.session}")
             record["reused_session"] = True
         else:
             _log(f"allocating {args.gpu} as {job.session}")
+            owned = True  # from here on, also when `colab new` itself fails half-way
             job.call(new_args(args.gpu, job.session), timeout=900)
+        owned = True
         timings["allocate_s"] = round(time.time() - t, 1)
         t = time.time()
         job.upload(HERE / "remote.sh", f"{STAGING}remote.sh")
@@ -432,7 +445,7 @@ def run_job(args, colab=run_colab):
             _manifest(job, record, stack)
         record["exit"] = worst
     finally:
-        if not args.keep:
+        if owned and not args.keep:
             stopped = _stop(job)
         record["stopped"] = stopped
         after = job.usage() if not args.dry_run else {}
@@ -510,7 +523,11 @@ def main(argv=None):
 
     for sig in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, interrupt)
-    record = run_job(args)
+    try:
+        record = run_job(args)
+    except SessionExists as refused:
+        print(f"fastmace-colab: {refused}", file=sys.stderr)
+        return 2
     code = record["exit"]
     return code if isinstance(code, int) else 1
 

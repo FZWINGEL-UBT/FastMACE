@@ -5,6 +5,7 @@ import csv
 import importlib.util
 import io
 import json
+import re
 import subprocess
 import tarfile
 from datetime import datetime, timezone
@@ -39,7 +40,9 @@ def test_arguments_batch_several_commands_and_default_session():
     with pytest.raises(SystemExit):
         fc.parse_args(["--gpu", "V100", "--command", "x", "--out", "/x"])
     name = fc.default_session("G4", datetime(2026, 10, 23, 20, 5, 1, tzinfo=timezone.utc))
-    assert name == "fm-g4-20261023-200501"
+    assert re.fullmatch(r"fm-g4-20261023-200501-[0-9a-f]{6}", name)
+    # two jobs started in the same second must not share a name (4-T13 lost a VM that way)
+    assert len({fc.default_session("A100", datetime(2026, 10, 23, tzinfo=timezone.utc)) for _ in range(50)}) == 50
 
 
 def test_build_env_needs_no_command():
@@ -144,8 +147,8 @@ def test_payload_holds_source_commands_models_and_baseline(tmp_path):
 class FakeColab:
     """The colab CLI as the driver sees it: canned results per subcommand, every call recorded."""
 
-    def __init__(self, fail_on=None, interrupt_on=None, capability="12.0", cache_changed=True):
-        self.calls, self.fail_on, self.interrupt_on = [], fail_on, interrupt_on
+    def __init__(self, fail_on=None, interrupt_on=None, capability="12.0", cache_changed=True, live=()):
+        self.calls, self.fail_on, self.interrupt_on, self.live = [], fail_on, interrupt_on, live
         self.capability, self.cache_changed = capability, cache_changed
         self.balance = 198.99
 
@@ -157,6 +160,8 @@ class FakeColab:
             raise KeyboardInterrupt
         if stage and stage == self.fail_on:
             raise subprocess.CalledProcessError(1, argv, "boom")
+        if sub == "sessions":
+            return "".join(f"[{name}] gpu-x | Hardware: G4\n" for name in self.live)
         if sub == "usage":
             text, self.balance = USAGE.replace("198.99", f"{self.balance:.2f}"), self.balance - 0.5
             return text
@@ -332,3 +337,27 @@ def test_a_part_claimed_meanwhile_is_not_overwritten(tmp_path):
         fc.os.link = real_link
     assert part.name == "002.tar.gz" and part.read_bytes() == b"b"
     assert (cache / "001.tar.gz").read_bytes() == b"other" and not incoming.exists()
+
+
+def test_a_live_name_is_refused_and_left_running(tmp_path):
+    colab = FakeColab(live=("t1",))
+    with pytest.raises(fc.SessionExists):
+        fc.run_job(_job_args(tmp_path), colab)
+    assert "new" not in colab.subcommands() and "stop" not in colab.subcommands()
+    assert list(csv.DictReader((tmp_path / "ledger.csv").open()))[0]["exit"] == "error"
+
+
+def test_reuse_runs_on_the_live_session(tmp_path):
+    colab = FakeColab(live=("t1",))
+    record = fc.run_job(_job_args(tmp_path, "--reuse", "--keep"), colab)
+    assert record["exit"] == 0 and record["reused_session"] is True
+    assert "new" not in colab.subcommands() and "stop" not in colab.subcommands()
+
+
+def test_an_error_before_allocation_stops_nothing(tmp_path):
+    args = _job_args(tmp_path)
+    args.commit = "no-such-commit"
+    colab = FakeColab()
+    with pytest.raises(subprocess.CalledProcessError):
+        fc.run_job(args, colab)
+    assert "stop" not in colab.subcommands()

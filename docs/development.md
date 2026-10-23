@@ -604,9 +604,12 @@ python3 tools/colab/fastmace_colab.py --gpu G4 --commit <sha> --out ~/fastmace-a
 - **Commands:** `--command` is repeatable, and the commands run one after another on the same VM. Each runs
   from the source root, with `$OUT` as its own results directory (`out/cmd<n>/`). A failing command does not
   stop the next one; the job's exit code is the first non-zero one.
-- **The VM:** `--session NAME` names it; a live session of that name is reused. `--keep` leaves it running
-  for the next call, and its venv is kept too. Without `--keep` the driver always runs `colab stop`, also
-  after an error, Ctrl-C, SIGTERM or SIGHUP. If all three stop attempts fail, it prints the command to run.
+- **The VM:** `--session NAME` names it. The default name is unique per call: GPU, UTC time and a random
+  suffix. Two 4-T13 jobs started in the same second once got the same name, and `colab stop` then stopped
+  only one of their VMs. The driver refuses a name that is already live (exit 2) and leaves that VM alone;
+  `--reuse` runs on it instead. `--keep` leaves the VM running for such a call, and its venv is kept too.
+  Without `--keep` the driver always runs `colab stop` on a VM it allocated or reused, also after an error,
+  Ctrl-C, SIGTERM or SIGHUP. If all three stop attempts fail, it prints the command to run.
 - **Source:** a `git -c core.autocrlf=false archive` of `--commit` from `--repo` (default: the main checkout,
   which sees every pushed branch) with `.source_commit`. The repository is private, so the VM does not clone
   it.
