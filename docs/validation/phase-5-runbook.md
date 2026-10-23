@@ -98,39 +98,44 @@ Pytest jobs run through `tools/acceptance/stoppable_pytest.sh` (results per fini
 
 Choice 7 made checkable on the CPU: the same inputs planned by the baseline and by the freeze.
 
-- **The format agreed with 5-T10** (conductor, 23 October 2026; 5-T11 creates the tool since decision 56 closed
-  5-T10, and keeps 5-T10's `"auto"` set possible for phase 6): one format (cases with stable ids in named sets,
-  a `package=` argument so the renamed `fastmace_4` export plans the same cases, canonical JSON records, `dump` and `compare
-  --explain-codes`; agreed with 5-T10 in the session notes, `5-T11-plan-corpus-format.md`). 5-T11 adds the
-  `"acceptance"` set and keeps its full records (`--full`) in `results/`, not hashes.
+- **The tool** (`tools/plan_corpus.py`, written by 5-T11 since decision 56 closed 5-T10, in the format agreed
+  with 5-T10 in the session notes, `5-T11-plan-corpus-format.md`): cases with stable ids in named sets (5-T11's
+  `"acceptance"`; a phase 6 set can be added beside it), a `--package` argument so the renamed `fastmace_4` export
+  plans the same cases, canonical JSON records with the reason texts apart (`texts`), `dump` and `compare
+  --explain-rules 12`. Every API difference between versions sits in `_plan`; the export's renaming of string
+  values (`IntegratorConfig.dof == "fastmace"`) is read back before comparing.
 - **Model inputs:** per label of `fastmace.model.labels` (19), the stand-ins of `tools/plan_corpus_labels.py`
-  (moved from `tests/cpu/test_planner.py`'s `LABEL_FACTS`, read from the released checkpoints with
-  `model_traits`), with the ForceField's facts the planner
-  reads (precision, superset, `rewrites="auto"`, the D3 record where it applies). The dimensions rule 12's
-  estimate needs (5-T03's names) are captured **once** from the checkpoints, on the CPU in WSL, one label per
-  process (free memory checked first; not during a timed stretch), into the same module per label, with each
-  checkpoint's sha256. A field one side lacks is filled with that side's default and listed.
+  (moved from `tests/cpu/test_planner.py`'s `LABEL_FACTS`, which imports them from there; read from the released
+  checkpoints with `model_traits`), `precision="float32"`, `rewrites="auto"`. The sizes rule 12's estimate needs
+  were read **once** from the released checkpoints by `tools/plan_corpus_capture.py`, on the CPU in WSL, one label
+  per process, free memory checked first (24 October 2026, 00:00–00:10 CEST: 10 labels with `fastmace_cpu`, the
+  POLAR, OMOL and OFF labels with `mace_cueq_latest` on the CPU, since PolarMACE needs `graph_longrange`), into
+  `tools/plan_corpus_dims.json` with each file's sha256, checked against the label table. They reach the plan
+  through 5-T03's `ModelDims` (`_with_dims`, once 5-T03 gives it a constructor from this record).
 - **Hardware and software (injected, documented):** `Hardware("NVIDIA GeForce RTX 5060 Ti", (12, 0), 16 GiB)` with
   12 GiB free (the desktop takes about 4 GiB; conductor, 23 October 2026), and `SoftwareTraits` with OEq, Triton,
-  NVRTC and fused cuEq available. **One low-memory case** (a 4 GiB GPU, 3 GiB free) on the largest labels so that
-  rule 12's path is exercised.
-- **Workloads,** per label (where the label's family allows; a refusal is a result, compared like a plan): MD NVT
-  (Langevin), NPT (BAOAB), NPT with D3 (labels without a D3 record: D3-BJ with r2SCAN's parameters, explicit), MC
-  swap with a superset, relaxation at fixed cell (LBFGS), relaxation at variable cell (LBFGS with
-  `FrechetCellFilter`; POLAR is refused on both sides by decision 50, expected); each with the default backend and,
-  where both pass the hard rules, with the other backend set explicitly. Structures: NaCl and NbCl5 3×3×3.
-- **Compared:** refusals as a multiset of (rule, code); `auto_options_off` verbatim (the model's support texts);
-  tier and mode; backend and convolution fusion; runner; the rewrites on and off
-  (names, not texts); force and MC energy precision; skin, pair-buffer headroom, edge bucket, re-capture budget and
-  variant cap; D3 skin and list; k-space headroom; the stress path. **Ignored:** reason texts, rule numbers, and the
-  phase 5 fields (`calibration`, `adaptation`, `predicted_memory_bytes`, `text`).
-- **Verdict per row:** identical, or **explained**: every difference is carried by a decision whose code belongs to
-  rule 12's action (decision 51: a rewrite turned off with rule 12's reason, or rule 12's warning) or rule 15's
-  warning. Anything else fails and goes to the conductor. Expected
-  explained rows: none on the 16 GiB record unless 5-T03 finds a label that does not fit; the low-memory case's
-  rule 12 rows.
-- **Output:** `results/5-T11-corpus/corpus.json` (every row, both sides) and a table in the report (counts per
-  verdict, every non-identical row).
+  NVRTC and fused cuEq available; the free memory is injected through the planner's `_free_memory_bytes`. **The
+  low-memory cases** (a 4 GiB GPU, 3 GiB free) on the four largest labels (OMOL-0 XL, POLAR-1-L, MP-0 large,
+  OFF23 large), NVT and NPT, so that rule 12's action is exercised.
+- **Workloads,** per label, NaCl and NbCl5 3×3×3 (NbCl5: the protocols' r2SCAN cell), with `backend` `auto`,
+  `hybrid` and `cueq` (a refusal is a result, compared like a plan): MD NVT (Langevin, 1 fs, 300 K), NPT (BAOAB),
+  NPT with the D3 list sized for a 40 bohr cutoff, MC swap (`species_changes`, minimum 250 K), LBFGS at fixed cell,
+  LBFGS with `FrechetCellFilter` (POLAR refused on both sides by decision 50, expected). 700 cases.
+- **Compared:** refusals as a multiset of (rule, code) with the error type; tier; runner; superset; allowances;
+  every resolved config (`rewrites`, `engine`, `precision`, `neighbours`, `polar`, `integrator`, `optimizer`, field
+  by field: backend, fusion, rewrites, precisions, skin, headroom, bucket, re-capture budget, variant cap, D3 skin,
+  k headroom, stress path); `auto_options_off` verbatim; `requested`; the choice of every decision both sides
+  have. **Not compared:** reason texts, rule numbers, decisions only the new side has (listed per row), and the
+  phase 5 fields (`calibration`, `adaptation`, `predicted_memory_bytes`).
+- **Verdict per row:** identical; **explained**: only the rewrite config differs and the new side carries a
+  decision with a code of rule 12 (decision 51 turns rewrites off and changes nothing else; rule 15 changes nothing,
+  so its decisions are only listed as added); anything else is **different**, fails, and goes to the conductor.
+  Expected explained rows: none on the 16 GiB record unless 5-T03 finds a label that does not fit; the low-memory
+  rows.
+- **Dry run** (24 October 2026, CPU): baseline dae3848 against main b95c1f5 (5-T01 merged), 700 of 700 identical,
+  8 s per side.
+- **Output:** `results/5-T11-corpus/` (`old.json`, `new.json`, `report.json`) and a table in the report (counts
+  per verdict, every non-identical row).
 
 ## Jobs
 
@@ -142,7 +147,7 @@ Local RTX 5060 Ti, run ID `5-T11-local-<date>`, `python3 <copy>/tools/ci/local_g
 | --- | --- | --- | --- | --- | --- |
 | `conformance` | 1 | no | no | `pytest tests/cpu -m rule` and `tests/cpu/test_rules_meta.py`; the meta-test's listing (rules → tests, precedence pairs) saved | 5 min |
 | `cpu-suite` | 2 | no | no | the conductor's merge-trial CPU suite at the freeze, cited by commit; `pytest tests/cpu -m acceptance` here | 20 min |
-| `corpus` | 3 | no | no | `tools/plan_corpus.py capture` (once), then `compare --baseline fastmace_4` | 1 h capture, 5 min compare |
+| `corpus` | 3 | no | no | `tools/plan_corpus.py dump` with `fastmace_4` and with the freeze, then `compare --explain-rules 12` (the sizes were captured once, before the freeze) | 1 min |
 | `preflight` | – | yes | no | the stale-listing selection | 1–3 h |
 | `trajectories-cpu` | 4 | no | no | `tools/trajectory_versions.py --against 4`, CPU float64, tiny MH-1-class model, NaCl 2×2×2, 100 steps, every 10, Langevin NVT and BAOAB NPT, D3 off and on; `compare --bitwise` | 15 min |
 | `trajectories-reproducible` | 4 | yes | no | the same, reproducible plan, plain cuEq float64, MH-1 NaCl, 500 steps, every 50, NVT and NPT, D3 off | 20 min |
@@ -259,20 +264,23 @@ Ti and the Colab L4 (and on the A100 if that leg runs).
 ## The compatibility tier's additions (test-side, `tests/_support/tiers.py`)
 
 `COMPAT_TESTS` gains the GPU tests the tasks write (conductor, 23 October 2026: 5-T03 and 5-T07 write them,
-5-T11 lists them and checks that `tests/cpu/test_tiers.py` collects them):
-- rule 6 on that GPU: the planner's fused-cuEq check loads (`test_loading_gpu.py` already holds the plain cuEq case;
-  the planner-side check is added if no existing test asserts the decision);
+5-T11 lists them when they merge and checks that `tests/cpu/test_tiers.py` collects them):
+- rule 6 on that GPU (5-T11, written): `test_compat_gpu.py`'s graph-kernel test, already in the tier, also asserts
+  that the planner's software check found cuEquivariance's fused kernels and the plan's `allow_naive_cueq`
+  decision is `off` with code `fused-cueq` (the loading side, `fused_cueq["naive"]`, is `test_loading_gpu.py`'s);
 - rule 12: the estimate against the measured peak on MH-1 NaCl (5-T03's test);
 - the forced re-capture switch smoke, correctness only (5-T07's test).
 
 ## Tool-side additions (before the freeze, CPU-tested on `fastmace/5-T11`)
 
-- `tools/plan_corpus.py` (`capture`, `compare`) and its CPU test on the tiny models (both sides the freeze's
-  package, so every row is identical; a planted difference is caught; an explained one is classified).
-- `tools/acceptance/phase5_local.sh`: the jobs above.
-- `tools/ab_fastmace.py --release 4`, `tools/trajectory_versions.py --against 4`, `tools/restart_versions.py` with
-  the baseline `fastmace_4` (format 4 on both sides).
-- `tests/_support/tiers.py`: the compat additions.
+- `tools/plan_corpus.py`, `plan_corpus_labels.py`, `plan_corpus_capture.py`, `plan_corpus_dims.json` and
+  `tests/cpu/test_plan_corpus.py` (written: the set, planning and refusals, compare's verdicts on planted
+  differences, the renamed export, the dims of all 19 checkpoints, the job script).
+- `tools/acceptance/phase5_local.sh` (written): the CPU jobs, the corpus, the pytest jobs and the tiers; the jobs
+  that need the `--release 4` side or 5-T07's and 5-T09's tools exit 3 until they are filled in at the freeze.
+- After 4-T13's tools merge: `tools/ab_fastmace.py --release 4`, `tools/trajectory_versions.py --against 4`,
+  `tools/restart_versions.py` with the baseline `fastmace_4` (format 4 on both sides).
+- `tests/_support/tiers.py`: 5-T03's and 5-T07's compat tests, when they merge.
 
 ## Recorded, not judged
 

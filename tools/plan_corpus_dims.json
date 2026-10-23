@@ -1,0 +1,1298 @@
+{
+ "matpes-pbe": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "default"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticDensityInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e+128x1o",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    },
+    {
+     "class": "RealAgnosticDensityResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e+128x1o",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "128x0e",
+   "num_bessel": 10,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 9063204,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e+128x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "MACE-matpes-pbe-omat-ft.model",
+  "label": "matpes-pbe",
+  "sha256": "e618ad582b84239905b9c3b77ce6e9ce111b0ecd1533223a1a6aac7a696b8aa0"
+ },
+ "matpes-r2scan": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "default"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticDensityInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e+128x1o",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    },
+    {
+     "class": "RealAgnosticDensityResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e+128x1o",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "128x0e",
+   "num_bessel": 10,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 9063214,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e+128x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "MACE-matpes-r2scan-omat-ft.model",
+  "label": "matpes-r2scan",
+  "sha256": "8f147ecffa1d06a696e5648b13b81abda9c96fda9d0fb3faba3cd3fb27d9bba9"
+ },
+ "mh1-mp": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "matpes_r2scan",
+    "mp_pbe_refit_add",
+    "spice_wB97M",
+    "oc20_usemppbe",
+    "omol",
+    "omat_pbe"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "512x0e+512x1o",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e",
+     "radial_mlp": [
+      1034,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    },
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "512x0e",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e+512x1o",
+     "radial_mlp": [
+      1034,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "512x0e",
+   "num_bessel": 10,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 6439878,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e+512x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "mace-mh-1.model",
+  "label": "mh1-mp",
+  "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47"
+ },
+ "mh1-omat": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "matpes_r2scan",
+    "mp_pbe_refit_add",
+    "spice_wB97M",
+    "oc20_usemppbe",
+    "omol",
+    "omat_pbe"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "512x0e+512x1o",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e",
+     "radial_mlp": [
+      1034,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    },
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "512x0e",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e+512x1o",
+     "radial_mlp": [
+      1034,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "512x0e",
+   "num_bessel": 10,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 6439878,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e+512x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "mace-mh-1.model",
+  "label": "mh1-omat",
+  "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47"
+ },
+ "mh1-r2scan": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "matpes_r2scan",
+    "mp_pbe_refit_add",
+    "spice_wB97M",
+    "oc20_usemppbe",
+    "omol",
+    "omat_pbe"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "512x0e+512x1o",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e",
+     "radial_mlp": [
+      1034,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    },
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "512x0e",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e+512x1o",
+     "radial_mlp": [
+      1034,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "512x0e",
+   "num_bessel": 10,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 6439878,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e+512x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "mace-mh-1.model",
+  "label": "mh1-r2scan",
+  "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47"
+ },
+ "mp0-large": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [],
+   "interactions": [
+    {
+     "class": "RealAgnosticResidualInteractionBlock",
+     "conv_tp_irreps_out": "256x0e+256x1o+256x2e+256x3o",
+     "conv_tp_irreps_out_dim": 4096,
+     "conv_tp_weight_numel": 1024,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "256x0e+256x1o",
+     "irreps_out": "256x0e+256x1o+256x2e+256x3o",
+     "node_feats_irreps": "256x0e",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      1024
+     ],
+     "target_irreps": "256x0e+256x1o+256x2e+256x3o"
+    },
+    {
+     "class": "RealAgnosticResidualInteractionBlock",
+     "conv_tp_irreps_out": "256x0e+256x0e+256x1o+256x1o+256x1o+256x2e+256x2e+256x2e+256x3o+256x3o",
+     "conv_tp_irreps_out_dim": 10240,
+     "conv_tp_weight_numel": 2560,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "256x0e",
+     "irreps_out": "256x0e+256x1o+256x2e+256x3o",
+     "node_feats_irreps": "256x0e+256x1o",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      2560
+     ],
+     "target_irreps": "256x0e+256x1o+256x2e+256x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "256x0e",
+   "num_bessel": 8,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 15847440,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "256x0e+256x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "256x0e"
+    }
+   ],
+   "r_max": 4.5
+  },
+  "file": "MACE_MPtrj_2022.9.model",
+  "label": "mp0-large",
+  "sha256": "f80e992b65ab8f88fdf26964511357c022e92704e4d9bcd086652635a8495b32"
+ },
+ "mp0-medium": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [],
+   "interactions": [
+    {
+     "class": "RealAgnosticResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e+128x1o",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    },
+    {
+     "class": "RealAgnosticResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e+128x1o",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "128x0e",
+   "num_bessel": 10,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 4688656,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e+128x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "2023-12-03-mace-128-L1_epoch-199.model",
+  "label": "mp0-medium",
+  "sha256": "01bfe22100139f424713cf921144e5509cbe353d67aa9fa1be9c6e1e0ed35845"
+ },
+ "mp0b3-medium": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "default"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticDensityInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e+128x1o",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    },
+    {
+     "class": "RealAgnosticDensityResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e+128x1o",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "128x0e",
+   "num_bessel": 10,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 9063204,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e+128x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "mace-mp-0b3-medium.model",
+  "label": "mp0b3-medium",
+  "sha256": "2f2be696351ac9e94fbe01cdfb6f017679acdbd2db7645209ef55fec9826b012"
+ },
+ "mpa0-medium": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "default"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticDensityInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e+128x1o",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    },
+    {
+     "class": "RealAgnosticDensityResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e+128x1o",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "128x0e",
+   "num_bessel": 10,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 9063204,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e+128x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "mace-mpa-0-medium.model",
+  "label": "mpa0-medium",
+  "sha256": "75428afe3a1d7d8062e19bcaabd5c433623cabf308242ec9fb493e38604fb638"
+ },
+ "off23-large": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [],
+   "interactions": [
+    {
+     "class": "RealAgnosticInteractionBlock",
+     "conv_tp_irreps_out": "224x0e+224x1o+224x2e+224x3o",
+     "conv_tp_irreps_out_dim": 3584,
+     "conv_tp_weight_numel": 896,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "224x0e+224x1o+224x2e",
+     "irreps_out": "224x0e+224x1o+224x2e+224x3o",
+     "node_feats_irreps": "224x0e",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      896
+     ],
+     "target_irreps": "224x0e+224x1o+224x2e+224x3o"
+    },
+    {
+     "class": "RealAgnosticResidualInteractionBlock",
+     "conv_tp_irreps_out": "224x0e+224x0e+224x0e+224x1o+224x1o+224x1o+224x1o+224x1o+224x2e+224x2e+224x2e+224x2e+224x2e+224x3o+224x3o+224x3o+224x3o",
+     "conv_tp_irreps_out_dim": 15904,
+     "conv_tp_weight_numel": 3808,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "224x0e",
+     "irreps_out": "224x0e+224x1o+224x2e+224x3o",
+     "node_feats_irreps": "224x0e+224x1o+224x2e",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      3808
+     ],
+     "target_irreps": "224x0e+224x1o+224x2e+224x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "224x0e",
+   "num_bessel": 8,
+   "num_elements": 10,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 4707312,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "224x0e+224x1o+224x2e"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "224x0e"
+    }
+   ],
+   "r_max": 5.0
+  },
+  "file": "MACE-OFF23_large.model",
+  "label": "off23-large",
+  "sha256": "a29e397dbf3e7a24ac50a9b0dfc919bd5a62efa346f5895a6237b0950c1d76f4"
+ },
+ "off23-medium": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [],
+   "interactions": [
+    {
+     "class": "RealAgnosticInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "128x0e+128x1o",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    },
+    {
+     "class": "RealAgnosticResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "128x0e",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e+128x1o",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "128x0e",
+   "num_bessel": 8,
+   "num_elements": 10,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 1428368,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e+128x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e"
+    }
+   ],
+   "r_max": 5.0
+  },
+  "file": "MACE-OFF23_medium.model",
+  "label": "off23-medium",
+  "sha256": "4842c52ad210d6e1f84d6cf1ffa70fae25a7e0d755ed55cf223f43913f587db7"
+ },
+ "off23-small": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [],
+   "interactions": [
+    {
+     "class": "RealAgnosticInteractionBlock",
+     "conv_tp_irreps_out": "96x0e+96x1o+96x2e+96x3o",
+     "conv_tp_irreps_out_dim": 1536,
+     "conv_tp_weight_numel": 384,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "96x0e",
+     "irreps_out": "96x0e+96x1o+96x2e+96x3o",
+     "node_feats_irreps": "96x0e",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      384
+     ],
+     "target_irreps": "96x0e+96x1o+96x2e+96x3o"
+    },
+    {
+     "class": "RealAgnosticResidualInteractionBlock",
+     "conv_tp_irreps_out": "96x0e+96x1o+96x2e+96x3o",
+     "conv_tp_irreps_out_dim": 1536,
+     "conv_tp_weight_numel": 384,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "96x0e",
+     "irreps_out": "96x0e+96x1o+96x2e+96x3o",
+     "node_feats_irreps": "96x0e",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      384
+     ],
+     "target_irreps": "96x0e+96x1o+96x2e+96x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "96x0e",
+   "num_bessel": 8,
+   "num_elements": 10,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 694320,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "96x0e"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "96x0e"
+    }
+   ],
+   "r_max": 4.5
+  },
+  "file": "MACE-OFF23_small.model",
+  "label": "off23-small",
+  "sha256": "165cce4cfec5a34b9c64d4ebf95de15d71106bb584b7291c8470f0749977c46f"
+ },
+ "off23b-medium": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [],
+   "interactions": [
+    {
+     "class": "RealAgnosticInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "128x0e+128x1o",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    },
+    {
+     "class": "RealAgnosticResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "128x0e",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e+128x1o",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "128x0e",
+   "num_bessel": 8,
+   "num_elements": 10,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 1428368,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e+128x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "MACE-OFF23b_medium.model",
+  "label": "off23b-medium",
+  "sha256": "871653738a4fbc8124dba1ff5bc595bd0abf7b849a8538c0825dc29ebadf1680"
+ },
+ "off24-medium": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [],
+   "interactions": [
+    {
+     "class": "RealAgnosticInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "128x0e+128x1o",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    },
+    {
+     "class": "RealAgnosticResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "128x0e",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e+128x1o",
+     "radial_mlp": [
+      8,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "128x0e",
+   "num_bessel": 8,
+   "num_elements": 10,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 1428368,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e+128x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "MACE-OFF24_medium.model",
+  "label": "off24-medium",
+  "sha256": "e5ccf5837f685899811a68754e7c994393bfd1a81720393b03c643b46c70bc69"
+ },
+ "omat0-medium": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "default"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticDensityInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "conv_tp_irreps_out_dim": 2048,
+     "conv_tp_weight_numel": 512,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e+128x1o",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      512
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    },
+    {
+     "class": "RealAgnosticDensityResidualInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "10x0e",
+     "hidden_irreps": "128x0e",
+     "irreps_out": "128x0e+128x1o+128x2e+128x3o",
+     "node_feats_irreps": "128x0e+128x1o",
+     "radial_mlp": [
+      10,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "128x0e+128x1o+128x2e+128x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "128x0e",
+   "num_bessel": 10,
+   "num_elements": 89,
+   "num_interactions": 2,
+   "parameter_dtype": "float64",
+   "parameters": 9063204,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e+128x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "128x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "mace-omat-0-medium.model",
+  "label": "omat0-medium",
+  "sha256": "d4b14be9afa294eebdbe31a0280b26a0fa29715771e978cbfd3ca24e0d90307a"
+ },
+ "omol0-xl": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "omol"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "1024x0e+1024x1o+1024x2e+1024x3o",
+     "conv_tp_irreps_out_dim": 16384,
+     "conv_tp_weight_numel": 4096,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "1024x0e+1024x1o+1024x2e",
+     "irreps_out": "1024x0e+1024x1o+1024x2e+1024x3o",
+     "node_feats_irreps": "1024x0e",
+     "radial_mlp": [
+      2056,
+      128,
+      128,
+      128,
+      4096
+     ],
+     "target_irreps": "1024x0e+1024x1o+1024x2e+1024x3o"
+    },
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x0e+128x1o+128x1o+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x2e+128x2e+128x3o+128x3o+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 9088,
+     "conv_tp_weight_numel": 2176,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "1024x0e+1024x1o+1024x2e",
+     "irreps_out": "1024x0e+1024x1o+1024x2e+1024x3o",
+     "node_feats_irreps": "1024x0e+1024x1o+1024x2e",
+     "radial_mlp": [
+      2056,
+      128,
+      128,
+      128,
+      2176
+     ],
+     "target_irreps": "1024x0e+1024x1o+1024x2e+1024x3o"
+    },
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x0e+128x1o+128x1o+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x2e+128x2e+128x3o+128x3o+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 9088,
+     "conv_tp_weight_numel": 2176,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "1024x0e",
+     "irreps_out": "1024x0e+1024x1o+1024x2e+1024x3o",
+     "node_feats_irreps": "1024x0e+1024x1o+1024x2e",
+     "radial_mlp": [
+      2056,
+      128,
+      128,
+      128,
+      2176
+     ],
+     "target_irreps": "1024x0e+1024x1o+1024x2e+1024x3o"
+    }
+   ],
+   "model_class": "ScaleShiftMACE",
+   "node_embedding_irreps": "1024x0e",
+   "num_bessel": 8,
+   "num_elements": 83,
+   "num_interactions": 3,
+   "parameter_dtype": "float64",
+   "parameters": 52365482,
+   "products": [
+    {
+     "correlation": 2,
+     "irreps_out": "1024x0e+1024x1o+1024x2e"
+    },
+    {
+     "correlation": 2,
+     "irreps_out": "1024x0e+1024x1o+1024x2e"
+    },
+    {
+     "correlation": 2,
+     "irreps_out": "1024x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "MACE-omol-0-extra-large-1024.model",
+  "label": "omol0-xl",
+  "sha256": "9b64b4fd5153ca578c694abc57806d8111050de6ff652e695c9b525bc4d36469"
+ },
+ "polar1-l": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "Default"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "conv_tp_irreps_out_dim": 8192,
+     "conv_tp_weight_numel": 2048,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "512x0e+512x1o+512x2e",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e",
+     "radial_mlp": [
+      1032,
+      64,
+      64,
+      64,
+      2048
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    },
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x0e+128x1o+128x1o+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x2e+128x2e+128x3o+128x3o+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 9088,
+     "conv_tp_weight_numel": 2176,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "512x0e+512x1o+512x2e",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e+512x1o+512x2e",
+     "radial_mlp": [
+      1032,
+      64,
+      64,
+      64,
+      2176
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    },
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x0e+128x1o+128x1o+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x2e+128x2e+128x3o+128x3o+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 9088,
+     "conv_tp_weight_numel": 2176,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "512x0e+512x1o+512x2e",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e+512x1o+512x2e",
+     "radial_mlp": [
+      1032,
+      64,
+      64,
+      64,
+      2176
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    }
+   ],
+   "model_class": "PolarMACE",
+   "node_embedding_irreps": "512x0e",
+   "num_bessel": 8,
+   "num_elements": 83,
+   "num_interactions": 3,
+   "parameter_dtype": "float32",
+   "parameters": 25718949,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e+512x1o+512x2e"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e+512x1o+512x2e"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e+512x1o+512x2e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "MACE-POLAR-1-L.model",
+  "label": "polar1-l",
+  "sha256": "9f65f8dc6ddaff1d631e299cb531376a7da5e68d1bef04f34a2d5073d5ef114b"
+ },
+ "polar1-m": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "Default"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "conv_tp_irreps_out_dim": 8192,
+     "conv_tp_weight_numel": 2048,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "512x0e+512x1o",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e",
+     "radial_mlp": [
+      1032,
+      64,
+      64,
+      64,
+      2048
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    },
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "128x0e+128x0e+128x1o+128x1o+128x1o+128x2e+128x2e+128x2e+128x3o+128x3o",
+     "conv_tp_irreps_out_dim": 5120,
+     "conv_tp_weight_numel": 1280,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "512x0e+512x1o",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e+512x1o",
+     "radial_mlp": [
+      1032,
+      64,
+      64,
+      64,
+      1280
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    }
+   ],
+   "model_class": "PolarMACE",
+   "node_embedding_irreps": "512x0e",
+   "num_bessel": 8,
+   "num_elements": 83,
+   "num_interactions": 2,
+   "parameter_dtype": "float32",
+   "parameters": 15238498,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e+512x1o"
+    },
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e+512x1o"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "MACE-POLAR-1-M.model",
+  "label": "polar1-m",
+  "sha256": "fab8b8713c832f31a2a853aaa22fd638be8a369cbf5095e6b3e982a18d10e93a"
+ },
+ "polar1-s": {
+  "dims": {
+   "edge_attrs_irreps": "1x0e+1x1o+1x2e+1x3o",
+   "heads": [
+    "Default"
+   ],
+   "interactions": [
+    {
+     "class": "RealAgnosticResidualNonLinearInteractionBlock",
+     "conv_tp_irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "conv_tp_irreps_out_dim": 8192,
+     "conv_tp_weight_numel": 2048,
+     "edge_feats_irreps": "8x0e",
+     "hidden_irreps": "512x0e",
+     "irreps_out": "512x0e+512x1o+512x2e+512x3o",
+     "node_feats_irreps": "512x0e",
+     "radial_mlp": [
+      1032,
+      64,
+      64,
+      64,
+      2048
+     ],
+     "target_irreps": "512x0e+512x1o+512x2e+512x3o"
+    }
+   ],
+   "model_class": "PolarMACE",
+   "node_embedding_irreps": "512x0e",
+   "num_bessel": 8,
+   "num_elements": 83,
+   "num_interactions": 1,
+   "parameter_dtype": "float32",
+   "parameters": 8051710,
+   "products": [
+    {
+     "correlation": 3,
+     "irreps_out": "512x0e"
+    }
+   ],
+   "r_max": 6.0
+  },
+  "file": "MACE-POLAR-1-S.model",
+  "label": "polar1-s",
+  "sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510"
+ }
+}
