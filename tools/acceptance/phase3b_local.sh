@@ -76,9 +76,9 @@ case "$job" in
     ;;
   regression-npt)  # item 5, NPT, NbCl5: one version per process (two-sided NPT is refused), alternating 3 3b 3b 3
     need_baseline
-    i=0
-    for side in 3 3b 3b 3; do
-      i=$((i + 1))
+    # NPT_PROCESSES (default "1:3 2:3b 3:3b 4:3"): which of the four processes to run, e.g. the rest after a stop
+    for process in ${NPT_PROCESSES:-1:3 2:3b 3:3b 4:3}; do
+      i=${process%%:*}; side=${process##*:}
       run regression-npt-$i-$side "$hybrid" tools/ab_fastmace.py --release 3 --expected-commit "$base" \
         --renamed "$versions" --output "$root/regression-npt-$i-$side" --model mh1-r2scan --checkpoint "$checkpoint" \
         --structures NbCl5 --sides "$side" --ensemble npt --warmup 300 --block 300 --blocks 12 --pattern abab
