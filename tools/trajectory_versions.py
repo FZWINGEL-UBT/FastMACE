@@ -23,6 +23,9 @@ the GPU), then ``compare --bitwise``: positions, energies and temperatures equal
 Phase 3b (3b-T10, item 5) runs it against the ``fastmace-3`` tag with ``run --against 3 --side 3|3b
 --expected-commit SHA`` (D3 off), in NVT and with ``--ensemble npt`` (hydrostatic BAOAB at 0 GPa): NPT rows
 add the cell and the stress, and ``compare --bitwise`` compares them too.
+
+Phase 4 (4-T13, item 5) runs it against the 3b release with ``run --against 3b --side 3b|4 --expected-commit SHA``,
+in NVT and NPT, with ``--dispersion none`` and ``d3bj`` (D3(BJ) on both sides; ``compare`` checks it matches).
 """
 
 from __future__ import annotations
@@ -56,17 +59,19 @@ def parse_args(argv=None):
     sub = p.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="One version's runs in this process")
     run.add_argument("--output", required=True, type=Path, help="Fresh directory")
-    run.add_argument("--against", choices=("1b", "p3b", "3"), default="1b",
-                     help="The earlier version (tools/ab_fastmace.py's releases): 1b (sides 1b, 2), p3b (p3b, 3) "
-                          "or 3 (3, 3b)")
-    run.add_argument("--side", required=True, choices=("1b", "2", "p3b", "3", "3b"),
-                     help="The release copy (1b, p3b, 3) or this checkout (2, 3, 3b)")
+    run.add_argument("--against", choices=("1b", "p3b", "3", "3b"), default="1b",
+                     help="The earlier version (tools/ab_fastmace.py's releases): 1b (sides 1b, 2), p3b (p3b, 3), "
+                          "3 (3, 3b) or 3b (3b, 4)")
+    run.add_argument("--side", required=True, choices=("1b", "2", "p3b", "3", "3b", "4"),
+                     help="The release copy (1b, p3b, 3, 3b) or this checkout (2, 3, 3b, 4)")
     run.add_argument("--renamed", type=Path, help="Directory holding the exported release package (release side)")
     run.add_argument("--expected-commit", default=None, help="Commit (prefix) of the release copy (default: its own)")
     run.add_argument("--device", choices=("cuda", "cpu"), default="cuda",
                      help="cpu: hide the GPUs before torch starts (CPU float64 with --backend auto)")
     run.add_argument("--ensemble", choices=("nvt", "npt"), default="nvt",
                      help="npt: hydrostatic BAOAB at 0 GPa; rows add the cell and the stress (3b-T10)")
+    run.add_argument("--dispersion", choices=("none", "d3bj"), default="none",
+                     help="d3bj: D3(BJ) on both sides (releases from 3b on; 4-T13)")
     run.add_argument("--reproducible", action="store_true", help="Plan with Workload(reproducible=True)")
     run.add_argument("--model", default="mh1-r2scan")
     run.add_argument("--checkpoint", required=True, type=Path)
@@ -141,10 +146,12 @@ def run(args):
                                    temperature_K=args.targets[0], max_temperature_K=max(args.targets),
                                    integrator_options=dict(ab_fastmace.RELEASE_INTEGRATOR_PINS.get(against, {})),
                                    reproducible=getattr(args, "reproducible", False),
-                                   device=getattr(args, "device", "cuda"))
+                                   device=getattr(args, "device", "cuda"),
+                                   dispersion=getattr(args, "dispersion", "none"))
     meta = dict(tool="trajectory_versions", status="running", created_utc=datetime.now(timezone.utc).isoformat(),
                 host=os.uname().nodename, python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(),
                 side=args.side, against=against, ensemble=side_args.ensemble, device=getattr(args, "device", "cuda"),
+                dispersion=side_args.dispersion,
                 reproducible=side_args.reproducible,
                 integrator_options=side_args.integrator_options if args.side == release.current else {},
                 release_source=source, oeq_runtime=oeq_runtime, oeq_runtime_shared=shared,
@@ -253,7 +260,9 @@ def compare(release, current, repeat=None, allowed=(), exact=False):
     a, b = _load(release), _load(current)
     for meta in (a, b):
         meta.setdefault("ensemble", "nvt")  # runs before 3b-T10 were NVT only
-    for key in ("backend", "steps", "every", "seeds", "targets", "structure", "model", "ensemble"):
+    for meta in (a, b):
+        meta.setdefault("dispersion", "none")  # runs before 4-T13 had no D3
+    for key in ("backend", "steps", "every", "seeds", "targets", "structure", "model", "ensemble", "dispersion"):
         if a[key] != b[key]:
             raise ValueError(f"the runs differ in {key}: {a[key]!r} against {b[key]!r}")
     seeds = [str(seed) for seed in a["seeds"]]

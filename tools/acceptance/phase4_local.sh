@@ -18,7 +18,7 @@
 # pytest jobs run through 3b-T10's stoppable_pytest.sh: results.jsonl per finished test, junit.xml also when stopped.
 # Stop one with kill -INT "$(cat <root>/<job>/pytest.pid)", never by killing this script's shell or the reservation.
 # regression, regression-npt, trajectories-* and restart-across need the release-3b tooling (tools/ab_fastmace.py
-# --release 3b, tools/trajectory_versions.py --against 3b, --resume-across), added after 3b-T10 merges.
+# --release 3b, tools/trajectory_versions.py --against 3b) and tools/restart_versions.py (4-T13).
 set -uo pipefail
 src=$(cd "${1:?SRC}" && pwd); job=${2:?JOB}; shift 2
 run_id=4-T13-local-${RUN_DATE:-$(date -u +%Y%m%d)}
@@ -252,14 +252,19 @@ torch.save(tiny_mace_model([11, 17], **FAMILIES['mh1']), sys.argv[1])" "$tiny")
         --release "$root/traj-repro-$ensemble-3b" --current "$root/traj-repro-$ensemble-4" --bitwise
     done
     ;;
-  restart-across)  # item 5: a baseline (v3) restart at step 50 resumed at the freeze to 100, CPU float64, tiny model
+  restart-across)  # item 5: a baseline (format 3) restart at step 50 resumed at the freeze to 100, CPU float64, tiny
+    # model; the release stages run a git archive of the baseline as the plain package (tools/restart_versions.py)
     need_baseline
     tiny=$root/tiny-mh1-11-17.model
     [ -f "$tiny" ] || { echo "run trajectories-cpu first (it writes the tiny model)" >&2; exit 2; }
-    run restart-across env CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=4 "$hybrid" tools/trajectory_versions.py \
-      resume-across --against 3b --expected-commit "$base" --renamed "$versions" --device cpu --backend auto \
-      --output "$root/restart-across" --model "$tiny" --checkpoint "$tiny" --structure NaCl@2x2x2 --steps 100 \
-      --restart-step 50 --seeds 20261023
+    release=$HOME/fastmace-4-T13/release-$base
+    [ -d "$release/fastmace" ] || { mkdir -p "$release" && git -C "${FASTMACE_REPOSITORY:-/mnt/d/Margraf/FastMACE}"       archive "$base" | tar -x -C "$release" && git -C "${FASTMACE_REPOSITORY:-/mnt/d/Margraf/FastMACE}"       rev-parse "$base" > "$release/.source_commit"; }
+    common=(--model "$tiny" --checkpoint "$tiny" --structure NaCl@2x2x2 --steps 100 --restart-step 50 --seed 20261023)
+    for stage in write uninterrupted; do
+      run restart-across-$stage env CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=4 PYTHONPATH= "$hybrid"         tools/restart_versions.py run --stage $stage --release-root "$release" --expected-commit "$base"         "${common[@]}" --output "$root/restart-across/$stage"
+    done
+    run restart-across-resume env CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=4 "$hybrid" tools/restart_versions.py run       --stage resume --source "$root/restart-across/write" "${common[@]}" --output "$root/restart-across/resume"
+    run restart-across-compare "$hybrid" tools/restart_versions.py compare "$root/restart-across/uninterrupted"       "$root/restart-across/resume"
     ;;
   compat)  # the GPU compatibility check on this Blackwell GPU (SPEC decision 39, amended; tests/_support/tiers.py)
     PYTEST_PYTHON=${PYTEST_PYTHON:-$hybrid}

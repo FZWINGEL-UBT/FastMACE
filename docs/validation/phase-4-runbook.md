@@ -169,7 +169,7 @@ Local RTX 5060 Ti, run ID `4-T13-local-<date>`, `python3 <copy>/tools/ci/local_g
 | `nve-drift` | rec. | no | `tools/bench/nve_drift.py` (tool-side): NVE in the default plan, NaCl and NbCl5 3×3×3, 20 ps at 1 fs, conserved quantity every 10 fs | 15 min |
 | `trajectories-cpu` | 5 | no | `tools/trajectory_versions.py --against 3b`, CPU float64, tiny MH-1-class model, NaCl 2×2×2, 100 steps, every 10, Langevin NVT and BAOAB NPT, D3 off and on; `compare --bitwise` | 15 min |
 | `trajectories-reproducible` | 5 | no | the same, reproducible plan, plain cuEq float64 on the GPU, MH-1 NaCl, 500 steps, every 50, NVT and NPT, D3 off | 20 min |
-| `restart-across` | 5 | no | a Langevin restart written by `fastmace_3b` (v3, step 50) resumed at the freeze to step 100, CPU float64, tiny model; bitwise against `fastmace_3b`'s uninterrupted run (tool-side `--resume-across`) | 10 min |
+| `restart-across` | 5 | no | a Langevin restart written by the baseline (format 3, step 50; a `git archive` of it run as the plain package) resumed at the freeze to step 100, CPU float64, tiny model; bitwise against the baseline's uninterrupted run (tool-side `tools/restart_versions.py`) | 10 min |
 | `compat` | – | no | `tools/acceptance/compat.py --provider local --label "RTX 5060 Ti"`: the compatibility tier on Blackwell | 30 min |
 | `cpu-acceptance` | rec. | no | `pytest tests/cpu -m acceptance`: the sampling checks (choice 8, gap 3) and the CPU acceptance tests already there | 20 min |
 | `acceptance-tier` | 1–4 | (step-time assertions) | `pytest tests/gpu -m acceptance` | 5–6 h |
@@ -285,6 +285,11 @@ and the A100's (`4-T13-colab-a100-<date>`) with its untimed share.
 - **Trajectories, bitwise:** CPU float64 (NVT and NPT, D3 off and on) and the reproducible GPU plan (NVT and NPT,
   D3 off): every row's positions, energy, temperature (under NPT, cell and pressure) equal.
 - **Restart across versions:** `restart-across` equals the baseline's uninterrupted run bitwise.
+  - *Seen in the tools' CPU dry run before the freeze (ff80ca2 against 4-T13 at a2bfbb5, tiny model):* the
+    format-3 restart resumes only with `allow_plan_change=True` ("the plan differs from the restart's in
+    integrator": phase 4's new integrator plan fields), and is then bitwise equal. Reported to the conductor;
+    whether resuming without `allow_plan_change` is part of the pass rule is the conductor's call before the
+    freeze. The job records which way it resumed (`plan_change`).
 
 **Recorded, not acceptance** (choices 7 and 8, decision 6).
 - NVE energy drift (float32 hybrid, NaCl and NbCl5, 20 ps): linear drift per ps and atom, RMS fluctuation;
@@ -330,8 +335,9 @@ code 0. It does not block the acceptance; the report records it with the fix's s
 - `tools/bench/ase_integrators_speed.py`: stock ASE and `fastmace.ase` sides, one per process; `tools/bench/nve_drift.py`.
 - `tools/validation/anneal_frame_probe.py`: `--optimizer fire`, `--fix-every`, `--ase-calculator mace`, and the
   first-50-steps maximum and fixed-atom check in `compare`.
-- `tools/ab_fastmace.py --release 3b`, `tools/trajectory_versions.py --against 3b` and `--resume-across`, after
-  3b-T10 merges (they extend its versions of these files).
+- `tools/ab_fastmace.py --release 3b`, `tools/trajectory_versions.py --against 3b --dispersion none|d3bj` (D3(BJ)
+  with r2SCAN's parameters, explicit for the tiny model), and `tools/restart_versions.py` (the cross-version
+  restart), after 3b-T10's merge.
 - Test-side: the `_listed` correction and the three coverage-gap test files.
 
 ## Not in this runbook
