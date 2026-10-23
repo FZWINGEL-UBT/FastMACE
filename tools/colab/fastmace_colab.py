@@ -143,8 +143,10 @@ def step_env(step, stage, arg="", wait_s=WAIT_S, reset=False, kill=False):
 def parse_usage(text):
     balance = re.search(r"balance:\s*([0-9.]+)", text)
     rate = re.search(r"rate:\s*([0-9.]+)\s*/\s*hr", text)
+    active = re.search(r"Active assignments:\s*([0-9]+)", text)
     return {"balance": float(balance.group(1)) if balance else None,
-            "rate_per_h": float(rate.group(1)) if rate else None}
+            "rate_per_h": float(rate.group(1)) if rate else None,
+            "active": int(active.group(1)) if active else None}
 
 
 def parse_step(output):
@@ -395,7 +397,10 @@ def run_job(args, colab=run_colab):
                                      Path(args.baseline).expanduser(), requirements)
         record["commit"] = sha
         before = job.usage()
+        # Balance, rate and assignments are the account's: with other VMs active (active_before/after > 1),
+        # cu_used includes their units too.
         record["cu_before"], record["rate_per_h"] = before["balance"], before["rate_per_h"]
+        record["active_before"] = before["active"]
         t = time.time()
         live = job.session in job.live_sessions()
         if live and not args.reuse:
@@ -470,6 +475,7 @@ def run_job(args, colab=run_colab):
         after = job.usage() if not args.dry_run else {}
         record["cu_after"], record["rate_per_h"] = after.get("balance"), after.get("rate_per_h") or record.get(
             "rate_per_h")
+        record["active_after"] = after.get("active")
         record["wall_s"] = round(time.time() - started, 1)
         if record.get("cu_before") is not None and record.get("cu_after") is not None:
             record["cu_used"] = round(record["cu_before"] - record["cu_after"], 2)

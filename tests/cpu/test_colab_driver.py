@@ -79,8 +79,8 @@ def test_step_environment_sets_every_variable_each_call():
 
 
 def test_usage_and_step_parsing():
-    assert fc.parse_usage(USAGE) == {"balance": 198.99, "rate_per_h": 5.30}
-    assert fc.parse_usage("nonsense") == {"balance": None, "rate_per_h": None}
+    assert fc.parse_usage(USAGE) == {"balance": 198.99, "rate_per_h": 5.30, "active": 1}
+    assert fc.parse_usage("nonsense") == {"balance": None, "rate_per_h": None, "active": None}
     out = "log line\n@@STEP {\"step\": \"a\", \"state\": \"running\"}\nmore\n@@STEP " \
           "{\"step\": \"a\", \"state\": \"done\", \"exit\": 3, \"seconds\": 7}\n"
     assert fc.parse_step(out) == {"step": "a", "state": "done", "exit": 3, "seconds": 7}
