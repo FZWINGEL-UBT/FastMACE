@@ -302,3 +302,49 @@ def test_divergence_over_the_shorter_trajectory_and_minimum_image():
     largest, first = probe.divergence(cell, a, b)
     assert largest == pytest.approx([0.02, 0.02])
     assert first["0.1"] is None
+
+
+def _probe_output(path, trajectory, minimum, fixed, energies):
+    cell = np.diag([10.0, 10.0, 10.0])
+    np.savez(path.with_suffix(".npz"), trajectory=trajectory, minimum=minimum, cell=cell,
+             fixed=np.asarray(fixed, dtype=np.int64))
+    path.with_suffix(".json").write_text(json.dumps({"relaxation": {"steps": len(trajectory) - 1,
+                                                                    "energies_eV_atom": energies}}))
+
+
+def test_compare_reports_the_first_50_steps_and_the_fixed_atoms(tmp_path):
+    start = np.zeros((4, 3)) + 5.0
+    a = np.stack([start + 0.01 * step for step in range(60)])
+    a[:, 0] = start[0]  # atom 0 fixed on side a
+    b = a.copy()
+    b[10, 1, 0] += 2e-9  # within the first 50 steps
+    b[55, 2, 0] += 1e-3  # after them
+    energies = [-1.0] * 60
+    _probe_output(tmp_path / "a", a, a[-1], [0], energies)
+    _probe_output(tmp_path / "b", b, b[-1], [0], energies)
+    result = probe.compare(tmp_path / "a", tmp_path / "b")
+    assert result["largest_first_50_steps_A"] == pytest.approx(2e-9)
+    assert result["fixed_atoms"] == 1 and result["fixed_in_place"] == {"a": True, "b": True}
+    moved = b.copy()
+    moved[-1, 0, 2] += 1e-12  # a fixed atom moved at the minimum
+    _probe_output(tmp_path / "c", moved, moved[-1], [0], energies)
+    assert probe.compare(tmp_path / "a", tmp_path / "c")["fixed_in_place"] == {"a": True, "b": False}
+
+
+def test_compare_without_fixed_atoms_reads_older_outputs(tmp_path):
+    trajectory = np.zeros((3, 2, 3)) + 5.0
+    np.savez((tmp_path / "old").with_suffix(".npz"), trajectory=trajectory, minimum=trajectory[-1],
+             cell=np.diag([10.0, 10.0, 10.0]))  # 4-T08's outputs have no "fixed"
+    (tmp_path / "old.json").write_text(json.dumps({"relaxation": {"steps": 2, "energies_eV_atom": [-1.0] * 3}}))
+    result = probe.compare(tmp_path / "old", tmp_path / "old")
+    assert result["fixed_atoms"] == 0 and result["fixed_in_place"] is None
+
+
+def test_probe_takes_fire_fixed_atoms_and_maces_calculator():
+    args = probe.parse_args(["run", "--side", "ase", "--checkpoint", "m", "--traj", "NbCl5=x", "--frame", "10",
+                             "--output", "o", "--optimizer", "fire", "--fix-every", "3", "--ase-calculator", "mace",
+                             "--precision", "float64"])
+    assert (args.optimizer, args.fix_every, args.ase_calculator) == ("fire", 3, "mace")
+    defaults = probe.parse_args(["run", "--side", "gpu", "--checkpoint", "m", "--traj", "N=x", "--frame", "0",
+                                 "--output", "o"])
+    assert (defaults.optimizer, defaults.fix_every, defaults.ase_calculator) == ("lbfgs", 0, "fastmace")
