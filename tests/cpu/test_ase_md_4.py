@@ -469,3 +469,18 @@ def test_fix_atoms_trajectory_keeps_the_constraint(loaded):
     assert len(frames) == 3
     for frame in frames:
         assert [list(c.index) for c in frame.constraints] == [FIXED]
+
+
+def test_the_ase_block_is_in_the_simulations_metadata_after_every_run(loaded):
+    """4-T10: the "ase" block rides in the Simulation's own metadata.json write (add_metadata_block), and it
+    reports the run's step and last frame (every loginterval steps from 0) before the frames are flushed."""
+    import json
+
+    dyn = _dyn(loaded, "VelocityVerlet", trajectory="run.traj", loginterval=2)
+    for steps, last in ((3, 2), (2, 4)):
+        dyn.run(steps)
+        written = json.loads(open("run.fastmace/metadata.json").read())["ase"]
+        assert written["nsteps"] == dyn.nsteps and written["last_frame_step"] == last
+        assert written == dyn.metadata["ase"]
+    with pytest.raises(ValueError, match="new non-empty"):
+        dyn.simulation.add_metadata_block("ase", dict)

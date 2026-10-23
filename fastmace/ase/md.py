@@ -207,7 +207,6 @@ class _Dynamics:
             from ase.md.logger import MDLogger
 
             self._logger = MDLogger(dyn=self._clock, atoms=self._frame, logfile=logfile)
-        self._last_frame_step = None
         self._sim = None
         self._cache = None
         self._speed_printed = False
@@ -242,6 +241,7 @@ class _Dynamics:
                 self._at(0)
             while self.nsteps < self.max_steps:
                 stop = self._next_stop()
+                self._running_to = stop  # the step the Simulation's metadata.json write at the end of run reports
                 sim.run(steps=stop - self.nsteps)
                 self.nsteps = stop
                 self._print_speed()
@@ -257,6 +257,7 @@ class _Dynamics:
         if forces is not None:
             raise TypeError("step(forces=...) is not supported: the engine evaluates the forces")
         sim = self._simulation()
+        self._running_to = self.nsteps + 1
         sim.run(steps=1)
         self.nsteps += 1
         committed = self._write_atoms()
@@ -312,7 +313,7 @@ class _Dynamics:
             import json
 
             return json.loads(path.read_text(encoding="utf-8"))
-        return {**self._sim.metadata(), "ase": self._ase_record()}
+        return self._sim.metadata()  # with the "ase" block (Simulation.add_metadata_block)
 
     # ------------------------------------------------------------------ the Simulation
 
@@ -326,6 +327,7 @@ class _Dynamics:
         output = Output(self.output, trajectory_every=None)
         self._sim = sim = simulation.Simulation(self.atoms, self._model, integrator=self.integrator, seed=self.seed,
                                                 workload=self._workload(), output=output, check=self.check)
+        sim.add_metadata_block("ase", self._ase_record)  # in the Simulation's own metadata.json writes
         if sim.degrees_of_freedom == 3 * len(self.atoms) - 3 and self._logger is not None:
             # The mass-weighted fixcm projection (decision 37): the log reads a copy of each frame with ASE's
             # FixCom, so Atoms.get_temperature, and with it MDLogger, counts 3N - 3 as FastMACE's thermo rows
@@ -378,30 +380,26 @@ class _Dynamics:
         self._write_records()
 
     def _write_records(self):
-        """Add the ``"ase"`` block to the ``metadata.json`` the ``Simulation`` has just written, and write
-        the report. The record is not built again: its software block (``provenance.fastmace_block``)
-        costs about 0.25 s, which made each ``run()`` that much slower than ``Simulation.run`` (1b-T21b)."""
-        import json
-
-        from fastmace import provenance
-
+        """Write the report. The ``"ase"`` block is in the ``metadata.json`` the ``Simulation`` writes at the end
+        of each run (``Simulation.add_metadata_block``): a second durable write of the record here (two fsyncs)
+        made each 300-step ``run()`` 21-32 ms slower than ``Simulation.run`` on the RTX 5060 Ti (4-T10), and
+        building the record again cost about 0.25 s (1b-T21b)."""
         directory = Path(self.output)
         directory.mkdir(parents=True, exist_ok=True)
-        path = directory / METADATA_NAME
-        if path.is_file():
-            record = json.loads(path.read_text(encoding="utf-8"))
-        else:
-            record = self._sim.metadata()
-        record["ase"] = self._ase_record()
-        provenance.write_metadata(path, record)
         (directory / REPORT_NAME).write_text(self.summary + "\n", encoding="utf-8")
 
     def _ase_record(self):
+        """The ``"ase"`` block, built when the ``Simulation`` writes ``metadata.json``: at the end of a run, before
+        the frames queued behind it are written, so the step and the last frame are the run's (frames every
+        ``loginterval`` steps from step 0), not the writer's position."""
+        step = max(self.nsteps, getattr(self, "_running_to", 0))
+        has_frames = self._trajectory is not None or self._trajectory_writer is not None
         return {"class": type(self).__name__, "todict": _json_safe(self.todict()),
                 "trajectory": None if self._trajectory is None else str(self._trajectory),
                 "logfile": self._logfile if isinstance(self._logfile, str) else None,
-                "loginterval": self.loginterval, "last_frame_step": self._last_frame_step, "nsteps": self.nsteps,
-                "observers": len(self.observers)}
+                "loginterval": self.loginterval,
+                "last_frame_step": (step // self.loginterval) * self.loginterval if has_frames else None,
+                "nsteps": step, "observers": len(self.observers)}
 
     # ------------------------------------------------------------------ observers
 
@@ -557,7 +555,6 @@ class _Dynamics:
                 self._trajectory_writer = Trajectory(str(self._trajectory), mode="a")
             self._trajectory_writer.set_description(self.todict() | {"interval": self.loginterval})
             self._trajectory_writer.write(frame)
-            self._last_frame_step = int(step)
         if self._logger is not None:
             self._clock.step = int(step)
             if self._log_frame is not None:

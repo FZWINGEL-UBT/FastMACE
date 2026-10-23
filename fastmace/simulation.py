@@ -426,6 +426,7 @@ class Simulation:
         self._run_started = None
         self._window_clock = None
         self._restart_points = []
+        self._metadata_blocks = {}  # name -> provider(), merged into every metadata.json record (4-T10)
         self._host_writes = 0
         self._sinks = []  # (interval, sink): add_sink
         self._runner = None  # the subprocess runner of a plan that runs in a child (2-T07)
@@ -1151,7 +1152,23 @@ class Simulation:
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,
             start_step=int(self._engine.state.step) if start_step is None else start_step)
 
+    def add_metadata_block(self, name: str, provider: Any) -> None:
+        """Add ``{name: provider()}`` to every ``metadata.json`` record this Simulation builds, evaluated at each
+        write: the ``fastmace.ase`` classes' ``"ase"`` block (4-T10), in the run's own durable write instead of
+        a second one per ``run()``. ``name`` must not be a key of the record itself."""
+        if not isinstance(name, str) or not name or name in self._metadata_blocks:
+            raise ValueError(f"metadata block name {name!r} must be a new non-empty string")
+        self._metadata_blocks[name] = provider
+
     def _metadata_record(self):
+        record = self._base_metadata_record()
+        for name, provider in self._metadata_blocks.items():
+            if name in record:
+                raise ValueError(f"metadata block {name!r} would replace the record's own {name!r}")
+            record = {**record, name: provider()}
+        return record
+
+    def _base_metadata_record(self):
         from fastmace import provenance
 
         if self._runner is not None:

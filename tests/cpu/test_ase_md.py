@@ -763,7 +763,8 @@ def test_the_files_never_stop_the_run(loaded, monkeypatch):
 def test_a_run_call_costs_what_simulation_run_costs(loaded, monkeypatch, tmp_path):
     """1b-T21b: per run() the shim builds no metadata record of its own (provenance.fastmace_block
     queries the software versions, about 0.25 s), takes no extra committed() sync without observers,
-    and writes metadata.json and report.txt once each beside the Simulation's own write."""
+    and writes report.txt beside the Simulation's own metadata.json write, which carries the "ase" block
+    (4-T10: a second durable write of the record cost 21-32 ms per 300-step run on the GPU)."""
     from fastmace import provenance, simulation
     from fastmace.io.output import Output
 
@@ -797,7 +798,7 @@ def test_a_run_call_costs_what_simulation_run_costs(loaded, monkeypatch, tmp_pat
     reference = per_call(lambda steps: sim.run(steps=steps))
     shim = per_call(_langevin(loaded).run)
     assert shim["block"] == reference["block"] == 1
-    assert shim["write_metadata"] == reference["write_metadata"] + 1  # the merged "ase" block
+    assert shim["write_metadata"] == reference["write_metadata"]  # the "ase" block rides in the Simulation's
     assert shim["committed"] == reference["committed"] + 1 == 1  # atoms hold the final state
 
 
