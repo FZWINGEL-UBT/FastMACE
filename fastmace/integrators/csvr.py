@@ -30,8 +30,8 @@ from ase import units
 from fastmace.config import IntegratorConfig
 
 from .base import CONSERVED_KEY, Integrator
-from .langevin import allocate_noise, base_output_values, check_ensemble, kinetic_energy
-from .nve import drift, half_kick, remove_momentum
+from .langevin import allocate_noise, base_output_values, check_ensemble, fixed_rows, kinetic_energy
+from .nve import constrained_drift, drift, half_kick, remove_momentum
 
 if TYPE_CHECKING:
     from fastmace.state import SimulationState
@@ -43,7 +43,8 @@ class CSVR(Integrator):
     ``config``: the timestep (fs), ``parameter("tau_fs")`` (ASE's ``taut``), ``fixcm`` (as ``nve.py``:
     momentum removed at the start and after each kick; the scaling keeps it zero), ``dof`` and
     ``noise_batch``. ``temperature_K`` is the starting target (default ``config.temperature_K``). Raises,
-    as ASE, when the starting kinetic energy is zero.
+    as ASE, when the starting kinetic energy is zero. ``FixAtoms`` as ``nve.py`` (ASE's ``Bussi`` steps with
+    ``VelocityVerlet``), with ``ndof`` 3(N - n_fixed).
     """
 
     def __init__(self, state: SimulationState, config: IntegratorConfig | None = None, *,
@@ -58,6 +59,8 @@ class CSVR(Integrator):
         self.taut = tau_fs * units.fs
         self.fix_com = config.fixcm
         self.noise_batch = config.noise_batch
+        self.fixed_rows = fixed_rows(state)
+        self.x_old = None if self.fixed_rows is None else torch.zeros_like(state.positions)
         if math.isclose(float(kinetic_energy(state)), 0.0, rel_tol=0, abs_tol=1e-12):
             raise ValueError("Initial kinetic energy is zero. Set the initial velocities before running CSVR "
                              "(as ASE's Bussi).")
@@ -114,19 +117,27 @@ class CSVR(Integrator):
         half_kick(state, self.dt)
         if self.fix_com:
             remove_momentum(state)
-        drift(state, self.dt)
+        if self.fixed_rows is None:
+            drift(state, self.dt)
+        else:
+            constrained_drift(state, self.dt, self.fixed_rows, self.x_old)
 
     def second_half(self, state: SimulationState) -> None:
         half_kick(state, self.dt)
         if self.fix_com:
             remove_momentum(state)
+        if self.fixed_rows is not None:
+            state.velocities.masked_fill_(self.fixed_rows, 0.0)
 
     def mid_step_tensors(self, state: SimulationState) -> tuple[torch.Tensor, ...]:
         return (state.velocities,)
 
     def buffers(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
-        return dict(positions=state.positions, velocities=state.velocities, noise=self.noise,
-                    transferred_energy=self.transferred_energy)
+        buffers = dict(positions=state.positions, velocities=state.velocities, noise=self.noise,
+                       transferred_energy=self.transferred_energy)
+        if self.x_old is not None:
+            buffers["x_old"] = self.x_old
+        return buffers
 
     def output_values(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
         values = base_output_values(state)
