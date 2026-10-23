@@ -33,6 +33,7 @@ forward is pinned by sha256: the rows reproduce its arithmetic.
 from __future__ import annotations
 
 from fastmace.model.capabilities import FACTORED_INTERACTIONS
+from fastmace.rewrites import memory as memory_terms
 from fastmace.rewrites.registry import CaseErrors, Rewrite, Support, check_tensors
 
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
@@ -283,7 +284,7 @@ RECORDS = {
         name="segment_gemm", applies_to=_segment_support, requires=("gated_rows",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={RESHAPE_FORWARD: RESHAPE_FORWARD_SHA256}, exactness="rounding",
         default="auto", deterministic=True, workload_constraints=(), apply=_apply_segment,
-        selfcheck=_segment_selfcheck),
+        selfcheck=_segment_selfcheck, selfcheck_memory=memory_terms.segment_gemm_selfcheck),
     "grouped_launch": Rewrite(
         name="grouped_launch", applies_to=_grouped_launch_support, requires=("block_linear",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=True,

@@ -25,7 +25,7 @@ from fastmace.config import IntegratorConfig, RewriteConfig
 from fastmace.model import capabilities
 from fastmace.planner import memory, rules
 from fastmace.planner.workload import Workload
-from fastmace.rewrites import generic, linear, mh1
+from fastmace.rewrites import fusion, generic, linear, mh1
 from fastmace.rewrites import memory as terms
 from fastmace.rewrites import registry as reg
 
@@ -213,12 +213,62 @@ def test_declared_terms():
     """Which records declare a term: the edge-sized changes; every term is (bytes per edge, bytes per node)."""
     declared = {name for family in (mh1, generic) for name, record in family.RECORDS.items()
                 if (record["memory"] if isinstance(record, dict) else record.memory) is not None}
+    assert fusion.RECORDS["segment_gemm"].selfcheck_memory is not None
     assert declared == {"factor_species", "fold_cutoff", "joint_radial_input", "fused_radial_hidden",
                         "reassociate_first", "streaming_conv", "generic_reassociate", "generic_streaming"}
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
     assert terms.streaming_conv(dims, 4) == (8, 0)
     with pytest.raises(ValueError, match="memory is not callable"):
         dataclasses.replace(mh1.RECORDS["fold_cutoff"], memory=3)
+
+
+@pytest.mark.rule(12)
+@pytest.mark.parametrize("sms", [10, 40])
+def test_segment_selfcheck_term_bounds_its_transient(monkeypatch, sms):
+    """segment_gemm's self-check probes ``2 x sms x 64`` atoms (the device's SM count, patched here); it checks
+    one interaction at a time, so its peak is one interaction's tensors and its declared term bounds it."""
+    pytest.importorskip("cuequivariance_torch")
+    import test_rewrites_fusion as trf
+    from test_rewrites_mh1 import context
+
+    from fastmace.kernels.triton import tile_rule
+
+    original, model, batch, _, _ = trf._rewritten_segment("on")
+    monkeypatch.setattr(tile_rule, "device_sms", lambda device: sms)
+    with PeakTracker() as tracker:
+        assert fusion._segment_selfcheck(original, model, context(batch)).passed
+    dims = capabilities.model_dims(original)
+    width = memory.DTYPE_BYTES[str(next(model.parameters()).dtype).removeprefix("torch.")]
+    declared = fusion.RECORDS["segment_gemm"].selfcheck_memory(dims, width, sms)
+    assert len(dims.interactions) == 2  # two interactions held at once would be about twice the term
+    assert tracker.peak <= declared <= 1.25 * tracker.peak, (tracker.peak, declared)
+
+
+@pytest.mark.rule(12)
+def test_the_build_estimate_wins_when_a_selfcheck_dominates():
+    """max(build, run): with many SMs segment_gemm's self-check transient exceeds the run, and the plan predicts
+    the build; turning the rewrite off (explicitly here) takes its transient with it."""
+    many = dataclasses.replace(tmp.GPU, sms=2000)
+    planner = tmp.minimal()
+    planned = planner.plan_traits(mh1_traits(), nacl(repeat=3), IntegratorConfig(), WORKLOAD, many,
+                                  precision="float32")
+    assert planned.rewrites.segment_gemm == "on"
+    reason = str(planned.decision("memory")[2])
+    assert "(build;" in reason and "self-check segment_gemm" in reason
+    without = planner.plan_traits(mh1_traits(), nacl(repeat=3), IntegratorConfig(), WORKLOAD, many,
+                                  precision="float32", rewrites=RewriteConfig(segment_gemm="off"))
+    assert "(run;" in str(without.decision("memory")[2])
+    assert without.predicted_memory_bytes < planned.predicted_memory_bytes
+
+
+def test_case_errors_equal_check_tensors():
+    expected, got = torch.ones(3), torch.tensor([1.0, 1.0, 1.0 + 1e-3])
+    cases = [("a", expected, expected), ("b", expected, got)]
+    errors = reg.CaseErrors()
+    for case in cases:
+        errors.add(*case)
+    assert errors.result() == reg.check_tensors(cases)
+    assert reg.CaseErrors().result("float32") == reg.check_tensors([], "float32")
 
 
 # --------------------------------------------------------------------------- decision 51's order

@@ -176,6 +176,9 @@ class Rewrite:
     # MACE's force call at its peak (negative: a stock tensor it does not keep), from the model's
     # ``capabilities.ModelDims`` and the force precision's bytes per float. None: no change declared.
     memory: Callable[[Any, int], Any] | None = None
+    # Its self-check's transient at build (5-T03): selfcheck_memory(dims, width, sms) -> bytes, from the model's
+    # widths, the bytes per float and the device's SM count (None off CUDA). None: no more than a force call.
+    selfcheck_memory: Callable[[Any, int, int | None], int] | None = None
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name:
@@ -202,8 +205,9 @@ class Rewrite:
         if self.deterministic is not None and not isinstance(self.deterministic, bool):
             raise ValueError(f"Rewrite {self.name}: deterministic must be True, False or None, "
                              f"got {self.deterministic!r}")
-        if self.memory is not None and not callable(self.memory):
-            raise ValueError(f"Rewrite {self.name}: memory is not callable")
+        for name in ("memory", "selfcheck_memory"):
+            if getattr(self, name) is not None and not callable(getattr(self, name)):
+                raise ValueError(f"Rewrite {self.name}: {name} is not callable")
 
     @classmethod
     def from_dict(cls, mapping):

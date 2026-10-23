@@ -74,5 +74,22 @@ def streaming_conv(dims, width):
     return _STREAMING_INDEX_BYTES, 0
 
 
+def segment_gemm_selfcheck(dims, width, sms):
+    """``segment_gemm``'s self-check (rewrites/fusion): per interaction it probes enough atoms that every product
+    takes Triton on this device, ``MIN_TRITON_WAVES x sms x BLOCK_M`` rows for the scalar segment (irrep
+    dimension 1), with ``linear_2``'s width (the interaction's target irreps) in and out. Probes, the upstream
+    gradient, both paths' outputs and input gradients and their intermediates: 8 such tensors at once, one
+    interaction at a time (measured on the tiny MH-1 model, tests/cpu/test_memory_estimate.py)."""
+    from fastmace.kernels.triton import tile_rule
+
+    atoms = tile_rule.MIN_TRITON_WAVES * max(int(sms or 1), 1) * tile_rule.BLOCK_M
+    return _SEGMENT_SELFCHECK_TENSORS * atoms * max(block.target for block in dims.interactions) * width
+
+
+# segment_gemm's self-check: tensors of [probe atoms, linear_2's width] live at once. 8.0-8.1 measured on the tiny
+# MH-1 model (CPU); one more covers the reshape probes and the small tensors beside them.
+_SEGMENT_SELFCHECK_TENSORS = 9
+
+
 __all__ = ["factor_species", "fold_cutoff", "fused_radial_hidden", "generic_reassociate", "joint_radial_input",
-           "reassociate_first", "streaming_conv"]
+           "reassociate_first", "segment_gemm_selfcheck", "streaming_conv"]

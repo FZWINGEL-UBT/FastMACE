@@ -73,9 +73,12 @@ class MemoryTerm:
 
 @dataclass(frozen=True)
 class MemoryEstimate:
-    """Rule 12's estimate (bytes). ``terms`` names every part; ``total`` is their sum, ``resident`` the part
-    already on the device when the plan is made (the weights of a loaded model), so ``needed`` is what
-    the run still allocates."""
+    """Rule 12's estimate (bytes): the larger of the run's and the build's.
+
+    ``terms`` are the run's parts (``run`` is their sum); ``build_terms`` the build's (``build``: the pristine
+    and the execution copy of the weights, and the largest self-check transient). ``total`` is the larger
+    of the two; ``resident`` the part already on the device when the plan is made (the weights of a loaded
+    model), so ``needed`` is what the build or run still allocates."""
 
     terms: tuple[tuple[str, int], ...]
     edges: int
@@ -84,10 +87,19 @@ class MemoryEstimate:
     dtype: str
     resident: int = 0
     rewrite_terms: tuple[tuple[str, int], ...] = field(default=())
+    build_terms: tuple[tuple[str, int], ...] = field(default=())
+
+    @property
+    def run(self) -> int:
+        return sum(value for _, value in self.terms)
+
+    @property
+    def build(self) -> int:
+        return sum(value for _, value in self.build_terms)
 
     @property
     def total(self) -> int:
-        return sum(value for _, value in self.terms)
+        return max(self.run, self.build)
 
     @property
     def needed(self) -> int:
@@ -98,10 +110,13 @@ class MemoryEstimate:
 
     def text(self, free_bytes: int | None = None) -> str:
         """One line for the plan's ``memory`` decision and the report."""
-        largest = sorted((item for item in self.terms if item[1] > 0), key=lambda item: -item[1])[:3]
+        building = self.build > self.run
+        terms = self.build_terms if building else self.terms
+        largest = sorted((item for item in terms if item[1] > 0), key=lambda item: -item[1])[:3]
         parts = ", ".join(f"{name} {value / 2**20:.0f} MiB" for name, value in largest)
-        out = (f"predicted {self.total / 2**30:.2f} GiB at {self.edges} edges, {self.nodes} atoms, {self.dtype} "
-               f"({parts})")
+        out = (f"predicted {self.total / 2**30:.2f} GiB ({'build' if building else 'run'}; run "
+               f"{self.run / 2**30:.2f}, build {self.build / 2**30:.2f}) at {self.edges} edges, {self.nodes} "
+               f"atoms, {self.dtype} ({parts})")
         if free_bytes:
             out += f"; needs {self.needed / 2**30:.2f} of {free_bytes / 2**30:.2f} GiB free"
         return out
@@ -152,13 +167,16 @@ def interaction_floats(dims, fused_conv: bool = False) -> list[tuple[int, int]]:
 
 def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, list_dtype: str | None = None,
              rewrite_terms: tuple[tuple[str, MemoryTerm], ...] = (), d3=None, resident_weights: bool = False,
-             workspace: bool = True, fused_conv: bool = False) -> MemoryEstimate:
+             workspace: bool = True, fused_conv: bool = False,
+             selfcheck_terms: tuple[tuple[str, int], ...] = ()) -> MemoryEstimate:
     """Rule 12's estimate for one force call of a model with ``dims`` on ``edges`` and ``nodes``.
 
     ``dtype`` is the force precision; ``capacity`` the MACE pair list's slots (0: no list), whose shifts are
     ``list_dtype`` wide (default ``dtype``); ``rewrite_terms`` the enabled rewrites' ``(name, MemoryTerm)``;
     ``d3`` a ``neighbors.adaptive.Rule12D3`` or ``None``; ``resident_weights`` whether the weights are on
-    the device already; ``fused_conv`` as ``interaction_floats``.
+    the device already; ``fused_conv`` as ``interaction_floats``; ``selfcheck_terms`` the enabled rewrites'
+    ``(name, bytes)`` of their self-checks' transients (``Rewrite.selfcheck_memory``), of which the build
+    holds the largest beside both copies of the weights.
     """
     width = DTYPE_BYTES[dtype]
     floats = interaction_floats(dims, fused_conv)
@@ -182,8 +200,27 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
         terms.append(("d3 list", int(d3.list_bytes + d3.build_bytes)))
     if workspace:
         terms.append(("workspace", WORKSPACE_BYTES))
+    build = [("weights (pristine and execution copy)", 2 * weights)]
+    largest = max(selfcheck_terms, key=lambda item: item[1], default=None)
+    if largest is not None and largest[1] > 0:
+        build.append((f"self-check {largest[0]}", int(largest[1])))
     return MemoryEstimate(terms=tuple(terms), edges=int(edges), nodes=int(nodes), capacity=int(capacity),
-                          dtype=dtype, resident=weights if resident_weights else 0, rewrite_terms=rewrites)
+                          dtype=dtype, resident=weights if resident_weights else 0, rewrite_terms=rewrites,
+                          build_terms=tuple(build))
+
+
+def selfcheck_memory_terms(records: Any, dims, enabled: list[str], dtype: str, sms: int | None
+                           ) -> tuple[tuple[str, int], ...]:
+    """``(name, bytes)`` of every enabled record that declares its self-check's transient:
+    ``Rewrite.selfcheck_memory(dims, width, sms)``."""
+    width = DTYPE_BYTES[dtype]
+    out = []
+    for name in enabled:
+        record = records[name] if name in records else None
+        declare = getattr(record, "selfcheck_memory", None)
+        if declare is not None:
+            out.append((name, int(declare(dims, width, sms))))
+    return tuple(out)
 
 
 def fits(estimate_: MemoryEstimate, free_bytes: int | None) -> bool:
@@ -230,4 +267,4 @@ def annotate_out_of_memory(error, plan) -> Any:
 
 __all__ = ["DTYPE_BYTES", "MARGIN", "MemoryEstimate", "MemoryTerm", "SAFETY", "WORKSPACE_BYTES",
            "annotate_out_of_memory", "drop_order", "estimate", "fits", "interaction_floats", "list_capacity",
-           "model_edges", "rewrite_memory_terms"]
+           "model_edges", "rewrite_memory_terms", "selfcheck_memory_terms"]

@@ -885,11 +885,12 @@ class MinimalPlanner:
         # OEq's convolution (hybrid) and cuEq's fused one keep neither gathered senders nor messages per edge.
         fused_conv = engine.backend == "hybrid" or engine.cueq_conv_fusion == "on"
 
-        def estimate(names):
+        def estimate(names):  # a rewrite turned off takes its run term and its self-check's transient with it
             terms = memory.rewrite_memory_terms(registry, dims, names, dtype)
+            checks = memory.selfcheck_memory_terms(registry, dims, names, dtype, getattr(hardware, "sms", None))
             return memory.estimate(dims, edges=edges, nodes=natoms, dtype=dtype, capacity=capacity, list_dtype=dtype,
                                    rewrite_terms=terms, d3=d3_memory, resident_weights=resident, workspace=cuda,
-                                   fused_conv=fused_conv)
+                                   fused_conv=fused_conv, selfcheck_terms=checks)
 
         found = estimate(enabled)
         dropped = []
