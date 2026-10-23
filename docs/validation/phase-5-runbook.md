@@ -86,13 +86,15 @@ Choice 7 made checkable on the CPU: the same inputs planned by the baseline and 
 - **One tool with 5-T10** (conductor, 23 October 2026): `tools/plan_corpus.py` is 5-T10's under D6 (b) and
   5-T11's under D6 (a); both use one format (cases with stable ids in named sets, a `package=` argument so the
   renamed `fastmace_4` export plans the same cases, canonical JSON records, `dump` and `compare
-  --explain-codes`). 5-T11 adds the `"acceptance"` set.
-- **Model inputs:** per label of `fastmace.model.labels` (19), the stand-ins of `tests/cpu/test_planner.py`'s
-  `LABEL_FACTS` (read from the released checkpoints with `model_traits`), with the ForceField's facts the planner
+  --explain-codes`; agreed with 5-T10 in the session notes, `5-T11-plan-corpus-format.md`). 5-T11 adds the
+  `"acceptance"` set and keeps its full records (`--full`) in `results/`, not hashes.
+- **Model inputs:** per label of `fastmace.model.labels` (19), the stand-ins of `tools/plan_corpus_labels.py`
+  (moved from `tests/cpu/test_planner.py`'s `LABEL_FACTS`, read from the released checkpoints with
+  `model_traits`), with the ForceField's facts the planner
   reads (precision, superset, `rewrites="auto"`, the D3 record where it applies). The dimensions rule 12's
   estimate needs (5-T03's names) are captured **once** from the checkpoints, on the CPU in WSL, one label per
-  process (free memory checked first; not during a timed stretch), into a JSON fixture with each checkpoint's
-  sha256. A field one side lacks is filled with that side's default and listed.
+  process (free memory checked first; not during a timed stretch), into the same module per label, with each
+  checkpoint's sha256. A field one side lacks is filled with that side's default and listed.
 - **Hardware and software (injected, documented):** `Hardware("NVIDIA GeForce RTX 5060 Ti", (12, 0), 16 GiB)` with
   12 GiB free (the desktop takes about 4 GiB; conductor, 23 October 2026), and `SoftwareTraits` with OEq, Triton,
   NVRTC and fused cuEq available. **One low-memory case** (a 4 GiB GPU, 3 GiB free) on the largest labels so that
@@ -102,7 +104,8 @@ Choice 7 made checkable on the CPU: the same inputs planned by the baseline and 
   swap with a superset, relaxation at fixed cell (LBFGS), relaxation at variable cell (LBFGS with
   `FrechetCellFilter`; POLAR is refused on both sides by decision 50, expected); each with the default backend and,
   where both pass the hard rules, with the other backend set explicitly. Structures: NaCl and NbCl5 3×3×3.
-- **Compared:** refusal codes; tier and mode; backend and convolution fusion; runner; the rewrites on and off
+- **Compared:** refusals as a multiset of (rule, code); `auto_options_off` verbatim (the model's support texts);
+  tier and mode; backend and convolution fusion; runner; the rewrites on and off
   (names, not texts); force and MC energy precision; skin, pair-buffer headroom, edge bucket, re-capture budget and
   variant cap; D3 skin and list; k-space headroom; the stress path. **Ignored:** reason texts, rule numbers, and the
   phase 5 fields (`calibration`, `adaptation`, `predicted_memory_bytes`, `text`).
@@ -130,7 +133,7 @@ Local RTX 5060 Ti, run ID `5-T11-local-<date>`, `python3 <copy>/tools/ci/local_g
 | `restart-across` | 4 | no | no | `tools/restart_versions.py`: a Langevin restart written by the baseline (format 4, step 50) resumed at the freeze to step 100, CPU float64, tiny model; bitwise against the baseline's uninterrupted run, without `allow_plan_change` and without a new revision | 10 min |
 | `regression` | 5 | yes | yes | `tools/ab_fastmace.py --release 4`: MH-1 hybrid Langevin NVT, D3 off, NaCl and NbCl5, 300 K, 12 blocks of 300 steps after 300; ABAB 4 first, ABAB 5 first, ABBA 4 first (4-T13's protocol) | 40 min |
 | `adapt-storm` | 6 | yes | yes (D2) | 5-T07's forced re-capture storm, MH-1 hybrid NaCl, switched against unswitched, one block each | 30 min |
-| `adapt-production` | 6 | yes | no | the NaCl and NbCl5 anneal profiles (4-T13's `npt_anneal_NbCl5_short` and its NaCl counterpart) through `fastmace run` with the default `adapt`; resume included | 1.5 h |
+| `adapt-production` | 6 | yes | no | through `fastmace run` with the default `adapt`, resume included: the shipped `npt_anneal_NbCl5_short` and `swap_anneal_NaNbOCl4_short` (the MC path), and an NVT anneal on NaCl 3×3×3 defined here from `main.py`'s `--profile anneal` (0 → 1000 K in 20 ps, then 3 K/ps to 250 K; samples and frames every 10 fs; no shipped profile is added) | 2 h |
 | `adapt-tests` | 6, 7 | yes | no | 5-T07's and 5-T08's GPU tests (switch at a canonical point, statistics against an unswitched compiled run, resume after a switch, broken capture) | 1 h |
 | `calibration` | 9 | yes | yes (D5) | 5-T09's NaCl smoke with MH-1: the record, the choice, the setup cost | 20 min |
 | `plans` | 10 | yes | no | one real plan printed per item 6–9 (`str(plan)` and `describe(full=True)`), from the runs above | 5 min |
@@ -193,7 +196,8 @@ acceptance` green here.
   interrupted against uninterrupted across the switch, statistical. A resume after the switch runs the compiled
   revision and, under D3 (a), does not switch again. Timed: the switched run is faster (above).
   **D2 (b)** adds: the skin re-plan's revision, recorded the same way.
-- **The production profiles** (NaCl, NbCl5 anneal): no switch, `counters.tier_switches == []`, on every option.
+- **The production profiles** (`npt_anneal_NbCl5_short`, `swap_anneal_NaNbOCl4_short`, the NaCl NVT anneal): no
+  switch, `counters.tier_switches == []`, on every option; under D3 (a) none during an MC block in any case.
   The re-capture time fraction per segment is recorded.
 - **D3's limits:** checked by 5-T07's CPU tests in the suite (cited), plus on the GPU: no switch with an explicit
   `mode=` and none under `reproducible=True` (D3 (a), (b), (d)).
