@@ -19,4 +19,4 @@ python -m fastmace.cli quench "$OUT/short-copy" --into gpu --optimizer gpu-LBFGS
     >"$OUT/copy.log" 2>&1
 echo "=== $(date -u +%FT%TZ) copy exit $?" >>"$OUT/progress.log"
 rm -f "$OUT"/short-copy/trajectory.*.traj "$OUT"/short-copy/restart.npz  # inputs, kept locally
-tail -3 "$OUT/e2e.log" "$OUT/copy.log"
+tail -n 3 "$OUT/e2e.log" "$OUT/copy.log"
