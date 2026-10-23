@@ -324,11 +324,13 @@ parent's `run()` ends the worker (`restart_worker()`) and runs the steps left in
 carries `"switch"`; that child resumes the hand-off, calls `switch_tier` and runs. A request at the call's
 last step waits for the next call.
 
-**Codes outside the rule table** (proposal for `rules.py`): `adapt-tier-switch` and `adapt-switch-failed`
-(`planner/adapt.py`) and `adaptation-unsupported` (`simulation.py`) belong to no §9.3 rule. 5-T07 leaves
-`rules.py` unchanged: the meta-test only requires that a rule's codes carry the rule's number, and these
-carry none. If the conductor wants non-rule codes listed, a `NON_RULE_CODES` mapping in `rules.py` (code →
-SPEC section) would hold them, with the meta-test checking that no code is in both.
+**Codes outside the rule table.** `adapt-tier-switch` and `adapt-switch-failed` (`planner/adapt.py`) and
+`adaptation-unsupported` (`simulation.py`) belong to no §9.3 rule and carry `rule=None`; `rules.py` lists
+none of them (conductor, 24 October 2026: this list is enough).
+
+**`Plan.adaptation`** stays `None` (conductor, 24 October 2026). Setting it on the active plan would make the
+built plan (`engine.plan`, which carries the self-checks) and the active one differ. The limits come from
+the recorded `PlannerOptions.adaptation`, which `simulation.json` and a resume carry.
 
 ## What this unblocks
 
