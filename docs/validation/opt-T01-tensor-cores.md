@@ -208,3 +208,34 @@ TFLOPS at 4096³, then K = N = 512 at M = 13608 and at M = 216:
 - **This applies to section 5's CUTLASS 3×TF32,** which uses the same three-product split. Its Gaussian-only
   accuracy result therefore does not settle accuracy. Before any A100 adoption, it needs this cancellation set,
   real MACE operands and the force gate. A corrected kernel, as in Ootomo and Yokota, may be needed.
+
+## 7. CUTLASS 3×TF32 under cancellation and wide dynamic range (Colab A100, 23 October 2026)
+
+This reruns section 5's benchmark on a fresh A100 (CUTLASS v4.8.1). It covers all 92 shapes and three operand
+sets, and adds the cancellation-scaled error |c − c64| / Σ|a·b|. The raw data is in
+`results/opt-T01-gemm-precision-20261020/colab-a100-cutlass-cancel/`. A first attempt had a stream race in the new
+reference kernels; it was discarded (`raced-first-attempt/`). Section 5's run is not affected.
+
+Worst errors over the 92 shapes, as max relative / Frobenius / cancellation-scaled:
+
+| Operand set | CUTLASS 3×TF32 | cuBLAS IEEE | CUTLASS 1×TF32 |
+| --- | --- | --- | --- |
+| Gaussian | 6.6e-7 / 3.4e-7 / 9.1e-7 | 1.1e-6 / 4.1e-7 / 4.3e-7 | 5.6e-4 / 3.0e-4 / 7.8e-4 |
+| Cancellation (section 6's construction) | **1.8e-3 / 8.6e-4 / 4.2e-7** | 4.1e-4 / 2.1e-4 / 1.4e-7 | 1.65 / 1.29 / 4.4e-4 |
+| Exponent-stratified, rows and columns × 2^±20 | 5.2e-7 / 3.7e-7 / 9.9e-7 | 7.0e-7 / 4.1e-7 / 4.3e-7 | 8.0e-4 / 4.4e-4 / 7.4e-4 |
+
+- **Under cancellation, 3×TF32 is worse than IEEE on 91 of 92 shapes:** 7× in the median, at worst 14× on the
+  cancellation-scaled metric. That is about 7 FP32 unit roundoffs of Σ|a·b| per output, from the dropped low×low
+  product, and it is not IEEE-equivalent.
+- **Dynamic range is fine:** on the exponent-stratified set the errors match the Gaussian ones, with no underflow
+  of the low parts.
+- **On random operands it is FP32-class:** its max relative error is slightly better than IEEE's.
+- **Timing repeats section 5:** NaCl 0.75×, NbCl5 0.54×, 83 of 92 shapes won, and graph replay is bitwise.
+
+**Verdict:**
+- The speed is real, but the accuracy is "FP32-class on typical data", not "IEEE-equivalent".
+- Whether 7 roundoffs of Σ|a·b| matter can only be shown by the model-level force gate (at most 2× the float32
+  calculator's error against float64) and NVE drift on real MACE operands.
+- A corrected kernel (Ootomo and Yokota) that keeps the low×low term or compensates it is the alternative if the
+  plain one fails the gate.
+- Nothing is adopted. Any A100 tensor-core path waits for the A100 to be decided as a production GPU.
