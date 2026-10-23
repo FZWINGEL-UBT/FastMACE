@@ -86,3 +86,32 @@ Each shape's measured time is multiplied by its invocations per force call.
   On sm_120, 2-T20a measures them at 12.6–15.1 TFLOPS.
   - The remaining GEMM gain has to come from less arithmetic or less traffic (OPT-T02, OPT-T04).
   - On small cells it can come from fuller grids (OPT-T03).
+
+## 4. A100 rerun (Colab, 23 October 2026)
+
+Same tool and shapes as section 2 (2-T20a's `gemms.csv` for NaCl and NbCl5), on a Google Colab
+A100-SXM4-40GB (sm_80), driver 580.82.07, torch 2.14.1+cu130, Triton 3.8.0, FastMACE `5c12ee3`. A fresh VM
+was used and released after the run; it used 1.19 compute units. The driver scripts and raw data are in
+`results/opt-T01-gemm-precision-20261020/colab-a100/`.
+
+| | cuBLAS IEEE | cuBLAS 1×TF32 | Triton IEEE | Triton tf32x3 |
+| --- | ---: | ---: | ---: | ---: |
+| Peak 4096³, TFLOPS | 14.8 | **132.2** | 18.2 | 16.8 |
+| NaCl GEMMs per force call, µs | 3,911 | 3,221 | 7,099 | 7,776 |
+| NbCl5 GEMMs per force call, µs | 10,946 | 4,383 | 14,935 | 16,929 |
+| Worst error vs float64 | 1.1e-6 | 4.2e-4 | 2.1e-6 | 5.9e-7 |
+
+- **Triton's tf32x3 is faster on 0 of 92 shapes.** The capture check is bitwise.
+- **Even at 4096³ it reaches only 16.8 TFLOPS**, while cuBLAS TF32 runs at 132. The ceiling for three TF32
+  products is about 44 TFLOPS, so Triton's 3×TF32 kernel with the screen's fixed tiles does not use the A100's
+  tensor cores well. The limit is the kernel, not the hardware. On sm_80, unlike sm_89 and sm_120, a well-built
+  3×TF32 kernel could beat FP32 in principle.
+- **Production shapes are the real test.** cuBLAS 1×TF32 takes NbCl5's GEMMs from 10.9 to 4.4 ms, but NaCl's
+  only from 3.9 to 3.2 ms, because its small shapes are not compute-bound. A fused 3×TF32 kernel, which shares
+  its operand loads between the three MMAs, would land between 1× and 3× the TF32 time: 4.4–13 ms on NbCl5.
+  Only a measurement decides it.
+- **Next test, not yet run:** CUTLASS's 3×TF32 (`OpMultiplyAddFastF32`, example 27, Sm80 kernels) on the same
+  shapes. It is the open item of the 23 October research prompt
+  (ResearchModule `studies/research_prompts/2026-10-23-fp32-tensor-core-research.md`).
+- **Also measured:** cuBLAS IEEE on this A100 is slower than the local RTX 5060 Ti on NaCl's small GEMMs
+  (3.9 against 2.6 ms per force call) and faster on NbCl5's (10.9 against 12.5 ms).
