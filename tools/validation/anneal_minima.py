@@ -22,7 +22,8 @@ frame and applies decision 46's pass rule:
         --runs results/4-T08-<machine>-<date>
 
 - every one of the 210 relaxations converged, on both sides;
-- per frame |dE| <= 0.025 meV/atom;
+- |dE| <= 0.025 meV/atom in at least 20 of 21 frames per crystal (amended by the owner, 23 October 2026;
+  it was per frame). The frames over the limit are still listed (``over_limit``);
 - the same structure (every atom within 0.1 A, minimum image) in at least 20 of 21 frames per crystal.
 
 It writes ``frames.csv`` and ``summary.json`` into the runs directory. Needs ASE and NumPy only.
@@ -50,6 +51,7 @@ COMPARISON = "quench-optimizer-comparison-rtx5060ti-20261013"
 DE_LIMIT_MEV_ATOM = 0.025
 DISTANCE_LIMIT_A = 0.1
 MIN_SAME_STRUCTURE = 20
+MIN_SAME_ENERGY = 20  # the energy clause's allowance (decision 46 as amended)
 
 
 def research_sources(research: Path, crystal: str) -> dict[str, Path]:
@@ -158,12 +160,13 @@ def side_rows(ase_json: Path, gpu_json: Path, *, run: str, cells: dict) -> list[
 
 def judge(rows, crystals=CRYSTALS, frames=FRAMES_PER_CRYSTAL) -> dict:
     """SPEC decision 46's pass rule over ``rows`` (``side_rows``'s keys)."""
-    failures, by_crystal = [], {}
+    failures, over_limit, by_crystal = [], [], {}
     for crystal in crystals:
         mine = [r for r in rows if r["crystal"] == crystal]
         same = sum(r["max_distance_A"] <= DISTANCE_LIMIT_A for r in mine)
+        same_energy = sum(abs(r["dE_meV_atom"]) <= DE_LIMIT_MEV_ATOM for r in mine)
         by_crystal[crystal] = {
-            "frames": len(mine), "same_structure": same,
+            "frames": len(mine), "same_structure": same, "same_energy": same_energy,
             "max_abs_dE_meV_atom": max((abs(r["dE_meV_atom"]) for r in mine), default=None),
             "max_distance_A": max((r["max_distance_A"] for r in mine), default=None)}
         if len(mine) != frames:
@@ -173,14 +176,18 @@ def judge(rows, crystals=CRYSTALS, frames=FRAMES_PER_CRYSTAL) -> dict:
                 if not r[f"{side}_converged"]:
                     failures.append(f"{crystal} frame {r['frame']}: {side} did not converge")
             if abs(r["dE_meV_atom"]) > DE_LIMIT_MEV_ATOM:
-                failures.append(f"{crystal} frame {r['frame']}: |dE| {abs(r['dE_meV_atom']):.4g} meV/atom "
-                                f"> {DE_LIMIT_MEV_ATOM}")
+                over_limit.append(f"{crystal} frame {r['frame']}: |dE| {abs(r['dE_meV_atom']):.4g} meV/atom "
+                                  f"> {DE_LIMIT_MEV_ATOM}")
+        if mine and same_energy < MIN_SAME_ENERGY:
+            failures.append(f"{crystal}: |dE| within {DE_LIMIT_MEV_ATOM} meV/atom in {same_energy}/{frames} "
+                            f"frames, fewer than {MIN_SAME_ENERGY}")
         if mine and same < MIN_SAME_STRUCTURE:
             failures.append(f"{crystal}: the same structure in {same}/{frames} frames, "
                             f"fewer than {MIN_SAME_STRUCTURE}")
-    return {"passed": not failures, "failures": failures, "crystals": by_crystal,
+    return {"passed": not failures, "failures": failures, "over_limit": over_limit, "crystals": by_crystal,
             "rule": {"dE_limit_meV_atom": DE_LIMIT_MEV_ATOM, "distance_limit_A": DISTANCE_LIMIT_A,
-                     "min_same_structure": MIN_SAME_STRUCTURE, "frames_per_crystal": frames}}
+                     "min_same_energy": MIN_SAME_ENERGY, "min_same_structure": MIN_SAME_STRUCTURE,
+                     "frames_per_crystal": frames, "amended": "owner, 23 October 2026"}}
 
 
 def reference_rows(data: Path, crystal: str, gpu_minima, run: str, gpu_frames: dict) -> list[dict]:
@@ -284,6 +291,8 @@ def main(argv=None):
         for crystal, c in verdict["crystals"].items():
             print(f"{crystal}: {c['frames']} frames, same structure {c['same_structure']}, "
                   f"max |dE| {c['max_abs_dE_meV_atom']} meV/atom, max distance {c['max_distance_A']} A")
+        for frame in verdict["over_limit"]:
+            print(f"over the energy limit: {frame}")
         print("PASS" if verdict["passed"] else "FAIL:\n  " + "\n  ".join(verdict["failures"]))
         return 0 if verdict["passed"] else 1
     return 0

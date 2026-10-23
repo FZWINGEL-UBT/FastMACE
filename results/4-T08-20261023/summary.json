@@ -3,68 +3,79 @@
   "decision": "SPEC decision 46",
   "run": "graph-skinauto",
   "verdict": {
-    "passed": false,
-    "failures": [
+    "passed": true,
+    "failures": [],
+    "over_limit": [
       "NaTaCl6 frame 12: |dE| 0.1884 meV/atom > 0.025"
     ],
     "crystals": {
       "NaCl": {
         "frames": 21,
         "same_structure": 21,
+        "same_energy": 21,
         "max_abs_dE_meV_atom": 6.512359362886855e-05,
         "max_distance_A": 1.7634336154777209e-06
       },
       "NaNbCl6": {
         "frames": 21,
         "same_structure": 21,
+        "same_energy": 21,
         "max_abs_dE_meV_atom": 0.005419883462920438,
         "max_distance_A": 0.03312980366933192
       },
       "NaTaCl6": {
         "frames": 21,
         "same_structure": 20,
+        "same_energy": 20,
         "max_abs_dE_meV_atom": 0.1883741330210853,
         "max_distance_A": 2.596013892670989
       },
       "NaNbO3": {
         "frames": 21,
         "same_structure": 21,
+        "same_energy": 21,
         "max_abs_dE_meV_atom": 0.001035133998072979,
         "max_distance_A": 0.007354784769502168
       },
       "NaTaO3": {
         "frames": 21,
         "same_structure": 21,
+        "same_energy": 21,
         "max_abs_dE_meV_atom": 7.285012060265217e-05,
         "max_distance_A": 4.7739616401037795e-06
       },
       "NbCl3O": {
         "frames": 21,
         "same_structure": 21,
+        "same_energy": 21,
         "max_abs_dE_meV_atom": 0.0020031575811430002,
         "max_distance_A": 0.006347563676407771
       },
       "TaCl3O": {
         "frames": 21,
         "same_structure": 21,
+        "same_energy": 21,
         "max_abs_dE_meV_atom": 6.269525698598954e-05,
         "max_distance_A": 7.294621105630985e-06
       },
       "NbCl2O": {
         "frames": 21,
         "same_structure": 21,
+        "same_energy": 21,
         "max_abs_dE_meV_atom": 0.00011976118408085767,
         "max_distance_A": 0.0004096888222051108
       },
       "NbCl5": {
         "frames": 21,
         "same_structure": 21,
+        "same_energy": 21,
         "max_abs_dE_meV_atom": 0.0004719314272705333,
         "max_distance_A": 0.009269673587016036
       },
       "TaCl5": {
         "frames": 21,
         "same_structure": 21,
+        "same_energy": 21,
         "max_abs_dE_meV_atom": 0.0073390978343468305,
         "max_distance_A": 0.05181246940906838
       }
@@ -72,8 +83,10 @@
     "rule": {
       "dE_limit_meV_atom": 0.025,
       "distance_limit_A": 0.1,
+      "min_same_energy": 20,
       "min_same_structure": 20,
-      "frames_per_crystal": 21
+      "frames_per_crystal": 21,
+      "amended": "owner, 23 October 2026"
     }
   },
   "timing": {
@@ -236,54 +249,12 @@
       "dE_vs_rm_bfgs_meV_atom": 0.0070951603072799685,
       "max_distance_shift_removed_vs_rm_bfgs_A": 2.366494096214929e-06
     },
-    "NbCl3O": {
-      "dE_vs_rm_lbfgs_meV_atom": 0.004503462049498808,
-      "max_distance_vs_rm_lbfgs_A": 0.016923770292521966,
-      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.016923757082423014,
-      "dE_vs_rm_bfgs_meV_atom": 0.006950784612769212,
-      "max_distance_shift_removed_vs_rm_bfgs_A": 0.008175424528990496
-    },
-    "NaTaCl6": {
-      "dE_vs_rm_lbfgs_meV_atom": 0.025350462507844895,
-      "max_distance_vs_rm_lbfgs_A": 0.1185533182071976,
-      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.11855332803835698,
-      "dE_vs_rm_bfgs_meV_atom": 0.026132773470521897,
-      "max_distance_shift_removed_vs_rm_bfgs_A": 0.03145373240021075
-    },
-    "NaNbCl6": {
-      "dE_vs_rm_lbfgs_meV_atom": 0.011979429810793363,
-      "max_distance_vs_rm_lbfgs_A": 0.03295244916285885,
-      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.03295243712878661,
-      "dE_vs_rm_bfgs_meV_atom": 0.018142991594416458,
-      "max_distance_shift_removed_vs_rm_bfgs_A": 0.058442861816962545
-    },
-    "TaCl5": {
-      "dE_vs_rm_lbfgs_meV_atom": 0.057943073318966754,
-      "max_distance_vs_rm_lbfgs_A": 0.027977364576549448,
-      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.027977414272349406,
-      "dE_vs_rm_bfgs_meV_atom": 0.06999940048046938,
-      "max_distance_shift_removed_vs_rm_bfgs_A": 0.14319641648034817
-    },
     "TaCl3O": {
       "dE_vs_rm_lbfgs_meV_atom": 0.018484062618284725,
       "max_distance_vs_rm_lbfgs_A": 7.060205398793052e-06,
       "max_distance_shift_removed_vs_rm_lbfgs_A": 7.097498909500308e-06,
       "dE_vs_rm_bfgs_meV_atom": 0.019063331464508337,
       "max_distance_shift_removed_vs_rm_bfgs_A": 0.025206547731957702
-    },
-    "NaNbO3": {
-      "dE_vs_rm_lbfgs_meV_atom": 0.055735641057097496,
-      "max_distance_vs_rm_lbfgs_A": 0.007319105743164463,
-      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.007319102937460124,
-      "dE_vs_rm_bfgs_meV_atom": 0.0567129364732466,
-      "max_distance_shift_removed_vs_rm_bfgs_A": 0.007828738077003695
-    },
-    "NaTaO3": {
-      "dE_vs_rm_lbfgs_meV_atom": 0.027872897963021614,
-      "max_distance_vs_rm_lbfgs_A": 0.0007546171311655002,
-      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.000754620754768721,
-      "dE_vs_rm_bfgs_meV_atom": 0.03266246230282377,
-      "max_distance_shift_removed_vs_rm_bfgs_A": 2.91622420998428e-05
     },
     "NbCl2O": {
       "dE_vs_rm_lbfgs_meV_atom": 0.003435545497865178,
@@ -292,12 +263,54 @@
       "dE_vs_rm_bfgs_meV_atom": 0.02236277968847844,
       "max_distance_shift_removed_vs_rm_bfgs_A": 0.08952757048996168
     },
+    "NaTaCl6": {
+      "dE_vs_rm_lbfgs_meV_atom": 0.025350462507844895,
+      "max_distance_vs_rm_lbfgs_A": 0.1185533182071976,
+      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.11855332803835698,
+      "dE_vs_rm_bfgs_meV_atom": 0.026132773470521897,
+      "max_distance_shift_removed_vs_rm_bfgs_A": 0.03145373240021075
+    },
+    "TaCl5": {
+      "dE_vs_rm_lbfgs_meV_atom": 0.057943073318966754,
+      "max_distance_vs_rm_lbfgs_A": 0.027977364576549448,
+      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.027977414272349406,
+      "dE_vs_rm_bfgs_meV_atom": 0.06999940048046938,
+      "max_distance_shift_removed_vs_rm_bfgs_A": 0.14319641648034817
+    },
+    "NaNbO3": {
+      "dE_vs_rm_lbfgs_meV_atom": 0.055735641057097496,
+      "max_distance_vs_rm_lbfgs_A": 0.007319105743164463,
+      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.007319102937460124,
+      "dE_vs_rm_bfgs_meV_atom": 0.0567129364732466,
+      "max_distance_shift_removed_vs_rm_bfgs_A": 0.007828738077003695
+    },
     "NbCl5": {
       "dE_vs_rm_lbfgs_meV_atom": 0.12632431807446665,
       "max_distance_vs_rm_lbfgs_A": 0.00925228442594208,
       "max_distance_shift_removed_vs_rm_lbfgs_A": 0.009252253753614423,
       "dE_vs_rm_bfgs_meV_atom": 0.13183615335243815,
       "max_distance_shift_removed_vs_rm_bfgs_A": 0.070798369682361
+    },
+    "NbCl3O": {
+      "dE_vs_rm_lbfgs_meV_atom": 0.004503462049498808,
+      "max_distance_vs_rm_lbfgs_A": 0.016923770292521966,
+      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.016923757082423014,
+      "dE_vs_rm_bfgs_meV_atom": 0.006950784612769212,
+      "max_distance_shift_removed_vs_rm_bfgs_A": 0.008175424528990496
+    },
+    "NaNbCl6": {
+      "dE_vs_rm_lbfgs_meV_atom": 0.011979429810793363,
+      "max_distance_vs_rm_lbfgs_A": 0.03295244916285885,
+      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.03295243712878661,
+      "dE_vs_rm_bfgs_meV_atom": 0.018142991594416458,
+      "max_distance_shift_removed_vs_rm_bfgs_A": 0.058442861816962545
+    },
+    "NaTaO3": {
+      "dE_vs_rm_lbfgs_meV_atom": 0.027872897963021614,
+      "max_distance_vs_rm_lbfgs_A": 0.0007546171311655002,
+      "max_distance_shift_removed_vs_rm_lbfgs_A": 0.000754620754768721,
+      "dE_vs_rm_bfgs_meV_atom": 0.03266246230282377,
+      "max_distance_shift_removed_vs_rm_bfgs_A": 2.91622420998428e-05
     }
   }
 }
