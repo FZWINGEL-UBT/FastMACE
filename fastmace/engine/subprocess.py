@@ -813,7 +813,12 @@ class _Heartbeat:
         self._thread.start()
 
     def stop(self):
+        # Wait for the thread: a write calls torch (the engine's step), and a daemon thread still inside torch
+        # when the interpreter exits is ended by pthread_exit, whose unwind through torch's noexcept GIL
+        # re-acquire calls std::terminate: SIGABRT after a written result (4-T13). One write at most.
         self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=PARENT_CHECK_S)
 
     def _loop(self):
         # Every PARENT_CHECK_S at least, for the parent check; the file is rewritten only on a change.
@@ -866,6 +871,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             directory = Path(command["stage"])
     finally:
+        heartbeat.simulation = None  # no last write reads the engine
         heartbeat.stop()
         worker.close()
 
