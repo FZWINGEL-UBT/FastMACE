@@ -245,7 +245,7 @@ def test_every_spec_item_is_in_the_file(tmp_path):
     for item, keys in IDENTITY_ITEMS.items():
         for key in (keys,) if isinstance(keys, str) else keys:
             assert key in record, item
-    assert int(stored["fastmace_restart"]) == restart_io.FORMAT_VERSION == 3
+    assert int(stored["fastmace_restart"]) == restart_io.FORMAT_VERSION == 4
     assert "mc" not in stored  # only with an attached move set (test_restart_v3.py)
 
 
@@ -301,7 +301,7 @@ def test_records_are_read_back(tmp_path):
     path = tmp_path / restart_io.RESTART_NAME
     write_full(path, state, integrator)
     stored = restart_io.read_restart(path)
-    assert restart_io.format_version(stored) == 3
+    assert restart_io.format_version(stored) == 4
     assert restart_io.stored_identity(stored) == identity()
     assert restart_io.plan_record(stored) == plan_record()
     assert restart_io.protocol_record(stored) == state.protocol.to_restart()
@@ -310,7 +310,7 @@ def test_records_are_read_back(tmp_path):
     assert integrator_record["class"] == "LangevinBAOAB" and integrator_record["temperature_K"] == 300.0
     assert IntegratorConfig(**integrator_record["config"]) == integrator.config
     assert restart_io.physical_record(stored) == {"total_charge": 0.0, "spin_multiplicity": 1,
-                                                  "pbc": [True, True, True], "constraints": []}
+                                                  "pbc": [True, True, True], "constraints": [], "fixed_atoms": []}
 
 
 def test_the_plan_record_holds_the_buckets(tmp_path):
@@ -365,8 +365,9 @@ def test_a_newer_format_is_refused(tmp_path):
     path = tmp_path / restart_io.RESTART_NAME
     write_full(path, state, integrator)
     stored = dict(restart_io.read_restart(path))
-    stored["fastmace_restart"] = np.asarray(4)
-    with pytest.raises(ValueError, match="format version 4"):
+    newer = restart_io.FORMAT_VERSION + 1
+    stored["fastmace_restart"] = np.asarray(newer)
+    with pytest.raises(ValueError, match=f"format version {newer}"):
         restart_io.load_state(stored, *make_state(steps=1))
 
 

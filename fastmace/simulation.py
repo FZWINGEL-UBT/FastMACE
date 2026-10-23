@@ -298,7 +298,8 @@ class Simulation:
       a float32 ``ForceField`` with ``species=`` (default: the structure's species). A path raises
       ``TypeError`` (load it with ``fm.load``, the trust decision needs one); ``species`` with a
       ``ForceField`` raises ``ValueError`` (the ``ForceField`` owns the superset);
-    - ``integrator``: ``fm.integrators.Langevin`` or ``fm.integrators.LangevinBAOAB``;
+    - ``integrator``: an ``fm.integrators`` record (``fm.integrators.RECORDS``); a scheme not registered yet is
+      refused by the plan (rule 1);
     - ``workload``: ``fm.Workload``; default ``Workload(max_temperature_K=integrator.temperature_K)``;
     - ``output``: ``fm.Output``; thermo rows, trajectory frames and ``metadata.json`` go to its
       directory, in chunks (§10.6). ``None`` writes no file;
@@ -333,8 +334,8 @@ class Simulation:
         from fastmace.planner import fallback, minimal, selfcheck
         from fastmace.planner.workload import Workload
 
-        if not isinstance(integrator, (records.Langevin, records.LangevinBAOAB)):
-            raise TypeError(f"integrator must be fm.integrators.Langevin or fm.integrators.LangevinBAOAB, got "
+        if not isinstance(integrator, tuple(records.RECORDS.values())):
+            raise TypeError(f"integrator must be an fm.integrators record ({', '.join(records.RECORDS)}), got "
                             f"{type(integrator).__name__}")
         if isinstance(seed, bool) or not isinstance(seed, int):
             raise TypeError(f"seed must be an int, got {seed!r}")
@@ -347,11 +348,16 @@ class Simulation:
             ff = force_field
         else:
             ff = ForceField(force_field, atoms, precision="float32", species=species)
+        target_K = getattr(integrator, "temperature_K", None)  # NVE has no target
         if workload is None:
-            workload = Workload(max_temperature_K=float(integrator.temperature_K))  # owner decision D7
+            if target_K is None:
+                raise ValueError(f"{type(integrator).__name__} has no temperature target: pass "
+                                 "workload=fm.Workload(max_temperature_K=...), which sizes the skin and the buckets "
+                                 "(rule 11, SPEC §7.6)")
+            workload = Workload(max_temperature_K=float(target_K))  # owner decision D7
         elif not isinstance(workload, Workload):
             raise TypeError(f"workload must be an fm.Workload, got {type(workload).__name__}")
-        if integrator.temperature_K > workload.max_temperature_K:
+        if target_K is not None and target_K > workload.max_temperature_K:
             raise PlanRefused.from_reasons([Reason(
                 f"the integrator's temperature_K={integrator.temperature_K:g} K is above "
                 f"Workload.max_temperature_K={workload.max_temperature_K:g} K, which sized the skin and the buckets "
@@ -1608,7 +1614,7 @@ def _restart_atoms(structure, stored):
 def _integrator(record):
     from fastmace import integrators
 
-    classes = {"Langevin": integrators.Langevin, "LangevinBAOAB": integrators.LangevinBAOAB}
+    classes = integrators.RECORDS
     if record["class"] not in classes:
         raise ValueError(f"unknown integrator record {record['class']!r}; this FastMACE has {sorted(classes)}")
     fields = dict(record["fields"])
