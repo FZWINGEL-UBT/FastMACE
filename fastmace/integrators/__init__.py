@@ -174,7 +174,7 @@ class NVE:
 
     timestep_fs: float
     fixcm: bool = True
-    dof: Literal["auto", "ase"] = "auto"
+    dof: Literal["auto", "fastmace", "ase"] = "auto"
 
     def __post_init__(self):
         _common(self, thermostat=False)
@@ -196,7 +196,7 @@ class CSVR:
     temperature_K: float
     tau_fs: float
     fixcm: bool = True
-    dof: Literal["auto", "ase"] = "auto"
+    dof: Literal["auto", "fastmace", "ase"] = "auto"
 
     def __post_init__(self):
         _common(self)
@@ -223,7 +223,7 @@ class NoseHooverChain:
     tchain: int = 3
     tloop: int = 1
     fixcm: bool = True
-    dof: Literal["auto", "ase"] = "auto"
+    dof: Literal["auto", "fastmace", "ase"] = "auto"
 
     def __post_init__(self):
         _common(self)
@@ -258,7 +258,7 @@ class MTK:
     ploop: int = 1
     cell_mode: Literal["hydrostatic", "full"] = "hydrostatic"
     fixcm: bool = True
-    dof: Literal["auto", "ase"] = "auto"
+    dof: Literal["auto", "fastmace", "ase"] = "auto"
 
     def __post_init__(self):
         _common(self)
@@ -295,7 +295,7 @@ class Berendsen:
     compressibility_per_GPa: float | None = None
     mask: tuple[int, int, int] | None = None
     fixcm: bool = True
-    dof: Literal["auto", "ase"] = "auto"
+    dof: Literal["auto", "fastmace", "ase"] = "auto"
 
     def __post_init__(self):
         _common(self)

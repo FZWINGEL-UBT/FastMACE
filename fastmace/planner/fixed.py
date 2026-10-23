@@ -75,6 +75,7 @@ AUTO_RULES = MappingProxyType({
     "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
     "NeighbourConfig.d3_skin": "rule_11_d3_skin_from_workload",
     "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
+    "IntegratorConfig.dof": "owner_decision_d2_default",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
@@ -217,6 +218,26 @@ class _Book:
             raise PlanRefused.from_reasons(self.refusals)
 
 
+def refuse_unsupported(book: _Book, config: IntegratorConfig, atoms) -> None:
+    """Rule 1 again at build (4-T01): the plan's integrator scheme on ``atoms``' constraints, from the scheme
+    records. The plan refused MC with constraints already."""
+    from fastmace.integrators import registry as schemes
+
+    fixed_atoms, other = schemes.constraint_names(atoms)
+    for reason in schemes.integrator_refusals(config, fix_atoms=bool(fixed_atoms), other_constraints=other):
+        book.refuse(reason, reason.code, 1)
+
+
+def _workload_text(atoms, pbc):
+    """The workload decision's reason: atom count, PBC and constraints."""
+    if not all(pbc):
+        return "refused"
+    fixed_atoms = sum(len(c.get_indices()) for c in atoms.constraints if type(c).__name__ == "FixAtoms")
+    if len(atoms.constraints) and not fixed_atoms:
+        return "refused"
+    return f"{len(atoms)} atoms, 3D PBC, " + (f"FixAtoms on {fixed_atoms} atoms" if fixed_atoms else "no constraints")
+
+
 def _toggle(value):
     return "on" if value else "off"
 
@@ -263,6 +284,20 @@ def _fixcm_projection(book, integrator, *, npt, mc_moves):
                                     code="fixcm-projection-ase")
     book.decide("IntegratorConfig.fixcm_projection", choice, why)
     return dataclasses.replace(integrator, fixcm_projection=choice)
+
+
+def _dof(book, integrator):
+    """Resolve ``IntegratorConfig.dof`` (4-T01, owner decision D2): ``"auto"`` is ``registry.DOF_AUTO``. Langevin
+    and BAOAB count as they did whatever the value (``dof_rule="langevin"``), so their plans only record it."""
+    from fastmace.integrators.registry import resolve_dof
+
+    rule = AUTO_RULES["IntegratorConfig.dof"]
+    choice = resolve_dof(integrator.dof)
+    explanation = ("kept as given" if integrator.dof != "auto" else
+                   "FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2)"
+                   if choice == "fastmace" else "the count of the scheme's ASE class (owner decision D2)")
+    book.decide("IntegratorConfig.dof", choice, Reason(_why(integrator.dof, rule, explanation), code=f"dof-{choice}"))
+    return dataclasses.replace(integrator, dof=choice)
 
 
 class FixedPlanner:
@@ -445,15 +480,27 @@ class FixedPlanner:
         if not all(pbc):
             refuse(f"periodic boundaries in all three directions (3D PBC) are required, got pbc={pbc} (SPEC §4.4)",
                    "non-3d-pbc", 1)
-        if atoms.constraints:
-            names = ", ".join(sorted({type(c).__name__ for c in atoms.constraints}))
-            refuse(f"constraints are refused in 1a ({names}; SPEC §4.4)", "constraints", 1)
+        if evaluation:
+            if atoms.constraints:
+                names = ", ".join(sorted({type(c).__name__ for c in atoms.constraints}))
+                refuse(f"constraints are refused in 1a ({names}; SPEC §4.4)", "constraints", 1)
+        else:
+            # Rule 1 from the scheme records (4-T01): the scheme, its ensemble and cell mode, its constraint rows.
+            from fastmace.integrators import registry as schemes
+
+            fixed_atoms, other = schemes.constraint_names(atoms)
+            for reason in schemes.integrator_refusals(integrator, fix_atoms=bool(fixed_atoms),
+                                                      other_constraints=other, mc=bool(mc and mc[0])):
+                refuse(reason, reason.code, 1)
         if not traits.padding_is_exact and not evaluation:
             refuse("edge padding is not exact for this model (edges beyond the cutoff get nonzero weights: "
                    "apply_cutoff=True with biased or species-dependent radial networks), so the graph tier "
                    "is refused (SPEC §9.3 rule 4)", "inexact-padding", 4)
-        book.decide("workload", "ok", f"{len(atoms)} atoms, 3D PBC, no constraints" if all(pbc) and not
-                    atoms.constraints else "refused")
+        text = _workload_text(atoms, pbc)
+        constraint_refused = any(getattr(r, "code", None) in ("constraints", "fix-atoms-with-fixcm",
+                                                               "mc-with-constraints") for r in book.refusals)
+        book.decide("workload", "refused" if text == "refused" or constraint_refused else "ok",
+                    "refused" if constraint_refused else text)
         book.decide("hardware", hardware.name, f"compute capability {hardware.compute_capability[0]}."
                     f"{hardware.compute_capability[1]}, {hardware.memory_bytes / 2**30:.1f} GiB (recorded only)")
 
@@ -535,6 +582,7 @@ class FixedPlanner:
             book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
                         "fixed cell: the graph engine computes no stress")
             integrator = _fixcm_projection(book, integrator, npt=npt, mc_moves=bool(mc and mc[0]))
+            integrator = _dof(book, integrator)
 
         phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
                                        evaluation=evaluation, mc=mc)
@@ -831,8 +879,7 @@ class FixedPlanner:
         the compiled tier (3-T06) passes False and gets a ``CompiledEngine`` on exact edge counts.
         """
         from fastmace.engine.graph import GraphEngine
-        from fastmace.integrators.baoab import LangevinBAOAB
-        from fastmace.integrators.langevin import Langevin
+        from fastmace.integrators import registry as schemes
         from fastmace.model.forces import MACEForceField
         from fastmace.state import SimulationState
 
@@ -853,8 +900,7 @@ class FixedPlanner:
         if not all(atoms.pbc):
             book.refuse("periodic boundaries in all three directions (3D PBC) are required (SPEC §4.4)",
                         "non-3d-pbc", 1)
-        if atoms.constraints:
-            book.refuse("constraints are refused in 1a (SPEC §4.4)", "constraints", 1)
+        refuse_unsupported(book, plan.integrator, atoms)
         book.raise_refusals()
         self.configure_process(plan.engine)
 
@@ -870,11 +916,7 @@ class FixedPlanner:
                                species=plan.superset or None)
         field = _with_d3(field, plan, atoms)
         state = SimulationState.from_atoms(atoms, field.device, plan.integrator.seed, compute_stress=npt)
-        if npt:
-            integrator = LangevinBAOAB(state, plan.integrator, temperature_K=temperature_K,
-                                       **integrator_keywords(plan.integrator))
-        else:
-            integrator = Langevin(state, plan.integrator, temperature_K=temperature_K)
+        integrator = schemes.build_integrator(state, plan.integrator, temperature_K=temperature_K)
         if plan.tier == COMPILED_TIER:
             from fastmace.engine.compiled import CompiledEngine
 

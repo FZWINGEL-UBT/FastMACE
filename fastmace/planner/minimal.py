@@ -936,8 +936,7 @@ class MinimalPlanner:
         field of FastMACE's state, integrator and ``GraphEngine``, without capture or padding."""
         from fastmace.engine.graph import GraphEngine
         from fastmace.engine.reference import ReferenceForceField
-        from fastmace.integrators.baoab import LangevinBAOAB
-        from fastmace.integrators.langevin import Langevin
+        from fastmace.integrators import registry as schemes
         from fastmace.state import SimulationState
 
         if plan.tier != REFERENCE_TIER:
@@ -946,8 +945,7 @@ class MinimalPlanner:
         if not all(atoms.pbc):
             book.refuse("periodic boundaries in all three directions (3D PBC) are required (SPEC §4.4)",
                         "non-3d-pbc", 1)
-        if atoms.constraints:
-            book.refuse("constraints are refused in phase 2 (SPEC §4.4)", "constraints", 1)
+        fixed.refuse_unsupported(book, plan.integrator, atoms)
         book.raise_refusals()
         self._check_atoms(plan, atoms)
         if temperature_K is None:
@@ -956,11 +954,7 @@ class MinimalPlanner:
         field = ReferenceForceField(force_field, atoms, device=plan.engine.device, dtype=plan.precision.dtype,
                                     polar=plan.polar, compute_stress=npt)
         state = SimulationState.from_atoms(atoms, field.device, plan.integrator.seed, compute_stress=npt)
-        if npt:
-            integrator = LangevinBAOAB(state, plan.integrator, temperature_K=temperature_K,
-                                       **fixed.integrator_keywords(plan.integrator))
-        else:
-            integrator = Langevin(state, plan.integrator, temperature_K=temperature_K)
+        integrator = schemes.build_integrator(state, plan.integrator, temperature_K=temperature_K)
         engine = GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, capture=False,
                              pad_edges=False, constraints=self.process)
         engine.plan = plan  # no rewrites, so no per-record self-checks (as build's plan, 2-T04)

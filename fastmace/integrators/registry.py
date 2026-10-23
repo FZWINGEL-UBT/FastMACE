@@ -15,8 +15,9 @@ Owner decisions this module encodes (phase 4 plan, "Owner decisions"; recommenda
 
 - D1: ``FIX_ATOMS_WITH_FIXCM``: ``fixcm=True`` with ``FixAtoms`` is refused. Which schemes take
   ``FixAtoms`` is each record's ``constraints``.
-- D2: ``degrees_of_freedom``: ``dof="auto"`` counts 3N - 3 under ``fixcm``, 3(N - n_fixed) with
-  ``FixAtoms``, 3N otherwise; ``dof="ase"`` the count of the scheme's ASE class (``ase_dof``).
+- D2: ``degrees_of_freedom``: ``dof="fastmace"`` counts 3N - 3 under ``fixcm``, 3(N - n_fixed) with
+  ``FixAtoms``, 3N otherwise; ``dof="ase"`` the count of the scheme's ASE class (``ase_dof``);
+  ``dof="auto"`` resolves to ``DOF_AUTO`` (``"fastmace"``; ``"ase"`` under alternative (b)).
 - Decision 10 (17 October 2026): MC moves with constraints are refused, also in the reference tier.
 """
 
@@ -42,7 +43,9 @@ ENSEMBLES = ("nve", "nvt", "npt")
 CELL_MODES = ("fixed", "hydrostatic", "full")
 # The §4.4 constraint rows a record can declare.
 CONSTRAINTS = ("fixcm", "fix_atoms")
-DOF_MODES = ("auto", "ase")
+DOF_MODES = ("fastmace", "ase")
+# D2 (recommended (a)): what dof="auto" resolves to in a plan; "ase" under alternative (b).
+DOF_AUTO = "fastmace"
 # ASE's degree-of-freedom counts, by scheme: "constraints" is Atoms.get_number_of_degrees_of_freedom
 # (3N minus the constraints' removed degrees; ASE Bussi, Atoms.get_temperature for Berendsen); "3n"
 # ignores constraints (ASE NoseHooverChainNVT, MTKNPT, IsotropicMTKNPT).
@@ -151,7 +154,7 @@ class IntegratorRecord(SchemeRecord):
     ensembles: tuple[str, ...] = ("nvt",)
     cell_modes: tuple[str, ...] = ("fixed",)
     non_canonical: bool = False
-    dof_modes: tuple[str, ...] = ("auto", "ase")
+    dof_modes: tuple[str, ...] = ("fastmace", "ase")
     ase_dof: str = "constraints"
     dof_rule: Literal["d2", "langevin"] = "d2"
     keywords: str | None = None
@@ -188,7 +191,7 @@ class IntegratorRecord(SchemeRecord):
                 return 3 * natoms - 3
             return 3 * natoms
         return degrees_of_freedom(natoms, n_fixed=n_fixed, fixcm=bool(getattr(config, "fixcm", False)),
-                                  dof=getattr(config, "dof", "auto"), ase_dof=self.ase_dof)
+                                  dof=resolve_dof(getattr(config, "dof", "auto")), ase_dof=self.ase_dof)
 
     def constructor_keywords(self, config: IntegratorConfig) -> dict[str, Any]:
         """The extra constructor keywords (``keywords``), ``{}`` without."""
@@ -216,14 +219,20 @@ class CellFilterRecord(SchemeRecord):
     kind: Literal["cell_filter"] = "cell_filter"
 
 
+def resolve_dof(dof: str) -> str:
+    """``dof`` with ``"auto"`` resolved (``DOF_AUTO``, owner decision D2); the planner records it."""
+    return DOF_AUTO if dof == "auto" else dof
+
+
 def degrees_of_freedom(natoms: int, *, n_fixed: int = 0, fixcm: bool, dof: str = "auto",
                        ase_dof: str = "constraints") -> int:
     """D2's count (recommended (a)) for the new integrators.
 
-    ``dof="auto"``: 3(N - n_fixed) with fixed atoms (no centre-of-mass projection then, D1), else 3N - 3
-    under ``fixcm``, else 3N. ``dof="ase"``: the scheme's ASE class, ``ase_dof`` ``"constraints"``
-    (3(N - n_fixed)) or ``"3n"``.
+    ``dof="fastmace"``: 3(N - n_fixed) with fixed atoms (no centre-of-mass projection then, D1), else
+    3N - 3 under ``fixcm``, else 3N. ``dof="ase"``: the scheme's ASE class, ``ase_dof`` ``"constraints"``
+    (3(N - n_fixed)) or ``"3n"``. ``"auto"`` is ``DOF_AUTO``.
     """
+    dof = resolve_dof(dof)
     if dof not in DOF_MODES:
         raise ValueError(f"dof must be one of {DOF_MODES}, got {dof!r}")
     if dof == "ase":
@@ -267,7 +276,8 @@ class Registry:
     def _lookup(self, kind, scheme):
         record = self._records.get((kind, scheme))
         if record is None:
-            raise KeyError(f"no {kind} scheme {scheme!r} in this FastMACE; registered: {self.schemes(kind)}")
+            raise KeyError(f"no {kind} scheme {scheme!r} in this FastMACE; registered: "
+                           f"{', '.join(self.schemes(kind)) or 'none'}")
         return record
 
     def schemes(self, kind: str) -> tuple[str, ...]:
@@ -366,7 +376,7 @@ def integrator_refusals(config: IntegratorConfig, *, fix_atoms: bool = False, ot
     if variable_cell and config.ensemble != "npt":
         refusals.append(_reason(f"a variable cell needs a barostat integrator, got ensemble={config.ensemble!r} "
                                 "(SPEC §4.4, §9.3 rule 1)", "variable-cell-without-barostat"))
-    if config.dof not in record.dof_modes:
+    if resolve_dof(config.dof) not in record.dof_modes:
         refusals.append(_reason(f"the {config.scheme} integrator implements dof {', '.join(record.dof_modes)}, "
                                 f"not {config.dof!r} (owner decision D2)", "scheme-dof"))
     if config.fixcm and "fixcm" not in record.constraints:
@@ -448,7 +458,7 @@ def callable_path(function: Callable) -> str:
     return f"{function.__module__}:{function.__qualname__}"
 
 
-__all__ = ("ASE_DOF", "CELL_MODES", "CONSTRAINTS", "CellFilterRecord", "DOF_MODES", "ENSEMBLES",
+__all__ = ("ASE_DOF", "CELL_MODES", "CONSTRAINTS", "CellFilterRecord", "DOF_AUTO", "DOF_MODES", "ENSEMBLES",
            "FIX_ATOMS_WITH_FIXCM", "IntegratorRecord", "OptimizerRecord", "Registry", "SchemeRecord",
            "build_dof", "build_integrator", "build_optimizer", "constraint_names", "degrees_of_freedom", "discover",
-           "integrator_refusals", "optimizer_refusals", "registry")
+           "integrator_refusals", "optimizer_refusals", "registry", "resolve_dof")

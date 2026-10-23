@@ -491,8 +491,7 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     pytest.importorskip("torch")
     from fastmace.io import restart
 
-    assert restart.FORMAT_VERSION == 3  # 3-T08 switched the writer to NEXT_FORMAT_VERSION
-    assert restart.NEXT_FORMAT_VERSION == 3
+    assert restart.FORMAT_VERSION == restart.NEXT_FORMAT_VERSION >= 3  # 3-T08 switched the writer; 4-T01 moved it on
     assert restart.V3_KEYS == ("mc",)
     assert restart.COMPOSITION_KEYS == ("species", "masses", "charges", "physical")
     assert restart.MC_RECORD_KEYS == ("moves", "cycle_position", "counters", "streams", "delta_A")

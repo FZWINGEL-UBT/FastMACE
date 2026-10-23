@@ -129,6 +129,9 @@ How to read the tables:
 | `--seed` | `IntegratorConfig.seed` | `20261001` | — | integrator |
 | `GPULangevin(fixcm=True)` (set in `GPUEngine.__init__`) | `IntegratorConfig.fixcm` | `True` | — | integrator |
 | ASE's projection, hard-coded in `GPULangevin._stage_a` (no flag; 3-T22) | `IntegratorConfig.fixcm_projection` | `"auto"` | `mass_weighted_under_nvt_fixcm_else_ase` | integrator (`"mass_weighted"`: the canonical projection for unequal masses, docs/design/fixcm-projection.md; `"auto"`: `"mass_weighted"` under NVT `fixcm`, for MD (decision 37, 3-T22c) and MC (3-T22b), else `"ase"`; the research engine and the ASE comparisons pin `"ase"`) |
+| none: `GPULangevin` or `GPULangevinBAOAB` by `--ensemble` (4-T01) | `IntegratorConfig.scheme` | `None` | — | integrator (the registry scheme; `None` is the ensemble's default, `config.DEFAULT_SCHEMES`: `"langevin"`, `"baoab"`, `"nve"`; docs/design/physics.md) |
+| none: 3N in `GPULangevin` (4-T01) | `IntegratorConfig.dof` | `"auto"` | `owner_decision_d2_default` | integrator (`"fastmace"`: 3N - 3 under `fixcm`, 3(N - n_fixed) with `FixAtoms`; `"ase"`: the scheme's ASE class; `"auto"`: `registry.DOF_AUTO`, `"fastmace"` under D2 (a); Langevin and BAOAB keep their count) |
+| none (4-T01) | `IntegratorConfig.parameters` | `()` | — | integrator (scheme parameters from the public records, sorted (name, value) pairs) |
 | `NOISE_BATCH` (also `GPULangevin(noise_batch=...)`) | `IntegratorConfig.noise_batch` | `256` | — | integrator (§3.2 hard-coded protocol choice) |
 | `--pressure-GPa` | `IntegratorConfig.pressure_GPa` | `0.0` | — | integrator |
 | `--cell-mode` | `IntegratorConfig.cell_mode` | `"hydrostatic"` | — | integrator |
