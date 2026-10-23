@@ -57,7 +57,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from fastmace.config import EngineConfig, FallbackConfig, GateConfig, Mode, NeighbourConfig, RunnerConfig
+from fastmace.config import (
+    EngineConfig,
+    FallbackConfig,
+    GateConfig,
+    IntegratorConfig,
+    Mode,
+    NeighbourConfig,
+    RunnerConfig,
+)
 
 if TYPE_CHECKING:
     import numpy as np
@@ -318,7 +326,8 @@ class Simulation:
     # True while an MC block runs (T15's block hook sets it): restart writes are refused then (§10.6).
     _mc_block_active: bool = False
 
-    def __init__(self, atoms: Any, force_field: Any, *, species: Any = None, integrator: Any,
+    def __init__(self, atoms: Any, force_field: Any, *, species: Any = None, integrator: Any = None,
+                 optimizer: Any = None,
                  workload: Workload | None = None, output: Output | None = None, seed: int,
                  check: Check = "skip", allow_naive_cueq: bool = False, mode: Mode | None = None,
                  allow_reference: bool = False, fallback: FallbackConfig | None = None,
@@ -328,13 +337,25 @@ class Simulation:
         options = planner_options(mode=mode, allow_reference=allow_reference, fallback=fallback, gate=gate,
                                   runner=runner, engine=engine, neighbours=neighbours)
         from fastmace import integrators as records
+        from fastmace import optimize as optimizers
         from fastmace.errors import PlanRefused, Reason
         from fastmace.io.output import Output
         from fastmace.model.forcefield import ForceField
         from fastmace.planner import fallback, minimal, selfcheck
         from fastmace.planner.workload import Workload
 
-        if not isinstance(integrator, tuple(records.RECORDS.values())):
+        if (integrator is None) == (optimizer is None):
+            raise TypeError("Simulation takes exactly one of integrator= (MD) and optimizer= (a relaxation)")
+        if optimizer is not None:
+            if not isinstance(optimizer, tuple(optimizers.RECORDS.values())):
+                raise TypeError(f"optimizer must be an fm.optimize record ({', '.join(optimizers.RECORDS)}), got "
+                                f"{type(optimizer).__name__}")
+            if output is not None:
+                raise ValueError("a relaxation writes no output files: Simulation.relax returns the relaxed Atoms and "
+                                 "its summary (pass output=None)")
+            if workload is None:  # the skin is the optimiser's (rule 11), not a temperature's (4-T05)
+                workload = Workload(max_temperature_K=0.0)
+        elif not isinstance(integrator, tuple(records.RECORDS.values())):
             raise TypeError(f"integrator must be an fm.integrators record ({', '.join(records.RECORDS)}), got "
                             f"{type(integrator).__name__}")
         if isinstance(seed, bool) or not isinstance(seed, int):
@@ -365,6 +386,7 @@ class Simulation:
 
         self.force_field = ff
         self.integrator = integrator
+        self.optimizer = optimizer
         self.workload = workload
         self.output = output
         self.seed = seed
@@ -372,7 +394,9 @@ class Simulation:
         self.allow_naive_cueq = bool(allow_naive_cueq)
         self.options = options
         self._atoms = atoms.copy()
-        self._config = integrator.to_config(seed=seed)
+        # A relaxation plans the MD-side defaults (seed) next to its optimiser (Plan.optimizer, 4-T05).
+        self._config = IntegratorConfig(seed=seed) if optimizer is not None else integrator.to_config(seed=seed)
+        self._optimizer_config = None if optimizer is None else optimizer.to_config()
         self._npt = self._config.ensemble == "npt"
         self._schedule = None
         self._mc = None  # the attached move set's MCDriver (3-T15), or None
@@ -405,20 +429,24 @@ class Simulation:
         stored = getattr(self, "_resume_plan", None)  # a resume of a fallback revision (2-T15)
         self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq,
                                   allow_reference=options.allow_reference,
-                                  mode=options.mode if stored is None else stored.tier)
+                                  mode=options.mode if stored is None else stored.tier,
+                                  optimizer=self._optimizer_config)
         if stored is not None:
             from fastmace.planner.fallback import replay_off
 
             self._plan = replay_off(stored, self._plan)
         setup["plan"] = time.perf_counter() - started
         if self._plan.runner == "subprocess":
+            if optimizer is not None:
+                raise NotImplementedError("a relaxation whose plan runs in a child process (SPEC §8.7) is not "
+                                          "supported yet: relax in a fresh process, or with the process's backend")
             self._start_runner(setup)
             return
 
         # The gate's references before any production engine exists (§12.3); under check="gate" an
         # unavailable reference raises GateUnavailable here, before the build. "skip" computes nothing.
         started = time.perf_counter()
-        references = selfcheck.references(self._plan, ff, atoms, integrator, check=check, seed=seed,
+        references = selfcheck.references(self._plan, ff, atoms, integrator or self._config, check=check, seed=seed,
                                          gate=options.gate)
         gate_s = time.perf_counter() - started
         # An MC plan's move-energy references, whatever check is (decision 35; 3-T11): None without MC moves.
@@ -673,6 +701,8 @@ class Simulation:
         from fastmace.errors import PlanRefused, Reason
         from fastmace.protocols import Schedule, ScheduleState
 
+        if self.optimizer is not None:
+            raise TypeError("this Simulation relaxes with an optimiser: call relax(fmax=, steps=), not run()")
         if steps is not None:
             steps = _steps(steps)
         if schedule is not None:
@@ -1087,6 +1117,38 @@ class Simulation:
 
     # ------------------------------------------------------------------ restart (§10.6)
 
+    def relax(self, *, fmax: float = 0.05, steps: int = 100_000_000) -> tuple[Any, dict[str, Any]]:
+        """Relax with the optimiser (SPEC §10.3; 4-T05): ASE's ``Optimizer.run(fmax=, steps=)`` on the engine.
+
+        A converged start takes no step; otherwise one step at a time until the largest constraint-adjusted
+        force is below ``fmax`` (eV/Angstrom) or ``steps`` steps are done, one force call per step. A second
+        call continues with the optimiser's history, as a second ``run`` of one ASE optimiser does.
+        Returns the relaxed ``Atoms`` (a copy of the structure at the committed positions and cell, no
+        calculator) and the summary of ``fastmace.optimize.driver.relax``: steps, converged, seconds,
+        initial and final energies per atom, fmax, the per-step energies and max forces, and the engine's
+        neighbour rebuilds and re-captures.
+        """
+        import numpy as np
+
+        from fastmace.optimize import driver
+
+        if self.optimizer is None:
+            raise TypeError("this Simulation runs MD: build it with optimizer=fm.optimize.LBFGS(...) to relax")
+        if isinstance(fmax, bool) or not isinstance(fmax, (int, float)) or not fmax > 0:
+            raise ValueError(f"fmax must be a positive number (eV/Angstrom), got {fmax!r}")
+        self._status = "running"
+        summary = driver.relax(self._engine, fmax=float(fmax), steps=steps)
+        self._status = "relaxed"
+        self._steps_run += summary["steps"]
+        self._loop_s += summary["seconds"]
+        committed = self.committed()
+        relaxed = self._atoms.copy()
+        relaxed.calc = None
+        relaxed.set_cell(committed.cell, scale_atoms=False)
+        relaxed.set_positions(committed.positions)
+        relaxed.set_momenta(np.zeros((len(relaxed), 3)))  # a minimum, as protocols.quench.relax returns it
+        return relaxed, summary
+
     def save_restart(self, path: Any) -> None:
         """Write the complete §10.6 state at the current committed step, a canonical restart point.
 
@@ -1101,6 +1163,9 @@ class Simulation:
         Only at a committed step: refused (``RuntimeError``) inside an MC block and while the engine
         holds an uncommitted (overflowed) step, before anything is written (§10.6, 3-T08).
         """
+        if self.optimizer is not None:
+            raise TypeError("a relaxation writes no restart files (conductor's choice 5, phase 4): relax again "
+                            "from the structure")
         self._check_restart_point()
         path = Path(path)
         if path.suffix != ".npz":

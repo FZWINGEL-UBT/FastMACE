@@ -67,7 +67,7 @@ class OptimizerStepper(Integrator):
         return {}  # the engine registers the optimiser's (``optimizer.``) and the DOF view's (``dof.``)
 
     def output_values(self, state) -> Mapping[str, Any]:
-        return {**self.optimizer.output_values(), "forces": state.forces}
+        return {**self.optimizer.output_values(), "forces": state.forces, "momenta": state.momenta}
 
     def state_dict(self) -> dict[str, Any]:
         return {}  # no optimiser restart files (conductor's choice 5)

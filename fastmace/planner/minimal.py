@@ -493,8 +493,11 @@ class MinimalPlanner:
 
     def plan(self, force_field, atoms, integrator: IntegratorConfig, workload, hardware: Hardware | None = None, *,
              variable_cell: bool | None = None, allow_naive_cueq: bool = False, allow_reference: bool = False,
-             mode: str | None = None, d3_cutoff_A: float | None = None) -> Plan:
+             mode: str | None = None, d3_cutoff_A: float | None = None, optimizer=None) -> Plan:
         """The MD plan for ``force_field`` (an ``fm.ForceField``), ``atoms``, ``integrator`` and ``workload``.
+
+        ``optimizer`` (an ``OptimizerConfig``, 4-T05) plans a relaxation instead: ``integrator`` then only
+        carries the MD-side defaults (seed), and the plan records the optimiser (``Plan.optimizer``).
 
         ``mode`` (default ``None``) is the execution mode; without one the planner picks the graph tier,
         or the compiled tier where rule 4 (inexact padding) says so; host callbacks keep the graph tier
@@ -522,7 +525,7 @@ class MinimalPlanner:
                                 precision=force_field.precision, rewrites=force_field.rewrites, species=superset,
                                 loaded=force_field.model, variable_cell=variable_cell,
                                 allow_naive_cueq=allow_naive_cueq, allow_reference=allow_reference, mode=mode,
-                                d3_cutoff_A=d3_cutoff_A)
+                                d3_cutoff_A=d3_cutoff_A, optimizer=optimizer)
         if workload.reproducible and plan.runner == "in-process":  # the CPU device, or already done above
             reproducible_mode.prepare_process(self.process, owner=f"a reproducible {plan.engine.backend} MD plan")
         return _with_dispersion(plan, record)
@@ -531,7 +534,7 @@ class MinimalPlanner:
                     precision: str, rewrites: Any = "auto", species=None, loaded=None,
                     variable_cell: bool | None = None, allow_naive_cueq: bool = False,
                     allow_reference: bool = False, mode: str | None = None,
-                    d3_cutoff_A: float | None = None) -> Plan:
+                    d3_cutoff_A: float | None = None, optimizer=None) -> Plan:
         """``plan`` from model ``traits`` (``capabilities.ModelTraits``) and the ForceField's facts.
 
         ``precision``, ``rewrites`` and ``species`` are the ForceField's; ``loaded`` is its model, if
@@ -560,7 +563,7 @@ class MinimalPlanner:
             "allowed (SPEC §9.3 rule 1); the reference tier runs FastMACE's integrators, so it lifts no refusal of "
             "§4.4 (3D PBC, no constraints, a barostat for a variable cell)" if allow_reference else "not requested",
             code="allow-reference" if allow_reference else "no-allow-reference"))
-        npt = integrator.ensemble == "npt"
+        npt = optimizer.variable_cell if optimizer is not None else integrator.ensemble == "npt"
         if variable_cell and not npt:
             book.refuse(f"a variable cell needs a barostat integrator, got ensemble={integrator.ensemble!r} "
                         "(SPEC §4.4, §9.3 rule 1)", "variable-cell-without-barostat", 1)
@@ -580,14 +583,16 @@ class MinimalPlanner:
         self._workload_decisions(book, workload, rule_11, mode)
         if reference:
             parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend,
-                                          rule_11, mc=(workload.mc_moves, workload.mc_energy_precision))
+                                          rule_11, mc=(workload.mc_moves, workload.mc_energy_precision),
+                                          optimizer=optimizer)
         else:
             parts = self._fixed(rewrites, precision, engine)._resolve(book, traits, atoms, integrator, hardware,
                                                                       backend_choice=backend, texts=TEXTS,
                                                                       reproducible=workload.reproducible,
                                                                       rule_11=rule_11,
                                                                       mc=(workload.mc_moves,
-                                                                          workload.mc_energy_precision))
+                                                                          workload.mc_energy_precision),
+                                                                      optimizer=optimizer)
             if d3_cutoff_A is not None:
                 parts["neighbours"] = self._d3_list(book, parts["neighbours"], atoms, superset, integrator,
                                                     workload, hardware, float(d3_cutoff_A))
@@ -608,7 +613,7 @@ class MinimalPlanner:
         return plan
 
     def _reference_parts(self, book, traits, atoms, integrator, hardware, rewrites, precision, backend, rule_11=None,
-                         mc=None):
+                         mc=None, optimizer=None):
         """The reference tier's plan parts (plan task 2-T03): 1a's resolution on the uncompiled stock backend,
         then every rewrite off, no capture, no pipelining, and the graph tier's padding refusals lifted."""
         from fastmace.reference import records
@@ -619,7 +624,7 @@ class MinimalPlanner:
         inner = fixed._Book()
         parts = self._fixed(rewrites, precision, engine)._resolve(inner, traits, atoms, integrator, hardware,
                                                                   backend_choice=backend, texts=TEXTS, rule_11=rule_11,
-                                                                  mc=mc)
+                                                                  mc=mc, optimizer=optimizer)
         book.refusals.extend(reason for reason in inner.refusals if reason.code not in REFERENCE_LIFTS)
         toggles = [name for name in fixed.REWRITE_FIELDS if getattr(parts["rewrites"], name) in ("on", "off")]
         replaced = {"tier": (REFERENCE_TIER, REFERENCE_REASONS["tier"]),
@@ -936,7 +941,6 @@ class MinimalPlanner:
         field of FastMACE's state, integrator and ``GraphEngine``, without capture or padding."""
         from fastmace.engine.graph import GraphEngine
         from fastmace.engine.reference import ReferenceForceField
-        from fastmace.integrators import registry as schemes
         from fastmace.state import SimulationState
 
         if plan.tier != REFERENCE_TIER:
@@ -945,16 +949,16 @@ class MinimalPlanner:
         if not all(atoms.pbc):
             book.refuse("periodic boundaries in all three directions (3D PBC) are required (SPEC §4.4)",
                         "non-3d-pbc", 1)
-        fixed.refuse_unsupported(book, plan.integrator, atoms)
+        fixed.refuse_unsupported(book, plan.integrator, atoms, plan.optimizer)
         book.raise_refusals()
         self._check_atoms(plan, atoms)
         if temperature_K is None:
             temperature_K = plan.integrator.temperature_K or 0.0
-        npt = plan.integrator.ensemble == "npt"
+        npt = plan.optimizer.variable_cell if plan.optimizer is not None else plan.integrator.ensemble == "npt"
         field = ReferenceForceField(force_field, atoms, device=plan.engine.device, dtype=plan.precision.dtype,
                                     polar=plan.polar, compute_stress=npt)
         state = SimulationState.from_atoms(atoms, field.device, plan.integrator.seed, compute_stress=npt)
-        integrator = schemes.build_integrator(state, plan.integrator, temperature_K=temperature_K)
+        integrator = fixed.build_stepper(state, plan, temperature_K=temperature_K)
         engine = GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, capture=False,
                              pad_edges=False, constraints=self.process)
         engine.plan = plan  # no rewrites, so no per-record self-checks (as build's plan, 2-T04)
