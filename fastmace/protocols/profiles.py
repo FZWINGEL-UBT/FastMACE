@@ -26,8 +26,8 @@ ASE_OPTIMIZERS = ("ase-LBFGS", "ase-BFGS")
 GPU_OPTIMIZERS = ("gpu-LBFGS", "gpu-FIRE")
 OPTIMIZER_ALIASES = {"LBFGS": "ase-LBFGS", "BFGS": "ase-BFGS"}
 OPTIMIZERS = (*OPTIMIZER_ALIASES, *ASE_OPTIMIZERS, *GPU_OPTIMIZERS)
-# Decision 47: "gpu-LBFGS" once plan task 4-T08 has passed.
-DEFAULT_OPTIMIZER = "ase-LBFGS"
+# Decision 47: GPU LBFGS, since plan task 4-T08 passed (23 October 2026); "ase-LBFGS" and "ase-BFGS" stay options.
+DEFAULT_OPTIMIZER = "gpu-LBFGS"
 QUENCH_KEYS = ("min_K", "bin_K", "per_bin", "fmax", "optimizer", "max_steps")
 ENSEMBLES = ("NVT", "NPT")  # NVE comes with its integrator (phase 4)
 DISPERSIONS = ("none", "d3bj")
@@ -162,7 +162,7 @@ PROFILES: Mapping[str, Profile] = MappingProxyType({
     "anneal": _research_profile("anneal", 20.0, 250.0, peak_K=1000.0, final_K=250.0, interval=20,
                                 relax_fmax=0.01,
                                 quench={"min_K": 500.0, "bin_K": 100.0, "per_bin": 2, "fmax": 0.01,
-                                        "optimizer": "LBFGS", "max_steps": 5000}),
+                                        "optimizer": DEFAULT_OPTIMIZER, "max_steps": 5000}),
 })
 
 

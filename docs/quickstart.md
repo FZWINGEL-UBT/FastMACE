@@ -161,9 +161,9 @@ fastmace quench run/ --into gpu --optimizer gpu-LBFGS
 The optimizers are `gpu-LBFGS` and `gpu-FIRE` on the graph engine, and
 `ase-LBFGS` and `ase-BFGS`, ASE's on `fm.calc`. Bare `LBFGS` and `BFGS` mean
 ASE's, so existing protocol files keep their meaning. The default is
-`ase-LBFGS` until the annealing-benchmark minima pass on the GPU (plan task
-4-T08). The same names go into a protocol's `[relax]` and `[quench]` tables,
-and the records hold the name that ran.
+`gpu-LBFGS`, which reproduces the annealing-benchmark minima of ASE's LBFGS
+(plan task 4-T08). The same names go into a protocol's `[relax]` and `[quench]`
+tables, and the records hold the name that ran.
 
 `fastmace relax` writes the relaxed structure (`--output`, default
 `<stem>.relaxed.extxyz`) with its `.json` summary and `.log`. `fastmace quench

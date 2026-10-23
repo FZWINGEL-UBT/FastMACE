@@ -97,7 +97,7 @@ def test_stage_tables_are_checked():
     with pytest.raises(ValueError, match="quench"):
         runner.split_stages({"quench": {"min_K": 500.0}})
     stages, _ = runner.split_stages({"relax": {"fmax": 0.05}})
-    assert stages["relax"] == {"fmax": 0.05, "optimizer": "ase-LBFGS", "max_steps": quench.QUENCH_MAX_STEPS}
+    assert stages["relax"] == {"fmax": 0.05, "optimizer": "gpu-LBFGS", "max_steps": quench.QUENCH_MAX_STEPS}
 
 
 # --------------------------------------------------------------------------- frame selection

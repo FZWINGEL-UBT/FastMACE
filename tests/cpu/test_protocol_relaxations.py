@@ -3,7 +3,7 @@
 The optimizer names (conductor, 23 October 2026): bare ``"LBFGS"`` and ``"BFGS"`` keep meaning ASE's, so
 existing protocol files are unchanged; ``"ase-LBFGS"`` and ``"ase-BFGS"`` name them explicitly, and
 ``"gpu-LBFGS"`` and ``"gpu-FIRE"`` are ``fm.optimize``'s on the graph engine. The records hold the resolved
-name. The default stays ``"ase-LBFGS"`` until 4-T08 passes (decision 47).
+name. The default is ``"gpu-LBFGS"`` since 4-T08 passed (decision 47; the shipped protocols name it too).
 
 One GPU relaxer relaxes every frame of a quench on one engine (``Simulation.update(cell=, positions=)``),
 each frame as a fresh relaxation would. On the CPU the "GPU" optimisers run on the eager CPU engine.
@@ -27,7 +27,7 @@ NA_CL = (11, 17)
 
 
 def test_names_resolve_and_bare_names_stay_ase():
-    assert profiles.DEFAULT_OPTIMIZER == "ase-LBFGS"
+    assert profiles.DEFAULT_OPTIMIZER == "gpu-LBFGS"  # decision 47, since 4-T08 passed
     assert profiles.resolve_optimizer("LBFGS") == "ase-LBFGS"
     assert profiles.resolve_optimizer("BFGS") == "ase-BFGS"
     for name in ("ase-LBFGS", "ase-BFGS", "gpu-LBFGS", "gpu-FIRE"):
@@ -40,7 +40,7 @@ def test_names_resolve_and_bare_names_stay_ase():
 
 def test_profiles_and_stages_record_the_resolved_name():
     anneal = PROFILES["anneal"]
-    assert anneal.relax_optimizer == "ase-LBFGS" and anneal.quench["optimizer"] == "ase-LBFGS"
+    assert anneal.relax_optimizer == anneal.quench["optimizer"] == "gpu-LBFGS"
     stages, _ = runner.split_stages({"relax": {"fmax": 0.05}})
     assert stages["relax"]["optimizer"] == profiles.DEFAULT_OPTIMIZER
     stages, _ = runner.split_stages({"relax": {"fmax": 0.05, "optimizer": "gpu-FIRE"},
