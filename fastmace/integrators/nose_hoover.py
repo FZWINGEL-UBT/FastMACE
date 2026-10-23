@@ -118,15 +118,17 @@ class NoseHooverChain:
 
     def _integrate_p_eta_j(self, j, delta2, delta4, kT, force):
         p, Q = self._p, self.masses
-        if j < self.length - 1:
-            p[j].mul_(torch.exp(-delta4 * p[j + 1] / Q[j + 1]))
+        # ASE evaluates the same factor before and after the kick (p[j + 1] does not change in between)
+        damping = torch.exp(-delta4 * p[j + 1] / Q[j + 1]) if j < self.length - 1 else None
+        if damping is not None:
+            p[j].mul_(damping)
         if j == 0:
             g_j = force() - self.first_dof * kT
         else:
             g_j = p[j - 1] ** 2 / Q[j - 1] - kT
         p[j].add_(delta2 * g_j)
-        if j < self.length - 1:
-            p[j].mul_(torch.exp(-delta4 * p[j + 1] / Q[j + 1]))
+        if damping is not None:
+            p[j].mul_(damping)
 
     def energy(self, kT: torch.Tensor) -> torch.Tensor:
         """ASE's get_thermostat_energy / get_barostat_energy."""
