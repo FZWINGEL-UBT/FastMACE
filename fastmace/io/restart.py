@@ -472,8 +472,14 @@ def check_identity(restart: Mapping[str, Any], identity: ForceFieldIdentity) -> 
     if different:
         changes = "; ".join(f"{name}: {getattr(stored, name)!r} in the file, {getattr(identity, name)!r} now"
                             for name in different)
-        raise RestartMismatch(f"the force field differs from the restart's in {', '.join(different)}",
-                              why=f"a resume continues the same physics only (SPEC §10.6). {changes}.")
+        why = f"a resume continues the same physics only (SPEC §10.6). {changes}."
+        if "reference_record_id" in different:
+            from fastmace.reference import records
+
+            reason = records.superseded(stored.reference_record_id)
+            if reason is not None:
+                why += f" The file's reference record is {reason}."
+        raise RestartMismatch(f"the force field differs from the restart's in {', '.join(different)}", why=why)
 
 
 def integrator_state(restart: Mapping[str, Any]) -> dict[str, np.ndarray]:

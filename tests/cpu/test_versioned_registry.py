@@ -40,9 +40,10 @@ SETTERS = {"capture_safe_mask_head": _patches.set_capture_safe_mask_head,
            "unfuse_full_addmm": _patches.set_unfuse_full_addmm,
            "cueq_conv_fusion": _patches.set_cueq_conv_fusion}
 WRONG = "0" * 64
-# The 0.3.16 reference record ids of 1b (main at b0f24d5).
+# The 0.3.16 reference record ids of 1b (main at b0f24d5); PolarMACE's since 4-T12 (SPEC decision 49).
 MH1_ID = "fastmace.reference/0.3.16/mh1/763155208cd1ef8c"
-POLAR_ID = "fastmace.reference/0.3.16/polar/8e216bde0c3515e9"
+POLAR_ID_1B = "fastmace.reference/0.3.16/polar/8e216bde0c3515e9"
+POLAR_ID = "fastmace.reference/0.3.16/polar/55cffb303c6d2e25"
 
 
 @pytest.fixture(autouse=True)
@@ -396,6 +397,20 @@ def test_the_qualified_records_are_unchanged():
     assert records.record_for("0.3.16", "mh1").id == MH1_ID
     assert records.record_for("0.3.16", "polar").id == POLAR_ID
     assert records.record_for("0.3.16", "mh1").qualified
+
+
+def test_the_polar_record_of_1b_is_superseded_by_the_gate_floor_alone():
+    """4-T12: a new PolarMACE record version, not an edit: the 1b record plus one gate entry."""
+    import dataclasses
+
+    from fastmace.reference import records
+
+    record = records.record_for("0.3.16", "polar")
+    assert record.numerical[-1]["name"] == "polar_float32_stress_floor"
+    assert dataclasses.replace(record, numerical=record.numerical[:-1]).id == POLAR_ID_1B
+    reason = records.superseded(POLAR_ID_1B)
+    assert "decision 49" in reason and POLAR_ID in reason
+    assert records.superseded(POLAR_ID) is None and records.superseded(MH1_ID) is None
 
 
 def test_an_unqualified_version_gets_stock_equivalence_only():

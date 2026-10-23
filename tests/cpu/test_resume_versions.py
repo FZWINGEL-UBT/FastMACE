@@ -111,6 +111,24 @@ def test_the_resume_finds_the_records_this_fastmace_builds():
     assert not _same_reference(record.id, "not an id")
 
 
+def test_a_superseded_reference_record_refuses_with_its_reason(monkeypatch):
+    """4-T12: PolarMACE restarts written before SPEC decision 49 carry the 1b record; the refusal says why."""
+    from fastmace import simulation
+    from fastmace.io import restart
+
+    old = "fastmace.reference/0.3.16/polar/8e216bde0c3515e9"
+    new = records.record_for("0.3.16", "polar").id
+    monkeypatch.setattr(restart, "stored_identity", lambda file: identity(reference_record_id=old))
+    with pytest.raises(RestartMismatch, match="reference_record_id") as raised:
+        simulation._resume_identity({}, identity(reference_record_id=new))
+    assert "superseded" in raised.value.why and "decision 49" in raised.value.why
+    # Other record changes keep the plain message.
+    monkeypatch.setattr(restart, "stored_identity", lambda file: identity(reference_record_id="ref-1"))
+    with pytest.raises(RestartMismatch) as raised:
+        simulation._resume_identity({}, identity(reference_record_id=new))
+    assert "superseded" not in raised.value.why
+
+
 def test_resume_identity_warns_on_versions_and_refuses_the_rest(monkeypatch):
     from fastmace import simulation
     from fastmace.io import restart

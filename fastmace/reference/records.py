@@ -128,6 +128,30 @@ FLOAT32_SUM_UNQUALIFIED = {
 }
 ENERGY_BOUND_UNQUALIFIED = "looser: unqualified MACE, float32 yardstick energy sum (SPEC §18 decision 2)"
 
+# A treatment of the gate's comparison, not of the model (SPEC §12.3, decision 49): PolarMACE's float32
+# stress sits at the general 1e-7 floor on rounding alone, so its record raises the stress floor. The
+# energy and force floors stay the general ones. ``gate_floors`` reads the entries that apply to the gate.
+POLAR_GATE_FLOOR = {
+    "name": "polar_float32_stress_floor",
+    "applies_to": "gate",
+    "floors": {"stress_eV_per_A3": 5e-7},
+    "what": "the gate's floor for the largest stress component is 5e-7 eV/A^3 (0.08 MPa) for PolarMACE; the energy "
+            "and force floors are SPEC §12.3's",
+    "why": "PolarMACE's float32 stress is 0.8-2.7e-7 eV/A^3 from float64 on every path (3b-T08), the order of the "
+           "general 1e-7 floor, so the ratio rule failed some configurations on rounding alone (1b-T23: 1.2e-7 on "
+           "NaCl 3x3x3)",
+    "decision": "SPEC §18 decision 49 (owner, 23 October 2026; 4-T12)",
+}
+
+# Qualified record ids that this FastMACE no longer builds, with the reason. Restart files and metadata
+# carry the ids, so a resume names the reason when it refuses one (``fastmace.io.restart.check_identity``).
+SUPERSEDED = {
+    "fastmace.reference/0.3.16/polar/8e216bde0c3515e9":
+        "the PolarMACE record of phases 1b-3b, superseded in 4-T12 by "
+        "fastmace.reference/0.3.16/polar/55cffb303c6d2e25, which adds the gate's PolarMACE stress floor "
+        "(polar_float32_stress_floor, SPEC §18 decision 49) and nothing else",
+}
+
 
 class ReferencePolicyError(FastMACEError):
     """No qualified reference for this request, or a record that would drop a correction (SPEC §12.1)."""
@@ -281,7 +305,7 @@ def record_for(mace_version, family, *, polar=None, d3=None):
 
         optional += ({"name": "d3", **OPTIONAL_PHYSICS["d3"], "parameters": dispersion.identity_entry(d3)},)
     correction = {"name": "baoab_full_cell_drag", "id": QUALIFICATION["id"], "qualification": QUALIFICATION}
-    stock, numerical = STOCK, (FLOAT64_ACCUMULATION,)
+    stock, numerical = STOCK, (FLOAT64_ACCUMULATION,) + ((POLAR_GATE_FLOOR,) if family == "polar" else ())
     if not qualified:
         from fastmace import _patches
 
@@ -291,6 +315,20 @@ def record_for(mace_version, family, *, polar=None, d3=None):
     return ReferenceRecord(schema=SCHEMA, mace_version=mace_version, family=family, stock=stock,
                            upstream_fixes=fixes, optional_physics=optional, integrator_corrections=(correction,),
                            numerical=numerical)
+
+
+def gate_floors(record):
+    """The gate floors ``record`` raises, ``{quantity: floor}`` (empty for every family but PolarMACE)."""
+    floors = {}
+    for entry in record.numerical:
+        if entry.get("applies_to") == "gate":
+            floors.update(entry["floors"])
+    return floors
+
+
+def superseded(record_id):
+    """Why a qualified record id is no longer built, or ``None`` for an id that is not superseded."""
+    return SUPERSEDED.get(str(record_id))
 
 
 def require_record_for_model(record, model):
@@ -308,7 +346,7 @@ def require_record_for_model(record, model):
 
 __all__ = [
     "ENERGY_BOUND_UNQUALIFIED", "FAMILIES", "FLOAT32_SUM_UNQUALIFIED",
-    "FLOAT64_ACCUMULATION", "ID_PREFIX", "OPTIONAL_PHYSICS", "POLAR_STRESS_FIX", "QUALIFIED_MACE_VERSIONS",
-    "ReferencePolicyError", "ReferenceRecord", "SCHEMA", "STOCK", "family_of", "mace_version", "record_for",
-    "require_record_for_model",
+    "FLOAT64_ACCUMULATION", "ID_PREFIX", "OPTIONAL_PHYSICS", "POLAR_GATE_FLOOR", "POLAR_STRESS_FIX",
+    "QUALIFIED_MACE_VERSIONS", "ReferencePolicyError", "ReferenceRecord", "SCHEMA", "STOCK", "SUPERSEDED", "family_of",
+    "gate_floors", "mace_version", "record_for", "require_record_for_model", "superseded",
 ]

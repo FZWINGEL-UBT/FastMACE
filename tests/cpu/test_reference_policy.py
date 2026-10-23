@@ -129,6 +129,25 @@ def test_polar_record_carries_the_issue_1642_fix_and_its_validation():
     assert record.is_stock
 
 
+def test_polar_record_carries_the_gate_stress_floor():
+    """SPEC decision 49 (4-T12): PolarMACE's stress floor of 5e-7 eV/A^3 is a gate entry of its record."""
+    from fastmace.config import PolarConfig
+
+    record = records.record_for("0.3.16", "polar")
+    assert [entry["name"] for entry in record.numerical] == ["float64_energy_accumulation",
+                                                             "polar_float32_stress_floor"]
+    entry = record.numerical[-1]
+    assert entry["applies_to"] == "gate" and entry["floors"] == {"stress_eV_per_A3": 5e-7}
+    assert "decision 49" in entry["decision"]
+    assert records.gate_floors(record) == {"stress_eV_per_A3": 5e-7}
+    assert record.is_stock  # a treatment of the comparison, not of the model
+    stabilised = records.record_for("0.3.16", "polar", polar=PolarConfig(fukui_regularisation=0.1))
+    assert records.gate_floors(stabilised) == {"stress_eV_per_A3": 5e-7}
+    for family in ("mh1", "omol", "residual", "density", "off", "unlabelled"):
+        assert records.gate_floors(records.record_for("0.3.16", family)) == {}, family
+        assert records.gate_floors(records.record_for("0.3.17", family)) == {}, family
+
+
 def test_record_ids_are_stable_and_change_with_every_entry():
     record = records.record_for("0.3.16", "polar")
     assert record.id == records.record_for("0.3.16", "polar").id
@@ -252,6 +271,7 @@ def test_float64_reference_equals_stock_mace(family):
     info = reference.info()
     assert info["record_id"] == record.id and info["dtype"] == "float64" and info["role"] == "reference"
     assert info["corrections_active"] == (["polar_kspace_stress"] if family == "polar" else [])
+    assert info["gate_floors"] == ({"stress_eV_per_A3": 5e-7} if family == "polar" else {})
 
 
 @needs_polar

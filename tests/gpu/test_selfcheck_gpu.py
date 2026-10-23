@@ -13,7 +13,10 @@ runs the gate's references, builds the engine, and runs the gate's production ha
 - references computed in-process (before any production engine) equal references computed in a
   fresh child process after the engine was built: float64 within 1e-12, the float32 yardstick within
   the model's process-to-process float32 scatter (OMOL-0 XL 2e-4 eV/Å, 1a-T19; others 1e-5);
-- the gate's time on NaCl 3x3x3 and NbCl5 2x2x2 (MH-1) is recorded ("seconds to a minute").
+- the gate's time on NaCl 3x3x3 and NbCl5 2x2x2 (MH-1) is recorded ("seconds to a minute");
+- 4-T12 (SPEC decision 49): POLAR-1-S passes on NaCl 3x3x3 and NbCl5 3x3x3, fixed cell and NPT, with
+  the PolarMACE record's stress floor of 5e-7 eV/Å^3 in the gate record; a deliberate stress error of
+  6e-7 eV/Å^3 in the production path still fails, on stress alone.
 """
 
 import json
@@ -109,6 +112,18 @@ CHILD = textwrap.dedent("""
         engine._graphs.clear()
     gate_started = time.perf_counter()
     out["gate"] = gate()
+    if SPEC.get("stress_offset"):
+        read = selfcheck._read_outputs
+
+        def shifted(engine_, stress):  # a deliberate stress error in the production path, nothing else
+            energy, forces, values = read(engine_, stress)
+            values = values.copy()
+            values[0, 0] += SPEC["stress_offset"]
+            return energy, forces, values
+
+        selfcheck._read_outputs = shifted
+        out["offset_gate"] = gate()
+        selfcheck._read_outputs = read
     out["seconds"] = {"references": references.seconds, "build": built - started - references.seconds,
                       "production": time.perf_counter() - gate_started}
     if SPEC.get("fresh_references"):
@@ -167,6 +182,44 @@ def test_gate_passes_in_graph_mode(name):
         assert fresh["reference"]["forces_eV_per_A"] <= 1e-12 and fresh["reference"]["stress_eV_per_A3"] <= 1e-12
         assert fresh["reference"]["energy_eV"] <= 1e-12 * out["atoms"]
         assert fresh["yardstick"]["forces_eV_per_A"] <= SCATTER.get(spec["label"], 1e-5)
+
+
+NPT = {"ensemble": "npt"}
+POLAR_CASES = {
+    "polar1-s-nacl-npt": dict(label="polar1-s", **NACL, integrator=NPT, stress_offset=6e-7),
+    "polar1-s-nacl-npt-full": dict(label="polar1-s", **NACL, integrator={**NPT, "cell_mode": "full"}),
+    "polar1-s-nbcl5-nvt": dict(label="polar1-s", structure="nbcl5", repeat=3),
+    "polar1-s-nbcl5-npt": dict(label="polar1-s", structure="nbcl5", repeat=3, integrator=NPT, stress_offset=6e-7),
+}
+POLAR_STRESS_FLOOR = 5e-7  # the PolarMACE record's entry (SPEC decision 49)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("name", list(POLAR_CASES))
+def test_polar_gate_uses_the_record_stress_floor(name):
+    from fastmace.reference import records
+
+    spec = POLAR_CASES[name]
+    if not _available(spec["label"]):
+        pytest.skip(f"{spec['label']} is not in FASTMACE_MODELS")
+    out = run_gate(spec)
+    _report(name, out)
+    gate = out["gate"]
+    assert gate["status"] == "passed", gate
+    assert gate["references"]["record_id"] == records.record_for("0.3.16", "polar").id
+    assert gate["floors"]["stress_eV_per_A3"] == POLAR_STRESS_FLOOR
+    assert gate["floors"]["force_eV_per_A"] == 1e-5 and gate["floors"]["energy_meV_per_atom"] == 0.01
+    if "npt" not in name:
+        assert gate["quantities"]["stress_eV_per_A3"]["note"] == "stress: not in plan"
+        return
+    stress = gate["quantities"]["stress_eV_per_A3"]
+    assert stress["floor"] == POLAR_STRESS_FLOOR and stress["floor_source"] == "reference record"
+    if spec.get("stress_offset"):
+        offset = out["offset_gate"]
+        assert offset["status"] == "failed", offset
+        failed = [quantity for quantity, q in offset["quantities"].items() if not q["passed"]]
+        assert failed == ["stress_eV_per_A3"], offset
+        assert offset["stress_eV_per_A3"] > POLAR_STRESS_FLOOR
 
 
 @pytest.mark.slow
