@@ -9,6 +9,12 @@ Then it warms each side up and times blocks round-robin (A B C A B C ...), each 
 its front end: ``Simulation.run(steps=n)``, ``RunResult.simulation.run(steps=n)`` after ``fm.md``'s
 first step, and ``Langevin.run(n)``. Ratios are against the first side.
 
+``--integrator`` (4-T10) times one of the phase 4 ``fastmace.ase`` classes instead of ``Langevin``
+(``INTEGRATORS``, ASE's arguments in ``ase_arguments``). Its ``Simulation`` and ``fm.md`` sides take the
+shim's own record (``integrator=``), so the three run the same physics; the unit conversions are
+tested on the CPU (``tests/cpu/test_ase_md_4.py``). Every side starts from the same Maxwell-Boltzmann
+momenta at ``--temperature-K`` (seeded; NVE and Bussi need them).
+
 All three build their engine through the minimal planner in this process, so they share one backend
 family (§8.7) and need no patch handling. ``fm.md`` arrives with 1b-T20 and ``fastmace.ase.Langevin``
 with 1b-T21; until then those sides stop with the task they wait for. Use an otherwise idle GPU.
@@ -40,6 +46,47 @@ WAITS_FOR = {"md": "1b-T20 (fm.md)", "ase": "1b-T21 (fastmace.ase.Langevin)"}
 # fm.md's defaults (1b-T20): 0.5 fs, main.py's friction 0.02 per ASE time unit.
 TIMESTEP_FS = 0.5
 FRICTION_ASE = 0.02
+# The fastmace.ase classes --integrator takes (4-T10); "Langevin" is the 1b comparison.
+INTEGRATORS = ("Langevin", "VelocityVerlet", "Bussi", "NoseHooverChainNVT", "IsotropicMTKNPT", "MTKNPT",
+               "NVTBerendsen", "NPTBerendsen", "Inhomogeneous_NPTBerendsen")
+# Their settings, in fs, GPa and 1/GPa: production-like time constants, NaCl's compressibility.
+TAU_FS, PDAMP_FS, TAUP_FS, PRESSURE_GPA, COMPRESSIBILITY_PER_GPA = 100.0, 1000.0, 1000.0, 0.0, 0.04
+
+
+def ase_arguments(name, temperature_K):
+    """The ASE arguments (ASE units) of ``fastmace.ase.<name>`` after ``atoms`` and ``timestep``."""
+    from ase import units
+
+    thermostat = {"temperature_K": temperature_K}
+    npt = dict(thermostat, pressure_au=PRESSURE_GPA * units.GPa, taut=TAU_FS * units.fs, taup=TAUP_FS * units.fs,
+               compressibility_au=COMPRESSIBILITY_PER_GPA / units.GPa)
+    mtk = dict(thermostat, pressure_au=PRESSURE_GPA * units.GPa, tdamp=TAU_FS * units.fs,
+               pdamp=PDAMP_FS * units.fs)
+    return {"Langevin": dict(thermostat, friction=FRICTION_ASE), "VelocityVerlet": {},
+            "Bussi": dict(thermostat, taut=TAU_FS * units.fs),
+            "NoseHooverChainNVT": dict(thermostat, tdamp=TAU_FS * units.fs), "IsotropicMTKNPT": mtk, "MTKNPT": mtk,
+            "NVTBerendsen": dict(thermostat, taut=TAU_FS * units.fs), "NPTBerendsen": npt,
+            "Inhomogeneous_NPTBerendsen": dict(npt, mask=(1, 1, 1))}[name]
+
+
+def ase_dynamics(args, atoms, loaded, output=None):
+    """``fastmace.ase.<args.integrator>`` on ``atoms`` (not run: nothing is planned yet)."""
+    from ase import units
+
+    import fastmace.ase
+
+    return getattr(fastmace.ase, args.integrator)(atoms, TIMESTEP_FS * units.fs,
+                                                  **ase_arguments(args.integrator, args.temperature_K), model=loaded,
+                                                  seed=args.seed, check=args.check, output=output)
+
+
+def thermalize(atoms, temperature_K, seed):
+    """Maxwell-Boltzmann momenta at ``temperature_K`` from ``seed``, the same for every side."""
+    import numpy as np
+    from ase import units
+
+    scale = np.sqrt(atoms.get_masses() * units.kB * temperature_K)[:, None]
+    atoms.set_momenta(np.random.default_rng(seed).standard_normal((len(atoms), 3)) * scale)
 
 
 class FrontEndUnavailable(RuntimeError):
@@ -142,6 +189,8 @@ def parse_args(argv=None):
     p.add_argument("--structure", default="NaCl",
                    help="Benchmark name (under FASTMACE_STRUCTURES) or a file with PATH@NXxNYxNZ")
     p.add_argument("--temperature-K", type=float, default=300.0)
+    p.add_argument("--integrator", choices=INTEGRATORS, default="Langevin",
+                   help="The fastmace.ase class of the ase side and the record of the others (4-T10)")
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--check", choices=("skip", "gate"), default="skip", help="The gate (opt-in, owner decision D1)")
     p.add_argument("--warmup", type=int, default=300)
@@ -164,34 +213,46 @@ def _output(args, name):
     return Output(str(args.output / name), trajectory_every=None)
 
 
+def _record(args, atoms, loaded):
+    """The integrator record of ``--integrator``: the shim's own, so every side runs the same physics."""
+    return ase_dynamics(args, atoms.copy(), loaded).integrator
+
+
 def build_simulation(args, atoms, loaded):
     from ase import units
 
     from fastmace import integrators
     from fastmace.model.forcefield import ForceField
+    from fastmace.planner.workload import Workload
+    from fastmace.quick import nve_max_temperature_K
     from fastmace.simulation import Simulation
-    integrator = integrators.Langevin(timestep_fs=TIMESTEP_FS, temperature_K=args.temperature_K,
-                                      friction_per_fs=FRICTION_ASE * units.fs)
+    if args.integrator == "Langevin":
+        integrator = integrators.Langevin(timestep_fs=TIMESTEP_FS, temperature_K=args.temperature_K,
+                                          friction_per_fs=FRICTION_ASE * units.fs)
+    else:
+        integrator = _record(args, atoms, loaded)
+    target = getattr(integrator, "temperature_K", None)  # NVE: fm.md's and the shim's workload
+    workload = Workload(max_temperature_K=nve_max_temperature_K(atoms) if target is None else float(target))
     sim = Simulation(atoms, ForceField(loaded, atoms), integrator=integrator, output=_output(args, "simulation"),
-                     seed=args.seed, check=args.check)
+                     seed=args.seed, check=args.check, workload=workload)
     return sim, lambda steps: sim.run(steps=steps), sim.plan, sim.gate
 
 
 def build_md(args, atoms, loaded):
     import fastmace as fm
 
-    result = fm.md(atoms, model=loaded, temperature_K=args.temperature_K, timestep_fs=TIMESTEP_FS, steps=1,
-                   seed=args.seed, check=args.check, output=_output(args, "md"))
+    if args.integrator == "Langevin":
+        physics = dict(temperature_K=args.temperature_K, timestep_fs=TIMESTEP_FS)
+    else:
+        physics = dict(integrator=_record(args, atoms, loaded))
+    result = fm.md(atoms, model=loaded, steps=1, seed=args.seed, check=args.check, output=_output(args, "md"),
+                   **physics)
     sim = result.simulation
     return result, lambda steps: sim.run(steps=steps), result.plan, result.gate
 
 
 def build_ase(args, atoms, loaded):
-    from ase import units
-
-    from fastmace.ase import Langevin
-    dyn = Langevin(atoms.copy(), TIMESTEP_FS * units.fs, temperature_K=args.temperature_K, friction=FRICTION_ASE,
-                   model=loaded, seed=args.seed, check=args.check, output=_output(args, "ase").directory)
+    dyn = ase_dynamics(args, atoms.copy(), loaded, output=_output(args, "ase").directory)
     dyn.run(1)  # the shim builds its Simulation at the first run, as fm.md runs its first step
     return dyn, dyn.run, dyn.plan, dyn.gate
 
@@ -215,10 +276,13 @@ def main(argv=None):
     args.output.mkdir(parents=True, exist_ok=False)
     protocol = step_time.TimingProtocol(warmup=args.warmup, block=args.block, blocks=args.blocks)
     structure, atoms = ab_step_time.read_structure(args.structure, None)
+    if args.integrator != "Langevin":
+        thermalize(atoms, args.temperature_K, args.seed)
     meta = dict(schema_version=step_time.SCHEMA_VERSION, status="running", tool="ab_frontends",
                 created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename, python=sys.executable,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, sha256=loaded.sha256,
                 structure=structure, natoms=len(atoms), temperature_K=args.temperature_K, check=args.check,
+                integrator=args.integrator, ase_arguments=ase_arguments(args.integrator, args.temperature_K),
                 timestep_fs=TIMESTEP_FS, friction_ase=FRICTION_ASE, protocol=protocol.as_dict(), sides=args.sides,
                 torch=torch.__version__, setup_s={}, plans={}, gates={})
     path = args.output / "metadata.json"

@@ -8,8 +8,8 @@ records in Python are TOML values or tables:
 - ``schedule``: a profile name (``fm.protocols.PROFILES``: slow, fast, ultrafast, anneal) or an
   array of ``[[schedule]]`` segments (``kind = "ramp"`` with ``start_K``, ``end_K`` and ``ps`` or
   ``rate_K_per_ps``; ``kind = "hold"`` with ``temperature_K`` and ``ps``);
-- ``integrator``: a table with ``type = "Langevin"`` or ``"LangevinBAOAB"`` and the record's
-  fields (``fm.integrators``); ``friction_per_fs`` defaults to ``fm.md``'s friction;
+- ``integrator``: a table with ``type`` one of ``INTEGRATOR_TYPES`` (the ``fm.integrators`` records)
+  and the record's fields; a Langevin record's ``friction_per_fs`` defaults to ``fm.md``'s friction;
 - ``dispersion``: ``"none"``, ``"d3bj"`` or a ``[dispersion]`` table of ``fm.D3`` fields;
 - ``mc``: one ``[mc]`` table or ``[[mc]]`` tables, each an ``fm.mc`` record: ``move`` (``"swap"``,
   ``"transmute"`` or ``"displace"``) and that record's fields (``pairs``, ``species``, ``delta_A``,
@@ -37,7 +37,8 @@ from fastmace.cli.md import run_md, usage_error
 
 HELP = "run MD or a protocol from a TOML file of fm.md arguments (write one with fastmace init)"
 
-INTEGRATOR_TYPES = ("Langevin", "LangevinBAOAB")
+# fm.integrators.RECORDS, written out so that --help imports no ASE (a test keeps them equal).
+INTEGRATOR_TYPES = ("Langevin", "LangevinBAOAB", "NVE", "CSVR", "NoseHooverChain", "MTK", "Berendsen")
 
 
 def add_arguments(parser):
@@ -121,11 +122,11 @@ def _integrator(value):
     fields = dict(value)
     kind = fields.pop("type", None)
     if kind not in INTEGRATOR_TYPES:
-        raise ValueError(f"integrator type = {kind!r} is not one of {', '.join(INTEGRATOR_TYPES)} (1b; the others "
-                         "come with their integrators, SPEC §10.2)")
+        raise ValueError(f"integrator type = {kind!r} is not one of {', '.join(INTEGRATOR_TYPES)} (SPEC §10.2)")
     record_type = getattr(integrators, kind)
     fields = _fields(record_type, fields, f"integrator ({kind})")
-    fields.setdefault("friction_per_fs", default_friction_per_fs())
+    if "friction_per_fs" in {field.name for field in dataclasses.fields(record_type)}:
+        fields.setdefault("friction_per_fs", default_friction_per_fs())
     return record_type(**fields)
 
 

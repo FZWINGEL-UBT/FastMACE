@@ -316,7 +316,7 @@ def test_ase_argument_lists_match_ase(name):
     expected = {**md.ASE_ARGUMENTS, **md.ASE_OPTIMIZER_ARGUMENTS}[name]
     ase_class = getattr(importlib.import_module(md.ASE_MODULES[name]), name)
     assert tuple(_ase_arguments(ase_class)) == expected
-    assert name in md.LATER or name in md.ASE_OPTIMIZER_ARGUMENTS
+    assert name in md.MAPPED or name in md.ASE_OPTIMIZER_ARGUMENTS
 
 
 # --------------------------------------------------------------------------- state, DOF view, buffers

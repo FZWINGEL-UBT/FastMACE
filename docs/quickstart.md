@@ -54,8 +54,8 @@ supercell. The summary report shows the plan, the gate status and the speed.
 | `--sha256`, `--trusted` | `sha256`, `trusted`, for model files outside the label table | |
 | `--structure` | the structure, any format ASE reads | required |
 | `--repeat NA NB NC` | `repeat` | `1 1 1`: the cell is never expanded silently |
-| `--ensemble` | `ensemble`: `NVT` (Langevin) or `NPT` (LangevinBAOAB) | `NVT` |
-| `--temperature` | `temperature_K` (K) | required |
+| `--ensemble` | `ensemble`: `NVT` (Langevin), `NPT` (LangevinBAOAB) or `NVE` (velocity Verlet) | `NVT` |
+| `--temperature` | `temperature_K` (K) | required, except for NVE, which refuses it |
 | `--pressure`, `--cell-mode` | `pressure_GPa` (GPa), `cell_mode` (`hydrostatic`, `full`), NPT only | `0`, `hydrostatic` |
 | `--timestep` | `timestep_fs` (fs) | `0.5` |
 | `--steps` | `steps` | required |
@@ -67,8 +67,9 @@ supercell. The summary report shows the plan, the gate status and the speed.
 The Langevin friction is `fm.md`'s default, 0.02 per ASE time unit (about
 0.002/fs), as in `main.py`.
 
-Some requests are refused before anything runs, with the reason: NVE
-(phase 4) and D3 (phase 3b). For D3, the refusal shows the expanded record.
+NVE has no target temperature. It starts from the momenta in the structure
+file, and `fm.md` draws no velocities: a file without momenta starts at rest.
+The skin is sized for twice the starting kinetic temperature, at least 1 K.
 MC moves run through `fastmace run` (below), and they are experimental until
 their qualification study is recorded. An error prints its message without a traceback and exits
 1. `--debug` also prints the traceback. A wrong combination of arguments
@@ -119,8 +120,8 @@ kind = "hold"
 temperature_K = 1000.0
 ps = 10.0
 
-[integrator]                   # fm.integrators.Langevin or LangevinBAOAB
-type = "LangevinBAOAB"
+[integrator]                   # an fm.integrators record: Langevin, LangevinBAOAB, NVE, CSVR,
+type = "LangevinBAOAB"         # NoseHooverChain, MTK or Berendsen
 temperature_K = 300.0
 cell_mode = "full"
 

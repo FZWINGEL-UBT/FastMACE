@@ -270,9 +270,9 @@ def test_check_gate_reaches_the_simulation(loaded, monkeypatch):
 def test_an_unmapped_ase_class_names_the_mapped_ones():
     import fastmace.ase
 
-    with pytest.raises(PlanRefused, match="Langevin, LangevinBAOAB") as error:
-        from fastmace.ase import VelocityVerlet  # noqa: F401
-    assert "phase 4" in str(error.value)
+    with pytest.raises(PlanRefused, match="Langevin, LangevinBAOAB, VelocityVerlet") as error:
+        from fastmace.ase import Andersen  # noqa: F401
+    assert "ase-class-unmapped" in error.value.codes
     with pytest.raises(AttributeError):
         fastmace.ase.NoSuchThing  # noqa: B018
 
@@ -328,7 +328,7 @@ def test_baoab_hydrostatic_needs_a_scalar_as_ase(loaded):
 def test_baoab_refusals(loaded):
     with pytest.raises(PlanRefused, match="use `Langevin`"):
         _baoab(loaded, externalstress=None)
-    with pytest.raises(PlanRefused, match="phase 4"):
+    with pytest.raises(PlanRefused, match="NPH"):
         _baoab(loaded, temperature_K=None)
     with pytest.raises(PlanRefused, match="P_mass"):
         _baoab(loaded, P_mass=1000.0)
