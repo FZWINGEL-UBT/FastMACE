@@ -581,3 +581,62 @@ anything:
   container's `dumb-init` (`results/modal-opt-T08-L4-3e5decd/pid-check.txt`). `tools/ab_step_time.gpu_processes()`
   therefore drops PID 1 inside a container (`MODAL_IS_REMOTE`, `MODAL_TASK_ID` or `/.dockerenv`). Runs before that
   fix, such as `modal-opt-T08-L4-3e5decd`, show `INVALID` for this reason only.
+
+## Google Colab
+
+Plan task ops-colab (23 October 2026): FastMACE jobs on Colab GPUs through the `colab` CLI (0.7.5, in WSL,
+signed in as the owner). The GPUs are G4 (RTX PRO 6000 Blackwell, sm_120, 96 GB), A100 and L4. The owner
+does not cap Colab compute units ("Dont cap anything for colab"), but every VM is stopped when its job ends,
+and every job records the units it used. Timed A/B comparisons stay on the local GPU (SPEC decision 39,
+amended). Label every Colab result "Colab <GPU>".
+
+The code is in `tools/colab/`:
+- `fastmace_colab.py`: the driver, run from WSL with the system `python3` (standard library only);
+- `remote.sh`: the VM side, in stages (probe, setup, restore, run, pack);
+- `remote_step.py`: runs one stage detached on the VM, so that `colab exec` can reattach to a long command.
+
+**One job:**
+
+```bash
+python3 tools/colab/fastmace_colab.py --gpu G4 --commit <sha> --out ~/fastmace-acceptance/colab-<run> --command 'python tools/acceptance/compat.py --provider colab --label "Colab G4" --output $OUT'
+```
+
+- **Commands:** `--command` is repeatable, and the commands run one after another on the same VM. Each runs
+  from the source root, with `$OUT` as its own results directory (`out/cmd<n>/`). A failing command does not
+  stop the next one; the job's exit code is the first non-zero one.
+- **The VM:** `--session NAME` names it; a live session of that name is reused. `--keep` leaves it running
+  for the next call, and its venv is kept too. Without `--keep` the driver always runs `colab stop`, also
+  after an error, Ctrl-C, SIGTERM or SIGHUP. If all three stop attempts fail, it prints the command to run.
+- **Source:** a `git -c core.autocrlf=false archive` of `--commit` from `--repo` (default: the main checkout,
+  which sees every pushed branch) with `.source_commit`. The repository is private, so the VM does not clone
+  it.
+- **Environment:** a uv-managed Python 3.10 venv with `tools/modal/requirements-hybrid.txt` (the
+  `mace_cueq_oeq` pins). certifi is raised to 2026.10.19 as in the local environment (`OVERRIDES`). OEq builds
+  its host extension with `g++`, without `nvcc`, and `OEQ_CUDA_DRIVER_LIBRARY` points at Colab's
+  `/usr/lib64-nvidia/libcuda.so.1`. The commands run in a clean environment, without the Colab kernel's
+  variables (`MPLBACKEND`, `TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD`).
+- **Models:** `--models` takes checkpoint names from `fastmace.model.labels` (default `mh-1,medium,polar-1-s`,
+  the compatibility tier's). The VM downloads them from their official URLs and accepts each one only if its
+  SHA-256 matches the label table. Nothing large is uploaded from the PC.
+- **Structures:** `--baseline` (default `~/fastmace-baseline/1a-T18`, under 1 MB) goes up with the source as
+  `FASTMACE_STRUCTURES` and `FASTMACE_BASELINE`.
+- **Results:** `<out>/out/` holds `probe.json` (GPU, capability, driver, CPUs, RAM), `setup.json` (Python,
+  package versions, the `pip freeze` sha256, setup times), `pip-freeze.txt` and `cmd<n>/`. `<out>/colab.json`
+  records the provider, GPU, capability, driver, versions, commit, commands and exit codes, the setup and
+  wall times, the cache key, and the compute units before and after (`colab usage`).
+- **Ledger:** every call, a failed one too, appends a row to `~/.fastmace-colab/colab-ledger.csv`
+  (`--ledger` to change it). Like the Modal ledger, the conductor commits copies to
+  `results/colab-ledger.csv`.
+
+**No Google Drive.** `colab drivemount` needs the owner's browser consent on every new VM: on 23 October
+2026 a second VM got HTTP 400 without a fresh consent. A Drive-backed environment therefore cannot run
+unattended. The driver keeps everything else in a local store, `~/.fastmace-colab`
+(`FASTMACE_COLAB_STATE`):
+- **Environment:** installed on every new VM. It takes about a minute, because uv fetches the wheels at
+  datacenter speed. `--build-env` sets up the environment without a command and writes
+  `manifests/<stack>.json`, the `pip freeze` and its sha256. Every later job compares its own freeze against
+  it (`env_matches_manifest` in `colab.json`).
+- **Compile caches:** Triton, Inductor, FastMACE's cache root with the OEq extension builds, MACE's compile
+  cache and the CUDA cache. They live in `caches/sm<capability>-py310-<stack>.tar.gz`, where `<stack>` is the
+  sha256 of the requirements. The driver uploads them before the commands, and downloads them after only when
+  a file changed. The capability comes from the VM's `nvidia-smi`, not from a table.
