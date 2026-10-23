@@ -23,6 +23,10 @@ one for a control or an alternating-process run):
         projection the NVT default; the baseline has ASE's)
     p3b main before phase 3 (tag ``phase-3-baseline``, 156ab76), exported as ``fastmace_p3b``, through its
         minimal planner
+  --release 3 (3b-T10, phase 3b item 5):
+    3b  this checkout, as above, D3 off (no dispersion)
+    3   the release at tag ``fastmace-3``, exported as ``fastmace_3``, through its minimal planner. The tag
+        was not set when this was written, so its commit has no default: give --expected-commit
 
 ``--engine-option FIELD=VALUE`` (repeatable) sets an ``EngineConfig`` field on this checkout's side only
 (``fused_integrator=on``: an option the release does not have); ``on``/``off`` read as booleans.
@@ -84,6 +88,7 @@ RELEASES = {
     "1b": Release("fastmace-1b", "673a8a1", "fastmace_1b", "minimal", "2"),
     "2": Release("fastmace-2", "e52c482", "fastmace_2", "minimal", "3"),
     "p3b": Release("phase-3-baseline", "156ab76", "fastmace_p3b", "minimal", "3"),
+    "3": Release("fastmace-3", None, "fastmace_3", "minimal", "3b"),  # commit: --expected-commit (tag not set yet)
 }
 # IntegratorConfig fields this checkout's side pins against a release unless --integrator-option sets them.
 RELEASE_INTEGRATOR_PINS = {"p3b": {"fixcm_projection": "ase"}}
@@ -106,7 +111,7 @@ def parse_args(argv=None):
     p.add_argument("--output", required=True, type=Path, help="Fresh directory")
     p.add_argument("--release", choices=sorted(RELEASES), default="1a",
                    help="The earlier release timed against this checkout (1a: sides 1a and 1b; 1b: sides 1b and 2)")
-    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b"),
+    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b", "3b"),
                    help="Build order; two sides for an A/B process, one for a control (default: release, checkout)")
     p.add_argument("--renamed", type=Path, help="Directory holding the release's exported renamed package")
     p.add_argument("--expected-commit", help="Commit (prefix) the release's copy must be (default: the release's)")
@@ -154,6 +159,8 @@ def parse_args(argv=None):
         args.sides = [args.release, args.current]
     if args.expected_commit is None:
         args.expected_commit = release.commit
+    if args.expected_commit is None and args.release in args.sides:
+        p.error(f"--release {args.release}: give --expected-commit (the {release.tag} commit; no default yet)")
     allowed = (args.release, args.current)
     if (len(args.sides) not in (1, 2) or len(set(args.sides)) != len(args.sides)
             or not set(args.sides) <= set(allowed)):
@@ -228,6 +235,11 @@ class Version:
             self.planner = self.module("planner.minimal").MinimalPlanner(engine=engine)
         else:
             self.planner = self.module("planner.fixed").FixedPlanner(engine=engine)
+        if getattr(self.args, "reproducible", False):
+            # A reproducible plan needs its process prepared before CUDA starts (SPEC §8.7), and hardware() starts
+            # it: claim the process first, as the planner's build would (3b-T10, tools/trajectory_versions.py).
+            self.module("planner.reproducible").prepare_process(self.planner.process,
+                                                                 owner="a reproducible MD plan (trajectory_versions)")
         self.hardware = self.planner.hardware()
 
     def load(self, checkpoint):

@@ -1,0 +1,3036 @@
+{
+  "tool": "d3_cost",
+  "command": "ab",
+  "created_utc": "2026-10-23T12:38:42.222396+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "f99add0",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "structure": "NbCl5",
+  "natoms": 1944,
+  "ensemble": "npt",
+  "timestep_fs": 1.0,
+  "route": [
+    {
+      "label": "heat",
+      "start_K": 0.0,
+      "end_K": 1000.0,
+      "steps": 20000
+    },
+    {
+      "label": "peak",
+      "start_K": 1000.0,
+      "end_K": 976.0,
+      "steps": 8000
+    },
+    {
+      "label": "transit",
+      "start_K": 976.0,
+      "end_K": 600.0,
+      "steps": 3760
+    },
+    {
+      "label": "cool600",
+      "start_K": 600.0,
+      "end_K": 576.0,
+      "steps": 8000
+    },
+    {
+      "label": "transit",
+      "start_K": 576.0,
+      "end_K": 300.0,
+      "steps": 2760
+    },
+    {
+      "label": "cool300",
+      "start_K": 300.0,
+      "end_K": 276.0,
+      "steps": 8000
+    }
+  ],
+  "args": {
+    "command": "ab",
+    "output": "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/d3-cost-npt-0.0GPa",
+    "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+    "model": "mh1-r2scan",
+    "structure": "NbCl5",
+    "ensemble": "npt",
+    "pressure_GPa": "0.0",
+    "timestep_fs": "1.0",
+    "route": "heat:0:1000:20000,peak:1000:976:8000,transit:976:600:3760,cool600:600:576:8000,transit:576:300:2760,cool300:300:276:8000",
+    "max_temperature_K": "None",
+    "d3_skin": "None",
+    "block": "1000",
+    "warmup": "50",
+    "skins": "1.0,1.5,2.0,2.5,3.0,4.0",
+    "timed_segments": "peak,cool600,cool300",
+    "build_repeats": "5",
+    "pass_repeats": "50",
+    "seed": "20261022"
+  },
+  "gpu_processes_at_start": [],
+  "pytest_at_start": [
+    113336,
+    128760,
+    128766
+  ],
+  "plans": {
+    "off": {
+      "dispersion": false,
+      "skin": 0.3,
+      "d3_skin": 1.0,
+      "max_temperature_K": 1000.0,
+      "ensemble": "npt",
+      "d3_skin_decision": "unused (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)"
+    },
+    "on": {
+      "dispersion": true,
+      "skin": 0.3,
+      "d3_skin": 2.07,
+      "max_temperature_K": 1000.0,
+      "ensemble": "npt",
+      "d3_skin_decision": "2.07 A (auto (rule_11_d3_skin_from_workload): D3 skin 2.07 A for 50 steps per rebuild at 1000 K and 1 fs: displacement 2.036 A (0.0204 A per step), barostat strain 0.029 A (2.77e-05 per step), cutoff 21.1671 A)"
+    }
+  },
+  "setup_s": {
+    "off": 20.306933161002235,
+    "on": 22.492532699994626
+  },
+  "blocks": [
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 0,
+      "steps": 1000,
+      "ms_per_step": 21.02418486699753,
+      "start_step": 50,
+      "volume_A3": 58673.09457956087,
+      "delta": {
+        "neighbour_rebuilds": 14,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 2750.854034428834,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129131,
+        129137,
+        129144,
+        129150,
+        129153
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 0,
+      "steps": 1000,
+      "ms_per_step": 28.013874709002266,
+      "start_step": 50,
+      "volume_A3": 51294.64342077341,
+      "delta": {
+        "neighbour_rebuilds": 15,
+        "recaptures": 6,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "d3_pairs": 0,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": -4588.987746026112,
+        "step": 1000
+      },
+      "d3_pairs": 1775790,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129199,
+        129205
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 1,
+      "steps": 1000,
+      "ms_per_step": 27.36649133699393,
+      "start_step": 1050,
+      "volume_A3": 56253.8181640732,
+      "delta": {
+        "neighbour_rebuilds": 37,
+        "recaptures": 2,
+        "pool_resets": 0,
+        "graphs": 2,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "d3_pairs": 0,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 4959.174743299787,
+        "step": 1000
+      },
+      "d3_pairs": 1775790,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129199,
+        129205,
+        129265,
+        129309,
+        129312
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 1,
+      "steps": 1000,
+      "ms_per_step": 20.892409416999726,
+      "start_step": 1050,
+      "volume_A3": 58636.1210892373,
+      "delta": {
+        "neighbour_rebuilds": 36,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": -36.97349032357306,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129265,
+        129309,
+        129312
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 2,
+      "steps": 1000,
+      "ms_per_step": 21.189526923000813,
+      "start_step": 2050,
+      "volume_A3": 58675.87889666595,
+      "delta": {
+        "neighbour_rebuilds": 54,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 39.75780742865027,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129265,
+        129309,
+        129312
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 2,
+      "steps": 1000,
+      "ms_per_step": 27.40319081299822,
+      "start_step": 2050,
+      "volume_A3": 52623.21237501195,
+      "delta": {
+        "neighbour_rebuilds": 53,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 2,
+        "d3_build_time_s": 0.0528788160008844,
+        "d3_term_build_s": 0.05399069599661743,
+        "d3_regrowths": 0,
+        "d3_pairs": 107092,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": -3630.60578906125,
+        "step": 1000
+      },
+      "d3_pairs": 1882882,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129265,
+        129309,
+        129312
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 3,
+      "steps": 1000,
+      "ms_per_step": 27.566481959001976,
+      "start_step": 3050,
+      "volume_A3": 56649.58725326919,
+      "delta": {
+        "neighbour_rebuilds": 67,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 5,
+        "d3_build_time_s": 0.08072567299677758,
+        "d3_term_build_s": 0.08516420200612629,
+        "d3_regrowths": 0,
+        "d3_pairs": -113102,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 4026.3748782572366,
+        "step": 1000
+      },
+      "d3_pairs": 1769780,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129265,
+        129309,
+        129312
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 3,
+      "steps": 1000,
+      "ms_per_step": 21.087654158996884,
+      "start_step": 3050,
+      "volume_A3": 61752.98042761926,
+      "delta": {
+        "neighbour_rebuilds": 65,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 3077.1015309533104,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129265,
+        129309,
+        129312
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 4,
+      "steps": 1000,
+      "ms_per_step": 21.05068236200168,
+      "start_step": 4050,
+      "volume_A3": 62776.6432918077,
+      "delta": {
+        "neighbour_rebuilds": 74,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 1023.6628641884381,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129265,
+        129309,
+        129312
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 4,
+      "steps": 1000,
+      "ms_per_step": 27.299132187006762,
+      "start_step": 4050,
+      "volume_A3": 54549.90463661083,
+      "delta": {
+        "neighbour_rebuilds": 78,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 8,
+        "d3_build_time_s": 0.13552559000527253,
+        "d3_term_build_s": 0.14151539199519902,
+        "d3_regrowths": 0,
+        "d3_pairs": 48365,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": -2099.682616658356,
+        "step": 1000
+      },
+      "d3_pairs": 1818145,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129265,
+        129309,
+        129312
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 5,
+      "steps": 1000,
+      "ms_per_step": 27.946449584997026,
+      "start_step": 5050,
+      "volume_A3": 56314.62860179324,
+      "delta": {
+        "neighbour_rebuilds": 85,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 9,
+        "d3_build_time_s": 0.13970339600200532,
+        "d3_term_build_s": 0.14542989199981093,
+        "d3_regrowths": 0,
+        "d3_pairs": -48902,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 1764.723965182413,
+        "step": 1000
+      },
+      "d3_pairs": 1769243,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 5,
+      "steps": 1000,
+      "ms_per_step": 20.975154527004634,
+      "start_step": 5050,
+      "volume_A3": 63097.5113302815,
+      "delta": {
+        "neighbour_rebuilds": 82,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 320.8680384738036,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129687,
+        129731,
+        129734
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 6,
+      "steps": 1000,
+      "ms_per_step": 21.152823130003526,
+      "start_step": 6050,
+      "volume_A3": 64831.15951298886,
+      "delta": {
+        "neighbour_rebuilds": 90,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 1733.6481827073585,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129687,
+        129731,
+        129734
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 6,
+      "steps": 1000,
+      "ms_per_step": 27.18511660399963,
+      "start_step": 6050,
+      "volume_A3": 56673.68414722072,
+      "delta": {
+        "neighbour_rebuilds": 94,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 9,
+        "d3_build_time_s": 0.13095450800756225,
+        "d3_term_build_s": 0.1369536009951844,
+        "d3_regrowths": 0,
+        "d3_pairs": -19014,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 359.05554542747996,
+        "step": 1000
+      },
+      "d3_pairs": 1750229,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129687,
+        129731,
+        129734
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 7,
+      "steps": 1000,
+      "ms_per_step": 27.684554237996053,
+      "start_step": 7050,
+      "volume_A3": 56757.95659043881,
+      "delta": {
+        "neighbour_rebuilds": 103,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 12,
+        "d3_build_time_s": 0.18176372998277657,
+        "d3_term_build_s": 0.18968530699203257,
+        "d3_regrowths": 0,
+        "d3_pairs": 6065,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 84.27244321808394,
+        "step": 1000
+      },
+      "d3_pairs": 1756294,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129687,
+        129731,
+        129734
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 7,
+      "steps": 1000,
+      "ms_per_step": 20.718842794005468,
+      "start_step": 7050,
+      "volume_A3": 68615.09437497132,
+      "delta": {
+        "neighbour_rebuilds": 96,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 3783.9348619824596,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        129687,
+        129731,
+        129734
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 8,
+      "steps": 1000,
+      "ms_per_step": 20.474421097998857,
+      "start_step": 8050,
+      "volume_A3": 73014.99890595641,
+      "delta": {
+        "neighbour_rebuilds": 104,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 4399.904530985092,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 8,
+      "steps": 1000,
+      "ms_per_step": 27.240038734002155,
+      "start_step": 8050,
+      "volume_A3": 58629.18769028434,
+      "delta": {
+        "neighbour_rebuilds": 107,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 13,
+        "d3_build_time_s": 0.20830504600598942,
+        "d3_term_build_s": 0.21815413800504757,
+        "d3_regrowths": 0,
+        "d3_pairs": -61658,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 1871.231099845536,
+        "step": 1000
+      },
+      "d3_pairs": 1694636,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 9,
+      "steps": 1000,
+      "ms_per_step": 27.19973795200349,
+      "start_step": 9050,
+      "volume_A3": 57976.283901289156,
+      "delta": {
+        "neighbour_rebuilds": 113,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 13,
+        "d3_build_time_s": 0.1969669799800613,
+        "d3_term_build_s": 0.20466746800229885,
+        "d3_regrowths": 0,
+        "d3_pairs": 20213,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": -652.9037889951869,
+        "step": 1000
+      },
+      "d3_pairs": 1714849,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 9,
+      "steps": 1000,
+      "ms_per_step": 19.97363958799542,
+      "start_step": 9050,
+      "volume_A3": 78903.89560623886,
+      "delta": {
+        "neighbour_rebuilds": 110,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 5888.89670028245,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 10,
+      "steps": 1000,
+      "ms_per_step": 19.855523562997405,
+      "start_step": 10050,
+      "volume_A3": 89364.29946960219,
+      "delta": {
+        "neighbour_rebuilds": 115,
+        "recaptures": 2,
+        "pool_resets": 0,
+        "graphs": 2,
+        "volume_A3": 10460.403863363332,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 10,
+      "steps": 1000,
+      "ms_per_step": 27.316119977003837,
+      "start_step": 10050,
+      "volume_A3": 60281.60698495945,
+      "delta": {
+        "neighbour_rebuilds": 122,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 15,
+        "d3_build_time_s": 0.2369210160104558,
+        "d3_term_build_s": 0.247844277000695,
+        "d3_regrowths": 0,
+        "d3_pairs": -67323,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 2305.3230836702933,
+        "step": 1000
+      },
+      "d3_pairs": 1647526,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 11,
+      "steps": 1000,
+      "ms_per_step": 26.764160694001475,
+      "start_step": 11050,
+      "volume_A3": 60546.98401849853,
+      "delta": {
+        "neighbour_rebuilds": 128,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 16,
+        "d3_build_time_s": 0.22334249599225586,
+        "d3_term_build_s": 0.237967106004362,
+        "d3_regrowths": 0,
+        "d3_pairs": -10698,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 265.37703353908,
+        "step": 1000
+      },
+      "d3_pairs": 1636828,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 11,
+      "steps": 1000,
+      "ms_per_step": 19.071122903005744,
+      "start_step": 11050,
+      "volume_A3": 105553.69256597455,
+      "delta": {
+        "neighbour_rebuilds": 121,
+        "recaptures": 2,
+        "pool_resets": 0,
+        "graphs": 2,
+        "volume_A3": 16189.393096372354,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 12,
+      "steps": 1000,
+      "ms_per_step": 18.756315988001006,
+      "start_step": 12050,
+      "volume_A3": 128558.58237669084,
+      "delta": {
+        "neighbour_rebuilds": 128,
+        "recaptures": 2,
+        "pool_resets": 0,
+        "graphs": 2,
+        "volume_A3": 23004.889810716297,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 12,
+      "steps": 1000,
+      "ms_per_step": 26.87065992400312,
+      "start_step": 12050,
+      "volume_A3": 61393.08684994544,
+      "delta": {
+        "neighbour_rebuilds": 131,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 16,
+        "d3_build_time_s": 0.24441350298729958,
+        "d3_term_build_s": 0.2560602140147239,
+        "d3_regrowths": 0,
+        "d3_pairs": -19139,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 846.1028314469077,
+        "step": 1000
+      },
+      "d3_pairs": 1617689,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        130293,
+        130337,
+        130340
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 13,
+      "steps": 1000,
+      "ms_per_step": 26.835370061002322,
+      "start_step": 13050,
+      "volume_A3": 64965.908479267506,
+      "delta": {
+        "neighbour_rebuilds": 142,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 19,
+        "d3_build_time_s": 0.26847422901482787,
+        "d3_term_build_s": 0.2816746769749443,
+        "d3_regrowths": 0,
+        "d3_pairs": -92492,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 3572.8216293220685,
+        "step": 1000
+      },
+      "d3_pairs": 1525197,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 13,
+      "steps": 1000,
+      "ms_per_step": 18.07383691999712,
+      "start_step": 13050,
+      "volume_A3": 162433.15210459102,
+      "delta": {
+        "neighbour_rebuilds": 130,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 33874.569727900176,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 14,
+      "steps": 1000,
+      "ms_per_step": 17.794115331002104,
+      "start_step": 14050,
+      "volume_A3": 213021.48329922813,
+      "delta": {
+        "neighbour_rebuilds": 134,
+        "recaptures": 2,
+        "pool_resets": 0,
+        "graphs": 2,
+        "volume_A3": 50588.33119463711,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 14,
+      "steps": 1000,
+      "ms_per_step": 26.240354624998872,
+      "start_step": 14050,
+      "volume_A3": 68380.24402719195,
+      "delta": {
+        "neighbour_rebuilds": 139,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 17,
+        "d3_build_time_s": 0.2458067219995428,
+        "d3_term_build_s": 0.25885866098542465,
+        "d3_regrowths": 0,
+        "d3_pairs": -69695,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 3414.335547924442,
+        "step": 1000
+      },
+      "d3_pairs": 1455502,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 15,
+      "steps": 1000,
+      "ms_per_step": 25.549493746002554,
+      "start_step": 15050,
+      "volume_A3": 75610.00592217178,
+      "delta": {
+        "neighbour_rebuilds": 140,
+        "recaptures": 2,
+        "pool_resets": 0,
+        "graphs": 2,
+        "d3_builds": 19,
+        "d3_build_time_s": 0.2437737849977566,
+        "d3_term_build_s": 0.2566707559672068,
+        "d3_regrowths": 0,
+        "d3_pairs": -139825,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 7229.761894979834,
+        "step": 1000
+      },
+      "d3_pairs": 1315677,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 15,
+      "steps": 1000,
+      "ms_per_step": 17.262454935000278,
+      "start_step": 15050,
+      "volume_A3": 287481.7611033875,
+      "delta": {
+        "neighbour_rebuilds": 142,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 74460.27780415938,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 16,
+      "steps": 1000,
+      "ms_per_step": 16.927522797996062,
+      "start_step": 16050,
+      "volume_A3": 402068.9689709535,
+      "delta": {
+        "neighbour_rebuilds": 145,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 114587.20786756597,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 16,
+      "steps": 1000,
+      "ms_per_step": 24.596532903997286,
+      "start_step": 16050,
+      "volume_A3": 86734.30661090367,
+      "delta": {
+        "neighbour_rebuilds": 152,
+        "recaptures": 2,
+        "pool_resets": 0,
+        "graphs": 2,
+        "d3_builds": 20,
+        "d3_build_time_s": 0.23830038299638545,
+        "d3_term_build_s": 0.25245565101795364,
+        "d3_regrowths": 0,
+        "d3_pairs": -169678,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 11124.300688731892,
+        "step": 1000
+      },
+      "d3_pairs": 1145999,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 17,
+      "steps": 1000,
+      "ms_per_step": 23.495538613999088,
+      "start_step": 17050,
+      "volume_A3": 99561.23590255728,
+      "delta": {
+        "neighbour_rebuilds": 155,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 20,
+        "d3_build_time_s": 0.21069727802387206,
+        "d3_term_build_s": 0.22571939298359212,
+        "d3_regrowths": 0,
+        "d3_pairs": -142552,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 12826.929291653607,
+        "step": 1000
+      },
+      "d3_pairs": 1003447,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 17,
+      "steps": 1000,
+      "ms_per_step": 16.4091454560039,
+      "start_step": 17050,
+      "volume_A3": 576663.8585766362,
+      "delta": {
+        "neighbour_rebuilds": 148,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 174594.8896056827,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 18,
+      "steps": 1000,
+      "ms_per_step": 16.555799955996918,
+      "start_step": 18050,
+      "volume_A3": 848067.6478359705,
+      "delta": {
+        "neighbour_rebuilds": 152,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 271403.7892593343,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 18,
+      "steps": 1000,
+      "ms_per_step": 22.658542589000717,
+      "start_step": 18050,
+      "volume_A3": 115108.8351396961,
+      "delta": {
+        "neighbour_rebuilds": 158,
+        "recaptures": 2,
+        "pool_resets": 0,
+        "graphs": 2,
+        "d3_builds": 22,
+        "d3_build_time_s": 0.21059456099465024,
+        "d3_term_build_s": 0.22871034299896564,
+        "d3_regrowths": 0,
+        "d3_pairs": -135217,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 15547.599237138813,
+        "step": 1000
+      },
+      "d3_pairs": 868230,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 19,
+      "steps": 950,
+      "ms_per_step": 21.985432348423945,
+      "start_step": 19050,
+      "volume_A3": 132305.84527600656,
+      "delta": {
+        "neighbour_rebuilds": 155,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 21,
+        "d3_build_time_s": 0.1660504840037902,
+        "d3_term_build_s": 0.18229235500621144,
+        "d3_regrowths": 0,
+        "d3_pairs": -117152,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 17197.010136310462,
+        "step": 950
+      },
+      "d3_pairs": 751078,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 19,
+      "steps": 950,
+      "ms_per_step": 16.556482609479357,
+      "start_step": 19050,
+      "volume_A3": 1247203.3998171038,
+      "delta": {
+        "neighbour_rebuilds": 154,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 399135.75198113325,
+        "step": 950
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 20,
+      "steps": 1000,
+      "ms_per_step": 16.511076303002483,
+      "start_step": 20000,
+      "volume_A3": 1921865.941462603,
+      "delta": {
+        "neighbour_rebuilds": 165,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 674662.5416454992,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 20,
+      "steps": 1000,
+      "ms_per_step": 21.451612043994828,
+      "start_step": 20000,
+      "volume_A3": 152968.64751820464,
+      "delta": {
+        "neighbour_rebuilds": 169,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 23,
+        "d3_build_time_s": 0.1647545969899511,
+        "d3_term_build_s": 0.18927901099959854,
+        "d3_regrowths": 0,
+        "d3_pairs": -100377,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 20662.802242198086,
+        "step": 1000
+      },
+      "d3_pairs": 650701,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 21,
+      "steps": 1000,
+      "ms_per_step": 20.8292853439998,
+      "start_step": 21000,
+      "volume_A3": 177277.25633949088,
+      "delta": {
+        "neighbour_rebuilds": 171,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 24,
+        "d3_build_time_s": 0.15149156597908586,
+        "d3_term_build_s": 0.16927587398822652,
+        "d3_regrowths": 0,
+        "d3_pairs": -90818,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 24308.608821286238,
+        "step": 1000
+      },
+      "d3_pairs": 559883,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 21,
+      "steps": 1000,
+      "ms_per_step": 16.388153234998754,
+      "start_step": 21000,
+      "volume_A3": 3057572.6209548563,
+      "delta": {
+        "neighbour_rebuilds": 165,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 1135706.6794922533,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 22,
+      "steps": 1000,
+      "ms_per_step": 16.302239001001,
+      "start_step": 22000,
+      "volume_A3": 4973697.813023251,
+      "delta": {
+        "neighbour_rebuilds": 161,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 1916125.1920683943,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 22,
+      "steps": 1000,
+      "ms_per_step": 20.30508883699804,
+      "start_step": 22000,
+      "volume_A3": 207370.98532949208,
+      "delta": {
+        "neighbour_rebuilds": 167,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 23,
+        "d3_build_time_s": 0.12874836300034076,
+        "d3_term_build_s": 0.14135392801836133,
+        "d3_regrowths": 0,
+        "d3_pairs": -82079,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 30093.728990001197,
+        "step": 1000
+      },
+      "d3_pairs": 477804,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 23,
+      "steps": 1000,
+      "ms_per_step": 20.125305882000248,
+      "start_step": 23000,
+      "volume_A3": 244770.12149712525,
+      "delta": {
+        "neighbour_rebuilds": 167,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 23,
+        "d3_build_time_s": 0.13425544099300168,
+        "d3_term_build_s": 0.15596496101352386,
+        "d3_regrowths": 0,
+        "d3_pairs": -72628,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 37399.13616763317,
+        "step": 1000
+      },
+      "d3_pairs": 405176,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 23,
+      "steps": 1000,
+      "ms_per_step": 16.27680045300076,
+      "start_step": 23000,
+      "volume_A3": 8181632.397869239,
+      "delta": {
+        "neighbour_rebuilds": 165,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 3207934.584845988,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 24,
+      "steps": 1000,
+      "ms_per_step": 16.433619927003747,
+      "start_step": 24000,
+      "volume_A3": 13693841.927080158,
+      "delta": {
+        "neighbour_rebuilds": 163,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 5512209.5292109195,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 24,
+      "steps": 1000,
+      "ms_per_step": 19.57524139900488,
+      "start_step": 24000,
+      "volume_A3": 293867.5461782055,
+      "delta": {
+        "neighbour_rebuilds": 171,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 24,
+        "d3_build_time_s": 0.1261289399844827,
+        "d3_term_build_s": 0.1422689999890281,
+        "d3_regrowths": 0,
+        "d3_pairs": -65574,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 49097.42468108027,
+        "step": 1000
+      },
+      "d3_pairs": 339602,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 25,
+      "steps": 1000,
+      "ms_per_step": 19.504864118003752,
+      "start_step": 25000,
+      "volume_A3": 358390.8137121125,
+      "delta": {
+        "neighbour_rebuilds": 176,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 25,
+        "d3_build_time_s": 0.12822763201256748,
+        "d3_term_build_s": 0.15160455998557154,
+        "d3_regrowths": 0,
+        "d3_pairs": -61010,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 64523.26753390697,
+        "step": 1000
+      },
+      "d3_pairs": 278592,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 25,
+      "steps": 1000,
+      "ms_per_step": 16.308220177001203,
+      "start_step": 25000,
+      "volume_A3": 23305404.936260264,
+      "delta": {
+        "neighbour_rebuilds": 160,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 9611563.009180106,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 26,
+      "steps": 1000,
+      "ms_per_step": 16.420257763995323,
+      "start_step": 26000,
+      "volume_A3": 39995503.56443588,
+      "delta": {
+        "neighbour_rebuilds": 161,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 16690098.628175613,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 26,
+      "steps": 1000,
+      "ms_per_step": 18.871822175999114,
+      "start_step": 26000,
+      "volume_A3": 442767.00427502993,
+      "delta": {
+        "neighbour_rebuilds": 162,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 22,
+        "d3_build_time_s": 0.10445224500290351,
+        "d3_term_build_s": 0.11708072798501235,
+        "d3_regrowths": 0,
+        "d3_pairs": -49947,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 84376.19056291744,
+        "step": 1000
+      },
+      "d3_pairs": 228645,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 27,
+      "steps": 1000,
+      "ms_per_step": 18.7303416499999,
+      "start_step": 27000,
+      "volume_A3": 558306.7468120449,
+      "delta": {
+        "neighbour_rebuilds": 167,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 24,
+        "d3_build_time_s": 0.10305884201079607,
+        "d3_term_build_s": 0.11667754600784974,
+        "d3_regrowths": 0,
+        "d3_pairs": -46582,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 115539.74253701494,
+        "step": 1000
+      },
+      "d3_pairs": 182063,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 27,
+      "steps": 1000,
+      "ms_per_step": 16.407780203000584,
+      "start_step": 27000,
+      "volume_A3": 69163949.52164963,
+      "delta": {
+        "neighbour_rebuilds": 162,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 29168445.957213752,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "off",
+      "pair": 28,
+      "steps": 1000,
+      "ms_per_step": 16.316439980000723,
+      "start_step": 28000,
+      "volume_A3": 120380249.16065025,
+      "delta": {
+        "neighbour_rebuilds": 158,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 51216299.639000624,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "on",
+      "pair": 28,
+      "steps": 1000,
+      "ms_per_step": 18.690164971005288,
+      "start_step": 28000,
+      "volume_A3": 719445.9526270286,
+      "delta": {
+        "neighbour_rebuilds": 163,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 23,
+        "d3_build_time_s": 0.09359049701015465,
+        "d3_term_build_s": 0.11485532100778073,
+        "d3_regrowths": 0,
+        "d3_pairs": -39438,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 161139.2058149837,
+        "step": 1000
+      },
+      "d3_pairs": 142625,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "on",
+      "pair": 29,
+      "steps": 1000,
+      "ms_per_step": 18.375942855003814,
+      "start_step": 29000,
+      "volume_A3": 938658.926249882,
+      "delta": {
+        "neighbour_rebuilds": 160,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 22,
+        "d3_build_time_s": 0.07934729001135565,
+        "d3_term_build_s": 0.09230612699320773,
+        "d3_regrowths": 0,
+        "d3_pairs": -32042,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 219212.9736228534,
+        "step": 1000
+      },
+      "d3_pairs": 110583,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "off",
+      "pair": 29,
+      "steps": 1000,
+      "ms_per_step": 16.42215872700035,
+      "start_step": 29000,
+      "volume_A3": 209530124.55781963,
+      "delta": {
+        "neighbour_rebuilds": 151,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 89149875.39716938,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "off",
+      "pair": 30,
+      "steps": 1000,
+      "ms_per_step": 16.21668738399603,
+      "start_step": 30000,
+      "volume_A3": 367137307.4800722,
+      "delta": {
+        "neighbour_rebuilds": 147,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 157607182.92225257,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "on",
+      "pair": 30,
+      "steps": 1000,
+      "ms_per_step": 18.488872980997257,
+      "start_step": 30000,
+      "volume_A3": 1245751.5218680522,
+      "delta": {
+        "neighbour_rebuilds": 153,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 22,
+        "d3_build_time_s": 0.08931800199934514,
+        "d3_term_build_s": 0.10721989899320761,
+        "d3_regrowths": 0,
+        "d3_pairs": -26591,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 307092.5956181702,
+        "step": 1000
+      },
+      "d3_pairs": 83992,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "on",
+      "pair": 31,
+      "steps": 760,
+      "ms_per_step": 18.20169537763592,
+      "start_step": 31000,
+      "volume_A3": 1554121.2134153263,
+      "delta": {
+        "neighbour_rebuilds": 111,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 15,
+        "d3_build_time_s": 0.052461978993960656,
+        "d3_term_build_s": 0.061458264994143974,
+        "d3_regrowths": 0,
+        "d3_pairs": -15238,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 308369.6915472741,
+        "step": 760
+      },
+      "d3_pairs": 68754,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "off",
+      "pair": 31,
+      "steps": 760,
+      "ms_per_step": 16.40508852237154,
+      "start_step": 31000,
+      "volume_A3": 560256025.3341671,
+      "delta": {
+        "neighbour_rebuilds": 104,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 193118717.85409492,
+        "step": 760
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "off",
+      "pair": 32,
+      "steps": 1000,
+      "ms_per_step": 16.14799840199703,
+      "start_step": 31760,
+      "volume_A3": 961635641.978715,
+      "delta": {
+        "neighbour_rebuilds": 133,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 401379616.6445478,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "on",
+      "pair": 32,
+      "steps": 1000,
+      "ms_per_step": 18.168066152000392,
+      "start_step": 31760,
+      "volume_A3": 2068512.1473596962,
+      "delta": {
+        "neighbour_rebuilds": 133,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 18,
+        "d3_build_time_s": 0.06390526302129729,
+        "d3_term_build_s": 0.07514676200662507,
+        "d3_regrowths": 0,
+        "d3_pairs": -15865,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 514390.9339443699,
+        "step": 1000
+      },
+      "d3_pairs": 52889,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "on",
+      "pair": 33,
+      "steps": 1000,
+      "ms_per_step": 18.07265863399516,
+      "start_step": 32760,
+      "volume_A3": 2773665.633384107,
+      "delta": {
+        "neighbour_rebuilds": 136,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 19,
+        "d3_build_time_s": 0.06739755099260947,
+        "d3_term_build_s": 0.08050040699890815,
+        "d3_regrowths": 0,
+        "d3_pairs": -12396,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 705153.4860244109,
+        "step": 1000
+      },
+      "d3_pairs": 40493,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "off",
+      "pair": 33,
+      "steps": 1000,
+      "ms_per_step": 16.299349673005054,
+      "start_step": 32760,
+      "volume_A3": 1628964317.7751906,
+      "delta": {
+        "neighbour_rebuilds": 131,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 667328675.7964756,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "off",
+      "pair": 34,
+      "steps": 1000,
+      "ms_per_step": 16.129032317003293,
+      "start_step": 33760,
+      "volume_A3": 2709646650.0606737,
+      "delta": {
+        "neighbour_rebuilds": 129,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 1080682332.2854831,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "on",
+      "pair": 34,
+      "steps": 1000,
+      "ms_per_step": 18.274483319000865,
+      "start_step": 33760,
+      "volume_A3": 3726527.315303382,
+      "delta": {
+        "neighbour_rebuilds": 138,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 19,
+        "d3_build_time_s": 0.060939323011552915,
+        "d3_term_build_s": 0.0739838139998028,
+        "d3_regrowths": 0,
+        "d3_pairs": -9443,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 952861.6819192749,
+        "step": 1000
+      },
+      "d3_pairs": 31050,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "on",
+      "pair": 35,
+      "steps": 1000,
+      "ms_per_step": 18.095815476997814,
+      "start_step": 34760,
+      "volume_A3": 5035099.487636753,
+      "delta": {
+        "neighbour_rebuilds": 134,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 18,
+        "d3_build_time_s": 0.05645361899223644,
+        "d3_term_build_s": 0.07644841800356517,
+        "d3_regrowths": 0,
+        "d3_pairs": -6439,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 1308572.1723333714,
+        "step": 1000
+      },
+      "d3_pairs": 24611,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "off",
+      "pair": 35,
+      "steps": 1000,
+      "ms_per_step": 16.278326614003163,
+      "start_step": 34760,
+      "volume_A3": 4425481671.681965,
+      "delta": {
+        "neighbour_rebuilds": 128,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 1715835021.6212912,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "off",
+      "pair": 36,
+      "steps": 1000,
+      "ms_per_step": 16.173991601004673,
+      "start_step": 35760,
+      "volume_A3": 7134369869.57103,
+      "delta": {
+        "neighbour_rebuilds": 129,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 2708888197.889065,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "on",
+      "pair": 36,
+      "steps": 1000,
+      "ms_per_step": 17.81740955999703,
+      "start_step": 35760,
+      "volume_A3": 6840750.05256667,
+      "delta": {
+        "neighbour_rebuilds": 135,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 19,
+        "d3_build_time_s": 0.06841587800590787,
+        "d3_term_build_s": 0.08138456999586197,
+        "d3_regrowths": 0,
+        "d3_pairs": -5271,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 1805650.5649299165,
+        "step": 1000
+      },
+      "d3_pairs": 19340,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "on",
+      "pair": 37,
+      "steps": 1000,
+      "ms_per_step": 17.64449732099456,
+      "start_step": 36760,
+      "volume_A3": 9339543.463531522,
+      "delta": {
+        "neighbour_rebuilds": 130,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 18,
+        "d3_build_time_s": 0.050825099991925526,
+        "d3_term_build_s": 0.06217891800770303,
+        "d3_regrowths": 0,
+        "d3_pairs": -3897,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 2498793.410964852,
+        "step": 1000
+      },
+      "d3_pairs": 15443,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "off",
+      "pair": 37,
+      "steps": 1000,
+      "ms_per_step": 16.172616239004128,
+      "start_step": 36760,
+      "volume_A3": 11354353956.737593,
+      "delta": {
+        "neighbour_rebuilds": 129,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 4219984087.166563,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "off",
+      "pair": 38,
+      "steps": 1000,
+      "ms_per_step": 16.234366081996995,
+      "start_step": 37760,
+      "volume_A3": 17816346387.75163,
+      "delta": {
+        "neighbour_rebuilds": 131,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 6461992431.014036,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "on",
+      "pair": 38,
+      "steps": 1000,
+      "ms_per_step": 17.60172111099382,
+      "start_step": 37760,
+      "volume_A3": 12771626.403961882,
+      "delta": {
+        "neighbour_rebuilds": 134,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 19,
+        "d3_build_time_s": 0.05083430701051839,
+        "d3_term_build_s": 0.06363163301284658,
+        "d3_regrowths": 0,
+        "d3_pairs": -2618,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 3432082.94043036,
+        "step": 1000
+      },
+      "d3_pairs": 12825,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "on",
+      "pair": 39,
+      "steps": 1000,
+      "ms_per_step": 17.69006814900058,
+      "start_step": 38760,
+      "volume_A3": 17573148.195770316,
+      "delta": {
+        "neighbour_rebuilds": 137,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 19,
+        "d3_build_time_s": 0.04745633999846177,
+        "d3_term_build_s": 0.06022252900584135,
+        "d3_regrowths": 0,
+        "d3_pairs": -2087,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 4801521.791808434,
+        "step": 1000
+      },
+      "d3_pairs": 10738,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool600",
+      "side": "off",
+      "pair": 39,
+      "steps": 1000,
+      "ms_per_step": 16.14655611699709,
+      "start_step": 38760,
+      "volume_A3": 27700463638.860767,
+      "delta": {
+        "neighbour_rebuilds": 132,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 9884117251.109138,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "off",
+      "pair": 40,
+      "steps": 1000,
+      "ms_per_step": 16.19299103400408,
+      "start_step": 39760,
+      "volume_A3": 42640921908.642746,
+      "delta": {
+        "neighbour_rebuilds": 123,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 14940458269.781979,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "on",
+      "pair": 40,
+      "steps": 1000,
+      "ms_per_step": 17.57579047299805,
+      "start_step": 39760,
+      "volume_A3": 24219979.26475552,
+      "delta": {
+        "neighbour_rebuilds": 134,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 18,
+        "d3_build_time_s": 0.050129190989537165,
+        "d3_term_build_s": 0.06377168200560845,
+        "d3_regrowths": 0,
+        "d3_pairs": -1794,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 6646831.068985205,
+        "step": 1000
+      },
+      "d3_pairs": 8944,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "on",
+      "pair": 41,
+      "steps": 1000,
+      "ms_per_step": 17.630321705000824,
+      "start_step": 40760,
+      "volume_A3": 33360806.187369257,
+      "delta": {
+        "neighbour_rebuilds": 120,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 17,
+        "d3_build_time_s": 0.04590497300523566,
+        "d3_term_build_s": 0.05723063100595027,
+        "d3_regrowths": 0,
+        "d3_pairs": -1212,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 9140826.922613736,
+        "step": 1000
+      },
+      "d3_pairs": 7732,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "off",
+      "pair": 41,
+      "steps": 1000,
+      "ms_per_step": 16.029293443993083,
+      "start_step": 40760,
+      "volume_A3": 64680594078.561844,
+      "delta": {
+        "neighbour_rebuilds": 112,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 22039672169.919098,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "off",
+      "pair": 42,
+      "steps": 760,
+      "ms_per_step": 16.18045081710366,
+      "start_step": 41760,
+      "volume_A3": 88002992610.55045,
+      "delta": {
+        "neighbour_rebuilds": 78,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 23322398531.9886,
+        "step": 760
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "transit",
+      "side": "on",
+      "pair": 42,
+      "steps": 760,
+      "ms_per_step": 17.370977074996947,
+      "start_step": 41760,
+      "volume_A3": 42422545.9299787,
+      "delta": {
+        "neighbour_rebuilds": 81,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 11,
+        "d3_build_time_s": 0.029181105994211975,
+        "d3_term_build_s": 0.03770697500294773,
+        "d3_regrowths": 0,
+        "d3_pairs": -652,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 9061739.742609441,
+        "step": 760
+      },
+      "d3_pairs": 7080,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "on",
+      "pair": 43,
+      "steps": 1000,
+      "ms_per_step": 17.45423638700595,
+      "start_step": 42520,
+      "volume_A3": 57730374.244917676,
+      "delta": {
+        "neighbour_rebuilds": 101,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 13,
+        "d3_build_time_s": 0.04035884199402062,
+        "d3_term_build_s": 0.049182003996975254,
+        "d3_regrowths": 0,
+        "d3_pairs": -517,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 15307828.314938977,
+        "step": 1000
+      },
+      "d3_pairs": 6563,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "off",
+      "pair": 43,
+      "steps": 1000,
+      "ms_per_step": 16.009496637001575,
+      "start_step": 42520,
+      "volume_A3": 130176434449.58662,
+      "delta": {
+        "neighbour_rebuilds": 94,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 42173441839.03618,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "off",
+      "pair": 44,
+      "steps": 1000,
+      "ms_per_step": 16.070361211997806,
+      "start_step": 43520,
+      "volume_A3": 188422147502.9955,
+      "delta": {
+        "neighbour_rebuilds": 95,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 58245713053.40889,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "on",
+      "pair": 44,
+      "steps": 1000,
+      "ms_per_step": 17.438313990001916,
+      "start_step": 43520,
+      "volume_A3": 77538012.66878177,
+      "delta": {
+        "neighbour_rebuilds": 100,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 13,
+        "d3_build_time_s": 0.03109594799025217,
+        "d3_term_build_s": 0.04104281599575188,
+        "d3_regrowths": 0,
+        "d3_pairs": -277,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 19807638.423864096,
+        "step": 1000
+      },
+      "d3_pairs": 6286,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "on",
+      "pair": 45,
+      "steps": 1000,
+      "ms_per_step": 17.431111498000973,
+      "start_step": 44520,
+      "volume_A3": 102726320.1152237,
+      "delta": {
+        "neighbour_rebuilds": 96,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 13,
+        "d3_build_time_s": 0.03661060999002075,
+        "d3_term_build_s": 0.047143928983132355,
+        "d3_regrowths": 0,
+        "d3_pairs": -156,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 25188307.446441934,
+        "step": 1000
+      },
+      "d3_pairs": 6130,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "off",
+      "pair": 45,
+      "steps": 1000,
+      "ms_per_step": 16.026848154993786,
+      "start_step": 44520,
+      "volume_A3": 267120371292.32916,
+      "delta": {
+        "neighbour_rebuilds": 94,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 78698223789.33365,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "off",
+      "pair": 46,
+      "steps": 1000,
+      "ms_per_step": 16.14170804999594,
+      "start_step": 45520,
+      "volume_A3": 371896770154.26794,
+      "delta": {
+        "neighbour_rebuilds": 91,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 104776398861.93878,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "on",
+      "pair": 46,
+      "steps": 1000,
+      "ms_per_step": 17.34500804500567,
+      "start_step": 45520,
+      "volume_A3": 134587573.73564193,
+      "delta": {
+        "neighbour_rebuilds": 95,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 12,
+        "d3_build_time_s": 0.03506412800925318,
+        "d3_term_build_s": 0.041415793988562655,
+        "d3_regrowths": 0,
+        "d3_pairs": -239,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 31861253.62041822,
+        "step": 1000
+      },
+      "d3_pairs": 5891,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "on",
+      "pair": 47,
+      "steps": 1000,
+      "ms_per_step": 17.5251410819983,
+      "start_step": 46520,
+      "volume_A3": 174381138.84671432,
+      "delta": {
+        "neighbour_rebuilds": 96,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 13,
+        "d3_build_time_s": 0.04252199199254392,
+        "d3_term_build_s": 0.052546223007084336,
+        "d3_regrowths": 0,
+        "d3_pairs": -200,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 39793565.11107239,
+        "step": 1000
+      },
+      "d3_pairs": 5691,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "off",
+      "pair": 47,
+      "steps": 1000,
+      "ms_per_step": 15.945049514994025,
+      "start_step": 46520,
+      "volume_A3": 509259357833.2505,
+      "delta": {
+        "neighbour_rebuilds": 91,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 137362587678.98254,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "off",
+      "pair": 48,
+      "steps": 1000,
+      "ms_per_step": 16.116597467997053,
+      "start_step": 47520,
+      "volume_A3": 688717300550.0543,
+      "delta": {
+        "neighbour_rebuilds": 90,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 179457942716.80383,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "on",
+      "pair": 48,
+      "steps": 1000,
+      "ms_per_step": 17.290555955994932,
+      "start_step": 47520,
+      "volume_A3": 224260743.26026875,
+      "delta": {
+        "neighbour_rebuilds": 98,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 13,
+        "d3_build_time_s": 0.03078636799909873,
+        "d3_term_build_s": 0.03847323600348318,
+        "d3_regrowths": 0,
+        "d3_pairs": -138,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 49879604.41355443,
+        "step": 1000
+      },
+      "d3_pairs": 5553,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "on",
+      "pair": 49,
+      "steps": 1000,
+      "ms_per_step": 17.442276875997777,
+      "start_step": 48520,
+      "volume_A3": 288055640.242317,
+      "delta": {
+        "neighbour_rebuilds": 99,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 13,
+        "d3_build_time_s": 0.0316080810080166,
+        "d3_term_build_s": 0.04026529300608672,
+        "d3_regrowths": 0,
+        "d3_pairs": -115,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 63794896.98204827,
+        "step": 1000
+      },
+      "d3_pairs": 5438,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "off",
+      "pair": 49,
+      "steps": 1000,
+      "ms_per_step": 15.931929069003672,
+      "start_step": 48520,
+      "volume_A3": 923479853649.6217,
+      "delta": {
+        "neighbour_rebuilds": 90,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 234762553099.56738,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "off",
+      "pair": 50,
+      "steps": 1000,
+      "ms_per_step": 16.168525222994504,
+      "start_step": 49520,
+      "volume_A3": 1226659157489.0144,
+      "delta": {
+        "neighbour_rebuilds": 89,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 303179303839.3927,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "cool300",
+      "side": "on",
+      "pair": 50,
+      "steps": 1000,
+      "ms_per_step": 17.272065966004448,
+      "start_step": 49520,
+      "volume_A3": 368175777.9232622,
+      "delta": {
+        "neighbour_rebuilds": 97,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 12,
+        "d3_build_time_s": 0.042087858986633364,
+        "d3_term_build_s": 0.050191438996989746,
+        "d3_regrowths": 0,
+        "d3_pairs": -66,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 80120137.68094516,
+        "step": 1000
+      },
+      "d3_pairs": 5372,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    }
+  ],
+  "segments": {
+    "heat": {
+      "off": {
+        "blocks": 20,
+        "steps": 19950,
+        "mean_ms": 19.296934094937868,
+        "median_ms": 19.914581575496413,
+        "neighbour_rebuilds": 2094,
+        "recaptures": 15,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 1247203.3998171038
+      },
+      "on": {
+        "blocks": 20,
+        "steps": 19950,
+        "mean_ms": 26.37182967333401,
+        "median_ms": 27.19242727800156,
+        "neighbour_rebuilds": 2174,
+        "recaptures": 19,
+        "d3_builds": 256,
+        "d3_build_time_s": 3.415198196002166,
+        "d3_term_build_s": 3.6038141289463965,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 132305.84527600656
+      },
+      "overhead_mean": 0.3666331420104756,
+      "overhead_pair_median": 0.3489917577622428,
+      "overhead_pairs": [
+        0.3324594930182867,
+        0.3098772281729447,
+        0.2932422187893491,
+        0.30723321575534057,
+        0.29682884941934606,
+        0.33235965194044903,
+        0.2851767556946003,
+        0.33620176151951675,
+        0.3304424385734921,
+        0.3617817540049688,
+        0.37574412935199253,
+        0.4033867240079112,
+        0.4326192809501137,
+        0.4847633172628294,
+        0.4746647493781926,
+        0.4800614305558586,
+        0.45304975793085966,
+        0.4318563192090157,
+        0.36861659655371937,
+        0.3279047770591237
+      ],
+      "d3_build_ms_per_step": 0.18064231222788954,
+      "d3_build_share_of_off_step": 0.009361192370723654
+    },
+    "peak": {
+      "off": {
+        "blocks": 8,
+        "steps": 8000,
+        "mean_ms": 16.38101838287548,
+        "median_ms": 16.39796671899967,
+        "neighbour_rebuilds": 1302,
+        "recaptures": 1,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 69163949.52164963
+      },
+      "on": {
+        "blocks": 8,
+        "steps": 8000,
+        "mean_ms": 19.92419518125007,
+        "median_ms": 19.850273640502564,
+        "neighbour_rebuilds": 1350,
+        "recaptures": 4,
+        "d3_builds": 188,
+        "d3_build_time_s": 1.0411176259731292,
+        "d3_term_build_s": 1.183505607987172,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 558306.7468120449
+      },
+      "overhead_mean": 0.21629771211773874,
+      "overhead_pair_median": 0.21622771244055428,
+      "overhead_pairs": [
+        0.2992255411050293,
+        0.27099649639085066,
+        0.24553988171509777,
+        0.23644115071091787,
+        0.19117038643682016,
+        0.19601427417019068,
+        0.14930121361306115,
+        0.14155244757450958
+      ],
+      "d3_build_ms_per_step": 0.1479382009983965,
+      "d3_build_share_of_off_step": 0.009031074719569895
+    },
+    "transit": {
+      "off": {
+        "blocks": 7,
+        "steps": 6520,
+        "mean_ms": 16.24886203481525,
+        "median_ms": 16.21668738399603,
+        "neighbour_rebuilds": 873,
+        "recaptures": 0,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 88002992610.55045
+      },
+      "on": {
+        "blocks": 7,
+        "steps": 6520,
+        "mean_ms": 18.066920866411998,
+        "median_ms": 18.20169537763592,
+        "neighbour_rebuilds": 922,
+        "recaptures": 1,
+        "d3_builds": 128,
+        "d3_build_time_s": 0.4399330380038009,
+        "d3_term_build_s": 0.5345489000028465,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 42422545.9299787
+      },
+      "overhead_mean": 0.111888378872399,
+      "overhead_pair_median": 0.10951521857467328,
+      "overhead_pairs": [
+        0.14548057014361415,
+        0.11897242990296797,
+        0.14011404075308298,
+        0.10951521857467328,
+        0.08539493637032192,
+        0.09988139942673024,
+        0.07357806474927342
+      ],
+      "d3_build_ms_per_step": 0.08198602760779854,
+      "d3_build_share_of_off_step": 0.005045647346388508
+    },
+    "cool600": {
+      "off": {
+        "blocks": 8,
+        "steps": 8000,
+        "mean_ms": 16.197779630626428,
+        "median_ms": 16.1733039200044,
+        "neighbour_rebuilds": 1042,
+        "recaptures": 0,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 27700463638.860767
+      },
+      "on": {
+        "blocks": 8,
+        "steps": 8000,
+        "mean_ms": 17.92058996537253,
+        "median_ms": 17.945034096996096,
+        "neighbour_rebuilds": 1077,
+        "recaptures": 1,
+        "d3_builds": 149,
+        "d3_build_time_s": 0.46622738102450967,
+        "d3_term_build_s": 0.5734970510311541,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 17573148.195770316
+      },
+      "overhead_mean": 0.1063608947666288,
+      "overhead_pair_median": 0.10520249142383875,
+      "overhead_pairs": [
+        0.12509709870627317,
+        0.10879630148232589,
+        0.13301796163777468,
+        0.1116508413973698,
+        0.10160868136535162,
+        0.09101069735647593,
+        0.0842259575822395,
+        0.09559388521114265
+      ],
+      "d3_build_ms_per_step": 0.07168713137889426,
+      "d3_build_share_of_off_step": 0.004425738157552762
+    },
+    "cool300": {
+      "off": {
+        "blocks": 8,
+        "steps": 8000,
+        "mean_ms": 16.051314416122295,
+        "median_ms": 16.048604683495796,
+        "neighbour_rebuilds": 734,
+        "recaptures": 0,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 1226659157489.0144
+      },
+      "on": {
+        "blocks": 8,
+        "steps": 8000,
+        "mean_ms": 17.399838725001246,
+        "median_ms": 17.434712744001445,
+        "neighbour_rebuilds": 782,
+        "recaptures": 0,
+        "d3_builds": 102,
+        "d3_build_time_s": 0.29013382796983933,
+        "d3_term_build_s": 0.3602607339780661,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 368175777.9232622
+      },
+      "overhead_mean": 0.0840133258821758,
+      "overhead_pair_median": 0.0863710738594875,
+      "overhead_pairs": [
+        0.09024267175679035,
+        0.08512271503784397,
+        0.08761943268113104,
+        0.07454601404527517,
+        0.09909605896917562,
+        0.07284158398377971,
+        0.09480005845196482,
+        0.06825240569501756
+      ],
+      "d3_build_ms_per_step": 0.045032591747258266,
+      "d3_build_share_of_off_step": 0.0028055391963431064
+    }
+  },
+  "gpu_processes_at_end": [],
+  "valid": true,
+  "pytest_during_blocks": [
+    113336,
+    129131,
+    129137,
+    129144,
+    129150,
+    129153,
+    129199,
+    129205,
+    129265,
+    129309,
+    129312,
+    129687,
+    129731,
+    129734,
+    130293,
+    130337,
+    130340
+  ]
+}

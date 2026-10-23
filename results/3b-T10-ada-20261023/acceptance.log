@@ -1,0 +1,643 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.17, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /data/cache/L4/inductor, triton /data/cache/L4/triton
+rootdir: /tmp/fastmace-src
+configfile: pyproject.toml
+plugins: xdist-3.8.0, platformdirs-4.12.3
+collected 394 items / 355 deselected / 39 selected
+
+tests/gpu/test_ase_equivalence_gpu.py ..                                 [  5%]
+tests/gpu/test_canonical_restart_gpu.py .                                [  7%]
+tests/gpu/test_engine_gpu.py FF.                                         [ 15%]
+tests/gpu/test_fallback_gpu.py stoppable_pytest: SIGINT, forwarding SIGINT to pytest 331
+
+
+=================================== FAILURES ===================================
+___________ test_mh1_plain_cueq_float64_against_the_research_engine ____________
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_mh1_baseline
+    def test_mh1_plain_cueq_float64_against_the_research_engine():
+        ours = fastmace_run(spec("cueq", modes=[("eager", 200), ("checked", 500), ("repeat", 500), ("pipelined", 500),
+                                                ("speculative", 200)], warmups=True))
+        theirs = baseline_run(spec("cueq", modes=[("checked", 500), ("repeat", 500), ("pipelined", 500)]))
+        modes, base = ours["modes"], theirs["modes"]
+        checked, pipelined = modes["checked"], modes["pipelined"]
+        summary = {
+            "replay_vs_eager_200": deviation(checked["positions"], modes["eager"]["positions"], 4),
+            "fastmace_repeat_500": deviation(modes["repeat"]["positions"], checked["positions"]),
+            "baseline_repeat_500": deviation(base["repeat"]["positions"], base["checked"]["positions"]),
+            "pipelined_vs_checked_500": deviation(pipelined["positions"], checked["positions"]),
+            "speculative_vs_pipelined_200": deviation(modes["speculative"]["positions"], pipelined["positions"], 4),
+            "baseline_checked_500": deviation(checked["positions"], base["checked"]["positions"]),
+            "baseline_pipelined_500": deviation(pipelined["positions"], base["pipelined"]["positions"]),
+            "kernels": {mode: same_kernels(modes[mode]["kinds"], base[mode]["kinds"],
+                                           skip=fused_integrator_keys(modes[mode]["info"]))
+                        for mode in ("checked", "pipelined")},
+            "ms_per_step": {mode: {"fastmace": modes[mode]["ms_per_step"], "baseline": base[mode]["ms_per_step"]}
+                            for mode in ("checked", "pipelined")},
+            "info": {mode: out["info"] for mode, out in modes.items()},
+            "baseline_edge_sizes": {mode: out["edge_sizes_used"] for mode, out in base.items()},
+            "baseline_builds": {mode: out["rebuilds"] for mode, out in base.items()},
+            "warmups": ours["warmups"], "allocator": [ours["allocator"], theirs["allocator"]], "torch": ours["torch"],
+        }
+        report("1a-T13-mh1-cueq-float64-nvt", summary)
+        assert checked["info"]["neighbour_rebuilds"] >= 1
+        for name in ("replay_vs_eager_200", "fastmace_repeat_500", "pipelined_vs_checked_500",
+                     "speculative_vs_pipelined_200", "baseline_checked_500", "baseline_pipelined_500"):
+            assert summary[name] <= FLOAT64_LIMIT, (name, summary[name])
+        assert all(out["async_equal"] for out in modes.values())
+        assert not any(ours["warmups"].values()), ours["warmups"]
+        for mode in ("checked", "pipelined"):
+            assert modes[mode]["info"]["edge_sizes_used"] == base[mode]["edge_sizes_used"]
+            # The baseline counts the force field's first build too.
+            assert modes[mode]["info"]["neighbour_rebuilds"] + 1 == base[mode]["rebuilds"]
+>           assert all(equal for _, _, equal in summary["kernels"][mode].values()), summary["kernels"][mode]
+E           AssertionError: {'C': (23, 23, True), "('B', 7168)": (237, 238, False)}
+E           assert False
+E            +  where False = all(<generator object test_mh1_plain_cueq_float64_against_the_research_engine.<locals>.<genexpr> at 0x2b53300c0970>)
+
+tests/gpu/test_engine_gpu.py:688: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-cueq-float64-nvt: {
+ "replay_vs_eager_200": 2.7977620220553945e-14,
+ "fastmace_repeat_500": 3.232969447708456e-13,
+ "baseline_repeat_500": 3.9257486150745535e-13,
+ "pipelined_vs_checked_500": 2.913225216616411e-13,
+ "speculative_vs_pipelined_200": 4.973799150320701e-14,
+ "baseline_checked_500": 3.9257486150745535e-13,
+ "baseline_pipelined_500": 2.433608869978343e-13,
+ "kernels": {
+  "checked": {
+   "C": [
+    23,
+    23,
+    true
+   ],
+   "('B', 7168)": [
+    237,
+    238,
+    false
+   ]
+  },
+  "pipelined": {
+   "('B', 7168)": [
+    237,
+    238,
+    false
+   ]
+  }
+ },
+ "ms_per_step": {
+  "checked": {
+   "fastmace": 67.45243568000205,
+   "baseline": 67.48145846999705
+  },
+  "pipelined": {
+   "fastmace": 67.1763924600009,
+   "baseline": 67.2991188800006
+  }
+ },
+ "info": {
+  "eager": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": false,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 0,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 0
+    }
+   ]
+  },
+  "checked": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "repeat": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "pipelined": {
+   "rebuilds_beside": 18,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 18,
+   "graphs": [
+    "ACP",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 18,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "ACP",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 19,
+     "key": "ACP",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 19,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 19,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "speculative": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "speculative",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "('ACB', 7168, 0)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 200,
+   "speculative_rollbacks": 5,
+   "speculative_rebuild_rollbacks": 5,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 1,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "('ACB', 7168, 0)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 25,
+     "key": "('ACB', 7168, 0)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 1
+    }
+   ]
+  }
+ },
+ "baseline_edge_sizes": {
+  "checked": [
+   7168
+  ],
+  "repeat": [
+   7168
+  ],
+  "pipelined": [
+   7168
+  ]
+ },
+ "baseline_builds": {
+  "checked": 15,
+  "repeat": 15,
+  "pipelined": 19
+ },
+ "warmups": {
+  "checked": [],
+  "pipelined": [],
+  "speculative": []
+ },
+ "allocator": [
+  "expandable_segments:True",
+  "expandable_segments:True"
+ ],
+ "torch": "2.14.1+cu130"
+}
+_________ test_mh1_plain_cueq_float64_npt_against_the_research_engine __________
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @needs_mh1_baseline
+    def test_mh1_plain_cueq_float64_npt_against_the_research_engine():
+        options = spec("cueq", ensemble="npt", modes=[("checked", 500), ("pipelined", 500)])
+        ours = fastmace_run(options)
+        theirs = baseline_run(options)
+        modes, base = ours["modes"], theirs["modes"]
+        summary = {mode: {"baseline_500": deviation(modes[mode]["positions"], base[mode]["positions"]),
+                          "kernels": same_kernels(modes[mode]["kinds"], base[mode]["kinds"],
+                                                  skip=fused_integrator_keys(modes[mode]["info"])),
+                          "ms_per_step": [modes[mode]["ms_per_step"], base[mode]["ms_per_step"]],
+                          "builds": [modes[mode]["info"]["neighbour_rebuilds"] + 1, base[mode]["rebuilds"]],
+                          "edge_sizes": [modes[mode]["info"]["edge_sizes_used"], base[mode]["edge_sizes_used"]]}
+                   for mode in ("checked", "pipelined")}
+        summary["pipelined_vs_checked_500"] = deviation(modes["pipelined"]["positions"], modes["checked"]["positions"])
+        report("1a-T13-mh1-cueq-float64-npt", summary)
+        assert all(out["async_equal"] for out in modes.values())
+        assert summary["pipelined_vs_checked_500"] <= FLOAT64_LIMIT
+        for mode in ("checked", "pipelined"):
+            assert summary[mode]["baseline_500"] <= FLOAT64_LIMIT, (mode, summary[mode])
+>           assert all(equal for _, _, equal in summary[mode]["kernels"].values()), summary[mode]["kernels"]
+E           AssertionError: {'C': (28, 28, True), "('B', 7168)": (294, 295, False)}
+E           assert False
+E            +  where False = all(<generator object test_mh1_plain_cueq_float64_npt_against_the_research_engine.<locals>.<genexpr> at 0x2b5330157a70>)
+
+tests/gpu/test_engine_gpu.py:712: AssertionError
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-cueq-float64-npt: {
+ "checked": {
+  "baseline_500": 5.329070518200751e-15,
+  "kernels": {
+   "C": [
+    28,
+    28,
+    true
+   ],
+   "('B', 7168)": [
+    294,
+    295,
+    false
+   ]
+  },
+  "ms_per_step": [
+   68.32513781999751,
+   68.16439305000131
+  ],
+  "builds": [
+   15,
+   15
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined": {
+  "baseline_500": 8.881784197001252e-15,
+  "kernels": {
+   "('B', 7168)": [
+    294,
+    295,
+    false
+   ]
+  },
+  "ms_per_step": [
+   68.20669385000201,
+   68.20545950999986
+  ],
+  "builds": [
+   18,
+   18
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined_vs_checked_500": 7.105427357601002e-15
+}
+=============================== warnings summary ===============================
+../../usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+---------- generated xml file: /tmp/fastmace-out/acceptance/junit.xml ----------
+============================= slowest 40 durations =============================
+1213.37s call     tests/gpu/test_ase_equivalence_gpu.py::test_baoab_variants_reproduce_their_references
+1087.61s call     tests/gpu/test_ase_equivalence_gpu.py::test_langevin_reproduces_ase_in_every_50_K_bin
+607.36s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+565.00s call     tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+549.04s call     tests/gpu/test_canonical_restart_gpu.py::test_mh1_hybrid_resumes_statistically
+495.38s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+0.01s setup    tests/gpu/test_ase_equivalence_gpu.py::test_langevin_reproduces_ase_in_every_50_K_bin
+
+(12 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+FAILED tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/usr/local/lib/python3.10/subprocess.py:1953: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+===== 2 failed, 4 passed, 355 deselected, 1 warning in 4797.81s (1:19:57) ======
