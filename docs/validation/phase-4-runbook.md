@@ -140,7 +140,7 @@ Local RTX 5060 Ti, run ID `4-T13-local-<date>`, `python3 <copy>/tools/ci/local_g
 | `regression-npt` | 5 | yes | BAOAB NPT, D3 off, NbCl5, one version per process, 4 processes 3b, 4, 4, 3b | 30 min |
 | `ase-speed` | rec. | yes | each new ASE class on stock ASE + MACE's calculator against its `fastmace.ase` class (tool-side `tools/bench/ase_integrators_speed.py`) | 45 min |
 | `step-costs` | rec. | yes | each new integrator against Langevin (NVT) or BAOAB (NPT), same process, 4 alternating blocks of 300 steps, NaCl and NbCl5 | 30 min |
-| `optimisers` | 1 | no | GPU LBFGS and FIRE against ASE, fixed and variable cell, with `FixAtoms` (`tools/bench/optimizer_frames.py`, `tools/validation/anneal_frame_probe.py`) | 1.5 h |
+| `optimisers` | 1 | no | fixed cell float32 and variable cell: `tools/bench/optimizer_frames.py` (ASE side, then the GPU side with `--compare`); float64 step for step and `FixAtoms`: `tools/validation/anneal_frame_probe.py run` per side (`--precision float64`, `--optimizer`, `--fix-every 3 --ase-calculator mace`), then `compare`; `fastmace relax` once | 2 h |
 | `minima` | 2 | no | `tools/validation/anneal_minima.py` at the freeze, only if required below | 0.5–1.5 h |
 | `protocol` | 2 | no | the short NbCl5 NPT anneal protocol through `fastmace run` with `gpu-LBFGS` (decision 47), start, then resume to the quench | 1.5 h |
 | `nve-drift` | rec. | no | NVE, hybrid float32, NaCl and NbCl5 3×3×3, 20 ps at 1 fs, conserved quantity every 10 fs | 15 min |
@@ -198,9 +198,9 @@ stretch; then the rest, the acceptance and slow tiers overnight. About 18–20 h
     within 0.01 %.
   - **The soft-cell extension (pre-declared; 4-T07 found NaNbO3 at 1.2e-3 Å and 1.3e-4, NbCl5 + D3 at 9.1e-3 Å
     and 2.4e-4, both at the same minima):** a crystal that passes the energy and atom clauses and misses only a
-    cell clause is relaxed again on both sides from its two minima to fmax 0.002 eV/Å. It passes if the cells are
-    then within the limits (the miss was the fmax tolerance on a flat cell landscape); still missing, it fails and
-    goes to the conductor. The report gives both comparisons.
+    cell clause is relaxed again on both sides from the same start to fmax 0.002 eV/Å (`--fmax 0.002`). It passes
+    if the cells are then within the limits (the miss was the fmax tolerance on a flat cell landscape); still
+    missing, it fails and goes to the conductor. The report gives both comparisons.
   - **FIRE on NaCl.** NbCl5 has no FIRE reference: ASE's own FIRE with the filter does not converge there in 5,000
     steps (4-T07, 447 switch flips). The GPU side runs and is recorded, not judged.
   - **PolarMACE:** the refusal of decision 50 (CPU tests); no comparison (4-T12b: the model's own surface,

@@ -48,3 +48,15 @@ def test_the_arguments():
     assert (args.structure, args.timestep_fs, args.warmup, args.block) == ("NaCl", 1.0, 300, 300)
     with pytest.raises(SystemExit):
         tool.parse_args(["--side", "ase", "--integrator", "MTKNPT", "--output", "out"])
+
+
+def test_nve_drift_fits_the_slope_and_the_scatter_about_it():
+    path = ROOT / "tools" / "bench" / "nve_drift.py"
+    spec = importlib.util.spec_from_file_location("_nve_drift", path)
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    times = [0.0, 1.0, 2.0, 3.0]
+    slope, rms, spread = tool.drift(times, [1.0 + 0.5 * t + (0.1 if i % 2 else -0.1) for i, t in enumerate(times)])
+    assert slope == pytest.approx(0.5 + 0.04, abs=1e-12)  # the alternating scatter tilts the fit a little
+    assert 0.0 < rms < 0.1 and spread == pytest.approx(1.7)
+    assert tool.parse_args(["--output", "o"]).ps == 20.0
