@@ -1270,7 +1270,8 @@ at graph speed are 2.x (§17).
 
 The planner uses rules, not measurement tables: it decides from properties of
 the model, workload and hardware, then verifies with self-checks. An optional
-short calibration (`plan(calibrate=True)`: about 50 steps per candidate tier,
+short calibration (`CalibrationConfig(calibrate=True)` through `Simulation(calibration=)`, `fm.md(calibrate=True)` or
+`fastmace run --calibrate`; decision 55: the backend dimension only, about 50 steps per candidate,
 results never persisted across runs) may break ties, but no per-GPU or
 per-shape table is ever stored. This is the project's generality rule.
 
@@ -1340,12 +1341,14 @@ them, and a user override cannot lift them, except through the `allow_*`
 flag named in the rule, which is recorded. When several hard constraints
 refuse, all reasons are reported together in one `PlanRefused` error
 (§7.6). Rules 8–12 are **preferences**: a user override replaces the
-decision, and the overridden plan is self-checked and gated like any other.
+decision, and the overridden plan is self-checked and gated like any other: the same gate policy as an
+unoverridden plan, so an override of an MD plan runs no gate unless `check="gate"` (decision 3), and an MC plan
+always runs the move-energy part (decision 35).
 Rules 13–15 are **reactions** to checks.
 
 | Order | Kind | Condition | Decision |
 | --- | --- | --- | --- |
-| 1 | hard | workload outside §4.4 (PBC, constraints, MC moves with constraints), or a variable cell with an integrator that has no barostat | refuse; reference tier only with `allow_reference=True` (never for MC with constraints) |
+| 1 | hard | workload outside §4.4 (PBC, constraints, MC moves with constraints), or a variable cell with an integrator that has no barostat, or a PolarMACE long-range source without qualification (`polar-unqualified-source`) | refuse; reference tier only with `allow_reference=True` (never for MC with constraints) |
 | 2 | hard | a species outside the ForceField's declared superset, in the structure or in a declared move set (swap pairs, transmutable sets) | refuse |
 | 3 | hard | PolarMACE with a plain compiled backend | refuse that combination (zero forces); hybrid, or eager plain |
 | 4 | hard | `padding_is_exact` false | no graph mode (padded edges would change energies); compiled with exact edge counts |
@@ -1356,7 +1359,7 @@ Rules 13–15 are **reactions** to checks.
 | 9 | preference | `host_callbacks_every` set, `fastmace.ase` observers included | graph mode stays. A replay per callback interval is cheap: in 3-T06's measurement a callback every step added 25 % on NaCl and 3 % on NbCl5, while compiled mode was 1.3–4.7× slower. Compiled mode only under rule 4 or with an explicit `mode="compiled"` (decision 38) |
 | 10 | preference | the integrator or optimiser and its cell mode (§9.2) | a barostat integrator or a cell-filtered optimiser (FIRE/LBFGS, never an NPT integrator for a relaxation) enables the stress path and the deformation-aware neighbour test; polar: k-vector headroom |
 | 11 | preference | `max_temperature_K` high; `"displace"` in `mc_moves`; D3 on | larger skin and bucket headroom (scaled from expected displacement per rebuild interval); a skin that keeps displacement trial rebuilds rare (§10.4); the D3 list's own skin (§11.2); re-capture budget |
-| 12 | preference | GPU memory insufficient for estimated edge bucket × feature width | drop memory-heavy rewrites or warn (e.g. generic-only POLAR-1-L NPT on NbCl5 ran out of memory on 20 GB) |
+| 12 | preference | estimated memory (model dimensions × edge bucket and nodes, forward and backward, plus the D3 list) above 90 % of free GPU memory | drop the rewrites that declare an edge-sized buffer, largest first, then warn (decision 51; e.g. generic-only POLAR-1-L NPT on NbCl5 ran out of memory on 20 GB). The estimate may carry one global safety factor, the same for every model and GPU, fitted on the 19 labels and recorded with its fit (5-T03); per-model, per-GPU or per-shape factors stay forbidden (§9.1) |
 | 13 | reaction | a rewrite self-check fails | disable that rewrite and every rewrite that requires it, record reasons, re-plan |
 | 14 | reaction | the gate fails (§12.3) | fallback algorithm (§9.4); never run silently with a failing gate |
 | 15 | reaction | known model–structure warning (§4.3) | warn (not refuse), with the documented diagnosis |
@@ -1445,8 +1448,8 @@ the record (decision 29):
    included, §12.3). The failed plan and every tried candidate are recorded.
 5. **Stop.** The reference tier is the last candidate only if it fits
    (§12.3); otherwise, or when the terminal sequence of step 2 is exhausted,
-   the planner refuses with the full record. Mid-run fallbacks (§9.6) follow
-   the same steps between segments, from the last committed state.
+   the planner refuses with the full record. Mid-run fallbacks (§9.6, decision 54) follow
+   the same steps at a canonical restart point, from the last committed state.
 
 ### 9.5 Output
 
@@ -1455,7 +1458,8 @@ bucket and skin settings, kernel availability, the fallback candidates and
 predicted memory. `str(plan)` is human-readable, and the plan is written into
 provenance (§13). Users can override the preferences of §9.3 (rules 8–12),
 never the hard constraints (rules 1–7) except through their `allow_*` flags;
-every override is self-checked and gated.
+every override is self-checked and gated. A replaced decision reads `choice (override; rule n would give X)`, with
+the code `override`, and `Plan.requested` keeps the user's value.
 
 A plan never changes in place. A runtime switch (§9.6) or a fallback creates
 a new frozen **revision** with its step, reason and predecessor. Provenance
@@ -1469,8 +1473,8 @@ During a run the planner monitors:
 - bucket overflow;
 - non-finite observables.
 
-It may switch tiers between segments (never mid-step), as a new plan
-revision (§9.5) with a logged event.
+It may switch tiers at a canonical restart point (never mid-step; forced earlier than the run's restart
+cadence if needed), as a new plan revision (§9.5) with a logged event (decisions 52–53).
 Non-finite energies stop the run with a diagnostic; they are never "fixed".
 
 ---
@@ -2121,7 +2125,8 @@ kernel categories, operators).
 
 ## 13. Provenance
 
-Every run writes `metadata.json` with:
+Every run writes `metadata.json` with (schema `fastmace.metadata/1`; additions within a major version raise
+`schema_minor`, and readers accept every older minor):
 - model path, SHA-256, head, licence;
 - the force-field identity (§10.6) and the reference record (§12.1);
 - the plan (tier, rewrites on/off with reasons), force and integration
