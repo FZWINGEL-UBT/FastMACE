@@ -50,14 +50,24 @@ Never install FastMACE into the GPU environments; GPU runs use
 
 ## Test tiers
 
-Plan tasks 1b-T24 and 1b-T27 (19 October 2026). The GPU suite has three tiers
-(`tests/_support/tiers.py`):
+Plan tasks 1b-T24 and 1b-T27 (19 October 2026), and 4-T13. The GPU suite has three tiers and a
+compatibility check (`tests/_support/tiers.py`):
 
 | Tier | Command | Who runs it, when | Local RTX 5060 Ti, warm caches |
 | --- | --- | --- | ---: |
 | fast (worker) | `pytest tests/gpu -m "not slow and not acceptance"` | every worker, for every change, as often as needed | 7.9 min (190 tests, 1b-T27) |
 | full (merge) | `pytest tests/gpu -m "not acceptance"` | the conductor, at merges that touch `model/`, `rewrites/`, `kernels/` or `engine/` | 38.7 min (244 tests; 142 min before 1b-T27) |
 | acceptance | `pytest tests/gpu -m acceptance` | phase acceptance, and merges that touch `model/`, `rewrites/` or `kernels/` | murphy: 103 min (10 tests) |
+| compat | `python tools/acceptance/compat.py --provider P --output DIR` (`pytest tests/gpu -m compat`) | every production GPU type each phase, and once when a type is added (SPEC decision 39, amended 23 October 2026) | about 30 min (estimate: the fast tier and about 20 min of listed slow tests) |
+
+**The compatibility tier** (plan task 4-T13) checks what differs between GPU architectures: the fast
+tier, plus the slow tests listed in `tiers.COMPAT_TESTS` (kernels compile and attach, the accuracy gate
+on MH-1, MP-0 and POLAR-1-S, replay against eager, reproducible mode, a restart round trip), plus
+`tests/gpu/test_compat_gpu.py` (the captured graphs' kernel counts, recorded, and a short NVE, NVT and
+NPT smoke). The root conftest marks them `compat`; it needs `FASTMACE_MODELS` but no research engine.
+The driver records the provider, the GPU, its compute capability and driver, and the package versions in
+`compat.json`. To add a test to the tier, list it in `COMPAT_TESTS`; `tests/cpu/test_tiers.py` checks
+that every entry is still collected.
 
 **Merge rule:** the full tier on merges that touch `model/`, `rewrites/`, `kernels/` or `engine/`,
 and in addition the acceptance tier on merges that touch `model/`, `rewrites/` or `kernels/`

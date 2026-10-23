@@ -295,6 +295,12 @@ class Plan:
             values = {key: _from_json(value) for key, value in values.items() if key in fields}
             if class_name == "IntegratorConfig":  # a plan from before the option ran ASE's projection (3-T22c)
                 values.setdefault("fixcm_projection", "ase")
+                # A plan from before 4-T01 counted what dof "auto" resolves to (decision 45); the planner
+                # records the resolved value, so an unchanged run's plan compares equal (SPEC §10.6, 4-T13).
+                if "dof" not in values:
+                    from fastmace.integrators.registry import resolve_dof
+
+                    values["dof"] = resolve_dof("auto")
             return cls_(**values)
 
         def decision(entry):
