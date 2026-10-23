@@ -62,7 +62,7 @@ def parse_args(argv=None):
     p.add_argument("--output", required=True, type=Path)
     p.add_argument("--checkpoint", required=True, type=Path)
     p.add_argument("--model", default="mh1")
-    p.add_argument("--head", default="matpes_r2scan")
+    p.add_argument("--head", default="matpes_r2scan", help="\"none\" for a single-head model (POLAR-1-S)")
     source = p.add_mutually_exclusive_group(required=True)
     source.add_argument("--traj", nargs="+", help="NAME=PATH of a captured.traj")
     source.add_argument("--structures", nargs="+", help="benchmark names, strained and rattled (4-T07)")
@@ -285,7 +285,8 @@ def main(argv=None):
 
     oeq = str(loading.prepare_hybrid())
     checkpoint = args.checkpoint.expanduser().resolve(strict=True)
-    loaded = loading.load_pristine(args.model, args.head, checkpoint=str(checkpoint))
+    head = None if args.head == "none" else args.head
+    loaded = loading.load_pristine(args.model, head, checkpoint=str(checkpoint))
     frames = read_frames(args)
     meta = {"schema": 4, "task": "4-T05/4-T06/4-T07", "side": args.side, "optimizer": args.optimizer,
             "cell_filter": args.cell_filter, "pressure_GPa": args.pressure_GPa, "dispersion": args.dispersion,
