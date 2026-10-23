@@ -383,7 +383,8 @@ def test_set_charges_takes_the_total():
 def test_simulation_update_is_one_transaction():  # 3-T03 (conductor answer; T13 applies an observer's change)
     from fastmace.simulation import Simulation
 
-    fields = ["species", "masses", "charges", "total_charge", "friction_per_fs", "positions", "momenta"]
+    # 4-T05 adds the cell (fixed cell, 4-T09's quench frames on one engine).
+    fields = ["species", "masses", "charges", "total_charge", "friction_per_fs", "positions", "momenta", "cell"]
     assert _parameters(Simulation.update) == ["self", *fields]
     assert _keyword_only(Simulation.update) == fields
     for name in fields:

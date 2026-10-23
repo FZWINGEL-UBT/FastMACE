@@ -221,7 +221,7 @@ def _replanned(plan, planner, force_field, atoms, *, mode, subprocess):
         raise ValueError("a mode or backend candidate re-plans: pass planner= (the planner of the failed plan)")
     planned = planner.plan(force_field, atoms, plan.integrator, plan.workload,
                            allow_naive_cueq="allow_naive_cueq" in plan.allowances,
-                           allow_reference=mode == "reference", mode=mode)
+                           allow_reference=mode == "reference", mode=mode, optimizer=plan.optimizer)
     if subprocess and planned.runner != "subprocess":
         planned = dataclasses.replace(planned, runner="subprocess", decisions=(*planned.decisions, (
             "runner", "subprocess", Reason("a fallback candidate of another backend runs in a child process: one "

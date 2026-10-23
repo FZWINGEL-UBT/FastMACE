@@ -823,13 +823,30 @@ class MACEForceField:
 
     def set_cell(self, cell):
         """compute_stress: the current float64 cell for the neighbour list and the model inputs; graph safe."""
-        import torch
-
         if not self._compute_stress:
             raise RuntimeError("set_cell needs a force field built with compute_stress=True")
         self.neighbours.set_cell(cell)
+        self._write_cell_inputs(cell)
+
+    def reset_cell(self, cell) -> None:
+        """A new cell between replays, fixed or variable cell (4-T05's ``Simulation.update(cell=)``): the
+        neighbour list's host cell (the caller rebuilds it) and the model's cell inputs in place, and a follower
+        copy's leader cell. The captured graphs read these at fixed addresses, so they stay valid."""
+        import torch
+
+        cell = torch.as_tensor(cell, dtype=torch.float64).to(self._device)
+        self.neighbours.reset_cell(cell.cpu().numpy())
+        if getattr(self, "_leader_cell", None) is not None:
+            self._leader_cell.copy_(cell)
+        self._write_cell_inputs(cell)
+
+    def _write_cell_inputs(self, cell):
+        """The model inputs the cell feeds (cell, volume, reciprocal cell), in place; graph safe."""
+        import torch
+
         with torch.no_grad():
-            self.data["cell"].copy_(cell)
+            if "cell" in self.data:
+                self.data["cell"].copy_(cell.reshape(self.data["cell"].shape))
             # PolarMACE's k-space sums also read the batch's volume and reciprocal cell
             # (mace.data.atomic_data: det(cell), 2 pi inv(cell^T)); other models ignore them.
             # Cross products instead of linalg.det/inv, which check for errors on the host.
