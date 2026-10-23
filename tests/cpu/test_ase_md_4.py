@@ -185,7 +185,7 @@ def test_the_class_is_mapped(name):
 
 @pytest.mark.parametrize("name", NAMES)
 def test_record_from_ase_units(loaded, name):
-    expected = CASES[name][1](**ASE_DOF) if name in WITHOUT_FIXCM else CASES[name][1]()
+    expected = CASES[name][1](**ASE_DOF) if name in WITHOUT_FIXCM else CASES[name][1](fixcm=True)  # ASE's default
     _records_close(_dyn(loaded, name).integrator, expected)
 
 
@@ -198,7 +198,8 @@ def test_fixcm_passes_through(loaded, name):
 
 @pytest.mark.parametrize("name", WITHOUT_FIXCM)
 def test_dof_auto_is_fastmaces_convention(loaded, name):
-    _records_close(_dyn(loaded, name, dof="auto").integrator, CASES[name][1](fixcm=True, dof="auto"))
+    fixcm = "auto" if name in ("VelocityVerlet", "Bussi") else True  # NHC and MTK take no FixAtoms
+    _records_close(_dyn(loaded, name, dof="auto").integrator, CASES[name][1](fixcm=fixcm, dof="auto"))
     with pytest.raises(ValueError, match="dof"):
         _dyn(loaded, name, dof="3n")
 
@@ -397,3 +398,74 @@ def test_the_report_names_the_integrator_and_its_label(loaded, name):
     berendsen = f"{HEADERS[name].removesuffix(' 1 fs')}: non-canonical: equilibration only (§10.2)"
     assert (berendsen in dyn.summary) is ("Berendsen" in name)
     assert ("non-canonical" in dyn.summary) is ("Berendsen" in name)
+
+
+# --------------------------------------------------------------------------- FixAtoms (4-T04, decision 44)
+
+FIXED = [0, 5]
+# Decision 44: FixAtoms with the fixed-cell schemes whose ASE class takes it (NVE, CSVR, NVT Berendsen and
+# Langevin), without fixcm; refused for NHC and MTK (ASE refuses them) and for every variable cell.
+FIX_ATOMS_RUNS = ("VelocityVerlet", "Bussi", "NVTBerendsen")
+FIX_ATOMS_REFUSED = ("NoseHooverChainNVT", "IsotropicMTKNPT", "MTKNPT", "NPTBerendsen", "Inhomogeneous_NPTBerendsen")
+
+
+def _fixed():
+    from ase.constraints import FixAtoms
+
+    atoms = _atoms()
+    atoms.set_constraint(FixAtoms(indices=FIXED))
+    return atoms
+
+
+@pytest.mark.parametrize("name", FIX_ATOMS_RUNS)
+def test_fix_atoms_runs_where_decision_44_allows_it(loaded, name):
+    options = {"fixcm": False} if name in WITH_FIXCM else {}
+    atoms = _fixed()
+    start = atoms.positions[FIXED].copy()
+    dyn = _dyn(loaded, name, atoms=atoms, logfile="run.log", **options)
+    dyn.run(4)
+    dyn.close()
+    np.testing.assert_array_equal(atoms.positions[FIXED], start)
+    np.testing.assert_array_equal(atoms.get_momenta()[FIXED], 0.0)
+    assert dyn.simulation.degrees_of_freedom == 3 * (len(atoms) - len(FIXED))
+    sim = _simulation(loaded, dyn.integrator, atoms=_fixed())
+    sim.run(steps=4)
+    assert dyn.plan == sim.plan
+    np.testing.assert_array_equal(dyn.simulation.committed().positions, sim.committed().positions)
+
+
+def test_fix_atoms_with_ases_default_fixcm_is_refused(loaded):
+    """``NVTBerendsen``'s ``fixcm=True`` (ASE's default) with FixAtoms: decision 44, as ``Langevin``'s."""
+    dyn = _dyn(loaded, "NVTBerendsen", atoms=_fixed())
+    with pytest.raises(PlanRefused, match="fixcm"):
+        dyn.run(1)
+
+
+@pytest.mark.parametrize("name", ["VelocityVerlet", "Bussi"])
+def test_fix_atoms_with_fastmaces_dof_runs_without_fixcm(loaded, name):
+    """``dof="auto"`` resolves ``fixcm="auto"``: off with FixAtoms, 3(N - n_fixed) degrees of freedom (4-T04)."""
+    dyn = _dyn(loaded, name, atoms=_fixed(), dof="auto")
+    dyn.run(2)
+    assert dyn.simulation.degrees_of_freedom == 3 * (len(dyn.atoms) - len(FIXED))
+    assert dyn.plan.integrator.fixcm is False
+
+
+@pytest.mark.parametrize("name", FIX_ATOMS_REFUSED)
+def test_fix_atoms_is_refused_elsewhere_with_the_reason(loaded, name):
+    options = {"fixcm": False} if name in WITH_FIXCM else {}
+    dyn = _dyn(loaded, name, atoms=_fixed(), **options)
+    with pytest.raises(PlanRefused, match="FixAtoms|fixed atoms|constraints") as raised:
+        dyn.run(1)
+    assert raised.value.codes  # rule 1's codes ("constraints", "fix-atoms-variable-cell"); the reason above
+
+
+def test_fix_atoms_trajectory_keeps_the_constraint(loaded):
+    from ase.io import read
+
+    dyn = _dyn(loaded, "VelocityVerlet", atoms=_fixed(), trajectory="run.traj", loginterval=2)
+    dyn.run(4)
+    dyn.close()
+    frames = read("run.traj", index=":")
+    assert len(frames) == 3
+    for frame in frames:
+        assert [list(c.index) for c in frame.constraints] == [FIXED]

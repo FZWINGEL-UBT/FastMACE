@@ -15,7 +15,10 @@ decision 37, as ``fastmace.ase.Langevin`` does (``LangevinBAOAB`` keeps its phas
 original has no ``fixcm`` (``VelocityVerlet``, ``Bussi``, ``NoseHooverChainNVT``, ``IsotropicMTKNPT``,
 ``MTKNPT``) removes no centre of mass, as ASE, and counts ASE's degrees of freedom: its keyword-only
 ``dof`` defaults to ``"ase"``; ``dof="auto"`` (or ``"fastmace"``) is FastMACE's convention instead,
-the total momentum removed and 3N - 3 counted.
+the total momentum removed and 3N - 3 counted (``fixcm="auto"``: with ``FixAtoms`` no momentum is removed and
+3(N - n_fixed) counted, 4-T04). ``FixAtoms`` runs where owner decision 44 allows it (NVE, CSVR, NVT
+Berendsen, Langevin; with ``fixcm=False`` for the classes that take ASE's ``fixcm``, whose default ``True``
+is refused with it); rule 1 refuses it elsewhere at the first ``run``, with the reason.
 
 Nothing here builds an engine: the classes build a ``fm.Simulation`` at the first ``run`` or
 ``step``, which plans, runs the optional gate (owner decision D1: ``check="gate"``) and builds
@@ -695,12 +698,15 @@ def _arguments(name):
 DOF_CHOICES = ("ase", "auto", "fastmace")
 
 
-def _without_fixcm(dof):
+def _without_fixcm(dof, *, fix_atoms=True):
     """The record's ``fixcm`` and ``dof`` for a class whose ASE original has no ``fixcm``: ``"ase"``, no
-    centre of mass removed and ASE's count (the default); otherwise FastMACE's convention (module docstring)."""
+    centre of mass removed and ASE's count (the default); otherwise FastMACE's convention (module docstring),
+    ``fixcm="auto"`` for the schemes that take ``FixAtoms`` (off with it, 4-T04) and ``True`` for the others."""
     if dof not in DOF_CHOICES:
         raise ValueError(f"dof must be one of {DOF_CHOICES}, got {dof!r}")
-    return {"fixcm": dof != "ase", "dof": dof}
+    if dof == "ase":
+        return {"fixcm": False, "dof": dof}
+    return {"fixcm": "auto" if fix_atoms else True, "dof": dof}
 
 
 class VelocityVerlet(_Dynamics):
@@ -880,7 +886,7 @@ class NoseHooverChainNVT(_Dynamics):
         self._refuse_extra(kwargs)
         record = integrators.NoseHooverChain(timestep_fs=float(timestep) / units.fs,
                                              temperature_K=float(temperature_K), tdamp_fs=float(tdamp) / units.fs,
-                                             tchain=tchain, tloop=tloop, **_without_fixcm(dof))
+                                             tchain=tchain, tloop=tloop, **_without_fixcm(dof, fix_atoms=False))
         self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
                     append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
                     output=output, check=check, dispersion=dispersion)
@@ -903,7 +909,8 @@ class _MTKDynamics(_Dynamics):
         record = integrators.MTK(timestep_fs=float(timestep) / units.fs, temperature_K=float(temperature_K),
                                  pressure_GPa=float(pressure_au) / units.GPa, tdamp_fs=float(tdamp) / units.fs,
                                  pdamp_fs=float(pdamp) / units.fs, tchain=tchain, pchain=pchain, tloop=tloop,
-                                 ploop=ploop, cell_mode=self.CELL_MODE, **_without_fixcm(dof))
+                                 ploop=ploop, cell_mode=self.CELL_MODE,
+                                 **_without_fixcm(dof, fix_atoms=False))
         self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
                     append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
                     output=output, check=check, dispersion=dispersion)

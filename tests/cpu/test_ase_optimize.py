@@ -319,3 +319,37 @@ def test_a_converged_start_takes_no_step(loaded):
     dyn = _ours("LBFGS", structure(), loaded)
     assert dyn.run(fmax=1e3, steps=10) is True
     assert dyn.nsteps == 0 and dyn.summary["steps"] == 0
+
+
+# --------------------------------------------------------------------------- FixAtoms (4-T04, decision 44)
+
+FIXED = [0, 5]
+
+
+def _fixed(make=structure):
+    from ase.constraints import FixAtoms
+
+    atoms = make()
+    atoms.set_constraint(FixAtoms(indices=FIXED))
+    return atoms
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_fix_atoms_relaxes_at_fixed_cell(loaded, name):
+    atoms = _fixed()
+    start = atoms.positions[FIXED].copy()
+    dyn = _ours(name, atoms, loaded)
+    dyn.run(fmax=1e-9, steps=4)
+    np.testing.assert_array_equal(atoms.positions[FIXED], start)
+    assert not np.array_equal(atoms.positions, structure().positions)
+    sim = _simulation(loaded, dyn.record, _fixed())
+    relaxed, _ = sim.relax(fmax=1e-9, steps=4)
+    assert dyn.plan == sim.plan
+    np.testing.assert_array_equal(atoms.positions, relaxed.positions)
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_fix_atoms_with_a_cell_filter_is_refused(loaded, name):
+    dyn = _ours(name, FrechetCellFilter(_fixed(strained)), loaded)
+    with pytest.raises(PlanRefused, match="FixAtoms|fixed atoms"):
+        dyn.run(fmax=0.01, steps=2)
