@@ -496,3 +496,13 @@ def test_simulation_runs_and_resumes_bitwise(tiny_model, cpu_planner, which, tmp
         assert torch.equal(getattr(resumed._engine.state, name), getattr(sim._engine.state, name)), name
     values = sim._engine.integrator.output_values(sim._engine.state)
     assert bool(torch.isfinite(values[CONSERVED_KEY]).all())
+
+
+def test_the_fused_stage_needs_cuda():
+    """4-T03b: the Triton chain stage is the default on CUDA only; on the CPU the PyTorch stage runs."""
+    state = new_state(argon(), compute_stress=True)
+    assert build("nhc", state).fused is False
+    assert build("full", state).fused is False
+    config = mtk_config("full")
+    with pytest.raises(ValueError, match="need CUDA"):
+        MTK(state, config, fused=True)

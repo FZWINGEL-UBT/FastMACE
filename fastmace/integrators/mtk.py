@@ -17,9 +17,11 @@ that term on the device. The force field needs ``compute_stress``, and the engin
 ``V = V0 exp(3 eps)``, positions not scaled with the cell (they evolve by ASE's exp/exprel drift).
 ``"full"`` is ``MTKNPT``: the 3 x 3 cell momentum ``p_g``. ASE diagonalises ``p_g`` (``np.linalg.eigh``)
 and applies exp and exprel to its eigenvalues; every use is a matrix function U f(L) U^T of the symmetric
-``p_g``, so this port evaluates exp and exprel of the matrix directly (``exp_and_exprel``: scaling and
-squaring of a 6 x 6 block Taylor series, no LAPACK, CUDA-graph safe, no eigenvector ambiguity at the
-degenerate ``p_g = 0`` of the start). The difference from ASE is rounding.
+``p_g``, so this port evaluates exp and exprel of the matrix directly (``exp_and_exprel``: a Horner Taylor
+series with scaling and squaring, 3 x 3 products as element-wise sums, no LAPACK, CUDA-graph safe, no
+eigenvector ambiguity at the degenerate ``p_g = 0`` of the start). The difference from ASE is rounding.
+With ``fused`` (by default on CUDA with Triton, plan task 4-T03b) the chains and the matrix functions run as
+single Triton programs, bitwise the PyTorch stage (``fastmace.kernels.triton.nose_hoover_chain``).
 
 Degrees of freedom (owner decision D2, conductor's answer of 23 October 2026): ASE counts 3N (as N) in
 every coupling term: the thermostat mass, force and energy, the drag ``1 + 1/N`` (``1 + d/N_f``), the
@@ -53,35 +55,43 @@ from fastmace.neighbors.skin import det_3x3, times_3x3
 
 from .base import CONSERVED_KEY, Integrator
 from .langevin import base_output_values, check_ensemble
-from .nose_hoover import NoseHooverChain, mass_temperature, remove_momentum, require, thermostat_masses, twice_kinetic
+from .nose_hoover import (
+    NoseHooverChain,
+    mass_temperature,
+    remove_momentum,
+    require,
+    thermostat_masses,
+    twice_kinetic,
+    use_fused,
+)
 
 if TYPE_CHECKING:
     from fastmace.state import SimulationState
 
-EXPM_SCALING = 4   # exp(M) = exp(M / 2^s)^(2^s) on the 6 x 6 block matrix; with the Taylor degree below
-EXPM_DEGREE = 16   # exact in float64 for |M| <= 16, while a barostat step moves |p_g dt / W| ~ 1e-4
+EXPM_SCALING = 4   # exp(A) = exp(A / 2^s)^(2^s), exprel(2B) = exprel(B) (exp(B) + I) / 2; with the Horner
+EXPM_DEGREE = 14   # degree below, exact in float64 for |A| <= 6, while a barostat step moves |p_g dt / W| ~ 1e-4
+# 2^-s, then the Horner factors 1 / (k + 1) for k = DEGREE - 1, ..., 1 (the fused kernel's table)
+EXPM_CONSTANTS = [2.0 ** -EXPM_SCALING] + [1.0 / (k + 1) for k in range(EXPM_DEGREE - 1, 0, -1)]
 
 
 def exp_and_exprel(a: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """exp(A) and exprel(A) = (exp(A) - I) A^-1 = sum_k A^k / (k + 1)! of a 3 x 3 tensor.
 
-    exp([[A, I], [0, 0]]) = [[exp(A), exprel(A)], [0, I]]: one scaling-and-squaring Taylor series of the block
-    matrix gives both. For a symmetric A they equal SciPy's ``U f(L) U^T`` (ASE's) to rounding.
+    B = A / 2^s; exprel(B) by Horner, R = I + B R / (k + 1) from R = I; exp(B) = I + B exprel(B); then s times
+    exprel(2B) = exprel(B) (exp(B) + I) / 2 and exp(2B) = exp(B)^2. Products are ``times_3x3``'s element-wise
+    sums, so the fused kernel reproduces them bitwise. For a symmetric A both equal SciPy's ``U f(L) U^T``
+    (ASE's) to rounding.
     """
-    n = a.shape[0]
-    eye = torch.eye(n, dtype=a.dtype, device=a.device)
-    block = torch.zeros((2 * n, 2 * n), dtype=a.dtype, device=a.device)
-    block[:n, :n] = a
-    block[:n, n:] = eye
-    block = block / 2 ** EXPM_SCALING
-    big = torch.eye(2 * n, dtype=a.dtype, device=a.device)
-    result, term = big.clone(), big
-    for k in range(1, EXPM_DEGREE + 1):
-        term = term @ block / k
-        result = result + term
+    eye = torch.eye(3, dtype=a.dtype, device=a.device)
+    b = a * EXPM_CONSTANTS[0]
+    r = eye
+    for factor in EXPM_CONSTANTS[1:]:
+        r = eye + times_3x3(b, r) * factor
+    e = eye + times_3x3(b, r)
     for _ in range(EXPM_SCALING):
-        result = result @ result
-    return result[:n, :n], result[:n, n:]
+        r = times_3x3(r, e + eye) * 0.5
+        e = times_3x3(e, e)
+    return e, r
 
 
 def exprel(x: torch.Tensor) -> torch.Tensor:
@@ -112,7 +122,7 @@ class MTK(Integrator):
     """
 
     def __init__(self, state: SimulationState, config: IntegratorConfig | None = None, *,
-                 temperature_K: float | None = None):
+                 temperature_K: float | None = None, fused: bool | None = None):
         if config is None:
             raise ValueError("MTK needs an IntegratorConfig (scheme 'mtk') with its parameters")
         check_ensemble(config, "npt", "MTK")
@@ -141,11 +151,17 @@ class MTK(Integrator):
         self.kT_step = torch.zeros((), **f64)        # this step's targets: stage A copies, stage B reads
         self.pressure = torch.zeros((), **f64)       # eV / A^3
         self.pressure_step = torch.zeros((), **f64)
-        self.thermostat = NoseHooverChain(self.tchain, tloop, [0.0] * self.tchain, first_dof=self.ndof,
-                                          energy_dof=self.ndof, device=device)
+        self.fused = use_fused(fused, device)
+        unit = [1.0] * max(self.tchain, self.pchain)  # placeholders; _masses() sets them
+        self.thermostat = NoseHooverChain(self.tchain, tloop, unit[:self.tchain], delta=self.dt / 2,
+                                          first_dof=self.ndof, energy_dof=self.ndof, device=device, fused=self.fused)
         cell_dof = 1 if self.hydrostatic else 9
-        self.barostat = NoseHooverChain(self.pchain, ploop, [0.0] * self.pchain, first_dof=cell_dof,
-                                        energy_dof=cell_dof, device=device)
+        self.barostat = NoseHooverChain(self.pchain, ploop, unit[:self.pchain], delta=self.dt / 2,
+                                        first_dof=cell_dof, energy_dof=cell_dof, device=device, fused=self.fused)
+        # The fused matrix functions' constants and outputs (full cell)
+        self.expm_constants = torch.tensor(EXPM_CONSTANTS, **f64)
+        self.expm_exp = torch.zeros((3, 3), **f64)
+        self.expm_rel = torch.zeros((3, 3), **f64)
         self._masses()
         # The isotropic strain and its reference cell (cell = cell0 exp(eps)); the full cell keeps eps at 0 and
         # cell0 as the starting cell, unused, so both cell modes hold the record's state_keys (format 4).
@@ -170,6 +186,7 @@ class MTK(Integrator):
             self.W = (self.ndof + 3) * kT * self.pdamp ** 2             # ASE: (3 N + 3) kT pdamp**2
         else:
             self.W = (self.n_eff + 1) * kT * self.pdamp ** 2            # ASE: (N + 1) kT pdamp**2
+        self.inv_W = 1.0 / self.W
 
     def _volume0(self) -> None:
         cell0 = self.cell0.detach().cpu().numpy()
@@ -208,14 +225,21 @@ class MTK(Integrator):
     # -- ASE's operators --------------------------------------------------------------------------------
 
     def _barostat_half(self):
-        if self.hydrostatic:
-            force = lambda: self.p_cell ** 2 / self.W                      # noqa: E731
-        else:
-            force = lambda: (self.p_cell * self.p_cell).sum() / self.W     # noqa: E731  trace(p_g^T p_g) / W
-        self.barostat.integrate(self.dt / 2, self.kT_step, force, self.p_cell.mul_)
+        squares = self.p_cell * self.p_cell                 # trace(p_g^T p_g) in the full cell
+        force = (squares if self.hydrostatic else squares.sum()) * self.inv_W
+        self.p_cell.mul_(self.barostat.integrate(self.kT_step, force))
 
     def _thermostat_half(self, state):
-        self.thermostat.integrate(self.dt / 2, self.kT_step, lambda: twice_kinetic(state), state.velocities.mul_)
+        state.velocities.mul_(self.thermostat.integrate(self.kT_step, twice_kinetic(state)))
+
+    def _exp_and_exprel(self, a):
+        if not self.fused:
+            return exp_and_exprel(a)
+        from fastmace.kernels.triton.nose_hoover_chain import exp_and_exprel as fused_exp_and_exprel
+
+        fused_exp_and_exprel(a.contiguous(), self.expm_constants, self.expm_exp, self.expm_rel,
+                             degree=EXPM_DEGREE, scaling=EXPM_SCALING)
+        return self.expm_exp, self.expm_rel
 
     def _volume(self, state):
         """ASE's ``_get_volume``: V0 exp(3 eps) (isotropic), |det h| (full)."""
@@ -245,7 +269,7 @@ class MTK(Integrator):
             v.copy_(v * torch.exp(-x) + force * exprel(-x))
         else:
             kappa = self.p_cell + torch.diagonal(self.p_cell).sum() / self.ndof * self.eye
-            decay, rel = exp_and_exprel(-kappa * delta / self.W)
+            decay, rel = self._exp_and_exprel(-kappa * delta / self.W)
             v.copy_(times_3x3(v, decay) + times_3x3(force, rel))
 
     def _drift(self, state, delta):
@@ -257,7 +281,7 @@ class MTK(Integrator):
             self.eps.add_(rate)
             state.cell.copy_(self.cell0 * torch.exp(self.eps))
         else:
-            grow, rel = exp_and_exprel(self.p_cell * delta / self.W)
+            grow, rel = self._exp_and_exprel(self.p_cell * delta / self.W)
             x.copy_(times_3x3(x, grow) + times_3x3(v * delta, rel))
             state.cell.copy_(state.cell @ grow)
 
@@ -289,7 +313,9 @@ class MTK(Integrator):
     def buffers(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
         named = dict(positions=state.positions, velocities=state.velocities, cell=state.cell,
                      thermostat_eta=self.thermostat.eta, thermostat_p_eta=self.thermostat.p_eta,
-                     barostat_xi=self.barostat.eta, barostat_p_xi=self.barostat.p_eta, p_cell=self.p_cell,
+                     thermostat_scale=self.thermostat.scale, barostat_xi=self.barostat.eta,
+                     barostat_p_xi=self.barostat.p_eta, barostat_scale=self.barostat.scale, p_cell=self.p_cell,
+                     expm_exp=self.expm_exp, expm_rel=self.expm_rel,
                      kT=self.kT, kT_step=self.kT_step, pressure=self.pressure, pressure_step=self.pressure_step)
         named.update(eps=self.eps, cell0=self.cell0, volume0=self.volume0)
         return named

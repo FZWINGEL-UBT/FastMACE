@@ -5,12 +5,20 @@ ASE's step (``ase/md/nose_hoover_chain.py``) is a Trotter splitting of the Nose-
 kick, the chain for dt/2. Each chain half is ``tloop`` times the three fourth-order Suzuki-Yoshida
 sub-steps, and each sub-step the chain loop down and up. The cut at the force evaluation falls between the
 drift and the second kick, so ``first_half`` is the chain, kick and drift, ``second_half`` the kick and the
-chain. The chain loops are Python loops over device scalars: unrolled when the stages are captured, no host
-sync. ``NoseHooverChain`` is ASE's ``NoseHooverChainThermostat`` and ``IsotropicMTKBarostat`` /
+chain. ``NoseHooverChain`` is ASE's ``NoseHooverChainThermostat`` and ``IsotropicMTKBarostat`` /
 ``MTKBarostat``'s chain in one class, which ``mtk.py`` uses for the barostat too.
 
+The chain half (plan task 4-T03b). ASE recomputes the chain force ``sum(p**2 / m)`` after every momentum
+scaling and scales the momenta three times per half. Here the force is reduced once per half and carried
+through each scaling s as ``F s**2``, and the momenta are scaled once by the product of the s: the same
+algebra, rounding-level from ASE. Every constant (the sub-step deltas over the chain masses) is a host float
+in a float64 table, so ``fastmace.kernels.triton.nose_hoover_chain`` runs the half as one Triton program
+with bitwise the PyTorch stage's results. ``fused`` picks it: by default on CUDA with Triton. Without it, the
+PyTorch stage runs the same arithmetic as Python loops over device scalars, unrolled at capture. No host
+sync either way.
+
 ASE integrates momenta; this port integrates the state's velocities, the same algebra with per-atom masses
-divided out (ULP-level differences). ``sum(p**2 / m)`` is recomputed wherever ASE recomputes it.
+divided out (ULP-level differences).
 
 Degrees of freedom (owner decision D2): ASE counts 3N in the first thermostat mass, its force and its energy.
 ``N_f = degrees_of_freedom(state)`` replaces 3N there: 3N - 3 under the ``fixcm`` default (the total
@@ -77,58 +85,83 @@ def twice_kinetic(state: SimulationState) -> torch.Tensor:
 
 
 class NoseHooverChain:
-    """One Nose-Hoover chain of ``length`` thermostats on the device (ASE's chain loops).
+    """One Nose-Hoover chain of ``length`` thermostats on the device (ASE's chain loops, 4-T03b's algorithm).
 
-    ``masses`` are host floats (Q or R), ``loops`` ASE's ``tloop`` or ``ploop``. ``first_dof`` is the count in
-    the first link's force, ``sum(p**2/m) - first_dof kT`` for a thermostat, and in its energy term
-    (``energy_dof``; ASE's isotropic barostat counts 1 there, though its mass counts 9). The coupled variable
-    is read by ``force`` (its kinetic term, ``sum(p**2/m)``) and scaled by ``scale``, callables of the owner.
+    ``masses`` are host floats (Q or R), ``loops`` ASE's ``tloop`` or ``ploop``, ``delta`` the half step (dt / 2).
+    ``first_dof`` is the count in the first link's force, ``F - first_dof kT`` with F the coupled kinetic term
+    (``sum(p**2/m)`` for a thermostat), and ``energy_dof`` the count in its energy term (ASE's isotropic
+    barostat counts 1 there, though its mass counts 9). ``integrate(kT, force)`` takes F as a device scalar
+    and returns the device scalar by which the owner scales its momenta.
     """
 
-    def __init__(self, length: int, loops: int, masses: list[float], *, first_dof: float, energy_dof: float,
-                 device: Any):
+    def __init__(self, length: int, loops: int, masses: list[float], *, delta: float, first_dof: float,
+                 energy_dof: float, device: Any, fused: bool = False):
         f64 = dict(dtype=torch.float64, device=device)
-        self.length, self.loops = length, loops
+        self.length, self.loops, self.delta = length, loops, delta
         self.first_dof, self.energy_dof = first_dof, energy_dof
+        self.fused = fused
         self.eta = torch.zeros(length, **f64)
         self.p_eta = torch.zeros(length, **f64)
         self.mass_tensor = torch.zeros(length, **f64)
+        self.inverse = torch.zeros(length, **f64)
+        # Per Suzuki-Yoshida coefficient: delta/2, the scaling's -delta/Q0, delta/Q_j (eta), -delta/4 / Q_(j+1)
+        self.table = torch.zeros((3, 2 + 2 * length), **f64)
+        self.dof_tensor = torch.tensor(float(first_dof), **f64)
+        self.scale = torch.zeros((), **f64)   # the fused kernel's output
         self.set_masses(masses)
         self._p = [self.p_eta[j] for j in range(length)]
 
     def set_masses(self, masses: list[float]) -> None:
+        """Q (host floats) and every constant that follows from them, in place."""
         self.masses = [float(mass) for mass in masses]
+        self.inv = [1.0 / mass for mass in self.masses]
+        self.rows = []
+        for coeff in FOURTH_ORDER_COEFFS:
+            delta = coeff * self.delta / self.loops
+            row = ([delta / 2, -delta * self.inv[0]] + [delta * inv for inv in self.inv]
+                   + [-(delta / 4) * inv for inv in self.inv[1:]] + [0.0])
+            self.rows.append(row)
         self.mass_tensor.copy_(torch.tensor(self.masses, dtype=torch.float64))
+        self.inverse.copy_(torch.tensor(self.inv, dtype=torch.float64))
+        self.table.copy_(torch.tensor(self.rows, dtype=torch.float64))
 
-    def integrate(self, delta: float, kT: torch.Tensor, force, scale) -> None:
-        """exp(i L_NHC delta): ``loops`` times the three Suzuki-Yoshida sub-steps."""
+    def integrate(self, kT: torch.Tensor, force: torch.Tensor) -> torch.Tensor:
+        """exp(i L_NHC delta): ``loops`` times the three Suzuki-Yoshida sub-steps. Returns the momentum scale."""
+        if self.fused:
+            from fastmace.kernels.triton.nose_hoover_chain import chain_half
+
+            chain_half(self.p_eta, self.eta, self.table, self.inverse, self.dof_tensor, kT, force, self.scale,
+                       length=self.length, loops=self.loops)
+            return self.scale
+        F, S = force, torch.ones_like(force)
         for _ in range(self.loops):
-            for coeff in FOURTH_ORDER_COEFFS:
-                self._loop(coeff * delta / self.loops, kT, force, scale)
+            for k, row in enumerate(self.rows):
+                d2, scale_c = row[0], row[1]
+                damp_c = row[2 + self.length:]
+                for j in range(self.length):
+                    self._link(self.length - j - 1, d2, damp_c, F, kT)
+                self.eta.add_(self.p_eta * self.table[k, 2:2 + self.length])
+                s = torch.exp(self._p[0] * scale_c)
+                F = F * s * s
+                S = S * s
+                for j in range(self.length):
+                    self._link(j, d2, damp_c, F, kT)
+        return S
 
-    def _loop(self, delta, kT, force, scale):
-        delta2 = delta / 2
-        delta4 = delta / 4
-        for j in range(self.length):
-            self._integrate_p_eta_j(self.length - j - 1, delta2, delta4, kT, force)
-        self.eta.add_(delta * self.p_eta / self.mass_tensor)
-        scale(torch.exp(-delta * self._p[0] / self.masses[0]))
-        for j in range(self.length):
-            self._integrate_p_eta_j(j, delta2, delta4, kT, force)
-
-    def _integrate_p_eta_j(self, j, delta2, delta4, kT, force):
-        p, Q = self._p, self.masses
-        # ASE evaluates the same factor before and after the kick (p[j + 1] does not change in between)
-        damping = torch.exp(-delta4 * p[j + 1] / Q[j + 1]) if j < self.length - 1 else None
-        if damping is not None:
-            p[j].mul_(damping)
+    def _link(self, j, d2, damp_c, F, kT):
+        """ASE's _integrate_p_eta_j: p[j] damped by p[j + 1], kicked by its force, damped again (ASE evaluates
+        the same factor twice: p[j + 1] does not change in between)."""
+        p = self._p
+        damp = torch.exp(p[j + 1] * damp_c[j]) if j < self.length - 1 else None
+        if damp is not None:
+            p[j].mul_(damp)
         if j == 0:
-            g_j = force() - self.first_dof * kT
+            g = F - self.first_dof * kT
         else:
-            g_j = p[j - 1] ** 2 / Q[j - 1] - kT
-        p[j].add_(delta2 * g_j)
-        if damping is not None:
-            p[j].mul_(damping)
+            g = p[j - 1] * p[j - 1] * self.inv[j - 1] - kT
+        p[j].add_(g * d2)
+        if damp is not None:
+            p[j].mul_(damp)
 
     def energy(self, kT: torch.Tensor) -> torch.Tensor:
         """ASE's get_thermostat_energy / get_barostat_energy."""
@@ -144,6 +177,19 @@ class NoseHooverChain:
             if tuple(source.shape) != tuple(target.shape):
                 raise ValueError(f"{name} has shape {tuple(source.shape)}, this chain has length {self.length}")
             target.copy_(source)
+
+
+def use_fused(fused: bool | None, device: Any) -> bool:
+    """The chain stage: ``fused=None`` picks the Triton kernels where they run (CUDA with Triton); ``True``
+    requires them."""
+    from fastmace.kernels.triton.nose_hoover_chain import available
+
+    reason = available(torch.device(device))
+    if fused is None:
+        return reason is None
+    if fused and reason is not None:
+        raise ValueError(f"fused=True: {reason}")
+    return bool(fused)
 
 
 def thermostat_masses(ndof: int, kT: float, tdamp: float, tchain: int) -> list[float]:
@@ -163,7 +209,7 @@ class NoseHooverChainNVT(Integrator):
     """
 
     def __init__(self, state: SimulationState, config: IntegratorConfig | None = None, *,
-                 temperature_K: float | None = None):
+                 temperature_K: float | None = None, fused: bool | None = None):
         if config is None:
             raise ValueError("NoseHooverChainNVT needs an IntegratorConfig (scheme 'nhc') with its parameters")
         check_ensemble(config, "nvt", "NoseHooverChainNVT")
@@ -181,8 +227,10 @@ class NoseHooverChainNVT(Integrator):
         self.kT = torch.zeros((), **f64)
         self.kT_step = torch.zeros((), **f64)  # the target of the step in flight: stage A copies, stage B reads
         self.tchain = tchain
-        self.thermostat = NoseHooverChain(tchain, tloop, self._thermostat_masses(), first_dof=self.ndof,
-                                          energy_dof=self.ndof, device=state.positions.device)
+        self.fused = use_fused(fused, state.positions.device)
+        self.thermostat = NoseHooverChain(tchain, tloop, self._thermostat_masses(), delta=self.dt / 2,
+                                          first_dof=self.ndof, energy_dof=self.ndof, device=state.positions.device,
+                                          fused=self.fused)
         self.set_temperature(self.mass_temperature_K if temperature_K is None else temperature_K)
         self.kT_step.copy_(self.kT)
 
@@ -207,8 +255,7 @@ class NoseHooverChainNVT(Integrator):
             remove_momentum(state)
 
     def _thermostat_half(self, state):
-        v = state.velocities
-        self.thermostat.integrate(self.dt / 2, self.kT_step, lambda: twice_kinetic(state), v.mul_)
+        state.velocities.mul_(self.thermostat.integrate(self.kT_step, twice_kinetic(state)))
 
     def first_half(self, state: SimulationState) -> None:
         self.kT_step.copy_(self.kT)                      # this step's target
@@ -227,7 +274,8 @@ class NoseHooverChainNVT(Integrator):
 
     def buffers(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
         return dict(positions=state.positions, velocities=state.velocities, thermostat_eta=self.thermostat.eta,
-                    thermostat_p_eta=self.thermostat.p_eta, kT=self.kT, kT_step=self.kT_step)
+                    thermostat_p_eta=self.thermostat.p_eta, thermostat_scale=self.thermostat.scale, kT=self.kT,
+                    kT_step=self.kT_step)
 
     def output_values(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
         values = base_output_values(state)

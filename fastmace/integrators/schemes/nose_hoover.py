@@ -10,12 +10,16 @@ _NO_FIX_ATOMS = ("ASE's {} does not support constraints, so there is no referenc
 
 def _policies(barostat: bool) -> tuple[tuple[str, str, str | None], ...]:
     """The runtime-state policies of the integrator's own buffers: the thermostat chain and the targets, and
-    for MTK the barostat chain, the cell momentum, the strain and its reference cell."""
+    for MTK the barostat chain, the cell momentum, the strain and its reference cell. The fused stage's
+    scales and matrix functions (4-T03b) are scratch, written before they are read in every step."""
     chain = (("thermostat_eta", "save", None), ("thermostat_p_eta", "save", None),
+             ("thermostat_scale", "derived", None),
              ("kT", "derived", "Integrator.set_temperature"), ("kT_step", "derived", "Integrator.load_state_dict"))
     if not barostat:
         return chain
-    return chain + (("barostat_xi", "save", None), ("barostat_p_xi", "save", None), ("p_cell", "save", None),
+    return chain + (("barostat_xi", "save", None), ("barostat_p_xi", "save", None),
+                    ("barostat_scale", "derived", None), ("expm_exp", "derived", None),
+                    ("expm_rel", "derived", None), ("p_cell", "save", None),
                     ("eps", "save", None), ("cell0", "save", None), ("volume0", "derived", "MTK.load_state_dict"),
                     ("pressure", "save", None), ("pressure_step", "derived", "MTK.load_state_dict"))
 
