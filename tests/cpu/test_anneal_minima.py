@@ -254,3 +254,28 @@ def test_git_commit_falls_back_to_the_environment(monkeypatch):
     monkeypatch.setattr(frames_tool.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(OSError()))
     monkeypatch.setenv("FASTMACE_COMMIT", "abc123")
     assert frames_tool.git_commit() == "abc123"
+
+
+# --- anneal_frame_probe.py: where two relaxations part ----------------------------------------------------
+
+probe = _tool("validation/anneal_frame_probe.py")
+
+
+def test_divergence_finds_the_first_step_above_each_threshold():
+    cell = np.diag([10.0, 10.0, 10.0])
+    a = np.zeros((5, 2, 3)) + 5.0
+    b = a.copy()
+    for step, offset in enumerate([0.0, 5e-6, 5e-4, 0.05, 0.5]):
+        b[step, 1, 0] += offset
+    largest, first = probe.divergence(cell, a, b)
+    assert largest == pytest.approx([0.0, 5e-6, 5e-4, 0.05, 0.5])
+    assert first == {"1e-06": 1, "0.0001": 2, "0.01": 3, "0.1": 4}
+
+
+def test_divergence_over_the_shorter_trajectory_and_minimum_image():
+    cell = np.diag([4.0, 4.0, 4.0])
+    a = np.zeros((3, 1, 3)) + [[0.01, 2.0, 2.0]]
+    b = np.zeros((2, 1, 3)) + [[3.99, 2.0, 2.0]]
+    largest, first = probe.divergence(cell, a, b)
+    assert largest == pytest.approx([0.02, 0.02])
+    assert first["0.1"] is None
