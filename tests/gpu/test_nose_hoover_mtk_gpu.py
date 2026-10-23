@@ -50,11 +50,12 @@ class HarmonicForces:
             state.stress.copy_(self.k * (d.T @ d) / volume + self.bulk_modulus * (volume / self.v0 - 1.0) * self.eye)
 
 
-def config(name, fixcm):
+def config(name, fixcm, pdamp_fs=2000.0):
+    # pdamp 2 ps: the stiff volume spring (0.5 eV/A^3) and W give a cell period of ~60 steps
     common = dict(timestep_fs=2.0, temperature_K=50.0, tdamp_fs=40.0, fixcm=fixcm, dof="auto" if fixcm else "ase")
     if name == "nhc":
         return records.NoseHooverChain(**common).to_config(seed=1)
-    return records.MTK(pressure_GPa=0.5, pdamp_fs=100.0, cell_mode=name, **common).to_config(seed=1)
+    return records.MTK(pressure_GPa=0.5, pdamp_fs=pdamp_fs, cell_mode=name, **common).to_config(seed=1)
 
 
 def build(name, fixcm):
@@ -127,6 +128,7 @@ def test_captured_half_steps_replay_the_eager_steps(name, fixcm):
     reference = written(eager_state, eager_dyn)
     for key, value in written(state, dyn).items():
         assert torch.equal(value, reference[key]), f"{key}: max |difference| {(value - reference[key]).abs().max()}"
+    assert all(bool(torch.isfinite(value).all()) for value in reference.values())
     assert not torch.equal(state.positions, eager_field.x0)
     assert float(dyn.thermostat.eta.abs().max()) > 0
     if dyn.variable_cell:
@@ -166,9 +168,9 @@ def test_cuda_trajectory_matches_ase(name):
         ase_dyn = NoseHooverChainNVT(reference, **common)
     else:
         cls = IsotropicMTKNPT if name == "hydrostatic" else MTKNPT
-        ase_dyn = cls(reference, pressure_au=0.5 * units.GPa, pdamp=100.0 * units.fs, **common)
+        ase_dyn = cls(reference, pressure_au=0.5 * units.GPa, pdamp=200.0 * units.fs, **common)
     state = SimulationState.from_atoms(test, "cuda", 7, compute_stress=name != "nhc")
-    dyn = build_integrator(state, config(name, fixcm=False))
+    dyn = build_integrator(state, config(name, fixcm=False, pdamp_fs=200.0))
     field = ASEForces(test)
     field(state)
     dyn.start(state)
