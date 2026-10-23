@@ -38,7 +38,7 @@ velocities = "exchange"
 # The anneal profile's initial relaxation (fm.protocols.PROFILES["anneal"]).
 [relax]
 fmax = 0.01
-optimizer = "LBFGS"
+optimizer = "gpu-LBFGS"
 max_steps = 5000
 
 # The anneal profile's quench: 2 frames per 100 K bin from 500 K on each ramp, and the final frame.
@@ -47,5 +47,5 @@ min_K = 500.0
 bin_K = 100.0
 per_bin = 2
 fmax = 0.01
-optimizer = "LBFGS"
+optimizer = "gpu-LBFGS"
 max_steps = 5000

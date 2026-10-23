@@ -276,7 +276,7 @@ def test_default_plans_equal_main_py(label, backend):
     # The research engine's MD defaults: no auto left anywhere.
     for part in (plan.rewrites, plan.engine, plan.precision, plan.neighbours, plan.integrator):
         assert "auto" not in dataclasses.astuple(part), part
-    assert plan.integrator == IntegratorConfig(fixcm_projection="mass_weighted")  # MD under fixcm (decision 37)
+    assert plan.integrator == IntegratorConfig(fixcm_projection="mass_weighted", dof="fastmace")  # decision 37; D2
     assert plan.polar.kspace_headroom == 0.0 if polar else plan.polar is None
 
 
@@ -473,7 +473,7 @@ def test_follow_up_inplace_block_linear_is_refused():
 def test_follow_up_npt_keywords_follow_baoab_settings():
     integrator = IntegratorConfig(ensemble="npt", pressure_GPa=1.5, cell_mode="full")
     plan = plan_for("mh1-r2scan", integrator=integrator)
-    assert plan.integrator == dataclasses.replace(integrator, fixcm_projection="ase")  # resolved (3-T22b)
+    assert plan.integrator == dataclasses.replace(integrator, fixcm_projection="ase", dof="fastmace")  # 3-T22b, D2
     keywords = fixed.integrator_keywords(plan.integrator)
     assert keywords == {"externalstress": -1.5 * units.GPa, "disable_cell_langevin": False}
     assert fixed.integrator_keywords(IntegratorConfig()) == {}

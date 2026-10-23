@@ -18,6 +18,9 @@ Phase 3 (plan task 3-T01, ``docs/design/contracts-3.md``) adds rule 11's skin an
 (``NeighbourConfig``), the re-capture policy (``EngineConfig``), the MC energy precision
 (``PrecisionConfig``), the MC driver's options (``MCConfig``) and the MC streams' seeds.
 
+Phase 4 (plan task 4-T01, ``docs/design/physics.md``) adds the integrator ``scheme``, its ``dof`` convention
+and scheme ``parameters`` to ``IntegratorConfig``, the ``"nve"`` ensemble, and ``OptimizerConfig``.
+
 This module holds no state: no caches, no registries, no switches.
 """
 
@@ -335,13 +338,29 @@ class PolarConfig:
 
 @dataclass(frozen=True)
 class IntegratorConfig:
-    """Langevin NVT and Langevin-Hoover NPT (BAOAB) settings of main.py (SPEC §10).
+    """The integrator settings (SPEC §10): main.py's Langevin NVT and Langevin-Hoover NPT (BAOAB), and from
+    phase 4 every scheme of ``fastmace.integrators.registry``.
 
-    Units as in main.py: femtoseconds, GPa, and the friction in inverse ASE time units.
+    Units as in main.py: femtoseconds, GPa, and the friction in inverse ASE time units. ``scheme`` names the
+    registry record the planner builds; ``None`` resolves from the ensemble (``DEFAULT_SCHEMES``), so every
+    earlier config means what it meant. Scheme-specific settings (time constants, chain lengths, the
+    Berendsen mask) are ``parameters``, in the units of the public record (``fm.integrators``) that sets
+    them; the fields below are shared or Langevin's.
     """
 
-    # "nvt": ASE Langevin (GPULangevin); "npt": ASE LangevinBAOAB (GPULangevinBAOAB).
-    ensemble: Literal["nvt", "npt"] = "nvt"
+    # "nve": no thermostat; "nvt": a thermostat (phase 1a: ASE Langevin); "npt": a barostat, variable cell
+    # (phase 1a: ASE LangevinBAOAB). The stress path and rule 10 follow "npt".
+    ensemble: Literal["nve", "nvt", "npt"] = "nvt"
+    # The registry scheme ("langevin", "baoab", "nve", "csvr", "nhc", "mtk", "berendsen"); None: from the
+    # ensemble (DEFAULT_SCHEMES).
+    scheme: str | None = None
+    # Degrees of freedom of targets and temperatures (owner decision D2): "fastmace", 3N - 3 under fixcm and
+    # 3(N - n_fixed) with FixAtoms; "ase", the scheme's ASE class; "auto", the planner's choice (D2's
+    # default, registry.DOF_AUTO). Langevin and BAOAB keep their count.
+    dof: Literal["auto", "fastmace", "ase"] = "auto"
+    # Scheme parameters, (name, value) pairs sorted by name; a mapping is normalised. Values are None,
+    # bools, numbers, strings or tuples of them.
+    parameters: tuple[tuple[str, typing.Any], ...] = ()
     timestep_fs: float = 0.5
     # Langevin friction, inverse ASE time units; NPT uses T_tau = 1 / friction.
     friction: float = 0.02
@@ -380,6 +399,11 @@ class IntegratorConfig:
 
     def __post_init__(self):
         _check_choices(self)
+        if self.scheme is None:
+            object.__setattr__(self, "scheme", DEFAULT_SCHEMES[self.ensemble])
+        if not isinstance(self.scheme, str) or not self.scheme:
+            raise ValueError(f"IntegratorConfig.scheme must be a scheme name or None, got {self.scheme!r}")
+        object.__setattr__(self, "parameters", scheme_parameters(self.parameters, "IntegratorConfig.parameters"))
         _positive(self, "timestep_fs", "friction", "noise_batch", "barostat_mass_factor")
         if self.barostat_tau_fs is not None:
             _positive(self, "barostat_tau_fs")
@@ -400,6 +424,19 @@ class IntegratorConfig:
     def effective_external_stress_GPa(self) -> float | tuple[float, ...]:
         """The external stress in GPa, ASE sign: ``external_stress_GPa``, else ``-pressure_GPa``."""
         return -self.pressure_GPa if self.external_stress_GPa is None else self.external_stress_GPa
+
+    def parameter(self, name: str, default: typing.Any = None) -> typing.Any:
+        """The scheme parameter ``name``, ``default`` if it is not set."""
+        return dict(self.parameters).get(name, default)
+
+    @property
+    def variable_cell(self) -> bool:
+        """Whether the cell changes: the ``"npt"`` ensemble."""
+        return self.ensemble == "npt"
+
+
+# The scheme of a config without one, by ensemble: phase 1a's two integrators, and NVE (4-T02).
+DEFAULT_SCHEMES = {"nvt": "langevin", "npt": "baoab", "nve": "nve"}
 
 
 @dataclass(frozen=True)
@@ -508,6 +545,86 @@ class MCConfig:
     def __post_init__(self):
         _count(self, "max_attempts_per_block", minimum=1)
         _count(self, "max_move_sets", minimum=1)
+
+
+@dataclass(frozen=True)
+class OptimizerConfig:
+    """A structure relaxation (SPEC §10.3; plan task 4-T01): the optimiser scheme of
+    ``fastmace.integrators.registry`` with its parameters, the optional cell filter with its parameters,
+    and ASE's convergence (``fmax``, ``steps``).
+
+    Units of the public records (``fm.optimize``): Angstrom, fs, GPa; ASE's argument names otherwise.
+    """
+
+    # The registry scheme: "lbfgs" (4-T05) or "fire" (4-T06).
+    scheme: str
+    # The optimiser's parameters, (name, value) pairs sorted by name (``fm.optimize.LBFGS`` and ``FIRE``).
+    parameters: tuple[tuple[str, typing.Any], ...] = ()
+    # The cell filter: None (fixed cell) or "frechet" (ASE's FrechetCellFilter, 4-T07).
+    cell_filter: str | None = None
+    # The cell filter's parameters (``fm.optimize.FrechetCell``).
+    cell_filter_parameters: tuple[tuple[str, typing.Any], ...] = ()
+    # ASE's convergence: the largest (constraint-adjusted) per-row force norm below fmax, eV/Angstrom.
+    fmax: float = 0.05
+    # Most optimiser steps (ASE's run(steps=) default).
+    steps: int = 100_000_000
+
+    def __post_init__(self):
+        if not isinstance(self.scheme, str) or not self.scheme:
+            raise ValueError(f"OptimizerConfig.scheme must be a scheme name, got {self.scheme!r}")
+        if self.cell_filter is not None and (not isinstance(self.cell_filter, str) or not self.cell_filter):
+            raise ValueError(f"OptimizerConfig.cell_filter must be None or a filter name, got {self.cell_filter!r}")
+        object.__setattr__(self, "parameters", scheme_parameters(self.parameters, "OptimizerConfig.parameters"))
+        object.__setattr__(self, "cell_filter_parameters", scheme_parameters(
+            self.cell_filter_parameters, "OptimizerConfig.cell_filter_parameters"))
+        if self.cell_filter is None and self.cell_filter_parameters:
+            raise ValueError("OptimizerConfig.cell_filter_parameters need a cell_filter")
+        _positive(self, "fmax")
+        _count(self, "steps", minimum=0)
+
+    def parameter(self, name: str, default: typing.Any = None) -> typing.Any:
+        """The optimiser parameter ``name``, ``default`` if it is not set."""
+        return dict(self.parameters).get(name, default)
+
+    def cell_filter_parameter(self, name: str, default: typing.Any = None) -> typing.Any:
+        """The cell filter parameter ``name``, ``default`` if it is not set."""
+        return dict(self.cell_filter_parameters).get(name, default)
+
+    @property
+    def variable_cell(self) -> bool:
+        """Whether a cell filter moves the cell."""
+        return self.cell_filter is not None
+
+
+def _parameter_value(value, name):
+    if value is None or isinstance(value, (bool, str)):
+        return value
+    if isinstance(value, (int, float)):
+        if not math.isfinite(value):
+            raise ValueError(f"{name} must be finite, got {value!r}")
+        return value
+    if isinstance(value, (list, tuple)):
+        return tuple(_parameter_value(item, name) for item in value)
+    raise ValueError(f"{name} must be None, a bool, a number, a string or a tuple of them, got {value!r}")
+
+
+def scheme_parameters(value, name="parameters") -> tuple[tuple[str, typing.Any], ...]:
+    """``value`` (a mapping or (name, value) pairs) as sorted, hashable (name, value) pairs; lists become
+    tuples, so a JSON round trip gives the same pairs. ValueError for a duplicate or non-string name, or a
+    value that is not None, a bool, a finite number, a string or a tuple of them."""
+    if isinstance(value, typing.Mapping):
+        pairs = list(value.items())
+    else:
+        try:
+            pairs = [tuple(pair) for pair in value]
+        except TypeError:
+            raise ValueError(f"{name} must be a mapping or (name, value) pairs, got {value!r}") from None
+    if any(len(pair) != 2 for pair in pairs):
+        raise ValueError(f"{name} must be a mapping or (name, value) pairs, got {value!r}")
+    names = [key for key, _ in pairs]
+    if any(not isinstance(key, str) or not key for key in names) or len(set(names)) != len(names):
+        raise ValueError(f"{name}: parameter names must be distinct non-empty strings, got {names!r}")
+    return tuple(sorted((key, _parameter_value(item, f"{name}[{key!r}]")) for key, item in pairs))
 
 
 def mc_stream_seeds(seed: int) -> dict[str, int]:

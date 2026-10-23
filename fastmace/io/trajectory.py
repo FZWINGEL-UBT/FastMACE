@@ -75,18 +75,23 @@ def _host(value: Any) -> np.ndarray:
     return np.asarray(value)
 
 
-def degrees_of_freedom(natoms: int, integrator: Any = None) -> int:
-    """The kinetic degrees of freedom a reported temperature counts (SPEC §10.4, decision 37; 3-T22c).
+def degrees_of_freedom(natoms: int, integrator: Any = None, n_fixed: int = 0) -> int:
+    """The kinetic degrees of freedom a reported temperature counts (SPEC §10.4, decision 37; 3-T22c; 4-T01).
 
-    3N - 3 when ``integrator`` (an ``IntegratorConfig``) is NVT with ``fixcm`` and the ``"mass_weighted"``
-    projection, which holds sum m v^2 = (3N - 3) kT at zero total momentum; 3N otherwise. That covers ASE's
-    projection, which holds 3N kT as ``Atoms.get_temperature`` counts it, ``fixcm`` off, NPT, and no
-    integrator."""
-    if integrator is None or getattr(integrator, "ensemble", "nvt") != "nvt" or not getattr(integrator, "fixcm", False):
-        return 3 * natoms
-    if getattr(integrator, "fixcm_projection", "ase") == "mass_weighted":
-        return 3 * natoms - 3
-    return 3 * natoms
+    The scheme record's count for ``integrator`` (an ``IntegratorConfig``) with ``n_fixed`` fixed atoms
+    (``IntegratorRecord.degrees_of_freedom``). Langevin and BAOAB keep 3-T22c's: 3N - 3 when NVT with
+    ``fixcm`` and the ``"mass_weighted"`` projection, which holds sum m v^2 = (3N - 3) kT at zero total
+    momentum; 3N otherwise, which covers ASE's projection (it holds 3N kT as ``Atoms.get_temperature``
+    counts it), ``fixcm`` off and NPT. The phase 4 schemes count by owner decision D2. 3N without an
+    integrator or for an unregistered scheme."""
+    if integrator is None:
+        return 3 * (natoms - n_fixed)
+    from fastmace.integrators.registry import registry
+
+    record = registry().get("integrator", getattr(integrator, "scheme", None) or "langevin")
+    if record is None:
+        return 3 * (natoms - n_fixed)
+    return record.degrees_of_freedom(integrator, natoms, n_fixed)
 
 
 def kinetic_temperature(kinetic_eV: float, degrees: int) -> float:

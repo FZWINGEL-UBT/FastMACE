@@ -175,6 +175,34 @@ def describe_move(move):
     return text + (f" ({velocities})" if velocities else "")
 
 
+# The header's name of each integrator scheme (IntegratorConfig.scheme); MTK and Berendsen add the cell mode.
+SCHEME_NAMES = {"langevin": "NVT Langevin", "baoab": "NPT LangevinBAOAB", "nve": "NVE VelocityVerlet",
+                "csvr": "NVT CSVR (Bussi)", "nhc": "NVT Nose-Hoover chain", "mtk": "NPT MTK",
+                "berendsen": "Berendsen"}
+
+
+def _scheme_name(config):
+    """The header's integrator: ``SCHEME_NAMES`` by the config's scheme, with the MTK cell mode and the
+    Berendsen ensemble."""
+    scheme = getattr(config, "scheme", None)
+    name = SCHEME_NAMES.get(scheme, f"{str(config.ensemble).upper()} {scheme}")
+    if scheme == "mtk":
+        name = f"{name} {config.cell_mode}"
+    elif scheme == "berendsen":
+        name = f"{str(config.ensemble).upper()} {name}"
+    return name
+
+
+def _scheme_record(config):
+    """The registry record of the config's scheme, ``None`` if it is not registered."""
+    from fastmace.integrators import registry
+
+    try:
+        return registry.registry().integrator(config.scheme)
+    except KeyError:
+        return None
+
+
 def _mapping(record):
     """A gate or D3 record as a dict: a mapping, ``to_metadata()``/``to_dict()``, a dataclass, or attributes."""
     if record is None or isinstance(record, Mapping):
@@ -220,6 +248,19 @@ def _label_of(model, head, sha256):
     return None
 
 
+def _floors_text(floors):
+    """"floors §12.3", plus each floor a reference record raised (4-T12: PolarMACE's stress, decision 49)."""
+    from fastmace.planner.selfcheck import FLOORS
+
+    raised = [f"{_GATE_NAMES[key]} {value:g} {unit}" for key, unit in _GATE_UNITS
+              if (value := (floors or {}).get(key, FLOORS[key])) != FLOORS[key]]
+    return "floors §12.3" + (f", {', '.join(raised)} from the reference record" if raised else "")
+
+
+_GATE_UNITS = (("energy_meV_per_atom", "meV/atom"), ("force_eV_per_A", "eV/Å"), ("stress_eV_per_A3", "eV/Å³"))
+_GATE_NAMES = {"energy_meV_per_atom": "energy", "force_eV_per_A": "force", "stress_eV_per_A3": "stress"}
+
+
 def gate_line(gate) -> str:
     """The report's gate line from a gate record (mapping); the not-run text for none or ``skipped``.
 
@@ -246,7 +287,7 @@ def gate_line(gate) -> str:
     elif len(steps) > 1 and gate.get("device"):
         where = f"reference on {gate['device']} after {steps[0].get('outcome')}"
     parts = [part for part in (where, gate.get("copies"), ", ".join(numbers)) if part]
-    detail = "; ".join(parts + ["floors §12.3"])
+    detail = "; ".join(parts + [_floors_text(gate.get("floors"))])
     yardstick = (gate.get("references") or {}).get("yardstick") or {}
     if str(yardstick.get("energy_bound", "")).startswith("looser"):  # 2-T04: unqualified MACE
         detail = f"{detail}; energy bound {yardstick['energy_bound']}"
@@ -360,8 +401,7 @@ class Report:
         pbc = "3D PBC" if all(self.pbc) else "PBC " + "".join("T" if p else "F" for p in self.pbc)
         run = "integrator unknown"
         if self.integrator is not None:
-            npt = self.integrator.ensemble == "npt"
-            run = f"{'NPT LangevinBAOAB' if npt else 'NVT Langevin'} {self.integrator.timestep_fs:g} fs"
+            run = f"{_scheme_name(self.integrator)} {self.integrator.timestep_fs:g} fs"
         structure = f"{self.structure}, {self.n_atoms} atoms ({repeat}), {pbc}, {run}"
         return f"FastMACE {self.version}  |  {model}  |  {structure}"
 
@@ -463,6 +503,9 @@ class Report:
             if self.plan is not None and self.plan.polar is not None:
                 lines.append("PolarMACE NPT stress: experimental: validated against finite differences on "
                              "NaCl 3×3×3 only (phase 3b)")
+        record = None if self.integrator is None else _scheme_record(self.integrator)
+        if record is not None and record.non_canonical:
+            lines.append(f"{_scheme_name(self.integrator)}: non-canonical: equilibration only (§10.2)")
         if self.mc:
             lines.append("MC: experimental: not yet qualified (§10.4)")
         if self.dispersion:

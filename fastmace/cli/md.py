@@ -1,4 +1,4 @@
-"""``fastmace md``: the CLI face of ``fm.md`` for constant-temperature runs (SPEC §7.5, §7.7).
+"""``fastmace md``: the CLI face of ``fm.md`` for constant-temperature and NVE runs (SPEC §7.5, §7.7).
 
 Each §7.5 flag is one ``fm.md`` argument (``md_arguments``); a flag not given is left to
 ``fm.md``'s default, so the CLI has no defaults of its own. ``--dispersion d3bj`` is passed as
@@ -14,7 +14,7 @@ import sys
 
 from fastmace.quick import ENSEMBLES
 
-HELP = "run constant-temperature MD in one command (the CLI face of fm.md)"
+HELP = "run constant-temperature or NVE MD in one command (the CLI face of fm.md)"
 
 ENSEMBLE_CHOICES = ENSEMBLES
 # fastmace.simulation.CHECK_MODES, written out so that --help imports no torch (a test keeps them equal).
@@ -56,7 +56,8 @@ def add_arguments(parser, *, required=True):
     run.add_argument("--repeat", type=int, nargs=3, metavar=("NA", "NB", "NC"),
                      help="supercell repeats (default 1 1 1: the cell is never expanded silently)")
     run.add_argument("--ensemble", type=str.upper, choices=ENSEMBLE_CHOICES,
-                     help="NVT (Langevin, default) or NPT (LangevinBAOAB); NVE is phase 4")
+                     help="NVT (Langevin, default), NPT (LangevinBAOAB) or NVE (velocity Verlet from the "
+                          "structure's momenta, without --temperature)")
     run.add_argument("--temperature", type=float, metavar="K", help="target temperature in K")
     run.add_argument("--pressure", type=float, metavar="GPA", help="NPT pressure in GPa (default 0)")
     run.add_argument("--cell-mode", choices=CELL_MODE_CHOICES, help="NPT cell mode (default hydrostatic)")

@@ -383,7 +383,8 @@ def test_set_charges_takes_the_total():
 def test_simulation_update_is_one_transaction():  # 3-T03 (conductor answer; T13 applies an observer's change)
     from fastmace.simulation import Simulation
 
-    fields = ["species", "masses", "charges", "total_charge", "friction_per_fs", "positions", "momenta"]
+    # 4-T05 adds the cell (fixed cell, 4-T09's quench frames on one engine).
+    fields = ["species", "masses", "charges", "total_charge", "friction_per_fs", "positions", "momenta", "cell"]
     assert _parameters(Simulation.update) == ["self", *fields]
     assert _keyword_only(Simulation.update) == fields
     for name in fields:
@@ -491,8 +492,7 @@ def test_restart_version_3_schema():  # §10.6 (3-T08)
     pytest.importorskip("torch")
     from fastmace.io import restart
 
-    assert restart.FORMAT_VERSION == 3  # 3-T08 switched the writer to NEXT_FORMAT_VERSION
-    assert restart.NEXT_FORMAT_VERSION == 3
+    assert restart.FORMAT_VERSION == restart.NEXT_FORMAT_VERSION >= 3  # 3-T08 switched the writer; 4-T01 moved it on
     assert restart.V3_KEYS == ("mc",)
     assert restart.COMPOSITION_KEYS == ("species", "masses", "charges", "physical")
     assert restart.MC_RECORD_KEYS == ("moves", "cycle_position", "counters", "streams", "delta_A")
@@ -551,11 +551,12 @@ def test_displacement_names():  # §10.4 displacements (3-T10)
 def test_protocol_run_names():  # §10.5 (3-T14)
     from fastmace.protocols import quench, runner
 
-    assert _parameters(quench.relax) == ["atoms", "calc", "fmax", "max_steps", "logfile", "optimizer"]
+    # 4-T09: ASE's cell filter in relax, and a relaxer (or an ASE calculator) and a directory name in quench_run.
+    assert _parameters(quench.relax) == ["atoms", "calc", "fmax", "max_steps", "logfile", "optimizer", "cell_filter"]
     assert _parameters(quench.select_frames) == ["frames", "min_K", "bin_K", "per_bin", "peak_K"]
     assert _parameters(quench.picks) == ["resolved", "frame_every", "settings"]
-    assert _parameters(quench.quench_run) == ["directory", "calc", "resolved", "frame_every", "timestep_fs",
-                                              "settings", "log"]
+    assert _parameters(quench.quench_run) == ["directory", "relaxer", "resolved", "frame_every", "timestep_fs",
+                                              "settings", "name", "log"]
     assert _keyword_only(runner.start) == ["relax", "quench", "steps", "source", "log"]
     assert _parameters(runner.resume) == ["directory", "steps", "log"]
     assert runner.RELAX_KEYS == ("fmax", "optimizer", "max_steps") and runner.PROTOCOL_RECORD == "protocol.json"

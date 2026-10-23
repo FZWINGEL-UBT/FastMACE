@@ -1,11 +1,24 @@
-"""ASE MD scripts on the graph engine: ``fastmace.ase.Langevin`` and ``LangevinBAOAB`` (SPEC §7.7 level 1).
+"""ASE MD scripts on the graph engine: ``fastmace.ase.Langevin``, ``LangevinBAOAB`` and the phase 4 classes
+(SPEC §7.7 level 1).
 
 An ASE script is ported by changing the import and adding ``model=``. Each class takes the argument
 names and units of its ASE 3.27 class (``SUPPORTED``) and refuses the rest with the reason
 (``REFUSED``); any other argument is a ``TypeError`` naming it. The FastMACE additions are
-keyword-only (``ADDITIONS``). The shim never reinterprets an ASE argument: ``friction`` and the
-time constants are in ASE units, and the conversion to the public integrator record is the only
-arithmetic (the record's ``to_config`` converts back, so the friction may differ by one ulp).
+keyword-only (``ADDITIONS``). The shim never reinterprets an ASE argument: ``friction``, the
+pressures and the time constants are in ASE units, and the conversion to the public integrator
+record is the only arithmetic (the record's ``to_config`` converts back, so a value may differ by
+one ulp).
+
+The centre of mass (owner decision D2, conductor's answer to 4-T10): a class whose ASE original
+takes ``fixcm`` (``Langevin``, ``NVTBerendsen``, ``NPTBerendsen``) passes it through and follows
+decision 37, as ``fastmace.ase.Langevin`` does (``LangevinBAOAB`` keeps its phase 1b mapping). A class whose ASE
+original has no ``fixcm`` (``VelocityVerlet``, ``Bussi``, ``NoseHooverChainNVT``, ``IsotropicMTKNPT``,
+``MTKNPT``) removes no centre of mass, as ASE, and counts ASE's degrees of freedom: its keyword-only
+``dof`` defaults to ``"ase"``; ``dof="auto"`` (or ``"fastmace"``) is FastMACE's convention instead,
+the total momentum removed and 3N - 3 counted (``fixcm="auto"``: with ``FixAtoms`` no momentum is removed and
+3(N - n_fixed) counted, 4-T04). ``FixAtoms`` runs where owner decision 44 allows it (NVE, CSVR, NVT
+Berendsen, Langevin; with ``fixcm=False`` for the classes that take ASE's ``fixcm``, whose default ``True``
+is refused with it); rule 1 refuses it elsewhere at the first ``run``, with the reason.
 
 Nothing here builds an engine: the classes build a ``fm.Simulation`` at the first ``run`` or
 ``step``, which plans, runs the optional gate (owner decision D1: ``check="gate"``) and builds
@@ -32,15 +45,48 @@ import warnings
 from pathlib import Path
 from typing import Any
 
+from ase import units as _ase_units
+
 # The FastMACE additions, keyword-only in every class.
 ADDITIONS = ("model", "force_field", "head", "seed", "output", "check", "dispersion")
 
 # Mapped ASE classes (phase 1b), and the ones that get a mapping with their integrators (§10.2).
-MAPPED = ("Langevin", "LangevinBAOAB")
-LATER = {"VelocityVerlet": "NVE", "NoseHooverChainNVT": "NHC", "Bussi": "CSVR", "IsotropicMTKNPT": "MTK",
-         "MTKNPT": "MTK", "NVTBerendsen": "Berendsen", "NPTBerendsen": "Berendsen",
-         "Inhomogeneous_NPTBerendsen": "Berendsen"}
+MAPPED = ("Langevin", "LangevinBAOAB", "VelocityVerlet", "Bussi", "NoseHooverChainNVT", "IsotropicMTKNPT", "MTKNPT",
+          "NVTBerendsen", "NPTBerendsen", "Inhomogeneous_NPTBerendsen")
 UNPLANNED = ("Andersen", "NPT")
+# The constructor arguments of the phase 4 ASE 3.27 classes along their class chain (plan task 4-T01), in
+# ASE's order; the same in ASE 3.29. 4-T10 splits each into SUPPORTED and REFUSED (rng, comm, master, and
+# FIRE's position_reset_callback and LBFGS's use_line_search); tests/cpu/test_contracts_4.py checks them
+# against inspect.signature.
+_DYNAMICS = ("trajectory", "logfile", "loginterval", "append_trajectory", "master", "comm")
+_NPT_BERENDSEN = ("atoms", "timestep", "temperature", "temperature_K", "pressure", "pressure_au", "taut", "taup",
+                  "compressibility", "compressibility_au", "fixcm", *_DYNAMICS)
+_MTK = ("atoms", "timestep", "temperature_K", "pressure_au", "tdamp", "pdamp", "tchain", "pchain", "tloop", "ploop",
+        *_DYNAMICS)
+ASE_ARGUMENTS = {
+    "VelocityVerlet": ("atoms", "timestep", *_DYNAMICS),
+    "Bussi": ("atoms", "timestep", "temperature_K", "taut", "rng", *_DYNAMICS),
+    "NoseHooverChainNVT": ("atoms", "timestep", "temperature_K", "tdamp", "tchain", "tloop", *_DYNAMICS),
+    "IsotropicMTKNPT": _MTK,
+    "MTKNPT": _MTK,
+    "NVTBerendsen": ("atoms", "timestep", "temperature", "taut", "fixcm", "temperature_K", *_DYNAMICS),
+    "NPTBerendsen": _NPT_BERENDSEN,
+    "Inhomogeneous_NPTBerendsen": ("mask", *_NPT_BERENDSEN),
+}
+# The ASE optimisers of owner decision D5 (recommended (a)), as above.
+ASE_OPTIMIZER_ARGUMENTS = {
+    "LBFGS": ("atoms", "restart", "logfile", "trajectory", "maxstep", "memory", "damping", "alpha", "use_line_search",
+              "append_trajectory", "master", "comm", "loginterval"),
+    "FIRE": ("atoms", "restart", "logfile", "trajectory", "dt", "maxstep", "maxmove", "dtmax", "Nmin", "finc", "fdec",
+             "astart", "fa", "a", "downhill_check", "position_reset_callback", "append_trajectory", "master", "comm",
+             "loginterval"),
+}
+# Where each class lives in ASE 3.27.
+ASE_MODULES = {"VelocityVerlet": "ase.md.verlet", "Bussi": "ase.md.bussi",
+               "NoseHooverChainNVT": "ase.md.nose_hoover_chain", "IsotropicMTKNPT": "ase.md.nose_hoover_chain",
+               "MTKNPT": "ase.md.nose_hoover_chain",
+               "NVTBerendsen": "ase.md.nvtberendsen", "NPTBerendsen": "ase.md.nptberendsen",
+               "Inhomogeneous_NPTBerendsen": "ase.md.nptberendsen", "LBFGS": "ase.optimize", "FIRE": "ase.optimize"}
 
 DEFAULT_OUTPUT = "fastmace-run"
 OUTPUT_SUFFIX = ".fastmace"
@@ -61,10 +107,6 @@ def _refuse(text, code):
 def unmapped(name: str):
     """``fastmace.ase.<name>`` for an ASE MD class without a mapping: ``PlanRefused`` listing the mapped ones."""
     mapped = ", ".join(MAPPED)
-    if name in LATER:
-        raise _refuse(f"ASE's {name} has no fastmace.ase mapping in this version; mapped: {mapped}. {name} maps "
-                      f"to FastMACE's {LATER[name]} integrator in phase 4 (SPEC §7.7, §10.2); FastMACE never falls "
-                      "back to ASE's own loop", code="ase-class-phase-4")
     if name in UNPLANNED:
         raise _refuse(f"ASE's {name} has no fastmace.ase mapping; mapped: {mapped} (SPEC §7.7); FastMACE never "
                       "falls back to ASE's own loop", code="ase-class-unmapped")
@@ -155,7 +197,8 @@ class _Dynamics:
         self.loginterval = loginterval
         self._logfile = logfile
         self._frame = atoms.copy()  # what the trajectory writer and the logger see
-        self._frame.set_constraint()
+        # The frame keeps only FixAtoms (4-T04), which ASE's trajectory stores and Atoms.get_temperature counts.
+        self._frame.set_constraint([c.copy() for c in atoms.constraints if type(c).__name__ == "FixAtoms"])
         self._frame.calc = None
         self._clock = _Clock(timestep)
         self._logger = None
@@ -164,7 +207,6 @@ class _Dynamics:
             from ase.md.logger import MDLogger
 
             self._logger = MDLogger(dyn=self._clock, atoms=self._frame, logfile=logfile)
-        self._last_frame_step = None
         self._sim = None
         self._cache = None
         self._speed_printed = False
@@ -199,6 +241,7 @@ class _Dynamics:
                 self._at(0)
             while self.nsteps < self.max_steps:
                 stop = self._next_stop()
+                self._running_to = stop  # the step the Simulation's metadata.json write at the end of run reports
                 sim.run(steps=stop - self.nsteps)
                 self.nsteps = stop
                 self._print_speed()
@@ -214,6 +257,7 @@ class _Dynamics:
         if forces is not None:
             raise TypeError("step(forces=...) is not supported: the engine evaluates the forces")
         sim = self._simulation()
+        self._running_to = self.nsteps + 1
         sim.run(steps=1)
         self.nsteps += 1
         committed = self._write_atoms()
@@ -269,7 +313,7 @@ class _Dynamics:
             import json
 
             return json.loads(path.read_text(encoding="utf-8"))
-        return {**self._sim.metadata(), "ase": self._ase_record()}
+        return self._sim.metadata()  # with the "ase" block (Simulation.add_metadata_block)
 
     # ------------------------------------------------------------------ the Simulation
 
@@ -283,6 +327,7 @@ class _Dynamics:
         output = Output(self.output, trajectory_every=None)
         self._sim = sim = simulation.Simulation(self.atoms, self._model, integrator=self.integrator, seed=self.seed,
                                                 workload=self._workload(), output=output, check=self.check)
+        sim.add_metadata_block("ase", self._ase_record)  # in the Simulation's own metadata.json writes
         if sim.degrees_of_freedom == 3 * len(self.atoms) - 3 and self._logger is not None:
             # The mass-weighted fixcm projection (decision 37): the log reads a copy of each frame with ASE's
             # FixCom, so Atoms.get_temperature, and with it MDLogger, counts 3N - 3 as FastMACE's thermo rows
@@ -305,11 +350,17 @@ class _Dynamics:
 
     def _workload(self):
         """``Simulation``'s default workload, with the shortest observer interval as the host callbacks
-        (rule 9, SPEC §7.7); a one-off observer (``interval <= 0``) is no cadence."""
+        (rule 9, SPEC §7.7); a one-off observer (``interval <= 0``) is no cadence. NVE has no target: its
+        ``max_temperature_K`` is ``fm.md``'s (``quick.nve_max_temperature_K`` of ``atoms`` at the first run)."""
         from fastmace.planner.workload import Workload
 
         intervals = [interval for _, interval, _, _ in self.observers if interval > 0]
-        return Workload(max_temperature_K=float(self.integrator.temperature_K),
+        temperature = getattr(self.integrator, "temperature_K", None)
+        if temperature is None:
+            from fastmace.quick import nve_max_temperature_K
+
+            temperature = nve_max_temperature_K(self.atoms)
+        return Workload(max_temperature_K=float(temperature),
                         host_callbacks_every=min(intervals) if intervals else None)
 
     def _print_speed(self):
@@ -329,30 +380,26 @@ class _Dynamics:
         self._write_records()
 
     def _write_records(self):
-        """Add the ``"ase"`` block to the ``metadata.json`` the ``Simulation`` has just written, and write
-        the report. The record is not built again: its software block (``provenance.fastmace_block``)
-        costs about 0.25 s, which made each ``run()`` that much slower than ``Simulation.run`` (1b-T21b)."""
-        import json
-
-        from fastmace import provenance
-
+        """Write the report. The ``"ase"`` block is in the ``metadata.json`` the ``Simulation`` writes at the end
+        of each run (``Simulation.add_metadata_block``): a second durable write of the record here (two fsyncs)
+        made each 300-step ``run()`` 21-32 ms slower than ``Simulation.run`` on the RTX 5060 Ti (4-T10), and
+        building the record again cost about 0.25 s (1b-T21b)."""
         directory = Path(self.output)
         directory.mkdir(parents=True, exist_ok=True)
-        path = directory / METADATA_NAME
-        if path.is_file():
-            record = json.loads(path.read_text(encoding="utf-8"))
-        else:
-            record = self._sim.metadata()
-        record["ase"] = self._ase_record()
-        provenance.write_metadata(path, record)
         (directory / REPORT_NAME).write_text(self.summary + "\n", encoding="utf-8")
 
     def _ase_record(self):
+        """The ``"ase"`` block, built when the ``Simulation`` writes ``metadata.json``: at the end of a run, before
+        the frames queued behind it are written, so the step and the last frame are the run's (frames every
+        ``loginterval`` steps from step 0), not the writer's position."""
+        step = max(self.nsteps, getattr(self, "_running_to", 0))
+        has_frames = self._trajectory is not None or self._trajectory_writer is not None
         return {"class": type(self).__name__, "todict": _json_safe(self.todict()),
                 "trajectory": None if self._trajectory is None else str(self._trajectory),
                 "logfile": self._logfile if isinstance(self._logfile, str) else None,
-                "loginterval": self.loginterval, "last_frame_step": self._last_frame_step, "nsteps": self.nsteps,
-                "observers": len(self.observers)}
+                "loginterval": self.loginterval,
+                "last_frame_step": (step // self.loginterval) * self.loginterval if has_frames else None,
+                "nsteps": step, "observers": len(self.observers)}
 
     # ------------------------------------------------------------------ observers
 
@@ -435,9 +482,9 @@ class _Dynamics:
         if tuple(bool(p) for p in atoms.pbc) != before.pbc:
             raise _refuse("an observer changed the PBC: that invalidates the plan (full 3D PBC, SPEC §4.4)",
                           code="observer-pbc")
-        if atoms.constraints:
-            raise _refuse("an observer added constraints: that invalidates the plan; FixAtoms is phase 4 (SPEC "
-                          "§4.4)", code="observer-constraints")
+        if _constraint_record(atoms) != before.constraints:
+            raise _refuse("an observer changed the constraints: that invalidates the plan; a run's FixAtoms stays "
+                          "as it started (SPEC §4.4)", code="observer-constraints")
         if not np.array_equal(atoms.cell.array, before.cell):
             raise _refuse("an observer changed the cell: only the barostat changes it (SPEC §7.7)",
                           code="observer-cell")
@@ -497,8 +544,8 @@ class _Dynamics:
                 frame.numbers = values["numbers"]
             if not np.array_equal(frame.get_masses(), values["masses"]):
                 frame.set_masses(values["masses"])
-        frame.set_positions(values["positions"])
-        frame.set_momenta(values["momenta"])
+        frame.set_positions(values["positions"], apply_constraint=False)  # the engine applied FixAtoms
+        frame.set_momenta(values["momenta"], apply_constraint=False)
         frame.calc = SinglePointCalculator(frame, energy=float(values["energy"][0]), forces=values["forces"],
                                            **extra)
         if self._trajectory is not None or self._trajectory_writer is not None:
@@ -508,7 +555,6 @@ class _Dynamics:
                 self._trajectory_writer = Trajectory(str(self._trajectory), mode="a")
             self._trajectory_writer.set_description(self.todict() | {"interval": self.loginterval})
             self._trajectory_writer.write(frame)
-            self._last_frame_step = int(step)
         if self._logger is not None:
             self._clock.step = int(step)
             if self._log_frame is not None:
@@ -542,7 +588,9 @@ class Langevin(_Dynamics):
     ``fixcm_projection`` (``fm.integrators.Langevin``'s; decision 37). With ``fixcm``, ``"auto"`` resolves
     to the mass-weighted projection: the log then reads its frames with ASE's ``FixCom``, so its
     temperature counts 3N - 3 (the trajectory frames stay unconstrained). ``fixcm_projection="ase"`` is
-    ASE's ``Langevin`` exactly (its noise stream, 3N).
+    ASE's ``Langevin`` exactly (its noise stream, 3N). ``FixAtoms`` runs with ``fixcm=False`` (ASE's default
+    ``fixcm=True`` is refused with it, owner decision 44); the log and the trajectory frames carry the
+    constraint, so temperatures count 3(N - n_fixed).
     """
 
     SUPPORTED = ("atoms", "timestep", "temperature", "friction", "fixcm", "temperature_K", "trajectory", "logfile",
@@ -608,7 +656,8 @@ class LangevinBAOAB(_Dynamics):
             raise _refuse("LangevinBAOAB without externalstress is fixed-cell BAOAB, which FastMACE does not have: "
                           "use `Langevin` for NVT (SPEC §10.2)", code="baoab-fixed-cell")
         if temperature_K is None:
-            raise _refuse("LangevinBAOAB without temperature_K is NVE/NPH: phase 4 (SPEC §10.2)",
+            raise _refuse("LangevinBAOAB without temperature_K is NPH, which FastMACE does not have: use "
+                          "IsotropicMTKNPT, MTKNPT or NPTBerendsen for NPT, VelocityVerlet for NVE (SPEC §10.2)",
                           code="baoab-no-thermostat")
         if P_mass is not None:
             raise _refuse("LangevinBAOAB(P_mass=...) is refused: FastMACE uses ASE's heuristic barostat mass; scale "
@@ -633,6 +682,259 @@ class LangevinBAOAB(_Dynamics):
         self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
                     append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
                     output=output, check=check, dispersion=dispersion)
+
+
+def _arguments(name):
+    """``(SUPPORTED, REFUSED)`` of ``name`` from its ASE argument list: ``rng``, ``comm`` and ``master`` refused."""
+    arguments = ASE_ARGUMENTS[name]
+    refused = ("rng", "comm", "master")
+    return (tuple(argument for argument in arguments if argument not in refused),
+            tuple(argument for argument in arguments if argument in refused))
+
+
+DOF_CHOICES = ("ase", "auto", "fastmace")
+
+
+def _without_fixcm(dof, *, fix_atoms=True):
+    """The record's ``fixcm`` and ``dof`` for a class whose ASE original has no ``fixcm``: ``"ase"``, no
+    centre of mass removed and ASE's count (the default); otherwise FastMACE's convention (module docstring),
+    ``fixcm="auto"`` for the schemes that take ``FixAtoms`` (off with it, 4-T04) and ``True`` for the others."""
+    if dof not in DOF_CHOICES:
+        raise ValueError(f"dof must be one of {DOF_CHOICES}, got {dof!r}")
+    if dof == "ase":
+        return {"fixcm": False, "dof": dof}
+    return {"fixcm": "auto" if fix_atoms else True, "dof": dof}
+
+
+class VelocityVerlet(_Dynamics):
+    """ASE 3.27's ``ase.md.verlet.VelocityVerlet`` on FastMACE's graph engine (NVE, SPEC §10.2).
+
+    ``VelocityVerlet(atoms, timestep, trajectory=None, logfile=None, loginterval=1, *,
+    append_trajectory=False, model=None, ..., dof="ase")``: ``timestep`` in ASE time units, the
+    momenta the structure's. Mapped to ``fm.integrators.NVE``; ``dof`` as the module docstring says.
+    The workload's ``max_temperature_K`` is ``fm.md``'s for NVE (``quick.nve_max_temperature_K``).
+    """
+
+    SUPPORTED, REFUSED = _arguments("VelocityVerlet")
+
+    def __init__(self, atoms, timestep, trajectory=None, logfile=None, loginterval=1, *, append_trajectory=False,
+                 model=None, force_field=None, head=None, seed=None, output=None, check="skip", dispersion=None,
+                 dof="ase", **kwargs):
+        from ase import units
+
+        from fastmace import integrators
+
+        self._refuse_extra(kwargs)
+        record = integrators.NVE(timestep_fs=float(timestep) / units.fs, **_without_fixcm(dof))
+        self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
+                    append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
+                    output=output, check=check, dispersion=dispersion)
+
+
+class Bussi(_Dynamics):
+    """ASE 3.27's ``ase.md.bussi.Bussi`` on FastMACE's graph engine (CSVR, SPEC §10.2).
+
+    ``Bussi(atoms, timestep, temperature_K, taut, *, trajectory=None, ..., seed=None, dof="ase")``:
+    ``timestep`` and ``taut`` in ASE time units. Mapped to ``fm.integrators.CSVR`` with ``tau_fs =
+    taut / fs``; the noise is ASE's stream from ``seed`` (conductor's choice 3), so ``rng`` is refused.
+    A zero initial kinetic energy raises ``ValueError``, as ASE's ``Bussi``.
+    """
+
+    SUPPORTED, REFUSED = _arguments("Bussi")
+
+    def __init__(self, atoms, timestep, temperature_K, taut, rng=None, *, trajectory=None, logfile=None,
+                 loginterval=1, append_trajectory=False, model=None, force_field=None, head=None, seed=None,
+                 output=None, check="skip", dispersion=None, dof="ase", **kwargs):
+        from ase import units
+
+        from fastmace import integrators
+
+        self._refuse_extra({**kwargs, "rng": rng})  # rng=None (ASE's default) is accepted
+        if math.isclose(atoms.get_kinetic_energy(), 0.0, rel_tol=0, abs_tol=1e-12):
+            raise ValueError("Initial kinetic energy is zero. Please set the initial velocities before running "
+                             "Bussi NVT.")  # ASE's message
+        record = integrators.CSVR(timestep_fs=float(timestep) / units.fs, temperature_K=float(temperature_K),
+                                  tau_fs=float(taut) / units.fs, **_without_fixcm(dof))
+        self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
+                    append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
+                    output=output, check=check, dispersion=dispersion)
+
+
+class NVTBerendsen(_Dynamics):
+    """ASE 3.27's ``ase.md.nvtberendsen.NVTBerendsen`` on FastMACE's graph engine (Berendsen, SPEC §10.2).
+
+    ``NVTBerendsen(atoms, timestep, temperature=None, taut=None, fixcm=True, *, temperature_K=None,
+    trajectory=None, ...)``: ``temperature`` in K (an alias of ``temperature_K``, as ASE's),
+    ``timestep`` and ``taut`` in ASE time units. Mapped to ``fm.integrators.Berendsen`` without a
+    pressure; ``fixcm`` follows decision 37 (module docstring). Non-canonical: equilibration only.
+    """
+
+    SUPPORTED, REFUSED = _arguments("NVTBerendsen")
+
+    def __init__(self, atoms, timestep, temperature=None, taut=None, fixcm=True, *, temperature_K=None,
+                 trajectory=None, logfile=None, loginterval=1, append_trajectory=False, model=None,
+                 force_field=None, head=None, seed=None, output=None, check="skip", dispersion=None, **kwargs):
+        from ase import units
+        from ase.md.md import process_temperature
+
+        from fastmace import integrators
+
+        self._refuse_extra(kwargs)
+        if taut is None:
+            raise TypeError("Missing 'taut' argument.")  # ASE's message
+        self.taut, self.fix_com = taut, fixcm
+        self.temperature = process_temperature(temperature, temperature_K, "K")
+        record = integrators.Berendsen(timestep_fs=float(timestep) / units.fs, temperature_K=float(self.temperature),
+                                       taut_fs=float(taut) / units.fs, fixcm=bool(fixcm))
+        self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
+                    append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
+                    output=output, check=check, dispersion=dispersion)
+
+
+class NPTBerendsen(_Dynamics):
+    """ASE 3.27's ``ase.md.nptberendsen.NPTBerendsen`` on FastMACE's graph engine (Berendsen NPT, §10.2).
+
+    ``NPTBerendsen(atoms, timestep, temperature=None, *, temperature_K=None, pressure=None,
+    pressure_au=None, taut=0.5 ps, taup=1 ps, compressibility=None, compressibility_au=None,
+    fixcm=True, trajectory=None, ...)``: ASE's arguments, units and defaults (``taut`` and ``taup``
+    default to ASE's 500 fs and 1000 fs, so a ported script keeps them). Exactly one of ``pressure``
+    (bar, deprecated as in ASE) and ``pressure_au`` (eV/Å³); ``compressibility`` (1/bar, deprecated) or
+    ``compressibility_au`` (Å³/eV). Mapped to ``fm.integrators.Berendsen`` with ``pressure_GPa =
+    pressure_au / GPa`` and ``compressibility_per_GPa = compressibility_au * GPa``; ``fixcm`` follows
+    decision 37. Non-canonical: equilibration only; the barostat is experimental: not yet qualified.
+    """
+
+    SUPPORTED, REFUSED = _arguments("NPTBerendsen")
+    MASK = None  # Inhomogeneous_NPTBerendsen's per-direction scaling
+
+    def __init__(self, atoms, timestep, temperature=None, *, temperature_K=None, pressure=None, pressure_au=None,
+                 taut=0.5e3 * _ase_units.fs, taup=1e3 * _ase_units.fs, compressibility=None, compressibility_au=None,
+                 fixcm=True, trajectory=None, logfile=None, loginterval=1, append_trajectory=False, model=None,
+                 force_field=None, head=None, seed=None, output=None, check="skip", dispersion=None, **kwargs):
+        from ase import units
+        from ase.md.md import process_temperature
+
+        from fastmace import integrators
+
+        self._refuse_extra(kwargs)
+        self.taut, self.taup, self.fix_com = taut, taup, fixcm
+        self.temperature = process_temperature(temperature, temperature_K, "K")
+        if (pressure is not None) + (pressure_au is not None) != 1:
+            raise TypeError("Exactly one of the parameters 'pressure', and 'pressure_au' must be given")  # ASE's
+        if pressure is not None:
+            warnings.warn(FutureWarning("The 'pressure' parameter is deprecated, please specify the pressure in "
+                                        "atomic units (eV/Å^3) using the 'pressure_au' parameter."), stacklevel=2)
+            pressure_au = pressure * (1e5 * units.Pascal)
+        self.pressure = pressure_au
+        if compressibility is not None and compressibility_au is not None:
+            raise TypeError("Do not give both 'compressibility' and 'compressibility_au'")  # ASE's
+        if compressibility is not None:
+            warnings.warn(FutureWarning("Specify the compressibility in atomic units."), stacklevel=2)
+            compressibility_au = compressibility / (1e5 * units.Pascal)
+        if compressibility_au is None:
+            raise TypeError(f"{type(self).__name__} needs compressibility_au (or the deprecated compressibility): "
+                            "ASE's class fails at its first step without it, and FastMACE chooses no default")
+        self.compressibility = compressibility_au
+        record = integrators.Berendsen(
+            timestep_fs=float(timestep) / units.fs, temperature_K=float(self.temperature),
+            taut_fs=float(taut) / units.fs, pressure_GPa=float(pressure_au) / units.GPa,
+            taup_fs=float(taup) / units.fs, compressibility_per_GPa=float(compressibility_au) * units.GPa,
+            mask=self.MASK, fixcm=bool(fixcm))
+        self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
+                    append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
+                    output=output, check=check, dispersion=dispersion)
+
+
+class Inhomogeneous_NPTBerendsen(NPTBerendsen):  # noqa: N801  (ASE's name)
+    """ASE 3.27's ``ase.md.nptberendsen.Inhomogeneous_NPTBerendsen`` on FastMACE's graph engine.
+
+    ``Inhomogeneous_NPTBerendsen(*args, mask=(1, 1, 1), **kwargs)``: ``NPTBerendsen``'s arguments and
+    ``mask``, the three 0/1 flags of the scaled cell directions. Mapped to ``fm.integrators.Berendsen``
+    with ``mask`` (``cell_mode="full"``: each cell vector scaled on its own, the angles kept).
+    """
+
+    SUPPORTED, REFUSED = _arguments("Inhomogeneous_NPTBerendsen")
+
+    def __init__(self, *args, mask=(1, 1, 1), **kwargs):
+        self.mask = mask
+        self.MASK = tuple(mask)
+        super().__init__(*args, **kwargs)
+
+
+class NoseHooverChainNVT(_Dynamics):
+    """ASE 3.27's ``ase.md.nose_hoover_chain.NoseHooverChainNVT`` on FastMACE's graph engine (NHC, §10.2).
+
+    ``NoseHooverChainNVT(atoms, timestep, temperature_K, tdamp, tchain=3, tloop=1, *, trajectory=None,
+    logfile=None, loginterval=1, append_trajectory=False, model=None, ..., dof="ase")``: ``timestep``
+    and ``tdamp`` in ASE time units. Mapped to ``fm.integrators.NoseHooverChain`` with ``tdamp_fs =
+    tdamp / fs``; ``dof`` as the module docstring says. ``comm`` other than ASE's default and ``master``
+    are refused.
+    """
+
+    SUPPORTED, REFUSED = _arguments("NoseHooverChainNVT")
+
+    def __init__(self, atoms, timestep, temperature_K, tdamp, tchain=3, tloop=1, *, trajectory=None, logfile=None,
+                 loginterval=1, append_trajectory=False, model=None, force_field=None, head=None, seed=None,
+                 output=None, check="skip", dispersion=None, dof="ase", **kwargs):
+        from ase import units
+
+        from fastmace import integrators
+
+        self._refuse_extra(kwargs)
+        record = integrators.NoseHooverChain(timestep_fs=float(timestep) / units.fs,
+                                             temperature_K=float(temperature_K), tdamp_fs=float(tdamp) / units.fs,
+                                             tchain=tchain, tloop=tloop, **_without_fixcm(dof, fix_atoms=False))
+        self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
+                    append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
+                    output=output, check=check, dispersion=dispersion)
+
+
+class _MTKDynamics(_Dynamics):
+    """ASE 3.27's MTK classes: one FastMACE scheme, ``cell_mode`` from the class (``CELL_MODE``)."""
+
+    CELL_MODE = ""
+
+    def __init__(self, atoms, timestep, temperature_K, pressure_au, tdamp, pdamp, tchain=3, pchain=3, tloop=1,
+                 ploop=1, *, trajectory=None, logfile=None, loginterval=1, append_trajectory=False, model=None,
+                 force_field=None, head=None, seed=None, output=None, check="skip", dispersion=None, dof="ase",
+                 **kwargs):
+        from ase import units
+
+        from fastmace import integrators
+
+        self._refuse_extra(kwargs)
+        record = integrators.MTK(timestep_fs=float(timestep) / units.fs, temperature_K=float(temperature_K),
+                                 pressure_GPa=float(pressure_au) / units.GPa, tdamp_fs=float(tdamp) / units.fs,
+                                 pdamp_fs=float(pdamp) / units.fs, tchain=tchain, pchain=pchain, tloop=tloop,
+                                 ploop=ploop, cell_mode=self.CELL_MODE,
+                                 **_without_fixcm(dof, fix_atoms=False))
+        self._setup(atoms, timestep, record, trajectory=trajectory, logfile=logfile, loginterval=loginterval,
+                    append_trajectory=append_trajectory, model=model, force_field=force_field, head=head, seed=seed,
+                    output=output, check=check, dispersion=dispersion)
+
+
+class IsotropicMTKNPT(_MTKDynamics):
+    """ASE 3.27's ``ase.md.nose_hoover_chain.IsotropicMTKNPT`` on FastMACE's graph engine (MTK, hydrostatic).
+
+    ``IsotropicMTKNPT(atoms, timestep, temperature_K, pressure_au, tdamp, pdamp, tchain=3, pchain=3,
+    tloop=1, ploop=1, *, trajectory=None, ..., dof="ase")``: ``pressure_au`` in eV/Å³, ``timestep``,
+    ``tdamp`` and ``pdamp`` in ASE time units. Mapped to ``fm.integrators.MTK(cell_mode="hydrostatic")``
+    with ``pressure_GPa = pressure_au / GPa``. Experimental: not yet qualified, as BAOAB (§10.2).
+    """
+
+    SUPPORTED, REFUSED = _arguments("IsotropicMTKNPT")
+    CELL_MODE = "hydrostatic"
+
+
+class MTKNPT(_MTKDynamics):
+    """ASE 3.27's ``ase.md.nose_hoover_chain.MTKNPT`` on FastMACE's graph engine (MTK, full cell).
+
+    Arguments as ``IsotropicMTKNPT``; mapped to ``fm.integrators.MTK(cell_mode="full")``.
+    Experimental: not yet qualified, as BAOAB (§10.2).
+    """
+
+    SUPPORTED, REFUSED = _arguments("MTKNPT")
+    CELL_MODE = "full"
 
 
 # --------------------------------------------------------------------------- helpers
@@ -663,6 +965,14 @@ class _Written:
         self.masses = atoms.get_masses()
         self.charges = atoms.get_initial_charges()
         self.info = {key: atoms.info.get(key) for key in PLAN_INFO_KEYS}
+        self.constraints = _constraint_record(atoms)
+
+
+def _constraint_record(atoms):
+    """``atoms``' constraints as rule 1 reads them: the ``FixAtoms`` indices and the other classes' names."""
+    from fastmace.integrators.registry import constraint_names
+
+    return constraint_names(atoms)
 
 
 def _kB():
@@ -721,14 +1031,14 @@ def _dispersion(dispersion, model, atoms):
 
 
 def _check_constraints(atoms):
+    """Only ``FixAtoms`` is supported (SPEC §4.4); whether the integrator takes it is rule 1's, at the plan
+    (``fixcm=True``, ASE's default, is refused with it: pass ``fixcm=False``; owner decision 44)."""
     from ase.constraints import FixAtoms
 
     for constraint in atoms.constraints:
-        if isinstance(constraint, FixAtoms):
-            raise _refuse("FixAtoms is refused until the integrators support it in phase 4 (SPEC §4.4); no other "
-                          "tier is substituted", code="constraint-fixatoms")
-        raise _refuse(f"the ASE constraint {type(constraint).__name__} is refused in 1.0 (SPEC §4.4)",
-                      code="constraint-other")
+        if not isinstance(constraint, FixAtoms):
+            raise _refuse(f"the ASE constraint {type(constraint).__name__} is refused in 1.0; only FixAtoms is "
+                          "supported (SPEC §4.4)", code="constraint-other")
 
 
 def _voigt_GPa(externalstress, hydrostatic):
@@ -767,4 +1077,5 @@ def _json_safe(record):
             for key, value in record.items()}
 
 
-__all__ = ("ADDITIONS", "MAPPED", "Langevin", "LangevinBAOAB", "unmapped")
+__all__ = ("ADDITIONS", "MAPPED", "Bussi", "Inhomogeneous_NPTBerendsen", "IsotropicMTKNPT", "Langevin", "LangevinBAOAB",
+           "MTKNPT", "NPTBerendsen", "NVTBerendsen", "NoseHooverChainNVT", "VelocityVerlet", "unmapped")

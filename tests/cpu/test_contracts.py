@@ -359,15 +359,18 @@ def test_simulation_signature():
 
     signature = inspect.signature(Simulation)
     assert list(signature.parameters)[:2] == ["atoms", "force_field"]
-    assert _keyword_only(signature) == ["species", "integrator", "workload", "output", "seed", "check",
+    # The planner inputs: 2-T01; optimizer= (a relaxation instead of MD): 4-T05.
+    assert _keyword_only(signature) == ["species", "integrator", "optimizer", "workload", "output", "seed", "check",
                                         "allow_naive_cueq", "mode", "allow_reference", "fallback", "gate",
-                                        "runner", "engine", "neighbours"]  # the planner inputs: 2-T01
+                                        "runner", "engine", "neighbours"]
     assert signature.parameters["check"].default == "skip"  # owner decision D1: opt-in gate
     assert signature.parameters["workload"].default is None  # owner decision D7
-    assert signature.parameters["integrator"].default is inspect.Parameter.empty
+    # Exactly one of integrator= and optimizer= (4-T05), so neither is required on its own.
+    assert signature.parameters["integrator"].default is None
+    assert signature.parameters["optimizer"].default is None
     assert signature.parameters["seed"].default is inspect.Parameter.empty
     assert CHECK_MODES == ("skip", "gate", "allow_unavailable")
-    for name in ("run", "save_restart", "resume", "set_positions", "set_momenta"):
+    for name in ("run", "relax", "save_restart", "resume", "set_positions", "set_momenta"):
         assert callable(getattr(Simulation, name))
     for name in ("plan", "gate"):
         assert isinstance(inspect.getattr_static(Simulation, name), property)

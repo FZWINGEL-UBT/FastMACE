@@ -111,6 +111,14 @@ class D3Term(d3.DispersionTerm):
         if self.variable_cell:
             self.list.set_cell(cell)
 
+    def reset_cell(self, cell) -> None:
+        """A new cell between replays, fixed or variable cell (4-T05's ``Simulation.update(cell=)``; host): the
+        list's, for the canonical point's rebuild (``DispersedForceField.rebuild_all``). The kernels read the list's
+        ``cell_t`` in place. ``GraphEngine.reset_cell`` passes a device tensor; the list takes a host array."""
+        if isinstance(cell, torch.Tensor):
+            cell = cell.detach().cpu().numpy()
+        self.list.reset_cell(cell)
+
     def needs_rebuild(self, positions, cell=None, fraction: float = 1.0):
         self.fraction = min(self.fraction, float(fraction))
         return self.list.needs_rebuild(positions, cell if self.variable_cell else None, fraction)

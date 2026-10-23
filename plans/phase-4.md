@@ -62,8 +62,10 @@ Why it matters:
 
 ## Owner decisions
 
-**Open.** Each names the tasks it blocks. The tasks that need none are
-listed under "Order and parallelism".
+**Decided (owner, 23 October 2026): the recommendation (a) of each**, D1–D6,
+in the owner's words "For the other decisions I trust your recommendations".
+They are SPEC §18 decisions 44 (D1) to 49 (D6). The text below keeps each
+option for the record.
 
 **D1. Where `FixAtoms` is supported.** §4.4 says "all 1.0 integrators and
 optimisers". ASE 3.27 is not uniform: `NoseHooverChainNVT`, `MTKNPT` and
@@ -115,9 +117,9 @@ no reference with fixed atoms.
   - GPU LBFGS (fmax 0.01 eV/Å, memory 100, maxstep 0.2 Å, fixed cell, at most
     5,000 steps) against ASE's LBFGS on `fm.calc`, with the same force field
     and precision. Only the optimiser differs;
-  - pass: all 210 converge; per frame |ΔE| ≤ 0.025 meV/atom; the same
-    structure (every atom within 0.1 Å) in at least 20 of 21 frames per
-    crystal;
+  - pass: all 210 converge; |ΔE| ≤ 0.025 meV/atom and the same structure
+    (every atom within 0.1 Å), each in at least 20 of 21 frames per crystal
+    (energy allowance added by the owner on 23 October 2026, SPEC decision 46);
   - the 13 October research-engine minima (`quench.csv`, `comparison.csv`)
     compared and recorded, not judged: other stack, and `lbfgs.traj` is on the
     NAS only.
@@ -460,6 +462,8 @@ PolarMACE would need").
   Cross-process controls use the 3 % noise floor or are left out.
 - When the Ada tier has passed at the freeze, the local leg reruns only: the
   tests corrected at acceptance, the GPU slow tier, and the items' own runs.
+- The GPU slow tier at this freeze also stands in for phase 3b's, which was
+  dropped (owner, 23 October 2026).
 - The runbook `docs/validation/phase-4-runbook.md` comes first and is
   accepted before the freeze. Report `docs/validation/phase-4.md`; the owner
   tags `fastmace-4`.
@@ -526,6 +530,55 @@ Wave 4   T13 acceptance
 - **Branches:** workers push their own `fastmace/4-Tnn` branches.
 - **Small, low-risk tasks** (T11, T12) skip the prestart report and the
   separate validation document. They keep their GPU check.
+
+## Answers from the tasks
+
+- **4-T01** (branch `fastmace/4-T01`, contract in
+  [docs/design/physics.md](../docs/design/physics.md)):
+  - `Optimizer.propose()` and `update()` take no argument: the optimiser is bound to its
+    `DOFView` at construction (`Class(dof, config)`), at fixed addresses. The plan had
+    `propose(state)`; accepted by the conductor on 23 October 2026.
+  - The support table is a registry of scheme records, one module per scheme in
+    `integrators/schemes/` and `optimize/schemes/`. T02, T03, T05, T06 and T07 add their
+    records there, not in `planner/minimal.py`.
+  - The new integrator records `NoseHooverChain` and `MTK` also take `fixcm` and `dof`, following
+    D2 (a)'s "the new integrators"; choice 1 listed them only for NVE, CSVR and Berendsen.
+  - FIRE's `dt` and `dtmax` stay in ASE time units, as in ASE (choice 1: ASE's names otherwise).
+  - Merged as `352b33c` (from `fastmace/4-T01-rebased` at `bc40c19`, 23 October 2026). SPEC §10.6's
+    format 4 paragraph is applied.
+  - **SPEC wording held until D1, D2 and D5 are decided.** 4-T01 proposed the text below, written for
+    the recommended options. The conductor applies it once the owner decides, and adjusts it if the
+    decision differs.
+    - §4.4, the paragraph under the heading: "Support is declared per scheme: each integrator,
+      optimiser and cell filter has a record in fastmace.integrators.registry that lists its
+      ensembles, cell modes and constraint rows (fixcm, fix_atoms), with a reason for each row it
+      lacks. Rule 1 (§9.3) reads these records and refuses anything outside them at plan time, before
+      any compilation, with a reason and a stable code. FixAtoms is held in the state as a device mask
+      and host indices. Every other ASE constraint is refused, and so are MC moves with any constraint
+      (decision 10)."
+    - §4.4, the FixAtoms row (D1): "NVE, Langevin, CSVR and NVT Berendsen, and FIRE and LBFGS at fixed
+      cell; refused for NHC, MTK and every variable cell (BAOAB, MTK, NPT Berendsen, cell filters), and
+      with fixcm=True". Fixed centre of mass row: "all 1.0 integrators".
+    - §4.4, degrees of freedom (D2): "Temperatures and thermostat targets count 3N − 3 degrees of
+      freedom under fixcm and 3(N − n_fixed) with FixAtoms (dof="auto"), or the scheme's ASE count
+      with dof="ase". Langevin and BAOAB keep their counts (decision 37)."
+    - §7.7 (D5): "Phase 4 maps VelocityVerlet, Bussi, NoseHooverChainNVT, IsotropicMTKNPT, MTKNPT,
+      NVTBerendsen, NPTBerendsen and Inhomogeneous_NPTBerendsen with ASE 3.27's arguments and units.
+      Each argument list is held as data and checked against inspect.signature. rng is refused in
+      favour of seed=. fastmace.ase.LBFGS and FIRE take ASE 3.27's arguments: use_line_search=True and
+      position_reset_callback are refused, and the deprecated maxmove too. They take Atoms or
+      ase.filters.FrechetCellFilter, and the other cell filters are refused with the reason. In
+      Simulation the same optimisers are fm.optimize.LBFGS and FIRE, and FrechetCellFilter is
+      fm.optimize.FrechetCell."
+- **4-T03 and 4-T03b** (branches `fastmace/4-T03-rebased`, `fastmace/4-T03b`;
+  [docs/validation/4-T03.md](../docs/validation/4-T03.md), [4-T03b.md](../docs/validation/4-T03b.md)):
+  - The task's "the chain updates are device scalar operations, unrolled at capture" now reads
+    **"fused"**: on CUDA with Triton, each chain half and MTK's 3 × 3 exp/exprel run as one Triton
+    program each, bitwise the PyTorch stage (4-T03b, accepted by the conductor on 23 October 2026).
+    The CPU keeps the PyTorch stage, within 1e-9 Å of ASE over 300 steps.
+  - D2 (a) for NHC and MTK: N_f replaces ASE's 3N in every coupling term (conductor, 23 October).
+  - MTK has no `eigh`: exp and exprel of the symmetric cell momentum as a matrix series.
+  - The MTK record's `state_keys` serve both cell modes; the full cell's `eps` stays 0.
 
 ## Checkpoints for the owner
 

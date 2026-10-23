@@ -8,19 +8,24 @@ shipped with FastMACE are the ``.toml`` files of ``DATA``, named by their stem
 
 The stages, in the run's output directory:
 
-1. ``start``: the relaxation with ``fm.calc``'s calculator on the model and in the force field's
-   precision (``relaxation.log``, ``relaxed.extxyz``), then ``fm.md`` on the relaxed structure,
+1. ``start``: the relaxation with its optimizer (``profiles.OPTIMIZERS``: ASE's on ``fm.calc``'s
+   calculator, or ``fm.optimize``'s on the graph engine; ``quench.relaxer``) on the model and in the
+   force field's precision (``relaxation.log``, ``relaxed.extxyz``), then ``fm.md`` on the relaxed structure,
    for at most ``steps`` steps of the schedule;
 2. ``resume``: ``Simulation.resume`` and the next at most ``steps`` steps. The move set is attached
    over the steps whose target is at or above ``min_mc_temperature_K`` (``quick.mc_ranges``), as
    ``fm.md`` attaches it; an attached set stays attached across a resume (§7.6);
-3. after the last MD step, the quench (``quench.quench_run``) with the model of the run.
+3. after the last MD step, the quench (``quench.quench_run``) with the model of the run, its precision,
+   D3 record and engine options; a GPU quench relaxes every frame on one engine (4-T09).
 
 Every piece ends with a restart at its last step, so a long protocol runs as pieces of bounded
 wall time. ``protocol.json`` records the stages, the pieces, the relaxation and the quench summary,
-and the engine counters of ``PIECE_COUNTERS`` per piece (each piece builds a new engine) with their
-sums over the run in ``counters``; ``metadata.json`` is the run's, with the plan, gate and
-``counters.mc``.
+and the counters of ``PIECE_COUNTERS`` per piece (each piece builds a new engine and force field) with
+their sums over the run in ``counters``. With D3 (``dispersion=``) the relaxation and the quench use
+MACE plus the run's D3 record, and the quench relaxes each frame at its own cell (NPT's). An NPT
+piece that ``CellDivergedError`` stops is recorded with its counters and the stop, status
+``"cell diverged"``, and the error is raised again (no quench; not resumable).
+``metadata.json`` is the run's, with the plan, gate and ``counters.mc``.
 """
 
 from __future__ import annotations
@@ -33,8 +38,10 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+from fastmace.errors import CellDivergedError
+from fastmace.longrange import d3
 from fastmace.protocols import quench as quench_stage
-from fastmace.protocols.profiles import OPTIMIZERS, _quench
+from fastmace.protocols.profiles import DEFAULT_OPTIMIZER, _quench, resolve_optimizer
 
 DATA = Path(__file__).resolve().parent / "data"
 PROTOCOL_RECORD = "protocol.json"
@@ -43,9 +50,11 @@ RELAX_KEYS = ("fmax", "optimizer", "max_steps")
 STAGES = ("relax", "quench")
 RELAXATION_LOG, RELAXED = "relaxation.log", "relaxed.extxyz"
 _LOAD_KEYS = ("head", "sha256", "trusted", "charge", "spin_multiplicity")
-# The engine counters (``Engine.info()``) a protocol run sums over its pieces: the MACE neighbour list's
-# rebuilds (3b-T06's cost cross-check reads them from the full ramp).
-PIECE_COUNTERS = ("neighbour_rebuilds",)
+# The counters a protocol run sums over its pieces: the MACE neighbour list's rebuilds (``Engine.info()``)
+# and D3's builds, rebuilds and build time (the D3 term's ``counters()``, in the force field's ``info()``);
+# 3b-T06's cost cross-check reads them from the full ramp. ``None`` without D3.
+PIECE_COUNTERS = ("neighbour_rebuilds", "d3_builds", "d3_rebuilds", "d3_build_s")
+_D3_COUNTERS = {"d3_builds": "builds", "d3_rebuilds": "rebuilds", "d3_build_s": "build_seconds"}
 
 
 def protocol_names() -> tuple[str, ...]:
@@ -66,12 +75,14 @@ def protocol_file(name_or_path: str | Path) -> tuple[Path, bool]:
 def _relax(data: Any) -> dict[str, Any]:
     if not isinstance(data, Mapping) or "fmax" not in data or set(data) - set(RELAX_KEYS):
         raise ValueError(f"relax needs fmax and takes {', '.join(RELAX_KEYS)}, got {data!r}")
-    fmax, optimizer = data["fmax"], data.get("optimizer", "LBFGS")
+    fmax, optimizer = data["fmax"], data.get("optimizer", DEFAULT_OPTIMIZER)
     max_steps = data.get("max_steps", quench_stage.QUENCH_MAX_STEPS)
     if isinstance(fmax, bool) or not isinstance(fmax, (int, float)) or not fmax > 0:
         raise ValueError(f"relax fmax must be a positive number (eV/Å), got {fmax!r}")
-    if optimizer not in OPTIMIZERS:
-        raise ValueError(f"relax optimizer must be one of {OPTIMIZERS}, got {optimizer!r}")
+    try:
+        optimizer = resolve_optimizer(optimizer)
+    except ValueError as error:
+        raise ValueError(f"relax {error}") from None
     if isinstance(max_steps, bool) or not isinstance(max_steps, int) or max_steps < 1:
         raise ValueError(f"relax max_steps must be a positive int, got {max_steps!r}")
     return {"fmax": float(fmax), "optimizer": optimizer, "max_steps": max_steps}
@@ -133,7 +144,6 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
     result); ``relax`` and ``quench`` the stage settings (``split_stages``).
     """
     from fastmace import quick
-    from fastmace.ase.calculator import FastMACECalculator
     from fastmace.model.loading import LoadedModel, load_pristine
     from fastmace.simulation import mc_moves, move_record
 
@@ -151,7 +161,9 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
     if mc is not None and schedule is not None and options.get("min_mc_temperature_K") is None:
         raise ValueError("mc= with a schedule needs min_mc_temperature_K= (SPEC §7.7)")
     repeat = quick._repeat(options.pop("repeat", (1, 1, 1)))
-    timestep_fs = options.get("timestep_fs", 0.5)
+    # fm.md's timestep: an explicit integrator record's, else timestep_fs= (default 0.5 fs).
+    integrator = options.get("integrator")
+    timestep_fs = integrator.timestep_fs if integrator is not None else options.get("timestep_fs", 0.5)
     steps = _remaining(schedule, timestep_fs, steps)
 
     atoms = quick._structure(structure)
@@ -169,14 +181,18 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
               "repeat": list(repeat), "atoms": len(atoms), "timestep_fs": timestep_fs, "relax": relax,
               "relaxation": None, "quench": quench, "quench_result": None,
               "mc": None if mc is None else [move_record(move) for move in mc],
-              "min_mc_temperature_K": options.get("min_mc_temperature_K"), "pieces": [], "counters": None,
+              "min_mc_temperature_K": options.get("min_mc_temperature_K"), "dispersion": None, "pieces": [],
+              "counters": None,
               "status": "relax"}
     _write(directory, record)
     if relax is not None:
-        calc = FastMACECalculator(model)
-        atoms, summary = quench_stage.relax(atoms, calc, relax["fmax"], relax["max_steps"],
-                                            logfile=directory / RELAXATION_LOG, optimizer=relax["optimizer"])
-        del calc
+        relaxer = quench_stage.relaxer(relax["optimizer"], model, dispersion=options.get("dispersion"),
+                                       engine=options.get("engine"))
+        try:
+            atoms, summary = relaxer(atoms, relax["fmax"], relax["max_steps"], logfile=directory / RELAXATION_LOG)
+        finally:
+            relaxer.close()
+        del relaxer
         _release_device_memory()
         atoms.write(directory / RELAXED)
         record["relaxation"] = summary
@@ -192,10 +208,16 @@ def start(structure: Any, options: Mapping[str, Any], *, relax: Mapping[str, Any
     _write(directory, record)
 
     started = time.perf_counter()
-    result = quick.md(atoms, model=model, output=output, steps=steps, **options)
+    try:
+        result = quick.md(atoms, model=model, output=output, steps=steps, **options)
+    except CellDivergedError as error:
+        _stopped(directory, record, 0, started, error)
+        raise
     log(result.summary)
     sim = result.simulation
     sim.report.repeat = repeat
+    dispersion = sim.force_field.dispersion
+    record["dispersion"] = None if dispersion is None else d3.describe(dispersion)
     return _end_piece(sim, directory, record, 0, started, log)
 
 
@@ -220,16 +242,21 @@ def resume(directory: str | Path, *, steps: int | None = None, log: Callable[[st
     if record["status"] == "md" and position is not None and not position.finished:
         count = position.remaining if steps is None else min(steps, position.remaining)
         moves = None if record["mc"] is None else tuple(move_from_record(move) for move in record["mc"])
-        if moves is None:
-            sim.run(steps=count)
-        else:
-            low = record["min_mc_temperature_K"]
-            # The last step ran with the move set iff its target is at or above the minimum (fm.md's rule),
-            # and an attached set is in the restart: keep it (mc=...) rather than attach a new driver.
-            attached = position.step > 0 and position.resolved.target(position.step) >= low
-            for piece, wanted in mc_ranges(position, count, low):
-                sim.run(steps=piece, mc=... if wanted == attached else moves if wanted else None)
-                attached = wanted
+        try:
+            if moves is None:
+                sim.run(steps=count)
+            else:
+                low = record["min_mc_temperature_K"]
+                # The last step ran with the move set iff its target is at or above the minimum (fm.md's rule),
+                # and an attached set is in the restart: keep it (mc=...) rather than attach a new driver.
+                attached = position.step > 0 and position.resolved.target(position.step) >= low
+                for piece, wanted in mc_ranges(position, count, low):
+                    sim.run(steps=piece, mc=... if wanted == attached else moves if wanted else None)
+                    attached = wanted
+        except CellDivergedError as error:
+            sim.close()
+            _stopped(directory, record, first, started, error)
+            raise
         sim.flush_output()
         log(sim.report.text())
     return _end_piece(sim, directory, record, first, started, log)
@@ -251,7 +278,8 @@ def _end_piece(sim, directory, record, first, started, log):
         return record
     resolved = None if position is None else position.resolved
     frame_every = sim.output.trajectory_every
-    model, precision = sim.force_field.model, sim.force_field.precision
+    model, precision, dispersion = sim.force_field.model, sim.force_field.precision, sim.force_field.dispersion
+    engine = sim.options.engine
     sim.close()
     _log_counters(directory, log)
     if record["quench"] is not None:
@@ -259,11 +287,13 @@ def _end_piece(sim, directory, record, first, started, log):
         _write(directory, record)
         del sim
         _release_device_memory()
-        from fastmace.ase.calculator import FastMACECalculator
-
-        calc = FastMACECalculator(model, precision=precision)
-        result = quench_stage.quench_run(directory, calc, resolved, frame_every, record["timestep_fs"],
-                                         record["quench"], log=log)
+        relaxer = quench_stage.relaxer(record["quench"]["optimizer"], model, precision=precision,
+                                       dispersion=dispersion, engine=engine)
+        try:
+            result = quench_stage.quench_run(directory, relaxer, resolved, frame_every, record["timestep_fs"],
+                                             record["quench"], log=log)
+        finally:
+            relaxer.close()
         record["quench_result"] = result
         log(f"quench: {result['frames']} frames, final quenched {result['final_quenched_eV_atom']:.6f} eV/atom, "
             f"{result['not_converged']} not converged ({directory / quench_stage.QUENCH_DIRECTORY})")
@@ -272,10 +302,28 @@ def _end_piece(sim, directory, record, first, started, log):
     return record
 
 
+def _stopped(directory, record, first, started, error):
+    """Record the piece that a ``CellDivergedError`` stopped (its restart and metadata are written) and the
+    stop; the run is not resumable (3b-T07)."""
+    metadata = json.loads((Path(directory) / "metadata.json").read_text(encoding="utf-8"))
+    record["pieces"].append({"first_step": first, "last_step": error.step, "wall_s": time.perf_counter() - started,
+                             "counters": _counters(metadata)})
+    record["counters"] = _sum_counters(record["pieces"])
+    record["status"] = "cell diverged"
+    record["stop"] = error.what
+    _write(directory, record)
+
+
 def _piece_counters(sim):
-    """``PIECE_COUNTERS`` of this piece's engine (``None`` where the engine does not report one)."""
-    info = (sim.metadata().get("counters") or {}).get("engine") or {}
-    return {key: info.get(key) for key in PIECE_COUNTERS}
+    """``PIECE_COUNTERS`` of this piece's engine and force field (``None`` where it does not report one)."""
+    return _counters(sim.metadata())
+
+
+def _counters(metadata):
+    engine = (metadata.get("counters") or {}).get("engine") or {}
+    dispersion = (metadata.get("force_field") or {}).get("d3") or {}
+    return {"neighbour_rebuilds": engine.get("neighbour_rebuilds"),
+            **{key: dispersion.get(name) for key, name in _D3_COUNTERS.items()}}
 
 
 def _sum_counters(pieces):

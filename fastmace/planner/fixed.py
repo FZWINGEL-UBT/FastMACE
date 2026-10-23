@@ -75,6 +75,7 @@ AUTO_RULES = MappingProxyType({
     "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
     "NeighbourConfig.d3_skin": "rule_11_d3_skin_from_workload",
     "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
+    "IntegratorConfig.dof": "owner_decision_d2_default",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
@@ -217,6 +218,43 @@ class _Book:
             raise PlanRefused.from_reasons(self.refusals)
 
 
+def refuse_unsupported(book: _Book, config: IntegratorConfig, atoms, optimizer=None) -> None:
+    """Rule 1 again at build (4-T01): the plan's integrator scheme (or its ``optimizer``'s, 4-T05) on ``atoms``'
+    constraints, from the scheme records. The plan refused MC with constraints already."""
+    from fastmace.integrators import registry as schemes
+
+    fixed_atoms, other = schemes.constraint_names(atoms)
+    if optimizer is not None:
+        reasons = schemes.optimizer_refusals(optimizer, fix_atoms=bool(fixed_atoms), other_constraints=other)
+    else:
+        reasons = schemes.integrator_refusals(config, fix_atoms=bool(fixed_atoms), other_constraints=other)
+    for reason in reasons:
+        book.refuse(reason, reason.code, 1)
+
+
+def build_stepper(state, plan: Plan, *, temperature_K: float | None = None):
+    """What steps ``state`` in ``plan``'s engine: the integrator from the registry, or for a relaxation the
+    optimiser over its DOF view in the integrator's place (``optimize.driver.OptimizerStepper``, 4-T05)."""
+    from fastmace.integrators import registry as schemes
+
+    if plan.optimizer is None:
+        return schemes.build_integrator(state, plan.integrator, temperature_K=temperature_K)
+    from fastmace.optimize.driver import OptimizerStepper
+
+    dof = schemes.build_dof(state, plan.optimizer)
+    return OptimizerStepper(schemes.build_optimizer(dof, plan.optimizer))
+
+
+def _workload_text(atoms, pbc):
+    """The workload decision's reason: atom count, PBC and constraints."""
+    if not all(pbc):
+        return "refused"
+    fixed_atoms = sum(len(c.get_indices()) for c in atoms.constraints if type(c).__name__ == "FixAtoms")
+    if len(atoms.constraints) and not fixed_atoms:
+        return "refused"
+    return f"{len(atoms)} atoms, 3D PBC, " + (f"FixAtoms on {fixed_atoms} atoms" if fixed_atoms else "no constraints")
+
+
 def _toggle(value):
     return "on" if value else "off"
 
@@ -263,6 +301,20 @@ def _fixcm_projection(book, integrator, *, npt, mc_moves):
                                     code="fixcm-projection-ase")
     book.decide("IntegratorConfig.fixcm_projection", choice, why)
     return dataclasses.replace(integrator, fixcm_projection=choice)
+
+
+def _dof(book, integrator):
+    """Resolve ``IntegratorConfig.dof`` (4-T01, owner decision D2): ``"auto"`` is ``registry.DOF_AUTO``. Langevin
+    and BAOAB count as they did whatever the value (``dof_rule="langevin"``), so their plans only record it."""
+    from fastmace.integrators.registry import resolve_dof
+
+    rule = AUTO_RULES["IntegratorConfig.dof"]
+    choice = resolve_dof(integrator.dof)
+    explanation = ("kept as given" if integrator.dof != "auto" else
+                   "FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2)"
+                   if choice == "fastmace" else "the count of the scheme's ASE class (owner decision D2)")
+    book.decide("IntegratorConfig.dof", choice, Reason(_why(integrator.dof, rule, explanation), code=f"dof-{choice}"))
+    return dataclasses.replace(integrator, dof=choice)
 
 
 class FixedPlanner:
@@ -410,7 +462,7 @@ class FixedPlanner:
         return Plan(**parts, reason="fixed plan of phase 1a (main.py)")
 
     def _resolve(self, book, traits, atoms, integrator, hardware, *, backend_choice=None, evaluation=False,
-                 texts=None, reproducible=False, rule_11=None, mc=None):
+                 texts=None, reproducible=False, rule_11=None, mc=None, optimizer=None):
         """The plan's parts (``Plan`` keywords except the reason), decisions and refusals in ``book``.
 
         Shared with the minimal planner (1b-T12): ``backend_choice`` is its backend rule;
@@ -419,7 +471,9 @@ class FixedPlanner:
         rewrites its text; ``reproducible`` (minimal planner, rule 5) takes the unfused convolution;
         ``rule_11`` (minimal planner, 3-T05) is ``(applies, neighbors.adaptive.Rule11)`` for the workload;
         ``mc`` (minimal planner, 3-T11) is ``(mc_moves, Workload.mc_energy_precision)``; its moves also
-        choose the fixcm projection (3-T22b).
+        choose the fixcm projection (3-T22b). ``optimizer`` (4-T05) plans a relaxation with that
+        ``OptimizerConfig``: rule 1 from the optimiser's record, checked steps only, the stress path for a
+        cell filter (rule 10); ``integrator`` then only carries the MD-side defaults.
         """
         from fastmace.longrange import polar as longrange
         from fastmace.model.capabilities import ModelTraits, model_traits
@@ -434,7 +488,7 @@ class FixedPlanner:
         requested = self._requested()
         explicit = {item.split(".", 1)[1] for item, value in requested if item.startswith("RewriteConfig.")
                     and value == "on"}
-        npt = evaluation or integrator.ensemble == "npt"
+        npt = evaluation or (optimizer.variable_cell if optimizer is not None else integrator.ensemble == "npt")
 
         # Workload (SPEC §4.4, rule 1) and the graph tier's exact padding (rule 4).
         if evaluation:
@@ -445,15 +499,31 @@ class FixedPlanner:
         if not all(pbc):
             refuse(f"periodic boundaries in all three directions (3D PBC) are required, got pbc={pbc} (SPEC §4.4)",
                    "non-3d-pbc", 1)
-        if atoms.constraints:
-            names = ", ".join(sorted({type(c).__name__ for c in atoms.constraints}))
-            refuse(f"constraints are refused in 1a ({names}; SPEC §4.4)", "constraints", 1)
+        if evaluation:
+            if atoms.constraints:
+                names = ", ".join(sorted({type(c).__name__ for c in atoms.constraints}))
+                refuse(f"constraints are refused in 1a ({names}; SPEC §4.4)", "constraints", 1)
+        else:
+            # Rule 1 from the scheme records (4-T01): the scheme, its ensemble and cell mode, its constraint rows.
+            from fastmace.integrators import registry as schemes
+
+            fixed_atoms, other = schemes.constraint_names(atoms)
+            if optimizer is not None:
+                reasons = schemes.optimizer_refusals(optimizer, fix_atoms=bool(fixed_atoms), other_constraints=other)
+            else:
+                reasons = schemes.integrator_refusals(integrator, fix_atoms=bool(fixed_atoms),
+                                                      other_constraints=other, mc=bool(mc and mc[0]))
+            for reason in reasons:
+                refuse(reason, reason.code, 1)
         if not traits.padding_is_exact and not evaluation:
             refuse("edge padding is not exact for this model (edges beyond the cutoff get nonzero weights: "
                    "apply_cutoff=True with biased or species-dependent radial networks), so the graph tier "
                    "is refused (SPEC §9.3 rule 4)", "inexact-padding", 4)
-        book.decide("workload", "ok", f"{len(atoms)} atoms, 3D PBC, no constraints" if all(pbc) and not
-                    atoms.constraints else "refused")
+        text = _workload_text(atoms, pbc)
+        constraint_refused = any(getattr(r, "code", None) in ("constraints", "fix-atoms-with-fixcm",
+                                                               "mc-with-constraints") for r in book.refusals)
+        book.decide("workload", "refused" if text == "refused" or constraint_refused else "ok",
+                    "refused" if constraint_refused else text)
         book.decide("hardware", hardware.name, f"compute capability {hardware.compute_capability[0]}."
                     f"{hardware.compute_capability[1]}, {hardware.memory_bytes / 2**30:.1f} GiB (recorded only)")
 
@@ -507,6 +577,31 @@ class FixedPlanner:
             book.decide("integrator", "none", "one-off evaluation")
             book.decide("compute_stress", "on", "one-off evaluation: stress for any cell (fm.calc, cell filters)")
             engine = dataclasses.replace(engine, speculative_graph=False)
+        elif optimizer is not None:
+            # A relaxation (4-T05, conductor's choice 5): its converged flag decides each step before the force
+            # call, so every step is a checked one, read with the neighbour flags in one host transfer.
+            for name, value in (("speculative_graph", engine.speculative_graph), ("pipelined", engine.pipelined)):
+                if value in (True, "on"):
+                    book.refuse(f"EngineConfig.{name} is not available for a relaxation: an optimiser runs checked "
+                                "steps, its converged flag read before each force call (SPEC §10.3)",
+                                f"{name.replace('_', '-')}-optimizer")
+                book.decide(f"EngineConfig.{name}", "off", Reason(
+                    "relaxation: checked steps, the converged flag read with the neighbour flags",
+                    code="optimizer-checked"))
+            pipelined, engine = False, dataclasses.replace(engine, speculative_graph=False)
+            async_output = engine.async_output != "off"
+            book.decide("EngineConfig.async_output", _toggle(async_output), _why(
+                engine.async_output, AUTO_RULES["EngineConfig.async_output"], "graph engine; the run loop's choice"))
+            book.decide("capture", "on" if self._device_type() == "cuda" else "off",
+                        "CUDA graphs" if self._device_type() == "cuda" else "CPU device: eager stages")
+            parameters = ", ".join(f"{name}={value}" for name, value in optimizer.parameters)
+            book.decide("integrator", "none", "relaxation: the optimiser steps the state")
+            book.decide("optimizer", optimizer.scheme, Reason(
+                f"{parameters}; " + (f"cell filter {optimizer.cell_filter}" if optimizer.cell_filter else "fixed cell"),
+                code=f"optimizer-{optimizer.scheme}"))
+            book.decide("compute_stress", _toggle(npt), Reason(
+                "a cell filter needs the stress path and the deformation-aware neighbour test" if npt else
+                "fixed cell: no stress", rule=10, code="rule-10-optimizer"))
         else:
             if npt and engine.speculative_graph:
                 book.refuse("EngineConfig.speculative_graph is not available with NPT (variable cell)",
@@ -535,9 +630,10 @@ class FixedPlanner:
             book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
                         "fixed cell: the graph engine computes no stress")
             integrator = _fixcm_projection(book, integrator, npt=npt, mc_moves=bool(mc and mc[0]))
+            integrator = _dof(book, integrator)
 
         phase_3 = self._phase_3_fields(book, dtype, rule_11, polar=bool(traits.polar), npt=npt,
-                                       evaluation=evaluation, mc=mc)
+                                       evaluation=evaluation, mc=mc, optimizer=optimizer)
         return dict(
             tier="compiled" if evaluation else TIER,
             rewrites=dataclasses.replace(rewrites, **rewrite_values),
@@ -550,12 +646,14 @@ class FixedPlanner:
                                            **phase_3["neighbours"]),
             polar=polar,
             integrator=None if evaluation else integrator,
+            optimizer=optimizer,
             decisions=tuple(book.decisions),
             requested=requested,
             auto_options_off=tuple(values["_auto_off"].items()),
         )
 
-    def _phase_3_fields(self, book, dtype, rule_11=None, *, polar=False, npt=False, evaluation=False, mc=None):
+    def _phase_3_fields(self, book, dtype, rule_11=None, *, polar=False, npt=False, evaluation=False, mc=None,
+                        optimizer=None):
         """The phase 3 "auto" fields (plan task 3-T01): rule 11's skin and headroom (3-T05), the re-capture
         budget (3-T04) and the MC energy precision (3-T11, which changes it only for MC plans).
 
@@ -575,13 +673,25 @@ class FixedPlanner:
         Workload.mc_energy_precision)``. Without MC moves it is the force precision, which nothing reads.
         For an MC plan, "auto" is the force precision pending the move-energy gate, which keeps it if the
         gate passes and revises the plan to float64 otherwise (``fallback.mc_energy_revision``); an
-        explicit precision is gated as it is, and float32 below a float64 force precision is refused."""
+        explicit precision is gated as it is, and float32 below a float64 force precision is refused.
+
+        A relaxation (``optimizer``, 4-T05) sizes the "auto" skin from the optimiser's largest step instead
+        (``neighbors.adaptive.optimizer_skin``): its atoms move up to ``maxstep_A`` per step, not thermally."""
         n, e, p = self.neighbours, self.engine, self.precision
         applies, sized = rule_11 if rule_11 is not None else (False, None)
         neighbours = {}
         if n.skin != "auto":
             skin, why = n.skin, _why(n.skin, AUTO_RULES["NeighbourConfig.skin"], "kept as given (rule 11 is a "
                                      "preference)")
+        elif optimizer is not None:
+            from fastmace.neighbors.adaptive import OPTIMIZER_SKIN_STEPS, optimizer_skin
+
+            maxstep = float(optimizer.parameter("maxstep_A", 0.2))
+            skin = optimizer_skin(maxstep)
+            why = Reason(_why("auto", AUTO_RULES["NeighbourConfig.skin"],
+                              f"relaxation: {OPTIMIZER_SKIN_STEPS:g} x maxstep {maxstep:g} A, at least "
+                              f"{DEFAULT_SKIN_A:g} A (at least 1.5 full steps between rebuilds)"),
+                         rule=11, code="rule-11-optimizer")
         elif applies:
             skin, why = sized.skin_A, Reason(_why("auto", AUTO_RULES["NeighbourConfig.skin"], sized.text()),
                                              rule=11, code="rule-11")
@@ -831,8 +941,6 @@ class FixedPlanner:
         the compiled tier (3-T06) passes False and gets a ``CompiledEngine`` on exact edge counts.
         """
         from fastmace.engine.graph import GraphEngine
-        from fastmace.integrators.baoab import LangevinBAOAB
-        from fastmace.integrators.langevin import Langevin
         from fastmace.model.forces import MACEForceField
         from fastmace.state import SimulationState
 
@@ -853,8 +961,7 @@ class FixedPlanner:
         if not all(atoms.pbc):
             book.refuse("periodic boundaries in all three directions (3D PBC) are required (SPEC §4.4)",
                         "non-3d-pbc", 1)
-        if atoms.constraints:
-            book.refuse("constraints are refused in 1a (SPEC §4.4)", "constraints", 1)
+        refuse_unsupported(book, plan.integrator, atoms, plan.optimizer)
         book.raise_refusals()
         self.configure_process(plan.engine)
 
@@ -863,18 +970,14 @@ class FixedPlanner:
         registry = self.registry or reg.default_registry()
         source = model.model if hasattr(model, "calculator") else model.models[0]
         resolution = self.rewrite_resolution(plan, source, registry)
-        npt = plan.integrator.ensemble == "npt"
+        npt = plan.optimizer.variable_cell if plan.optimizer is not None else plan.integrator.ensemble == "npt"
         field = MACEForceField(model, atoms, rewrites=resolution, engine=plan.engine, neighbours=plan.neighbours,
                                polar=plan.polar or PolarConfig(), compute_stress=npt, compile_cache=compile_cache,
                                registry=registry, check=check, float64_energy=plan.precision.float64_energy,
                                species=plan.superset or None)
         field = _with_d3(field, plan, atoms)
         state = SimulationState.from_atoms(atoms, field.device, plan.integrator.seed, compute_stress=npt)
-        if npt:
-            integrator = LangevinBAOAB(state, plan.integrator, temperature_K=temperature_K,
-                                       **integrator_keywords(plan.integrator))
-        else:
-            integrator = Langevin(state, plan.integrator, temperature_K=temperature_K)
+        integrator = build_stepper(state, plan, temperature_K=temperature_K)
         if plan.tier == COMPILED_TIER:
             from fastmace.engine.compiled import CompiledEngine
 

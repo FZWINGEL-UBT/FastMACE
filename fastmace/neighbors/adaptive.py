@@ -46,6 +46,17 @@ BOLTZMANN_EV_PER_K = 8.617333262e-5
 TARGET_REBUILD_STEPS = 16
 # Phase 1a's pair-buffer headroom (``NeighbourConfig.capacity_headroom``), the headroom floor.
 DEFAULT_HEADROOM = 1.15
+# Rule 11 for optimisers (4-T05): the skin in optimiser steps of the largest length, maxstep. The rebuild test
+# fires once an atom has moved skin / 2, so 3 maxsteps keep at least 1.5 full steps between rebuilds in a
+# relaxation's first, largest steps. Measured on MH-1 NaCl and NbCl5 quench frames (docs/validation/4-T05.md):
+# 0.6 A halves the rebuilds of 0.3 A and the re-captures with them, and 1.0 A gains nothing more.
+OPTIMIZER_SKIN_STEPS = 3.0
+
+
+def optimizer_skin(maxstep_A: float, floor_skin_A: float = DEFAULT_SKIN_A) -> float:
+    """Rule 11's skin for an optimiser whose largest per-atom step is ``maxstep_A``: ``OPTIMIZER_SKIN_STEPS``
+    of them, at least the floor (Angstrom)."""
+    return max(float(floor_skin_A), OPTIMIZER_SKIN_STEPS * float(maxstep_A))
 
 
 def maxwell_tail(z: float) -> float:

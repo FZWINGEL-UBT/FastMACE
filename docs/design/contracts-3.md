@@ -396,10 +396,10 @@ Added by 3-T14 under the conductor's answers (`plans/phase-3.md`, "3-T14 swap-MC
 
 | Name | Signature | Meaning |
 | --- | --- | --- |
-| `protocols.quench.relax` | `relax(atoms, calc, fmax, max_steps=5000, logfile=None, optimizer="LBFGS") -> (Atoms, summary)` | ASE LBFGS or BFGS at fixed cell (`langevin/quench.py:relax`) |
+| `protocols.quench.relax` | `relax(atoms, calc, fmax, max_steps=5000, logfile=None, optimizer="ase-LBFGS", cell_filter=None) -> (Atoms, summary)` | ASE LBFGS or BFGS at fixed cell (`langevin/quench.py:relax`); 4-T09: names resolved (`"LBFGS"` is `"ase-LBFGS"`), `cell_filter` an `fm.optimize.FrechetCell` through ASE's `FrechetCellFilter` |
 | `protocols.quench.select_frames` | `select_frames(frames, min_K, bin_K, per_bin, peak_K)` | the research function, unchanged |
 | `protocols.quench.picks` | `picks(resolved, frame_every, settings)` | `select_frames` over a run's frames (step 0, every `frame_every`), then the final frame |
-| `protocols.quench.quench_run` | `quench_run(directory, calc, resolved, frame_every, timestep_fs, settings, *, log=print) -> summary` | `<run>/quench/`: `captured.traj`, `quenched.traj`, `quench.csv` (per frame; an interrupted quench continues), `quench.json` (last) |
+| `protocols.quench.quench_run` | `quench_run(directory, relaxer, resolved, frame_every, timestep_fs, settings, *, name="quench", log=print) -> summary` | `<run>/quench/` (or `name`, 4-T09): `settings.json` (first; a continuation needs the same), `captured.traj`, `quenched.traj`, `quench.csv` (per frame; an interrupted quench continues), `quench.json` (last). `relaxer`: `quench.relaxer(...)` (ASE or GPU, 4-T09) or an ASE calculator |
 | `protocols.runner.start` | `start(structure, options, *, relax=None, quench=None, steps=None, source=None, log=print) -> record` | relaxation, then `fm.md` for at most `steps` steps, a restart, and the quench once the schedule is done |
 | `protocols.runner.resume` | `resume(directory, *, steps=None, log=print) -> record` | `Simulation.resume`, at most `steps` more steps with the move set attached as `fm.md` attaches it, a restart, the quench at the end |
 | `protocols.runner.split_stages` | `split_stages(data) -> ({"relax", "quench"}, rest)` | the `[relax]` (`RELAX_KEYS = ("fmax", "optimizer", "max_steps")`) and `[quench]` (`profiles.QUENCH_KEYS`) tables of a protocol |

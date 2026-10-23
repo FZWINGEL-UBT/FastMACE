@@ -20,6 +20,11 @@ those of the PyTorch stage:
 The random numbers are those ``Langevin.prepare_step`` copied into ``xi`` and ``eta`` (the host-drawn
 batch, ASE's order), so the stream is unchanged. Fixed-cell ``Langevin`` on CUDA only; anything else keeps
 the PyTorch stage.
+
+``FixAtoms`` (plan task 4-T04): with a free mask (``state.free_mask``), the drift kernel's ``FIXED`` variant
+puts the fixed atoms back at their old positions after the drift, as ``Langevin.first_half``'s ``where``,
+before the velocity line; their squared displacement from the reference positions is then that of the old
+positions. Without a mask the kernel is the one before 4-T04.
 """
 
 from __future__ import annotations
@@ -63,12 +68,13 @@ def _kernels():
 
     @triton.jit
     def drift_kernel(x_ptr, v_ptr, f_ptr, m_ptr, rp_raw_ptr, rv_raw_ptr, sp_ptr, sq_ptr, total_ptr, coef_ptr, rp_ptr,
-                     rv_ptr, xold_ptr, mid_ptr, ref_ptr, max_ptr, natoms, FIX_COM: tl.constexpr,
-                     MASS_WEIGHTED: tl.constexpr, SAVE_MID: tl.constexpr, BLOCK: tl.constexpr):
+                     rv_ptr, xold_ptr, mid_ptr, ref_ptr, max_ptr, free_ptr, natoms, FIX_COM: tl.constexpr,
+                     MASS_WEIGHTED: tl.constexpr, SAVE_MID: tl.constexpr, FIXED: tl.constexpr, BLOCK: tl.constexpr):
         """Per atom: the centre-of-mass correction (ASE's, or with MASS_WEIGHTED the mass-weighted means
         sp / M and sq / M, a float64 division as PyTorch's tensor / tensor, no factor; 3-T22b),
         v += c1 f/m - c2 v + rnd_vel, x_old = x,
-        x += dt v + rnd_pos, v = (x - x_old - rnd_pos) / dt, the saved velocity, and the squared
+        x += dt v + rnd_pos (with FIXED, x of a fixed atom, free mask 0, stays x_old; 4-T04),
+        v = (x - x_old - rnd_pos) / dt, the saved velocity, and the squared
         displacement from the reference positions into the maximum."""
         a = tl.program_id(0) * BLOCK + tl.arange(0, BLOCK)
         live = a < natoms
@@ -80,6 +86,8 @@ def _kernels():
         inv_dt = tl.load(coef_ptr + 5)  # PyTorch's CUDA tensor / Python scalar is tensor * (1 / scalar)
         inv_n = tl.load(coef_ptr + 6)
         m = tl.load(m_ptr + a, mask=live, other=1.0)
+        if FIXED:
+            free = tl.load(free_ptr + a, mask=live, other=1.0) != 0.0
         den = m * nf
         s0 = tl.zeros([BLOCK], dtype=tl.float64)  # squared displacement components (static branches below)
         s1 = tl.zeros([BLOCK], dtype=tl.float64)
@@ -102,6 +110,8 @@ def _kernels():
             f = tl.load(f_ptr + k, mask=live)
             v = v + (((c1 * f) / m - c2 * v) + rv)
             xn = x + (dt * v + rp)
+            if FIXED:
+                xn = tl.where(free, xn, x)
             v = ((xn - x) - rp) * inv_dt
             tl.store(xold_ptr + k, x, mask=live)
             tl.store(x_ptr + k, xn, mask=live)
@@ -256,11 +266,13 @@ class FusedIntegrator:
             sp, sq = rp_raw.sum(dim=0), q.sum(dim=0)
         else:
             sp = sq = rp_raw
+        free = state.free_mask
         drift_kernel[(triton.cdiv(natoms, BLOCK),)](
             state.positions, state.velocities, state.forces, state.masses, rp_raw, rv_raw, sp, sq, self.total_mass,
             self.coefficients, integrator.rnd_pos, integrator.rnd_vel, integrator.x_old, engine._mids[0],
-            neighbours.reference_positions, self.largest, natoms, FIX_COM=bool(integrator.fix_com),
-            MASS_WEIGHTED=weighted, SAVE_MID=pipelined, BLOCK=BLOCK, enable_fp_fusion=False)
+            neighbours.reference_positions, self.largest, state.masses if free is None else free, natoms,
+            FIX_COM=bool(integrator.fix_com), MASS_WEIGHTED=weighted, SAVE_MID=pipelined, FIXED=free is not None,
+            BLOCK=BLOCK, enable_fp_fusion=False)
         capacity = neighbours.capacity
         inside = torch.empty(capacity, dtype=torch.int64, device=state.positions.device)
         inside_kernel[(triton.cdiv(capacity, BLOCK),)](

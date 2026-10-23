@@ -54,8 +54,8 @@ supercell. The summary report shows the plan, the gate status and the speed.
 | `--sha256`, `--trusted` | `sha256`, `trusted`, for model files outside the label table | |
 | `--structure` | the structure, any format ASE reads | required |
 | `--repeat NA NB NC` | `repeat` | `1 1 1`: the cell is never expanded silently |
-| `--ensemble` | `ensemble`: `NVT` (Langevin) or `NPT` (LangevinBAOAB) | `NVT` |
-| `--temperature` | `temperature_K` (K) | required |
+| `--ensemble` | `ensemble`: `NVT` (Langevin), `NPT` (LangevinBAOAB) or `NVE` (velocity Verlet) | `NVT` |
+| `--temperature` | `temperature_K` (K) | required, except for NVE, which refuses it |
 | `--pressure`, `--cell-mode` | `pressure_GPa` (GPa), `cell_mode` (`hydrostatic`, `full`), NPT only | `0`, `hydrostatic` |
 | `--timestep` | `timestep_fs` (fs) | `0.5` |
 | `--steps` | `steps` | required |
@@ -67,8 +67,9 @@ supercell. The summary report shows the plan, the gate status and the speed.
 The Langevin friction is `fm.md`'s default, 0.02 per ASE time unit (about
 0.002/fs), as in `main.py`.
 
-Some requests are refused before anything runs, with the reason: NVE
-(phase 4) and D3 (phase 3b). For D3, the refusal shows the expanded record.
+NVE has no target temperature. It starts from the momenta in the structure
+file, and `fm.md` draws no velocities: a file without momenta starts at rest.
+The skin is sized for twice the starting kinetic temperature, at least 1 K.
 MC moves run through `fastmace run` (below), and they are experimental until
 their qualification study is recorded. An error prints its message without a traceback and exits
 1. `--debug` also prints the traceback. A wrong combination of arguments
@@ -119,8 +120,8 @@ kind = "hold"
 temperature_K = 1000.0
 ps = 10.0
 
-[integrator]                   # fm.integrators.Langevin or LangevinBAOAB
-type = "LangevinBAOAB"
+[integrator]                   # an fm.integrators record: Langevin, LangevinBAOAB, NVE, CSVR,
+type = "LangevinBAOAB"         # NoseHooverChain, MTK or Berendsen
 temperature_K = 300.0
 cell_mode = "full"
 
@@ -149,6 +150,29 @@ sim = run.simulation               # the Simulation, to run on or restart
 
 `fm.md`, `fastmace md` and `fastmace run` build the same `Simulation`. For
 the same inputs they give the same plan, gate and trajectory.
+
+## 6. Relaxations and quenches: `fastmace relax` and `fastmace quench`
+
+```bash
+fastmace relax NaCl.cif --model mh1 --head matpes_r2scan --optimizer gpu-LBFGS --fmax 0.01
+fastmace relax NaCl.cif --model mh1 --head matpes_r2scan --optimizer gpu-FIRE --cell-filter frechet --pressure 0
+fastmace quench run/ --into gpu --optimizer gpu-LBFGS
+```
+
+The optimizers are `gpu-LBFGS` and `gpu-FIRE` on the graph engine, and
+`ase-LBFGS` and `ase-BFGS`, ASE's on `fm.calc`. Bare `LBFGS` and `BFGS` mean
+ASE's, so existing protocol files keep their meaning. The default is
+`gpu-LBFGS`, which reproduces the annealing-benchmark minima of ASE's LBFGS
+(plan task 4-T08). The same names go into a protocol's `[relax]` and `[quench]`
+tables, and the records hold the name that ran.
+
+`fastmace relax` writes the relaxed structure (`--output`, default
+`<stem>.relaxed.extxyz`) with its `.json` summary and `.log`. `fastmace quench
+RUN_DIR` quenches the frames of any finished run with a schedule, trajectory
+frames and a restart, as a protocol's quench picks them. Each frame keeps its
+own cell. `--into NAME` writes `RUN_DIR/quench-NAME/`, so one run can be
+quenched with several optimizers side by side. A GPU quench relaxes all its
+frames on one engine.
 
 ## For CI: the install check
 
