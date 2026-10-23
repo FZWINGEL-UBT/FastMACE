@@ -30,7 +30,7 @@ planner decision, tier, rewrite, size or step changes with this task.
 | 9 | preference | — | `host-callbacks-graph-sync`, `host-callbacks-compiled`, `no-host-callbacks` |
 | 10 | preference | — | `rule-10-optimizer` |
 | 11 | preference | — | `rule-11`, `rule-11-fixed`, `rule-11-md-only`, `rule-11-optimizer`, `rule-11-d3` (an explicit value is an `override`, 5-T02) |
-| 12 | preference | — | `rule-12-d3`, `rule-12-d3-memory`, `rule-12-d3-warn`, `rule-12-memory` (reserved for 5-T03's estimate) |
+| 12 | preference | — | `rule-12-d3`, `rule-12-d3-memory`, `rule-12-d3-warn`, `rule-12-memory`, `rule-12-memory-drop`, `rule-12-memory-warn` (5-T03: the estimate and decision 51's action) |
 | 13 | reaction | — | `selfcheck-failed`, `selfcheck-dependant` |
 | 14 | reaction | — | `fallback-exhausted`, `fallback-rewrite-off`, `fallback-rewrite-on`, `runner-subprocess-fallback` |
 | 15 | reaction | — | `model-structure-warning` (reserved for 5-T04) |
