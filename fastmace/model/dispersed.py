@@ -118,6 +118,11 @@ class DispersedForceField:
         self.mace.set_cell(cell)
         self.d3.set_cell(cell)
 
+    def reset_cell(self, cell):
+        """A new cell between replays for MACE and the D3 list (``MACEForceField.reset_cell``, 4-T05)."""
+        self.mace.reset_cell(cell)
+        self.d3.reset_cell(cell)
+
     def needs_rebuild(self, positions, fraction=1.0):
         return self.mace.needs_rebuild(positions, fraction) | self.d3.needs_rebuild(positions, fraction=fraction)
 

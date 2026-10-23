@@ -22,6 +22,7 @@ if TYPE_CHECKING:
         EngineConfig,
         IntegratorConfig,
         NeighbourConfig,
+        OptimizerConfig,
         PolarConfig,
         PrecisionConfig,
         RewriteConfig,
@@ -139,7 +140,11 @@ class Plan:
       restart record: a resume runs them again;
     - ``dispersion``: the force field's complete ``fm.D3`` record, or ``None`` without D3 (3b-T04). The
       build puts the D3 term into the force field (``fastmace.model.dispersed``); its list's skin is
-      ``neighbours.d3_skin``.
+      ``neighbours.d3_skin``;
+    - ``optimizer``: the ``OptimizerConfig`` of a relaxation (4-T05), or ``None`` for MD. The build then puts
+      the optimiser in the integrator's place (``fastmace.optimize.driver.OptimizerStepper``); ``integrator``
+      still holds the MD-side defaults the shared rules read (seed, fixcm). Not in the restart record:
+      relaxations write no restart files (conductor's choice 5).
     """
 
     tier: str
@@ -165,6 +170,7 @@ class Plan:
     runner: Literal["in-process", "subprocess"] = "in-process"
     selfchecks: tuple[SelfCheck, ...] = ()
     dispersion: Any = None
+    optimizer: OptimizerConfig | None = None
 
     def __post_init__(self):
         if self.runner not in RUNNERS:

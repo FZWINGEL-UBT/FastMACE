@@ -1,0 +1,252 @@
+{
+  "schema": 3,
+  "task": "4-T05/4-T06",
+  "side": "gpu",
+  "optimizer": "fire",
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T06:03:33+00:00",
+  "fastmace_commit": null,
+  "machine": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/home/fzwin/.cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NaCl": {
+      "traj": "/mnt/g/Margraf/ResearchModule/Experiments/Langevin_Thermostat/results/anneal-NaCl-rtx5060ti-20261010/NaCl/quench-min500K-bin100K-n2-fmax0.01/captured.traj",
+      "runs": {
+        "graph-skin0.3": {
+          "setup_s": 31.333740643000056,
+          "tier": "graph",
+          "skin_A": 0.3,
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 50,
+              "seconds": 0.3255282520003675,
+              "initial_eV_atom": -6.82620714770423,
+              "energy_eV_atom": -6.887273649374644,
+              "fmax_eV_A": 0.009181279506645011,
+              "neighbour_rebuilds": 5,
+              "recaptures": 4,
+              "ms_per_step": 6.51056504000735,
+              "switch_flips": 3,
+              "dE_vs_ase_meV_atom": -2.2075794525733272e-05,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 8.51923719255099e-07
+            },
+            "10": {
+              "converged": true,
+              "steps": 60,
+              "seconds": 0.28994542700093007,
+              "initial_eV_atom": -6.759718418121338,
+              "energy_eV_atom": -6.887283244618663,
+              "fmax_eV_A": 0.00904500582329724,
+              "neighbour_rebuilds": 8,
+              "recaptures": 2,
+              "ms_per_step": 4.832423783348834,
+              "switch_flips": 3,
+              "dE_vs_ase_meV_atom": -2.7594743379211195e-05,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 9.73857738540993e-07
+            },
+            "20": {
+              "converged": true,
+              "steps": 49,
+              "seconds": 0.14639187200009474,
+              "initial_eV_atom": -6.854242008041452,
+              "energy_eV_atom": -6.8872783603491605,
+              "fmax_eV_A": 0.009848161598619485,
+              "neighbour_rebuilds": 3,
+              "recaptures": 0,
+              "ms_per_step": 2.9875892244917295,
+              "switch_flips": 3,
+              "dE_vs_ase_meV_atom": -3.090611233602658e-05,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 1.0806227257715486e-06
+            }
+          },
+          "engine": {
+            "edge_sizes_used": [
+              7168,
+              7680,
+              8192
+            ],
+            "neighbour_rebuilds": 16,
+            "graphs": [
+              "('B', 8192)",
+              "('B', 7680)",
+              "C",
+              "('B', 7168)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 6,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 7680)",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 5,
+                "key": "C",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 7,
+                "key": "('B', 7168)",
+                "reason": "new variant of B",
+                "counted": true
+              },
+              {
+                "step": 44,
+                "key": "C",
+                "reason": "the neighbour capacity grew",
+                "counted": true
+              },
+              {
+                "step": 44,
+                "key": "('B', 7168)",
+                "reason": "the neighbour capacity grew",
+                "counted": true
+              },
+              {
+                "step": 45,
+                "key": "AC",
+                "reason": "the neighbour capacity grew",
+                "counted": true
+              },
+              {
+                "step": 50,
+                "key": "('B', 8192)",
+                "reason": "new variant of B",
+                "counted": true
+              },
+              {
+                "step": 58,
+                "key": "('B', 7680)",
+                "reason": "the neighbour capacity grew",
+                "counted": true
+              }
+            ]
+          }
+        }
+      }
+    },
+    "NbCl5": {
+      "traj": "/mnt/g/Margraf/ResearchModule/Experiments/Langevin_Thermostat/results/anneal-production-rtx5060ti-20261010/NbCl5/quench-min500K-bin100K-n2-fmax0.01/captured.traj",
+      "runs": {
+        "graph-skin0.3": {
+          "setup_s": 29.786203943000146,
+          "tier": "graph",
+          "skin_A": 0.3,
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 181,
+              "seconds": 3.868286962999264,
+              "initial_eV_atom": -10.56108589415197,
+              "energy_eV_atom": -10.623284354744625,
+              "fmax_eV_A": 0.009925890863928912,
+              "neighbour_rebuilds": 11,
+              "recaptures": 1,
+              "ms_per_step": 21.371751176791513,
+              "switch_flips": 8,
+              "dE_vs_ase_meV_atom": -1.8764424680739467e-05,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 9.062742010780007e-06
+            },
+            "10": {
+              "converged": true,
+              "steps": 288,
+              "seconds": 6.04909625000073,
+              "initial_eV_atom": -10.49879901889911,
+              "energy_eV_atom": -10.623311040087492,
+              "fmax_eV_A": 0.005647026286258989,
+              "neighbour_rebuilds": 27,
+              "recaptures": 0,
+              "ms_per_step": 21.003806423613646,
+              "switch_flips": 6,
+              "dE_vs_ase_meV_atom": 0.0,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 5.416332155172134e-05
+            },
+            "20": {
+              "converged": true,
+              "steps": 133,
+              "seconds": 2.7589736839981924,
+              "initial_eV_atom": -10.590692715267094,
+              "energy_eV_atom": -10.623328187215476,
+              "fmax_eV_A": 0.008790338819199937,
+              "neighbour_rebuilds": 8,
+              "recaptures": 0,
+              "ms_per_step": 20.744163037580392,
+              "switch_flips": 6,
+              "dE_vs_ase_meV_atom": -6.868026147799355e-06,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 4.898612887888016e-06
+            }
+          },
+          "engine": {
+            "edge_sizes_used": [
+              53504,
+              56320
+            ],
+            "neighbour_rebuilds": 46,
+            "graphs": [
+              "('B', 56320)",
+              "C",
+              "('B', 53504)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 1,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 56320)",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 12,
+                "key": "C",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 89,
+                "key": "('B', 53504)",
+                "reason": "new variant of B",
+                "counted": true
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T06:04:50+00:00"
+}

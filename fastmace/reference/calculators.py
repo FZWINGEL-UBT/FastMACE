@@ -267,15 +267,21 @@ class ReferenceCalculator:
         """The issue 1642 self-test: analytic stress against central finite differences of this energy.
 
         Returns the result; raises ``ReferencePolicyError`` when they differ by more than ``tolerance``
-        (eV/A^3). 1a-T19 runs it on NaCl 3x3x3 (record entry ``validation``).
+        (eV/A^3). The finite differences hold the k-vectors included for ``atoms``' cell (``polar.frozen_kset``):
+        a k-vector crossing the hard k-space cutoff under the strain steps the energy, and central differences
+        across the step go as 1/h (3b-T08: 4.4e-4 eV/A^3 on NbCl5 3x3x3, 8.3e-9 frozen). So the test runs on
+        any structure (record entry ``validation``).
         """
+        from fastmace.longrange import polar
+
         if not self.is_polar:
             raise ValueError("the stress fix applies to PolarMACE references only")
         analytic = self.evaluate(atoms)[2]
-        fd = finite_difference_stress(self, atoms, h=h)
+        with polar.frozen_kset(self.model, atoms.cell.array) as included:
+            fd = finite_difference_stress(self, atoms, h=h)
         delta = float(np.abs(analytic - fd).max())
-        result = {"max_abs": delta, "tolerance": float(tolerance), "strain": float(h),
-                  "fd_stress": fd.tolist(), "passed": bool(delta <= tolerance)}
+        result = {"max_abs": delta, "tolerance": float(tolerance), "strain": float(h), "kset": "frozen",
+                  "k_vectors_included": included, "fd_stress": fd.tolist(), "passed": bool(delta <= tolerance)}
         if delta > tolerance:
             raise records.ReferencePolicyError(
                 f"the reference stress differs from finite differences of its energy by {delta:.2e} eV/A^3 "

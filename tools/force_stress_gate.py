@@ -34,8 +34,8 @@ the configurations to files and starts one fresh child process per job, one afte
 A research-engine process that had built the hybrid engine moved the float64 POLAR-1-S reference by
 up to 7.8e-7 eV/A (1a-T10), so no reference shares a process with a production engine. The first
 float64 reference of a PolarMACE run checks its stress against finite differences of its energy on
-NaCl 3x3x3 (ReferenceCalculator.check_stress_fix), so a reference without the k-space correction of
-MACE issue 1642 cannot pass unnoticed (1a-T19).
+its structure's first hydrostatic configuration (ReferenceCalculator.check_stress_fix, k-set frozen),
+so a reference without the k-space correction of MACE issue 1642 cannot pass unnoticed (1a-T19).
 
 Structures: benchmark names resolve to r2SCAN CIFs under --structures-root (a directory holding
 Structures/Benchmark/R2SCAN, such as the baseline export, which is the default root when --baseline
@@ -91,11 +91,11 @@ REFERENCE_SCOPES = ("calculator", "configuration")
 FD_STRAIN = 1e-4
 FD_TOLERANCE = 1e-6  # eV/A^3
 VOIGT = ((0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1))
-# The self-test always runs on NaCl 3x3x3, the gate's first hydrostatic configuration, whatever the run's
-# structures: POLAR-1-S on NbCl5 3x3x3 differs from finite differences by 4.4e-4 eV/A^3 even on the
-# corrected path (a model property, recorded in docs/validation/phase-1a.md), so the test would stop
-# a run for a reason other than the one it guards against.
-FD_STRUCTURE, FD_REPEAT, FD_KEY = "NaCl", (3, 3, 3), "hydrostatic-0"
+# The self-test runs on the first float64 reference's own structure, its first hydrostatic configuration.
+# Until 4-T11 it ran on NaCl 3x3x3 whatever the run's structures (decision 26): POLAR-1-S on NbCl5 3x3x3
+# differed from finite differences by 4.4e-4 eV/A^3, a k-vector crossing the hard k-space cutoff under
+# the strain (3b-T08). check_stress_fix now holds the unstrained cell's k-set, 8.3e-9 there.
+FD_KEY = "hydrostatic-0"
 # The research engine's benchmark crystals (workflow.NAMES); a name resolves to its r2SCAN CIF in the export.
 BENCHMARK_NAMES = ("NaCl", "NaNbCl6", "NaTaCl6", "NaNbO3", "NaTaO3",
                    "NbCl3O", "TaCl3O", "NbCl2O", "NbCl5", "TaCl5")
@@ -559,14 +559,9 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
                       engine_config=args.engine_config)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
         # One finite-difference self-test, by the first float64 reference (it acts for polar models only), on
-        # the gate's first NaCl 3x3x3 configuration (the same draw as a NaCl run's own hydrostatic-0).
-        fd_name, fd_source, fd_repeat = structure_spec(FD_STRUCTURE, FD_REPEAT, structures_root)
-        fd_base = read(fd_source).repeat(fd_repeat)
-        fd_base.set_pbc(True)
-        fd_file = output / "configs" / "fd-selftest.npz"
-        write_configurations(fd_file, fd_base, {"hydrostatic": make_configurations(
-            fd_base, "hydrostatic", 1, args.seed, args.strain, args.rattle_A)})
-        next(job for job in jobs if job["dtype"] == "float64")["fd_check"] = str(fd_file)
+        # its structure's first hydrostatic configuration.
+        fd_job = next(job for job in jobs if job["dtype"] == "float64")
+        fd_job["fd_check"] = str(files[fd_job["structure"]])
         jobs.append(dict(kind="production", name=f"production-{args.engine}", engine=args.engine,
                          planner=args.planner,
                          structures={s: dict(configurations=str(files[s]), keys=keys[s]) for s in keys}))
@@ -603,8 +598,8 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
         for process in meta["processes"]:
             check = (process.get("result") or {}).get("fd_stress_check")
             if check:
-                where = f"{FD_STRUCTURE}/{check['key']}"
-                if where in production and tuple(meta["structures"][FD_STRUCTURE]["repeat"]) == FD_REPEAT:
+                where = f"{check['structure']}/{check['key']}"
+                if where in production:
                     check["production_max_abs"] = float(np.abs(production[where][2]
                                                                - np.array(check["fd_stress"])).max())
                 meta.setdefault("fd_stress_checks", {})[where] = check
@@ -733,16 +728,15 @@ def reference_child(job, result):
         values[f"{job['structure']}/{key}"] = _evaluate_reference(reference, configs[key])
         print(job["name"], key, flush=True)
     if reference.is_polar and job.get("fd_check"):
-        # The self-test: a reference without the k-space stress correction must not pass unnoticed. It runs
-        # on NaCl 3x3x3 (FD_STRUCTURE), then the long-range state goes back to this job's structure.
-        fd_base, fd_configs = read_configurations(job["fd_check"])
+        # The self-test: a reference without the k-space stress correction must not pass unnoticed. The
+        # long-range state is sized for its configuration's cell, then goes back to the base cell.
+        _, fd_configs = read_configurations(job["fd_check"])
         reference.rebase(fd_configs[FD_KEY])
         try:
             check = reference.check_stress_fix(fd_configs[FD_KEY], tolerance=FD_TOLERANCE, h=FD_STRAIN)
         finally:
             reference.rebase(base)
-        result["fd_stress_check"] = dict(structure=f"{FD_STRUCTURE} {'x'.join(map(str, FD_REPEAT))}", key=FD_KEY,
-                                         **check)
+        result["fd_stress_check"] = dict(structure=job["structure"], key=FD_KEY, **check)
         print(job["name"], "finite-difference stress check", FD_KEY, f"{check['max_abs']:.2e}", flush=True)
     result.update(dtype=job["dtype"], role=reference.role, record_id=reference.record.id)
     _torch_record(torch, result)

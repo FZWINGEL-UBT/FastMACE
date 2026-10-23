@@ -1,0 +1,94 @@
+{
+  "schema": 3,
+  "task": "4-T05/4-T06",
+  "side": "ase",
+  "optimizer": "lbfgs",
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T05:50:19+00:00",
+  "fastmace_commit": null,
+  "machine": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/home/fzwin/.cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NaCl": {
+      "traj": "/home/fzwin/fastmace-4t05/frames/NaCl_captured.traj",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 51,
+          "seconds": 23.078943960998004,
+          "initial_eV_atom": -6.826207154326969,
+          "energy_eV_atom": -6.887279775407579,
+          "fmax_eV_A": 0.009328561616805934,
+          "ms_per_step": 452.52831296074515,
+          "switch_flips": null
+        },
+        "10": {
+          "converged": true,
+          "steps": 56,
+          "seconds": 0.9865343950004899,
+          "initial_eV_atom": -6.759718420328917,
+          "energy_eV_atom": -6.887280490663317,
+          "fmax_eV_A": 0.009311349593428612,
+          "ms_per_step": 17.61668562500875,
+          "switch_flips": null
+        },
+        "20": {
+          "converged": true,
+          "steps": 44,
+          "seconds": 0.7808941139992385,
+          "initial_eV_atom": -6.854242002522504,
+          "energy_eV_atom": -6.887274129523171,
+          "fmax_eV_A": 0.009458576828144997,
+          "ms_per_step": 17.747593499982692,
+          "switch_flips": null
+        }
+      }
+    },
+    "NbCl5": {
+      "traj": "/home/fzwin/fastmace-4t05/frames/NbCl5_captured.traj",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 169,
+          "seconds": 42.20492171799924,
+          "initial_eV_atom": -10.561085895133116,
+          "energy_eV_atom": -10.623391160013254,
+          "fmax_eV_A": 0.009351120753435688,
+          "ms_per_step": 249.7332646035458,
+          "switch_flips": null
+        },
+        "10": {
+          "converged": true,
+          "steps": 314,
+          "seconds": 9.165231593000499,
+          "initial_eV_atom": -10.49879901705946,
+          "energy_eV_atom": -10.623420712388592,
+          "fmax_eV_A": 0.009749725994211388,
+          "ms_per_step": 29.188635646498405,
+          "switch_flips": null
+        },
+        "20": {
+          "converged": true,
+          "steps": 168,
+          "seconds": 4.866130897000403,
+          "initial_eV_atom": -10.590692716984101,
+          "energy_eV_atom": -10.623407612980149,
+          "fmax_eV_A": 0.009759190078600212,
+          "ms_per_step": 28.965064863097638,
+          "switch_flips": null
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T05:51:42+00:00"
+}

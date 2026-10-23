@@ -1,0 +1,17 @@
+{
+ "task": "4-T11",
+ "machine": "local PC (WSL2)",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "environment": "mace_cueq_latest",
+ "backend": "reference: MACE calculator, plain cuEq, eager",
+ "precision": "float64",
+ "model": "polar1-s (MACE-POLAR-1-S.model)",
+ "fastmace_commit": "d0bc71c470875c8e8011dac1435c3d4a9229e6d9",
+ "baseline_commit": null,
+ "test": "tests/gpu/test_reference_gpu.py::test_polar1s_stress_check_passes_on_the_gate_configuration",
+ "strain": 1e-4,
+ "results": [
+  {"structure": "NbCl5 3x3x3", "config": "gate hydrostatic-0", "natoms": 1944, "max_abs_eV_per_A3": 8.324228887787721e-09, "kset": "frozen", "k_vectors_included": 2894},
+  {"structure": "NaCl 3x3x3", "config": "gate hydrostatic-0", "natoms": 216, "max_abs_eV_per_A3": 6.928687571600145e-09, "kset": "frozen", "k_vectors_included": 231}
+ ]
+}
