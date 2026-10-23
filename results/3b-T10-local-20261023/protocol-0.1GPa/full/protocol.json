@@ -1,0 +1,112 @@
+{
+  "protocol_record_version": 1,
+  "source": "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/protocol-0.1GPa/full.protocol.yaml",
+  "structure": "/home/fzwin/fastmace-3b-T10/src-f99add0/fastmace/protocols/data/NbCl5_R2SCAN.cif",
+  "repeat": [
+    3,
+    3,
+    3
+  ],
+  "atoms": 1944,
+  "timestep_fs": 1.0,
+  "relax": {
+    "fmax": 0.01,
+    "optimizer": "LBFGS",
+    "max_steps": 5000
+  },
+  "relaxation": {
+    "optimizer": "LBFGS",
+    "fixed_cell": true,
+    "fmax_target_eV_A": 0.01,
+    "max_steps": 5000,
+    "converged": true,
+    "steps": 17,
+    "seconds": 44.458589310001116,
+    "initial_eV_atom": -10.715681854086915,
+    "energy_eV_atom": -10.715861037030383,
+    "fmax_eV_A": 0.008668506843871035
+  },
+  "quench": {
+    "min_K": 500.0,
+    "bin_K": 100.0,
+    "per_bin": 2,
+    "fmax": 0.01,
+    "optimizer": "LBFGS",
+    "max_steps": 5000
+  },
+  "quench_result": {
+    "settings": {
+      "min_K": 500.0,
+      "bin_K": 100.0,
+      "per_bin": 2,
+      "fmax": 0.01,
+      "optimizer": "LBFGS",
+      "max_steps": 5000,
+      "fixed_cell": true,
+      "cell": "frame",
+      "selection": "thermostat target temperature; each ramp separately; evenly spaced within each bin; plus the final frame"
+    },
+    "frames": 21,
+    "frame_every": 100,
+    "trajectory_frames": 2701,
+    "quench_wall_s": 3173.6340688089986,
+    "quench_seconds_sum": 3173.5844501409956,
+    "not_converged": 10,
+    "heating": {
+      "n": 10,
+      "mean_eV_atom": -10.697174895287878,
+      "sd_eV_atom": 0.017324933828222457
+    },
+    "cooling": {
+      "n": 10,
+      "mean_eV_atom": -10.666847598890705,
+      "sd_eV_atom": 0.0031020056034851955
+    },
+    "final_quenched_eV_atom": -10.687102172844865
+  },
+  "mc": null,
+  "min_mc_temperature_K": null,
+  "dispersion": "D3(functional=r2scan, damping=bj, pair_cutoff_bohr=40.0, cn_cutoff_bohr=40.0, three_body=False, smoothing=none, precision=float64, autoang=0.52917726, autoev=27.21138505, s6=1.0, s8=0.7898, a1=0.4948, a2=5.7308)",
+  "pieces": [
+    {
+      "first_step": 0,
+      "last_step": 90000,
+      "wall_s": 2195.7954199369997,
+      "counters": {
+        "neighbour_rebuilds": 13352,
+        "d3_builds": 1751,
+        "d3_rebuilds": 1750,
+        "d3_build_s": 19.079455147970293
+      }
+    },
+    {
+      "first_step": 90000,
+      "last_step": 180000,
+      "wall_s": 2203.091669415997,
+      "counters": {
+        "neighbour_rebuilds": 12392,
+        "d3_builds": 1588,
+        "d3_rebuilds": 1587,
+        "d3_build_s": 18.057082526203885
+      }
+    },
+    {
+      "first_step": 180000,
+      "last_step": 270000,
+      "wall_s": 2365.7948304710008,
+      "counters": {
+        "neighbour_rebuilds": 9568,
+        "d3_builds": 1141,
+        "d3_rebuilds": 1140,
+        "d3_build_s": 16.028773852078302
+      }
+    }
+  ],
+  "counters": {
+    "neighbour_rebuilds": 35312,
+    "d3_builds": 4480,
+    "d3_rebuilds": 4477,
+    "d3_build_s": 53.16531152625248
+  },
+  "status": "complete"
+}

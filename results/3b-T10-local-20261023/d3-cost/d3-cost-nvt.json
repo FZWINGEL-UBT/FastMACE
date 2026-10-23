@@ -1,0 +1,836 @@
+{
+  "tool": "d3_cost",
+  "command": "ab",
+  "created_utc": "2026-10-23T12:26:52.720605+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "f99add0",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "structure": "NbCl5",
+  "natoms": 1944,
+  "ensemble": "nvt",
+  "timestep_fs": 1.0,
+  "route": [
+    {
+      "label": "heat",
+      "start_K": 0.0,
+      "end_K": 1000.0,
+      "steps": 5000
+    },
+    {
+      "label": "peak",
+      "start_K": 1000.0,
+      "end_K": 976.0,
+      "steps": 8000
+    }
+  ],
+  "args": {
+    "command": "ab",
+    "output": "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/d3-cost-nvt",
+    "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+    "model": "mh1-r2scan",
+    "structure": "NbCl5",
+    "ensemble": "nvt",
+    "pressure_GPa": "0.0",
+    "timestep_fs": "1.0",
+    "route": "heat:0:1000:5000,peak:1000:976:8000",
+    "max_temperature_K": "None",
+    "d3_skin": "None",
+    "block": "1000",
+    "warmup": "50",
+    "skins": "1.0,1.5,2.0,2.5,3.0,4.0",
+    "timed_segments": "peak,cool600,cool300",
+    "build_repeats": "5",
+    "pass_repeats": "50",
+    "seed": "20261022"
+  },
+  "gpu_processes_at_start": [],
+  "pytest_at_start": [
+    113336
+  ],
+  "plans": {
+    "off": {
+      "dispersion": false,
+      "skin": 0.3,
+      "d3_skin": 1.0,
+      "max_temperature_K": 1000.0,
+      "ensemble": "nvt",
+      "d3_skin_decision": "unused (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)"
+    },
+    "on": {
+      "dispersion": true,
+      "skin": 0.3,
+      "d3_skin": 2.04,
+      "max_temperature_K": 1000.0,
+      "ensemble": "nvt",
+      "d3_skin_decision": "2.04 A (auto (rule_11_d3_skin_from_workload): D3 skin 2.04 A for 50 steps per rebuild at 1000 K and 1 fs: displacement 2.036 A (0.0204 A per step), cutoff 21.1671 A)"
+    }
+  },
+  "setup_s": {
+    "off": 29.52001132100122,
+    "on": 20.63885524500074
+  },
+  "blocks": [
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 0,
+      "steps": 1000,
+      "ms_per_step": 20.845192777000193,
+      "start_step": 50,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 31,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 0,
+      "steps": 1000,
+      "ms_per_step": 25.33054343299591,
+      "start_step": 50,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 31,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "d3_pairs": 0,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1770498,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 1,
+      "steps": 1000,
+      "ms_per_step": 25.738796993995493,
+      "start_step": 1050,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 77,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 6,
+        "d3_build_time_s": 0.21852143899013754,
+        "d3_term_build_s": 0.22276819300896022,
+        "d3_regrowths": 0,
+        "d3_pairs": 1931,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1772429,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 1,
+      "steps": 1000,
+      "ms_per_step": 21.159501094000007,
+      "start_step": 1050,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 74,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 2,
+      "steps": 1000,
+      "ms_per_step": 21.03098112600128,
+      "start_step": 2050,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 102,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 2,
+      "steps": 1000,
+      "ms_per_step": 25.72738897500676,
+      "start_step": 2050,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 107,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 12,
+        "d3_build_time_s": 0.4039638810136239,
+        "d3_term_build_s": 0.41167822901479667,
+        "d3_regrowths": 0,
+        "d3_pairs": -684,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1771745,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 3,
+      "steps": 1000,
+      "ms_per_step": 25.9583072969981,
+      "start_step": 3050,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 135,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 17,
+        "d3_build_time_s": 0.5601117730184342,
+        "d3_term_build_s": 0.5714251809913549,
+        "d3_regrowths": 0,
+        "d3_pairs": -419,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1771326,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 3,
+      "steps": 1000,
+      "ms_per_step": 21.06974755199917,
+      "start_step": 3050,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 127,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "off",
+      "pair": 4,
+      "steps": 950,
+      "ms_per_step": 20.981159215788416,
+      "start_step": 4050,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 134,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 0.0,
+        "step": 950
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "heat",
+      "side": "on",
+      "pair": 4,
+      "steps": 950,
+      "ms_per_step": 25.983882904210507,
+      "start_step": 4050,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 147,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 19,
+        "d3_build_time_s": 0.6262397079917719,
+        "d3_term_build_s": 0.638959696960228,
+        "d3_regrowths": 0,
+        "d3_pairs": -511,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 950
+      },
+      "d3_pairs": 1770815,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 5,
+      "steps": 1000,
+      "ms_per_step": 26.076526588003617,
+      "start_step": 5000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 169,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 22,
+        "d3_build_time_s": 0.732072671991773,
+        "d3_term_build_s": 0.7449638939942815,
+        "d3_regrowths": 0,
+        "d3_pairs": -668,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1770147,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 5,
+      "steps": 1000,
+      "ms_per_step": 21.219251413000165,
+      "start_step": 5000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 157,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 6,
+      "steps": 1000,
+      "ms_per_step": 21.249986085000273,
+      "start_step": 6000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 163,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 1,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 6,
+      "steps": 1000,
+      "ms_per_step": 26.49691706500016,
+      "start_step": 6000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 168,
+        "recaptures": 1,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 23,
+        "d3_build_time_s": 0.7783852709762868,
+        "d3_term_build_s": 0.7945308670241502,
+        "d3_regrowths": 0,
+        "d3_pairs": -344,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1769803,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 7,
+      "steps": 1000,
+      "ms_per_step": 26.23115971000516,
+      "start_step": 7000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 167,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 23,
+        "d3_build_time_s": 0.76916730600351,
+        "d3_term_build_s": 0.7834227379717049,
+        "d3_regrowths": 0,
+        "d3_pairs": 285,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1770088,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 7,
+      "steps": 1000,
+      "ms_per_step": 21.18231834100152,
+      "start_step": 7000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 163,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 8,
+      "steps": 1000,
+      "ms_per_step": 21.10627804199612,
+      "start_step": 8000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 159,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 8,
+      "steps": 1000,
+      "ms_per_step": 26.393180475999543,
+      "start_step": 8000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 168,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 22,
+        "d3_build_time_s": 0.7401478399842745,
+        "d3_term_build_s": 0.7543359550254536,
+        "d3_regrowths": 0,
+        "d3_pairs": 247,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1770335,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 9,
+      "steps": 1000,
+      "ms_per_step": 26.619954298002995,
+      "start_step": 9000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 162,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 1,
+        "d3_builds": 22,
+        "d3_build_time_s": 0.7437379610128119,
+        "d3_term_build_s": 0.7582513229863252,
+        "d3_regrowths": 0,
+        "d3_pairs": -290,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1770045,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 9,
+      "steps": 1000,
+      "ms_per_step": 21.1890454319946,
+      "start_step": 9000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 160,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 10,
+      "steps": 1000,
+      "ms_per_step": 21.559566257004917,
+      "start_step": 10000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 159,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 10,
+      "steps": 1000,
+      "ms_per_step": 26.26392046899855,
+      "start_step": 10000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 165,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 22,
+        "d3_build_time_s": 0.735154996989877,
+        "d3_term_build_s": 0.7492429779886152,
+        "d3_regrowths": 0,
+        "d3_pairs": 74,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1770119,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 11,
+      "steps": 1000,
+      "ms_per_step": 26.08422852199874,
+      "start_step": 11000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 162,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 23,
+        "d3_build_time_s": 0.7601721379978699,
+        "d3_term_build_s": 0.776815807003004,
+        "d3_regrowths": 0,
+        "d3_pairs": 176,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1770295,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 11,
+      "steps": 1000,
+      "ms_per_step": 21.03855751199444,
+      "start_step": 11000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 157,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "off",
+      "pair": 12,
+      "steps": 1000,
+      "ms_per_step": 21.129773209999257,
+      "start_step": 12000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 157,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": null,
+      "recompiled": false,
+      "pytest": [
+        113336
+      ]
+    },
+    {
+      "segment": "peak",
+      "side": "on",
+      "pair": 12,
+      "steps": 1000,
+      "ms_per_step": 26.2364152989976,
+      "start_step": 12000,
+      "volume_A3": 55909.94847866195,
+      "delta": {
+        "neighbour_rebuilds": 166,
+        "recaptures": 0,
+        "pool_resets": 0,
+        "graphs": 0,
+        "d3_builds": 22,
+        "d3_build_time_s": 0.7279347199873882,
+        "d3_term_build_s": 0.7434936159988865,
+        "d3_regrowths": 0,
+        "d3_pairs": -10,
+        "d3_capacity": 0,
+        "d3_fraction": 0.0,
+        "volume_A3": 0.0,
+        "step": 1000
+      },
+      "d3_pairs": 1770285,
+      "recompiled": false,
+      "pytest": [
+        113336,
+        128760,
+        128766
+      ]
+    }
+  ],
+  "segments": {
+    "heat": {
+      "off": {
+        "blocks": 5,
+        "steps": 4950,
+        "mean_ms": 21.017681576565586,
+        "median_ms": 21.03098112600128,
+        "neighbour_rebuilds": 468,
+        "recaptures": 2,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 55909.94847866195
+      },
+      "on": {
+        "blocks": 5,
+        "steps": 4950,
+        "mean_ms": 25.745399082423486,
+        "median_ms": 25.738796993995493,
+        "neighbour_rebuilds": 497,
+        "recaptures": 2,
+        "d3_builds": 54,
+        "d3_build_time_s": 1.8088368010139675,
+        "d3_term_build_s": 1.8448312999753398,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 55909.94847866195
+      },
+      "overhead_mean": 0.22494001008794595,
+      "overhead_pair_median": 0.22330902304881817,
+      "overhead_pairs": [
+        0.2151743427839481,
+        0.21641795237289374,
+        0.22330902304881817,
+        0.23201795526662994,
+        0.23843886016829408
+      ],
+      "d3_build_ms_per_step": 0.3726931919142101,
+      "d3_build_share_of_off_step": 0.017732364559645705
+    },
+    "peak": {
+      "off": {
+        "blocks": 8,
+        "steps": 8000,
+        "mean_ms": 21.20934703649891,
+        "median_ms": 21.18568188649806,
+        "neighbour_rebuilds": 1275,
+        "recaptures": 1,
+        "d3_builds": 0,
+        "d3_build_time_s": 0.0,
+        "d3_term_build_s": 0.0,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 55909.94847866195
+      },
+      "on": {
+        "blocks": 8,
+        "steps": 8000,
+        "mean_ms": 26.300287803375795,
+        "median_ms": 26.250167883998074,
+        "neighbour_rebuilds": 1327,
+        "recaptures": 1,
+        "d3_builds": 179,
+        "d3_build_time_s": 5.986772904943791,
+        "d3_term_build_s": 6.105057177992421,
+        "d3_regrowths": 0,
+        "recompiled_blocks": 0,
+        "volume_end_A3": 55909.94847866195
+      },
+      "overhead_mean": 0.24003288541207546,
+      "overhead_pair_median": 0.2407548162418096,
+      "overhead_pairs": [
+        0.2289088846945655,
+        0.2469145607442793,
+        0.23835168973128207,
+        0.25048956635006103,
+        0.2563073869202217,
+        0.21820263709921073,
+        0.23982970349215593,
+        0.2416799289914633
+      ],
+      "d3_build_ms_per_step": 0.7631321472490527,
+      "d3_build_share_of_off_step": 0.03598093547791866
+    }
+  },
+  "gpu_processes_at_end": [],
+  "valid": true,
+  "pytest_during_blocks": [
+    113336,
+    128760,
+    128766
+  ]
+}
