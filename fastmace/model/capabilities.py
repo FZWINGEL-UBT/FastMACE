@@ -114,6 +114,34 @@ class ModelDims:
     heads: int
     interactions: tuple[InteractionDims, ...]
 
+    def record(self) -> dict[str, Any]:
+        """A JSON-able record (lists for tuples); ``from_record`` reads it back."""
+        import dataclasses
+
+        return _json_ready(dataclasses.asdict(self))
+
+    @classmethod
+    def from_record(cls, record: Mapping[str, Any]) -> ModelDims:
+        """The ``ModelDims`` of a ``record()`` (a capture of a released checkpoint, say)."""
+        blocks = []
+        for block in record["interactions"]:
+            fields = dict(block)
+            fields["radial"] = tuple(int(width) for width in fields["radial"])
+            fields["other_radials"] = tuple((tuple(int(width) for width in widths), int(saved))
+                                            for widths, saved in fields.get("other_radials", ()))
+            blocks.append(InteractionDims(**fields))
+        return cls(parameters=int(record["parameters"]), elements=int(record["elements"]),
+                   heads=int(record["heads"]), interactions=tuple(blocks))
+
+
+def _json_ready(value):
+    """Tuples as lists, recursively (a dataclass record for JSON)."""
+    if isinstance(value, (list, tuple)):
+        return [_json_ready(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _json_ready(item) for key, item in value.items()}
+    return value
+
 
 @dataclass(frozen=True)
 class ModelTraits:
