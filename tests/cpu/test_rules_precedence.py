@@ -6,7 +6,8 @@ carries ``pytest.mark.precedence(a, b)``: rule ``a`` wins over ``b``, where ``b`
 ``"override"`` (a user's explicit value) or an ``allow_*`` flag. ``test_rules_meta.PAIRS`` lists the pairs.
 
 Pairs that need later tasks are added there: rule 5 against the MACE model's rule 12 (5-T03, owner decision
-D1) and against runtime adaptation (5-T07, D2 and D3); rule 15 (5-T04).
+D1) and against runtime adaptation (5-T07, D2 and D3). Rule 15 has no pair: it only warns and overrides
+nothing (5-T04; tests/cpu/test_rules_15.py).
 """
 
 import dataclasses

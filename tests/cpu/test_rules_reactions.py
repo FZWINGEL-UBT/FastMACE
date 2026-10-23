@@ -5,7 +5,7 @@
 - Rule 13 before rule 14: a candidate whose self-check fails is never gated (the self-checks run in the
   build, before the gate; §9.4 step 4).
 - Rule 14: the fallback's candidates carry rule 14's codes, and a failing gate never activates a candidate.
-- Rule 15 is plan task 5-T04's (``planner/warnings.py``); it adds its test with its decisions.
+- Rule 15 (plan task 5-T04, ``planner/warnings.py``) is tested in ``test_rules_15.py``.
 
 Plan-level stubs only (no model, no GPU): faults are injected here, never through a hook in the library.
 """

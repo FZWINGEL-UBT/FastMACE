@@ -5,8 +5,8 @@
 - ``rules.check_reason`` and the override record (choice 4) behave as docs/design/planner-5.md says.
 - Every reason the library emits with a rule number uses a code of that rule (a static scan of ``fastmace/``).
 - A rule's code never appears without its number (``NUMBERLESS`` lists the exceptions; 5-T02 emptied it).
-- Every rule has at least one test marked ``pytest.mark.rule(n)`` (``UNTESTED`` lists the exceptions: rule 15
-  until plan task 5-T04 emits and tests it).
+- Every rule has at least one test marked ``pytest.mark.rule(n)`` (``UNTESTED`` lists the exceptions; 5-T04
+  emptied it with rule 15's tests).
 - Every precedence pair of 5-T02's matrix (``PAIRS``) has a test marked ``pytest.mark.precedence(a, b)``, and
   every marked pair is listed. Later tasks add their pairs here with their tests (5-T03: rule 5 against the
   MACE model's rule 12; 5-T07: rule 5 against runtime adaptation).
@@ -27,8 +27,8 @@ TESTS = REPO / "tests"
 HELPERS = {("integrators/registry.py", "_reason"): (1, 1), ("planner/reproducible.py", "block"): (5, 2)}
 # Rules whose codes the library still emits without the number (5-T02 numbered them all).
 NUMBERLESS = set()
-# Rules without a test marked rule(n) yet: rule 15 until 5-T04 emits its decisions and marks its test.
-UNTESTED = {15}
+# Rules without a test marked rule(n) yet (5-T04 marked rule 15: tests/cpu/test_rules_15.py).
+UNTESTED = set()
 # The precedence matrix of plan task 5-T02 (SPEC §9.3's strict order): (a, b) means rule a wins over b, where b is
 # a later rule, "override" (a user's explicit value) or an allow_* flag. tests/cpu/test_rules_precedence.py.
 PAIRS = {
