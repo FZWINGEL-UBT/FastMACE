@@ -156,13 +156,14 @@ def main(argv=None):
     parser.add_argument("--block", type=int, default=300)
     parser.add_argument("--part", choices=("stages", "mh1"), required=True)
     args = parser.parse_args(argv)
-    result = dict(gpu=torch.cuda.get_device_name(), torch=torch.__version__, fastmace=fm.__version__,
-                  atoms=216, stages={}, mh1={})
+    # No CUDA call before the part runs: a Simulation configures the allocator before CUDA is first touched
+    result = dict(torch=torch.__version__, fastmace=fm.__version__, atoms=216, stages={}, mh1={})
 
     if args.part == "stages":
         stages(args, result)
     else:
         mh1(args, result)
+    result["gpu"] = torch.cuda.get_device_name()
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2))
