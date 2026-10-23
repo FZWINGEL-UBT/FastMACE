@@ -1,0 +1,90 @@
+{
+  "protocol_record_version": 1,
+  "source": "/home/fzwin/fastmace-runs/3b-T07/short.protocol.yaml",
+  "structure": "/mnt/d/Margraf/FastMACE/.claude/worktrees/compassionate-kare-e71471/fastmace/protocols/data/NbCl5_R2SCAN.cif",
+  "repeat": [
+    3,
+    3,
+    3
+  ],
+  "atoms": 1944,
+  "timestep_fs": 1.0,
+  "relax": {
+    "fmax": 0.01,
+    "optimizer": "LBFGS",
+    "max_steps": 5000
+  },
+  "relaxation": {
+    "optimizer": "LBFGS",
+    "fixed_cell": true,
+    "fmax_target_eV_A": 0.01,
+    "max_steps": 5000,
+    "converged": true,
+    "steps": 17,
+    "seconds": 31.918107311999847,
+    "initial_eV_atom": -10.715681853473699,
+    "energy_eV_atom": -10.715861034162996,
+    "fmax_eV_A": 0.008642355825617124
+  },
+  "quench": {
+    "min_K": 500.0,
+    "bin_K": 100.0,
+    "per_bin": 2,
+    "fmax": 0.01,
+    "optimizer": "LBFGS",
+    "max_steps": 5000
+  },
+  "quench_result": {
+    "settings": {
+      "min_K": 500.0,
+      "bin_K": 100.0,
+      "per_bin": 2,
+      "fmax": 0.01,
+      "optimizer": "LBFGS",
+      "max_steps": 5000,
+      "fixed_cell": true,
+      "cell": "frame",
+      "selection": "thermostat target temperature; each ramp separately; evenly spaced within each bin; plus the final frame"
+    },
+    "frames": 21,
+    "frame_every": 100,
+    "trajectory_frames": 271,
+    "quench_wall_s": 2052.987141488001,
+    "quench_seconds_sum": 2052.9523184260006,
+    "not_converged": 10,
+    "heating": {
+      "n": 10,
+      "mean_eV_atom": -10.71268304809874,
+      "sd_eV_atom": 0.0055047271279246544
+    },
+    "cooling": {
+      "n": 10,
+      "mean_eV_atom": -10.644509203674216,
+      "sd_eV_atom": 0.01791335426069214
+    },
+    "final_quenched_eV_atom": -10.614310497318316
+  },
+  "mc": null,
+  "min_mc_temperature_K": null,
+  "dispersion": "D3(functional=r2scan, damping=bj, pair_cutoff_bohr=40.0, cn_cutoff_bohr=40.0, three_body=False, smoothing=none, precision=float64, autoang=0.52917726, autoev=27.21138505, s6=1.0, s8=0.7898, a1=0.4948, a2=5.7308)",
+  "pieces": [
+    {
+      "first_step": 0,
+      "last_step": 27000,
+      "wall_s": 563.4802532960002,
+      "counters": {
+        "neighbour_rebuilds": 3496,
+        "d3_builds": 456,
+        "d3_rebuilds": 455,
+        "d3_build_s": 3.245831576004093
+      }
+    }
+  ],
+  "counters": {
+    "neighbour_rebuilds": 3496,
+    "d3_builds": 456,
+    "d3_rebuilds": 455,
+    "d3_build_s": 3.245831576004093
+  },
+  "status": "complete"
+}

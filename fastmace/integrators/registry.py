@@ -23,6 +23,7 @@ Owner decisions this module encodes (phase 4 plan, "Owner decisions"; recommenda
 
 from __future__ import annotations
 
+import functools
 import importlib
 import pkgutil
 from collections.abc import Callable, Iterable, Mapping
@@ -287,9 +288,6 @@ class Registry:
         return tuple(record for (k, _), record in sorted(self._records.items()) if kind in (None, k))
 
 
-_REGISTRY: Registry | None = None
-
-
 def discover(packages: Iterable[str] = tuple(dict.fromkeys(_PACKAGES.values()))) -> Registry:
     """A registry of every ``RECORDS`` entry in the modules of ``packages``."""
     found = Registry()
@@ -301,12 +299,10 @@ def discover(packages: Iterable[str] = tuple(dict.fromkeys(_PACKAGES.values())))
     return found
 
 
+@functools.lru_cache(maxsize=1)
 def registry() -> Registry:
     """The process's registry, discovered once (records are immutable, so it is never invalidated)."""
-    global _REGISTRY
-    if _REGISTRY is None:
-        _REGISTRY = discover()
-    return _REGISTRY
+    return discover()
 
 
 # --------------------------------------------------------------------------- rule 1 (SPEC §4.4, §9.3)

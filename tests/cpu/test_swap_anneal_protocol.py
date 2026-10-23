@@ -357,7 +357,8 @@ def test_a_tiny_protocol_in_pieces_equals_one_go(model_path, cpu_planner, tmp_pa
     for record in (first, second):
         rebuilds = [piece["counters"]["neighbour_rebuilds"] for piece in record["pieces"]]
         assert all(isinstance(count, int) and count >= 0 for count in rebuilds), rebuilds
-        assert record["counters"] == {"neighbour_rebuilds": sum(rebuilds)}
+        assert record["counters"]["neighbour_rebuilds"] == sum(rebuilds)
+        assert record["counters"]["d3_builds"] is None  # no D3 in this run
     assert first["relaxation"]["energy_eV_atom"] == second["relaxation"]["energy_eV_atom"]
     for (n1, x1, p1), (n2, x2, p2) in zip(_frames(whole), _frames(pieces), strict=True):
         assert np.array_equal(n1, n2) and np.array_equal(x1, x2) and np.array_equal(p1, p2)

@@ -1,0 +1,70 @@
+{
+  "steps": 200,
+  "plans": {
+    "float64": {
+      "backend": "cueq",
+      "compile_mode": "default",
+      "device": "cuda:0",
+      "pipelined": "on",
+      "async_output": "on",
+      "speculative_graph": false,
+      "pipeline_edge_margin": 0.0,
+      "pipeline_rebuild_fraction": 0.8,
+      "cueq_conv_fusion": "on",
+      "first_derivative_only": true,
+      "unfuse_full_addmm": true,
+      "dynamo_cache_size_limit": 64,
+      "expandable_segments": "on",
+      "empty_cache_before_capture": true,
+      "warmup_in_graph_pool": true,
+      "dynamic_edges": false,
+      "model_template_cache": true,
+      "overlap_rebuild": true,
+      "step_graph": false,
+      "fused_integrator": true,
+      "recapture_budget": 64,
+      "graph_variant_cap": 64
+    },
+    "float32": {
+      "backend": "cueq",
+      "compile_mode": "default",
+      "device": "cuda:0",
+      "pipelined": "on",
+      "async_output": "on",
+      "speculative_graph": false,
+      "pipeline_edge_margin": 0.0,
+      "pipeline_rebuild_fraction": 0.8,
+      "cueq_conv_fusion": "on",
+      "first_derivative_only": true,
+      "unfuse_full_addmm": true,
+      "dynamo_cache_size_limit": 64,
+      "expandable_segments": "on",
+      "empty_cache_before_capture": true,
+      "warmup_in_graph_pool": true,
+      "dynamic_edges": false,
+      "model_template_cache": true,
+      "overlap_rebuild": true,
+      "step_graph": false,
+      "fused_integrator": true,
+      "recapture_budget": 64,
+      "graph_variant_cap": 64
+    }
+  },
+  "max_abs_difference": {
+    "fastmace_float64": {
+      "T_K": 5.56266513740411e-07,
+      "PE_eV_atom": 8.880851609660567e-11,
+      "V_A3_atom": 5.754436926963535e-10
+    },
+    "fastmace_float32": {
+      "T_K": 1.573581857883255e-05,
+      "PE_eV_atom": 2.3178981112259578e-07,
+      "V_A3_atom": 2.2556815082452886e-08
+    }
+  },
+  "mean_T_K": {
+    "ase": 290.66265864102274,
+    "fastmace_float64": 290.66265846335153,
+    "fastmace_float32": 290.6626604193789
+  }
+}
