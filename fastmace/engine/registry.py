@@ -102,6 +102,8 @@ POLICIES = (
     _policy("state.rng.batch", "state", "save"),  # drawn-ahead noise; generator and cursor are host state
     # BAOAB's barostat momentum and cell force (in the state since 1b-T05; the integrator aliases them).
     *(_policy(f"state.{name}", "state", "save") for name in ("p_eps", "force_eps")),
+    # FixAtoms' mask (4-T01): from the fixed indices, which the restart's physical record holds.
+    _policy("state.free_mask", "state", "derived", "SimulationState.from_atoms"),
     # Integrator scratch, written before it is read in every step.
     *(_policy(f"integrator.{name}", "integrator", "derived") for name in (
         "x_old", "rnd_pos", "rnd_vel", "xi", "eta", "zeta")),
@@ -141,9 +143,19 @@ POLICIES = (
 )
 
 
+def scheme_policies() -> tuple[RegisteredBuffer, ...]:
+    """The policies the integrator and optimiser scheme records declare (``SchemeRecord.buffers``, 4-T01), after
+    ``POLICIES``: a scheme adds its buffers with its record, not here."""
+    from fastmace.integrators.registry import registry
+
+    owners = {"integrator": "integrator", "optimizer": "optimizer", "cell_filter": "dof"}
+    return tuple(_policy(f"{owners[record.kind]}.{name}", owners[record.kind], restart, recompute)
+                 for record in registry().records() for name, restart, recompute in record.buffers)
+
+
 def policy_for(name: str) -> RegisteredBuffer:
     """The policy of the buffer at attribute path ``name``; ``RegistryError`` when it has none."""
-    for entry in POLICIES:
+    for entry in (*POLICIES, *scheme_policies()):
         if entry.name == name or fnmatch.fnmatchcase(name, entry.name):
             return entry if entry.name == name else replace(entry, name=name)
     raise RegistryError(f"the runtime buffer {name} has no registry policy",
