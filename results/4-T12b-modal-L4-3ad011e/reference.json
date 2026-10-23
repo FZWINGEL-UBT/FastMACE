@@ -1,0 +1,82 @@
+{
+ "part": "reference",
+ "natoms": 1944,
+ "energy_eV": -20790774.84970133,
+ "max_force_eV_A": 119.64211025795386,
+ "rms_force_eV_A": 27.44827161464939,
+ "atoms_above_10_eV_A": 1250,
+ "stress_eV_A3": [
+  [
+   0.038597044659800135,
+   0.0007523075508741615,
+   -2.112330773835247e-06
+  ],
+  [
+   0.0007523075508741615,
+   0.030708713019401677,
+   0.0009779061205274163
+  ],
+  [
+   -2.112330773835247e-06,
+   0.0009779061205274163,
+   0.037114320142921126
+  ]
+ ],
+ "reference": {
+  "record_id": "fastmace.reference/0.3.16/polar/1b78dc6383d5150e",
+  "role": "reference",
+  "dtype": "float64",
+  "float64_energy": false,
+  "energy_bound": "float64 accumulation",
+  "e0_table": null,
+  "backend": "cueq",
+  "cueq_conv_fusion": false,
+  "model": {
+   "path": "/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/models/MACE-POLAR-1-S.model",
+   "sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+   "label": "polar1-s",
+   "head": "Default"
+  },
+  "patches": [
+   "single_graph_strain",
+   "polar_longrange"
+  ],
+  "corrections_active": [
+   "polar_kspace_stress"
+  ],
+  "optional_physics": [],
+  "gate_floors": {
+   "stress_eV_per_A3": 5e-07
+  },
+  "stock": true,
+  "polar": {
+   "bounds": [
+    19,
+    18,
+    6
+   ],
+   "k_vectors": 4169,
+   "k_superset": 7986,
+   "headroom": 0.1
+  },
+  "dispersion": null
+ },
+ "tool": "tools/validation/polar_cell_probe.py",
+ "args": {
+  "model": "polar1-s",
+  "structure": "NbCl5",
+  "repeat": "[3, 3, 3]",
+  "strain": "0.02",
+  "rattle": "0.02",
+  "seed": "0",
+  "precision": "float32",
+  "lbfgs_steps": "300",
+  "force_step": "0.001",
+  "scan_max": "0.002",
+  "scan_points": "21",
+  "part": "reference",
+  "compare_model": "mh1-r2scan",
+  "output": "/tmp/fastmace-out/reference.json"
+ },
+ "fastmace_commit": "3ad011eb55bf8f3d914c5b5b286e0572c79279d8"
+}
