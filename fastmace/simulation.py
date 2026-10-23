@@ -1317,6 +1317,18 @@ class Simulation:
             raise ValueError(f"{name} must be finite")
         return array
 
+    def _host_cell(self, cell):
+        import numpy as np
+
+        if self._npt:
+            raise ValueError("a host write of the cell is for fixed-cell runs; a barostat moves the cell itself")
+        array = np.asarray(cell, dtype=np.float64)
+        if array.shape != (3, 3):
+            raise ValueError(f"cell must have shape (3, 3), got {array.shape}")
+        if not np.isfinite(array).all() or not np.linalg.det(array) > 0:
+            raise ValueError("cell must be finite with a positive volume (right-handed rows)")
+        return array
+
     def set_positions(self, positions: Any) -> None:
         """Host write of positions at a canonical point: quiesce, write, rebuild, re-evaluate (owner
         decision D4). ``positions`` in Å, shape ``(N, 3)``; the momenta stay."""
@@ -1339,7 +1351,7 @@ class Simulation:
     # contract of fastmace.events, at a committed step; 3-T02's force field checks the superset.
 
     def update(self, *, species: Any = None, masses: Any = None, charges: Any = None, total_charge: Any = None,
-               friction_per_fs: Any = None, positions: Any = None, momenta: Any = None) -> None:
+               friction_per_fs: Any = None, positions: Any = None, momenta: Any = None, cell: Any = None) -> None:
         """Any combination of host changes as one transaction with one force evaluation (SPEC §8.5, §7.7).
 
         - ``species``: atomic numbers or symbols, ``(N,)``; in the ``ForceField``'s superset
@@ -1350,10 +1362,14 @@ class Simulation:
         - ``friction_per_fs``: the Langevin friction in 1/fs (the record's unit); it drops the captured
           graphs, which bake it in (a recorded re-capture), and with the default barostat τ moves ``P_tau``
           and the barostat mass with it;
-        - ``positions`` (Å) and ``momenta`` (ASE units), ``(N, 3)``; momenta use the new masses.
+        - ``positions`` (Å) and ``momenta`` (ASE units), ``(N, 3)``; momenta use the new masses;
+        - ``cell`` (Å, ``(3, 3)``, rows the lattice vectors), fixed-cell runs only (4-T05; 4-T09 relaxes quench
+          frames with their own NPT cells on one engine): the positions are not scaled, so give them too. The
+          lists and cell inputs change in place, so the captured graphs stay unless the rebuild grows a capacity
+          or the edge count needs a new padded size.
 
         Everything is validated before anything is written. The changes apply in this order: species,
-        masses, charges, friction, positions, momenta; then a canonical point (neighbour list rebuilt at the
+        masses, charges, friction, cell, positions, momenta; then a canonical point (neighbour list rebuilt at the
         committed positions, forces and stress evaluated once, ``integrator.start``), as a host write of
         positions (owner decision D4). Nothing given: nothing happens.
         """
@@ -1387,9 +1403,13 @@ class Simulation:
             fields["positions"] = self._host_values(positions, "positions")
         if momenta is not None:
             fields["momenta"] = self._host_values(momenta, "momenta")
+        if cell is not None:
+            fields["cell"] = self._host_cell(cell)
         if not fields:
             return
-        writes = {"positions", "momenta"}
+        writes = {"positions", "momenta", "cell"}
+        if self._runner is not None and "cell" in fields:
+            raise NotImplementedError("a host write of the cell is not passed to a subprocess runner yet")
         if self._runner is not None:  # the next child applies them in this order (HOST_WRITE_KINDS)
             for name in ("species", "masses", "charges", "total_charge", "friction_per_fs", "positions", "momenta"):
                 if name in fields:
@@ -1410,6 +1430,8 @@ class Simulation:
             events.append(Event("friction", values=fields["friction_per_fs"] / units.fs))
         self._queue.drain()  # frames queued at the committed step are written before it changes
         transaction = Transaction(engine, events)  # validates, before anything is written
+        if "cell" in fields:
+            transaction.host_writes.append(lambda state: engine.reset_cell(fields["cell"]))
         if "positions" in fields:
             transaction.host_writes.append(lambda state: state.positions.copy_(
                 _tensor(fields["positions"], state.positions)))
@@ -1417,6 +1439,10 @@ class Simulation:
             transaction.host_writes.append(lambda state: state.velocities.copy_(
                 _tensor(fields["momenta"], state.velocities) / state.masses))
         transaction.run()
+        if "cell" in fields:  # the frames of a fixed-cell run take the template's cell
+            self._atoms.set_cell(fields["cell"], scale_atoms=False)
+            if self._writer is not None:
+                self._writer.atoms.set_cell(fields["cell"], scale_atoms=False)
         if {"species", "masses"} & set(fields):
             self._composition_changed()
         self._record_friction(fields.get("friction_per_fs"))

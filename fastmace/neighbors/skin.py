@@ -387,6 +387,19 @@ class SkinNeighbourList:
 
     # ------------------------------------------------------------------ graph-capturable
 
+    def reset_cell(self, cell) -> None:
+        """A new cell for the next ``build`` (host, between replays; 4-T05's ``Simulation.update(cell=)``).
+
+        Fixed cell: the host cell, the padding pair and the GPU build's cell constants follow it; the shifts
+        the captured graphs read are rewritten in place by the next build, which the caller runs.
+        Variable cell: the current cell as ``set_cell`` copies it.
+        """
+        self.cell = np.array(cell, dtype=float)
+        self._set_padding()
+        self._device_constants = None
+        if self.variable_cell:
+            self.cell_t.copy_(torch.as_tensor(self.cell, dtype=torch.float64, device=self.device))
+
     def set_cell(self, cell: torch.Tensor) -> None:
         """variable_cell: copy the current cell (float64 tensor) in place; CUDA-graph safe."""
         if not self.variable_cell:

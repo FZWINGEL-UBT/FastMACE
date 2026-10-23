@@ -738,6 +738,30 @@ class GraphEngine(Engine):
             self.integrator.start(state)
         self.canonical_points += 1
 
+    def reset_cell(self, cell) -> None:
+        """A host write of the cell at fixed cell (4-T05, for 4-T09's quench frames on one engine): ``state.cell``,
+        the force field's lists and cell inputs, and the energy-graph copies, all in place. The caller ends at a
+        canonical point (``canonicalise(reevaluate=True)``; ``Simulation.update`` does), whose rebuild writes
+        the new shifts into the buffers the captured graphs read: only a grown capacity or a new padded edge
+        size re-captures. A variable-cell engine is refused (its barostat state belongs to the cell)."""
+        if self.variable_cell:
+            raise ValueError("a host write of the cell is for fixed-cell engines; a variable-cell run moves its cell "
+                             "itself")
+        fields = [self.force_field] + [field for field in self._energy_fields.values() if field is not self.force_field]
+        missing = [type(field).__name__ for field in fields if getattr(field, "reset_cell", None) is None]
+        if missing:
+            raise TypeError(f"{', '.join(missing)} cannot take a new cell (reset_cell)")
+        if isinstance(cell, torch.Tensor):
+            cell = cell.detach().to(self.device, torch.float64)
+        else:  # a copy: read-only (frozen) arrays too
+            cell = torch.tensor([[float(value) for value in row] for row in cell], dtype=torch.float64,
+                                device=self.device)
+        self.flush()
+        with torch.no_grad():
+            self.state.cell.copy_(cell)
+        for field in fields:
+            field.reset_cell(cell)
+
     def restart_buckets(self) -> dict[str, int]:
         """The edge bucket and neighbour capacity for the restart's plan record (SPEC §10.6, ``Plan.to_restart``)."""
         return {"edge_bucket": int(self.edge_bucket), "neighbour_capacity": int(self.force_field.edge_capacity)}
