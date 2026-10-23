@@ -363,6 +363,10 @@ Merge orders where files overlap:
 
   The pass rule stays at 3 combined SE, with one extension of 3 more seeds.
   The tool-side additions are written and CPU-tested before the freeze.
+- **3b-T10, test tiers (owner, 23 October 2026):** the acceptance tier runs
+  at the 3b freeze; the 3b GPU slow tier is dropped. The preflight already ran
+  the slow tests of every file 3b touched, and phase 4's acceptance runs the
+  slow tier once at its freeze. Item 2's extension ASE runs may run on Modal.
 
 ## Checkpoints for the owner
 

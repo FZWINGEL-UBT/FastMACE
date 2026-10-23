@@ -462,6 +462,8 @@ PolarMACE would need").
   Cross-process controls use the 3 % noise floor or are left out.
 - When the Ada tier has passed at the freeze, the local leg reruns only: the
   tests corrected at acceptance, the GPU slow tier, and the items' own runs.
+- The GPU slow tier at this freeze also stands in for phase 3b's, which was
+  dropped (owner, 23 October 2026).
 - The runbook `docs/validation/phase-4-runbook.md` comes first and is
   accepted before the freeze. Report `docs/validation/phase-4.md`; the owner
   tags `fastmace-4`.
