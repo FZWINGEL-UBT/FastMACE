@@ -9,6 +9,8 @@ Phase 1b writes version 1. Phase 2 adds keys and changes none, so the schema sta
 `fastmace.metadata/1`. See "What phase 2 adds" below. OPT-T07 (20 October 2026) adds
 `subprocess.calls` and `subprocess.persistent` by the same rule. `subprocess.children` still
 counts child processes; before OPT-T07 there was one child per call, so it equalled the calls.
+Phase 5 (plan task 5-T01, 23 October 2026) adds keys too and records it in the minor version
+`schema_minor` (1); see "What phase 5 adds" below.
 
 ## How a run writes it
 
@@ -59,13 +61,14 @@ Top-level keys, in order. "Source" is the input of `metadata_record`.
 | Key | Content | Source |
 | --- | --- | --- |
 | `schema` | `"fastmace.metadata/1"` | |
+| `schema_minor` | `1` (5-T01): additions within version 1; a record without it is minor 0 | `provenance.SCHEMA_MINOR` |
 | `created_utc` | ISO time | `created_utc` (default now) |
 | `code` | `version`, `git_commit`, `git_dirty` (§13 "code version") | `fastmace_block` |
 | `checkpoint` | `path`, `sha256`, `head`, `licence`, `label`, `trust` | `checkpoint`: a `LoadedModel` (`provenance()`) or a mapping |
 | `model` | the 1a `model_block`, unchanged | `model` |
 | `force_field_identity` | `ForceFieldIdentity.to_dict()` plus `digest` | `identity` (T05's record or its dict) |
 | `reference_record` | the §12.1 record; at least `id` | `reference_record`: a mapping, `to_dict()`, or `.id`; must equal the identity's `reference_record_id` |
-| `plan` | active revision: `revision`, `tier`, `reason`, `step`, `description` (`str(plan)`), `backend`, `conv_fusion`, `rewrites`, `engine`, `neighbours`, `polar`, `integrator`, `decisions` (`key`, `choice`, `reason`, `code`, `rule`), `requested`, `auto_options_off`, `superset`, `workload`, `software`, `allowances`, `fallbacks_tried` (each `TriedCandidate` of 2-T06/2-T15: `dimension`, `change`, `outcome`, `reason`, `stage`, `revision`, `reduced_gate_runs`, `full_gate_runs`; `[]` when no fallback ran), `predicted_memory_bytes`, `runner` (`"in-process"` or `"subprocess"`, 2-T07) | `plan` (T12's `Plan`) |
+| `plan` | active revision: `revision`, `tier`, `reason`, `step`, `description` (`str(plan)`), `backend`, `conv_fusion`, `rewrites`, `engine`, `neighbours`, `polar`, `integrator`, `decisions` (`key`, `choice`, `reason`, `code`, `rule`), `requested`, `auto_options_off`, `superset`, `workload`, `software`, `allowances`, `fallbacks_tried` (each `TriedCandidate` of 2-T06/2-T15: `dimension`, `change`, `outcome`, `reason`, `stage`, `revision`, `reduced_gate_runs`, `full_gate_runs`; `[]` when no fallback ran), `predicted_memory_bytes`, `runner` (`"in-process"` or `"subprocess"`, 2-T07), `calibration` (`CalibrationRecord`, 5-T09; `null` when none ran), `adaptation` (the active `AdaptationConfig`, 5-T07; `null` before) | `plan` (T12's `Plan`) |
 | `plan_revisions` | `[{revision, tier, step, reason, description, runner, fallback}]`, oldest first, active last (§9.5); `fallback` is the activated candidate that became the revision, else `null` | `plan.chain()` and `plan` |
 | `precision` | `force`, `integration` (always `"float64"`, §7.3), `tf32`, `float64_energy` (T03, D2) | `plan.precision`; without a plan, the identity's force precision |
 | `runtime` | `RuntimeInfo`: `file_locks`, `file_lock_source`, `file_lock_switch_late`, `cuda_driver_cache` (§14) | `fastmace.runtime_info()` |
@@ -75,7 +78,7 @@ Top-level keys, in order. "Source" is the input of `metadata_record`.
 | `integrator` | integrator parameters | `integrator`, default the plan's `IntegratorConfig` |
 | `schedule` | the schedule and its position | `schedule`: a mapping or `to_restart()` (T07) |
 | `gate` | `status`, `reason`, `selfchecks`, `device`, `reduced_cell`, `steps`, and the rest of the gate record (2-T05: `copies`, `quantities`, `references`, `seconds`, `replay`, …). `selfchecks` defaults to the plan's per-record self-checks (2-T04 `SelfCheck`: `name`, `passed`, `max_relative_error`, `threshold`, `modules`, `dtype`, `detail`) | `gate`; default `{"status": "skipped", "reason": "opt-in: check=\"gate\"", ...}` (D1), with `device` and `reduced_cell` `null` and `steps` `[]` |
-| `counters` | `recaptures`, `neighbour_lists` (`{name: {rebuilds, build_time_s, skin_A}}` for MACE and D3), `overflows_redone`; `mc` (3-T15: `{move: {attempted, impossible, accepted}}`, plus `trial_rebuilds` for `displace`; `null` when no move set was ever attached); `tier_switches` (phase 5) always `null`; `engine` (the engine's `info()`) | `counters`, `engine_info` |
+| `counters` | `recaptures`, `neighbour_lists` (`{name: {rebuilds, build_time_s, skin_A}}` for MACE and D3), `overflows_redone`; `mc` (3-T15: `{move: {attempted, impossible, accepted}}`, plus `trial_rebuilds` for `displace`; `null` when no move set was ever attached); `tier_switches` (5-T01: a list of `{step, from, to, reason, revision}`, `[]` without a switch; 5-T07 fills it); `engine` (the engine's `info()`) | `counters`, `engine_info` |
 | `restart_points` | `[{step, output_chunk, output_rows, output_frames, ...}]` (T06's indices, §10.6) | `restart_points` |
 | `timing` | `setup_s` (`{stage: seconds}`), `setup_total_s`, then the timing summary | `setup`, `timing` |
 | `report` | the run report | `report`: T15's `to_metadata()` or a mapping |
@@ -86,8 +89,8 @@ Setup stages use §12.5's names: load, rewrites, compilation, capture, gate. 1b-
 further: load, plan, rewrites, self-checks, model copy, first compiled call, captures. The
 record keeps whatever stage names it is given. Values must be seconds ≥ 0.
 
-`counters` takes only the keys listed. The phase-5 key `tier_switches` is refused as an input,
-so that nothing fills it by accident. `counters.mc` is checked: known move types only, exactly
+`counters` takes only the keys listed. `tier_switches` takes `planner.plan.TierSwitch` records or
+mappings with exactly `provenance.TIER_SWITCH_KEYS`. `counters.mc` is checked: known move types only, exactly
 those keys.
 
 ## SPEC §13 item by item
@@ -108,7 +111,7 @@ those keys.
 | integrator parameters, schedule | `integrator`, `schedule` |
 | gate status, self-check results | `gate.status`, `gate.selfchecks` |
 | re-captures; rebuilds, build times, skins; overflows redone | `counters.recaptures`, `.neighbour_lists`, `.overflows_redone` |
-| tier switches; MC counters | `counters.tier_switches`: `null` (phase 5); `counters.mc` (3-T15) |
+| tier switches; MC counters | `counters.tier_switches` (a list, 5-T01); `counters.mc` (3-T15) |
 | restart points with chunk indices; timing summary | `restart_points`; `timing` |
 | code version (package + git hash) | `code.version`, `code.git_commit` |
 
@@ -146,6 +149,17 @@ What 1b-T10 adds:
 `plan`) when its revision is the active one.
 
 A self-check result marked "cached" is not recorded, because 2-T19 added no qualification cache.
+
+## What phase 5 adds (plan task 5-T01)
+
+`SPEC_13_KEYS` lists these too (`docs/design/planner-5.md`).
+
+| Item | Key | Filled by |
+| --- | --- | --- |
+| schema minor version | `schema_minor` | 5-T01 |
+| calibration record | `plan.calibration` | 5-T09 |
+| adaptation limits | `plan.adaptation` | 5-T07 |
+| tier switches | `counters.tier_switches` (no longer `null`) | 5-T07 |
 
 ## Not in version 1
 

@@ -63,7 +63,11 @@ class FastMACEError(Exception):
 class Reason(str):
     """One refusal reason: the text, the §9.3 hard rule (``None`` for a ``run`` request) and a stable code.
 
-    Reports and tests match ``code``, never the text.
+    Reports and tests match ``code``, never the text. Decisions use the same record. Plan task 5-T01's contract
+    (``fastmace.planner.rules``): ``rule`` is ``None`` or one of 1-15; with a rule, ``code`` is one of that
+    rule's codes (or ``rules.OVERRIDE_CODE`` for an overridden preference), and a rule's code never comes
+    without its number. ``rules.check_reason`` says what is wrong; the conformance suite calls it
+    (``tests/cpu/test_rules_meta.py``), the planner does not, so a reason costs nothing at run time.
     """
 
     def __new__(cls, text, *, rule=None, code):

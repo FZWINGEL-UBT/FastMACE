@@ -9,6 +9,12 @@ Phase 1b adds revisions (``Plan.revise``), the software traits the plan was made
 restart record (``Plan.to_restart``, ``Plan.from_restart``; the format is
 docs/design/plan-1b.md). Phase 2 records the fallback's tried candidates in ``fallbacks``
 (``planner.fallback.TriedCandidate``, 2-T06), in restart record version 2.
+
+Phase 5 (plan task 5-T01, docs/design/planner-5.md) adds the contracts of the planner's completion: the
+override record (``Plan.overrides``, reasons from ``planner.rules.override``), the calibration record
+(``Plan.calibration``, ``CalibrationRecord``; 5-T09 fills it), the active adaptation limits
+(``Plan.adaptation``; 5-T07) and the record of a tier switch (``TierSwitch``, provenance's
+``counters.tier_switches``). None of them is in the restart record, so its version stays 2.
 """
 
 from __future__ import annotations
@@ -19,6 +25,7 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
     from fastmace.config import (
+        AdaptationConfig,
         EngineConfig,
         IntegratorConfig,
         NeighbourConfig,
@@ -107,6 +114,63 @@ class SelfCheck:
 
 
 @dataclass(frozen=True)
+class CalibrationCandidate:
+    """One candidate the optional calibration measured (SPEC §9.1; plan task 5-T09 under owner decision D5).
+
+    - ``change``: the candidate as a change of the rules' plan (``"backend cueq"``); ``""`` is the rules' own;
+    - ``step_ms``: its measured mean step time per block, ms, in the order the blocks ran (A B A B).
+    """
+
+    change: str
+    step_ms: tuple[float, ...]
+
+    def __post_init__(self):
+        object.__setattr__(self, "step_ms", tuple(float(value) for value in self.step_ms))
+
+
+@dataclass(frozen=True)
+class CalibrationRecord:
+    """What the calibration of this run measured (``Plan.calibration``): a record of this run only, never read
+    by another run (SPEC §9.1).
+
+    - ``candidates``: every ``CalibrationCandidate``, the rules' plan first;
+    - ``chosen``: the ``change`` of the candidate the plan took (``""``: the rules' plan);
+    - ``changed_plan``: whether the measurement changed the rules' choice (always ``False`` if D5 decides
+      that calibration only reports);
+    - ``steps``, ``margin``: the ``CalibrationConfig`` it ran with (``margin`` ``None`` where unused);
+    - ``setup_s``: what calibrating cost, s (the report shows it).
+    """
+
+    candidates: tuple[CalibrationCandidate, ...]
+    chosen: str
+    changed_plan: bool
+    steps: int
+    margin: float | None
+    setup_s: float
+
+    def __post_init__(self):
+        object.__setattr__(self, "candidates", tuple(self.candidates))
+        if self.chosen not in {candidate.change for candidate in self.candidates}:
+            raise ValueError(f"CalibrationRecord.chosen {self.chosen!r} is not one of its candidates")
+
+
+@dataclass(frozen=True)
+class TierSwitch:
+    """One runtime tier switch (SPEC §9.6; plan task 5-T07): at ``step``, from tier ``from_tier`` to ``to_tier``,
+    for ``reason``, as plan ``revision``. ``record()`` is its entry in provenance's ``counters.tier_switches``."""
+
+    step: int
+    from_tier: str
+    to_tier: str
+    reason: str
+    revision: int
+
+    def record(self) -> dict[str, Any]:
+        return {"step": int(self.step), "from": self.from_tier, "to": self.to_tier, "reason": str(self.reason),
+                "revision": int(self.revision)}
+
+
+@dataclass(frozen=True)
 class Plan:
     """A frozen execution plan (SPEC §9.5).
 
@@ -119,7 +183,10 @@ class Plan:
       included. ``key`` is stable and unique within a plan (``plan.decision(key)``); a reason that
       reports and tests match on is a ``fastmace.errors.Reason`` with a ``code``;
     - ``requested``: ``(item, value)`` of every option the caller set to something other than
-      ``"auto"`` (an explicit ``"on"`` is refused, never downgraded, when it cannot be honoured);
+      ``"auto"`` (an explicit ``"on"`` is refused, never downgraded, when it cannot be honoured). Where such
+      a value replaced a preference's choice (rules 8-12), the decision's reason is an override
+      (``planner.rules.override``: "override; rule n would give X", code ``override``) and ``overrides()``
+      lists it; a request equal to the rule's choice is no override, and one against a hard rule is refused;
     - ``auto_options_off``: ``(option, reason)`` for every option that ``auto`` switched off because
       the model does not support it (the research engine's ``model.auto_options_off``);
     - ``fallbacks``: every candidate the fallback tried (``planner.fallback.TriedCandidate``), in
@@ -144,7 +211,12 @@ class Plan:
     - ``optimizer``: the ``OptimizerConfig`` of a relaxation (4-T05), or ``None`` for MD. The build then puts
       the optimiser in the integrator's place (``fastmace.optimize.driver.OptimizerStepper``); ``integrator``
       still holds the MD-side defaults the shared rules read (seed, fixcm). Not in the restart record:
-      relaxations write no restart files (conductor's choice 5).
+      relaxations write no restart files (conductor's choice 5);
+    - ``calibration``: the ``CalibrationRecord`` of the optional calibration (SPEC §9.1, 5-T09), or ``None``
+      when it did not run. Not in the restart record: it is a record of the run that measured;
+    - ``adaptation``: the ``AdaptationConfig`` whose limits are active for this plan (SPEC §9.6, 5-T07), or
+      ``None`` where no runtime adaptation applies (evaluations, relaxations, and every plan until 5-T07).
+      Not in the restart record: a resume takes it from the recorded ``PlannerOptions``.
     """
 
     tier: str
@@ -171,6 +243,8 @@ class Plan:
     selfchecks: tuple[SelfCheck, ...] = ()
     dispersion: Any = None
     optimizer: OptimizerConfig | None = None
+    calibration: CalibrationRecord | None = None
+    adaptation: AdaptationConfig | None = None
 
     def __post_init__(self):
         if self.runner not in RUNNERS:
@@ -182,6 +256,17 @@ class Plan:
             if entry[0] == key:
                 return entry
         raise KeyError(f"the plan has no decision {key!r}")
+
+    def overrides(self) -> tuple[tuple[str, str, int, str], ...]:
+        """``(key, choice, rule, what the rule would give)`` of every decision the caller overrode (choice 4)."""
+        from fastmace.planner.rules import overridden
+
+        out = []
+        for key, choice, reason in self.decisions:
+            entry = overridden(reason)
+            if entry is not None:
+                out.append((key, choice, *entry))
+        return tuple(out)
 
     def revise(self, reason: str, step: int | None, **changes: Any) -> Plan:
         """A new revision: ``changes`` applied, ``predecessor`` this plan, at ``step`` (SPEC §9.5).
