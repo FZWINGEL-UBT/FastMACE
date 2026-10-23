@@ -339,6 +339,7 @@ class Simulation:
         from fastmace import integrators as records
         from fastmace import optimize as optimizers
         from fastmace.errors import PlanRefused, Reason
+        from fastmace.integrators import registry as schemes
         from fastmace.io.output import Output
         from fastmace.model.forcefield import ForceField
         from fastmace.planner import fallback, minimal, selfcheck
@@ -394,8 +395,11 @@ class Simulation:
         self.allow_naive_cueq = bool(allow_naive_cueq)
         self.options = options
         self._atoms = atoms.copy()
+        # FixAtoms (4-T04): fixed for the life of the run; the records' fixcm="auto" resolves from it.
+        self._fixed_indices = schemes.constraint_names(atoms)[0]
         # A relaxation plans the MD-side defaults (seed) next to its optimiser (Plan.optimizer, 4-T05).
-        self._config = IntegratorConfig(seed=seed) if optimizer is not None else integrator.to_config(seed=seed)
+        self._config = (IntegratorConfig(seed=seed) if optimizer is not None
+                        else integrator.to_config(seed=seed, fixed_atoms=bool(self._fixed_indices)))
         self._optimizer_config = None if optimizer is None else optimizer.to_config()
         self._npt = self._config.ensemble == "npt"
         # The cell-divergence stop's V0 (3b-T07): the starting volume, kept across a resume (simulation.json).
@@ -1047,12 +1051,13 @@ class Simulation:
     @property
     def degrees_of_freedom(self) -> int:
         """The degrees of freedom of this run's reported temperatures: 3N - 3 under the ``"mass_weighted"``
-        ``fixcm`` projection, else 3N (``io.trajectory.degrees_of_freedom``; SPEC §10.4, decision 37)."""
+        ``fixcm`` projection, 3(N - n_fixed) with ``FixAtoms``, else 3N (``io.trajectory.degrees_of_freedom``;
+        SPEC §10.4, decisions 37 and 45)."""
         from fastmace.io.trajectory import degrees_of_freedom
 
         plan = getattr(self, "_plan", None)
         integrator = getattr(plan, "integrator", None) or self._config
-        return degrees_of_freedom(len(self._atoms), integrator)
+        return degrees_of_freedom(len(self._atoms), integrator, len(self._fixed_indices))
 
     def _sample(self, step):
         position = self._schedule
@@ -1584,7 +1589,7 @@ class Simulation:
         if friction_per_fs is None:
             return
         self.integrator = dataclasses.replace(self.integrator, friction_per_fs=friction_per_fs)
-        self._config = self.integrator.to_config(seed=self.seed)
+        self._config = self.integrator.to_config(seed=self.seed, fixed_atoms=bool(self._fixed_indices))
         if getattr(self._plan, "integrator", None) is not None:
             self._plan = dataclasses.replace(self._plan, integrator=dataclasses.replace(
                 self._plan.integrator, friction=self._config.friction))
@@ -1745,8 +1750,10 @@ def _record_force_field(record):
 def _restart_atoms(structure, stored):
     """The run's ``Atoms`` at the restart's positions and cell, with its composition at the restart step
     (species and masses from the restart file, ``io.restart.composition``; SPEC §10.6), not the initial
-    structure's: an accepted swap or transmutation changed them since. PBC from the record."""
+    structure's: an accepted swap or transmutation changed them since. PBC from the record; ``FixAtoms`` from
+    the restart's fixed atoms (format 4; a run's constraint never changes, 4-T04)."""
     from ase import Atoms
+    from ase.constraints import FixAtoms
 
     from fastmace.io import restart
 
@@ -1756,6 +1763,9 @@ def _restart_atoms(structure, stored):
     cell = stored["cell_state"] if "cell_state" in stored else stored["cell"]
     atoms = Atoms(numbers=numbers, positions=stored["positions"], cell=cell, pbc=structure["pbc"])
     atoms.set_masses(masses)
+    fixed = restart.fixed_atoms(stored)
+    if fixed:
+        atoms.set_constraint(FixAtoms(indices=list(fixed)))
     return atoms
 
 
@@ -1782,7 +1792,7 @@ def _kept_projection(integrator, plan_record):
     if getattr(integrator, "fixcm_projection", None) != "auto" or not plan_record:
         return integrator
     values = plan_record.get("integrator") or {}
-    if values.get("fixcm_projection", "ase") == "ase" and integrator.fixcm:
+    if values.get("fixcm_projection", "ase") == "ase" and values.get("fixcm", integrator.fixcm is not False):
         # "auto" now resolves to "mass_weighted" under NVT fixcm; this run ran ASE's projection, so it keeps it.
         return dataclasses.replace(integrator, fixcm_projection="ase")
     return integrator  # what "auto" resolves to now is what it ran with: the record stays as it is

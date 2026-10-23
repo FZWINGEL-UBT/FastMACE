@@ -5,6 +5,12 @@ after it. ASE works in momenta, this port in ``state.velocities``; the operation
 run follows ASE's to rounding. ``fixcm`` (owner decision D2, recommended (a)), which ASE's class lacks:
 ``start`` removes the total momentum, and each half step projects it out again after its kick, so float
 drift of the force sum never accumulates. CSVR and Berendsen build on the helpers here.
+
+``FixAtoms`` (plan task 4-T04; ``fixcm`` is refused with it): ASE's step with a constraint. The fixed atoms'
+forces are zero (``get_forces(md=True)``), so after the first kick their velocities are zero and the drift
+leaves them where they are; then every velocity is recomputed from the displacement,
+``p = (r_new - r) m / dt``, as ``VelocityVerlet.step`` does whenever ``atoms.constraints`` is not empty; after
+the second kick the fixed velocities are zero again (``set_momenta``). Without ``FixAtoms`` none of this runs.
 """
 
 from __future__ import annotations
@@ -18,7 +24,7 @@ from ase import units
 from fastmace.config import IntegratorConfig
 
 from .base import CONSERVED_KEY, Integrator
-from .langevin import base_output_values, check_ensemble, kinetic_energy
+from .langevin import base_output_values, check_ensemble, fixed_rows, kinetic_energy
 
 if TYPE_CHECKING:
     from fastmace.state import SimulationState
@@ -40,6 +46,15 @@ def drift(state: SimulationState, dt: float) -> None:
     state.positions.add_(dt * state.velocities)
 
 
+def constrained_drift(state: SimulationState, dt: float, fixed: torch.Tensor, x_old: torch.Tensor) -> None:
+    """``FixAtoms``' drift, as ASE's ``VelocityVerlet`` with a constraint: the fixed velocities zero (their forces
+    are zero in ASE), ``r += dt p / m``, then ``p = (r_new - r) m / dt`` for every atom."""
+    state.velocities.masked_fill_(fixed, 0.0)
+    x_old.copy_(state.positions)
+    drift(state, dt)
+    state.velocities.copy_((state.positions - x_old) / dt)
+
+
 class VelocityVerlet(Integrator):
     """``ase.md.verlet.VelocityVerlet`` with the state on the device.
 
@@ -56,6 +71,8 @@ class VelocityVerlet(Integrator):
         self.dt = config.timestep_fs * units.fs
         self.fix_com = config.fixcm
         self.temperature_K = None  # no target (the restart's integrator record stores none)
+        self.fixed_rows = fixed_rows(state)
+        self.x_old = None if self.fixed_rows is None else torch.zeros_like(state.positions)
 
     @property
     def variable_cell(self) -> bool:
@@ -76,18 +93,26 @@ class VelocityVerlet(Integrator):
         half_kick(state, self.dt)
         if self.fix_com:
             remove_momentum(state)
-        drift(state, self.dt)
+        if self.fixed_rows is None:
+            drift(state, self.dt)
+        else:
+            constrained_drift(state, self.dt, self.fixed_rows, self.x_old)
 
     def second_half(self, state: SimulationState) -> None:
         half_kick(state, self.dt)
         if self.fix_com:
             remove_momentum(state)
+        if self.fixed_rows is not None:
+            state.velocities.masked_fill_(self.fixed_rows, 0.0)
 
     def mid_step_tensors(self, state: SimulationState) -> tuple[torch.Tensor, ...]:
         return (state.velocities,)
 
     def buffers(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
-        return dict(positions=state.positions, velocities=state.velocities)
+        buffers = dict(positions=state.positions, velocities=state.velocities)
+        if self.x_old is not None:
+            buffers["x_old"] = self.x_old
+        return buffers
 
     def output_values(self, state: SimulationState) -> Mapping[str, torch.Tensor]:
         values = base_output_values(state)
@@ -102,4 +127,4 @@ class VelocityVerlet(Integrator):
             raise ValueError(f"VelocityVerlet has no internal state, got {sorted(state_dict)}")
 
 
-__all__ = ("VelocityVerlet", "drift", "half_kick", "kinetic_energy", "remove_momentum")
+__all__ = ("VelocityVerlet", "constrained_drift", "drift", "half_kick", "kinetic_energy", "remove_momentum")

@@ -128,7 +128,7 @@ def _slab():
 
 @pytest.mark.parametrize(("rule", "code", "kwargs"), [
     (1, "non-3d-pbc", dict(atoms=_slab())),
-    (1, "constraints", dict(atoms=_with_constraint(nacl()))),
+    (1, "fix-atoms-with-fixcm", dict(atoms=_with_constraint(nacl()))),  # the default fixcm=True (4-T04)
     (1, "variable-cell-without-barostat", dict(variable_cell=True)),
     (2, "species-not-in-superset", dict(species=["Na"])),
     (5, "reproducible-family-not-qualified", dict(label="mp0-medium",
@@ -188,7 +188,7 @@ def test_three_violated_rules_give_one_refusal_with_three_reasons():
         plan_label("mh1-r2scan", atoms=_with_constraint(_slab()),
                    workload=Workload(max_temperature_K=300.0, reproducible=True),
                    planner=minimal(engine=EngineConfig(backend="hybrid")))
-    assert sorted(codes(caught.value)) == ["constraints", "non-3d-pbc", "reproducible-backend"]
+    assert sorted(codes(caught.value)) == ["fix-atoms-with-fixcm", "non-3d-pbc", "reproducible-backend"]
     assert not isinstance(caught.value, SpeciesNotInSuperset)
 
 
@@ -575,7 +575,8 @@ def test_evaluation_plan_is_compiled_with_stress_and_no_workload():
 def test_fixed_planner_refusals_carry_codes():
     with pytest.raises(PlanRefused) as caught:
         tp.plan_for("mh1-r2scan", atoms=_with_constraint(_slab()), rewrites=RewriteConfig(inplace_block_linear=True))
-    assert sorted(codes(caught.value)) == ["constraints", "inplace-block-linear-not-carried-over", "non-3d-pbc"]
+    assert sorted(codes(caught.value)) == ["fix-atoms-with-fixcm", "inplace-block-linear-not-carried-over",
+                                           "non-3d-pbc"]
     assert fixed.PlanRefused is PlanRefused
 
 

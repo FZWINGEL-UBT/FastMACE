@@ -13,6 +13,11 @@ Phase 4 (plan task 4-T01, conductor's choice 1) adds the records of the new sche
 ``IntegratorConfig.parameters`` in the record's units (fs, K, GPa); the implementations (4-T02, 4-T03)
 convert. Time constants have no defaults, as in ASE: physics is never chosen silently. A record whose
 scheme is not registered yet plans to a ``scheme-unknown`` refusal (rule 1).
+
+``fixcm`` of the schemes that take ``FixAtoms`` (Langevin, NVE, CSVR, Berendsen; plan task 4-T04) defaults to
+``"auto"``: off when the structure has fixed atoms, which pin the frame already, on otherwise. ``to_config``
+resolves it from ``fixed_atoms`` (the ``Simulation`` passes whether its ``Atoms`` carry ``FixAtoms``); an
+explicit ``fixcm=True`` with fixed atoms is refused by rule 1 (owner decision 44).
 """
 
 from __future__ import annotations
@@ -23,11 +28,24 @@ from typing import Literal
 
 from fastmace.config import IntegratorConfig, _check_choices, external_stress
 
-__all__ = ["CSVR", "MTK", "NVE", "RECORDS", "Berendsen", "Langevin", "LangevinBAOAB", "NoseHooverChain"]
+__all__ = ["CSVR", "MTK", "NVE", "RECORDS", "Berendsen", "Langevin", "LangevinBAOAB", "NoseHooverChain",
+           "resolve_fixcm"]
+
+
+def resolve_fixcm(fixcm: bool | str, fixed_atoms: bool) -> bool:
+    """A record's ``fixcm`` for a structure with (``fixed_atoms``) or without ``FixAtoms``: ``"auto"`` is off
+    with fixed atoms and on without; ``True`` and ``False`` stay (rule 1 refuses ``True`` with fixed atoms)."""
+    return (not fixed_atoms) if fixcm == "auto" else bool(fixcm)
+
+
+def _check_fixcm(record):
+    if not isinstance(record.fixcm, bool) and record.fixcm != "auto":
+        raise ValueError(f"{type(record).__name__}.fixcm must be True, False or 'auto', got {record.fixcm!r}")
 
 
 def _validate(record):
     _check_choices(record)
+    _check_fixcm(record)
     name = type(record).__name__
     for field in ("timestep_fs", "friction_per_fs"):
         value = getattr(record, field)
@@ -53,22 +71,25 @@ class Langevin:
     ``fixcm_projection`` is how ``fixcm`` projects the noise (``IntegratorConfig.fixcm_projection``;
     docs/design/fixcm-projection.md): ``"ase"``, ASE's, ``"mass_weighted"``, canonical at a fixed centre
     of mass for unequal masses too, or ``"auto"``, the planner's choice (``"mass_weighted"`` for MC plans
-    under ``fixcm``, else ``"ase"``).
+    under ``fixcm``, else ``"ase"``). ``fixcm``: ``"auto"`` (off with ``FixAtoms``, on otherwise), ``True`` or
+    ``False``.
     """
 
     timestep_fs: float = 0.5
     temperature_K: float
     friction_per_fs: float
-    fixcm: bool = True
+    fixcm: bool | Literal["auto"] = "auto"
     fixcm_projection: Literal["auto", "ase", "mass_weighted"] = "auto"
 
     def __post_init__(self):
         _validate(self)
 
-    def to_config(self, *, seed: int) -> IntegratorConfig:
-        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s)."""
+    def to_config(self, *, seed: int, fixed_atoms: bool = False) -> IntegratorConfig:
+        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s); ``fixed_atoms``: whether
+        the structure has ``FixAtoms`` (``fixcm="auto"``)."""
         return IntegratorConfig(ensemble="nvt", timestep_fs=float(self.timestep_fs),
-                                friction=_friction(self.friction_per_fs), seed=seed, fixcm=self.fixcm,
+                                friction=_friction(self.friction_per_fs), seed=seed,
+                                fixcm=resolve_fixcm(self.fixcm, fixed_atoms),
                                 fixcm_projection=self.fixcm_projection, temperature_K=float(self.temperature_K))
 
 
@@ -127,8 +148,9 @@ class LangevinBAOAB:
                                 temperature_K=float(self.temperature_K), external_stress_GPa=self.external_stress_GPa,
                                 disable_cell_langevin=self.disable_cell_langevin)
 
-    def to_config(self, *, seed: int) -> IntegratorConfig:
-        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s)."""
+    def to_config(self, *, seed: int, fixed_atoms: bool = False) -> IntegratorConfig:
+        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s). ``fixed_atoms`` is
+        accepted as by every record; rule 1 refuses ``FixAtoms`` with a variable cell."""
         return self._config(seed, _friction(self.friction_per_fs))
 
 
@@ -153,14 +175,16 @@ def _chain(record, *names):
 
 def _common(record, *, thermostat=True):
     _check_choices(record)
+    _check_fixcm(record)
     _number(record, "timestep_fs", positive=True)
     if thermostat:
         _number(record, "temperature_K", minimum=0)
 
 
-def _base_config(record, seed, *, ensemble, scheme, parameters, **fields):
+def _base_config(record, seed, *, ensemble, scheme, parameters, fixed_atoms=False, **fields):
     return IntegratorConfig(ensemble=ensemble, scheme=scheme, timestep_fs=float(record.timestep_fs), seed=seed,
-                            fixcm=record.fixcm, dof=record.dof, parameters=parameters, **fields)
+                            fixcm=resolve_fixcm(record.fixcm, fixed_atoms), dof=record.dof, parameters=parameters,
+                            **fields)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -168,20 +192,21 @@ class NVE:
     """Velocity Verlet, ASE's ``VelocityVerlet`` on the graph engine (SPEC §10.2; 4-T02).
 
     ``fixcm``: remove the total momentum at the start and project it out each step (owner decision D2);
-    ``dof``: ``"auto"`` (3N - 3 under ``fixcm``) or ``"ase"`` (ASE's count), for the reported temperature.
-    The conserved quantity is E_kin + E_pot.
+    ``"auto"`` turns it off with ``FixAtoms``. ``dof``: ``"auto"`` (3N - 3 under ``fixcm``, 3(N - n_fixed) with
+    ``FixAtoms``) or ``"ase"`` (ASE's count), for the reported temperature. The conserved quantity is
+    E_kin + E_pot.
     """
 
     timestep_fs: float
-    fixcm: bool = True
+    fixcm: bool | Literal["auto"] = "auto"
     dof: Literal["auto", "fastmace", "ase"] = "auto"
 
     def __post_init__(self):
         _common(self, thermostat=False)
 
-    def to_config(self, *, seed: int) -> IntegratorConfig:
+    def to_config(self, *, seed: int, fixed_atoms: bool = False) -> IntegratorConfig:
         """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s)."""
-        return _base_config(self, seed, ensemble="nve", scheme="nve", parameters={})
+        return _base_config(self, seed, ensemble="nve", scheme="nve", parameters={}, fixed_atoms=fixed_atoms)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -195,17 +220,17 @@ class CSVR:
     timestep_fs: float
     temperature_K: float
     tau_fs: float
-    fixcm: bool = True
+    fixcm: bool | Literal["auto"] = "auto"
     dof: Literal["auto", "fastmace", "ase"] = "auto"
 
     def __post_init__(self):
         _common(self)
         _number(self, "tau_fs", positive=True)
 
-    def to_config(self, *, seed: int) -> IntegratorConfig:
+    def to_config(self, *, seed: int, fixed_atoms: bool = False) -> IntegratorConfig:
         """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s)."""
         return _base_config(self, seed, ensemble="nvt", scheme="csvr", parameters={"tau_fs": float(self.tau_fs)},
-                            temperature_K=float(self.temperature_K))
+                            temperature_K=float(self.temperature_K), fixed_atoms=fixed_atoms)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -230,8 +255,9 @@ class NoseHooverChain:
         _number(self, "tdamp_fs", positive=True)
         _chain(self, "tchain", "tloop")
 
-    def to_config(self, *, seed: int) -> IntegratorConfig:
-        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s)."""
+    def to_config(self, *, seed: int, fixed_atoms: bool = False) -> IntegratorConfig:
+        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s); rule 1 refuses
+        ``FixAtoms`` here (decision 44)."""
         return _base_config(self, seed, ensemble="nvt", scheme="nhc", temperature_K=float(self.temperature_K),
                             parameters={"tdamp_fs": float(self.tdamp_fs), "tchain": self.tchain,
                                         "tloop": self.tloop})
@@ -267,8 +293,9 @@ class MTK:
         _number(self, "pdamp_fs", positive=True)
         _chain(self, "tchain", "pchain", "tloop", "ploop")
 
-    def to_config(self, *, seed: int) -> IntegratorConfig:
-        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s)."""
+    def to_config(self, *, seed: int, fixed_atoms: bool = False) -> IntegratorConfig:
+        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s); rule 1 refuses
+        ``FixAtoms`` here (decision 44)."""
         return _base_config(self, seed, ensemble="npt", scheme="mtk", temperature_K=float(self.temperature_K),
                             pressure_GPa=float(self.pressure_GPa), cell_mode=self.cell_mode,
                             parameters={"tdamp_fs": float(self.tdamp_fs), "pdamp_fs": float(self.pdamp_fs),
@@ -294,7 +321,7 @@ class Berendsen:
     taup_fs: float | None = None
     compressibility_per_GPa: float | None = None
     mask: tuple[int, int, int] | None = None
-    fixcm: bool = True
+    fixcm: bool | Literal["auto"] = "auto"
     dof: Literal["auto", "fastmace", "ase"] = "auto"
 
     def __post_init__(self):
@@ -315,16 +342,18 @@ class Berendsen:
                 raise ValueError(f"Berendsen.mask must be three 0/1 flags, got {self.mask!r}")
             object.__setattr__(self, "mask", tuple(int(flag) for flag in mask))
 
-    def to_config(self, *, seed: int) -> IntegratorConfig:
-        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s)."""
+    def to_config(self, *, seed: int, fixed_atoms: bool = False) -> IntegratorConfig:
+        """The ``IntegratorConfig`` of this record with ``seed`` (the ``Simulation``'s); ``FixAtoms`` runs with
+        NVT only (rule 1)."""
         parameters = {"taut_fs": float(self.taut_fs)}
         if self.pressure_GPa is None:
             return _base_config(self, seed, ensemble="nvt", scheme="berendsen", parameters=parameters,
-                                temperature_K=float(self.temperature_K))
+                                temperature_K=float(self.temperature_K), fixed_atoms=fixed_atoms)
         parameters.update(taup_fs=float(self.taup_fs), compressibility_per_GPa=float(self.compressibility_per_GPa),
                           mask=self.mask)
         return _base_config(self, seed, ensemble="npt", scheme="berendsen", parameters=parameters,
-                            temperature_K=float(self.temperature_K), pressure_GPa=float(self.pressure_GPa),
+                            fixed_atoms=fixed_atoms, temperature_K=float(self.temperature_K),
+                            pressure_GPa=float(self.pressure_GPa),
                             cell_mode="hydrostatic" if self.mask is None else "full")
 
 

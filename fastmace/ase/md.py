@@ -188,7 +188,8 @@ class _Dynamics:
         self.loginterval = loginterval
         self._logfile = logfile
         self._frame = atoms.copy()  # what the trajectory writer and the logger see
-        self._frame.set_constraint()
+        # The frame keeps only FixAtoms (4-T04), which ASE's trajectory stores and Atoms.get_temperature counts.
+        self._frame.set_constraint([c.copy() for c in atoms.constraints if type(c).__name__ == "FixAtoms"])
         self._frame.calc = None
         self._clock = _Clock(timestep)
         self._logger = None
@@ -468,9 +469,9 @@ class _Dynamics:
         if tuple(bool(p) for p in atoms.pbc) != before.pbc:
             raise _refuse("an observer changed the PBC: that invalidates the plan (full 3D PBC, SPEC §4.4)",
                           code="observer-pbc")
-        if atoms.constraints:
-            raise _refuse("an observer added constraints: that invalidates the plan; FixAtoms is phase 4 (SPEC "
-                          "§4.4)", code="observer-constraints")
+        if _constraint_record(atoms) != before.constraints:
+            raise _refuse("an observer changed the constraints: that invalidates the plan; a run's FixAtoms stays "
+                          "as it started (SPEC §4.4)", code="observer-constraints")
         if not np.array_equal(atoms.cell.array, before.cell):
             raise _refuse("an observer changed the cell: only the barostat changes it (SPEC §7.7)",
                           code="observer-cell")
@@ -530,8 +531,8 @@ class _Dynamics:
                 frame.numbers = values["numbers"]
             if not np.array_equal(frame.get_masses(), values["masses"]):
                 frame.set_masses(values["masses"])
-        frame.set_positions(values["positions"])
-        frame.set_momenta(values["momenta"])
+        frame.set_positions(values["positions"], apply_constraint=False)  # the engine applied FixAtoms
+        frame.set_momenta(values["momenta"], apply_constraint=False)
         frame.calc = SinglePointCalculator(frame, energy=float(values["energy"][0]), forces=values["forces"],
                                            **extra)
         if self._trajectory is not None or self._trajectory_writer is not None:
@@ -575,7 +576,9 @@ class Langevin(_Dynamics):
     ``fixcm_projection`` (``fm.integrators.Langevin``'s; decision 37). With ``fixcm``, ``"auto"`` resolves
     to the mass-weighted projection: the log then reads its frames with ASE's ``FixCom``, so its
     temperature counts 3N - 3 (the trajectory frames stay unconstrained). ``fixcm_projection="ase"`` is
-    ASE's ``Langevin`` exactly (its noise stream, 3N).
+    ASE's ``Langevin`` exactly (its noise stream, 3N). ``FixAtoms`` runs with ``fixcm=False`` (ASE's default
+    ``fixcm=True`` is refused with it, owner decision 44); the log and the trajectory frames carry the
+    constraint, so temperatures count 3(N - n_fixed).
     """
 
     SUPPORTED = ("atoms", "timestep", "temperature", "friction", "fixcm", "temperature_K", "trajectory", "logfile",
@@ -696,6 +699,14 @@ class _Written:
         self.masses = atoms.get_masses()
         self.charges = atoms.get_initial_charges()
         self.info = {key: atoms.info.get(key) for key in PLAN_INFO_KEYS}
+        self.constraints = _constraint_record(atoms)
+
+
+def _constraint_record(atoms):
+    """``atoms``' constraints as rule 1 reads them: the ``FixAtoms`` indices and the other classes' names."""
+    from fastmace.integrators.registry import constraint_names
+
+    return constraint_names(atoms)
 
 
 def _kB():
@@ -754,14 +765,14 @@ def _dispersion(dispersion, model, atoms):
 
 
 def _check_constraints(atoms):
+    """Only ``FixAtoms`` is supported (SPEC §4.4); whether the integrator takes it is rule 1's, at the plan
+    (``fixcm=True``, ASE's default, is refused with it: pass ``fixcm=False``; owner decision 44)."""
     from ase.constraints import FixAtoms
 
     for constraint in atoms.constraints:
-        if isinstance(constraint, FixAtoms):
-            raise _refuse("FixAtoms is refused until the integrators support it in phase 4 (SPEC §4.4); no other "
-                          "tier is substituted", code="constraint-fixatoms")
-        raise _refuse(f"the ASE constraint {type(constraint).__name__} is refused in 1.0 (SPEC §4.4)",
-                      code="constraint-other")
+        if not isinstance(constraint, FixAtoms):
+            raise _refuse(f"the ASE constraint {type(constraint).__name__} is refused in 1.0; only FixAtoms is "
+                          "supported (SPEC §4.4)", code="constraint-other")
 
 
 def _voigt_GPa(externalstress, hydrostatic):

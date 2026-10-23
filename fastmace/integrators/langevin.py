@@ -41,6 +41,16 @@ def allocate_noise(state: SimulationState, shape: tuple[int, ...]) -> None:
     rng.cursor = shape[0]
 
 
+def fixed_rows(state: SimulationState) -> torch.Tensor | None:
+    """``(N, 1)`` bool, True for the ``FixAtoms`` atoms (from ``state.free_mask``), or ``None`` without them.
+
+    The integrators' mask path (plan task 4-T04, ASE's ``FixAtoms``): the fixed rows of the positions are reset
+    to their values before the drift (``adjust_positions``) and the fixed rows of the velocities set to zero
+    after the last kick (``adjust_momenta``), both with ``where``/``masked_fill``, so free atoms keep their bits.
+    Without ``FixAtoms`` no step does anything extra."""
+    return None if state.free_mask is None else state.free_mask == 0
+
+
 def kinetic_energy(state: SimulationState) -> torch.Tensor:
     return (0.5 * (state.masses * state.velocities ** 2).sum()).reshape(1)
 
@@ -63,6 +73,9 @@ class Langevin(Integrator):
     ``fixcm_projection`` and ``noise_batch``. ``fixcm_projection="ase"`` is ASE's projection bit for bit;
     ``"mass_weighted"`` removes the mass-weighted mean of both random terms without ASE's scale factor,
     which is canonical at fixed centre of mass for unequal masses too (docs/design/fixcm-projection.md).
+    ``FixAtoms`` (``fixed_rows``; ``fixcm`` is refused with it): the fixed atoms go back to their positions
+    after the drift, as ASE's ``set_positions``, so their mid-step velocity is ``-rnd_pos / dt`` as in ASE, and
+    their velocities are zero after the second kick, as ASE's ``set_momenta``. The noise is drawn for every atom.
 
     Random numbers come from ``state.rng`` ``noise_batch`` steps at a time, in ASE's order (per step
     ``xi``, then ``eta``, each ``(N, 3)``): a ``(k, 2, N, 3)`` draw gives the same numbers as k pairs of
@@ -86,6 +99,7 @@ class Langevin(Integrator):
         self.eta = torch.zeros_like(state.positions)
         self.rnd_pos = torch.zeros_like(state.positions)
         self.rnd_vel = torch.zeros_like(state.positions)
+        self.fixed_rows = fixed_rows(state)
         allocate_noise(state, (self.noise_batch, 2, self.natoms, 3))
 
         # ASE coefficients (Langevin.updatevars). c1, c2 do not depend on T;
@@ -168,11 +182,15 @@ class Langevin(Integrator):
         v.add_(self.c1 * state.forces / masses - self.c2 * v + self.rnd_vel)
         self.x_old.copy_(x)
         x.add_(self.dt * v + self.rnd_pos)
+        if self.fixed_rows is not None:
+            x.copy_(torch.where(self.fixed_rows, self.x_old, x))
         v.copy_((x - self.x_old - self.rnd_pos) / self.dt)
 
     def second_half(self, state: SimulationState) -> None:
         v = state.velocities
         v.add_(self.c1 * state.forces / state.masses - self.c2 * v + self.rnd_vel)
+        if self.fixed_rows is not None:
+            v.masked_fill_(self.fixed_rows, 0.0)
 
     def mid_step_tensors(self, state: SimulationState) -> tuple[torch.Tensor, ...]:
         return (state.velocities,)

@@ -37,7 +37,7 @@ def test_the_public_namespaces():
 
 def test_the_phase_1a_records():
     langevin, baoab = reg.registry().integrator("langevin"), reg.registry().integrator("baoab")
-    assert (langevin.ensembles, langevin.cell_modes, langevin.constraints) == (("nvt",), ("fixed",), ("fixcm",))
+    assert (langevin.ensembles, langevin.cell_modes, langevin.constraints) == (("nvt",), ("fixed",), ("fixcm", "fix_atoms"))
     assert (baoab.ensembles, baoab.cell_modes, baoab.variable_cell) == (("npt",), ("hydrostatic", "full"), True)
     assert langevin.load().__name__ == "Langevin" and baoab.load().__name__ == "LangevinBAOAB"
     assert "externalstress" in baoab.constructor_keywords(IntegratorConfig(ensemble="npt"))
@@ -101,10 +101,10 @@ def test_phase_1a_configs_pass():
     assert reg.integrator_refusals(IntegratorConfig(ensemble="npt", cell_mode="full"), variable_cell=True) == []
 
 
-def test_fix_atoms_is_refused_by_langevin_until_4_t04():
+def test_langevin_takes_fix_atoms_without_fixcm():  # 4-T04 (decision 44)
+    assert reg.integrator_refusals(IntegratorConfig(fixcm=False), fix_atoms=True) == []
     reasons = reg.integrator_refusals(IntegratorConfig(), fix_atoms=True)
-    assert _codes(reasons) == ["constraints"]
-    assert "FixAtoms" in reasons[0] and "4-T04" in reasons[0]
+    assert _codes(reasons) == ["fix-atoms-with-fixcm"] and "fixcm=False" in reasons[0]
 
 
 @pytest.mark.parametrize(("kwargs", "config", "codes"), [
@@ -164,9 +164,11 @@ def test_the_planner_takes_rule_1_from_the_registry():
     assert codes(caught.value) == ["scheme-unknown"]
     atoms = nacl()
     atoms.set_constraint(FixAtoms(indices=[0]))
+    assert plan_label("mh1-r2scan", atoms=atoms, integrator=IntegratorConfig(fixcm=False)).integrator.fixcm is False
     with pytest.raises(PlanRefused) as caught:
-        plan_label("mh1-r2scan", atoms=atoms, integrator=IntegratorConfig(fixcm=False))
-    assert codes(caught.value) == ["constraints"] and "4-T04" in caught.value.reasons[0]
+        plan_label("mh1-r2scan", atoms=atoms, integrator=IntegratorConfig(ensemble="npt", fixcm=False),
+                   variable_cell=True)
+    assert codes(caught.value) == ["constraints"] and "variable cell" in caught.value.reasons[0]
     plan = plan_label("mh1-r2scan")
     assert plan.integrator.dof == "fastmace" and plan.integrator.scheme == "langevin"
     assert dict((item, choice) for item, choice, _ in plan.decisions)["IntegratorConfig.dof"] == "fastmace"

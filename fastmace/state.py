@@ -250,7 +250,8 @@ class SimulationState:
 
         Forces and energy start as zeros; the engine fills them with the initial evaluation.
         ``compute_stress`` allocates ``stress``. ``FixAtoms`` becomes ``fixed_indices`` and ``free_mask``;
-        any other constraint raises (SPEC §4.4). Whether the integrator takes fixed atoms is rule 1's
+        any other constraint raises (SPEC §4.4); the fixed atoms' velocities are zero, as ASE's
+        ``set_momenta`` with the constraint leaves them (4-T04). Whether the integrator takes fixed atoms is rule 1's
         (``fastmace.integrators.registry``). The noise batch is left to the integrator, whose layout it is;
         charges, total charge and spin to the planner, because whether they are inputs depends on the model.
         """
@@ -264,15 +265,17 @@ class SimulationState:
 
         f64 = dict(dtype=torch.float64, device=device)
         positions = torch.tensor(atoms.get_positions(), **f64)
+        velocities = torch.tensor(atoms.get_velocities(), **f64)
         free_mask = None
         if fixed:
             free_mask = torch.ones((len(atoms), 1), **f64)
             free_mask[list(fixed)] = 0.0
+            velocities[list(fixed)] = 0.0
         return cls(
             fixed_indices=fixed,
             free_mask=free_mask,
             positions=positions,
-            velocities=torch.tensor(atoms.get_velocities(), **f64),
+            velocities=velocities,
             masses=torch.tensor(atoms.get_masses()[:, None], **f64),
             cell=torch.tensor(atoms.cell.array, **f64),
             species=torch.tensor(atoms.numbers, dtype=torch.int64, device=device),

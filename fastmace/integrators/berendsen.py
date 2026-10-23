@@ -7,6 +7,9 @@ says so; the planner warns and the report shows the line).
   ``lambda = sqrt(1 + (T0 / T - 1) dt / taut)``, clamped to [0.9, 1.1] as ASE does, with T the kinetic
   temperature over ``ndof`` (D2; ``dof="ase"`` is ASE's ``get_temperature``), then one velocity Verlet
   step. ``fixcm`` is ASE's: after the first kick the mean momentum ``sum(p) / N`` is subtracted.
+  ``FixAtoms`` (4-T04, NVT only; ``fixcm`` is refused with it): ASE's fixed atoms have zero forces and momenta,
+  so their velocities are set to zero after each kick and the drift leaves them in place. ASE's
+  ``NVTBerendsen`` does not recompute the momenta from the displacement, and neither does this port.
 - ``NPTBerendsen`` (``pressure_GPa``, cell mode ``"hydrostatic"``): after the velocity scaling the cell and
   the positions are scaled by ``1 - dt kappa / (3 taup) (P0 - P)``, P from the stress including the
   ideal-gas term of the scaled velocities (``get_stress(include_ideal_gas=True)``).
@@ -34,7 +37,7 @@ from fastmace.config import IntegratorConfig
 from fastmace.neighbors.skin import det_3x3, inverse_3x3, times_3x3
 
 from .base import Integrator
-from .langevin import base_output_values
+from .langevin import base_output_values, fixed_rows
 from .nve import drift, half_kick
 
 if TYPE_CHECKING:
@@ -67,6 +70,7 @@ class Berendsen(Integrator):
         self.dt = config.timestep_fs * units.fs
         self.fix_com = config.fixcm
         self.natoms = state.natoms
+        self.fixed_rows = fixed_rows(state)
         self.tautscl = self.dt / (_positive(config, "taut_fs") * units.fs)
         self.ndof = self.degrees_of_freedom(state)
         f64 = dict(dtype=torch.float64, device=state.positions.device)
@@ -165,10 +169,14 @@ class Berendsen(Integrator):
             # ASE's fixcm: subtract the mean momentum sum(p) / N
             v, masses = state.velocities, state.masses
             v.sub_((masses * v).sum(dim=0) / self.natoms / masses)
+        if self.fixed_rows is not None:
+            state.velocities.masked_fill_(self.fixed_rows, 0.0)
         drift(state, self.dt)
 
     def second_half(self, state: SimulationState) -> None:
         half_kick(state, self.dt)
+        if self.fixed_rows is not None:
+            state.velocities.masked_fill_(self.fixed_rows, 0.0)
 
     def mid_step_tensors(self, state: SimulationState) -> tuple[torch.Tensor, ...]:
         return (state.velocities,)
