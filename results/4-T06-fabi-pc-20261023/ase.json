@@ -1,0 +1,94 @@
+{
+  "schema": 3,
+  "task": "4-T05/4-T06",
+  "side": "ase",
+  "optimizer": "fire",
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T06:02:21+00:00",
+  "fastmace_commit": null,
+  "machine": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/home/fzwin/.cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NaCl": {
+      "traj": "/mnt/g/Margraf/ResearchModule/Experiments/Langevin_Thermostat/results/anneal-NaCl-rtx5060ti-20261010/NaCl/quench-min500K-bin100K-n2-fmax0.01/captured.traj",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 50,
+          "seconds": 24.171013330997084,
+          "initial_eV_atom": -6.826207162053497,
+          "energy_eV_atom": -6.88727362729885,
+          "fmax_eV_A": 0.009182184830751736,
+          "ms_per_step": 483.4202666199417,
+          "switch_flips": 3
+        },
+        "10": {
+          "converged": true,
+          "steps": 60,
+          "seconds": 1.2974735909992887,
+          "initial_eV_atom": -6.759718426951656,
+          "energy_eV_atom": -6.88728321702392,
+          "fmax_eV_A": 0.009044842780582105,
+          "ms_per_step": 21.624559849988145,
+          "switch_flips": 3
+        },
+        "20": {
+          "converged": true,
+          "steps": 49,
+          "seconds": 0.8380832800030475,
+          "initial_eV_atom": -6.854241998107345,
+          "energy_eV_atom": -6.887278329443048,
+          "fmax_eV_A": 0.009848649550298428,
+          "ms_per_step": 17.10374040822546,
+          "switch_flips": 3
+        }
+      }
+    },
+    "NbCl5": {
+      "traj": "/mnt/g/Margraf/ResearchModule/Experiments/Langevin_Thermostat/results/anneal-production-rtx5060ti-20261010/NbCl5/quench-min500K-bin100K-n2-fmax0.01/captured.traj",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 181,
+          "seconds": 25.56424837099985,
+          "initial_eV_atom": -10.561085894765187,
+          "energy_eV_atom": -10.6232843359802,
+          "fmax_eV_A": 0.009930331044938632,
+          "ms_per_step": 141.23894127624226,
+          "switch_flips": 8
+        },
+        "10": {
+          "converged": true,
+          "steps": 288,
+          "seconds": 8.23187556799894,
+          "initial_eV_atom": -10.498799017304746,
+          "energy_eV_atom": -10.623311040087492,
+          "fmax_eV_A": 0.005899551495541623,
+          "ms_per_step": 28.5829012777741,
+          "switch_flips": 6
+        },
+        "20": {
+          "converged": true,
+          "steps": 133,
+          "seconds": 3.7652198180003325,
+          "initial_eV_atom": -10.590692713918019,
+          "energy_eV_atom": -10.62332818034745,
+          "fmax_eV_A": 0.008790559544849454,
+          "ms_per_step": 28.309923443611524,
+          "switch_flips": 6
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T06:03:27+00:00"
+}

@@ -123,6 +123,7 @@ def test_polar_record_carries_the_issue_1642_fix_and_its_validation():
     validation = fix["validation"]
     assert validation["method"] == "central finite differences of the reference energy"
     assert validation["structure"] == "NaCl 3x3x3" and validation["tolerance_eV_per_A3"] == 1e-6
+    # The qualified record's text is fixed (its id): 3b-T08 resolved this finding, the entry still states it.
     assert "4.4e-4" in fix["open_findings"][0] and "phase 3b" in fix["open_findings"][0]
     # A fix is a correction of a defect, not non-stock physics.
     assert record.is_stock
@@ -268,6 +269,45 @@ def test_polar_stress_fix_is_active_against_finite_differences():
     assert check["passed"] and check["max_abs"] < 1e-5 * scale
     with pytest.raises(records.ReferencePolicyError, match="finite differences"):
         reference.check_stress_fix(atoms, tolerance=1e-12 * scale)
+
+
+def cell_at_the_kspace_cutoff(model, atoms, n=(3, 0, 0), ratio=1 + 5e-6):
+    """``atoms`` scaled so that the k-vector of integer coefficients ``n`` lies at ``ratio`` x the cutoff."""
+    k = np.asarray(n, float) @ (2 * np.pi * np.linalg.inv(atoms.cell.array.T))
+    scale = np.linalg.norm(k) / (float(model.kspace_cutoff) * ratio)
+    atoms = atoms.copy()
+    atoms.set_cell(atoms.cell.array * scale, scale_atoms=True)
+    return atoms
+
+
+@needs_polar
+def test_polar_stress_check_freezes_the_kset_across_the_cutoff():
+    """3b-T08: a k-vector just outside the hard k-space cutoff enters under +h strain, so the live energy
+    steps and its finite differences go as 1/h; the self-test holds the unstrained cell's included set."""
+    from fastmace.longrange import polar
+
+    model = model64("polar")
+    atoms = cell_at_the_kspace_cutoff(model, structure("polar", rattle=0.05, seed=3, sheared=True))
+    reference = calculators.ReferenceCalculator.from_calculator(mace_calculator(model), record_of(model), atoms)
+    _, _, stress = reference.evaluate(atoms)
+    live = calculators.finite_difference_stress(reference, atoms)
+    scale = np.abs(stress).max()
+    with polar.frozen_kset(reference.model, atoms.cell.array):
+        frozen = calculators.finite_difference_stress(reference, atoms)
+    assert polar.get_state(reference.model).frozen_included is None
+    # The (3, 0, 0) pair enters at e_xx = +h: the live xx difference has the step (1.1e-5; frozen, every
+    # component <= 2.7e-7, the O(h^2) truncation; 23 October 2026). The others are the same either way.
+    assert np.abs(stress - frozen).max() < 1e-6 * scale
+    assert np.abs(stress - live)[0, 0] > 20 * np.abs(stress - frozen).max()
+    off_xx = np.ones((3, 3), bool)
+    off_xx[0, 0] = False
+    np.testing.assert_array_equal(live[off_xx], frozen[off_xx])
+    check = reference.check_stress_fix(atoms, tolerance=1e-6 * scale)
+    assert check["passed"] and check["kset"] == "frozen" and check["max_abs"] < 1e-6 * scale
+    np.testing.assert_array_equal(check["fd_stress"], frozen)
+    # The live set is back afterwards: the same strained energy as before the check.
+    assert polar.get_state(reference.model).frozen_included is None
+    np.testing.assert_array_equal(calculators.finite_difference_stress(reference, atoms), live)
 
 
 @needs_polar

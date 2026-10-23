@@ -149,6 +149,12 @@ class ReferenceForceField:
 
         self.atoms.set_cell(cell.detach().to("cpu", torch.float64).numpy(), scale_atoms=False)
 
+    def reset_cell(self, cell) -> None:
+        """A new cell between steps (4-T05's ``Simulation.update(cell=)``)."""
+        import numpy as np
+
+        self.atoms.set_cell(np.asarray(cell, dtype=np.float64), scale_atoms=False)
+
     def reset_polar(self, cell) -> tuple[bool, bool]:
         """A canonical restart point: size a PolarMACE k-space state for ``cell``, as a fresh build does."""
         if self.reference.is_polar:

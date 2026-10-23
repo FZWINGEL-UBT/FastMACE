@@ -167,6 +167,11 @@ class D3PairList:
             moved = True
         return moved
 
+    def reset_cell(self, cell) -> None:
+        """A new cell for the next ``build``, fixed or variable cell (host, between replays; 4-T05)."""
+        self.cell = np.array(cell, dtype=float)
+        self.cell_t.copy_(torch.as_tensor(self.cell, dtype=torch.float64, device=self.device))
+
     def build(self, positions, cell=None) -> bool:
         """Rebuild from (N, 3) float64 positions (NumPy or tensor) at the current cell (``cell``: set it first).
 

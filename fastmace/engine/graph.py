@@ -175,6 +175,12 @@ class GraphEngine(Engine):
         if config.pipelined == "auto":
             raise ValueError("EngineConfig.pipelined is 'auto'; the planner resolves it, so pass 'on' or 'off'")
         self.variable_cell = bool(integrator.variable_cell)
+        # An optimiser in the integrator's place (fastmace.optimize.driver.OptimizerStepper, 4-T05): checked
+        # steps only, whose one host transfer also carries its status.
+        self.optimizer = getattr(integrator, "optimizer", None)
+        if self.optimizer is not None and (config.speculative_graph or config.pipelined == "on"):
+            raise ValueError("an optimiser runs checked steps only: its converged flag decides each step before "
+                             "the force call (pipelined='off', speculative_graph=False)")
         if config.speculative_graph:
             if self.variable_cell:
                 raise ValueError("speculative combined graphs are not available for NPT (variable cell)")
@@ -223,6 +229,10 @@ class GraphEngine(Engine):
         # Rebuild flag and edge count, read by the host with one transfer per step.
         self._flags = torch.zeros(2, dtype=torch.int64, device=device)
         self._flags_host = torch.zeros(2, **pinned)
+        # An optimiser's [converged, max force, energy], read with the flags; halted: the last step stopped at it.
+        self._status_host = torch.zeros(3, dtype=torch.float64, pin_memory=self.cuda)
+        self._status_view = self._status_host.numpy()
+        self.halted = False
         # Speculative steps: per slot [rebuild, count], copied behind the step.
         self._spec_flags = torch.zeros((SPECULATIVE_SLOTS, 2), dtype=torch.int64, device=device)
         self._spec_flags_host = torch.zeros((SPECULATIVE_SLOTS, 2), **pinned)
@@ -400,6 +410,19 @@ class GraphEngine(Engine):
     def potential_energy(self) -> float:
         self.flush()
         return float(self.state.energy[0])
+
+    def optimizer_status(self) -> tuple[bool, float, float]:
+        """``(converged, max force, energy)`` as the last step's host transfer read them: the committed state
+        before that step (the state itself when it halted). An optimiser engine only; no sync."""
+        converged, force, energy = (float(value) for value in self._status_view)
+        return bool(converged), force, energy
+
+    def read_optimizer_status(self) -> tuple[bool, float, float]:
+        """``(converged, max force, energy)`` of the committed state now (a host sync)."""
+        if self.optimizer is None:
+            raise TypeError("this engine steps an integrator, not an optimiser")
+        converged, force, energy = (float(value) for value in self.integrator.status.detach().cpu())
+        return bool(converged), force, energy
 
     def energy(self, *, precision: str | None = None) -> torch.Tensor:
         """The potential energy of the committed state from the forward-only energy graph (key ``ENERGY_KEY``,
@@ -641,6 +664,8 @@ class GraphEngine(Engine):
         extra = {"rebuilds_beside": self.rebuilds_beside} if self.config.overlap_rebuild else {}
         if self.config.fused_integrator:  # True, or why the PyTorch stage was kept
             extra["fused_integrator"] = self.fused_integrator_reason or True
+        if self.optimizer is not None:
+            extra["optimizer"] = self.integrator.config.scheme
         return {**extra,
             "engine": "graph", "mode": self.mode, "capture": self.capture, "pad_edges": self.pad_edges,
             "variable_cell": self.variable_cell, "initial_edges": self.initial_edges, "edge_bucket": self.edge_bucket,
@@ -713,6 +738,30 @@ class GraphEngine(Engine):
             self.integrator.start(state)
         self.canonical_points += 1
 
+    def reset_cell(self, cell) -> None:
+        """A host write of the cell at fixed cell (4-T05, for 4-T09's quench frames on one engine): ``state.cell``,
+        the force field's lists and cell inputs, and the energy-graph copies, all in place. The caller ends at a
+        canonical point (``canonicalise(reevaluate=True)``; ``Simulation.update`` does), whose rebuild writes
+        the new shifts into the buffers the captured graphs read: only a grown capacity or a new padded edge
+        size re-captures. A variable-cell engine is refused (its barostat state belongs to the cell)."""
+        if self.variable_cell:
+            raise ValueError("a host write of the cell is for fixed-cell engines; a variable-cell run moves its cell "
+                             "itself")
+        fields = [self.force_field] + [field for field in self._energy_fields.values() if field is not self.force_field]
+        missing = [type(field).__name__ for field in fields if getattr(field, "reset_cell", None) is None]
+        if missing:
+            raise TypeError(f"{', '.join(missing)} cannot take a new cell (reset_cell)")
+        if isinstance(cell, torch.Tensor):
+            cell = cell.detach().to(self.device, torch.float64)
+        else:  # a copy: read-only (frozen) arrays too
+            cell = torch.tensor([[float(value) for value in row] for row in cell], dtype=torch.float64,
+                                device=self.device)
+        self.flush()
+        with torch.no_grad():
+            self.state.cell.copy_(cell)
+        for field in fields:
+            field.reset_cell(cell)
+
     def restart_buckets(self) -> dict[str, int]:
         """The edge bucket and neighbour capacity for the restart's plan record (SPEC §10.6, ``Plan.to_restart``)."""
         return {"edge_bucket": int(self.edge_bucket), "neighbour_capacity": int(self.force_field.edge_capacity)}
@@ -748,6 +797,9 @@ class GraphEngine(Engine):
         if state.rng.batch is not None:
             named["state.rng.batch"] = state.rng.batch
         named.update({f"integrator.{name}": tensor for name, tensor in self.integrator.buffers(state).items()})
+        if self.optimizer is not None:  # 4-T05: the optimiser's history and scalars, the DOF view's own buffers
+            named.update({f"optimizer.{name}": tensor for name, tensor in self.optimizer.buffers().items()})
+            named.update({f"dof.{name}": tensor for name, tensor in self.optimizer.dof.buffers().items()})
         # Set by set_temperature between steps and read by every step; not in buffers() (1a).
         sqrt_kT = getattr(self.integrator, "sqrt_kT", None)
         if isinstance(sqrt_kT, torch.Tensor):
@@ -759,7 +811,8 @@ class GraphEngine(Engine):
         named.update({"engine.rebuild_needed": self.rebuild_needed, "engine.flags": self._flags,
                       "engine.pipe_flags": self._pipe_flags, "engine.spec_flags": self._spec_flags,
                       "engine.flags_host": self._flags_host, "engine.pipe_flags_host": self._pipe_flags_host,
-                      "engine.spec_flags_host": self._spec_flags_host, "engine.overflow": self.overflow})
+                      "engine.spec_flags_host": self._spec_flags_host, "engine.overflow": self.overflow,
+                      "engine.status_host": self._status_host})
         named.update({f"engine.mid.{index}": tensor for index, tensor in enumerate(self._mids)})
         # Derived buffers not registered above under their owner's name (a tensor is registered once).
         named.update({f"derived.{name}": self.derived[name].buffer for name in self.derived.names()
@@ -872,8 +925,16 @@ class GraphEngine(Engine):
         # a rebuild step C runs again on the new candidates.
         self._run("AC")
         self._flags_host.copy_(self._flags, non_blocking=True)
+        if self.optimizer is not None:
+            self._status_host.copy_(self.integrator.status, non_blocking=True)
         if self._flags_host.is_pinned():
             torch.cuda.current_stream().synchronize()  # host sync (the only one on most steps)
+        if self.optimizer is not None:
+            # A converged optimiser left the positions unchanged in stage A: the committed state stays, and
+            # the step neither evaluates forces nor counts (4-T05).
+            self.halted = bool(self._status_view[0])
+            if self.halted:
+                return
         rebuild, count = (int(value) for value in self._flags_host)
         if rebuild:
             self._rebuild()

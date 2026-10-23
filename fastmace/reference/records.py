@@ -65,6 +65,11 @@ STOCK = {
     "source": "1a-T19's gate references (run 1a-T19-gate-leto-20261018)",
 }
 
+# The entry's text enters the qualified record's id (restart files and metadata carry it), so it stays as
+# 1b qualified it. Its validation is now wider than it says: since 4-T11, check_stress_fix holds the
+# unstrained cell's k-set and runs on any structure, and the open NbCl5 finding is resolved (3b-T08: the
+# finite-difference reference stepped where a k-vector crossed the hard k-space cutoff; the stress is
+# exact, 8.3e-9 eV/A^3 with the k-set frozen). A new qualified record version would restate both.
 POLAR_STRESS_FIX = {
     "name": "polar_kspace_stress",
     "issue": "MACE issue 1642",
