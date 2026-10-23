@@ -62,8 +62,10 @@ Why it matters:
 
 ## Owner decisions
 
-**Open.** Each names the tasks it blocks. The tasks that need none are
-listed under "Order and parallelism".
+**Decided (owner, 23 October 2026): the recommendation (a) of each**, D1–D6,
+in the owner's words "For the other decisions I trust your recommendations".
+They are SPEC §18 decisions 44 (D1) to 49 (D6). The text below keeps each
+option for the record.
 
 **D1. Where `FixAtoms` is supported.** §4.4 says "all 1.0 integrators and
 optimisers". ASE 3.27 is not uniform: `NoseHooverChainNVT`, `MTKNPT` and

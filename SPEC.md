@@ -308,20 +308,27 @@ dispersion rule.
 
 ### 4.4 Boundary conditions and constraints
 
-Support is declared per engine and integrator; the planner refuses anything
-outside this table at plan time, before any compilation.
+Support is declared per scheme: each integrator, optimiser and cell filter
+has a record in `fastmace.integrators.registry` that lists its ensembles, cell
+modes and constraint rows (`fixcm`, `fix_atoms`), with a reason for each row it
+lacks. Rule 1 (§9.3) reads these records and refuses anything outside them at
+plan time, before any compilation, with a reason and a stable code. `FixAtoms`
+is held in the state as a device mask and host indices. Every other ASE
+constraint is refused, and so are MC moves with any constraint (decision 10).
 
 | Feature | Tiers 1–3 (force field) | Integrators and optimisers | Today |
 | --- | --- | --- | --- |
 | Periodicity | full 3D PBC only (the force wrapper and the polar path require it) | — | `MACEForces` and `polar_gpu.enable` raise without 3D PBC |
 | Non-periodic or mixed PBC (molecules, slabs) | not in 1.0; reference tier only | ASE-driven | — |
-| Fixed centre of mass | — | Langevin (ASE `fixcm`), BAOAB, NVE, CSVR, NHC, MTK | Langevin only |
-| `FixAtoms` | — | all 1.0 integrators and optimisers (phase 4); MC moves with constraints refused in 1.0 (owner decision 10, 17 October 2026) | both GPU integrators raise on any constraint (`gpu_langevin.py:2136`) |
+| Fixed centre of mass | — | all 1.0 integrators | Langevin only |
+| `FixAtoms` | — | NVE, Langevin, CSVR and NVT Berendsen, and FIRE and LBFGS at fixed cell (decision 44); refused for NHC, MTK and every variable cell (BAOAB, MTK, NPT Berendsen, cell filters), and with `fixcm=True`; MC moves with constraints refused in 1.0 (owner decision 10, 17 October 2026) | both GPU integrators raise on any constraint (`gpu_langevin.py:2136`) |
 | Other ASE constraints, RATTLE | — | refused in 1.0; RATTLE in 1.x | — |
 | Variable cell | stress path | BAOAB, MTK; FIRE/LBFGS with a cell filter | BAOAB |
 
-Degrees of freedom for temperatures follow the active constraints (today
-`3N`, which is correct only without constraints).
+Temperatures and thermostat targets count 3N − 3 degrees of freedom under
+`fixcm` and 3(N − n_fixed) with `FixAtoms` (`dof="auto"`, decision 45), or the
+scheme's ASE count with `dof="ase"`. Langevin and BAOAB keep their counts
+(decision 37).
 
 ---
 
@@ -773,6 +780,18 @@ print(dyn.summary)                 # the same report as fm.md
   `NVTBerendsen`/`NPTBerendsen` → Berendsen (phase 4, with those
   integrators, §10.2). An ASE class without a mapping raises with the list
   of mapped ones; the shim never falls back to ASE's own loop silently.
+  Phase 4 maps `VelocityVerlet`, `Bussi`, `NoseHooverChainNVT`,
+  `IsotropicMTKNPT`, `MTKNPT`, `NVTBerendsen`, `NPTBerendsen` and
+  `Inhomogeneous_NPTBerendsen` with ASE 3.27's arguments and units. Each
+  argument list is held as data and checked against `inspect.signature`.
+  `rng` is refused in favour of `seed=`.
+- Optimisers (decision 48): `fastmace.ase.LBFGS` and `fastmace.ase.FIRE`
+  take ASE 3.27's arguments. `use_line_search=True`,
+  `position_reset_callback` and the deprecated `maxmove` are refused. They
+  take `Atoms` or `ase.filters.FrechetCellFilter`, and the other cell filters
+  are refused with the reason. In `Simulation` the same optimisers are
+  `fm.optimize.LBFGS` and `FIRE`, and `FrechetCellFilter` is
+  `fm.optimize.FrechetCell`.
 - ASE members: `run`, `step`, `atoms`, `nsteps`, `dt`, `attach`,
   `observers`, `todict`, `get_time`. `run(n)` advances in graph chunks
   between observer calls. FastMACE members: `summary`, `plan`, `gate`,
@@ -2498,6 +2517,33 @@ Open decisions for the owner:
    - **ResearchModule `main.py`** (43) gets `--dispersion off|d3bj` for NVT
      and NPT, default `off`, recorded in `run.json`. Whether the chlorides'
      production NPT defaults to `d3bj` is decided after acceptance.
+44–49. Decided (user, 23 October 2026, the phase 4 plan's D1–D6, the
+   recommendation (a) of each: "For the other decisions I trust your
+   recommendations"; `plans/phase-4.md`):
+   - **`FixAtoms`** (44): with NVE, Langevin, CSVR and NVT Berendsen, and
+     with FIRE and LBFGS at fixed cell. It is refused, with the reason, for
+     NHC and MTK (ASE refuses them too), for every variable cell, and with
+     `fixcm=True` (§4.4).
+   - **Degrees of freedom** (45): with `fixcm=True` the new integrators remove
+     the total momentum at the start, project it out each step and count
+     3N − 3. With `FixAtoms` they count 3(N − n_fixed) and do not project.
+     `dof="ase"` reproduces ASE's counts, and the ASE-equivalence tests use
+     it.
+   - **The annealing-benchmark minima** (46): GPU LBFGS (fmax 0.01 eV/Å,
+     memory 100, maxstep 0.2 Å, fixed cell, at most 5,000 steps) against
+     ASE's LBFGS on `fm.calc` on the 210 `captured.traj` frames. Pass: all
+     converge; |ΔE| ≤ 0.025 meV/atom per frame; every atom within 0.1 Å in at
+     least 20 of 21 frames per crystal. The 13 October research-engine minima
+     are compared and recorded, not judged.
+   - **Protocol relaxations** (47): once 4-T08 passes, `[relax]` and
+     `[quench]` use GPU LBFGS by default. `"ase-LBFGS"` and `"ase-BFGS"` stay
+     options, and `protocol.json` records which ran.
+   - **Optimisers in `fastmace.ase`** (48): `LBFGS` and `FIRE` with ASE
+     3.27's arguments, on `Atoms` or `FrechetCellFilter`; other cell filters
+     refused (§7.7).
+   - **PolarMACE's stress floor** (49): 5e-7 eV/Å³ (0.08 MPa) in the
+     reference record, for the stress part only. The energy and force floors
+     stay.
 
 ---
 
