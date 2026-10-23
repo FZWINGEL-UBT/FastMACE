@@ -1,0 +1,81 @@
+============================= test session starts ==============================
+platform linux -- Python 3.10.17, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /data/cache/L4/inductor, triton /data/cache/L4/triton
+rootdir: /tmp/fastmace-src
+configfile: pyproject.toml
+plugins: xdist-3.8.0, platformdirs-4.12.3
+collected 54 items
+
+tests/gpu/test_d3_list_gpu.py ...........                                [ 20%]
+tests/gpu/test_d3_kernel_gpu.py ssssssssssss......ssss.................. [ 94%]
+.                                                                        [ 96%]
+tests/gpu/test_d3_integration_gpu.py .                                   [ 98%]
+tests/gpu/test_npt_d3_gpu.py .                                           [100%]
+
+=============================== warnings summary ===============================
+tests/gpu/test_d3_integration_gpu.py: 23 warnings
+  /usr/local/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_d3_integration_gpu.py::test_d3_in_the_captured_force_graph
+  /usr/local/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Precompiled extension shared object not found.
+  For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+  
+    from openequivariance._torch.TensorProduct import TensorProduct
+
+tests/gpu/test_d3_integration_gpu.py: 22 warnings
+  /usr/local/lib/python3.10/ast.py:418: UserWarning: The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`.
+    return visitor(node)
+
+tests/gpu/test_d3_integration_gpu.py::test_d3_in_the_captured_force_graph
+  /usr/local/lib/python3.10/site-packages/torch/jit/_serialization.py:89: FutureWarning: `torch.jit.save` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+-------------- generated xml file: /tmp/fastmace-out/d3/junit.xml --------------
+============================= slowest 40 durations =============================
+147.62s call     tests/gpu/test_d3_integration_gpu.py::test_d3_in_the_captured_force_graph
+89.98s call     tests/gpu/test_npt_d3_gpu.py::test_npt_with_d3_follows_ase
+12.86s call     tests/gpu/test_d3_kernel_gpu.py::test_float64_equals_the_torch_tier[NaCl-rattled]
+7.51s call     tests/gpu/test_d3_kernel_gpu.py::test_float32_within_the_gate[NaCl-rattled]
+4.41s call     tests/gpu/test_d3_kernel_gpu.py::test_energy_only_equals_the_full_energy[NbCl5-strained-torch.float64]
+2.70s call     tests/gpu/test_d3_list_gpu.py::test_gpu_build_equals_cpu_build[NaCl-rattled]
+1.93s call     tests/gpu/test_d3_kernel_gpu.py::test_energy_only_equals_the_full_energy[NbCl5-strained-torch.float32]
+0.83s call     tests/gpu/test_d3_kernel_gpu.py::test_float64_equals_the_torch_tier[NaNbCl6-strained]
+0.83s call     tests/gpu/test_d3_kernel_gpu.py::test_float64_equals_the_torch_tier[NaNbCl6-rattled]
+0.79s call     tests/gpu/test_d3_list_gpu.py::test_gpu_build_equals_cpu_build[NaClx2-strained]
+0.79s call     tests/gpu/test_d3_kernel_gpu.py::test_float32_within_the_gate[NaNbCl6-rattled]
+0.79s call     tests/gpu/test_d3_kernel_gpu.py::test_species_changed_in_place_replays_like_a_fresh_kernel
+0.78s call     tests/gpu/test_d3_kernel_gpu.py::test_float32_within_the_gate[NaNbCl6-strained]
+0.63s call     tests/gpu/test_d3_kernel_gpu.py::test_float64_equals_the_torch_tier[NbCl5-strained]
+0.61s call     tests/gpu/test_d3_kernel_gpu.py::test_float64_equals_the_torch_tier[NbCl5-rattled]
+0.60s call     tests/gpu/test_d3_kernel_gpu.py::test_float32_within_the_gate[NbCl5-rattled]
+0.59s call     tests/gpu/test_d3_kernel_gpu.py::test_float32_within_the_gate[NbCl5-strained]
+0.45s call     tests/gpu/test_d3_list_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3x2-strained]
+0.42s call     tests/gpu/test_d3_kernel_gpu.py::test_capture_and_replay_bitwise[NaNbCl6-rattled-torch.float32-evaluate]
+0.41s call     tests/gpu/test_d3_kernel_gpu.py::test_capture_and_replay_bitwise[NaNbCl6-rattled-torch.float64-evaluate]
+0.41s call     tests/gpu/test_d3_kernel_gpu.py::test_capture_and_replay_bitwise[NaNbCl6-rattled-torch.float64-evaluate_energy]
+0.40s call     tests/gpu/test_d3_kernel_gpu.py::test_capture_and_replay_bitwise[NaNbCl6-rattled-torch.float32-evaluate_energy]
+0.39s call     tests/gpu/test_d3_kernel_gpu.py::test_energy_only_equals_the_full_energy[NaNbCl6-rattled-torch.float64]
+0.39s call     tests/gpu/test_d3_kernel_gpu.py::test_energy_only_equals_the_full_energy[NaNbCl6-rattled-torch.float32]
+0.36s call     tests/gpu/test_d3_list_gpu.py::test_half_screen_equals_the_full_screen
+0.31s call     tests/gpu/test_d3_kernel_gpu.py::test_capture_and_replay_bitwise[NbCl5-strained-torch.float64-evaluate]
+0.30s call     tests/gpu/test_d3_kernel_gpu.py::test_capture_and_replay_bitwise[NbCl5-strained-torch.float64-evaluate_energy]
+0.30s call     tests/gpu/test_d3_kernel_gpu.py::test_capture_and_replay_bitwise[NbCl5-strained-torch.float32-evaluate]
+0.29s call     tests/gpu/test_d3_kernel_gpu.py::test_capture_and_replay_bitwise[NbCl5-strained-torch.float32-evaluate_energy]
+0.27s call     tests/gpu/test_d3_list_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x2-strained]
+0.24s call     tests/gpu/test_d3_list_gpu.py::test_gpu_build_equals_cpu_build[NbCl5x2-unwrapped]
+0.19s call     tests/gpu/test_d3_kernel_gpu.py::test_float64_equals_the_torch_tier[NaCl-strained]
+0.19s call     tests/gpu/test_d3_kernel_gpu.py::test_float32_within_the_gate[NaCl-strained]
+0.15s call     tests/gpu/test_d3_list_gpu.py::test_device_stages_replay_in_a_cuda_graph[variable]
+0.11s call     tests/gpu/test_d3_list_gpu.py::test_device_stages_replay_in_a_cuda_graph[fixed]
+0.03s call     tests/gpu/test_d3_list_gpu.py::test_gpu_build_equals_cpu_build[NbCl5-rattled]
+0.03s call     tests/gpu/test_d3_list_gpu.py::test_nbcl5_3x3x3_pairs_and_build_time
+0.02s call     tests/gpu/test_d3_list_gpu.py::test_gpu_build_equals_cpu_build[NaNbO3-rattled]
+0.01s setup    tests/gpu/test_d3_list_gpu.py::test_gpu_build_equals_cpu_build[NaCl-rattled]
+
+(1 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+SKIPPED [12] tests/gpu/test_d3_kernel_gpu.py:41: could not import 'dftd3.interface': No module named 'dftd3'
+SKIPPED [4] tests/gpu/test_d3_kernel_gpu.py:57: could not import 'dftd3.interface': No module named 'dftd3'
+=========== 38 passed, 16 skipped, 47 warnings in 281.46s (0:04:41) ============

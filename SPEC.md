@@ -2239,8 +2239,9 @@ This is today's provenance block, made complete and schema-versioned.
 
 ## 16. Migration plan and milestones
 
-Each phase ends with its acceptance criteria met on the RTX 5060 Ti, plus one
-Ada spot check: the GPU acceptance tier on an Ada GPU (decision 39).
+Each phase ends with its acceptance criteria met on the RTX 5060 Ti, plus the
+GPU compatibility check on every production GPU type (decision 39, amended
+23 October 2026).
 
 | Phase | Content | Acceptance | Estimate (1 developer) |
 | --- | --- | --- | --- |
@@ -2496,6 +2497,27 @@ Open decisions for the owner:
      - the tests corrected at acceptance;
      - the GPU slow tier;
      - the items' own runs.
+   - *Amended (user, 23 October 2026, "yes" to the conductor's proposal):*
+     acceptance splits in two.
+     - **Full acceptance**, once per phase, on the reference GPU (the RTX
+       5060 Ti): the acceptance and slow tiers, the physics comparisons and
+       the timed A/Bs. Its untimed runs may also run elsewhere (a Colab A100)
+       to finish sooner; timed runs stay on the reference GPU.
+     - **GPU compatibility check** (`-m compat`, about 30–60 min) on every
+       production GPU type each phase, and once when a GPU type is added. It
+       covers what differs between architectures:
+       - kernels compile and attach (every rewrite, OEq, Triton, no naive cuEq fallback);
+       - the accuracy gate on MH-1 and a few other models;
+       - CUDA-graph replay equal to eager, with the kernel count recorded;
+       - reproducible mode bitwise;
+       - a short MD smoke (NVE drift, NVT temperature, one NPT run);
+       - a restart round trip;
+       - the fast GPU tier.
+     - It replaces "one Ada spot check". A Colab L4 may stand in for the Ada
+       workstations, for correctness only.
+     - Production GPU types: Ada (the workstations), Blackwell (the local
+       PC), and the Colab A100 if its compatibility check passes.
+     - Phase 4-T13 defines the tier.
 40–43. Decided (user, 22 October 2026, the phase 3b plan's D1–D4, the
    recommendation of each: "Accept the recommendations for phase 3b's D1-D4
    and prestart the phase 3b workers"; `plans/phase-3b.md`):

@@ -1,0 +1,428 @@
+{
+  "rule": "|difference| <= 3 combined SE; blocks >= 2 max tau(V, P, PE), pooled over seeds; V fluctuation by jackknife over the same blocks",
+  "settings": {
+    "structure": "NbCl5",
+    "repeat": [
+      1,
+      1,
+      3
+    ],
+    "cell_mode": "hydrostatic",
+    "pressure_GPa": 0.0,
+    "timestep_fs": 1.0,
+    "friction_per_ase_time": 0.02,
+    "barostat_tau_fs": 2000.0,
+    "barostat_mass_factor": 1.0,
+    "cell_langevin": true,
+    "head": "matpes_r2scan",
+    "d3_functional": "r2scan"
+  },
+  "runs": [
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/fastmace-300K-s1",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/fastmace-300K-s2",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/fastmace-300K-s3",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/fastmace-300K-s4",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/fastmace-300K-s5",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/fastmace-300K-s6",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/fastmace-600K-s1",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/fastmace-600K-s2",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/fastmace-600K-s3",
+    "/mnt/d/Margraf/FastMACE/.claude/worktrees/elated-mcnulty-b0e7ec/results/3b-T05-npt-d3-comparison/ase-300K-s101",
+    "/mnt/d/Margraf/FastMACE/.claude/worktrees/elated-mcnulty-b0e7ec/results/3b-T05-npt-d3-comparison/ase-300K-s102",
+    "/mnt/d/Margraf/FastMACE/.claude/worktrees/elated-mcnulty-b0e7ec/results/3b-T05-npt-d3-comparison/ase-300K-s103",
+    "/mnt/d/Margraf/FastMACE/.claude/worktrees/elated-mcnulty-b0e7ec/results/3b-T05-npt-d3-comparison/ase-600K-s101",
+    "/mnt/d/Margraf/FastMACE/.claude/worktrees/elated-mcnulty-b0e7ec/results/3b-T05-npt-d3-comparison/ase-600K-s102",
+    "/mnt/d/Margraf/FastMACE/.claude/worktrees/elated-mcnulty-b0e7ec/results/3b-T05-npt-d3-comparison/ase-600K-s103",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/modal-L4-300K-s104/out/ase-300K-s104",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/ase-300K-s105",
+    "/home/fzwin/fastmace-acceptance/3b-T10-local-20261023/npt-compare/ase-300K-s106"
+  ],
+  "temperatures": {
+    "300K": {
+      "block_samples": 99,
+      "tau_samples": {
+        "volume_A3_atom": 38.50223682690613,
+        "pressure_GPa": 5.3881370994772615,
+        "potential_eV_atom": 49.39948551896178
+      },
+      "tau_volume_samples": 38.50223682690613,
+      "engines": {
+        "ase": {
+          "seeds": [
+            101,
+            102,
+            103,
+            104,
+            105,
+            106
+          ],
+          "blocks": 120,
+          "volume_A3_atom": {
+            "mean": 29.000173086394398,
+            "se": 0.011356317143291666,
+            "between_seed_se": 0.016010744919144563
+          },
+          "pressure_GPa": {
+            "mean": -0.000788877676882876,
+            "se": 0.0013739711638961643,
+            "between_seed_se": 0.0011733010972202892
+          },
+          "potential_eV_atom": {
+            "mean": -10.677367849333395,
+            "se": 0.00011729954373178786,
+            "between_seed_se": 0.0002611444405103885
+          },
+          "volume_std": {
+            "mean": 0.3021416044661578,
+            "se": 0.011291314059537622
+          },
+          "temperature_K": 299.29680308689643,
+          "volume_drift_A3_atom_per_ps": {
+            "101": -0.003723242235604309,
+            "102": 0.0005651140294409907,
+            "103": 0.007806455405710042,
+            "104": 0.0013697976852645472,
+            "105": -0.00413479251428428,
+            "106": 0.00019912982802109628
+          },
+          "volume_drift": {
+            "mean": 0.00034707703309134786,
+            "se": 0.0017645808315701734
+          },
+          "volume_windows": [
+            {
+              "mean": 29.015359974453535,
+              "se": 0.014825061209103249
+            },
+            {
+              "mean": 28.97403793382691,
+              "se": 0.02170250858841449
+            },
+            {
+              "mean": 28.99234576044056,
+              "se": 0.02774751743928264
+            },
+            {
+              "mean": 29.015929157472552,
+              "se": 0.03374775988556633
+            }
+          ],
+          "stationary": true
+        },
+        "fastmace": {
+          "seeds": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ],
+          "blocks": 120,
+          "volume_A3_atom": {
+            "mean": 28.999220347835244,
+            "se": 0.010912715231971983,
+            "between_seed_se": 0.015396909948940827
+          },
+          "pressure_GPa": {
+            "mean": -0.001401658248331934,
+            "se": 0.001295641888878878,
+            "between_seed_se": 0.0016408512063690438
+          },
+          "potential_eV_atom": {
+            "mean": -10.677459226596508,
+            "se": 0.00011230697682136465,
+            "between_seed_se": 8.908745126326938e-05
+          },
+          "volume_std": {
+            "mean": 0.3064407329450033,
+            "se": 0.012187002696315731
+          },
+          "temperature_K": 298.48946916813,
+          "volume_drift_A3_atom_per_ps": {
+            "1": 0.004198039354847843,
+            "2": 0.0019100862426209696,
+            "3": -0.0009674831302944378,
+            "4": 0.002284764632125306,
+            "5": -0.004561845271912904,
+            "6": 0.006148795461709981
+          },
+          "volume_drift": {
+            "mean": 0.0015020595481827932,
+            "se": 0.0015546613512038884
+          },
+          "volume_windows": [
+            {
+              "mean": 28.99125040996904,
+              "se": 0.021043777825360887
+            },
+            {
+              "mean": 28.98966902815477,
+              "se": 0.029417415312313618
+            },
+            {
+              "mean": 28.99673372238357,
+              "se": 0.04719356376115709
+            },
+            {
+              "mean": 29.016276609007694,
+              "se": 0.01954753893522665
+            }
+          ],
+          "stationary": true
+        }
+      },
+      "stationary": true,
+      "comparison": {
+        "volume_A3_atom": {
+          "difference": -0.0009527385591532322,
+          "combined_se": 0.01574970770500626,
+          "sigmas": 0.06049245973310294,
+          "passed": true,
+          "between_seed_sigmas": 0.04289140786773796
+        },
+        "pressure_GPa": {
+          "difference": -0.000612780571449058,
+          "combined_se": 0.0018885138769508174,
+          "sigmas": 0.3244776641188624,
+          "passed": true,
+          "between_seed_sigmas": 0.3037803235410916
+        },
+        "potential_eV_atom": {
+          "difference": -9.137726311259087e-05,
+          "combined_se": 0.00016239470435466837,
+          "sigmas": 0.5626862247492003,
+          "passed": true,
+          "between_seed_sigmas": 0.3311705390972458
+        },
+        "volume_std": {
+          "difference": 0.004299128478845504,
+          "combined_se": 0.01661375357681457,
+          "sigmas": 0.25876924555117875,
+          "passed": true
+        }
+      },
+      "drift_comparison": {
+        "volume_drift": {
+          "difference": 0.0011549825150914453,
+          "combined_se": 0.0023517477390383487,
+          "sigmas": 0.4911166686456466,
+          "passed": true
+        },
+        "volume_window_1": {
+          "difference": -0.024109564484493973,
+          "combined_se": 0.025741465090721012,
+          "sigmas": 0.9366042064631632,
+          "passed": true
+        },
+        "volume_window_2": {
+          "difference": 0.015631094327858364,
+          "combined_se": 0.0365565753686987,
+          "sigmas": 0.4275863964336871,
+          "passed": true
+        },
+        "volume_window_3": {
+          "difference": 0.004387961943010055,
+          "combined_se": 0.05474629836364915,
+          "sigmas": 0.0801508425987684,
+          "passed": true
+        },
+        "volume_window_4": {
+          "difference": 0.0003474515351413743,
+          "combined_se": 0.039000225329067544,
+          "sigmas": 0.008908962248544053,
+          "passed": true
+        }
+      },
+      "judged_on": "stationary means",
+      "passed": true
+    },
+    "600K": {
+      "block_samples": 587,
+      "tau_samples": {
+        "volume_A3_atom": 293.1872704873415,
+        "pressure_GPa": 1.0,
+        "potential_eV_atom": 285.1207698027633
+      },
+      "tau_volume_samples": 293.1872704873415,
+      "engines": {
+        "ase": {
+          "seeds": [
+            101,
+            102,
+            103
+          ],
+          "blocks": 9,
+          "volume_A3_atom": {
+            "mean": 43.74247607038018,
+            "se": 1.7921567040403967,
+            "between_seed_se": 0.9169207702179453
+          },
+          "pressure_GPa": {
+            "mean": -0.0022025631434374466,
+            "se": 0.0012863893362373405,
+            "between_seed_se": 0.00033092008227600053
+          },
+          "potential_eV_atom": {
+            "mean": -10.587086817869451,
+            "se": 0.004966580230396458,
+            "between_seed_se": 0.0022226631296235234
+          },
+          "volume_std": {
+            "mean": 5.597281497747728,
+            "se": 0.7831040886192465
+          },
+          "temperature_K": 594.0907812204496,
+          "volume_drift_A3_atom_per_ps": {
+            "101": 0.8009466718424573,
+            "102": 0.6508148890050234,
+            "103": 0.9615180785394869
+          },
+          "volume_drift": {
+            "mean": 0.8044265464623225,
+            "se": 0.08970915996011718
+          },
+          "volume_windows": [
+            {
+              "mean": 36.614357195283276,
+              "se": 1.110236583478649
+            },
+            {
+              "mean": 44.19672139324797,
+              "se": 1.8108853017572344
+            },
+            {
+              "mean": 47.91365737028692,
+              "se": 1.7598329664941115
+            },
+            {
+              "mean": 48.70438813872196,
+              "se": 0.8303323407238075
+            }
+          ],
+          "stationary": false
+        },
+        "fastmace": {
+          "seeds": [
+            1,
+            2,
+            3
+          ],
+          "blocks": 9,
+          "volume_A3_atom": {
+            "mean": 41.39164270318786,
+            "se": 2.1827645989765676,
+            "between_seed_se": 0.8702674240428027
+          },
+          "pressure_GPa": {
+            "mean": 0.0027444401965855316,
+            "se": 0.000709936546249977,
+            "between_seed_se": 0.00025431689182928374
+          },
+          "potential_eV_atom": {
+            "mean": -10.594442847079728,
+            "se": 0.006480225297015844,
+            "between_seed_se": 0.0014046096843723388
+          },
+          "volume_std": {
+            "mean": 6.517468331790197,
+            "se": 1.034878019354044
+          },
+          "temperature_K": 591.8694072176398,
+          "volume_drift_A3_atom_per_ps": {
+            "1": 1.1816447601785043,
+            "2": 0.7935127301687865,
+            "3": 1.3344203159394639
+          },
+          "volume_drift": {
+            "mean": 1.103192602095585,
+            "se": 0.16099825042213578
+          },
+          "volume_windows": [
+            {
+              "mean": 33.08802432782406,
+              "se": 0.46338865448527705
+            },
+            {
+              "mean": 40.74888673584028,
+              "se": 0.8248479367930107
+            },
+            {
+              "mean": 46.168028119932636,
+              "se": 1.196649615862422
+            },
+            {
+              "mean": 49.830993030923175,
+              "se": 2.2570183928510033
+            }
+          ],
+          "stationary": false
+        }
+      },
+      "stationary": false,
+      "comparison": {
+        "volume_A3_atom": {
+          "difference": -2.3508333671923154,
+          "combined_se": 2.8242320985326743,
+          "sigmas": 0.83237966469317,
+          "passed": true,
+          "between_seed_sigmas": 1.8595961386503799
+        },
+        "pressure_GPa": {
+          "difference": 0.004947003340022979,
+          "combined_se": 0.0014692880670877618,
+          "sigmas": 3.366939030430096,
+          "passed": false,
+          "between_seed_sigmas": 11.85322695209909
+        },
+        "potential_eV_atom": {
+          "difference": -0.00735602921027656,
+          "combined_se": 0.008164572192408431,
+          "sigmas": 0.9009693388609302,
+          "passed": true,
+          "between_seed_sigmas": 2.797725805344349
+        },
+        "volume_std": {
+          "difference": 0.920186834042469,
+          "combined_se": 1.2977767637595958,
+          "sigmas": 0.7090486281914409,
+          "passed": true
+        }
+      },
+      "drift_comparison": {
+        "volume_drift": {
+          "difference": 0.2987660556332624,
+          "combined_se": 0.18430455778341087,
+          "sigmas": 1.6210454002139396,
+          "passed": true
+        },
+        "volume_window_1": {
+          "difference": -3.5263328674592174,
+          "combined_se": 1.2030603959901676,
+          "sigmas": 2.9311353604628487,
+          "passed": true
+        },
+        "volume_window_2": {
+          "difference": -3.4478346574076895,
+          "combined_se": 1.9898943929143769,
+          "sigmas": 1.7326721808377126,
+          "passed": true
+        },
+        "volume_window_3": {
+          "difference": -1.745629250354284,
+          "combined_se": 2.1281405905398136,
+          "sigmas": 0.8202603052233012,
+          "passed": true
+        },
+        "volume_window_4": {
+          "difference": 1.1266048922012146,
+          "combined_se": 2.404908277194705,
+          "sigmas": 0.46846064895056416,
+          "passed": true
+        }
+      },
+      "judged_on": "V drift and windowed V means",
+      "passed": true
+    }
+  }
+}
