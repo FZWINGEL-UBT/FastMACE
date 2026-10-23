@@ -50,6 +50,7 @@ def parse_args(argv=None):
     run.add_argument("--temperature-K", type=float, default=600.0)
     run.add_argument("--timeout-s", type=int, default=3600)
     run.add_argument("--skip-done", action="store_true", help="keep case files already written")
+    run.add_argument("--memory-history", action="store_true", help="passed to each case (see case --help)")
     case = sub.add_parser("case", help="one case in this process (the run command's child)")
     case.add_argument("--output", type=Path, required=True)
     case.add_argument("--label", required=True)
@@ -60,6 +61,8 @@ def parse_args(argv=None):
     case.add_argument("--precision", default=None)
     case.add_argument("--steps", type=int, default=100)
     case.add_argument("--temperature-K", type=float, default=600.0)
+    case.add_argument("--memory-history", action="store_true",
+                      help="record torch.cuda.memory's history and write the allocations live at the peak by site")
     fit = sub.add_parser("fit", help="the table and the fitted factor from a run's case files")
     fit.add_argument("directory", type=Path)
     return p.parse_args(argv)
@@ -134,12 +137,17 @@ def run_case(args):
     import torch
 
     torch.cuda.reset_peak_memory_stats()
+    if args.memory_history:
+        torch.cuda.memory._record_memory_history(stacks="python", max_entries=2_000_000)
     started = time.perf_counter()
     engine = planner.build(plan, force_field, atoms, temperature_K=args.temperature_K)
     record["after_build_bytes"] = int(torch.cuda.max_memory_allocated())
     for _ in range(args.steps):
         engine.step()
     torch.cuda.synchronize()
+    if args.memory_history:
+        record["at_peak"] = live_at_peak(torch.cuda.memory._snapshot())
+        torch.cuda.memory._record_memory_history(enabled=None)
     record.update(peak_bytes=int(torch.cuda.max_memory_allocated()),
                   peak_reserved_bytes=int(torch.cuda.max_memory_reserved()),
                   seconds=time.perf_counter() - started, torch=torch.__version__,
@@ -152,6 +160,58 @@ def run_case(args):
     path.write_text(json.dumps(record, indent=1) + "\n")
     print(json.dumps({key: record[key] for key in ("label", "structure", "ensemble", "mode", "peak_bytes",
                                                     "predicted_bytes", "ratio")}))
+
+
+def _site(frames):
+    """A call site for grouping: the innermost FastMACE frame, else MACE's, else torch's, else the first one."""
+    for marker in ("/fastmace/", "/mace/", "/torch/"):
+        for frame in frames or ():
+            if marker in frame.get("filename", ""):
+                return f"{frame['filename'].split(marker)[-1]}:{frame.get('line')}:{frame.get('name')}"
+    frame = (frames or [{}])[0]
+    return f"{frame.get('filename', '?')}:{frame.get('line')}:{frame.get('name')}"
+
+
+def _outer(frames):
+    """The outermost FastMACE frame (which stage of the build or step allocated)."""
+    inner = [frame for frame in frames or () if "/fastmace/" in frame.get("filename", "")]
+    if not inner:
+        return "?"
+    frame = inner[-1]
+    return f"{frame['filename'].split('/fastmace/')[-1]}:{frame.get('line')}:{frame.get('name')}"
+
+
+def live_at_peak(snapshot, top=40):
+    """The allocations live at the largest point of the recorded history, by site, largest first: replays the
+    device trace's alloc and free events (``torch.cuda.memory._snapshot``)."""
+    events = [event for event in snapshot.get("device_traces", [[]])[0]
+              if event.get("action") in ("alloc", "free_completed")]
+    live, current, peak, peak_index = {}, 0, 0, -1
+    for index, event in enumerate(events):
+        if event["action"] == "alloc":
+            live[event["addr"]] = event["size"]
+            current += event["size"]
+        else:
+            current -= live.pop(event["addr"], 0)
+        if current > peak:
+            peak, peak_index = current, index
+    alive = {}
+    for event in events[:peak_index + 1]:
+        if event["action"] == "alloc":
+            alive[event["addr"]] = event
+        else:
+            alive.pop(event["addr"], None)
+    by_site, by_stage = {}, {}
+    for event in alive.values():
+        for table, key in ((by_site, _site(event.get("frames"))), (by_stage, _outer(event.get("frames")))):
+            entry = table.setdefault(key, [0, 0])
+            entry[0] += event["size"]
+            entry[1] += 1
+    def ranked(table):
+        return [{"site": key, "bytes": value[0], "count": value[1]}
+                for key, value in sorted(table.items(), key=lambda item: -item[1][0])[:top]]
+    return {"traced_peak_bytes": peak, "events": len(events), "peak_event": peak_index,
+            "by_site": ranked(by_site), "by_stage": ranked(by_stage)}
 
 
 def run(args):
@@ -173,6 +233,8 @@ def run(args):
                                "--temperature-K", str(args.temperature_K)]
                     if args.precision:
                         command += ["--precision", args.precision]
+                    if args.memory_history:
+                        command.append("--memory-history")
                     log = args.output / f"{name}.log"
                     with log.open("w") as handle:
                         try:
