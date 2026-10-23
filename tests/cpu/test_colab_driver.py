@@ -26,6 +26,12 @@ def _load():
 
 fc = _load()
 
+
+@pytest.fixture(autouse=True)
+def no_backoff(monkeypatch):
+    """The driver's retry back-off sleeps (transfers, polls) cost nothing here."""
+    monkeypatch.setattr(fc.time, "sleep", lambda seconds: None)
+
 USAGE = """\
 Current balance: 198.99 compute units
 Usage rate: 5.30/hr
@@ -382,3 +388,38 @@ def test_stop_endpoint_releases_only_an_unnamed_live_one():
         with pytest.raises(SystemExit):
             fc.stop_endpoint(refused, colab=listing, run=run, python="/py")
     assert len(runs) == 1
+
+
+def test_a_hung_poll_reattaches_instead_of_failing_the_job(tmp_path, monkeypatch):
+    # 4-T13: one `colab exec` poll of a 2 h command hung past its subprocess timeout; the job must go on.
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
+    fake = FakeColab()
+    hung = {"n": 0}
+
+    def flaky(argv, timeout=None):
+        if argv[1] == "exec" and "STAGE=run" in argv and hung["n"] < 2:
+            hung["n"] += 1
+            if hung["n"] == 1:
+                raise subprocess.TimeoutExpired(argv, timeout)
+            raise subprocess.CalledProcessError(1, argv, "websocket closed")
+        return fake(argv, timeout)
+
+    record = fc.run_job(_job_args(tmp_path), flaky)
+    assert record["exit"] == 0 and hung["n"] == 2
+    assert record["commands"][0]["exit"] == 0
+
+
+def test_polls_give_up_after_repeated_failures_but_salvage_the_records(tmp_path, monkeypatch):
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
+    fake = FakeColab()
+
+    def dead(argv, timeout=None):
+        if argv[1] == "exec" and "STAGE=run" in argv:
+            raise subprocess.TimeoutExpired(argv, timeout)
+        return fake(argv, timeout)
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        fc.run_job(_job_args(tmp_path), dead)
+    assert fc.stop_args("t1") in fake.calls
+    assert "pack" in fake.stages()  # the records were packed and downloaded before the stop
+    assert (tmp_path / "out" / "out" / "setup.json").exists()

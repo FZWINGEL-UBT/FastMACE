@@ -73,6 +73,7 @@ WAIT_S = 1200  # one `colab exec` waits at most this long; the driver calls agai
 # Largest single upload: 64 MiB went up and 80 MiB failed with HTTP 400 (CPU VM, 23 October 2026; base64 adds a
 # third on the wire).
 CHUNK_BYTES = 48 * 2**20
+POLL_RETRIES = 5  # consecutive failed `colab exec` polls of one stage before the job gives up
 LEDGER_FIELDS = ("date_utc", "session", "gpu", "gpu_name", "capability", "commit", "commands", "exit", "wall_s",
                  "setup_s", "cache_key", "cache_hit", "cu_before", "cu_after", "cu_used", "out")
 
@@ -334,12 +335,25 @@ class Job:
     def step(self, step, stage, arg="", timeout_s=None, reset=False):
         """Run one remote.sh stage to the end; returns (exit, seconds, log tail)."""
         deadline = time.time() + (timeout_s or 3600)
-        first = True
+        first, failures = True, 0
         while True:
-            wait = max(10, min(WAIT_S, deadline - time.time()))
+            # After a failed poll, wait briefly: the next exec may queue behind the hung one in the kernel, which
+            # ends within its own WAIT_S, so the subprocess timeout covers that too.
+            wait = 60 if failures else max(10, min(WAIT_S, deadline - time.time()))
             env = step_env(step, stage, arg, wait_s=wait, reset=reset and first)
-            out = self.call(exec_args(self.session, HERE / "remote_step.py", wait + 120, env), timeout=wait + 300)
-            first = False
+            try:
+                out = self.call(exec_args(self.session, HERE / "remote_step.py", wait + 120 + WAIT_S * bool(failures),
+                                          env), timeout=wait + 300 + WAIT_S * bool(failures))
+            except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as error:
+                # The stage runs detached on the VM, so a lost poll loses nothing: reattach (4-T13: one poll of a
+                # 2 h command hung past its timeout and the job was thrown away).
+                failures += 1
+                if failures > POLL_RETRIES:
+                    raise
+                _log(f"poll of {step} failed ({type(error).__name__}); reattaching ({failures}/{POLL_RETRIES})")
+                time.sleep(10 * failures)
+                continue
+            first, failures = False, 0
             if self.args.dry_run:
                 return 0, 0, ""
             state = parse_step(out) or {}
@@ -445,6 +459,10 @@ def run_job(args, colab=run_colab):
             _receive(job.work / "out.tar.gz", job.out, record)
             _manifest(job, record, stack)
         record["exit"] = worst
+    except Exception:
+        if owned and record.get("setup_s") is not None and not args.dry_run:
+            _salvage(job, record)
+        raise
     finally:
         if owned and not args.keep:
             stopped = _stop(job)
@@ -462,6 +480,19 @@ def run_job(args, colab=run_colab):
             _log(f"exit {record['exit']}, wall {record['wall_s']} s, CU {record.get('cu_before')} -> "
                  f"{record.get('cu_after')}; {job.out / 'colab.json'}; ledger {ledger}")
     return record
+
+
+def _salvage(job, record):
+    """Before the VM goes after a failure: pack and download whatever records the commands left."""
+    try:
+        _log("salvaging the records before stopping")
+        job.step("pack", "pack", timeout_s=900)
+        job.download(f"{REMOTE}/out.tar.gz", job.work / "out.tar.gz")
+        _receive(job.work / "out.tar.gz", job.out, record)
+        record["salvaged"] = True
+    except Exception as error:  # noqa: BLE001  (the original error is the one that propagates)
+        _log(f"salvage failed: {error!r}")
+        record["salvaged"] = False
 
 
 def _stop(job):
