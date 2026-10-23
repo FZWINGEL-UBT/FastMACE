@@ -186,7 +186,8 @@ def common(args):
     route = parse_route(args.route)
     meta = dict(tool="d3_cost", command=args.command, created_utc=datetime.now(timezone.utc).isoformat(),
                 host=os.uname().nodename, gpu=torch.cuda.get_device_name(), torch=torch.__version__,
-                fastmace_commit=ab_step_time.fastmace_commit() or os.environ.get("FASTMACE_SOURCE_COMMIT"), model=args.model, checkpoint_sha256=sha,
+                fastmace_commit=ab_step_time.fastmace_commit() or os.environ.get("FASTMACE_SOURCE_COMMIT"),
+                model=args.model, checkpoint_sha256=sha,
                 structure=name, natoms=len(base), ensemble=args.ensemble, timestep_fs=args.timestep_fs,
                 route=[dataclasses.asdict(s) for s in route], args={k: str(v) for k, v in vars(args).items()},
                 gpu_processes_at_start=others, pytest_at_start=pytest_running())
@@ -286,7 +287,8 @@ def scan(args):
             build_ms = 1e3 * sorted(build_s)[len(build_s) // 2]
             seg = per_segment[label]
             rate = seg["rebuilds"] / seg["steps"]
-            timings[label] = dict(frame=frame, pass_ms=pass_ms, build_ms=build_ms, build_ms_all=[1e3 * x for x in build_s],
+            timings[label] = dict(frame=frame, pass_ms=pass_ms, build_ms=build_ms,
+                                  build_ms_all=[1e3 * x for x in build_s],
                                   pairs=int(replay.list.num_pairs), rebuilds_per_step=rate,
                                   amortised_ms=pass_ms + rate * build_ms)
         results[f"{skin:g}"] = dict(skin_A=skin, rebuilds=len(rebuild_steps), segments=per_segment, timed=timings)
@@ -348,7 +350,8 @@ def ab(args):
             index += 1
         summary = segment_summary(blocks, segment.label)
         print(f"{segment.label}: off {summary['off']['mean_ms']:.3f} on {summary['on']['mean_ms']:.3f} ms "
-              f"overhead {100 * summary['overhead_mean']:.2f} % (median pairs {100 * summary['overhead_pair_median']:.2f} %) "
+              f"overhead {100 * summary['overhead_mean']:.2f} % "
+              f"(median pairs {100 * summary['overhead_pair_median']:.2f} %) "
               f"d3 builds {summary['on']['d3_builds']} volume {summary['on']['volume_end_A3']:.0f}", flush=True)
         meta["blocks"] = blocks
         write(args, meta)
