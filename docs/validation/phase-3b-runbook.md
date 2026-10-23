@@ -166,7 +166,11 @@ above, with the result log and junit.
   32 → 49 Å³/atom in 20 ps on both engines.)
 - **Provenance of these two bullets:** written on 23 October 2026 by 3b-T05, at the conductor's request,
   after 3b-T05's own comparison runs (not before any result, as the rest of this runbook was). The tool is
-  `tools/validation/npt_d3_comparison.py analyse` (fastmace/3b-T05-rebased). The report says so.
+  `tools/validation/npt_d3_comparison.py analyse` (fastmace/3b-T05-rebased). The report says so in one
+  sentence.
+- **Scope of these two bullets (conductor, 23 October 2026):** they apply only to the runs at the freeze.
+  3b-T05's comparison numbers are reported as context, judged by the rules in force when 3b-T05 ran (300 K:
+  PE missed at 3.45 SE; 600 K: non-stationary).
 - **One pre-declared extension:** if a comparison misses, 3 more seeds per engine run for that temperature,
   and the 6-seed comparison decides. Still missing: the item fails and goes to the conductor.
 - Not judged: whether NbCl5 stays solid at 600 K (decision 6).
