@@ -1,0 +1,584 @@
+{
+  "tool": "d3_cost",
+  "command": "scan",
+  "created_utc": "2026-10-22T23:48:55.466457+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "3176bf92f6dea0012462dd24804d2fb413d9973c",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "structure": "NbCl5",
+  "natoms": 1944,
+  "ensemble": "npt",
+  "timestep_fs": 1.0,
+  "route": [
+    {
+      "label": "heat",
+      "start_K": 0.0,
+      "end_K": 1000.0,
+      "steps": 20000
+    },
+    {
+      "label": "peak",
+      "start_K": 1000.0,
+      "end_K": 976.0,
+      "steps": 8000
+    },
+    {
+      "label": "transit",
+      "start_K": 976.0,
+      "end_K": 600.0,
+      "steps": 3760
+    },
+    {
+      "label": "cool600",
+      "start_K": 600.0,
+      "end_K": 576.0,
+      "steps": 8000
+    },
+    {
+      "label": "transit",
+      "start_K": 576.0,
+      "end_K": 300.0,
+      "steps": 2760
+    },
+    {
+      "label": "cool300",
+      "start_K": 300.0,
+      "end_K": 276.0,
+      "steps": 8000
+    }
+  ],
+  "args": {
+    "command": "scan",
+    "output": "/mnt/d/Margraf/FastMACE/.claude/worktrees/bold-brahmagupta-7fb32c/results/3b-T06-rtx5060ti-20261023/scan-npt",
+    "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+    "model": "mh1-r2scan",
+    "structure": "NbCl5",
+    "ensemble": "npt",
+    "pressure_GPa": "0.0",
+    "timestep_fs": "1.0",
+    "route": "heat:0:1000:20000,peak:1000:976:8000,transit:976:600:3760,cool600:600:576:8000,transit:576:300:2760,cool300:300:276:8000",
+    "max_temperature_K": "None",
+    "d3_skin": "None",
+    "block": "1000",
+    "warmup": "50",
+    "skins": "1.0,1.5,2.0,2.5,3.0,4.0",
+    "timed_segments": "peak,cool600,cool300",
+    "build_repeats": "5",
+    "pass_repeats": "50",
+    "seed": "20261022"
+  },
+  "gpu_processes_at_start": [],
+  "pytest_at_start": [],
+  "plan": {
+    "dispersion": true,
+    "skin": 0.3,
+    "d3_skin": 2.07,
+    "max_temperature_K": 1000.0,
+    "ensemble": "npt",
+    "d3_skin_decision": "2.07 A (auto (rule_11_d3_skin_from_workload): D3 skin 2.07 A for 50 steps per rebuild at 1000 K and 1 fs: displacement 2.036 A (0.0204 A per step), barostat strain 0.029 A (2.77e-05 per step), cutoff 21.1671 A)"
+  },
+  "setup_s": 20.901278654999942,
+  "run": {
+    "wall_s": 1070.329312847,
+    "before": {
+      "neighbour_rebuilds": 0,
+      "recaptures": 0,
+      "pool_resets": 0,
+      "graphs": 0,
+      "d3_builds": 1,
+      "d3_build_time_s": 0.02869892500007154,
+      "d3_term_build_s": 0.029190284000151223,
+      "d3_regrowths": 1,
+      "d3_pairs": 1775790,
+      "d3_capacity": 2042880,
+      "d3_skin_A": 2.07,
+      "d3_fraction": 1.0,
+      "volume_A3": 55909.94847866195,
+      "step": 0
+    },
+    "after": {
+      "neighbour_rebuilds": 6317,
+      "recaptures": 25,
+      "pool_resets": 0,
+      "graphs": 22,
+      "d3_builds": 826,
+      "d3_build_time_s": 5.590025703996162,
+      "d3_term_build_s": 6.129682973991976,
+      "d3_regrowths": 1,
+      "d3_pairs": 5716,
+      "d3_capacity": 2042880,
+      "d3_skin_A": 2.07,
+      "d3_fraction": 0.8,
+      "volume_A3": 241587771.79387906,
+      "step": 50520
+    },
+    "engine_fraction": 0.8
+  },
+  "volumes_A3": {
+    "heat": [
+      55909.948478661936,
+      129417.65334989679
+    ],
+    "peak": [
+      129417.65334989679,
+      511962.63715282385
+    ],
+    "transit": [
+      13408059.332930028,
+      31018979.53420264
+    ],
+    "cool600": [
+      1344088.4519677379,
+      13408059.332930028
+    ],
+    "cool300": [
+      31018979.53420264,
+      241587771.7938793
+    ]
+  },
+  "skins": {
+    "1": {
+      "skin_A": 1.0,
+      "rebuilds": 1867,
+      "segments": {
+        "heat": {
+          "steps": 20000,
+          "rebuilds": 620
+        },
+        "peak": {
+          "steps": 8000,
+          "rebuilds": 410
+        },
+        "transit": {
+          "steps": 6520,
+          "rebuilds": 280
+        },
+        "cool600": {
+          "steps": 8000,
+          "rebuilds": 328
+        },
+        "cool300": {
+          "steps": 8000,
+          "rebuilds": 229
+        }
+      },
+      "timed": {
+        "peak": {
+          "frame": 24000,
+          "pass_ms": 1.4792799377441406,
+          "build_ms": 8.421709000231203,
+          "build_ms_all": [
+            8.472510000046896,
+            8.670797999911883,
+            8.319393999954627,
+            8.101722999981575,
+            8.421709000231203
+          ],
+          "pairs": 360346,
+          "rebuilds_per_step": 0.05125,
+          "amortised_ms": 1.9108925240059897
+        },
+        "cool600": {
+          "frame": 35760,
+          "pass_ms": 0.8734169769287109,
+          "build_ms": 7.303870000214374,
+          "build_ms_all": [
+            8.056467999722372,
+            7.303870000214374,
+            5.730454000058671,
+            6.989861999954883,
+            7.474126000033721
+          ],
+          "pairs": 25197,
+          "rebuilds_per_step": 0.041,
+          "amortised_ms": 1.1728756469375003
+        },
+        "cool300": {
+          "frame": 46520,
+          "pass_ms": 0.810830078125,
+          "build_ms": 7.040770999992674,
+          "build_ms_all": [
+            7.040770999992674,
+            7.043034000162152,
+            7.260294999923644,
+            6.344949999856908,
+            6.8568690003303345
+          ],
+          "pairs": 6295,
+          "rebuilds_per_step": 0.028625,
+          "amortised_ms": 1.0123721479997903
+        }
+      }
+    },
+    "1.5": {
+      "skin_A": 1.5,
+      "rebuilds": 1203,
+      "segments": {
+        "heat": {
+          "steps": 20000,
+          "rebuilds": 391
+        },
+        "peak": {
+          "steps": 8000,
+          "rebuilds": 269
+        },
+        "transit": {
+          "steps": 6520,
+          "rebuilds": 182
+        },
+        "cool600": {
+          "steps": 8000,
+          "rebuilds": 214
+        },
+        "cool300": {
+          "steps": 8000,
+          "rebuilds": 147
+        }
+      },
+      "timed": {
+        "peak": {
+          "frame": 24000,
+          "pass_ms": 1.5360140991210938,
+          "build_ms": 8.303155999783485,
+          "build_ms_all": [
+            8.464464000098815,
+            8.562070000152744,
+            8.303155999783485,
+            8.001843999863922,
+            7.984849999957078
+          ],
+          "pairs": 385225,
+          "rebuilds_per_step": 0.033625,
+          "amortised_ms": 1.8152077196138134
+        },
+        "cool600": {
+          "frame": 35760,
+          "pass_ms": 0.8902642822265625,
+          "build_ms": 8.095616999980848,
+          "build_ms_all": [
+            8.754359999784356,
+            8.095616999980848,
+            6.907963999765343,
+            7.294752999769116,
+            9.103003999825887
+          ],
+          "pairs": 26489,
+          "rebuilds_per_step": 0.02675,
+          "amortised_ms": 1.1068220369760502
+        },
+        "cool300": {
+          "frame": 46520,
+          "pass_ms": 0.8125702667236329,
+          "build_ms": 7.652391000192438,
+          "build_ms_all": [
+            8.355558999937784,
+            7.549724000000424,
+            8.661666000080004,
+            7.0410190000984585,
+            7.652391000192438
+          ],
+          "pairs": 6347,
+          "rebuilds_per_step": 0.018375,
+          "amortised_ms": 0.9531829513521689
+        }
+      }
+    },
+    "2": {
+      "skin_A": 2.0,
+      "rebuilds": 860,
+      "segments": {
+        "heat": {
+          "steps": 20000,
+          "rebuilds": 270
+        },
+        "peak": {
+          "steps": 8000,
+          "rebuilds": 197
+        },
+        "transit": {
+          "steps": 6520,
+          "rebuilds": 132
+        },
+        "cool600": {
+          "steps": 8000,
+          "rebuilds": 155
+        },
+        "cool300": {
+          "steps": 8000,
+          "rebuilds": 106
+        }
+      },
+      "timed": {
+        "peak": {
+          "frame": 24000,
+          "pass_ms": 1.6088858032226563,
+          "build_ms": 9.390871000050538,
+          "build_ms_all": [
+            9.971633000077418,
+            9.191287000248849,
+            9.390871000050538,
+            9.232212000370055,
+            9.49444699972446
+          ],
+          "pairs": 411117,
+          "rebuilds_per_step": 0.024625,
+          "amortised_ms": 1.8401360015989008
+        },
+        "cool600": {
+          "frame": 35760,
+          "pass_ms": 0.8749330902099609,
+          "build_ms": 8.26604599978964,
+          "build_ms_all": [
+            8.160314999713592,
+            7.972572999733529,
+            8.49453800037736,
+            8.344251999915286,
+            8.26604599978964
+          ],
+          "pairs": 27834,
+          "rebuilds_per_step": 0.019375,
+          "amortised_ms": 1.035087731455885
+        },
+        "cool300": {
+          "frame": 46520,
+          "pass_ms": 0.818248291015625,
+          "build_ms": 8.696603999851504,
+          "build_ms_all": [
+            7.881746999828465,
+            8.696603999851504,
+            8.142673000293144,
+            8.736130999750458,
+            8.72816499986584
+          ],
+          "pairs": 6422,
+          "rebuilds_per_step": 0.01325,
+          "amortised_ms": 0.9334782940136575
+        }
+      }
+    },
+    "2.5": {
+      "skin_A": 2.5,
+      "rebuilds": 650,
+      "segments": {
+        "heat": {
+          "steps": 20000,
+          "rebuilds": 192
+        },
+        "peak": {
+          "steps": 8000,
+          "rebuilds": 154
+        },
+        "transit": {
+          "steps": 6520,
+          "rebuilds": 102
+        },
+        "cool600": {
+          "steps": 8000,
+          "rebuilds": 121
+        },
+        "cool300": {
+          "steps": 8000,
+          "rebuilds": 81
+        }
+      },
+      "timed": {
+        "peak": {
+          "frame": 24000,
+          "pass_ms": 1.678297576904297,
+          "build_ms": 8.709902000191505,
+          "build_ms_all": [
+            8.448375999705604,
+            9.715879999930621,
+            11.492942999666411,
+            8.706277999863232,
+            8.709902000191505
+          ],
+          "pairs": 438025,
+          "rebuilds_per_step": 0.01925,
+          "amortised_ms": 1.8459631904079834
+        },
+        "cool600": {
+          "frame": 35760,
+          "pass_ms": 0.8864927673339844,
+          "build_ms": 7.81605199972546,
+          "build_ms_all": [
+            8.5035950000929,
+            7.81605199972546,
+            6.403201000011904,
+            7.474147999801062,
+            9.583302000010008
+          ],
+          "pairs": 29267,
+          "rebuilds_per_step": 0.015125,
+          "amortised_ms": 1.004710553829832
+        },
+        "cool300": {
+          "frame": 46520,
+          "pass_ms": 0.8158252716064454,
+          "build_ms": 6.864869999844814,
+          "build_ms_all": [
+            7.053319000078773,
+            6.535764000091149,
+            6.595868000204064,
+            7.3836970000229485,
+            6.864869999844814
+          ],
+          "pairs": 6482,
+          "rebuilds_per_step": 0.010125,
+          "amortised_ms": 0.8853320803548741
+        }
+      }
+    },
+    "3": {
+      "skin_A": 3.0,
+      "rebuilds": 515,
+      "segments": {
+        "heat": {
+          "steps": 20000,
+          "rebuilds": 146
+        },
+        "peak": {
+          "steps": 8000,
+          "rebuilds": 125
+        },
+        "transit": {
+          "steps": 6520,
+          "rebuilds": 83
+        },
+        "cool600": {
+          "steps": 8000,
+          "rebuilds": 97
+        },
+        "cool300": {
+          "steps": 8000,
+          "rebuilds": 64
+        }
+      },
+      "timed": {
+        "peak": {
+          "frame": 24000,
+          "pass_ms": 1.7372991943359375,
+          "build_ms": 10.840785000254982,
+          "build_ms_all": [
+            10.90578599996661,
+            10.956787999930384,
+            10.575919000075373,
+            10.04848899992794,
+            10.840785000254982
+          ],
+          "pairs": 466267,
+          "rebuilds_per_step": 0.015625,
+          "amortised_ms": 1.9066864599649216
+        },
+        "cool600": {
+          "frame": 35760,
+          "pass_ms": 0.8795327758789062,
+          "build_ms": 8.66808899991156,
+          "build_ms_all": [
+            9.059075000095618,
+            8.22986100001799,
+            9.016865999910806,
+            8.66808899991156,
+            8.354532999874209
+          ],
+          "pairs": 30689,
+          "rebuilds_per_step": 0.012125,
+          "amortised_ms": 0.9846333550028339
+        },
+        "cool300": {
+          "frame": 46520,
+          "pass_ms": 0.8157881927490235,
+          "build_ms": 8.393441999942297,
+          "build_ms_all": [
+            8.393441999942297,
+            8.578170999953727,
+            8.293855999909283,
+            8.496160000049713,
+            7.995357999789121
+          ],
+          "pairs": 6546,
+          "rebuilds_per_step": 0.008,
+          "amortised_ms": 0.8829357287485619
+        }
+      }
+    },
+    "4": {
+      "skin_A": 4.0,
+      "rebuilds": 343,
+      "segments": {
+        "heat": {
+          "steps": 20000,
+          "rebuilds": 82
+        },
+        "peak": {
+          "steps": 8000,
+          "rebuilds": 89
+        },
+        "transit": {
+          "steps": 6520,
+          "rebuilds": 58
+        },
+        "cool600": {
+          "steps": 8000,
+          "rebuilds": 69
+        },
+        "cool300": {
+          "steps": 8000,
+          "rebuilds": 45
+        }
+      },
+      "timed": {
+        "peak": {
+          "frame": 24000,
+          "pass_ms": 1.8713247680664062,
+          "build_ms": 11.103597999863268,
+          "build_ms_all": [
+            11.103597999863268,
+            12.001893000160635,
+            11.697540000113804,
+            11.028834000171628,
+            11.081929999818385
+          ],
+          "pairs": 525997,
+          "rebuilds_per_step": 0.011125,
+          "amortised_ms": 1.994852295814885
+        },
+        "cool600": {
+          "frame": 35760,
+          "pass_ms": 0.8902252960205078,
+          "build_ms": 9.418875999926968,
+          "build_ms_all": [
+            7.981821000157652,
+            9.340200000224286,
+            9.418875999926968,
+            9.852644000147848,
+            10.406612000224413
+          ],
+          "pairs": 33967,
+          "rebuilds_per_step": 0.008625,
+          "amortised_ms": 0.9714631015198779
+        },
+        "cool300": {
+          "frame": 46520,
+          "pass_ms": 0.8102457427978516,
+          "build_ms": 8.819766000215168,
+          "build_ms_all": [
+            9.708880000289355,
+            9.45747300011135,
+            8.730580000246846,
+            8.819766000215168,
+            7.886886000051163
+          ],
+          "pairs": 6670,
+          "rebuilds_per_step": 0.005625,
+          "amortised_ms": 0.8598569265490619
+        }
+      }
+    }
+  },
+  "gpu_processes_at_end": [],
+  "valid": true
+}
