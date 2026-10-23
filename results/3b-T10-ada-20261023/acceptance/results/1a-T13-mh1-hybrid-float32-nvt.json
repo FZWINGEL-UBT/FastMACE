@@ -1,0 +1,466 @@
+{
+ "replay_vs_eager_200": 4.5142176219314933e-08,
+ "fastmace_repeat_500": 9.917035725948153e-08,
+ "pipelined_vs_checked_500": 1.0708968467554314e-07,
+ "speculative_vs_pipelined_200": 3.6839951533806925e-08,
+ "baseline_scatter_500": 1.271599128216394e-07,
+ "baseline_checked_500": 7.952145075762473e-08,
+ "baseline_scatter_per_record": [
+  5.633319588582708e-09,
+  1.6447398970553806e-08,
+  3.381430779825223e-08,
+  5.705537731159893e-08,
+  6.185208079045879e-08,
+  5.370438849183756e-08,
+  5.8112981093927374e-08,
+  7.462439910455032e-08,
+  8.516633798194562e-08,
+  1.271599128216394e-07
+ ],
+ "fastmace_per_record": [
+  6.580959777124917e-09,
+  1.734978909151419e-08,
+  4.125127972542941e-08,
+  4.237990047784024e-08,
+  5.437278893793973e-08,
+  4.999327352095406e-08,
+  6.372140681776273e-08,
+  7.033102811249137e-08,
+  6.308660616127781e-08,
+  7.952145075762473e-08
+ ],
+ "kernels": {
+  "C": [
+   23,
+   23,
+   true
+  ],
+  "('B', 7168)": [
+   303,
+   304,
+   true
+  ]
+ },
+ "ms_per_step": {
+  "fastmace": {
+   "eager": 26.631568689999767,
+   "checked": 4.857809989998714,
+   "repeat": 4.885791090000566,
+   "pipelined": 4.825628869994034,
+   "speculative": 4.8668966599962005
+  },
+  "baseline": [
+   5.056375300000582,
+   4.865477599996666
+  ]
+ },
+ "info": {
+  "eager": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": false,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 0,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 0
+    }
+   ]
+  },
+  "checked": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "repeat": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "pipelined": {
+   "rebuilds_beside": 18,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 18,
+   "graphs": [
+    "ACP",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 18,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "ACP",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 19,
+     "key": "ACP",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 19,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 19,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "speculative": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "speculative",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "('ACB', 7168, 0)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 200,
+   "speculative_rollbacks": 5,
+   "speculative_rebuild_rollbacks": 5,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 1,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "('ACB', 7168, 0)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 25,
+     "key": "('ACB', 7168, 0)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 1
+    }
+   ]
+  }
+ },
+ "baseline_builds": [
+  15,
+  15
+ ],
+ "streaming": 2,
+ "warmups": {
+  "checked": [],
+  "pipelined": [],
+  "speculative": []
+ }
+}

@@ -100,6 +100,9 @@ case "$job" in
     run d3-reference-table env PYTHONPATH="$src:$src/tests" "$latest" tools/validation/d3_reference_table.py \
       --output "$root/d3-reference-table" --devices cpu cuda
     ;;
+  d3-table)  # item 1's numbers alone (d3_reference_table.py), e.g. after a fix of the tool
+    run d3-reference-table env PYTHONPATH="$src:$src/tests" "$latest" tools/validation/d3_reference_table.py       --output "$root/d3-reference-table" --devices cpu cuda
+    ;;
   npt-compare)  # item 2: the FastMACE side at the freeze (3b-T05's tool and settings), seeds 1-3 (EXTRA_SEEDS: the
     # pre-declared extension, e.g. "4 5 6"); the ASE side is 3b-T05's (cited, unchanged), analysed together
     for temperature in 300 600; do

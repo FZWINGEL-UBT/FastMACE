@@ -6,8 +6,8 @@ tool records the deviations behind it for the report. On the six rattled and str
 
 - the two references' agreement (energy per atom, max force component, max stress component);
 - float64 against each reference, with the rule's bound 2 x agreement + floor and pass/fail;
-- the negative control without pass 3 (the CN chain term) against torch-dftd: its force deviation must exceed
-  the bound;
+- the negative control without pass 3 (the CN chain term) against torch-dftd: on NbCl5 and NaNbCl6
+  (``CHAIN_CASES``) its force deviation must exceed the bound; NaCl's chain term vanishes (dE/dCN ~ 0), recorded only;
 - float32 against float64 on the same device, against the gate's floors.
 
     PYTHONPATH=<checkout>:<checkout>/tests python tools/validation/d3_reference_table.py --output DIR [--devices cpu cuda]
@@ -33,7 +33,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 sys.path.insert(0, str(ROOT / "tests" / "cpu"))
 
 from _support.d3_cases import CASES, FLOORS, GATE, deviations, within  # noqa: E402
-from test_d3_kernel import RECORD, evaluate  # noqa: E402
+from test_d3_kernel import CHAIN_CASES, RECORD, evaluate  # noqa: E402
 
 
 def references():
@@ -80,10 +80,11 @@ def main(argv=None):
                        float32_vs_float64=deviations(single, ours, len(atoms)))
             row["pass_torch_dftd"] = within(row["torch_dftd"], agreement)
             row["pass_simple_dftd3"] = within(row["simple_dftd3"], agreement)
-            row["negative_control_fails"] = row["no_chain_vs_torch_dftd"][1] > entry["bound"][1]
+            row["negative_control_fails"] = (row["no_chain_vs_torch_dftd"][1] > entry["bound"][1]
+                                             if name in CHAIN_CASES else None)  # NaCl: no chain term to miss
             row["pass_float32_gate"] = all(d <= g for d, g in zip(row["float32_vs_float64"], GATE))
-            row["pass"] = (row["pass_torch_dftd"] and row["pass_simple_dftd3"] and row["negative_control_fails"]
-                           and row["pass_float32_gate"])
+            row["pass"] = (row["pass_torch_dftd"] and row["pass_simple_dftd3"]
+                           and row["negative_control_fails"] is not False and row["pass_float32_gate"])
             passed &= row["pass"]
             entry["devices"][device] = row
         record["cases"][name] = entry
