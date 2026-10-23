@@ -3,9 +3,9 @@
 A tiny MH-1-class model, NaCl, the minimal planner on the CPU without compilation (as
 ``test_simulation.py``). ``fm.md`` builds a ``Simulation`` and nothing else, so its plan and gate
 equal the equivalent ``Simulation``'s; its inferences lose to explicit arguments; every
-``ValueError`` of §7.7 comes before anything is loaded; NVE and D3 are refused with their
-phase, and MC runs (on T09's driver); ``summary`` is the run report (1b-T15) and ``metadata``
-the ``metadata.json`` record.
+``ValueError`` of §7.7 comes before anything is loaded; NVE is refused with its phase, D3 runs
+(3b-T04: MACE plus D3, with the gate's reference MACE plus torch-dftd), and MC runs (on T09's
+driver); ``summary`` is the run report (1b-T15) and ``metadata`` the ``metadata.json`` record.
 """
 
 from __future__ import annotations
@@ -302,15 +302,31 @@ def test_nve_is_phase_4(tmp_path):
     assert "nve-phase-4" in raised.value.codes
 
 
-def test_d3bj_is_expanded_then_refused_phase_3b(tmp_path):
-    from fastmace.quick import md
+def _r2scan(loaded):
+    import dataclasses
 
-    # A label whose checkpoint need not be present: the refusal comes before loading.
-    with pytest.raises(PlanRefused, match="phase 3b") as raised:
-        md(_atoms(), model="mh1-r2scan", dispersion="d3bj", temperature_K=300.0, steps=3, seed=1,
-           output=tmp_path / "run")
-    assert "d3-phase-3b" in raised.value.codes
-    assert "functional=r2scan" in str(raised.value) and "pair_cutoff_bohr=40" in str(raised.value)
+    return dataclasses.replace(loaded, functional="r2scan")
+
+
+def test_d3bj_runs_and_is_labelled(loaded, tmp_path):
+    from fastmace import D3
+    from fastmace.model.dispersed import DispersedForceField
+
+    run = _md(_r2scan(loaded), tmp_path, dispersion="d3bj")
+    assert run.plan.dispersion == D3(functional="r2scan")
+    assert isinstance(run.simulation._engine.force_field, DispersedForceField)
+    assert "physics: D3(BJ) functional r2scan" in run.summary and "non-stock" in run.summary
+    assert "D3: experimental" in run.summary
+    assert run.metadata["force_field_identity"]["physics"]["dispersion"]["functional"] == "r2scan"
+    assert "functional=r2scan" in run.metadata["force_field"]["dispersion"]
+    assert run.metadata["force_field"]["d3"]["builds"] >= 1
+
+
+def test_d3_gate_compares_against_mace_plus_torch_dftd(loaded, tmp_path, no_engines_yet):
+    pytest.importorskip("torch_dftd")
+    run = _md(_r2scan(loaded), tmp_path, dispersion="d3bj", check="gate")
+    assert run.gate.status == "passed"
+    assert "non-stock (MACE plus torch-dftd" in json.dumps(run.gate.references)  # the reference's info()
 
 
 def test_d3bj_refused_for_mace_off(tmp_path):
@@ -329,13 +345,12 @@ def test_d3bj_refused_for_a_path(tmp_path):
            steps=3, seed=1)
 
 
-def test_explicit_d3_with_another_functional_names_the_warning(tmp_path):
+def test_explicit_d3_with_another_functional_names_the_warning(loaded, tmp_path):
     from fastmace import D3
-    from fastmace.quick import md
 
-    with pytest.raises(PlanRefused, match="phase 3b") as raised:
-        md(_atoms(), model="mh1-r2scan", dispersion=D3(functional="pbe"), temperature_K=300.0, steps=3, seed=1)
-    assert "differs from the training functional" in str(raised.value)
+    run = _md(_r2scan(loaded), tmp_path, dispersion=D3(functional="pbe"))
+    assert "differs from the training functional" in run.summary
+    assert run.plan.dispersion == D3(functional="pbe")
 
 
 @pytest.fixture
@@ -420,4 +435,4 @@ def test_every_refusal_at_once(tmp_path):
     with pytest.raises(PlanRefused) as raised:
         md(_atoms(), model="mh1-r2scan", ensemble="NVE", dispersion="d3bj", mc=_swap(), temperature_K=300.0, steps=3,
            seed=1)
-    assert set(raised.value.codes) == {"nve-phase-4", "d3-phase-3b"}
+    assert set(raised.value.codes) == {"nve-phase-4"}  # D3 runs since 3b-T04

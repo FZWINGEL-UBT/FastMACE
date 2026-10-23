@@ -91,6 +91,8 @@ T04 registers them and adds anything its version-counter test finds. The table i
 | BAOAB `p_eps`, `force_eps` (move into the state, T05) | save | capture |
 | Langevin `x_old`, `rnd_pos`, `rnd_vel`, `xi`, `eta`; BAOAB `xi`, `zeta` | derived (written before read) | capture |
 | integrator `sqrt_kT` (target) | derived from the protocol position | capture |
+| BAOAB `externalstress` (pressure target, 3b-T05) | derived from the protocol position; the restart's integrator record keeps the current one | capture |
+| BAOAB `externalstress_step` (the target of the step in flight, 3b-T05) | derived (stage A copies the target; a resume fills it) | capture |
 | `neighbours.*` (candidates, edges, shifts, `count`, `reference_positions`, build cell h₀) | reset (`rebuild`) | capture |
 | `neighbours.cell` (copy of the current cell, T04) | derived from `state.cell` (`set_cell`) | capture |
 | force-field `cell`, `volume`, `rcell` | derived from `state.cell` | capture |
@@ -103,7 +105,10 @@ T04 registers them and adds anything its version-counter test finds. The table i
 | `engine.flags_host`, `pipe_flags_host`, `spec_flags_host` (host mirrors, T04) | derived (overwritten before read) | no capture |
 | `derived.*`: the derived-state registry's buffers not registered under another name (3-T03; Langevin `c3_unit`/`c4_unit`/`c5_unit`, BAOAB `inv_sqrt_masses`, the fused `coefficients`) | derived (`DerivedStateRegistry.refresh`) | capture |
 
-`sqrt_kT` is read by the engine from the integrator (it is not in 1a's `Integrator.buffers`).
+`sqrt_kT` is read by the engine from the integrator (it is not in 1a's `Integrator.buffers`), and so is
+BAOAB's `externalstress`, which `set_pressure` and `set_external_stress` fill between steps. Stage B reads
+`externalstress_step`, the copy stage A takes, so that a pipelined redo of B(n), which runs after the host
+filled step n+1's target, still uses step n's (3b-T05).
 `p_eps` and `force_eps` are registered as `state.p_eps` and `state.force_eps` (T05 moved them into
 the state; the integrator's names are aliases, registered once). `state.charges` is saved. The pipeline floor and next bucket are host integers, not tensors: T14 resets them.
 

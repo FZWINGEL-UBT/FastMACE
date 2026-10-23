@@ -19,6 +19,9 @@ current cell and evaluates again, as the gate's references do. ``reset_polar`` (
 canonical restart point) sizes it for the current cell, as a fresh build does, so that a resumed
 run continues bit for bit.
 
+D3 (3b-T04): with a force field that has D3, the reference is MACE plus ``torch-dftd`` on the same
+record (``calculators.load(d3=...)``, SPEC §12.1), labelled non-stock.
+
 The planner builds it for ``mode="reference"`` and as the last candidate of the fallback's terminal
 sequence when it fits (§9.4 step 5, ``MinimalPlanner.reference_fits``).
 """
@@ -68,7 +71,8 @@ class ReferenceForceField:
         self.source = model
         self.reference = calculators.load(
             model.label or str(model.path), atoms, dtype=dtype, device=device, head=None if model.label else model.head,
-            family=model.family, polar=polar, sha256=model.sha256, charge=model.charge,
+            family=model.family, polar=polar, d3=getattr(force_field, "dispersion", None), sha256=model.sha256,
+            charge=model.charge,
             spin_multiplicity=model.spin_multiplicity)
         self._device = torch.device(device)
         self._dtype = torch.float64 if dtype == "float64" else torch.float32

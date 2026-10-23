@@ -22,19 +22,22 @@ NOTE = "compatibility tier: compiled, no CUDA graphs; use `fm.md` or `fastmace.a
 
 # fm.calc's keywords that go to fm.load; the rest go to FastMACECalculator.
 _LOAD_OPTIONS = ("sha256", "trusted", "download", "charge", "spin_multiplicity")
-_CALCULATOR_OPTIONS = ("rewrites", "precision")
+_CALCULATOR_OPTIONS = ("rewrites", "precision", "dispersion")
 
 
 class FastMACECalculator(Calculator):
-    """``FastMACECalculator(model, *, head=None, rewrites="auto", precision="float32")``: energy,
-    free_energy, forces and Voigt stress in ASE units; full 3D PBC only (§7.6).
+    """``FastMACECalculator(model, *, head=None, rewrites="auto", precision="float32", dispersion=None)``:
+    energy, free_energy, forces and Voigt stress in ASE units; full 3D PBC only (§7.6).
 
     - ``model``: an ``fm.load`` result or a label of the model table (a checkpoint path or URL
       needs ``fm.load`` or ``fm.calc`` with ``sha256=``/``trusted=``, since the trust decision
       needs one); ``head`` selects a head of a label's checkpoint, and must match a loaded
       model's head;
     - ``rewrites``: ``"auto"`` or a ``RewriteConfig``; ``precision``: the force precision,
-      ``"float32"`` or ``"float64"``. Energies are accumulated in float64 (§7.3).
+      ``"float32"`` or ``"float64"``. Energies are accumulated in float64 (§7.3);
+    - ``dispersion``: ``None``, ``"d3bj"`` or an ``fm.D3``, as ``fm.ForceField`` takes it (MACE plus D3,
+      SPEC §11.2; 3b-T04). ``dispersion`` is then the complete record. With D3 there are no per-atom
+      ``energies`` (D3's energy is not split by atom here).
 
     ``energies`` (per atom) is listed only for models whose energy terms are all atom-resolved;
     PolarMACE's k-space electrostatics are not (§7.3). Non-periodic or mixed-PBC atoms raise
@@ -46,7 +49,8 @@ class FastMACECalculator(Calculator):
 
     implemented_properties = ["energy", "free_energy", "forces", "stress"]
 
-    def __init__(self, model: Any, *, head: str | None = None, rewrites: Any = "auto", precision: str = "float32"):
+    def __init__(self, model: Any, *, head: str | None = None, rewrites: Any = "auto", precision: str = "float32",
+                 dispersion: Any = None):
         from fastmace.model.forcefield import PRECISIONS, ForceField
 
         super().__init__()
@@ -63,10 +67,11 @@ class FastMACECalculator(Calculator):
                              "pass head= to fm.load instead")
         if precision not in PRECISIONS:
             raise ValueError(f"precision must be one of {PRECISIONS}, got {precision!r}")
-        ForceField(model, precision=precision, rewrites=rewrites)  # checks them; each plan gets its own
+        # Checks them and expands "d3bj"; each plan gets its own force field.
+        self.dispersion = ForceField(model, precision=precision, rewrites=rewrites, dispersion=dispersion).dispersion
         self.model, self.precision, self.rewrites = model, precision, rewrites
         self.implemented_properties = list(type(self).implemented_properties)
-        if _atom_resolved(model.model):
+        if _atom_resolved(model.model) and self.dispersion is None:
             self.implemented_properties.append("energies")
         self.plan = None
         self.notes: list[str] = []
@@ -83,7 +88,8 @@ class FastMACECalculator(Calculator):
         from fastmace.model.forcefield import ForceField
         from fastmace.planner import minimal
 
-        force_field = ForceField(self.model, atoms, precision=self.precision, rewrites=self.rewrites)
+        force_field = ForceField(self.model, atoms, precision=self.precision, rewrites=self.rewrites,
+                                 dispersion=self.dispersion)
         planner = minimal.default_planner(force_field)
         plan = planner.plan_evaluation(force_field, atoms)  # rule 1 (3D PBC) and the others refuse here
         if self._compile_cache is None:
@@ -114,7 +120,7 @@ def calc(model: Any, *, head: str | None = None, **options: Any) -> FastMACECalc
     (label, path or URL, loaded as ``fm.load`` does); prints the compatibility-tier note once.
 
     ``options``: ``fm.load``'s ``sha256``, ``trusted``, ``download``, ``charge`` and
-    ``spin_multiplicity``, and the calculator's ``rewrites`` and ``precision``.
+    ``spin_multiplicity``, and the calculator's ``rewrites``, ``precision`` and ``dispersion``.
     """
     unknown = sorted(set(options) - set(_LOAD_OPTIONS) - set(_CALCULATOR_OPTIONS))
     if unknown:

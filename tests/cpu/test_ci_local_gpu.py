@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -288,3 +289,147 @@ def test_the_quiet_and_cpu_only_flags(tmp_path, monkeypatch):
 
 def test_check_command_status(tmp_path):
     assert lg.main(["check", "--marker", str(tmp_path / "gpu")]) == 0
+
+
+# The queue (task OPS-T01): waiting reservations take the GPU in arrival order. On 22 October 2026 waiters
+# raced for the marker at each release; one worker's back-to-back jobs kept winning for 37 minutes.
+
+def _queued(marker, proc, pid, purpose, arrival_ns):
+    proc.add(pid, ["python3", "tools/ci/local_gpu.py", "run"])
+    return lg.enqueue(marker, purpose, pid, pid, proc.root, arrival_ns=arrival_ns)
+
+
+def test_the_queue_is_next_to_the_marker(tmp_path):
+    assert lg.queue_dir(tmp_path / ".fastmace-local-gpu") == tmp_path / ".fastmace-local-gpu-queue"
+
+
+def test_waiters_take_the_gpu_in_arrival_order(proc, tmp_path):
+    marker = tmp_path / "gpu"
+    proc.add(40, ["bash"])
+    assert lg.reserve(marker, "holder", pid=40, proc_root=proc.root)[0]
+    a = _queued(marker, proc, 41, "a", 1)
+    b = _queued(marker, proc, 42, "b", 2)
+    c = _queued(marker, proc, 43, "c", 3)
+    assert [t["purpose"] for _, t in lg.live_tickets(marker, proc.root)] == ["a", "b", "c"]
+    assert not lg.take_turn(marker, *a, proc_root=proc.root)[0]  # the holder still has it
+    lg.release(marker, pid=40)
+    ok, reason = lg.take_turn(marker, *c, proc_root=proc.root)
+    assert not ok and "'a'" in reason  # c polls first but is behind a and b
+    assert not lg.take_turn(marker, *b, proc_root=proc.root)[0]
+    ok, holder = lg.take_turn(marker, *a, proc_root=proc.root)
+    assert ok and holder["purpose"] == "a" and not a[0].exists()
+    lg.release(marker, pid=41)
+    assert not lg.take_turn(marker, *c, proc_root=proc.root)[0]
+    assert lg.take_turn(marker, *b, proc_root=proc.root)[0]
+    lg.release(marker, pid=42)
+    assert lg.take_turn(marker, *c, proc_root=proc.root)[0]
+    assert lg.live_tickets(marker, proc.root) == []
+
+
+def test_a_stale_ticket_is_skipped(proc, tmp_path, capsys):
+    marker = tmp_path / "gpu"
+    _queued(marker, proc, 41, "crashed waiter", 1)
+    b = _queued(marker, proc, 42, "b", 2)
+    proc.remove(41)
+    ok, holder = lg.take_turn(marker, *b, proc_root=proc.root)
+    assert ok and holder["purpose"] == "b"
+    assert "stale" in capsys.readouterr().err
+    assert list(lg.queue_dir(marker).iterdir()) == []
+
+
+def test_a_ticket_whose_pid_was_reused_is_stale(proc, tmp_path):
+    marker = tmp_path / "gpu"
+    _queued(marker, proc, 41, "old", 1)
+    proc.add(41, ["other"], start=999)
+    assert lg.live_tickets(marker, proc.root) == []
+
+
+def test_a_lost_ticket_is_rewritten_at_its_place(proc, tmp_path):
+    marker = tmp_path / "gpu"
+    proc.add(40, ["bash"])
+    lg.reserve(marker, "holder", pid=40, proc_root=proc.root)
+    a = _queued(marker, proc, 41, "a", 1)
+    _queued(marker, proc, 42, "b", 2)
+    a[0].unlink()
+    assert not lg.take_turn(marker, *a, proc_root=proc.root)[0]
+    assert [t["purpose"] for _, t in lg.live_tickets(marker, proc.root)] == ["a", "b"]
+
+
+def test_a_waiter_that_times_out_leaves_the_queue(proc, tmp_path):
+    marker = tmp_path / "gpu"
+    clock = Clock()
+    proc.add(40, ["bash"])
+    proc.add(41, ["bash"])
+    lg.reserve(marker, "holder", pid=40, proc_root=proc.root)
+    ok, reasons = lg.acquire(marker, "patient", pid=41, proc_root=proc.root, wait_s=60, interval_s=30,
+                             min_available_gib=10, clock=clock, sleep=clock.sleep)
+    assert not ok and "holder" in reasons[0] and clock.now == 60
+    assert lg.live_tickets(marker, proc.root) == []
+
+
+def test_acquire_waits_behind_an_earlier_ticket(proc, tmp_path):
+    marker = tmp_path / "gpu"
+    clock = Clock()
+    proc.add(41, ["bash"])
+    first = _queued(marker, proc, 42, "first", 1)
+    calls = []
+
+    def sleep(seconds):
+        calls.append(seconds)
+        clock.sleep(seconds)
+        if len(calls) == 2:  # the earlier waiter takes its turn and finishes
+            assert lg.take_turn(marker, *first, proc_root=proc.root)[0]
+            lg.release(marker, pid=42)
+
+    ok, _ = lg.acquire(marker, "second", pid=41, proc_root=proc.root, wait_s=600, interval_s=30,
+                       min_available_gib=10, clock=clock, sleep=sleep)
+    assert ok and len(calls) == 2  # the GPU was free all along, but "first" came first
+
+
+def test_concurrent_waiters_run_in_arrival_order(proc, tmp_path):
+    import threading
+
+    marker = tmp_path / "gpu"
+    proc.add(40, ["bash"])
+    lg.reserve(marker, "holder", pid=40, proc_root=proc.root)
+    order, threads = [], []
+
+    def waiter(pid):
+        ok, _ = lg.acquire(marker, f"w{pid}", pid=pid, proc_root=proc.root, wait_s=60, interval_s=0.01,
+                           min_available_gib=None)
+        order.append(pid)
+        lg.release(marker, pid)
+
+    for pid in (43, 41, 44, 42):  # arrival order, not pid order
+        proc.add(pid, ["bash"])
+        threads.append(threading.Thread(target=waiter, args=(pid,)))
+        threads[-1].start()
+        while len(lg.live_tickets(marker, proc.root)) < len(threads):
+            time.sleep(0.005)
+    lg.release(marker, pid=40)
+    for thread in threads:
+        thread.join(30)
+    assert order == [43, 41, 44, 42]
+
+
+def test_status_lists_the_queue(proc, tmp_path, monkeypatch, capsys):
+    marker = tmp_path / "gpu"
+    monkeypatch.setattr(lg.time, "time", lambda: 1000.0)
+    proc.add(41, ["bash"])
+    proc.add(42, ["bash"])
+    lg.enqueue(marker, "3-T01 fast tier", 41, 41, proc.root, arrival_ns=int(900e9))
+    lg.enqueue(marker, "3-T02 timing", 42, 42, proc.root, arrival_ns=int(990e9))
+    lines = lg.queue_lines(marker, proc.root)
+    assert "1." in lines[1] and "3-T01 fast tier" in lines[1] and "1m40s" in lines[1]
+    assert "2." in lines[2] and "3-T02 timing" in lines[2] and "0m10s" in lines[2]
+
+
+def test_run_with_a_temporary_home_leaves_no_ticket(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("FASTMACE_LOCAL_GPU_MARKER", raising=False)
+    monkeypatch.setattr(lg, "wait_for_machine", lambda *args, **kwargs: (True, []))
+    assert lg.main(["run", "--purpose", "unit test", "--wait-minutes", "0", "--", sys.executable, "-c", "pass"]) == 0
+    assert not (tmp_path / ".fastmace-local-gpu").exists()
+    assert list((tmp_path / ".fastmace-local-gpu-queue").iterdir()) == []
+    assert lg.main(["status"]) == 0
+    assert "local GPU free" in capsys.readouterr().out

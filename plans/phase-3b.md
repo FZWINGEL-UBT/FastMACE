@@ -99,7 +99,9 @@ follow in the next section.
    Grimme's maintained program and satisfies §11.2's "the `dftd3` program".
    - If its wheel doesn't install cleanly, it is built with cmake and
      gfortran (both installed in WSL).
-   - `tad-dftd3` 0.7.0 (pip) is an optional third cross-check.
+   - `tad-dftd3` 0.7.0 (pip) was meant as an optional third cross-check,
+     but it has no periodic boundaries. It is installed and not used
+     (3b-T01).
    - All three go into local `mace_cueq_latest`, under the local package
      rule.
 2. **Explicit numbers in `fm.D3`:** s6 = 1, s8 = 0.7898, a1 = 0.4948,
@@ -275,8 +277,86 @@ Merge orders where files overlap:
 - **Workstations:** none until the owner says they're back. Then only when
   nobody else is on the GPU or running active jobs, with files only under
   `/mnt/homes/zwingel`.
-- **Modal:** under the guard, at most $5 for the phase (the month stood at
-  $7.86 on 22 October).
+- **Modal:** a phase may use as much of the monthly $30 as it needs
+  (owner, 22 October 2026), but never more than the month allows. The guard
+  stops at $27, keeping the $3 reserve. The month stood at $7.86 on
+  22 October. Long untimed runs (the ASE comparison, the full protocol) may
+  move to Modal; timed items stay on the RTX 5060 Ti.
+- **Tests and merges (owner, 22 October 2026):**
+  - workers run only the test files their change touches;
+  - the full CPU suite runs once per merge, in the conductor's trial;
+  - finished branches are trial-merged in batches;
+  - one full CPU suite runs on the PC at a time.
+
+## Conductor answers to the prestart reports (22 October 2026)
+
+- **3b-T01:** the draft contract is on its branch (9a59cbb). Additions:
+  - `evaluate_energy()`, energy only, for MC energy fields;
+  - torch-dftd 0.5.1 and `dftd3` 1.6.0 also go into local `fastmace_cpu`,
+    because trial merges run the CPU suite there and the D3 CPU tests would
+    otherwise skip.
+- **3b-T02, the list:**
+  - 12 B per pair, sorted canonically by (i, j, image). Padded slots are
+    i = j = N, with a device count.
+  - Per-pair integer images (skin.py's convention: positions unwrapped, the
+    atoms' build offsets absorbed), times the current cell at each step.
+  - The runtime test is skin.py's deformation-aware test with the D3
+    cutoff. The skin is max(1.0 Å, 2·n·d + r_c·f/(1−f)), with n = 50
+    provisional; T06 sets the numbers. It applies to every run with D3 on.
+  - Rule 12 records the pair and memory estimate. It warns above 25 % of
+    device memory and refuses only when the D3 buffers alone exceed free
+    memory. It drops no rewrites.
+  - Registry entries and wiring stay with T04.
+  - The builder is device-agnostic, so the CPU tier gets the same list.
+- **3b-T03, the kernel:**
+  - One Triton program per atom over a CSR, with float64 register sums and
+    no atomics. It is deterministic, and the sums over atoms use a fixed
+    order.
+  - The tables ship with FastMACE as package data, byte-identical to
+    torch-dftd 0.5.1's `dftd3_params.npz` (sha256 in the identity), with
+    torch-dftd's MIT notice. So the native path needs no `[d3]` extra
+    (SPEC §4.1, §14). Whether the release may ship them is checked in
+    phase 6.
+  - Tolerances follow the 3b-T10 runbook's item 1.
+  - New: a torch CPU tier (float64) for CPU devices and the CPU suite, which
+    also serves as the kernel's oracle.
+- **3b-T04, integration:**
+  - The energy-only entry is used for MC energy fields and follow copies.
+  - `needs_rebuild` is a device flag OR-ed into the fused stage.
+    `build()` returns True when addresses changed, and the graphs are then
+    recaptured.
+  - D3 rebuilds stay on the main stream.
+  - MC trial rebuilds cover the D3 list.
+- **3b-T05, NPT:**
+  - The pressure setter is approved, half-step lag included (documented, and
+    the restart round trip covers a changed target).
+  - CPU tests use torch-dftd as the D3 term until T03's torch tier merges.
+  - The comparison uses **P_tau = 2 ps** on both engines (mass factor 1,
+    friction 0.02), recorded as a test setting. The library default and D1's
+    protocol keep 20 T_tau.
+  - The ASE side runs MACE in float32 (cuEq) with torch-dftd in float64:
+    about 4 h instead of 6.5 h, in jobs of 70 min or less.
+- **3b-T06, cost:**
+  - It sets rule 11's D3 numbers after T02 and T04 merge.
+  - If NPT can't share a process, the cost is decomposed: in-process pass
+    time plus counted rebuilds times build time.
+  - Timing takes about 1.5 h.
+- **3b-T07, protocol:**
+  - `trajectory_every = 100`, `thermo_every = 10` (unlike main.py's
+    10 fs frames).
+  - Pressure schedules are reserved and refused, unless T05's setter lands
+    first and wiring them is small.
+  - `SOURCES.md` covers the NbCl5 CIF, and the D3 counters go into the
+    output.
+- **3b-T10, acceptance:** the runbook (f2bf00e) is accepted with three
+  item 2 changes:
+  - P_tau = 2 ps on both engines;
+  - ASE with MACE in float32;
+  - SE from blocks of at least twice the decorrelation time pooled over the
+    seeds, with a jackknife for the V fluctuation.
+
+  The pass rule stays at 3 combined SE, with one extension of 3 more seeds.
+  The tool-side additions are written and CPU-tested before the freeze.
 
 ## Checkpoints for the owner
 

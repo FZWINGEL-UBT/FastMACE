@@ -694,7 +694,8 @@ class GraphEngine(Engine):
             moved |= polar_moved
             if overflowed:
                 self.polar_overflow_steps.append(state.step)
-        moved |= bool(field.rebuild(state.positions))
+        # Every list, D3's too, whatever its own test says (DispersedForceField.rebuild_all; 3b-T04).
+        moved |= bool(getattr(field, "rebuild_all", field.rebuild)(state.positions))
         if moved:
             self.invalidate_graphs("the canonical rebuild moved buffers")
         field.compact(state.positions)  # as the build does: eager, then the exact count
@@ -751,6 +752,9 @@ class GraphEngine(Engine):
         sqrt_kT = getattr(self.integrator, "sqrt_kT", None)
         if isinstance(sqrt_kT, torch.Tensor):
             named.setdefault("integrator.sqrt_kT", sqrt_kT)
+        externalstress = getattr(self.integrator, "externalstress", None)  # the pressure target (3b-T05)
+        if isinstance(externalstress, torch.Tensor):
+            named.setdefault("integrator.externalstress", externalstress)
         named.update({f"force_field.{name}": tensor for name, tensor in self.force_field.buffers().items()})
         named.update({"engine.rebuild_needed": self.rebuild_needed, "engine.flags": self._flags,
                       "engine.pipe_flags": self._pipe_flags, "engine.spec_flags": self._spec_flags,

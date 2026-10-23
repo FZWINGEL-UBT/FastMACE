@@ -48,7 +48,7 @@ SCALARS = (
     ("min_mc_temperature_K", "MC: the lowest MC temperature, required with a schedule (MC runs only at or "
                              "above it).", "300.0"),
     ("repeat", "Supercell repeats; the cell is never expanded silently.", "[1, 1, 1]"),
-    ("dispersion", "\"d3bj\": the D3(BJ) record of the head's training functional, refused until phase 3b;\n"
+    ("dispersion", "\"d3bj\": the D3(BJ) record of the head's training functional (MACE plus D3);\n"
                    "# a full record is the [dispersion] table below.", '"d3bj"'),
     ("seed", "Noise seed; without it one is drawn and recorded in metadata.json.", "1"),
     ("check", '"skip" (default), "gate" (the gate on this structure, opt-in) or "allow_unavailable".', '"skip"'),
@@ -67,9 +67,10 @@ TABLES = (
      "# ensemble and the physics keys above. friction_per_fs defaults to fm.md's (0.02 per ASE time unit).",
      ("[integrator]", 'type = "LangevinBAOAB"', "temperature_K = 300.0", "pressure_GPa = 0.0",
       'cell_mode = "full"')),
-    ("A full D3 record (the fields of fm.D3); its functional should be the model's training functional.",
+    ("A full D3 record (the fields of fm.D3); its functional should be the model's training functional.\n"
+     "# s6, s8, a1, a2: the Becke-Johnson numbers; without them, the functional's set (pbe or r2scan).",
      ("[dispersion]", 'functional = "r2scan"', "pair_cutoff_bohr = 40.0", "cn_cutoff_bohr = 40.0",
-      "three_body = false")),
+      "three_body = false", "s6 = 1.0", "s8 = 0.7898", "a1 = 0.4948", "a2 = 5.7308")),
     ("MC moves, one [[mc]] table each (the fields of fm.mc.Swap, Transmute or Displace; experimental).",
      ("[[mc]]", 'move = "swap"', 'pairs = [["Na", "Cl"]]', "every = 100", "attempts = 50",
       'velocities = "exchange"')),

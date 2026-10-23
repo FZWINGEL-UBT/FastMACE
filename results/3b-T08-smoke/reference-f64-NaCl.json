@@ -1,0 +1,337 @@
+{
+ "tool": "tools/polar_stress_fd.py",
+ "argv": [
+  "--path",
+  "reference",
+  "--dtype",
+  "float64",
+  "--structure",
+  "NaCl",
+  "--repeat",
+  "2",
+  "2",
+  "2",
+  "--configs",
+  "ideal",
+  "--steps",
+  "1e-3",
+  "1e-4",
+  "--probe",
+  "--scan",
+  "--scan-points",
+  "5",
+  "--output",
+  "/mnt/d/Margraf/FastMACE/.claude/worktrees/silly-hawking-10a1b1/results/3b-T08-smoke/reference-f64-NaCl.json"
+ ],
+ "path": "reference",
+ "dtype": "float64",
+ "label": "polar-1-s",
+ "structure": "NaCl",
+ "repeat": [
+  2,
+  2,
+  2
+ ],
+ "frozen_kset": false,
+ "started": "2026-10-22T17:58:38+00:00",
+ "load_s": 10.125815955005237,
+ "info": {
+  "reference": {
+   "record_id": "fastmace.reference/0.3.16/polar/8e216bde0c3515e9",
+   "role": "reference",
+   "dtype": "float64",
+   "float64_energy": false,
+   "energy_bound": "float64 accumulation",
+   "e0_table": null,
+   "backend": "cueq",
+   "cueq_conv_fusion": false,
+   "model": {
+    "path": "/home/fzwin/models/MACE-POLAR-1-S.model",
+    "sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+    "label": "polar1-s",
+    "head": "Default"
+   },
+   "patches": [
+    "single_graph_strain",
+    "polar_longrange"
+   ],
+   "corrections_active": [
+    "polar_kspace_stress"
+   ],
+   "optional_physics": [],
+   "polar": {
+    "bounds": [
+     4,
+     4,
+     4
+    ],
+    "k_vectors": 102,
+    "k_superset": 220,
+    "headroom": 0.1
+   }
+  },
+  "kspace": {
+   "kspace_cutoff": 1.8467166423797607,
+   "sigma2": [
+    2.25
+   ],
+   "sigma2_module": "electric_potential_descriptor.density_basis.radial_spline"
+  }
+ },
+ "commit": "",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+ "configs": {
+  "ideal": {
+   "natoms": 64,
+   "volume_A3": 1396.0104183137878,
+   "cell": [
+    [
+     11.17625288,
+     0.0,
+     0.0
+    ],
+    [
+     0.0,
+     11.17625288,
+     0.0
+    ],
+    [
+     0.0,
+     0.0,
+     11.17625288
+    ]
+   ],
+   "energy_eV": -542171.3427836867,
+   "analytic": [
+    [
+     -0.004944196746701121,
+     3.345838571728709e-18,
+     2.614326704012974e-18
+    ],
+    [
+     3.345838571728709e-18,
+     -0.004944196746701118,
+     2.8902853481326644e-18
+    ],
+    [
+     2.614326704012974e-18,
+     2.8902853481326644e-18,
+     -0.0049441967467011155
+    ]
+   ],
+   "first_evaluation_s": 4.646038652994321,
+   "kset": {
+    "included": 74,
+    "flipped": 0
+   },
+   "steps": [
+    {
+     "h": 0.001,
+     "fd": [
+      [
+       -0.004944812259573965,
+       0.0,
+       0.0
+      ],
+      [
+       0.0,
+       -0.004944812259573965,
+       0.0
+      ],
+      [
+       0.0,
+       0.0,
+       -0.004944812259573965
+      ]
+     ],
+     "max_abs": 6.155128728490417e-07,
+     "max_rel": 0.00012449198613702532,
+     "detail": [
+      {
+       "component": "00",
+       "e_plus": -542171.3493428022,
+       "e_minus": -542171.3355367833,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "11",
+       "e_plus": -542171.3493428022,
+       "e_minus": -542171.3355367833,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "22",
+       "e_plus": -542171.3493428022,
+       "e_minus": -542171.3355367833,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "12",
+       "e_plus": -542171.3427099149,
+       "e_minus": -542171.3427099149,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "02",
+       "e_plus": -542171.3427099149,
+       "e_minus": -542171.3427099149,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "01",
+       "e_plus": -542171.3427099149,
+       "e_minus": -542171.3427099149,
+       "flipped": [
+        0,
+        0
+       ]
+      }
+     ]
+    },
+    {
+     "h": 0.0001,
+     "fd": [
+      [
+       -0.004944203126785893,
+       0.0,
+       0.0
+      ],
+      [
+       0.0,
+       -0.004944203126785893,
+       0.0
+      ],
+      [
+       0.0,
+       0.0,
+       -0.004944203126785893
+      ]
+     ],
+     "max_abs": 6.380084777331263e-09,
+     "max_rel": 1.2904188696754835e-06,
+     "detail": [
+      {
+       "component": "00",
+       "e_plus": -542171.3434704638,
+       "e_minus": -542171.342090032,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "11",
+       "e_plus": -542171.3434704638,
+       "e_minus": -542171.342090032,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "22",
+       "e_plus": -542171.3434704638,
+       "e_minus": -542171.342090032,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "12",
+       "e_plus": -542171.342782949,
+       "e_minus": -542171.342782949,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "02",
+       "e_plus": -542171.342782949,
+       "e_minus": -542171.342782949,
+       "flipped": [
+        0,
+        0
+       ]
+      },
+      {
+       "component": "01",
+       "e_plus": -542171.342782949,
+       "e_minus": -542171.342782949,
+       "flipped": [
+        0,
+        0
+       ]
+      }
+     ]
+    }
+   ],
+   "scan_xx": [
+    {
+     "e_xx": -0.002,
+     "energy_eV": -542171.3275969275,
+     "stress_xx": -0.005936960099334688,
+     "kset": {
+      "included": 74,
+      "flipped": 0
+     }
+    },
+    {
+     "e_xx": -0.001,
+     "energy_eV": -542171.3355367833,
+     "stress_xx": -0.005438725411180042,
+     "kset": {
+      "included": 74,
+      "flipped": 0
+     }
+    },
+    {
+     "e_xx": 0.0,
+     "energy_eV": -542171.3427836867,
+     "stress_xx": -0.004944196746701171,
+     "kset": {
+      "included": 74,
+      "flipped": 0
+     }
+    },
+    {
+     "e_xx": 0.001,
+     "energy_eV": -542171.3493428022,
+     "stress_xx": -0.004453360927481264,
+     "kset": {
+      "included": 74,
+      "flipped": 0
+     }
+    },
+    {
+     "e_xx": 0.002,
+     "energy_eV": -542171.3552192756,
+     "stress_xx": -0.003966204682787447,
+     "kset": {
+      "included": 74,
+      "flipped": 0
+     }
+    }
+   ]
+  }
+ },
+ "finished": "2026-10-22T17:58:46+00:00"
+}

@@ -21,8 +21,10 @@ from fastmace.protocols.schedule import Schedule, ramp
 
 OPTIMIZERS = ("LBFGS", "BFGS")
 QUENCH_KEYS = ("min_K", "bin_K", "per_bin", "fmax", "optimizer", "max_steps")
+ENSEMBLES = ("NVT", "NPT")  # NVE comes with its integrator (phase 4)
+DISPERSIONS = ("none", "d3bj")
 _PROFILE_KEYS = {"name", "segments", "sample_interval", "trajectory_interval", "relax_fmax", "relax_optimizer",
-                 "quench"}
+                 "quench", "ensemble", "pressure_GPa", "dispersion"}
 
 
 def _interval(value: Any, name: str) -> int:
@@ -43,7 +45,13 @@ class Profile:
 
     ``relax_fmax`` 0 means no initial relaxation (fixed cell, eV/Å). ``quench`` is ``None`` or a
     mapping with ``QUENCH_KEYS`` (frames per ``bin_K`` bin of the target from ``min_K``, quenched to
-    ``fmax`` with ``optimizer``, at most ``max_steps``).
+    ``fmax`` with ``optimizer``, at most ``max_steps``). Relaxation and quench keep the cell fixed;
+    after NPT each frame is quenched at its own cell.
+
+    ``ensemble`` is ``"NVT"`` or ``"NPT"`` (``fm.md``'s; any case). ``pressure_GPa`` is NPT's
+    constant hydrostatic target, ``None`` for NVT and 0 GPa by default for NPT; pressure schedules
+    are refused until the pressure setter (plan task 3b-T05). ``dispersion`` is ``"none"`` or
+    ``"d3bj"`` (``fm.md``'s, SPEC §7.7).
     """
 
     name: str
@@ -53,6 +61,9 @@ class Profile:
     relax_fmax: float = 0.0
     relax_optimizer: str = "LBFGS"
     quench: Mapping[str, Any] | None = None
+    ensemble: str = "NVT"
+    pressure_GPa: float | None = None
+    dispersion: str = "none"
 
     def __post_init__(self) -> None:
         if not isinstance(self.name, str) or not self.name:
@@ -66,9 +77,39 @@ class Profile:
             raise ValueError(f"relax_optimizer must be one of {OPTIMIZERS}, got {self.relax_optimizer!r}")
         if self.quench is not None:
             object.__setattr__(self, "quench", MappingProxyType(_quench(self.quench)))
+        if not isinstance(self.ensemble, str) or self.ensemble.upper() not in ENSEMBLES:
+            raise ValueError(f"ensemble must be one of {ENSEMBLES}, got {self.ensemble!r}")
+        object.__setattr__(self, "ensemble", self.ensemble.upper())
+        object.__setattr__(self, "pressure_GPa", _pressure(self.pressure_GPa, self.ensemble))
+        if self.dispersion not in DISPERSIONS:
+            raise ValueError(f"dispersion must be one of {DISPERSIONS}, got {self.dispersion!r}")
+
+    def md_options(self) -> dict[str, Any]:
+        """``fm.md``'s schedule, ensemble, pressure and dispersion arguments of this profile."""
+        options: dict[str, Any] = {"schedule": self.schedule, "ensemble": self.ensemble}
+        if self.ensemble == "NPT":
+            options["pressure_GPa"] = self.pressure_GPa
+        if self.dispersion != "none":
+            options["dispersion"] = self.dispersion
+        return options
 
     def __hash__(self) -> int:
         return hash((self.name, self.schedule))
+
+
+def _pressure(value: Any, ensemble: str) -> float | None:
+    if ensemble != "NPT":
+        if value is not None:
+            raise ValueError(f"pressure_GPa needs ensemble NPT, got {value!r} with {ensemble}")
+        return None
+    if value is None:
+        return 0.0
+    if isinstance(value, (list, tuple, Mapping)):
+        raise ValueError("pressure_GPa takes a constant; pressure schedules come with the pressure setter "
+                         "(plan task 3b-T05)")
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+        raise ValueError(f"pressure_GPa must be a finite number, got {value!r}")
+    return float(value)
 
 
 def _quench(data: Any) -> dict[str, Any]:
@@ -108,7 +149,8 @@ PROFILES: Mapping[str, Profile] = MappingProxyType({
 
 def profile_from_data(data: Mapping[str, Any]) -> Profile:
     """A profile from a mapping: ``name``, ``segments`` (``Schedule.from_data``) and optional
-    ``sample_interval``, ``trajectory_interval``, ``relax_fmax``, ``relax_optimizer``, ``quench``.
+    ``sample_interval``, ``trajectory_interval``, ``relax_fmax``, ``relax_optimizer``, ``quench``,
+    ``ensemble``, ``pressure_GPa``, ``dispersion``.
     Unknown keys and invalid values raise ``ValueError``."""
     if not isinstance(data, Mapping):
         raise ValueError(f"a profile must be a mapping, got {type(data).__name__}")

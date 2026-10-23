@@ -211,14 +211,20 @@ def test_fix_atoms_is_refused_with_the_phase_4_reason(loaded):
 
 def test_dispersion_follows_fm_md(loaded):
     """'d3bj' expands from the training functional as fm.md does (a model loaded from a path has none,
-    so only an explicit fm.D3 is accepted); a complete record is refused until phase 3b, shown."""
+    so only an explicit fm.D3 is accepted); the record goes into an fm.ForceField (3b-T04)."""
     import fastmace as fm
+    from fastmace.ase import md
+    from fastmace.model.forcefield import ForceField
 
     with pytest.raises(ValueError, match="training functional is unknown") as error:
         _langevin(loaded, dispersion="d3bj")
     assert not isinstance(error.value, PlanRefused)
-    with pytest.raises(PlanRefused, match=r"D3: phase 3b; the expanded record is D3\(functional=pbe"):
-        _langevin(loaded, dispersion=fm.D3(functional="pbe"))
+    field = md._dispersion(fm.D3(functional="pbe"), loaded, _atoms())
+    assert isinstance(field, ForceField) and field.dispersion == fm.D3(functional="pbe")
+    assert md._dispersion(None, loaded, _atoms()) is loaded
+    assert md._dispersion(fm.D3(functional="pbe"), field, _atoms()) is field
+    with pytest.raises(ValueError, match="differs from the force field"):
+        md._dispersion(fm.D3(functional="r2scan"), field, _atoms())
     with pytest.raises(ValueError, match="not 'd3bj'"):
         _langevin(loaded, dispersion="d4")
 
@@ -228,13 +234,13 @@ def test_d3bj_expansion_for_a_label_matches_fm_md(loaded, monkeypatch):
     import dataclasses
 
     from fastmace.ase import md
+    from fastmace.longrange.d3 import D3
 
     r2scan = dataclasses.replace(loaded, label="mh1", head="matpes_r2scan", functional="r2scan")
-    with pytest.raises(PlanRefused, match="functional=r2scan"):
-        md._dispersion("d3bj", r2scan)
+    assert md._dispersion("d3bj", r2scan, _atoms()).dispersion == D3(functional="r2scan")
     off = dataclasses.replace(loaded, label="mace-off-small", functional="wb97m-d3bj")
     with pytest.raises(ValueError, match="count it twice"):
-        md._dispersion("d3bj", off)
+        md._dispersion("d3bj", off, _atoms())
 
 
 def test_check_is_passed_through(loaded):

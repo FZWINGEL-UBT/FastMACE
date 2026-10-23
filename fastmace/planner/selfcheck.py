@@ -653,6 +653,7 @@ def _job(plan, force_field, copies, *, device=None, cell="production", repeat=No
         "family": model.family, "device": device or plan.engine.device, "backend": plan.engine.backend,
         "polar": polar, "cell": cell, "repeat": None if repeat is None else list(repeat),
         "copies": _copy_entries(copies),
+        "dispersion": None if plan.dispersion is None else dataclasses.asdict(plan.dispersion),
     }
 
 
@@ -695,8 +696,18 @@ def _load_reference(job, dtype, atoms):
     from fastmace.reference import calculators
 
     return calculators.load(job["source"], atoms, dtype=dtype, device=job["device"], head=job["head"],
-                            family=job["family"], polar=_polar_config(job), sha256=job["sha256"],
+                            family=job["family"], polar=_polar_config(job), d3=_d3_record(job), sha256=job["sha256"],
                             charge=job["charge"], spin_multiplicity=job["spin_multiplicity"])
+
+
+def _d3_record(job):
+    """The plan's ``fm.D3`` from ``job`` (the reference is MACE plus torch-dftd on it, SPEC §12.1), or None."""
+    values = job.get("dispersion")
+    if values is None:
+        return None
+    from fastmace.longrange.d3 import D3
+
+    return D3(**values)
 
 
 def _free(device):
@@ -1392,6 +1403,10 @@ def _reduced_outputs(references: References, engine, stress: bool):
             engine=dataclasses.replace(plan.engine, compile_mode="none"), neighbours=plan.neighbours,
             polar=plan.polar or PolarConfig(), compute_stress=stress, check=False,
             float64_energy=plan.precision.float64_energy, species=getattr(engine.force_field, "superset", None))
+        if plan.dispersion is not None:  # the D3 term on the reduced cell too (3b-T04)
+            from fastmace.model import dispersed
+
+            reduced = dispersed.wrap(reduced, plan.dispersion, copies[0].atoms, skin=float(plan.neighbours.d3_skin))
         return [reduced.evaluate(copy.atoms, stress=stress) for copy in copies]
     finally:
         del reduced, loaded

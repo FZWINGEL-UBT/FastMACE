@@ -46,6 +46,8 @@ oeq = ["openequivariance>=0.7"]
 # graph-longrange is pinned per MACE version; MACE 0.3.16 calls the 0.4.0 interface.
 polar = ["graph-longrange==0.4.0"]
 d3 = ["torch-dftd==0.5.1"]
+# The D3 references of the cross-check tests (3b-T01): torch-dftd and simple-dftd3; not in [full].
+d3-reference = ["torch-dftd==0.5.1", "dftd3==1.6.0"]
 # Union of [oeq], [polar] and [d3]; no packages of its own (SPEC §14).
 full = [
     "openequivariance>=0.7",
@@ -64,6 +66,8 @@ include = ["fastmace*"]
 # The vendored OEq streaming kernels: the CUDA template and their BSD-3 licence and notice (SPEC §14).
 "fastmace.kernels.oeq_streaming" = ["*.cuh", "LICENSE", "NOTICE.md"]
 "fastmace.protocols" = ["data/*.toml", "data/*.cif", "data/*.md"]
+# The D3 reference tables, byte-identical to torch-dftd 0.5.1's, with its MIT licence (SPEC §11.2, §14).
+"fastmace.longrange" = ["data/dftd3_params.npz", "data/LICENSE", "data/NOTICE.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

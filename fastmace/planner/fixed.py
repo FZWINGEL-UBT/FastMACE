@@ -73,6 +73,7 @@ AUTO_RULES = MappingProxyType({
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
     "NeighbourConfig.skin": "rule_11_skin_from_workload",
     "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
+    "NeighbourConfig.d3_skin": "rule_11_d3_skin_from_workload",
     "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
@@ -605,6 +606,12 @@ class FixedPlanner:
                 n.headroom, AUTO_RULES["NeighbourConfig.headroom"],
                 f"capacity_headroom {n.capacity_headroom:g} and edge_bucket_fraction as given" + would))
         neighbours["headroom"] = "fixed"
+        if n.d3_skin == "auto":  # the minimal planner sizes it when the force field has D3 (3b-T02)
+            from fastmace.neighbors.adaptive import D3_FLOOR_SKIN_A
+
+            neighbours["d3_skin"] = D3_FLOOR_SKIN_A
+            book.decide("NeighbourConfig.d3_skin", "unused", _why(
+                "auto", AUTO_RULES["NeighbourConfig.d3_skin"], f"no D3 list; {D3_FLOOR_SKIN_A:g} A, the floor"))
         budget = e.graph_variant_cap if e.recapture_budget == "auto" else e.recapture_budget
         buckets = ("" if not applies or sized.recapture_budget is None else
                    f"; rule 11 expects at most {sized.recapture_budget} padded edge buckets inside the capacity")
@@ -861,6 +868,7 @@ class FixedPlanner:
                                polar=plan.polar or PolarConfig(), compute_stress=npt, compile_cache=compile_cache,
                                registry=registry, check=check, float64_energy=plan.precision.float64_energy,
                                species=plan.superset or None)
+        field = _with_d3(field, plan, atoms)
         state = SimulationState.from_atoms(atoms, field.device, plan.integrator.seed, compute_stress=npt)
         if npt:
             integrator = LangevinBAOAB(state, plan.integrator, temperature_K=temperature_K,
@@ -874,6 +882,15 @@ class FixedPlanner:
                                   constraints=constraints, dynamic_edges=True)
         return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
                            capture=capture)
+
+
+def _with_d3(field, plan: Plan, atoms):
+    """``field`` with the plan's D3 term (``fastmace.model.dispersed``, 3b-T04); ``field`` itself without D3."""
+    if plan.dispersion is None:
+        return field
+    from fastmace.model import dispersed
+
+    return dispersed.wrap(field, plan.dispersion, atoms, skin=float(plan.neighbours.d3_skin))
 
 
 def auto_options_off(plan: Plan) -> dict[str, str]:
