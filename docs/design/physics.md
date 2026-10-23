@@ -38,6 +38,18 @@ SPEC §4.4's support table is data: one record per scheme, in
 Registered today: `langevin` and `baoab`, which declare `fixcm` only. 4-T04 adds their
 `fix_atoms` row after D1.
 
+**Shared buffer names (4-T01b).** A buffer name is per owner: `integrator.`, `optimizer.` or
+`dof.`. Two schemes of one owner may declare the same name only if it means the same thing in
+both: the same quantity, units and shape, and the same restart policy. Only one scheme runs per
+engine, but restart, capture and the gate read the policy by name alone.
+
+- **Different restart policies:** discovery refuses the pair with `RegistryError`, naming both
+  schemes and the buffer. Rename the buffer in one of the records. For example, Berendsen's
+  pressure target and MTK's barostat state cannot both be `integrator.pressure`.
+- **Same restart policy, different `recompute` functions:** this is allowed. The runtime-state
+  registry keeps one policy whose `recompute` lists both functions, sorted and joined with
+  ` | `. Example: LBFGS and FIRE's `optimizer.fmax` and `optimizer.status`.
+
 ## Constructors and dispatch
 
 Only the planner builds schemes (SPEC §5), through:
