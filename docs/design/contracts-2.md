@@ -48,6 +48,9 @@ fm.md(..., integrator=None, mode="graph", allow_reference=False, fallback=None, 
   `simulation.PlannerOptions`, before anything is loaded (`fm.md` validates them
   right after `check`). A wrong mode raises `ValueError`, and a wrong type
   `TypeError`.
+- Phase 5 (plan task 5-T01, `docs/design/planner-5.md`) appends `adaptation=None, calibration=None` to
+  `Simulation`'s planner inputs, after `neighbours`, so the planner inputs stay its last keywords.
+  `fm.md` gains them only with 5-T09.
 - `None` for `fallback`, `gate` and `runner` means the record's defaults. For
   `engine` and `neighbours` it means the default planner's
   (`minimal.default_planner`: CUDA if available, else the CPU without compilation).

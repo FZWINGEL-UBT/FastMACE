@@ -359,10 +359,11 @@ def test_simulation_signature():
 
     signature = inspect.signature(Simulation)
     assert list(signature.parameters)[:2] == ["atoms", "force_field"]
-    # The planner inputs: 2-T01; optimizer= (a relaxation instead of MD): 4-T05.
+    # The planner inputs: 2-T01; optimizer= (a relaxation instead of MD): 4-T05; adaptation= and calibration=
+    # appended to the planner inputs: 5-T01 (docs/design/planner-5.md).
     assert _keyword_only(signature) == ["species", "integrator", "optimizer", "workload", "output", "seed", "check",
                                         "allow_naive_cueq", "mode", "allow_reference", "fallback", "gate",
-                                        "runner", "engine", "neighbours"]
+                                        "runner", "engine", "neighbours", "adaptation", "calibration"]
     assert signature.parameters["check"].default == "skip"  # owner decision D1: opt-in gate
     assert signature.parameters["workload"].default is None  # owner decision D7
     # Exactly one of integrator= and optimizer= (4-T05), so neither is required on its own.

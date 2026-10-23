@@ -10,6 +10,9 @@ prefetched random batches live in the restart file (§10.6). Phase 2 (plan task 
 keys: the fallbacks tried and the revision each became, the per-record self-checks, the always-on
 treatments, the gate's device, reduced cell and resource steps, the runner and its child records
 (``subprocess``), and the force field's own record with the strain path it bound (``force_field``).
+Phase 5 (plan task 5-T01) adds keys and changes none, so the schema stays version 1 and its minor
+version (``SCHEMA_MINOR``, key ``schema_minor``) becomes 1: ``counters.tier_switches`` is a list
+(``TIER_SWITCH_KEYS``; empty without a switch), and the plan records ``calibration`` and ``adaptation``.
 
 Phase 1a's blocks stay as they were, so that ``main.py`` on FastMACE (1a-T17) writes the same files:
 
@@ -49,7 +52,7 @@ import fastmace
 from fastmace import _patches, kernels
 from fastmace.io import durable
 
-__all__ = ["SCHEMA", "SPEC_13_KEYS", "collect", "cueq_versions", "environment", "fastmace_block",
+__all__ = ["SCHEMA", "SCHEMA_MINOR", "SPEC_13_KEYS", "collect", "cueq_versions", "environment", "fastmace_block",
            "generator_digest", "git_commit", "metadata_record", "model_block", "run_record", "sha256_file",
            "subprocess_block",
            "write_metadata"]
@@ -409,6 +412,9 @@ def run_record(protocol, code_files=(), root=None, created_utc=None):
 # ------------------------------------------------------------------------ metadata.json version 1
 
 SCHEMA = "fastmace.metadata/1"
+# Additions within version 1: 0 for phases 1b-4, 1 from phase 5 (5-T01: tier switches, calibration, adaptation).
+# A reader of version 1 takes every minor version; a record without the key is minor 0.
+SCHEMA_MINOR = 1
 # Every item of SPEC §13, then what plan task 1b-T10 adds: (item, dotted key path in the record).
 # docs/design/metadata-schema.md describes each key; phase 2 freezes and validates the schema.
 SPEC_13_KEYS = (
@@ -471,6 +477,10 @@ SPEC_13_KEYS = (
     ("strain path bound by the force field (2-T08b)", "force_field.strain_path"),
     ("compiled with dynamic edges (2-T13)", "plan.engine.dynamic_edges"),
     ("reproducible mode (2-T16)", "plan.workload.reproducible"),
+    # plan task 5-T01: what phase 5 records
+    ("schema minor version (5-T01)", "schema_minor"),
+    ("calibration record (5-T09)", "plan.calibration"),
+    ("adaptation limits (5-T07)", "plan.adaptation"),
 )
 # Integration is always float64 (SPEC §7.3); only the force precision is a choice.
 INTEGRATION_PRECISION = "float64"
@@ -484,12 +494,15 @@ CHECKPOINT_KEYS = ("path", "sha256", "head", "licence", "label", "trust")
 # persistent worker serves many calls), ``persistent`` is ``RunnerConfig.persistent``.
 SUBPROCESS_KEYS = ("python", "reason", "directory", "children", "calls", "persistent", "seconds", "failed", "last")
 SUBPROCESS_CHILD_KEYS = ("action", "stage", "pid", "exit_code", "seconds", "steps")
-# Counters the caller fills, and those a later phase fills (tier switches: phase 5, §9.6).
-COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone", "mc")
+# Counters the caller fills; tier_switches (phase 5, §9.6) is a list of TIER_SWITCH_KEYS records, [] without one.
+COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone", "mc", "tier_switches")
 # Counters the engine's info() carries (the graph engine's re-capture policy and overflow redos, 3-T04),
 # taken from it when the caller gives none.
 ENGINE_COUNTER_KEYS = ("recaptures", "overflows_redone")
-LATER_COUNTER_KEYS = ("tier_switches",)
+# Counters a later phase fills: none since phase 5.
+LATER_COUNTER_KEYS = ()
+# One tier switch (planner.plan.TierSwitch.record(); 5-T07): its step, the tiers, the reason and the revision.
+TIER_SWITCH_KEYS = ("step", "from", "to", "reason", "revision")
 # counters.mc (3-T15): per move type the driver's cumulative counts (io.restart.MC_COUNTER_KEYS), and for
 # displacements also the trial neighbour-list rebuilds (3-T10); null when no move set was ever attached.
 MC_TRIAL_REBUILDS = "trial_rebuilds"
@@ -665,6 +678,8 @@ def _plan(plan):
         "fallbacks_tried": _plain(list(plan.fallbacks), "plan.fallbacks"),  # TriedCandidate, §9.4 (2-T15)
         "predicted_memory_bytes": plan.predicted_memory_bytes,
         "runner": plan.runner,
+        "calibration": config(plan.calibration, "calibration"),  # CalibrationRecord (5-T09), null when none ran
+        "adaptation": config(plan.adaptation, "adaptation"),  # the active AdaptationConfig (5-T07), else null
     }
 
 
@@ -762,17 +777,37 @@ def _counters(counters, engine_info):
     given = dict(counters or {})
     for key in given:
         if key in LATER_COUNTER_KEYS:
-            raise ValueError(f"counters: {key!r} is filled by a later phase (tier switches: phase 5)")
+            raise ValueError(f"counters: {key!r} is filled by a later phase")
         if key not in COUNTER_KEYS:
             raise ValueError(f"counters: unknown key {key!r}; this FastMACE records {COUNTER_KEYS}")
     if given.get("mc") is not None:
         given["mc"] = _mc_counters(given["mc"])
+    given["tier_switches"] = _tier_switches(given.get("tier_switches"))
     for key in ENGINE_COUNTER_KEYS:
         if given.get(key) is None and isinstance(engine_info, Mapping) and engine_info.get(key) is not None:
             given[key] = engine_info[key]
     out = {key: _plain(given.get(key), f"counters.{key}") for key in COUNTER_KEYS}
     out.update(dict.fromkeys(LATER_COUNTER_KEYS))
     out["engine"] = None if engine_info is None else _plain(engine_info, "counters.engine")
+    return out
+
+
+def _tier_switches(switches):
+    """``counters.tier_switches``: ``TierSwitch`` records or mappings with exactly ``TIER_SWITCH_KEYS``."""
+    if switches is None:
+        return []
+    if not isinstance(switches, (list, tuple)):
+        raise ValueError(f"counters.tier_switches must be a list of tier switches, got {switches!r}")
+    out = []
+    for index, switch in enumerate(switches):
+        if callable(getattr(switch, "record", None)):
+            switch = switch.record()
+        if not isinstance(switch, Mapping) or set(switch) != set(TIER_SWITCH_KEYS):
+            raise ValueError(f"counters.tier_switches[{index}] must have the keys {TIER_SWITCH_KEYS}, got {switch!r}")
+        for key in ("step", "revision"):
+            if isinstance(switch[key], bool) or not isinstance(switch[key], int) or switch[key] < 0:
+                raise ValueError(f"counters.tier_switches[{index}].{key} must be an integer >= 0, got {switch[key]!r}")
+        out.append({key: _plain(switch[key], f"counters.tier_switches[{index}].{key}") for key in TIER_SWITCH_KEYS})
     return out
 
 
@@ -869,6 +904,7 @@ def metadata_record(*, model=None, checkpoint=None, identity=None, reference_rec
         integrator_record = _plain(integrator, "integrator")
     return {
         "schema": SCHEMA,
+        "schema_minor": SCHEMA_MINOR,
         "created_utc": created_utc if created_utc is not None else datetime.now(timezone.utc).isoformat(),
         "code": {"version": block["version"], "git_commit": block["git_commit"], "git_dirty": block["git_dirty"]},
         "checkpoint": _checkpoint(checkpoint),

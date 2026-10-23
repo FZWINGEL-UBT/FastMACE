@@ -241,6 +241,29 @@ three MC streams' seeds derive from the simulation's `seed` (`config.mc_stream_s
 | none (new, SPEC §10.4) | `MCConfig.max_attempts_per_block` | `10_000` | — | MC driver (3-T09) |
 | none (new, SPEC §10.4) | `MCConfig.max_move_sets` | `8` | — | MC driver (3-T09) |
 
+## 12. Runtime adaptation and calibration of phase 5 → `AdaptationConfig`, `CalibrationConfig`
+
+New in the library (plan task 5-T01, `docs/design/planner-5.md`); the research engine has neither. They
+reach the planner through `Simulation(adaptation=, calibration=)` (`PlannerOptions`). A field an open
+owner decision of `plans/phase-5.md` fixes defaults to `"pending"` (`config.PENDING`), and
+`Simulation` refuses any other value (`adaptation-pending`, `calibration-pending`) until 5-T07 (D2, D3)
+or 5-T09 (D5) implements it.
+
+| Research engine | FastMACE field | Default | `auto` rule | Kind |
+| --- | --- | --- | --- | --- |
+| none (new, SPEC §9.6) | `AdaptationConfig.adapt` | `"auto"` | `adapt_between_segments` | runtime adaptation (`"off"`: the monitor records only) |
+| none (new, SPEC §9.6, D2) | `AdaptationConfig.trigger` | `"pending"` | — | runtime adaptation (`config.ADAPTATION_TRIGGERS`) |
+| none (new, SPEC §9.6, D2 (a), (b)) | `AdaptationConfig.recapture_time_fraction` | `0.2` | — | runtime adaptation (trigger threshold) |
+| none (new, SPEC §9.6, D2 (b)) | `AdaptationConfig.skin_replan` | `"pending"` | — | runtime adaptation |
+| none (new, SPEC §9.6, D3) | `AdaptationConfig.max_switches` | `"pending"` | — | runtime adaptation (`None`: no limit) |
+| none (new, SPEC §9.6, D3 (b)) | `AdaptationConfig.switch_back_after` | `"pending"` | — | runtime adaptation (`None`: one way) |
+| none (new, SPEC §9.6, D3 (d)) | `AdaptationConfig.min_points_between` | `"pending"` | — | runtime adaptation (`None`: no minimum) |
+| none (new, SPEC §9.6, D3 (c)) | `AdaptationConfig.reproducible` | `"pending"` | — | runtime adaptation |
+| none (new, SPEC §9.1) | `CalibrationConfig.calibrate` | `False` | — | calibration (`True` refused until 5-T09) |
+| none (new, SPEC §9.1) | `CalibrationConfig.steps` | `50` | — | calibration (measured steps per candidate) |
+| none (new, SPEC §9.1, D5 (a)) | `CalibrationConfig.margin` | `0.05` | — | calibration |
+| none (new, SPEC §9.1, D5) | `CalibrationConfig.choose` | `"pending"` | — | calibration (`False`: record only) |
+
 ## Auto resolution rules
 
 The research engine resolves `auto` in two stages, and the result depends on the
@@ -285,6 +308,7 @@ tier 1, §8.1); "hybrid" the resolved backend. Support keys are those of
 | `on_for_torch_2_14_unless_alloc_conf_set` | Set `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` before the first CUDA allocation when torch ≥ 2.14 and the variable is unset; otherwise leave the allocator alone. | `EngineConfig.expandable_segments` |
 | `variable_cell_0_1_else_0` | `0.1` for a variable-cell integrator (NPT), `0.0` otherwise. | `PolarConfig.kspace_headroom` |
 | `fallback_search_on_failure` | On a failing build, compile, capture, self-check or gate before the first step, the §9.4 search (diagnosis, ddmin within the budget, the terminal sequence), each candidate validated before activation (2-T15); nothing happens on a run that does not fail. `"refuse"` raises as in 1b. | `FallbackConfig.fallback` |
+| `adapt_between_segments` | Runtime adaptation (SPEC §9.6, 5-T07): at a canonical restart point after the trigger fires, a tier switch as a new plan revision, validated before activation, within the limits of `AdaptationConfig`. Until D2 and D3 are decided and 5-T07 lands, `"auto"` records only: nothing switches, so default plans and runs are unchanged (conductor's choice 7). | `AdaptationConfig.adapt` |
 | `largest_smaller_supercell_at_least_min_height` | The gate's reduced cell (2-T05): the largest supercell of the same primitive cell that is smaller than the production cell and whose every height is at least `reduced_cell_min_height_cutoffs` × the cutoff; none if no such cell exists. | `GateConfig.reduced_cell` |
 
 An explicit `"on"` keeps the research engine's refusals: a dependency that is off
@@ -329,6 +353,9 @@ model is an error with a reason, never a silent downgrade.
   comes from the research engine.
 - Phase 3b (plan task 3b-T02) added `NeighbourConfig.d3_skin` (admits `"auto"`), 81 in all. It does not
   come from the research engine, whose D3 ran through torch-dftd on the ASE path.
+- Phase 5 (plan task 5-T01) added two records with 12 fields (section 12: `AdaptationConfig` 8,
+  `CalibrationConfig` 4). One admits `"auto"` (`AdaptationConfig.adapt`). None comes from the research
+  engine.
 
 ## Open questions for the conductor
 
