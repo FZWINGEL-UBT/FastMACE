@@ -26,6 +26,7 @@ import os
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -591,6 +592,47 @@ def test_a_failing_heartbeat_write_never_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(runner_module.os, "replace", broken)
     beat.mark("call")  # the call goes on; the parent sees a stale heartbeat at worst
     assert [entry.name for entry in tmp_path.iterdir()] == ["child-0001.heartbeat"]
+
+
+def test_stop_waits_for_the_heartbeat_thread(tmp_path):
+    beat = runner_module._Heartbeat(tmp_path / "child-0001.heartbeat")
+    beat.stop()  # never started: nothing to wait for
+    beat = runner_module._Heartbeat(tmp_path / "child-0002.heartbeat")
+    beat.start(0.0005)
+    beat.stop()
+    assert not beat._thread.is_alive()
+
+
+_EXIT_DURING_A_HEARTBEAT = """
+import tempfile
+import fastmace  # noqa: F401
+import torch
+from fastmace.engine import subprocess as runner
+big = torch.ones(1500, 1500)
+# A torch call that holds the thread in C++ (GIL released) for longer than int(engine.state.step) does
+runner._Heartbeat.text = lambda self: str(float((big @ big).sum()))
+beat = runner._Heartbeat(tempfile.mkdtemp() + "/child.heartbeat")
+beat.start(1e-6)
+sum(float(big[0, 0]) for _ in range(2000))
+beat.stop()
+raise SystemExit(0)
+"""
+
+
+@pytest.mark.slow  # about 40 s: 20 fresh interpreters
+def test_a_child_exits_cleanly_while_its_heartbeat_is_inside_torch():
+    """4-T13: the heartbeat is a daemon thread whose writes call torch (``int(engine.state.step)``). A thread still
+    inside such a call when the interpreter exits is ended by ``pthread_exit``, and the unwind through torch's
+    noexcept GIL re-acquire calls ``std::terminate`` ("terminate called without an active exception", SIGABRT).
+    ``stop()`` waits for the thread, so the child exits 0. Without the wait, 29 of 30 such runs aborted."""
+    root = Path(runner_module.__file__).resolve().parents[2]
+    environment = dict(os.environ, PYTHONPATH=str(root), PYTHONDONTWRITEBYTECODE="1", OMP_NUM_THREADS="1",
+                       CUDA_VISIBLE_DEVICES="")
+    children = [subprocess.Popen([sys.executable, "-c", _EXIT_DURING_A_HEARTBEAT], env=environment,
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True) for _ in range(20)]
+    results = [(child.wait(timeout=300), child.stderr.read()) for child in children]
+    aborted = [(code, error.strip().splitlines()[-1:]) for code, error in results if code != 0]
+    assert aborted == [], f"{len(aborted)} of 20 children did not exit cleanly: {aborted[:3]}"
 
 
 # --------------------------------------------------------------------------- mc= through the runner (3-T15)
