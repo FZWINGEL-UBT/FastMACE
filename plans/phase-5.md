@@ -170,6 +170,8 @@ compile family), so a backend candidate runs in a child.
 
 ## Owner decisions
 
+**Decided (user, 23 October 2026): the recommendation (a) of each, D1–D6; SPEC §18 decisions 51–56. 5-T10 is closed (D6 (a)).**
+
 Each has a recommendation (a). The task list says which tasks each blocks;
 everything else can start before the answers.
 

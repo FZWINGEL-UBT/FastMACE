@@ -2583,6 +2583,42 @@ Open decisions for the owner:
    cell relaxation on a sane structure, NaCl first; freezing the k-set per
    rebuild and a smooth cutoff were not chosen.
 
+51–56. Decided (user, 23 October 2026, the phase 5 plan's D1–D6, the
+   recommendation of each: "Go ahead and do all recommended decisions for
+   D1-D6"). Details are in `plans/phase-5.md`, "Owner decisions".
+   - **Rule 12 action** (51, D1 (a)): above 90 % of free GPU memory, turn off
+     the rewrites whose records declare an edge-sized buffer, largest term
+     first, each with rule 12's reason. If it still does not fit, keep the plan,
+     warn with the estimate, and let an out-of-memory error carry the estimate.
+     Never shrink rule 11's skin or headroom. Never change the tier, the
+     precision or an explicit user setting. The margin and the estimate's
+     accuracy come from 5-T03's measurements, and the estimate is never below the
+     measured peak on the 19 labels.
+   - **Adaptation trigger** (52, D2 (a)): the re-capture budget is exceeded and
+     re-capturing takes more than 20 % of wall time over the segments since the
+     last switch. The one switch is graph → compiled (same backend, rewrites
+     and precision) at the next canonical point. Rebuild rate, build time and
+     overflows are recorded, not acted on.
+   - **Adaptation limits** (53, D3 (a)): one way, at most one switch per run. No
+     switch under `reproducible=True`, with an explicit `mode=`, during an MC
+     block, or in a subprocess child without the parent's hand-off. A switch is
+     validated before activation (self-checks; the gate when requested; the
+     move-energy part for MC) and logged.
+   - **Mid-run fallbacks** (54, D4 (a)): a capture error at a re-capture and a
+     compile error of the compiled tier during `run()` trigger them. They start
+     from the last committed canonical point, redo the steps after it, and
+     handle output as on resume. Out-of-memory, non-finite values, refusals and
+     process constraints are not triggers.
+   - **Calibration** (55, D5 (a)): `calibrate=True`, off by default. It covers
+     the backend dimension only (hybrid against plain cuEq, when both pass the
+     hard rules and no backend is set). Each candidate runs in a child process,
+     50 steps after warm-up, alternating. It changes the choice only when the
+     other candidate is faster by more than 5 % in every pair. It is recorded as
+     measured, and nothing is read from earlier runs.
+   - **Two-stage `auto`** (56, D6 (a)): `FixedPlanner`'s two stages stay as
+     they are in phase 5, covered by the conformance suite. Reconsider in phase
+     6. Task 5-T10 is closed.
+
 ---
 
 ## 19. Revision history
