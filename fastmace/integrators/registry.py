@@ -14,7 +14,8 @@ its module there, and changes no shared file.
 Owner decisions this module encodes (phase 4 plan, "Owner decisions"; recommendations until decided):
 
 - D1: ``FIX_ATOMS_WITH_FIXCM``: ``fixcm=True`` with ``FixAtoms`` is refused. Which schemes take
-  ``FixAtoms`` is each record's ``constraints``.
+  ``FixAtoms`` is each record's ``constraints``; a variable cell with ``FixAtoms`` is refused for every
+  scheme (decision 44, code ``fix-atoms-variable-cell``).
 - D2: ``degrees_of_freedom``: ``dof="fastmace"`` counts 3N - 3 under ``fixcm``, 3(N - n_fixed) with
   ``FixAtoms``, 3N otherwise; ``dof="ase"`` the count of the scheme's ASE class (``ase_dof``);
   ``dof="auto"`` resolves to ``DOF_AUTO`` (``"fastmace"``; ``"ase"`` under alternative (b)).
@@ -374,9 +375,9 @@ def integrator_refusals(config: IntegratorConfig, *, fix_atoms: bool = False, ot
 
     The scheme is registered and runs the config's ensemble and cell mode (``variable_cell``: the workload
     asks for a variable cell); its constraint rows cover ``fixcm`` and ``FixAtoms``; no other constraint;
-    no MC with constraints. Codes: ``scheme-unknown``, ``scheme-ensemble``, ``scheme-cell-mode``,
-    ``scheme-dof``, ``variable-cell-without-barostat``, ``constraints``, ``fix-atoms-with-fixcm``,
-    ``mc-with-constraints``.
+    no MC with constraints; no ``FixAtoms`` with a variable cell. Codes: ``scheme-unknown``,
+    ``scheme-ensemble``, ``scheme-cell-mode``, ``scheme-dof``, ``variable-cell-without-barostat``,
+    ``constraints``, ``fix-atoms-with-fixcm``, ``fix-atoms-variable-cell``, ``mc-with-constraints``.
     """
     records = records or registry()
     record = records.get("integrator", config.scheme)
@@ -401,6 +402,12 @@ def integrator_refusals(config: IntegratorConfig, *, fix_atoms: bool = False, ot
                                 f"{record.refusal('fixcm')}", "constraints"))
     refusals += _constraint_refusals(record, fix_atoms=fix_atoms, other=tuple(other_constraints),
                                      fixcm=config.fixcm, mc=mc, what=f"the {config.scheme} integrator")
+    if fix_atoms and "fix_atoms" in record.constraints and (variable_cell or record.cell_mode(config) != "fixed"):
+        # A scheme that takes FixAtoms at fixed cell (Berendsen) refuses it with its barostat: no ASE class
+        # holds fixed atoms in a moving cell (decision 44; alternative (c) was fractional coordinates).
+        refusals.append(_reason(f"FixAtoms constraints are refused with a variable cell ({config.scheme}, "
+                                f"cell mode {config.cell_mode!r}); FixAtoms runs at fixed cell only (owner decision "
+                                "44, SPEC §4.4)", "fix-atoms-variable-cell"))
     return refusals
 
 

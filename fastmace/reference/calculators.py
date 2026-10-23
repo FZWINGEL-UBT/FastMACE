@@ -229,6 +229,7 @@ class ReferenceCalculator:
 
     def _evaluate_d3(self, atoms):
         copy = atoms.copy()
+        copy.set_constraint()  # every atom's forces: FixAtoms would zero the fixed rows (4-T04)
         copy.calc = self._d3_calculator
         return (float(copy.get_potential_energy()), np.array(copy.get_forces(), dtype=np.float64),
                 np.array(copy.get_stress(voigt=False), dtype=np.float64))

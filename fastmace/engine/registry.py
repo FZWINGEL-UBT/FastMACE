@@ -97,6 +97,8 @@ POLICIES = (
     *(_policy(f"state.{name}", "state", "save") for name in ("p_eps", "force_eps")),
     # FixAtoms' mask (4-T01): from the fixed indices, which the restart's physical record holds.
     _policy("state.free_mask", "state", "derived", "SimulationState.from_atoms"),
+    # The integrators' copy of it as fixed rows (4-T04), fixed for the life of a run.
+    _policy("integrator.fixed_rows", "integrator", "derived", "fastmace.integrators.langevin.fixed_rows"),
     # Integrator scratch, written before it is read in every step.
     *(_policy(f"integrator.{name}", "integrator", "derived") for name in (
         "x_old", "rnd_pos", "rnd_vel", "xi", "eta", "zeta")),

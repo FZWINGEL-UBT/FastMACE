@@ -202,11 +202,12 @@ def test_todict_get_time_and_dt_as_ase(loaded):
     assert dyn.nsteps == 3 and dyn.get_time() == 3 * DT
 
 
-def test_fix_atoms_is_refused_with_the_phase_4_reason(loaded):
+def test_fix_atoms_with_ases_default_fixcm_is_refused(loaded):  # 4-T04: FixAtoms runs with fixcm=False
     atoms = _atoms()
     atoms.set_constraint(FixAtoms(indices=[0]))
-    with pytest.raises(PlanRefused, match="phase 4"):
-        _langevin(loaded, atoms=atoms)
+    dyn = _langevin(loaded, atoms=atoms)
+    with pytest.raises(PlanRefused, match="fixcm=False"):
+        dyn.run(1)
 
 
 def test_dispersion_follows_fm_md(loaded):
