@@ -37,7 +37,8 @@ def test_the_public_namespaces():
 
 def test_the_phase_1a_records():
     langevin, baoab = reg.registry().integrator("langevin"), reg.registry().integrator("baoab")
-    assert (langevin.ensembles, langevin.cell_modes, langevin.constraints) == (("nvt",), ("fixed",), ("fixcm", "fix_atoms"))
+    assert (langevin.ensembles, langevin.cell_modes, langevin.constraints) == (("nvt",), ("fixed",),
+                                                                              ("fixcm", "fix_atoms"))
     assert (baoab.ensembles, baoab.cell_modes, baoab.variable_cell) == (("npt",), ("hydrostatic", "full"), True)
     assert langevin.load().__name__ == "Langevin" and baoab.load().__name__ == "LangevinBAOAB"
     assert "externalstress" in baoab.constructor_keywords(IntegratorConfig(ensemble="npt"))
