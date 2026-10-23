@@ -367,7 +367,7 @@ def test_scheme_records_declare_their_buffer_policies(monkeypatch):
     from fastmace.engine import registry as runtime
 
     records = reg.Registry([*reg.registry().records(), _record(buffers=(("chain_q", "save", None),))])
-    monkeypatch.setattr(reg, "_REGISTRY", records)
+    monkeypatch.setattr(reg, "registry", lambda: records)
     assert runtime.policy_for("integrator.chain_q").restart == "save"
     assert runtime.policy_for("state.free_mask").restart == "derived"
     with pytest.raises(runtime.RegistryError):
