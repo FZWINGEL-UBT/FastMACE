@@ -44,7 +44,8 @@ def parse_args(argv=None):
     run.add_argument("--traj", required=True, help="NAME=PATH of a captured.traj")
     run.add_argument("--frame", required=True, type=int)
     run.add_argument("--other", type=Path, default=None, help="the other side's .npz of the 4-T08 run")
-    run.add_argument("--other-key", default=None, help="key in --other (default NAME/FRAME or NAME/graph-skinauto/FRAME)")
+    run.add_argument("--other-key", default=None,
+                     help="key in --other (default NAME/FRAME or NAME/graph-skinauto/FRAME)")
     run.add_argument("--precision", choices=("float32", "float64"), default="float32")
     run.add_argument("--fmax", type=float, default=0.01)
     run.add_argument("--steps", type=int, default=5000)
@@ -73,7 +74,8 @@ def _other_positions(args, name):
     import numpy as np
 
     saved = dict(np.load(args.other))
-    for key in ([args.other_key] if args.other_key else [f"{name}/{args.frame}", f"{name}/graph-skinauto/{args.frame}"]):
+    keys = [args.other_key] if args.other_key else [f"{name}/{args.frame}", f"{name}/graph-skinauto/{args.frame}"]
+    for key in keys:
         if key in saved:
             return key, saved[key]
     raise KeyError(f"no {name} frame {args.frame} in {args.other}")
@@ -109,7 +111,8 @@ def ase_side(args, loaded, atoms, name, record, trajectory):
         key, start = _other_positions(args, name)
         again, summary = relax(start, keep=False)
         summary["start"] = key
-        summary["displacement_from_start_A"] = float(divergence(atoms.cell.array, start[None], again.positions[None])[0][0])
+        summary["displacement_from_start_A"] = float(
+            divergence(atoms.cell.array, start[None], again.positions[None])[0][0])
         record["re_relaxation"] = summary
     return relaxed.positions
 
@@ -155,7 +158,8 @@ def gpu_side(args, loaded, atoms, name, record, trajectory):
         key, start = _other_positions(args, name)
         again, summary = relax(start, keep=False)
         summary["start"] = key
-        summary["displacement_from_start_A"] = float(divergence(atoms.cell.array, start[None], again.positions[None])[0][0])
+        summary["displacement_from_start_A"] = float(
+            divergence(atoms.cell.array, start[None], again.positions[None])[0][0])
         record["re_relaxation"] = summary
     sim.close()
     return minimum
