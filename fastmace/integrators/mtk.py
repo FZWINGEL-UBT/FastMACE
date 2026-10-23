@@ -147,14 +147,13 @@ class MTK(Integrator):
         self.barostat = NoseHooverChain(self.pchain, ploop, [0.0] * self.pchain, first_dof=cell_dof,
                                         energy_dof=cell_dof, device=device)
         self._masses()
-        if self.hydrostatic:
-            self.p_cell = torch.zeros((), **f64)
-            self.eps = torch.zeros((), **f64)
-            self.cell0 = state.cell.detach().clone()
-            self.volume0 = torch.zeros((), **f64)
-            self._volume0()
-        else:
-            self.p_cell = torch.zeros((3, 3), **f64)
+        # The isotropic strain and its reference cell (cell = cell0 exp(eps)); the full cell keeps eps at 0 and
+        # cell0 as the starting cell, unused, so both cell modes hold the record's state_keys (format 4).
+        self.p_cell = torch.zeros(() if self.hydrostatic else (3, 3), **f64)
+        self.eps = torch.zeros((), **f64)
+        self.cell0 = state.cell.detach().clone()
+        self.volume0 = torch.zeros((), **f64)
+        self._volume0()
         self.eye = torch.eye(3, **f64)
         self.set_temperature(self.mass_temperature_K if temperature_K is None else temperature_K)
         self.set_pressure(config.pressure_GPa)
@@ -292,8 +291,7 @@ class MTK(Integrator):
                      thermostat_eta=self.thermostat.eta, thermostat_p_eta=self.thermostat.p_eta,
                      barostat_xi=self.barostat.eta, barostat_p_xi=self.barostat.p_eta, p_cell=self.p_cell,
                      kT=self.kT, kT_step=self.kT_step, pressure=self.pressure, pressure_step=self.pressure_step)
-        if self.hydrostatic:
-            named.update(eps=self.eps, cell0=self.cell0, volume0=self.volume0)
+        named.update(eps=self.eps, cell0=self.cell0, volume0=self.volume0)
         return named
 
     def volume(self, state: SimulationState) -> torch.Tensor:
@@ -311,40 +309,33 @@ class MTK(Integrator):
                                  + cell_kinetic + self.pressure_step * self._volume(state)).reshape(1)
         return values
 
-    def _keys(self) -> set[str]:
-        keys = {"eta", "p_eta", "xi", "p_xi", "p_cell", "pressure_au", "mass_temperature_K"}
-        return keys | {"eps", "cell0"} if self.hydrostatic else keys
+    _KEYS = frozenset({"eta", "p_eta", "xi", "p_xi", "p_cell", "eps", "cell0", "pressure_au", "mass_temperature_K"})
 
     def state_dict(self) -> dict[str, Any]:
-        """The chains, the cell momentum, the pressure target and the masses' temperature (isotropic: the strain
-        and the reference cell too): the record's ``state_keys`` of this cell mode."""
+        """The chains, the cell momentum, the strain and its reference cell, the pressure target and the masses'
+        temperature: the record's ``state_keys`` (the full cell's ``eps`` is 0 and its ``cell0`` unused)."""
         host = lambda tensor: tensor.detach().cpu().numpy().copy()  # noqa: E731
         thermostat, barostat = self.thermostat.state_dict(), self.barostat.state_dict()
         saved = dict(eta=thermostat["eta"], p_eta=thermostat["p_eta"], xi=barostat["eta"], p_xi=barostat["p_eta"],
-                     p_cell=host(self.p_cell), pressure_au=host(self.pressure),
-                     mass_temperature_K=np.asarray(self.mass_temperature_K))
-        if self.hydrostatic:
-            saved.update(eps=host(self.eps), cell0=host(self.cell0))
+                     p_cell=host(self.p_cell), eps=host(self.eps), cell0=host(self.cell0),
+                     pressure_au=host(self.pressure), mass_temperature_K=np.asarray(self.mass_temperature_K))
         return saved
 
     def load_state_dict(self, state_dict: Mapping[str, Any]) -> None:
-        if set(state_dict) != self._keys():
-            raise ValueError(f"MTK's {self.config.cell_mode} state is {sorted(self._keys())}, got {sorted(state_dict)}")
+        if set(state_dict) != self._KEYS:
+            raise ValueError(f"MTK's state is {sorted(self._KEYS)}, got {sorted(state_dict)}")
         self.mass_temperature_K = float(np.asarray(state_dict["mass_temperature_K"]))
         self._masses()
         self.thermostat.load(state_dict["eta"], state_dict["p_eta"])
         self.barostat.load(state_dict["xi"], state_dict["p_xi"])
-        tensors = [("p_cell", self.p_cell), ("pressure_au", self.pressure)]
-        if self.hydrostatic:
-            tensors += [("eps", self.eps), ("cell0", self.cell0)]
-        for name, target in tensors:
+        for name, target in (("p_cell", self.p_cell), ("eps", self.eps), ("cell0", self.cell0),
+                             ("pressure_au", self.pressure)):
             source = torch.from_numpy(np.array(state_dict[name], dtype=np.float64))
             if tuple(source.shape) != tuple(target.shape):
                 raise ValueError(f"{name} has shape {tuple(source.shape)}, this cell mode needs {tuple(target.shape)}")
             target.copy_(source)
         self.pressure_GPa = float(self.pressure) / units.GPa
-        if self.hydrostatic:
-            self._volume0()
+        self._volume0()
         self.kT_step.copy_(self.kT)
         self.pressure_step.copy_(self.pressure)
 

@@ -19,8 +19,8 @@ RECORDS = (
                      ase_class="ase.md.nose_hoover_chain.NoseHooverChainNVT", ase_dof="3n",
                      state_keys=("eta", "p_eta", "mass_temperature_K"), buffers=_CHAIN,
                      conserved="E_pot + E_kin + the thermostat energy (ASE's get_conserved_energy)"),
-    # One scheme, two ASE classes: cell_mode "hydrostatic" is IsotropicMTKNPT (state keys eps and cell0 too),
-    # "full" MTKNPT; state_keys is their union, and state_dict() holds the keys of the run's cell mode.
+    # One scheme, two ASE classes: cell_mode "hydrostatic" is IsotropicMTKNPT, "full" MTKNPT. Both hold every
+    # state key; the full cell's eps stays 0 and its cell0 (the starting cell) is unused.
     IntegratorRecord(scheme="mtk", implementation="fastmace.integrators.mtk:MTK",
                      ensembles=("npt",), cell_modes=("hydrostatic", "full"), constraints=("fixcm",),
                      refusals={"fix_atoms": _NO_FIX_ATOMS.format("IsotropicMTKNPT and MTKNPT")},

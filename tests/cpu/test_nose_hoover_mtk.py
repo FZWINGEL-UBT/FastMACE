@@ -362,12 +362,7 @@ def test_state_dict_round_trip(which):
     for _ in range(5):
         md_step(state, dyn, field)
     saved = dyn.state_dict()
-    keys = set(dyn.record.state_keys)
-    if which == "full":
-        keys -= {"eps", "cell0"}
-    if which == "nhc":
-        keys = {"eta", "p_eta", "mass_temperature_K"}
-    assert set(saved) == keys
+    assert set(saved) == set(dyn.record.state_keys)  # restart format 4 checks exactly these
     other = build(which, new_state(argon(), compute_stress=which != "nhc"), temperature_K=300.0)
     pointers = {name: tensor.data_ptr() for name, tensor in other.buffers(state).items()
                 if name not in ("positions", "velocities", "cell")}
@@ -404,8 +399,7 @@ def test_restart_round_trip(tmp_path, which, fixcm):
         dyn.set_temperature(schedule(step))
         md_step(state, dyn, field)
     path = tmp_path / restart_io.RESTART_NAME
-    restart_io.write_restart(path, state, engine="gpu", integrator_state=dyn.state_dict(),
-                             variable_cell=dyn.variable_cell)
+    restart_io.write_restart(path, state, engine="gpu", integrator=dyn, variable_cell=dyn.variable_cell)
 
     resumed = new_state(atoms, compute_stress=which != "nhc")
     # The engine of a resumed run builds the integrator at the schedule's current target, not the start's.
@@ -436,3 +430,69 @@ def test_detached_volume_is_the_cells():
     state = new_state(argon(), compute_stress=True)
     dyn = build("hydrostatic", state)
     assert float(dyn.volume(state)) == pytest.approx(float(det_3x3(state.cell)))
+
+
+# -------------------------------------------------------------------------- through Simulation (4-T01's dispatch)
+
+@pytest.fixture(scope="module")
+def tiny_model(tmp_path_factory):
+    pytest.importorskip("cuequivariance_torch")
+    from _support.tiny_models import FAMILIES, tiny_mace_model
+    from fastmace.model import loading
+
+    model = tiny_mace_model([11, 17], **FAMILIES["mh1"])
+    path = tmp_path_factory.mktemp("models") / "tiny-mh1-11-17.model"
+    torch.save(model, path)
+    loading._LICENCES_SHOWN.add(str(path))
+    return loading.load_pristine(str(path), trusted=True)
+
+
+@pytest.fixture
+def cpu_planner(monkeypatch):
+    from fastmace.config import EngineConfig
+    from fastmace.engine import constraints
+    from fastmace.planner import minimal
+
+    planner = minimal.MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"), environ={},
+                                     process=constraints.ProcessRecord())
+    monkeypatch.setattr(minimal, "default_planner", lambda force_field: planner)
+    return planner
+
+
+def simulation_record(which):
+    common = dict(timestep_fs=1.0, temperature_K=300.0, tdamp_fs=20.0)
+    if which == "nhc":
+        return records.NoseHooverChain(**common)
+    return records.MTK(pressure_GPa=0.2, pdamp_fs=200.0, cell_mode=which, **common)
+
+
+def tiny_simulation(tiny_model, which):
+    from _support.structures import nacl
+    from fastmace.model.forcefield import ForceField
+    from fastmace.planner.workload import Workload
+    from fastmace.simulation import Simulation
+
+    atoms = nacl(repeat=1, rattle=0.05, seed=3)
+    return Simulation(atoms, ForceField(tiny_model, atoms, precision="float64"), integrator=simulation_record(which),
+                      workload=Workload(max_temperature_K=400.0), seed=4)
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+@pytest.mark.parametrize("which", ["nhc", "hydrostatic", "full"])
+def test_simulation_runs_and_resumes_bitwise(tiny_model, cpu_planner, which, tmp_path):
+    """Simulation builds the scheme through the registry; save, resume and run equals the uninterrupted run."""
+    from fastmace.protocols import hold, ramp
+    from fastmace.simulation import Simulation
+
+    sim = tiny_simulation(tiny_model, which)
+    assert type(sim._engine.integrator).__name__ == ("NoseHooverChainNVT" if which == "nhc" else "MTK")
+    sim.run(schedule=ramp(300.0, 350.0, ps=0.01))
+    sim.save_restart(tmp_path / "restart.npz")
+    resumed = Simulation.resume(tmp_path)
+    assert resumed._engine.integrator.mass_temperature_K == 300.0  # the masses' temperature, not the target
+    sim.run(schedule=hold(350.0, ps=0.01))
+    resumed.run(schedule=hold(350.0, ps=0.01))
+    for name in ("positions", "velocities", "cell"):
+        assert torch.equal(getattr(resumed._engine.state, name), getattr(sim._engine.state, name)), name
+    values = sim._engine.integrator.output_values(sim._engine.state)
+    assert bool(torch.isfinite(values[CONSERVED_KEY]).all())
