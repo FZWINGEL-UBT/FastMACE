@@ -133,9 +133,10 @@ POLICIES = (
     *(_policy(f"engine.{name}", "engine", "reset", "GraphEngine.flush", sticky=True)
       for name in ("rebuild_needed", "flags", "pipe_flags", "spec_flags", "overflow")),
     _policy("engine.mid.*", "engine", "reset", "GraphEngine.flush"),
-    # Host mirrors of the flags: overwritten by the copy behind every step before the host reads them.
+    # Host mirrors of the flags (and of an optimiser's status, 4-T05): overwritten by the copy behind every
+    # step before the host reads them.
     *(_policy(f"engine.{name}", "engine", "derived", capture=False)
-      for name in ("flags_host", "pipe_flags_host", "spec_flags_host")),
+      for name in ("flags_host", "pipe_flags_host", "spec_flags_host", "status_host")),
     # The derived-state registry's buffers (SPEC §8.5, 3-T03; fastmace.events): recomputed from the species,
     # masses, charges, friction and the force results by their refresh functions. Captured, so that a
     # warm-up of a graph that refreshes them (3-T09's attempts) leaves no trace.

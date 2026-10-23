@@ -75,6 +75,12 @@ follow in the next section.
 - **Alternatives:** (b) 0.1 GPa, to keep the molecular chloride condensed at
   1000 K; (c) a 600 K peak.
 - The production crystal set and pressures are a later, research decision.
+- **Changed (owner, 23 October 2026):** "Yes, rerun the full D1 protocol at
+  0.1 GPa (alternative b) for the acceptance item." At 0 GPa, 3b-T07's full
+  run vaporised: V/V0 reached 20 at step 30,430, and the cell-divergence stop
+  ended it cleanly. 3b-T06 measured the box at 2.3e8 Å³ by 276 K with D3.
+  The acceptance item (3b-T10 item 4) therefore runs at 0.1 GPa, with the
+  rest of the protocol unchanged. The 0 GPa results are kept as context.
 
 **D2. PolarMACE in 3b.**
 - **Recommended:** investigate the hybrid polar stress precision only: the

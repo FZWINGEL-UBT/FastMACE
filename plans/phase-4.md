@@ -62,8 +62,10 @@ Why it matters:
 
 ## Owner decisions
 
-**Open.** Each names the tasks it blocks. The tasks that need none are
-listed under "Order and parallelism".
+**Decided (owner, 23 October 2026): the recommendation (a) of each**, D1–D6,
+in the owner's words "For the other decisions I trust your recommendations".
+They are SPEC §18 decisions 44 (D1) to 49 (D6). The text below keeps each
+option for the record.
 
 **D1. Where `FixAtoms` is supported.** §4.4 says "all 1.0 integrators and
 optimisers". ASE 3.27 is not uniform: `NoseHooverChainNVT`, `MTKNPT` and
@@ -566,6 +568,15 @@ Wave 4   T13 acceptance
       ase.filters.FrechetCellFilter, and the other cell filters are refused with the reason. In
       Simulation the same optimisers are fm.optimize.LBFGS and FIRE, and FrechetCellFilter is
       fm.optimize.FrechetCell."
+- **4-T03 and 4-T03b** (branches `fastmace/4-T03-rebased`, `fastmace/4-T03b`;
+  [docs/validation/4-T03.md](../docs/validation/4-T03.md), [4-T03b.md](../docs/validation/4-T03b.md)):
+  - The task's "the chain updates are device scalar operations, unrolled at capture" now reads
+    **"fused"**: on CUDA with Triton, each chain half and MTK's 3 × 3 exp/exprel run as one Triton
+    program each, bitwise the PyTorch stage (4-T03b, accepted by the conductor on 23 October 2026).
+    The CPU keeps the PyTorch stage, within 1e-9 Å of ASE over 300 steps.
+  - D2 (a) for NHC and MTK: N_f replaces ASE's 3N in every coupling term (conductor, 23 October).
+  - MTK has no `eigh`: exp and exprel of the symmetric cell momentum as a matrix series.
+  - The MTK record's `state_keys` serve both cell modes; the full cell's `eps` stays 0.
 
 ## Checkpoints for the owner
 
