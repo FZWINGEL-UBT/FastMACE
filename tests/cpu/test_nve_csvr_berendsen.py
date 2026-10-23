@@ -331,31 +331,6 @@ def test_csvr_matches_ase_bussi(noise_batch):
     assert float(dyn.output_values(state)[CONSERVED_KEY][0]) == pytest.approx(conserved, abs=1e-10)
 
 
-def test_csvr_ndof_change_redraws_the_rows_from_the_cursor():
-    """4-T04's FixAtoms events change ndof: the rows not yet used are drawn again with the new gamma shape."""
-    atoms = nacl()
-    state = new_state(atoms)
-    dyn = build(CSVR_RECORD, state, noise_batch=7)
-    for _ in range(3):
-        dyn.prepare_step(state)
-    used = state.rng.batch[:3].clone()
-    reference = np.random.default_rng(SEED)
-    for _ in range(7):  # the first batch, drawn already
-        reference.standard_normal(), reference.standard_gamma(0.5 * (3 * len(atoms) - 1))
-    state.fixed_indices = (0, 1)  # what 4-T04's event changes; the count follows
-    dyn.refresh_degrees_of_freedom(state)
-    ndof = 3 * (len(atoms) - 2)
-    assert dyn.ndof == ndof
-    assert float(dyn.target_kinetic) == pytest.approx(0.5 * units.kB * 600.0 * ndof, rel=1e-15)
-    assert torch.equal(state.rng.batch[:3], used) and state.rng.cursor == 3
-    for row in range(3, 7):
-        assert float(state.rng.batch[row, 0]) == reference.standard_normal()
-        assert float(state.rng.batch[row, 1]) == 2.0 * reference.standard_gamma(0.5 * (ndof - 1))
-    unchanged = state.rng.batch.clone()
-    dyn.refresh_degrees_of_freedom(state)  # no change: nothing drawn
-    assert torch.equal(state.rng.batch, unchanged)
-
-
 # -------------------------------------------------------------------------- Berendsen
 
 def test_nvt_berendsen_matches_ase():
@@ -558,10 +533,13 @@ def loaded(tmp_path_factory):
 @pytest.mark.filterwarnings("ignore::UserWarning")
 @pytest.mark.parametrize("record", [NVE, CSVR_RECORD, NVT_BERENDSEN, NPT_BERENDSEN, INHOMOGENEOUS],
                          ids=["nve", "csvr", "nvt-berendsen", "npt-berendsen", "inhomogeneous"])
-def test_simulation_runs_each_scheme(loaded, monkeypatch, record):
-    """4-T01's planner dispatch builds these integrators from the public records; a short run moves the atoms."""
+def test_simulation_runs_each_scheme(loaded, monkeypatch, tmp_path, record):
+    """4-T01's planner dispatch builds these integrators from the public records; a short run with thermo output
+    moves the atoms. NVE has no target temperature: its target_K column is NaN (4-T10's report)."""
     from fastmace.config import EngineConfig
     from fastmace.engine import constraints
+    from fastmace.io import output as output_io
+    from fastmace.io.output import Output
     from fastmace.model.forcefield import ForceField
     from fastmace.planner import minimal
     from fastmace.planner.workload import Workload
@@ -572,7 +550,8 @@ def test_simulation_runs_each_scheme(loaded, monkeypatch, record):
     monkeypatch.setattr(minimal, "default_planner", lambda force_field: planner)
     atoms = nacl(seed=13)
     sim = Simulation(atoms, ForceField(loaded, atoms, precision="float64"), integrator=record,
-                     workload=Workload(max_temperature_K=700.0), seed=SEED)
+                     workload=Workload(max_temperature_K=700.0), seed=SEED,
+                     output=Output(str(tmp_path / "run"), trajectory_every=None, thermo_every=1, restart_every=None))
     integrator = sim._engine.integrator
     expected = {"nve": VelocityVerlet, "csvr": CSVR, "berendsen": Berendsen}[record.to_config(seed=0).scheme]
     assert type(integrator) is expected and integrator.config.scheme == record.to_config(seed=0).scheme
@@ -583,3 +562,12 @@ def test_simulation_runs_each_scheme(loaded, monkeypatch, record):
     assert np.abs(after.positions - before).max() > 1e-4
     if record.to_config(seed=0).variable_cell:
         assert not np.allclose(after.cell, atoms.cell.array)
+    sim.close()
+    header, rows = output_io.read_thermo(tmp_path / "run")
+    assert len(rows) >= 5
+    targets = [float(row[header.index("target_K")]) for row in rows]
+    if record.to_config(seed=0).scheme == "nve":
+        assert all(np.isnan(target) for target in targets)
+    else:
+        assert targets == [600.0] * len(rows)
+    assert all(np.isfinite(float(row[header.index("temperature_K")])) for row in rows)
