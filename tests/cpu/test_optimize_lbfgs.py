@@ -11,7 +11,6 @@ a step limit and a second run with a lower ``fmax`` count steps as ASE does.
 
 from __future__ import annotations
 
-
 import numpy as np
 import pytest
 import torch

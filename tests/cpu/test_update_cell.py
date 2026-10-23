@@ -9,10 +9,14 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from test_events import BAOAB, LANGEVIN, cpu_planner, fresh_simulation, loaded, simulation  # noqa: F401
+import test_events
 
 from _support.structures import nacl
 from fastmace import events
+
+# test_events' tiny MH-1-like model and CPU planner (fixtures), and its Simulation helpers.
+loaded, cpu_planner = test_events.loaded, test_events.cpu_planner
+simulation, fresh_simulation, BAOAB = test_events.simulation, test_events.fresh_simulation, test_events.BAOAB
 
 
 def other_frame(scale=1.03, seed=8):
