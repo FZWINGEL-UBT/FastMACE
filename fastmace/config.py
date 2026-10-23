@@ -354,9 +354,10 @@ class IntegratorConfig:
     # The registry scheme ("langevin", "baoab", "nve", "csvr", "nhc", "mtk", "berendsen"); None: from the
     # ensemble (DEFAULT_SCHEMES).
     scheme: str | None = None
-    # Degrees of freedom of targets and temperatures (owner decision D2): "auto", 3N - 3 under fixcm and
-    # 3(N - n_fixed) with FixAtoms; "ase", the scheme's ASE class. Langevin and BAOAB keep their count.
-    dof: Literal["auto", "ase"] = "auto"
+    # Degrees of freedom of targets and temperatures (owner decision D2): "fastmace", 3N - 3 under fixcm and
+    # 3(N - n_fixed) with FixAtoms; "ase", the scheme's ASE class; "auto", the planner's choice (D2's
+    # default, registry.DOF_AUTO). Langevin and BAOAB keep their count.
+    dof: Literal["auto", "fastmace", "ase"] = "auto"
     # Scheme parameters, (name, value) pairs sorted by name; a mapping is normalised. Values are None,
     # bools, numbers, strings or tuples of them.
     parameters: tuple[tuple[str, typing.Any], ...] = ()

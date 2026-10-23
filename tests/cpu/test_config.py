@@ -51,6 +51,7 @@ AUTO_RULES = {
     "NeighbourConfig.headroom": "rule_11_headroom_from_workload",
     "NeighbourConfig.d3_skin": "rule_11_d3_skin_from_workload",
     "IntegratorConfig.fixcm_projection": "mass_weighted_under_nvt_fixcm_else_ase",
+    "IntegratorConfig.dof": "owner_decision_d2_default",
     "EngineConfig.recapture_budget": "recapture_budget_from_workload",
     "PrecisionConfig.mc_energy": "force_precision_if_move_energy_gate_passes_else_float64",
     "RewriteConfig.factor_species": "on_for_hybrid_graph_engine_if_model_supports",
@@ -213,7 +214,8 @@ def test_rejected_switches_have_no_field():
         (config.PolarConfig, {"dipole_cap": (3.0, 2.0)}),
         (config.PolarConfig, {"kspace_headroom": -0.1}),
         (config.IntegratorConfig, {"timestep_fs": 0.0}),
-        (config.IntegratorConfig, {"ensemble": "nve"}),
+        (config.IntegratorConfig, {"ensemble": "nph"}),  # "nve" is valid since 4-T01
+        (config.IntegratorConfig, {"dof": "3n"}),
         (config.IntegratorConfig, {"barostat_tau_fs": -1.0}),
     ],
 )

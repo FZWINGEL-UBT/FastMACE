@@ -162,9 +162,13 @@ def test_state_from_atoms():
     assert stressed.stress.shape == (3, 3) and not stressed.stress.any()
 
 
-def test_from_atoms_refuses_constraints():
+def test_from_atoms_refuses_constraints_other_than_fix_atoms():  # FixAtoms is a mask since 4-T01
+    from ase.constraints import FixBondLength
+
     atoms = argon()
     atoms.set_constraint(FixAtoms(indices=[0]))
+    assert SimulationState.from_atoms(atoms, "cpu", 0).fixed_indices == (0,)
+    atoms.set_constraint(FixBondLength(0, 1))
     with pytest.raises(ValueError, match="onstraints"):
         SimulationState.from_atoms(atoms, "cpu", 0)
 

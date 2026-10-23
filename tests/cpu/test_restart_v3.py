@@ -45,8 +45,8 @@ def mc_state():
 # --------------------------------------------------------------------------- the format
 
 
-def test_the_writer_is_version_3():
-    assert restart_io.FORMAT_VERSION == restart_io.NEXT_FORMAT_VERSION == 3
+def test_the_writer_is_version_4():  # 4-T01 moved the writer on; version 3's keys stay
+    assert restart_io.FORMAT_VERSION == restart_io.NEXT_FORMAT_VERSION == 4
 
 
 def test_a_v3_round_trip_holds_the_mc_record(tmp_path):
@@ -55,7 +55,7 @@ def test_a_v3_round_trip_holds_the_mc_record(tmp_path):
     path = tmp_path / restart_io.RESTART_NAME
     write_full(path, state, integrator)
     stored = restart_io.read_restart(path)
-    assert int(stored["fastmace_restart"]) == 3
+    assert int(stored["fastmace_restart"]) == restart_io.FORMAT_VERSION
     assert restart_io.mc_record(stored) == mc_state()
     fresh, fresh_integrator = make_state(seed=5, steps=1)
     assert fresh.mc is None

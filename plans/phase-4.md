@@ -527,6 +527,20 @@ Wave 4   T13 acceptance
 - **Small, low-risk tasks** (T11, T12) skip the prestart report and the
   separate validation document. They keep their GPU check.
 
+## Answers from the tasks
+
+- **4-T01** (branch `fastmace/4-T01`, contract in
+  [docs/design/physics.md](../docs/design/physics.md)):
+  - `Optimizer.propose()` and `update()` take no argument: the optimiser is bound to its
+    `DOFView` at construction (`Class(dof, config)`), at fixed addresses. The plan had
+    `propose(state)`; accepted by the conductor on 23 October 2026.
+  - The support table is a registry of scheme records, one module per scheme in
+    `integrators/schemes/` and `optimize/schemes/`. T02, T03, T05, T06 and T07 add their
+    records there, not in `planner/minimal.py`.
+  - The new integrator records `NoseHooverChain` and `MTK` also take `fixcm` and `dof`, following
+    D2 (a)'s "the new integrators"; choice 1 listed them only for NVE, CSVR and Berendsen.
+  - FIRE's `dt` and `dtmax` stay in ASE time units, as in ASE (choice 1: ASE's names otherwise).
+
 ## Checkpoints for the owner
 
 1. Before the go messages: D1, D3, D5 and D6. D2 and D4 can wait until

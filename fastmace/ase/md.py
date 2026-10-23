@@ -41,6 +41,39 @@ LATER = {"VelocityVerlet": "NVE", "NoseHooverChainNVT": "NHC", "Bussi": "CSVR", 
          "MTKNPT": "MTK", "NVTBerendsen": "Berendsen", "NPTBerendsen": "Berendsen",
          "Inhomogeneous_NPTBerendsen": "Berendsen"}
 UNPLANNED = ("Andersen", "NPT")
+# The constructor arguments of the phase 4 ASE 3.27 classes along their class chain (plan task 4-T01), in
+# ASE's order; the same in ASE 3.29. 4-T10 splits each into SUPPORTED and REFUSED (rng, comm, master, and
+# FIRE's position_reset_callback and LBFGS's use_line_search); tests/cpu/test_contracts_4.py checks them
+# against inspect.signature.
+_DYNAMICS = ("trajectory", "logfile", "loginterval", "append_trajectory", "master", "comm")
+_NPT_BERENDSEN = ("atoms", "timestep", "temperature", "temperature_K", "pressure", "pressure_au", "taut", "taup",
+                  "compressibility", "compressibility_au", "fixcm", *_DYNAMICS)
+_MTK = ("atoms", "timestep", "temperature_K", "pressure_au", "tdamp", "pdamp", "tchain", "pchain", "tloop", "ploop",
+        *_DYNAMICS)
+ASE_ARGUMENTS = {
+    "VelocityVerlet": ("atoms", "timestep", *_DYNAMICS),
+    "Bussi": ("atoms", "timestep", "temperature_K", "taut", "rng", *_DYNAMICS),
+    "NoseHooverChainNVT": ("atoms", "timestep", "temperature_K", "tdamp", "tchain", "tloop", *_DYNAMICS),
+    "IsotropicMTKNPT": _MTK,
+    "MTKNPT": _MTK,
+    "NVTBerendsen": ("atoms", "timestep", "temperature", "taut", "fixcm", "temperature_K", *_DYNAMICS),
+    "NPTBerendsen": _NPT_BERENDSEN,
+    "Inhomogeneous_NPTBerendsen": ("mask", *_NPT_BERENDSEN),
+}
+# The ASE optimisers of owner decision D5 (recommended (a)), as above.
+ASE_OPTIMIZER_ARGUMENTS = {
+    "LBFGS": ("atoms", "restart", "logfile", "trajectory", "maxstep", "memory", "damping", "alpha", "use_line_search",
+              "append_trajectory", "master", "comm", "loginterval"),
+    "FIRE": ("atoms", "restart", "logfile", "trajectory", "dt", "maxstep", "maxmove", "dtmax", "Nmin", "finc", "fdec",
+             "astart", "fa", "a", "downhill_check", "position_reset_callback", "append_trajectory", "master", "comm",
+             "loginterval"),
+}
+# Where each class lives in ASE 3.27.
+ASE_MODULES = {"VelocityVerlet": "ase.md.verlet", "Bussi": "ase.md.bussi",
+               "NoseHooverChainNVT": "ase.md.nose_hoover_chain", "IsotropicMTKNPT": "ase.md.nose_hoover_chain",
+               "MTKNPT": "ase.md.nose_hoover_chain",
+               "NVTBerendsen": "ase.md.nvtberendsen", "NPTBerendsen": "ase.md.nptberendsen",
+               "Inhomogeneous_NPTBerendsen": "ase.md.nptberendsen", "LBFGS": "ase.optimize", "FIRE": "ase.optimize"}
 
 DEFAULT_OUTPUT = "fastmace-run"
 OUTPUT_SUFFIX = ".fastmace"
