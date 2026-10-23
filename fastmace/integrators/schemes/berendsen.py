@@ -10,7 +10,8 @@ from fastmace.integrators.registry import IntegratorRecord
 
 RECORDS = (
     IntegratorRecord(scheme="berendsen", implementation="fastmace.integrators.berendsen:Berendsen",
-                     ensembles=("nvt", "npt"), cell_modes=("fixed", "hydrostatic", "full"), constraints=("fixcm", "fix_atoms"),
+                     ensembles=("nvt", "npt"), cell_modes=("fixed", "hydrostatic", "full"),
+                     constraints=("fixcm", "fix_atoms"),
                      ase_class="ase.md.nvtberendsen.NVTBerendsen", non_canonical=True,
                      buffers=(("target_temperature", "derived", "Integrator.set_temperature"),
                               ("berendsen_pressure", "derived", "Berendsen.restore_externalstress")),
