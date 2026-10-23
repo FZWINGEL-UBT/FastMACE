@@ -323,21 +323,40 @@ def check_tensors(cases, dtype=None):
 
     ``dtype`` defaults to the dtype of the first expected tensor. Each name counts as one module.
     """
-    cases = list(cases)
-    if not cases:
-        return CheckResult(True, 0.0, threshold_for(dtype or "float64"), 0, "nothing to check",
-                           str(dtype or "float64").removeprefix("torch."))
-    dtype = str(dtype or cases[0][1].dtype).removeprefix("torch.")
-    threshold = threshold_for(dtype)
-    worst, problems, names = 0.0, [], []
+    errors = CaseErrors()
     for name, expected, got in cases:
-        error = relative_error(got, expected)
-        worst = max(worst, error)
-        if name not in names:
-            names.append(name)
-        if not error <= threshold:
-            problems.append(f"{name}: relative error {error:.3g} > {threshold:g}")
-    return CheckResult(not problems, worst, threshold, len(names), "; ".join(problems) or "ok", dtype)
+        errors.add(name, expected, got)
+    return errors.result(dtype)
+
+
+class CaseErrors:
+    """``check_tensors`` one case at a time: ``add`` keeps only the case's relative error, so a self-check can
+    free its tensors before computing the next case (5-T03: the segment_gemm self-check held every
+    interaction's probes and gradients at once); ``result`` is ``check_tensors``' result for the same cases."""
+
+    def __init__(self):
+        self.errors: list[tuple[str, float]] = []
+        self.first_dtype = None
+
+    def add(self, name, expected, got):
+        if self.first_dtype is None:
+            self.first_dtype = expected.dtype
+        self.errors.append((name, relative_error(got, expected)))
+
+    def result(self, dtype=None):
+        if not self.errors:
+            return CheckResult(True, 0.0, threshold_for(dtype or "float64"), 0, "nothing to check",
+                               str(dtype or "float64").removeprefix("torch."))
+        dtype = str(dtype or self.first_dtype).removeprefix("torch.")
+        threshold = threshold_for(dtype)
+        worst, problems, names = 0.0, [], []
+        for name, error in self.errors:
+            worst = max(worst, error)
+            if name not in names:
+                names.append(name)
+            if not error <= threshold:
+                problems.append(f"{name}: relative error {error:.3g} > {threshold:g}")
+        return CheckResult(not problems, worst, threshold, len(names), "; ".join(problems) or "ok", dtype)
 
 
 # --------------------------------------------------------------------------- planner-facing records

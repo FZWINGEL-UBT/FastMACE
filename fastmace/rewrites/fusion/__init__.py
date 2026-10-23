@@ -33,7 +33,7 @@ forward is pinned by sha256: the rows reproduce its arithmetic.
 from __future__ import annotations
 
 from fastmace.model.capabilities import FACTORED_INTERACTIONS
-from fastmace.rewrites.registry import Rewrite, Support, check_tensors
+from fastmace.rewrites.registry import CaseErrors, Rewrite, Support, check_tensors
 
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
 GATE_FORWARD = "mace.modules.gate:GatedEquivariantBlock.forward"
@@ -81,11 +81,12 @@ def _support(model):
 
 
 def _chain_cases(original, rewritten, context):
-    """(cases, dtype): each chain against the unrewritten interaction, values and both input gradients."""
+    """(errors, dtype): each chain against the unrewritten interaction, values and both input gradients, as a
+    ``CaseErrors`` (each case's tensors are freed before the next interaction's probe)."""
     import torch
 
     generator = torch.Generator().manual_seed(context.seed)
-    cases, dtype = [], None
+    cases, dtype = CaseErrors(), None
     for index, interaction in enumerate(getattr(rewritten, "interactions", ())):
         chain = getattr(interaction, "gated_rows", None)
         if chain is None:
@@ -108,13 +109,16 @@ def _chain_cases(original, rewritten, context):
             for function in (stock, chain):
                 out = function(x, y)
                 values.append((out.detach(), *torch.autograd.grad(out, (x, y), grad)))
-        cases += [(f"interactions.{index}.gated_rows", a, b) for a, b in zip(*values)]
+        for a, b in zip(*values):
+            cases.add(f"interactions.{index}.gated_rows", a, b)
+        del values, x, y, grad
         dtype = dtype or weight.dtype
     return cases, dtype
 
 
 def _selfcheck(original, rewritten, context):
-    return check_tensors(*_chain_cases(original, rewritten, context))
+    errors, dtype = _chain_cases(original, rewritten, context)
+    return errors.result(dtype)
 
 
 def join_in_place(model):
@@ -157,7 +161,7 @@ def _segment_selfcheck(original, rewritten, context):
         stock = original.get_submodule(f"interactions.{index}").reshape
         probe = torch.randn((5, view.components * view.mul), generator=generator, dtype=torch.float64)
         probe = probe.to(device=interaction.linear_2.weight_0.device, dtype=interaction.linear_2.weight_0.dtype)
-        cases.append((f"interactions.{index}.reshape", stock(probe), view(probe)))
+        cases.add(f"interactions.{index}.reshape", stock(probe), view(probe))
     for index, interaction in enumerate(getattr(rewritten, "interactions", ())):
         chain = getattr(interaction, "gated_rows", None)
         if chain is None or chain.joined is None:
@@ -188,8 +192,12 @@ def _segment_selfcheck(original, rewritten, context):
             for function, inputs in ((stock, full), (joined, rows)):
                 out = function(*inputs)
                 values.append((out.detach(), *torch.autograd.grad(out, rows, grad)))
-        cases += [(f"interactions.{index}.gated_rows.joined", a, b) for a, b in zip(*values)]
-    return check_tensors(cases, dtype)
+        for a, b in zip(*values):
+            cases.add(f"interactions.{index}.gated_rows.joined", a, b)
+        # Each interaction's probe rows, products and gradients are sized to fill the device (several GB on a
+        # wide model); free them before the next interaction's (5-T03, rule 12's build estimate).
+        del values, rows, full, grad
+    return cases.result(dtype)
 
 
 def _block_modules(model):
