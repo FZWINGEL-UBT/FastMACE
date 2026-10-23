@@ -92,10 +92,12 @@ tier, so the stale-test listing starts at `fastmace-3`, not at 3b.
 **Pre-declared correction:** `test_subprocess_worker_gpu.py`'s two `_listed(pid)` assertions cannot pass under
 WSL2: `nvidia-smi --query-compute-apps=pid` reports PIDs from outside WSL's namespace (or none), so a worker's PID
 never matches. Test-side fix (written before the go, verified in `preflight`): `_listed` stays where `nvidia-smi`
-lists the test's own PIDs; under WSL (`microsoft` in `/proc/version`, or the probe that its own CUDA process is not
-listed) it becomes "the process is alive (`/proc/<pid>`) and the GPU's used memory is more than 64 MiB above the
-reading taken before the worker started". The killed-parent check then asserts that the worker exits and the
-memory returns within 30 s, which is what the test means by "kept the GPU". Both tests' other assertions are
+lists PIDs; under WSL (`microsoft` in `/proc/version`) "holds the GPU" becomes "the process is alive
+(`/proc/<pid>`) and the GPU's used memory is more than 128 MiB above the reading taken before the worker started",
+and "released" becomes "the process is gone and the used memory is back within 128 MiB". The margin is wider than
+the tests' 64 MiB free-memory check because WSL's reading is the whole GPU's, the Windows desktop's included; a
+worker's CUDA context alone is several hundred MiB. The killed-parent check then asserts that the worker exits and
+the memory returns within 30 s, which is what the test means by "kept the GPU". Both tests' other assertions are
 unchanged.
 
 ## Stoppable pytest runs (phase 3 lesson)
@@ -280,11 +282,16 @@ stretch; then the rest, the acceptance and slow tiers overnight. About 18–20 h
 `tests/cpu/test_subprocess_runner.py::test_mc_attaches_keeps_and_detaches_through_the_runner[fresh-children]`:
 under `-n 8` the child was killed by SIGABRT ("terminate called without an active exception") after it had written
 an `ok` result; 3 of 3 passed alone. That message is C++'s `std::terminate` from destroying a joinable
-`std::thread`, here at the child's interpreter exit. 4-T13 looks for the thread (the runner's child exit path, the
-async writer, torch's or Triton's pools) before the freeze, on the CPU, and either proposes a fix to the conductor
-(library code is not 4-T13's to change) or records it in the report with the evidence. It does not block the
-acceptance: the child had written a correct result before it aborted. Whether the runner should accept such a
-result is part of the finding.
+`std::thread`, here at the child's interpreter exit. **Found** (23 October 2026, CPU): the child's `_Heartbeat` is a
+daemon thread whose loop calls `int(engine.state.step)`, a torch call that releases the GIL; `main()`'s `finally`
+calls `heartbeat.stop()`, which sets the event but does not join. If the thread is inside that call when the
+interpreter finalises, CPython 3.10 ends it with `pthread_exit`, and the forced unwind through the noexcept
+GIL-reacquire calls `std::terminate`. Reproduced: a daemon thread in `int(tensor)` at exit aborts 40 of 40 runs
+(0 of 40 when joined); the real `_Heartbeat` with its window widened aborts 29 of 30 with `stop()` as written,
+0 of 30 with a join. Proposed fix (library code, the conductor's call): `stop()` joins the thread, and `main()`
+clears `heartbeat.simulation` first. The parent rightly fails such a call: it accepts a result only with exit
+code 0. It does not block the acceptance; the report records it with the fix's state. Note:
+`4-T13-finding-runner-child-abort.md` in the session notes.
 
 ## Tool-side additions (before the freeze, CPU-tested on `fastmace/4-T13`)
 
