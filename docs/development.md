@@ -663,3 +663,11 @@ unattended. The driver keeps everything else in a local store, `~/.fastmace-cola
 - **Batch the tiers:** a cold tier is several times slower than a warm local one (A100 pilot: 43.5 min for
   the fast tier, against 7.9 min locally warm). Give one call several `--command`s rather than one VM per
   tier.
+
+**Measured on a G4** (23 October 2026, `docs/validation/ops-colab-g4-20261023.md`):
+- **Setup:** a VM is ready to run commands about a minute after the call starts (56 s cold, 81 s for the
+  environment build). With the compile caches it takes 204 s, because uploading the 513 MB cache takes 154 s.
+- **The compatibility tier:** 40.8 min of tests cold and 36.6 min warm. The caches save about 10 %, about
+  100 s net of the upload: most of the tier is runtime, not compilation.
+- **Compute units:** 9.4 CU for the cold job (about 13 CU/h). `cu_used` is the change in the account's
+  balance, so it includes every other VM that was active (`active_before`, `active_after` in `colab.json`).
