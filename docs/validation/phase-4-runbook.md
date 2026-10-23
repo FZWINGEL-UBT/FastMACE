@@ -124,8 +124,13 @@ test from its branch unchanged.
    consumed noise batch), NHC, MTK hydrostatic and full (h ≠ h₀ at the restart step), NVT and NPT Berendsen and
    Langevin with `FixAtoms`, reproducible plan, MH-1 NaCl, float64 and float32, 200 steps with a restart at 100.
 
-Both are written on `fastmace/4-T13`, CPU-collected, and run first in `preflight` at the freeze; a failure there
-is triaged as above.
+3. **The sampling checks of choice 8 did not exist.** New CPU acceptance test `tests/cpu/test_sampling_canonical.py`:
+   CSVR and NHC (`fixcm=True`, `dof="auto"`, N_f = 3N − 3) on 4-T03's Lennard-Jones argon (108 atoms, 150 K, 2 fs,
+   τ 20 fs), 2 ps equilibration, then 400 kinetic-energy samples every 100 fs, one-sample KS against
+   Gamma(N_f/2, k_B T); NVT Berendsen as the negative control (the same test must reject it).
+
+The GPU files are written on `fastmace/4-T13`, CPU-collected, and run first in `preflight` at the freeze; a
+failure there is triaged as above. The CPU file runs in `cpu-acceptance`.
 
 ## Jobs
 
@@ -138,20 +143,19 @@ Local RTX 5060 Ti, run ID `4-T13-local-<date>`, `python3 <copy>/tools/ci/local_g
 | `preflight` | – | no | the selected tests, the two new test files, the `_listed` correction | 3 h |
 | `regression` | 5 | yes | `tools/ab_fastmace.py --release 3b`: MH-1 hybrid Langevin NVT, D3 off, NaCl and NbCl5, 300 K, 12 blocks of 300 steps after 300; ABAB 3b first, ABAB 4 first, ABBA 3b first | 40 min |
 | `regression-npt` | 5 | yes | BAOAB NPT, D3 off, NbCl5, one version per process, 4 processes 3b, 4, 4, 3b | 30 min |
-| `ase-speed` | rec. | yes | each new ASE class on stock ASE + MACE's calculator against its `fastmace.ase` class (tool-side `tools/bench/ase_integrators_speed.py`) | 45 min |
-| `step-costs` | rec. | yes | each new integrator against Langevin (NVT) or BAOAB (NPT), same process, 4 alternating blocks of 300 steps, NaCl and NbCl5 | 30 min |
+| `ase-speed` | rec. | yes | each new ASE class and `Langevin` on stock ASE + MACE's calculator against its `fastmace.ase` class, NaCl and NbCl5, one side per process (tool-side `tools/bench/ase_integrators_speed.py`); the FastMACE sides are also the step costs against Langevin | 1 h |
 | `optimisers` | 1 | no | fixed cell float32 and variable cell: `tools/bench/optimizer_frames.py` (ASE side, then the GPU side with `--compare`); float64 step for step and `FixAtoms`: `tools/validation/anneal_frame_probe.py run` per side (`--precision float64`, `--optimizer`, `--fix-every 3 --ase-calculator mace`), then `compare`; `fastmace relax` once | 2 h |
 | `minima` | 2 | no | `tools/validation/anneal_minima.py` at the freeze, only if required below | 0.5–1.5 h |
 | `protocol` | 2 | no | the short NbCl5 NPT anneal protocol through `fastmace run` with `gpu-LBFGS` (decision 47), start, then resume to the quench | 1.5 h |
-| `nve-drift` | rec. | no | NVE, hybrid float32, NaCl and NbCl5 3×3×3, 20 ps at 1 fs, conserved quantity every 10 fs | 15 min |
+| `nve-drift` | rec. | no | `tools/bench/nve_drift.py` (tool-side): NVE in the default plan, NaCl and NbCl5 3×3×3, 20 ps at 1 fs, conserved quantity every 10 fs | 15 min |
 | `trajectories-cpu` | 5 | no | `tools/trajectory_versions.py --against 3b`, CPU float64, tiny MH-1-class model, NaCl 2×2×2, 100 steps, every 10, Langevin NVT and BAOAB NPT, D3 off and on; `compare --bitwise` | 15 min |
 | `trajectories-reproducible` | 5 | no | the same, reproducible plan, plain cuEq float64 on the GPU, MH-1 NaCl, 500 steps, every 50, NVT and NPT, D3 off | 20 min |
 | `restart-across` | 5 | no | a Langevin restart written by `fastmace_3b` (v3, step 50) resumed at the freeze to step 100, CPU float64, tiny model; bitwise against `fastmace_3b`'s uninterrupted run (tool-side `--resume-across`) | 10 min |
-| `cpu-acceptance` | rec. | no | `pytest tests/cpu -m acceptance`: the sampling checks (choice 8) | 10 min |
+| `cpu-acceptance` | rec. | no | `pytest tests/cpu -m acceptance`: the sampling checks (choice 8, gap 3) and the CPU acceptance tests already there | 20 min |
 | `acceptance-tier` | 1–4 | (step-time assertions) | `pytest tests/gpu -m acceptance` | 5–6 h |
 | `slow-tier` | – | no | `pytest tests/gpu -m "slow and not acceptance"`, also for phase 3b | 2–3 h |
 
-Order: `preflight`; the timed jobs (`regression`, `regression-npt`, `ase-speed`, `step-costs`) in one quiet
+Order: `preflight`; the timed jobs (`regression`, `regression-npt`, `ase-speed`) in one quiet
 stretch; then the rest, the acceptance and slow tiers overnight. About 18–20 h of GPU in all.
 
 ## Timing design (decision 39: repeats sized to the effect)
@@ -165,7 +169,9 @@ stretch; then the rest, the acceptance and slow tiers overnight. About 18–20 h
   otherwise rerun as 4-T10 ran it, and the median of 12 blocks decides.
 - **Against stock ASE** (recorded; the effect is a multiple): one process per side, one block of 300 steps after
   300 warm-up, per class and structure. Cross-process, so a ratio within 3 % of 1 is reported as "no difference".
-- **Recorded step costs:** one process, 4 alternating blocks per pair; no pass mark, no more repeats.
+- **Recorded step costs** of each new integrator against Langevin (NVT classes) and BAOAB (`ase-speed`'s
+  `Langevin` side and 1b's BAOAB step time): one block per class and process, cross-process, so a difference
+  within 3 % is reported as none; no pass mark, no more repeats.
 - **Quench time GPU against ASE:** cited from 4-T08 (one block per crystal, separate processes); not rerun.
 - **Cross-process controls** (phase 3 open finding 2): bounded at 3 % or left out.
 
@@ -261,15 +267,17 @@ stretch; then the rest, the acceptance and slow tiers overnight. About 18–20 h
 **Recorded, not acceptance** (choices 7 and 8, decision 6).
 - NVE energy drift (float32 hybrid, NaCl and NbCl5, 20 ps): linear drift per ps and atom, RMS fluctuation;
   4-T03's 20 ps extended energies of NHC and MTK cited.
-- Each new integrator's step time against Langevin or BAOAB (4-T03b's NHC and MTK numbers as context).
+- Each new integrator's step time against Langevin or BAOAB (`ase-speed`; 4-T03b's NHC and MTK numbers as
+  context).
 - **End to end against stock ASE** (the conductor's item; so far only the optimisers were measured: 4-T08 1.3–4.9×
   on the quench): each new MD class on stock ASE 3.27 with MACE's own calculator (cuEq float32, MACE's defaults,
   the way a user runs it today) against its `fastmace.ase` class with the planner's default (MH-1 hybrid float32),
   MH-1 `matpes_r2scan`, NaCl and NbCl5 3×3×3, 1 fs, 300 K, the time constants of 4-T10's A/B, pressure 0. ms/step
   and the ratio per class and structure.
 - Quench time GPU against ASE (4-T08).
-- The kinetic-energy distributions of CSVR and NHC against the canonical gamma distribution (KS, fixed seed, tiny
-  model, CPU): statistic and p-value. A p-value below 0.001 goes to the conductor before the report.
+- The kinetic-energy distributions of CSVR and NHC against the canonical gamma distribution (gap 3: KS, fixed
+  seeds, Lennard-Jones argon, CPU): statistic and p-value, and the Berendsen control's. A p-value below 0.001
+  (or a control that passes) goes to the conductor before the report.
 - **Model fitness, for the owner (4-T12b):** POLAR-1-S's forces on NbCl5 3×3×3 are about 70× MH-1's at the same
   structure (largest 119.6 against 1.7 eV/Å; 1,250 of 1,944 atoms above 10 eV/Å). Whether POLAR-1-S is fit for
   NbCl5 is a model question, recorded, not a FastMACE finding.
@@ -296,10 +304,12 @@ code 0. It does not block the acceptance; the report records it with the fix's s
 ## Tool-side additions (before the freeze, CPU-tested on `fastmace/4-T13`)
 
 - `tools/acceptance/phase4_local.sh`: the jobs above.
-- `tools/bench/ase_integrators_speed.py`: stock ASE and `fastmace.ase` sides, one per process.
+- `tools/bench/ase_integrators_speed.py`: stock ASE and `fastmace.ase` sides, one per process; `tools/bench/nve_drift.py`.
+- `tools/validation/anneal_frame_probe.py`: `--optimizer fire`, `--fix-every`, `--ase-calculator mace`, and the
+  first-50-steps maximum and fixed-atom check in `compare`.
 - `tools/ab_fastmace.py --release 3b`, `tools/trajectory_versions.py --against 3b` and `--resume-across`, after
   3b-T10 merges (they extend its versions of these files).
-- Test-side: the `_listed` correction and the two coverage-gap test files.
+- Test-side: the `_listed` correction and the three coverage-gap test files.
 
 ## Not in this runbook
 
