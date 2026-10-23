@@ -17,9 +17,22 @@ if os.environ.get("RESET") == "1":
     # A new batch (also on a kept session): the previous batch's steps and records go.
     subprocess.run(f"rm -rf {STEPS} {FM}/out", shell=True)
 os.makedirs(STEPS, exist_ok=True)
-for name in os.listdir("/content"):
-    if name.startswith("fm_"):  # the driver's uploads (fastmace_colab.STAGING)
+chunked = {}
+for name in sorted(os.listdir("/content")):
+    if not name.startswith("fm_"):  # the driver's uploads (fastmace_colab.STAGING)
+        continue
+    base, _, suffix = name.rpartition(".chunk")
+    if base and suffix.isdigit():  # a large upload in pieces (fastmace_colab.split_file), joined in order
+        chunked.setdefault(base, []).append(name)
+    else:
         os.replace(f"/content/{name}", f"{FM}/{name[3:]}")
+for base, names in chunked.items():
+    with open(f"{FM}/{base[3:]}", "wb") as out:
+        for name in names:
+            with open(f"/content/{name}", "rb") as f:
+                while block := f.read(1 << 24):
+                    out.write(block)
+            os.remove(f"/content/{name}")
 log, rc, pidf = (f"{STEPS}/{step}.{suffix}" for suffix in ("log", "rc", "pid"))
 
 

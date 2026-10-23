@@ -288,3 +288,25 @@ def test_changed_caches_add_a_part_and_all_parts_go_up(tmp_path):
     fc.run_job(args, colab)
     assert [c[-1] for c in colab.calls if c[1] == "upload" and "cache-in" in c[-1]] == [
         "/content/fm_cache-in-000.tar.gz", "/content/fm_cache-in-001.tar.gz"]
+
+
+def test_large_files_are_split_for_upload(tmp_path):
+    big = tmp_path / "big.bin"
+    data = bytes(range(256)) * 41  # 10496 bytes
+    big.write_bytes(data)
+    assert fc.split_file(big, tmp_path / "c", len(data)) == [big]
+    chunks = fc.split_file(big, tmp_path / "c", 4096)
+    assert [c.name for c in chunks] == ["big.bin.chunk000", "big.bin.chunk001", "big.bin.chunk002"]
+    assert b"".join(c.read_bytes() for c in chunks) == data
+
+
+def test_a_large_cache_part_goes_up_in_chunks(tmp_path, monkeypatch):
+    args = _job_args(tmp_path)
+    first = fc.run_job(args, FakeColab())
+    part = tmp_path / "store" / "caches" / first["cache_key"] / "000.tar.gz"
+    part.write_bytes(b"x" * 2500)
+    monkeypatch.setattr(fc, "CHUNK_BYTES", 1000)
+    colab = FakeColab(cache_changed=False)
+    fc.run_job(args, colab)
+    assert [c[-1] for c in colab.calls if c[1] == "upload" and "cache-in" in c[-1]] == [
+        f"/content/fm_cache-in-000.tar.gz.chunk{n:03d}" for n in range(3)]

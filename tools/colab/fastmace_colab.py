@@ -67,6 +67,7 @@ DEFAULT_MODELS = "mh-1,medium,polar-1-s"
 DEFAULT_REPO = "/mnt/d/Margraf/FastMACE"  # the main checkout sees every pushed branch
 STATE = Path(os.path.expanduser(os.environ.get("FASTMACE_COLAB_STATE", "~/.fastmace-colab")))
 WAIT_S = 1200  # one `colab exec` waits at most this long; the driver calls again while a step runs
+CHUNK_BYTES = 100 * 2**20  # largest single upload (base64 makes it 133 MiB on the wire)
 LEDGER_FIELDS = ("date_utc", "session", "gpu", "gpu_name", "capability", "commit", "commands", "exit", "wall_s",
                  "setup_s", "cache_key", "cache_hit", "cu_before", "cu_after", "cu_used", "out")
 
@@ -148,6 +149,21 @@ def stack_key(requirements):
 
 def cache_key(capability, stack):
     return f"sm{capability.replace('.', '')}-py{PYTHON.replace('.', '')}-{stack}"
+
+
+def split_file(path, directory, size):
+    """``[path]`` if it fits in one upload, else its pieces ``<directory>/<name>.chunk<nnn>``."""
+    path = Path(path)
+    if path.stat().st_size <= size:
+        return [path]
+    Path(directory).mkdir(parents=True, exist_ok=True)
+    chunks = []
+    with open(path, "rb") as f:
+        for n, block in enumerate(iter(lambda: f.read(size), b"")):
+            chunk = Path(directory) / f"{path.name}.chunk{n:03d}"
+            chunk.write_bytes(block)
+            chunks.append(chunk)
+    return chunks
 
 
 def cache_parts(directory):
@@ -275,7 +291,16 @@ class Job:
                 time.sleep(10 * attempt)
 
     def upload(self, local, remote):
-        self.transfer(upload_args(self.session, local, remote))
+        """`colab upload` sends a file as one base64 JSON request, which fails above the Jupyter server's
+        request limit (a 513 MB cache part did, 23 October 2026): larger files go up in chunks that
+        remote_step.py joins."""
+        chunks = split_file(local, self.work / "chunks", CHUNK_BYTES) if not self.args.dry_run else [local]
+        if len(chunks) == 1:
+            self.transfer(upload_args(self.session, local, remote))
+            return
+        for chunk in chunks:
+            self.transfer(upload_args(self.session, chunk, f"{remote}.{chunk.name.rsplit('.', 1)[1]}"))
+            chunk.unlink()
 
     def download(self, remote, local):
         Path(local).parent.mkdir(parents=True, exist_ok=True)
