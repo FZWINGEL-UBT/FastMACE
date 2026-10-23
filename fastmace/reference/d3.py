@@ -60,8 +60,10 @@ def torch_dftd3_calculator(record: d3.D3, *, dtype: str = "float64", device: str
 
 
 def torch_dftd3(atoms, record: d3.D3, *, dtype: str = "float64", device: str = "cpu"):
-    """``(energy, forces, stress)`` of ``atoms`` from ``torch-dftd`` on ``record``'s numbers."""
+    """``(energy, forces, stress)`` of ``atoms`` from ``torch-dftd`` on ``record``'s numbers; every atom's forces,
+    whatever ``atoms``' constraints."""
     atoms = atoms.copy()
+    atoms.set_constraint()
     atoms.calc = torch_dftd3_calculator(record, dtype=dtype, device=device)
     return (float(atoms.get_potential_energy()), np.array(atoms.get_forces(), dtype=float),
             np.array(atoms.get_stress(voigt=False), dtype=float))

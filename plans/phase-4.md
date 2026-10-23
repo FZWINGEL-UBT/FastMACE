@@ -117,9 +117,9 @@ no reference with fixed atoms.
   - GPU LBFGS (fmax 0.01 eV/Å, memory 100, maxstep 0.2 Å, fixed cell, at most
     5,000 steps) against ASE's LBFGS on `fm.calc`, with the same force field
     and precision. Only the optimiser differs;
-  - pass: all 210 converge; per frame |ΔE| ≤ 0.025 meV/atom; the same
-    structure (every atom within 0.1 Å) in at least 20 of 21 frames per
-    crystal;
+  - pass: all 210 converge; |ΔE| ≤ 0.025 meV/atom and the same structure
+    (every atom within 0.1 Å), each in at least 20 of 21 frames per crystal
+    (energy allowance added by the owner on 23 October 2026, SPEC decision 46);
   - the 13 October research-engine minima (`quench.csv`, `comparison.csv`)
     compared and recorded, not judged: other stack, and `lbfgs.traj` is on the
     NAS only.

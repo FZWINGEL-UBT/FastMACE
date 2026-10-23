@@ -347,6 +347,7 @@ def test_parity_refusal_with_charge_and_spin_inputs(tmp_path_factory):
 
 
 @pytest.mark.slow
+@pytest.mark.acceptance  # about 5.5 min: phase acceptance, not every merge (owner, 23 October 2026)
 def test_swap_populations_follow_boltzmann(loaded, swap_case):
     """χ² of the configurations sampled every k attempts (λ2^k ≤ 0.01), pooled per energy level, at a fixed
     seed: they fit the Boltzmann populations and reject uniform populations and 1.5 β."""

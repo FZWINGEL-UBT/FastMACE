@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "L4",
+  "source_commit": "3066709aba2e93f56cfd7120962f33836dd3cb2b",
+  "command": "nvidia-smi -L; OMP_NUM_THREADS=2 python tools/validation/anneal_frame_probe.py run --side gpu --precision float32 --checkpoint /data/models/mace-mh-1.model --traj NaTaCl6=/data/anneal-minima/NaTaCl6/captured.traj --frame 12 --other /data/anneal-minima/runs/NaTaCl6/ase.npz --output $OUT/gpu-float32 > $OUT/gpu-float32.log 2>&1; echo gpu float32 exit $?; grep -A1 'NaTaCl6 frame' $OUT/gpu-float32.log; OMP_NUM_THREADS=2 python tools/validation/anneal_frame_probe.py run --side ase --precision float32 --checkpoint /data/models/mace-mh-1.model --traj NaTaCl6=/data/anneal-minima/NaTaCl6/captured.traj --frame 12 --other /data/anneal-minima/runs/NaTaCl6/gpu.npz --output $OUT/ase-float32 > $OUT/ase-float32.log 2>&1; echo ase float32 exit $?; grep -A1 'NaTaCl6 frame' $OUT/ase-float32.log; OMP_NUM_THREADS=2 python tools/validation/anneal_frame_probe.py run --side gpu --precision float64 --checkpoint /data/models/mace-mh-1.model --traj NaTaCl6=/data/anneal-minima/NaTaCl6/captured.traj --frame 12 --other /data/anneal-minima/runs/NaTaCl6/ase.npz --output $OUT/gpu-float64 > $OUT/gpu-float64.log 2>&1; echo gpu float64 exit $?; grep -A1 'NaTaCl6 frame' $OUT/gpu-float64.log; OMP_NUM_THREADS=2 python tools/validation/anneal_frame_probe.py run --side ase --precision float64 --checkpoint /data/models/mace-mh-1.model --traj NaTaCl6=/data/anneal-minima/NaTaCl6/captured.traj --frame 12 --other /data/anneal-minima/runs/NaTaCl6/gpu.npz --output $OUT/ase-float64 > $OUT/ase-float64.log 2>&1; echo ase float64 exit $?; grep -A1 'NaTaCl6 frame' $OUT/ase-float64.log;",
+  "nvidia_smi": "NVIDIA L4, 610.57.04, 23034 MiB, 8.9",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 1053.909607887268,
+  "estimated_gpu_cost_usd": 0.23420213508605958
+}

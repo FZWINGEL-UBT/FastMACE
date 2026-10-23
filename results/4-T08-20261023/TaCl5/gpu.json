@@ -1,0 +1,359 @@
+{
+  "schema": 3,
+  "task": "4-T05/4-T06/4-T08",
+  "side": "gpu",
+  "optimizer": "lbfgs",
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T10:34:12+00:00",
+  "fastmace_commit": "6eb0b76",
+  "machine": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/home/fzwin/.cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "TaCl5": {
+      "traj": "/home/fzwin/fastmace-data/anneal-minima/TaCl5/captured.traj",
+      "runs": {
+        "graph-skinauto": {
+          "setup_s": 60.19823872899724,
+          "tier": "graph",
+          "skin_A": "auto",
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 162,
+              "seconds": 3.509720196998387,
+              "initial_eV_atom": -14.644423547472973,
+              "energy_eV_atom": -14.709078049218213,
+              "fmax_eV_A": 0.00990774731943639,
+              "neighbour_rebuilds": 6,
+              "recaptures": 1,
+              "ms_per_step": 21.664939487644364,
+              "switch_flips": null,
+              "warm_up": true
+            },
+            "1": {
+              "converged": true,
+              "steps": 224,
+              "seconds": 4.65643476400146,
+              "initial_eV_atom": -14.63983342161885,
+              "energy_eV_atom": -14.70909776670452,
+              "fmax_eV_A": 0.008588154964827923,
+              "neighbour_rebuilds": 7,
+              "recaptures": 0,
+              "ms_per_step": 20.78765519643509,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "2": {
+              "converged": true,
+              "steps": 306,
+              "seconds": 6.36936966200301,
+              "initial_eV_atom": -14.63279589299312,
+              "energy_eV_atom": -14.70910905749219,
+              "fmax_eV_A": 0.00650780257236754,
+              "neighbour_rebuilds": 10,
+              "recaptures": 0,
+              "ms_per_step": 20.814933535957547,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "3": {
+              "converged": true,
+              "steps": 205,
+              "seconds": 4.2857902420000755,
+              "initial_eV_atom": -14.62894144617481,
+              "energy_eV_atom": -14.709096022716766,
+              "fmax_eV_A": 0.009869650211234588,
+              "neighbour_rebuilds": 7,
+              "recaptures": 0,
+              "ms_per_step": 20.906293863415,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "4": {
+              "converged": true,
+              "steps": 224,
+              "seconds": 4.664585218000866,
+              "initial_eV_atom": -14.619651419390376,
+              "energy_eV_atom": -14.709097761798787,
+              "fmax_eV_A": 0.009930232595373078,
+              "neighbour_rebuilds": 8,
+              "recaptures": 0,
+              "ms_per_step": 20.82404115178958,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "5": {
+              "converged": true,
+              "steps": 265,
+              "seconds": 5.526423297000292,
+              "initial_eV_atom": -14.609247898613965,
+              "energy_eV_atom": -14.709105613790912,
+              "fmax_eV_A": 0.008712114906070392,
+              "neighbour_rebuilds": 9,
+              "recaptures": 0,
+              "ms_per_step": 20.85442753585016,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "6": {
+              "converged": true,
+              "steps": 264,
+              "seconds": 5.507546558998001,
+              "initial_eV_atom": -14.605054794760889,
+              "energy_eV_atom": -14.709108607268627,
+              "fmax_eV_A": 0.009848355412997391,
+              "neighbour_rebuilds": 10,
+              "recaptures": 0,
+              "ms_per_step": 20.86191878408334,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "7": {
+              "converged": true,
+              "steps": 246,
+              "seconds": 5.13581071900262,
+              "initial_eV_atom": -14.602480027533362,
+              "energy_eV_atom": -14.709101863726668,
+              "fmax_eV_A": 0.009795285964548617,
+              "neighbour_rebuilds": 9,
+              "recaptures": 0,
+              "ms_per_step": 20.877279345539108,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "8": {
+              "converged": true,
+              "steps": 290,
+              "seconds": 6.047592454997357,
+              "initial_eV_atom": -14.594632060316854,
+              "energy_eV_atom": -14.709104833411581,
+              "fmax_eV_A": 0.008232814454684772,
+              "neighbour_rebuilds": 10,
+              "recaptures": 0,
+              "ms_per_step": 20.853767086197784,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "9": {
+              "converged": true,
+              "steps": 289,
+              "seconds": 6.2044322729998385,
+              "initial_eV_atom": -14.582643755178884,
+              "energy_eV_atom": -14.709102980148645,
+              "fmax_eV_A": 0.009069463219127522,
+              "neighbour_rebuilds": 11,
+              "recaptures": 1,
+              "ms_per_step": 21.46862378200636,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "10": {
+              "converged": true,
+              "steps": 302,
+              "seconds": 6.329399889997148,
+              "initial_eV_atom": -14.583048626719188,
+              "energy_eV_atom": -14.709105267078298,
+              "fmax_eV_A": 0.009996975205320136,
+              "neighbour_rebuilds": 12,
+              "recaptures": 0,
+              "ms_per_step": 20.95827778144751,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "11": {
+              "converged": true,
+              "steps": 331,
+              "seconds": 6.923882948001847,
+              "initial_eV_atom": -14.5851046809689,
+              "energy_eV_atom": -14.709105084952995,
+              "fmax_eV_A": 0.009592040357192475,
+              "neighbour_rebuilds": 13,
+              "recaptures": 0,
+              "ms_per_step": 20.918075371606786,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "12": {
+              "converged": true,
+              "steps": 307,
+              "seconds": 6.4138962520009954,
+              "initial_eV_atom": -14.5959545714865,
+              "energy_eV_atom": -14.709108019071351,
+              "fmax_eV_A": 0.009567058575375955,
+              "neighbour_rebuilds": 11,
+              "recaptures": 0,
+              "ms_per_step": 20.89217020195764,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "13": {
+              "converged": true,
+              "steps": 266,
+              "seconds": 5.556454195997503,
+              "initial_eV_atom": -14.602391161545805,
+              "energy_eV_atom": -14.709109186880873,
+              "fmax_eV_A": 0.00954824202516373,
+              "neighbour_rebuilds": 9,
+              "recaptures": 0,
+              "ms_per_step": 20.888925548862794,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "14": {
+              "converged": true,
+              "steps": 242,
+              "seconds": 5.071454823999375,
+              "initial_eV_atom": -14.606517419157695,
+              "energy_eV_atom": -14.709105221945563,
+              "fmax_eV_A": 0.009379667770567925,
+              "neighbour_rebuilds": 10,
+              "recaptures": 0,
+              "ms_per_step": 20.9564248925594,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "15": {
+              "converged": true,
+              "steps": 234,
+              "seconds": 4.8915694520037505,
+              "initial_eV_atom": -14.616643914715253,
+              "energy_eV_atom": -14.709101335501964,
+              "fmax_eV_A": 0.009768261779164397,
+              "neighbour_rebuilds": 9,
+              "recaptures": 0,
+              "ms_per_step": 20.904142957280985,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "16": {
+              "converged": true,
+              "steps": 221,
+              "seconds": 4.616407870998955,
+              "initial_eV_atom": -14.621050667615584,
+              "energy_eV_atom": -14.709103281483237,
+              "fmax_eV_A": 0.009960110573662749,
+              "neighbour_rebuilds": 9,
+              "recaptures": 0,
+              "ms_per_step": 20.88872339818532,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "17": {
+              "converged": true,
+              "steps": 199,
+              "seconds": 4.161205021999194,
+              "initial_eV_atom": -14.628563594793587,
+              "energy_eV_atom": -14.709094460731672,
+              "fmax_eV_A": 0.009702957561368245,
+              "neighbour_rebuilds": 7,
+              "recaptures": 0,
+              "ms_per_step": 20.91057799999595,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "18": {
+              "converged": true,
+              "steps": 245,
+              "seconds": 5.115497901002527,
+              "initial_eV_atom": -14.63352691759298,
+              "energy_eV_atom": -14.709106318744613,
+              "fmax_eV_A": 0.00850632031112665,
+              "neighbour_rebuilds": 9,
+              "recaptures": 0,
+              "ms_per_step": 20.87958326939807,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "19": {
+              "converged": true,
+              "steps": 198,
+              "seconds": 4.134826661997067,
+              "initial_eV_atom": -14.642001449325939,
+              "energy_eV_atom": -14.709100403535514,
+              "fmax_eV_A": 0.009680632749371695,
+              "neighbour_rebuilds": 6,
+              "recaptures": 0,
+              "ms_per_step": 20.882962939379127,
+              "switch_flips": null,
+              "warm_up": false
+            },
+            "20": {
+              "converged": true,
+              "steps": 156,
+              "seconds": 3.254196692003461,
+              "initial_eV_atom": -14.677325028205605,
+              "energy_eV_atom": -14.709088783205292,
+              "fmax_eV_A": 0.009128246500634306,
+              "neighbour_rebuilds": 4,
+              "recaptures": 0,
+              "ms_per_step": 20.860235205150392,
+              "switch_flips": null,
+              "warm_up": false
+            }
+          },
+          "planned_skin_A": 0.6000000000000001,
+          "engine": {
+            "edge_sizes_used": [
+              53504,
+              56320,
+              59136
+            ],
+            "neighbour_rebuilds": 186,
+            "graphs": [
+              "('B', 59136)",
+              "('B', 56320)",
+              "C",
+              "('B', 53504)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 2,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 56320)",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 6,
+                "key": "C",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 46,
+                "key": "('B', 53504)",
+                "reason": "new variant of B",
+                "counted": true
+              },
+              {
+                "step": 2186,
+                "key": "('B', 59136)",
+                "reason": "new variant of B",
+                "counted": true
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T10:37:04+00:00"
+}

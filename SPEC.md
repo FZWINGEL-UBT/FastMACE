@@ -2532,9 +2532,13 @@ Open decisions for the owner:
    - **The annealing-benchmark minima** (46): GPU LBFGS (fmax 0.01 eV/Å,
      memory 100, maxstep 0.2 Å, fixed cell, at most 5,000 steps) against
      ASE's LBFGS on `fm.calc` on the 210 `captured.traj` frames. Pass: all
-     converge; |ΔE| ≤ 0.025 meV/atom per frame; every atom within 0.1 Å in at
+     converge; |ΔE| ≤ 0.025 meV/atom and every atom within 0.1 Å, each in at
      least 20 of 21 frames per crystal. The 13 October research-engine minima
-     are compared and recorded, not judged.
+     are compared and recorded, not judged. *Amended (owner, 23 October
+     2026):* the energy clause was per frame. 4-T08 missed it on one frame
+     (NaTaCl6 frame 12, 0.188 meV/atom), which has two minima that float32
+     rounding chooses between; float64 GPU and ASE agree to 1.6e-12. So the
+     energy clause takes the structure clause's 20-of-21 allowance.
    - **Protocol relaxations** (47): once 4-T08 passes, `[relax]` and
      `[quench]` use GPU LBFGS by default. `"ase-LBFGS"` and `"ase-BFGS"` stay
      options, and `protocol.json` records which ran.
