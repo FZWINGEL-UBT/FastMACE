@@ -76,6 +76,15 @@ def dims(label) -> dict | None:
     return None if entry is None else entry["dims"]
 
 
+def model_dims(label) -> dict | None:
+    """``capabilities.model_dims(model).record()`` of ``label``'s checkpoint (5-T03's ``ModelDims``), or ``None``.
+
+    What the planner's rule 12 estimate reads; ``ModelDims.from_record`` turns it back into the record.
+    """
+    entry = _dims_file().get(label)
+    return None if entry is None else entry.get("model_dims")
+
+
 def checkpoint_sha256(label) -> str | None:
     """The sha256 of the checkpoint file the sizes were read from."""
     entry = _dims_file().get(label)

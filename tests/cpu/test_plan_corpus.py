@@ -80,6 +80,9 @@ def test_dims_of_every_checkpoint_were_captured_from_the_released_files():
         assert dims["num_interactions"] == len(corpus_labels.LABEL_FACTS[label][1]), label
         assert dims["model_class"] == corpus_labels.LABEL_FACTS[label][0], label
         assert all(block["conv_tp_irreps_out_dim"] for block in dims["interactions"]), label
+        # 5-T03's own record of what the planner's estimate reads (ModelDims.record), one entry per interaction
+        planner_dims = corpus_labels.model_dims(label)
+        assert planner_dims is not None and len(planner_dims["interactions"]) == dims["num_interactions"], label
 
 
 def test_cases_plan_or_refuse_with_their_rule(small_dump):
@@ -181,3 +184,28 @@ def test_the_phase_5_job_script_parses_and_refuses_what_is_not_ready(tmp_path):
     assert pending.returncode == 3 and b"filled in at the freeze" in pending.stderr
     baseline = subprocess.run(["bash", str(script), str(tmp_path), "corpus"], env=env, capture_output=True)
     assert baseline.returncode == 2 and b"FASTMACE_4_COMMIT" in baseline.stderr
+
+
+def test_rule_12_sizes_reach_traits_that_carry_them(monkeypatch):
+    """5-T03's ``ModelTraits.dims``: the captured ``model_dims`` record through ``ModelDims.from_record``."""
+    import dataclasses
+    import types
+
+    @dataclasses.dataclass(frozen=True)
+    class Traits:
+        dims: object = None
+
+    class ModelDims:
+        @classmethod
+        def from_record(cls, record):
+            return ("dims", record["probe"])
+
+    monkeypatch.setattr(corpus_labels, "model_dims", lambda label: {"probe": label})
+    monkeypatch.setattr(corpus, "_module", lambda package, name: types.SimpleNamespace(ModelDims=ModelDims))
+    assert corpus._with_dims("fastmace", Traits(), "mh1-r2scan").dims == ("dims", "mh1-r2scan")
+    # Traits without the field (the baseline's) stay as they are.
+    from fastmace.model import capabilities
+
+    plain = capabilities.model_traits(corpus_labels.stand_in("mh1-r2scan"))
+    if "dims" not in {field.name for field in dataclasses.fields(plain)}:
+        assert corpus._with_dims("fastmace", plain, "mh1-r2scan") is plain

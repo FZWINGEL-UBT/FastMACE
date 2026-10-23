@@ -106,6 +106,12 @@ def _child(label: str) -> None:
     model = torch.load(path, map_location="cpu", weights_only=False)
     record = {"label": label, "file": entry.checkpoint.file_name, "sha256": _sha256(path),
               "sha256_expected": entry.checkpoint.sha256, "dims": read_dims(model)}
+    from fastmace.model import capabilities
+
+    if hasattr(capabilities, "model_dims"):  # 5-T03: what the planner's estimate reads, as its own record
+        dims = capabilities.model_dims(model)
+        record["model_dims"] = None if dims is None else dims.record()
+        record["model_dims_source"] = os.environ.get("FASTMACE_SOURCE_COMMIT", "unknown")
     print(json.dumps(record, sort_keys=True))
 
 

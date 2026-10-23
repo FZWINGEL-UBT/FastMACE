@@ -111,7 +111,10 @@ Choice 7 made checkable on the CPU: the same inputs planned by the baseline and 
   per process, free memory checked first (24 October 2026, 00:00–00:10 CEST: 10 labels with `fastmace_cpu`, the
   POLAR, OMOL and OFF labels with `mace_cueq_latest` on the CPU, since PolarMACE needs `graph_longrange`), into
   `tools/plan_corpus_dims.json` with each file's sha256, checked against the label table. They reach the plan
-  through 5-T03's `ModelDims` (`_with_dims`, once 5-T03 gives it a constructor from this record).
+  through 5-T03's `ModelDims`: the same tool stored `capabilities.model_dims(model).record()` per label, run with
+  5-T03's branch (f0ddbc1, 24 October 2026, after WSL's restart), and `_with_dims` attaches
+  `ModelDims.from_record` where a version's traits have `dims`. If 5-T03's record changes before it merges, the
+  capture is rerun at the freeze (about 3 minutes).
 - **Hardware and software (injected, documented):** `Hardware("NVIDIA GeForce RTX 5060 Ti", (12, 0), 16 GiB)` with
   12 GiB free (the desktop takes about 4 GiB; conductor, 23 October 2026), and `SoftwareTraits` with OEq, Triton,
   NVRTC and fused cuEq available; the free memory is injected through the planner's `_free_memory_bytes`. **The

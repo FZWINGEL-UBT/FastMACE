@@ -167,11 +167,11 @@ def _with_dims(package: str, traits, label: str):
     """Rule 12's model sizes on ``traits``, where the version's traits carry them (5-T03's ``dims``)."""
     if "dims" not in {field.name for field in dataclasses.fields(traits)}:
         return traits
-    record = corpus_labels.dims(label)
-    memory = _module(package, "planner.memory")
-    if record is None or not hasattr(memory, "ModelDims") or not hasattr(memory.ModelDims, "from_capture"):
+    record = corpus_labels.model_dims(label)
+    capabilities = _module(package, "model.capabilities")
+    if record is None or not hasattr(getattr(capabilities, "ModelDims", None), "from_record"):
         return traits
-    return dataclasses.replace(traits, dims=memory.ModelDims.from_capture(record))
+    return dataclasses.replace(traits, dims=capabilities.ModelDims.from_record(record))
 
 
 def _json(value: Any) -> Any:
