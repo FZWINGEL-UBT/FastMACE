@@ -26,10 +26,10 @@ planner decision, tier, rewrite, size or step changes with this task.
 | 5 | hard | — | `reproducible-tier`, `reproducible-family-not-qualified`, `reproducible-backend`, `reproducible-conv-fusion`, `reproducible-cueq-version`, `reproducible-kernel-not-deterministic`, `reproducible-qualified`, `reproducible-environment`, `backend-cueq-reproducible` |
 | 6 | hard | `allow_naive_cueq` | `naive-cueq`, `fused-cueq`, `allow-naive-cueq` |
 | 7 | hard | — | `atom-count-changes` |
-| 8 | preference | — | `superset` |
+| 8 | preference | — | `superset`, `species-changes` (5-T02) |
 | 9 | preference | — | `host-callbacks-graph-sync`, `host-callbacks-compiled`, `no-host-callbacks` |
 | 10 | preference | — | `rule-10-optimizer` |
-| 11 | preference | — | `rule-11`, `rule-11-fixed`, `rule-11-md-only`, `rule-11-optimizer`, `rule-11-d3`, `rule-11-d3-given` |
+| 11 | preference | — | `rule-11`, `rule-11-fixed`, `rule-11-md-only`, `rule-11-optimizer`, `rule-11-d3` (an explicit value is an `override`, 5-T02) |
 | 12 | preference | — | `rule-12-d3`, `rule-12-d3-memory`, `rule-12-d3-warn`, `rule-12-memory` (reserved for 5-T03's estimate) |
 | 13 | reaction | — | `selfcheck-failed`, `selfcheck-dependant` |
 | 14 | reaction | — | `fallback-exhausted`, `fallback-rewrite-off`, `fallback-rewrite-on`, `runner-subprocess-fallback` |
@@ -70,6 +70,18 @@ failure that passes fails the suite, so neither list can go stale.
 
 `pytest.mark.rule(n)` (`pyproject.toml`): the test checks rule n. A test may carry several. The meta-test
 finds them statically in `tests/`.
+
+`pytest.mark.precedence(a, b)` (5-T02): the test checks that rule `a` wins over `b`, a later rule,
+`"override"` (a user's explicit value) or an `allow_*` flag. `test_rules_meta.PAIRS` lists 5-T02's matrix;
+the meta-test checks that every pair has a marked test and every marked pair is listed. 5-T03 (rule 5
+against the MACE model's rule 12) and 5-T07 (rule 5 against adaptation) add their pairs.
+
+**After 5-T02:** `NUMBERLESS` is empty; `UNTESTED` holds rule 15 until 5-T04 emits and tests it. The suite is
+`tests/cpu/test_rules_{hard,preferences,reactions,precedence}.py`; `tests/_support/rule_cases.assert_conforms`
+runs `check_reason` on every reason of a plan or refusal, which covers reasons built elsewhere and passed
+through `_Book.refuse` (the static scan cannot read those). The overrides of rule 11 (skin, headroom,
+re-capture budget, D3 skin) use `rules.override`; an explicit `mode="compiled"` keeps `mode-compiled-tier`,
+which the report reads, and says that it was requested.
 
 ## Overrides (choice 4)
 
@@ -193,6 +205,48 @@ characters. A section with nothing to say is one line ("none") or left out where
    the revision chain with step and reason (switches from 5-T07).
 
 5-T05 writes the golden files; 5-T03, 5-T07 and 5-T09 update their sections.
+
+## Runtime monitor (5-T06; `planner/adapt.py`)
+
+`Monitor(adaptation)` keeps the counters of one process's engine per **segment**: from one reading to the
+next. `Simulation._observe(reason, canonical=True)` reads at moments that synchronise anyway, so the step
+path gains no synchronisation (conductor's answers to 5-T06, 23 October 2026):
+
+| `reason` | Where | Canonical |
+| --- | --- | --- |
+| `restart` | after a restart write (`save_restart`, in or out of `run()`) | yes |
+| `mc-block` | after an MC block that ran | yes |
+| `host-write` | after a host write's transaction (`update`, `set_*`) | yes |
+| `run-end` | at the end of each `run()` call, also when it stops (non-finite, cell diverged) | no |
+
+The first `run()` takes the baseline, so the setup's captures are not in any segment; a reading without
+a baseline takes it. A reading at the same step as the previous one closes nothing.
+
+`Segment` (`counters.segments`, `provenance.SEGMENT_KEYS`): `first_step`, `last_step`, `reason`,
+`canonical`, `wall_s` (the run's loop clock between the readings), `recaptures` and `recapture_s` (the
+captures counted against the budget, and their host time), `captures` and `capture_s` (all of them),
+`overflows_redone`, `budget_exceeded_at` (cumulative), and `lists`: `{"mace": {rebuilds, build_time_s:
+null}}`, plus `"d3"` with its measured build time when the force field has the D3 term. MACE's list is
+rebuilt on a side stream (`overlap_rebuild`), so its host time is not its build time; no CUDA events are
+added for it.
+
+The graph engine times each capture on the host, from the synchronisation in `_capture` that ends the
+step's queued work to the one that ends the capture (`capture_seconds`, `recapture_seconds`,
+`recapture_log[...]["s"]`), and `runtime_counters()` returns what the monitor reads (cheaper than
+`info()`). Other engines' counters read as 0.
+
+API for 5-T07: `observe(info, *, step, wall_s, reason, canonical=True) -> Segment | None`;
+`decide(window) -> None` (5-T07's trigger; `_observe` keeps its return value as `request`); `mark(step)`
+starts the window; `window(since_step=None)` sums the kept segments since the mark (or `since_step`);
+`totals()`, `segments` (the last `SEGMENT_LIMIT` = 1,000), `records()`, `neighbour_lists(...)`;
+`start(info, *, step, wall_s)` re-baselines (a new engine). A switch may act only on a canonical reading.
+
+The monitor starts empty in every process: a resume starts a new one (restart format 4, choice 5), and
+takes `AdaptationConfig` from the recorded `PlannerOptions`. Under the subprocess runner the child's
+monitor `export(cursor)`s each call's segments with their sum, the parent `absorb`s them, and the
+parent's `metadata.json` has every call's segments. The report's `runtime` line appears only when
+re-captures or overflows happened: `re-captures N (S s, P % of the loop; budget B exceeded at step K);
+overflows redone M`. The step-time effect of the host timestamps is measured in 5-T11 (item 5).
 
 ## What this unblocks
 

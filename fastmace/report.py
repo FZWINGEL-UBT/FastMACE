@@ -392,6 +392,7 @@ class Report:
         self.licence, self.licence_line = licence(model, sha256)
         self.speed = {"status": "pending"}
         self.measured = None
+        self.runtime = None  # the runtime monitor's line (planner.adapt.report_line; 5-T06), or None
 
     # ------------------------------------------------------------------ the lines
 
@@ -553,8 +554,9 @@ class Report:
         mc_energy = move_energy_line(self.gate)
         fields += [("mc ΔE", mc_energy)] if mc_energy else []
         fields += [("mc", self._mc())] if self.mc else []
-        fields += [("setup", self._setup()), ("speed", self._speed()),
-                   ("output", ", ".join(self.outputs) or "none"), ("licence", self.licence_line)]
+        fields += [("setup", self._setup()), ("speed", self._speed())]
+        fields += [("runtime", self.runtime)] if self.runtime else []  # re-captures or overflows (5-T06)
+        fields += [("output", ", ".join(self.outputs) or "none"), ("licence", self.licence_line)]
         warnings = self.warnings() or ["none"]
         fields += [("warn", warnings[0])] + [(None, line) for line in warnings[1:]]
         out = []

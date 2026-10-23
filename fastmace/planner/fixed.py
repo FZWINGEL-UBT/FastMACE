@@ -55,6 +55,7 @@ from fastmace.config import (
 from fastmace.errors import PlanRefused, Reason
 from fastmace.rewrites import versions
 
+from . import rules
 from .plan import Hardware, Plan
 
 TIER = "graph"
@@ -680,27 +681,26 @@ class FixedPlanner:
         n, e, p = self.neighbours, self.engine, self.precision
         applies, sized = rule_11 if rule_11 is not None else (False, None)
         neighbours = {}
-        if n.skin != "auto":
-            skin, why = n.skin, _why(n.skin, AUTO_RULES["NeighbourConfig.skin"], "kept as given (rule 11 is a "
-                                     "preference)")
-        elif optimizer is not None:
+        # Rule 11's skin; an explicit other value is an override (SPEC §9.3, §9.5; conductor's choice 4).
+        if optimizer is not None:
             from fastmace.neighbors.adaptive import OPTIMIZER_SKIN_STEPS, optimizer_skin
 
             maxstep = float(optimizer.parameter("maxstep_A", 0.2))
-            skin = optimizer_skin(maxstep)
-            why = Reason(_why("auto", AUTO_RULES["NeighbourConfig.skin"],
-                              f"relaxation: {OPTIMIZER_SKIN_STEPS:g} x maxstep {maxstep:g} A, at least "
-                              f"{DEFAULT_SKIN_A:g} A (at least 1.5 full steps between rebuilds)"),
-                         rule=11, code="rule-11-optimizer")
+            rule_skin, code = optimizer_skin(maxstep), "rule-11-optimizer"
+            explanation = (f"relaxation: {OPTIMIZER_SKIN_STEPS:g} x maxstep {maxstep:g} A, at least "
+                           f"{DEFAULT_SKIN_A:g} A (at least 1.5 full steps between rebuilds)")
         elif applies:
-            skin, why = sized.skin_A, Reason(_why("auto", AUTO_RULES["NeighbourConfig.skin"], sized.text()),
-                                             rule=11, code="rule-11")
+            rule_skin, code, explanation = sized.skin_A, "rule-11", sized.text()
         else:
-            skin = DEFAULT_SKIN_A
+            rule_skin, code = DEFAULT_SKIN_A, "rule-11-fixed"
             would = "" if sized is None else f"; rule 11 would give {sized.skin_A:g} A"
-            why = Reason(_why("auto", AUTO_RULES["NeighbourConfig.skin"],
-                              "phase 1a's skin: rule 11 sizes only MC and species-change workloads" + would),
-                         rule=11, code="rule-11-fixed")
+            explanation = "phase 1a's skin: rule 11 sizes only MC and species-change workloads" + would
+        if n.skin == "auto" or n.skin == rule_skin:
+            skin = rule_skin
+            why = Reason(_why(n.skin, AUTO_RULES["NeighbourConfig.skin"], explanation), rule=11, code=code)
+        else:
+            skin = n.skin
+            why = rules.override(11, f"{rule_skin:g} A", detail=f"NeighbourConfig.skin={skin:g} A kept as given")
         book.decide("NeighbourConfig.skin", f"{skin:g} A", why)
         neighbours["skin"] = skin
         if n.headroom == "auto" and applies:
@@ -709,12 +709,18 @@ class FixedPlanner:
                 "auto", AUTO_RULES["NeighbourConfig.headroom"],
                 f"capacity_headroom {sized.capacity_headroom:g} from the skin, edge_bucket_fraction as given"),
                 rule=11, code="rule-11"))
+        elif applies and n.capacity_headroom != sized.capacity_headroom:
+            book.decide("NeighbourConfig.headroom", "fixed", rules.override(
+                11, f"capacity_headroom {sized.capacity_headroom:g}",
+                detail=f"NeighbourConfig.headroom='fixed', capacity_headroom {n.capacity_headroom:g} and "
+                       "edge_bucket_fraction as given"))
         else:
             would = (f"; rule 11 would give {sized.capacity_headroom:g}"
                      if n.headroom == "auto" and sized is not None else "")
-            book.decide("NeighbourConfig.headroom", "fixed", _why(
+            book.decide("NeighbourConfig.headroom", "fixed", Reason(_why(
                 n.headroom, AUTO_RULES["NeighbourConfig.headroom"],
-                f"capacity_headroom {n.capacity_headroom:g} and edge_bucket_fraction as given" + would))
+                f"capacity_headroom {n.capacity_headroom:g} and edge_bucket_fraction as given" + would),
+                rule=11, code="rule-11-fixed" if n.headroom == "auto" else "rule-11"))
         neighbours["headroom"] = "fixed"
         if n.d3_skin == "auto":  # the minimal planner sizes it when the force field has D3 (3b-T02)
             from fastmace.neighbors.adaptive import D3_FLOOR_SKIN_A
@@ -725,10 +731,15 @@ class FixedPlanner:
         budget = e.graph_variant_cap if e.recapture_budget == "auto" else e.recapture_budget
         buckets = ("" if not applies or sized.recapture_budget is None else
                    f"; rule 11 expects at most {sized.recapture_budget} padded edge buckets inside the capacity")
-        book.decide("EngineConfig.recapture_budget", str(budget), _why(
-            "auto" if e.recapture_budget == "auto" else e.recapture_budget, AUTO_RULES["EngineConfig.recapture_budget"],
-            f"the graph variant cap ({e.graph_variant_cap}): past it the run warns, records and the report "
-            "recommends the compiled tier (3-T04)" + buckets))
+        if budget == e.graph_variant_cap:
+            why = Reason(_why(
+                e.recapture_budget, AUTO_RULES["EngineConfig.recapture_budget"],
+                f"the graph variant cap ({e.graph_variant_cap}): past it the run warns, records and the report "
+                "recommends the compiled tier (3-T04)" + buckets), rule=11, code="rule-11")
+        else:
+            why = rules.override(11, str(e.graph_variant_cap), detail=f"EngineConfig.recapture_budget={budget} kept "
+                                 f"as given; the rule gives the graph variant cap{buckets}")
+        book.decide("EngineConfig.recapture_budget", str(budget), why)
         if polar and npt and not evaluation:
             book.decide("overflow check", "per step", "PolarMACE with a variable cell: the k-vector flag is read "
                         "after every force stage, one host sync per step (3-T04)")

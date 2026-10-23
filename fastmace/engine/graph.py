@@ -64,6 +64,11 @@ records the step and recommends the compiled tier (``recapture_warning``); it ne
 (runtime adaptation is phase 5, SPEC §9.6). At most ``EngineConfig.graph_variant_cap`` graphs are kept:
 the least recently replayed one is evicted, and its later capture counts. The registry
 (``fastmace.engine.registry``) holds the buffer policies.
+
+**Capture time** (5-T06): each capture's host time, from the synchronisation that ends the step's queued
+work to the one that ends the capture (both are the capture's own, so the step gains none), adds to
+``capture_seconds``, and a counted one to ``recapture_seconds``; ``runtime_counters()`` holds what the
+runtime monitor (``fastmace.planner.adapt``) reads.
 """
 
 from __future__ import annotations
@@ -73,6 +78,7 @@ import math
 import warnings
 from collections import OrderedDict
 from collections.abc import Callable, Iterable, Mapping
+from time import perf_counter as _clock
 from typing import Any
 
 import torch
@@ -271,6 +277,10 @@ class GraphEngine(Engine):
         budget = config.recapture_budget
         self.recapture_budget = config.graph_variant_cap if budget == "auto" else int(budget)
         self.recaptures = 0
+        self.capture_count = 0
+        self.capture_seconds = 0.0  # host time of every capture (5-T06)
+        self.recapture_seconds = 0.0  # ... of the counted ones
+        self._capture_clock = None  # the capture's start: reset by _capture once the queued work is done
         self.recapture_log = []
         self.recapture_budget_exceeded_at = None
         self.graph_evictions = 0
@@ -689,7 +699,18 @@ class GraphEngine(Engine):
             "graph_variant_cap": self.config.graph_variant_cap, "graph_evictions": self.graph_evictions,
             "recapture_log": [dict(entry) for entry in self.recapture_log],
             "invalidations": [dict(entry) for entry in self.invalidations],
+            "captures": self.capture_count, "capture_seconds": self.capture_seconds,
+            "recapture_seconds": self.recapture_seconds,
         }
+
+    def runtime_counters(self) -> Mapping[str, Any]:
+        """The cumulative counters the runtime monitor reads at a canonical point (``planner.adapt``; 5-T06):
+        neighbour rebuilds, captures and re-captures with their host time, overflows redone, and the step the
+        re-capture budget was exceeded at. Cheaper than ``info()``, and part of it."""
+        return {"neighbour_rebuilds": self.rebuilds, "captures": self.capture_count,
+                "capture_seconds": self.capture_seconds, "recaptures": self.recaptures,
+                "recapture_seconds": self.recapture_seconds, "overflows_redone": self.overflows_redone,
+                "recapture_budget_exceeded_at": self.recapture_budget_exceeded_at}
 
     # ------------------------------------------------------------------ canonical restart points
 
@@ -1186,6 +1207,7 @@ class GraphEngine(Engine):
             self._dropped[evicted] = "evicted by the variant cap"
             self.graph_evictions += 1
             logger.info("graph engine: evicted %s (variant cap %d)", evicted, self.config.graph_variant_cap)
+        self._capture_clock = _clock()
         try:
             self._capture(key)
         except Exception as error:
@@ -1194,8 +1216,9 @@ class GraphEngine(Engine):
             except AttributeError:  # pragma: no cover - an exception type without a __dict__
                 pass
             raise
+        seconds = _clock() - self._capture_clock
         self._kinds_seen.add(_kind(key))
-        self._record_capture(key, counted, reason)
+        self._record_capture(key, counted, reason, seconds)
 
     def _capture_reason(self, key) -> tuple[bool, str]:
         """Whether capturing ``key`` now counts against the budget, and why (conductor answer 3 of 3-T04)."""
@@ -1205,10 +1228,15 @@ class GraphEngine(Engine):
             return True, f"new variant of {_kind(key)}"
         return False, "first capture"
 
-    def _record_capture(self, key, counted: bool, reason: str) -> None:
+    def _record_capture(self, key, counted: bool, reason: str, seconds: float) -> None:
         step = int(self.state.step)
-        self.recapture_log.append({"step": step, "key": str(key), "reason": reason, "counted": counted})
+        self.recapture_log.append({"step": step, "key": str(key), "reason": reason, "counted": counted,
+                                   "s": seconds})
         del self.recapture_log[:-LOG_LIMIT]
+        self.capture_count += 1
+        self.capture_seconds += seconds
+        if counted:
+            self.recapture_seconds += seconds
         if not counted:
             logger.info("graph engine: captured %s at step %d (%s)", key, step, reason)
             return
@@ -1251,6 +1279,7 @@ class GraphEngine(Engine):
                    and begin_pool is not None and end_pool is not None)
         device = torch.cuda.current_device()
         torch.cuda.synchronize()
+        self._capture_clock = _clock()  # the step's queued work is done: the capture's time starts here
         allocated = torch.cuda.memory_allocated()
         with torch.cuda.stream(side):  # warm-up allocations and library handles
             if in_pool:

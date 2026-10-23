@@ -123,6 +123,7 @@ PHASE_5 = (
     ("schema minor version (5-T01)", "schema_minor"),
     ("calibration record (5-T09)", "plan.calibration"),
     ("adaptation limits (5-T07)", "plan.adaptation"),
+    ("runtime monitor segments (5-T06)", "counters.segments"),
 )
 # Filled by a later phase: an explicit null until then. Since phase 5 (tier switches, 5-T01) none is left.
 LATER_PHASES = ()

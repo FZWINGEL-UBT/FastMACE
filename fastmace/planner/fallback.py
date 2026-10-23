@@ -185,7 +185,8 @@ def _rewrite_candidate(plan, wanted, why):
     on = [name for name in changed if name not in off]
     change = "rewrites " + "; ".join(part for part in (f"{', '.join(off)} off" if off else "",
                                                         f"{', '.join(on)} on" if on else "") if part)
-    reasons = {name: Reason(f"{PREFIX}{why} (SPEC §9.4)", code=REWRITE_OFF_CODE if name in off else REWRITE_ON_CODE)
+    reasons = {name: Reason(f"{PREFIX}{why} (SPEC §9.4)", rule=14,
+                            code=REWRITE_OFF_CODE if name in off else REWRITE_ON_CODE)
                for name in changed}
     decisions = []
     for key, choice, reason in plan.decisions:
@@ -225,7 +226,8 @@ def _replanned(plan, planner, force_field, atoms, *, mode, subprocess):
     if subprocess and planned.runner != "subprocess":
         planned = dataclasses.replace(planned, runner="subprocess", decisions=(*planned.decisions, (
             "runner", "subprocess", Reason("a fallback candidate of another backend runs in a child process: one "
-                                           "compile family per process (SPEC §8.7, §9.4 step 3)", code=RUNNER_CODE))))
+                                           "compile family per process (SPEC §8.7, §9.4 step 3)", rule=14,
+                                           code=RUNNER_CODE))))
     return _keep_off(plan, planned)
 
 

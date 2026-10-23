@@ -409,7 +409,7 @@ def test_rule_11_d3_keeps_an_explicit_skin_and_rule_12_warns():
     planner = minimal(neighbours=NeighbourConfig(d3_skin=2.0))
     plan = plan_label("mh1-r2scan", planner=planner, d3_cutoff_A=D3_CUTOFF)
     assert plan.neighbours.d3_skin == 2.0
-    assert plan.decision("NeighbourConfig.d3_skin")[2].code == "rule-11-d3-given"
+    assert plan.decision("NeighbourConfig.d3_skin")[2].code == "override"
     small = dataclasses.replace(GPU, memory_bytes=2**24)
     with pytest.warns(ResourceWarning, match="rule 12"):
         plan = minimal().plan_traits(tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(), WORKLOAD, small,
