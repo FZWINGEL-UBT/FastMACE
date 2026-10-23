@@ -67,7 +67,9 @@ DEFAULT_MODELS = "mh-1,medium,polar-1-s"
 DEFAULT_REPO = "/mnt/d/Margraf/FastMACE"  # the main checkout sees every pushed branch
 STATE = Path(os.path.expanduser(os.environ.get("FASTMACE_COLAB_STATE", "~/.fastmace-colab")))
 WAIT_S = 1200  # one `colab exec` waits at most this long; the driver calls again while a step runs
-CHUNK_BYTES = 100 * 2**20  # largest single upload (base64 makes it 133 MiB on the wire)
+# Largest single upload: 64 MiB went up and 80 MiB failed with HTTP 400 (CPU VM, 23 October 2026; base64 adds a
+# third on the wire).
+CHUNK_BYTES = 48 * 2**20
 LEDGER_FIELDS = ("date_utc", "session", "gpu", "gpu_name", "capability", "commit", "commands", "exit", "wall_s",
                  "setup_s", "cache_key", "cache_hit", "cu_before", "cu_after", "cu_used", "out")
 
