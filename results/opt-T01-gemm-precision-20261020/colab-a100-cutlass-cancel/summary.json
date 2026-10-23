@@ -1,0 +1,198 @@
+{
+  "tool": "opt-T01 CUTLASS 3xTF32 bench with cancellation / exponent operand sets (bench.cu)",
+  "cutlass": "v4.8.1 2c85f497547eb441f0fe80bfb0fb2e6f9add1719",
+  "operand_sets": {
+    "gaussian": "randn (timed: 5 warm-up, 50 event-timed calls, median; peak 10 calls)",
+    "cancellation": "BF16x6 probe construction: per column pair q one u ~ U[0,1), A[:,2q+1] = -(A[:,2q](1+1e-3u)), B[2q+1,:] = B[2q,:]; odd last column stays randn",
+    "exponent": "randn, row i of A x 2^e_i, column j of B x 2^f_j, integer e, f ~ U{-20..20}"
+  },
+  "errors": "vs cublasDgemm of the same float32 inputs: max_rel = max|C-R|/max|R|, frob_rel = ||C-R||_F/||R||_F, cancel = max |C-R|/(|A||B| + 1e-30) with |A||B| by DGEMM; cutlass errors are the worst of the 3 tiles",
+  "peak_4096": {
+    "cutlass_3xtf32": {
+      "us": 3292.672,
+      "tflops": 41.740857,
+      "tile": "64x128x16_w32x64x16_s4"
+    },
+    "cutlass_1xtf32": {
+      "us": 1135.104,
+      "tflops": 121.080494,
+      "tile": "128x128x16_w64x64x16_s3"
+    },
+    "cublas_ieee": {
+      "us": 7238.656,
+      "tflops": 18.986805,
+      "tile": "-"
+    },
+    "cublas_dgemm": {
+      "us": 7625.216,
+      "tflops": 18.02427,
+      "tile": "-"
+    }
+  },
+  "capture": {
+    "shape": [
+      13608,
+      512,
+      512
+    ],
+    "mode": "cutlass_3xtf32",
+    "tile": "128x128x16_w64x64x16_s3",
+    "ran": true,
+    "replay1_bitwise_equal_eager": true,
+    "replay2_bitwise_equal_eager": true
+  },
+  "gemm_us_per_force_call_gaussian": {
+    "NaCl": {
+      "cutlass_3xtf32": 2179.0719999999997,
+      "cutlass_1xtf32": 1661.9519999999995,
+      "cublas_ieee": 2904.064,
+      "cublas_dgemm": 2839.551999999999,
+      "ratio_3xtf32_over_cublas_ieee": 0.7503526093088857
+    },
+    "NbCl5": {
+      "cutlass_3xtf32": 6589.44,
+      "cutlass_1xtf32": 3799.0399999999986,
+      "cublas_ieee": 12229.119999999994,
+      "cublas_dgemm": 12624.896000000004,
+      "ratio_3xtf32_over_cublas_ieee": 0.5388319028679089
+    }
+  },
+  "shapes_3xtf32_faster_than_cublas_ieee": 83,
+  "worst_error": {
+    "gaussian": {
+      "cutlass_3xtf32": {
+        "max_rel": 6.577868e-07,
+        "frob_rel": 3.441451e-07,
+        "cancel": 9.085047e-07
+      },
+      "cutlass_1xtf32": {
+        "max_rel": 0.0005623676,
+        "frob_rel": 0.0002999899,
+        "cancel": 0.0007807331
+      },
+      "cublas_ieee": {
+        "max_rel": 1.138079e-06,
+        "frob_rel": 4.058995e-07,
+        "cancel": 4.276011e-07
+      }
+    },
+    "cancellation": {
+      "cutlass_3xtf32": {
+        "max_rel": 0.001844888,
+        "frob_rel": 0.0008561235,
+        "cancel": 4.147104e-07
+      },
+      "cutlass_1xtf32": {
+        "max_rel": 1.654118,
+        "frob_rel": 1.288676,
+        "cancel": 0.0004367055
+      },
+      "cublas_ieee": {
+        "max_rel": 0.0004121345,
+        "frob_rel": 0.0002120132,
+        "cancel": 1.381425e-07
+      }
+    },
+    "exponent": {
+      "cutlass_3xtf32": {
+        "max_rel": 5.216227e-07,
+        "frob_rel": 3.690203e-07,
+        "cancel": 9.856965e-07
+      },
+      "cutlass_1xtf32": {
+        "max_rel": 0.0007954048,
+        "frob_rel": 0.0004361123,
+        "cancel": 0.0007429021
+      },
+      "cublas_ieee": {
+        "max_rel": 7.032972e-07,
+        "frob_rel": 4.131577e-07,
+        "cancel": 4.297838e-07
+      }
+    }
+  },
+  "ratio_3xtf32_over_ieee": {
+    "gaussian": {
+      "max_rel": {
+        "worst": 3.9723945271610828,
+        "median": 1.5942394890115543,
+        "min": 0.38890990959042526,
+        "shapes_3xtf32_worse": 66,
+        "n": 92,
+        "worst_shape": "NaCl 13x28x512"
+      },
+      "frob_rel": {
+        "worst": 4.245487685624147,
+        "median": 1.7990788315518982,
+        "min": 0.7228809101760412,
+        "shapes_3xtf32_worse": 80,
+        "n": 92,
+        "worst_shape": "NaCl 216x6x96"
+      },
+      "cancel": {
+        "worst": 4.284644890692277,
+        "median": 1.577590688351764,
+        "min": 0.357700445500661,
+        "shapes_3xtf32_worse": 67,
+        "n": 92,
+        "worst_shape": "NaCl 216x6x512"
+      }
+    },
+    "cancellation": {
+      "max_rel": {
+        "worst": 10.46515311550827,
+        "median": 6.725147641906707,
+        "min": 0.7905936047576703,
+        "shapes_3xtf32_worse": 91,
+        "n": 92,
+        "worst_shape": "NaCl 8192x68x1280"
+      },
+      "frob_rel": {
+        "worst": 7.052638155049116,
+        "median": 6.058031371969009,
+        "min": 1.187179383170482,
+        "shapes_3xtf32_worse": 92,
+        "n": 92,
+        "worst_shape": "NbCl5 1944x6x96"
+      },
+      "cancel": {
+        "worst": 14.33007623395552,
+        "median": 7.027108255222391,
+        "min": 0.8947123441373944,
+        "shapes_3xtf32_worse": 91,
+        "n": 92,
+        "worst_shape": "NaCl 216x6x512"
+      }
+    },
+    "exponent": {
+      "max_rel": {
+        "worst": 5.126080723728318,
+        "median": 1.4478314088471649,
+        "min": 0.43367935920064465,
+        "shapes_3xtf32_worse": 69,
+        "n": 92,
+        "worst_shape": "NaCl 216x96x6"
+      },
+      "frob_rel": {
+        "worst": 5.491997120030936,
+        "median": 1.7888155910798442,
+        "min": 0.705296538297025,
+        "shapes_3xtf32_worse": 80,
+        "n": 92,
+        "worst_shape": "NaCl 216x96x6"
+      },
+      "cancel": {
+        "worst": 4.4214463222045275,
+        "median": 1.6883911071385613,
+        "min": 0.36295606760318183,
+        "shapes_3xtf32_worse": 63,
+        "n": 92,
+        "worst_shape": "NaCl 216x6x512"
+      }
+    }
+  },
+  "not_run": {},
+  "shapes": 92,
+  "cu_before": "Current balance: 186.31 compute units\nUsage rate: 0.00/hr\nActive assignments: 0",
+  "cu_after": "Current balance: 186.31 compute units\nUsage rate: 8.90/hr\nActive assignments: 1"
+}

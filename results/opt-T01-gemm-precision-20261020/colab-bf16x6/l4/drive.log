@@ -1,0 +1,56 @@
+== new fm-bf16x6-l4 2026-10-23T18:55:04Z
+ok
+[colab] Uploaded '/home/fzwin/colab-runs/opt-T01-bf16x6-20261023T185355Z/probe_bf16x6.py' to '/content/bf16x6/probe_bf16x6.py'
+== setup 2026-10-23T18:55:13Z
+setup exit 0
+2.14.1+cu130 3.8.0 13.0
+/content/bf16x6/venv/lib/python3.13/site-packages/torch/_subclasses/functional_tensor.py:368: UserWarning: Failed to initialize NumPy: No module named 'numpy' (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:84.)
+  cpu = _conversion_method_template(device=torch.device("cpu"))
+== run 2026-10-23T18:55:46Z
+   "frob_rel": 0.00029537782608620653,
+   "cancel": 0.00010911199023762063
+  }
+ },
+ "cancel": {
+  "cublas_ieee": {
+   "max_rel": 4.831279186935895e-05,
+   "frob_rel": 4.513842156284376e-05,
+   "cancel": 6.775036032010325e-09
+  },
+  "triton_ieee": {
+   "max_rel": 4.831279186935895e-05,
+   "frob_rel": 4.531378665463022e-05,
+   "cancel": 6.775036032010325e-09
+  },
+  "triton_tf32x3": {
+   "max_rel": 0.0002673634060664475,
+   "frob_rel": 0.0001652225779866343,
+   "cancel": 3.02882342727171e-08
+  },
+  "triton_bf16x3": {
+   "max_rel": 0.01080022672020431,
+   "frob_rel": 0.0077722787602220195,
+   "cancel": 1.74261254082996e-06
+  },
+  "triton_bf16x6": {
+   "max_rel": 3.933724561816934e-05,
+   "frob_rel": 2.933918807964013e-05,
+   "cancel": 5.025540279420733e-09
+  },
+  "cublas_tf32": {
+   "max_rel": 0.6057259139060927,
+   "frob_rel": 0.5217768570166894,
+   "cancel": 7.678266035604888e-05
+  }
+ }
+}
+refused {}
+elapsed_s 67.0
+
+[colab] Downloaded '/content/bf16x6/result.tgz' to '/home/fzwin/colab-runs/opt-T01-bf16x6-20261023T185355Z/l4/result.tgz'
+== stop 2026-10-23T18:57:03Z
+[colab] Stopping session 'fm-bf16x6-l4'...
+[colab] Session terminated.
+Current balance: 188.78 compute units
+Usage rate: 14.20/hr
+Active assignments: 2

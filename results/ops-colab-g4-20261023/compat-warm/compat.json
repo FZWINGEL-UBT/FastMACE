@@ -1,0 +1,117 @@
+{
+  "tool": "compat",
+  "tier": "-m compat (tests/_support/tiers.py)",
+  "provider": "colab",
+  "label": "Colab G4",
+  "host": "7806ef405417",
+  "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "capability": [
+    12,
+    0
+  ],
+  "driver": "580.82.07",
+  "cuda": "13.0",
+  "versions": {
+    "torch": "2.14.1+cu130",
+    "triton": "3.8.0",
+    "cuequivariance": "0.12.0",
+    "cuequivariance_torch": "0.12.0",
+    "openequivariance": "0.7.0",
+    "mace": null,
+    "ase": "3.27.0",
+    "numpy": "2.2.6"
+  },
+  "python": "/content/fm/venv/bin/python",
+  "fastmace_commit": "018db4f5eb368abf1a4290d56af3e76479504ace",
+  "started_utc": "2026-10-23T20:25:37+00:00",
+  "command": [
+    "/content/fm/venv/bin/python",
+    "-m",
+    "pytest",
+    "tests/gpu",
+    "-m",
+    "compat",
+    "-p",
+    "no:cacheprovider",
+    "-rfEs",
+    "--durations=30",
+    "--junitxml=/content/fm/out/cmd1/junit.xml",
+    "-p",
+    "resultlog",
+    "--result-log=/content/fm/out/cmd1/results.jsonl"
+  ],
+  "exit_code": 0,
+  "wall_s": 2214.734718837,
+  "finished_utc": "2026-10-23T21:02:32+00:00",
+  "counts": {
+    "passed": 357,
+    "failed": 0,
+    "error": 0,
+    "skipped": 2
+  },
+  "failures": [],
+  "slowest": [
+    {
+      "test": "tests.gpu.test_reproducible_gpu::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]",
+      "seconds": 201.785
+    },
+    {
+      "test": "tests.gpu.test_eager_gpu::test_mh1_hybrid_eager_equals_graph_within_float32_noise",
+      "seconds": 152.757
+    },
+    {
+      "test": "tests.gpu.test_compat_gpu::test_a_short_md_smoke_in_nve_nvt_and_npt",
+      "seconds": 142.121
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[mh1-r2scan-nvt]",
+      "seconds": 141.032
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[polar1-s]",
+      "seconds": 114.84
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[mh1-r2scan-npt-full]",
+      "seconds": 105.027
+    },
+    {
+      "test": "tests.gpu.test_canonical_restart_gpu::test_mh1_plain_cueq_float64_resumes_within_1e_12",
+      "seconds": 88.506
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[mp0-medium]",
+      "seconds": 87.408
+    },
+    {
+      "test": "tests.gpu.test_tiny_released_gpu::test_tiny_broken_captured_graph_fails_while_eager_passes",
+      "seconds": 67.624
+    },
+    {
+      "test": "tests.gpu.test_compat_gpu::test_captured_graphs_and_their_kernel_counts_are_recorded",
+      "seconds": 67.193
+    },
+    {
+      "test": "tests.gpu.test_mc_driver_gpu::test_captured_attempts_tiny_plain_cueq",
+      "seconds": 66.009
+    },
+    {
+      "test": "tests.gpu.test_tiny_engine_gpu::test_no_compile_at_a_later_edge_bucket_tiny_plain_cueq",
+      "seconds": 50.812
+    },
+    {
+      "test": "tests.gpu.test_d3_integration_gpu::test_d3_in_the_captured_force_graph",
+      "seconds": 43.46
+    },
+    {
+      "test": "tests.gpu.test_forces_gpu::test_two_force_fields_from_one_model_step_independently[float32-default]",
+      "seconds": 40.51
+    },
+    {
+      "test": "tests.gpu.test_engine_gpu::test_process_constraints_refuse_a_mixed_process",
+      "seconds": 37.119
+    }
+  ],
+  "test_seconds": 2198.1280000000047,
+  "junit": "/content/fm/out/cmd1/junit.xml"
+}

@@ -1,0 +1,77 @@
+Fri Oct 23 18:55:49 2026       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.82.07              Driver Version: 580.82.07      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA L4                      Off |   00000000:00:03.0 Off |                    0 |
+| N/A   44C    P8             12W /   72W |       0MiB /  23034MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+/content/bf16x6/venv/lib/python3.13/site-packages/torch/_subclasses/functional_tensor.py:368: UserWarning: Failed to initialize NumPy: No module named 'numpy' (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:84.)
+  cpu = _conversion_method_template(device=torch.device("cpu"))
+3.13.16 2.14.1+cu130 3.8.0 13.0
+exit=0
+   "max_rel": 3.1051439014173573e-06,
+   "frob_rel": 1.1447666312152118e-06,
+   "cancel": 4.209626623939828e-07
+  },
+  "triton_tf32x3": {
+   "max_rel": 7.91278632949083e-07,
+   "frob_rel": 3.1103714018161023e-07,
+   "cancel": 1.240057152851049e-07
+  },
+  "triton_bf16x3": {
+   "max_rel": 4.981985250481691e-06,
+   "frob_rel": 4.443733573105098e-06,
+   "cancel": 1.7942270593232116e-06
+  },
+  "triton_bf16x6": {
+   "max_rel": 7.184356416954497e-07,
+   "frob_rel": 2.9320370166206153e-07,
+   "cancel": 1.1516830536954268e-07
+  },
+  "cublas_tf32": {
+   "max_rel": 0.0003272159304625599,
+   "frob_rel": 0.00029537782608620653,
+   "cancel": 0.00010911199023762063
+  }
+ },
+ "cancel": {
+  "cublas_ieee": {
+   "max_rel": 4.831279186935895e-05,
+   "frob_rel": 4.513842156284376e-05,
+   "cancel": 6.775036032010325e-09
+  },
+  "triton_ieee": {
+   "max_rel": 4.831279186935895e-05,
+   "frob_rel": 4.531378665463022e-05,
+   "cancel": 6.775036032010325e-09
+  },
+  "triton_tf32x3": {
+   "max_rel": 0.0002673634060664475,
+   "frob_rel": 0.0001652225779866343,
+   "cancel": 3.02882342727171e-08
+  },
+  "triton_bf16x3": {
+   "max_rel": 0.01080022672020431,
+   "frob_rel": 0.0077722787602220195,
+   "cancel": 1.74261254082996e-06
+  },
+  "triton_bf16x6": {
+   "max_rel": 3.933724561816934e-05,
+   "frob_rel": 2.933918807964013e-05,
+   "cancel": 5.025540279420733e-09
+  },
+  "cublas_tf32": {
+   "max_rel": 0.6057259139060927,
+   "frob_rel": 0.5217768570166894,
+   "cancel": 7.678266035604888e-05
+  }
+ }
+}
+refused {}
+elapsed_s 67.0
+

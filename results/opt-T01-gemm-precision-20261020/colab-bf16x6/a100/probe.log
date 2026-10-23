@@ -1,0 +1,76 @@
+/content/bf16x6/venv/lib/python3.13/site-packages/torch/_subclasses/functional_tensor.py:368: UserWarning: Failed to initialize NumPy: No module named 'numpy' (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_numpy.cpp:84.)
+  cpu = _conversion_method_template(device=torch.device("cpu"))
+4096x4096x4096 {'cublas_ieee': 18.97, 'cublas_tf32': 133.15, 'cublas_bf16_dense': 260.11, 'triton_ieee': 18.27, 'triton_tf32x3': 16.84, 'triton_bf16x3': 29.38, 'triton_bf16x6': 19.19}
+216x512x512 {'cublas_ieee': 3.25, 'cublas_tf32': 3.25, 'cublas_bf16_dense': 4.1, 'triton_ieee': 1.81, 'triton_tf32x3': 1.47, 'triton_bf16x3': 1.7, 'triton_bf16x6': 1.49}
+1512x512x512 {'cublas_ieee': 9.22, 'cublas_tf32': 20.92, 'cublas_bf16_dense': 27.65, 'triton_ieee': 7.23, 'triton_tf32x3': 6.45, 'triton_bf16x3': 9.05, 'triton_bf16x6': 7.44}
+5832x512x512 {'cublas_ieee': 15.8, 'cublas_tf32': 58.55, 'cublas_bf16_dense': 87.82, 'triton_ieee': 13.82, 'triton_tf32x3': 12.76, 'triton_bf16x3': 17.88, 'triton_bf16x6': 13.51}
+13608x512x512 {'cublas_ieee': 17.51, 'cublas_tf32': 82.94, 'cublas_bf16_dense': 133.99, 'triton_ieee': 15.91, 'triton_tf32x3': 14.81, 'triton_bf16x3': 23.7, 'triton_bf16x6': 17.37}
+ratio 2.2858528001872274 wins {'216x512x512': False, '1512x512x512': False, '5832x512x512': False, '13608x512x512': False}
+{
+ "random": {
+  "cublas_ieee": {
+   "max_rel": 2.736444786068381e-06,
+   "frob_rel": 1.1454209141003706e-06,
+   "cancel": 4.2220134231469514e-07
+  },
+  "triton_ieee": {
+   "max_rel": 2.736444786068381e-06,
+   "frob_rel": 1.1454209141003706e-06,
+   "cancel": 4.2220134231469514e-07
+  },
+  "triton_tf32x3": {
+   "max_rel": 8.117634252696644e-07,
+   "frob_rel": 3.110734584064836e-07,
+   "cancel": 1.2627287177605232e-07
+  },
+  "triton_bf16x3": {
+   "max_rel": 5.337716619603242e-06,
+   "frob_rel": 4.44573858652977e-06,
+   "cancel": 1.7681746113936647e-06
+  },
+  "triton_bf16x6": {
+   "max_rel": 7.106589844097668e-07,
+   "frob_rel": 2.9320318847357504e-07,
+   "cancel": 9.640976945968394e-08
+  },
+  "cublas_tf32": {
+   "max_rel": 0.0003430700553799711,
+   "frob_rel": 0.00029402212156624824,
+   "cancel": 0.00011145104832685843
+  }
+ },
+ "cancel": {
+  "cublas_ieee": {
+   "max_rel": 4.773528270071118e-05,
+   "frob_rel": 4.603995522140618e-05,
+   "cancel": 6.506534408204455e-09
+  },
+  "triton_ieee": {
+   "max_rel": 4.773528270071118e-05,
+   "frob_rel": 4.603995522140618e-05,
+   "cancel": 6.506534408204455e-09
+  },
+  "triton_tf32x3": {
+   "max_rel": 0.00019004315667365927,
+   "frob_rel": 0.0001658612689427121,
+   "cancel": 2.6329185733165024e-08
+  },
+  "triton_bf16x3": {
+   "max_rel": 0.010169239052924701,
+   "frob_rel": 0.00780626283184511,
+   "cancel": 1.309695025687139e-06
+  },
+  "triton_bf16x6": {
+   "max_rel": 3.120182234066863e-05,
+   "frob_rel": 2.9944397060000598e-05,
+   "cancel": 4.8879968375388544e-09
+  },
+  "cublas_tf32": {
+   "max_rel": 0.5556236788533097,
+   "frob_rel": 0.5247262959121112,
+   "cancel": 7.383664091281155e-05
+  }
+ }
+}
+refused {}
+elapsed_s 46.8

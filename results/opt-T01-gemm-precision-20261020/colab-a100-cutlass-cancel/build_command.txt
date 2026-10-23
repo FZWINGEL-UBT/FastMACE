@@ -1,0 +1,1 @@
+nvcc -arch=sm_80 -O3 -std=c++17 -DNDEBUG -I/content/cutlass_bench/cutlass/include -I/content/cutlass_bench/cutlass/tools/util/include -I/content/cutlass_bench/src -c <each .cu>; nvcc -arch=sm_80 -o bench *.o -lcublas

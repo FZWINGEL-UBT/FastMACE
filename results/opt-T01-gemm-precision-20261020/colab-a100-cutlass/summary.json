@@ -1,0 +1,92 @@
+{
+  "tool": "opt-T01 CUTLASS 3xTF32 bench (bench.cu)",
+  "cutlass": "v4.8.1 2c85f497547eb441f0fe80bfb0fb2e6f9add1719",
+  "timing": "5 warm-up calls, then 50 calls each between CUDA events, median (peak: 10 calls)",
+  "errors": "against cublasDgemm of the same float32 inputs: max|C-R|/max|R| and ||C-R||_F/||R||_F",
+  "note": "cutlass modes: fastest of 3 fixed tile configs per shape (a screen's upper bound); times are from a C++ binary (no PyTorch dispatch), so they are lower than the 23 October torch.mm times",
+  "peak_4096": {
+    "cutlass_3xtf32": {
+      "us": 3366.9119,
+      "tflops": 40.820478,
+      "tile": "64x128x16_w32x64x16_s4",
+      "max_rel": 8.322507e-07,
+      "frob_rel": 3.99381e-07
+    },
+    "cutlass_1xtf32": {
+      "us": 1133.568,
+      "tflops": 121.244555,
+      "tile": "128x128x16_w64x64x16_s3",
+      "max_rel": 0.0003015009,
+      "frob_rel": 0.0002940611
+    },
+    "cublas_ieee": {
+      "us": 7231.9999,
+      "tflops": 19.00428,
+      "tile": "-",
+      "max_rel": 2.822327e-06,
+      "frob_rel": 1.145745e-06
+    },
+    "cublas_dgemm": {
+      "us": 7150.5921,
+      "tflops": 19.22064,
+      "tile": "-",
+      "max_rel": 0.0,
+      "frob_rel": 0.0
+    }
+  },
+  "capture": {
+    "shape": [
+      13608,
+      512,
+      512
+    ],
+    "mode": "cutlass_3xtf32",
+    "tile": "128x128x16_w64x64x16_s3",
+    "ran": true,
+    "replay1_bitwise_equal_eager": true,
+    "replay2_bitwise_equal_eager": true
+  },
+  "gemm_us_per_force_call": {
+    "NaCl": {
+      "cutlass_3xtf32": 1939.9679999999994,
+      "cutlass_1xtf32": 1496.5759999999998,
+      "cublas_ieee": 2600.4480000000003,
+      "cublas_dgemm": 2586.623999999999,
+      "torch_cublas_ieee_20261023": 3911.1680053174496,
+      "torch_cublas_tf32_20261023": 3220.9920212626457,
+      "ratio_3xtf32_over_cublas_ieee": 0.7460129946839926,
+      "ratio_1xtf32_over_cublas_ieee": 0.5755069895648748,
+      "best_of_3xtf32_and_cublas_ieee": 1867.264
+    },
+    "NbCl5": {
+      "cutlass_3xtf32": 5716.48,
+      "cutlass_1xtf32": 3432.447999999999,
+      "cublas_ieee": 10313.215999999995,
+      "cublas_dgemm": 10783.232000000002,
+      "torch_cublas_ieee_20261023": 10945.535980165005,
+      "torch_cublas_tf32_20261023": 4382.720030844212,
+      "ratio_3xtf32_over_cublas_ieee": 0.5542868490294397,
+      "ratio_1xtf32_over_cublas_ieee": 0.33282033460755606,
+      "best_of_3xtf32_and_cublas_ieee": 5708.2880000000005
+    }
+  },
+  "shapes_3xtf32_faster_than_cublas_ieee": {
+    "NaCl": 38,
+    "NbCl5": 45
+  },
+  "shapes_3xtf32_faster_than_cublas_ieee_total": 83,
+  "worst_error": {
+    "cutlass_3xtf32": 6.758658e-07,
+    "cutlass_1xtf32": 0.0005717728,
+    "cublas_ieee": 1.505305e-06
+  },
+  "worst_frob_error": {
+    "cutlass_3xtf32": 3.464761e-07,
+    "cutlass_1xtf32": 0.0003078664,
+    "cublas_ieee": 4.06903e-07
+  },
+  "not_run": {},
+  "shapes": 92,
+  "cu_before": "Current balance: 190.00 compute units\nUsage rate: 14.20/hr\nActive assignments: 2",
+  "cu_after": "Current balance: 188.78 compute units\nUsage rate: 24.64/hr\nActive assignments: 4"
+}

@@ -1,0 +1,746 @@
+cublas math mode 0 (CUBLAS_DEFAULT_MATH=0, TF32_TENSOR_OP=3), NVIDIA_TF32_OVERRIDE=(unset)
+capture: ran 1 replay1 1 replay2 1
+peak 4096^3
+  cublas_ieee     -                          7232.00 us  max_rel 2.82e-06  frob 1.15e-06
+  cutlass_3xtf32  128x128x16_w64x64x16_s3   10235.39 us  max_rel 8.32e-07  frob 3.99e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4      3584.00 us  max_rel 8.32e-07  frob 3.99e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4     3366.91 us  max_rel 8.32e-07  frob 3.99e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3    1133.57 us  max_rel 3.02e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4      2229.76 us  max_rel 3.02e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4     1542.14 us  max_rel 3.02e-04  frob 2.94e-04
+[0] NaCl 1512 x 512 x 512  A R ld 512  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            62.46 us  max_rel 8.74e-07  frob 4.04e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     102.40 us  max_rel 3.78e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        35.33 us  max_rel 3.78e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       38.91 us  max_rel 3.78e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 3.10e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        23.55 us  max_rel 3.10e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       24.58 us  max_rel 3.10e-04  frob 2.93e-04
+[1] NaCl 648 x 512 x 512  A R ld 512  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            38.91 us  max_rel 2.92e-07  frob 2.07e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     102.40 us  max_rel 4.54e-07  frob 2.94e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        23.55 us  max_rel 4.54e-07  frob 2.94e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       37.89 us  max_rel 4.54e-07  frob 2.94e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 2.83e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 2.83e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 2.83e-04  frob 2.94e-04
+[2] NaCl 216 x 512 x 512  A R ld 512  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            27.65 us  max_rel 2.78e-07  frob 2.07e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     102.40 us  max_rel 4.42e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 4.42e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       37.89 us  max_rel 4.42e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 2.98e-04  frob 2.95e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 2.98e-04  frob 2.95e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 2.98e-04  frob 2.95e-04
+[3] NaCl 1080 x 512 x 512  A R ld 512  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            52.22 us  max_rel 3.30e-07  frob 2.07e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     102.40 us  max_rel 3.79e-07  frob 2.94e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        34.82 us  max_rel 3.79e-07  frob 2.94e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       37.89 us  max_rel 3.79e-07  frob 2.94e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 2.77e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 2.77e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 2.77e-04  frob 2.94e-04
+[4] NaCl 8192 x 68 x 1280  A R ld 68  B C ld 68  RC_4_4_4
+  cublas_ieee     -                            98.30 us  max_rel 3.06e-07  frob 1.49e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     194.56 us  max_rel 3.82e-07  frob 2.57e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        76.80 us  max_rel 3.82e-07  frob 2.57e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       73.73 us  max_rel 3.82e-07  frob 2.57e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      54.27 us  max_rel 2.96e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        71.68 us  max_rel 2.96e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       66.05 us  max_rel 2.96e-04  frob 2.94e-04
+[5] NaCl 8192 x 64 x 64  A R ld 64  B C ld 64  RC_4_4_4
+  cublas_ieee     -                            19.46 us  max_rel 3.13e-07  frob 1.45e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      27.65 us  max_rel 3.19e-07  frob 2.61e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 3.19e-07  frob 2.61e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.19e-07  frob 2.61e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      15.36 us  max_rel 3.14e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.14e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.87 us  max_rel 3.14e-04  frob 2.93e-04
+[6] NaCl 8192 x 64 x 64  A R ld 64  B R ld 64  RR_4_4_4
+  cublas_ieee     -                            19.46 us  max_rel 2.83e-07  frob 1.44e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      27.65 us  max_rel 3.89e-07  frob 2.59e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 3.89e-07  frob 2.59e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.89e-07  frob 2.59e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      15.36 us  max_rel 3.31e-04  frob 2.95e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.31e-04  frob 2.95e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       16.38 us  max_rel 3.31e-04  frob 2.95e-04
+[7] NaCl 1080 x 512 x 384  A R ld 512  B R ld 384  RR_4_4_4
+  cublas_ieee     -                            38.91 us  max_rel 3.20e-07  frob 2.08e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     101.38 us  max_rel 3.97e-07  frob 2.94e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        23.55 us  max_rel 3.97e-07  frob 2.94e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       38.91 us  max_rel 3.97e-07  frob 2.94e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 3.07e-04  frob 2.95e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        18.43 us  max_rel 3.07e-04  frob 2.95e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       23.55 us  max_rel 3.07e-04  frob 2.95e-04
+[8] NaCl 1080 x 384 x 512  A R ld 384  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            43.01 us  max_rel 3.19e-07  frob 1.81e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      80.90 us  max_rel 4.14e-07  frob 2.89e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        28.67 us  max_rel 4.14e-07  frob 2.89e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       31.74 us  max_rel 4.14e-07  frob 2.89e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      25.60 us  max_rel 3.06e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        20.48 us  max_rel 3.06e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       20.48 us  max_rel 3.06e-04  frob 2.94e-04
+[9] NaCl 216 x 2048 x 384  A R ld 9728  B R ld 384  RR_4_4_4
+  cublas_ieee     -                            43.01 us  max_rel 2.58e-07  frob 2.12e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     358.40 us  max_rel 4.87e-07  frob 3.46e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        62.46 us  max_rel 4.87e-07  frob 3.46e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      115.71 us  max_rel 4.87e-07  frob 3.46e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      74.75 us  max_rel 2.61e-04  frob 2.96e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        40.96 us  max_rel 2.61e-04  frob 2.96e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       55.30 us  max_rel 2.61e-04  frob 2.96e-04
+[10] NaCl 216 x 512 x 128  A R ld 512  B C ld 512  RC_4_4_4
+  cublas_ieee     -                            20.48 us  max_rel 1.29e-07  frob 1.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     104.45 us  max_rel 3.72e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 3.72e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       34.82 us  max_rel 3.72e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      26.62 us  max_rel 2.96e-04  frob 2.91e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 2.96e-04  frob 2.91e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       23.55 us  max_rel 2.96e-04  frob 2.91e-04
+[11] NaCl 216 x 384 x 2048  A R ld 384  B R ld 2048  RR_4_4_4
+  cublas_ieee     -                            40.96 us  max_rel 3.40e-07  frob 2.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      79.87 us  max_rel 3.82e-07  frob 2.89e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        28.67 us  max_rel 3.82e-07  frob 2.89e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       31.74 us  max_rel 3.82e-07  frob 2.89e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      24.58 us  max_rel 2.91e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        20.48 us  max_rel 2.91e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       20.48 us  max_rel 2.91e-04  frob 2.93e-04
+[12] NaCl 8192 x 128 x 10  A R ld 128  B R ld 10  RR_4_2_2
+  cublas_ieee     -                            19.46 us  max_rel 1.62e-07  frob 1.10e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      39.94 us  max_rel 3.13e-07  frob 2.74e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 3.13e-07  frob 2.74e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       25.60 us  max_rel 3.13e-07  frob 2.74e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 3.23e-04  frob 2.98e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.23e-04  frob 2.98e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.23e-04  frob 2.98e-04
+[13] NaCl 1512 x 512 x 256  A R ld 512  B R ld 256  RR_4_4_4
+  cublas_ieee     -                            39.94 us  max_rel 2.85e-07  frob 2.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     102.40 us  max_rel 3.50e-07  frob 2.94e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        23.55 us  max_rel 3.50e-07  frob 2.94e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       37.89 us  max_rel 3.50e-07  frob 2.94e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 2.93e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 2.93e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 2.93e-04  frob 2.94e-04
+[14] NaCl 1512 x 256 x 512  A R ld 256  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            37.89 us  max_rel 6.64e-07  frob 2.87e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      59.39 us  max_rel 4.55e-07  frob 2.82e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        23.55 us  max_rel 4.55e-07  frob 2.82e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       25.60 us  max_rel 4.55e-07  frob 2.82e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      21.50 us  max_rel 3.00e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 3.00e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.00e-04  frob 2.94e-04
+[15] NaCl 216 x 512 x 128  A R ld 512  B R ld 128  RR_4_4_4
+  cublas_ieee     -                            19.46 us  max_rel 1.72e-07  frob 1.03e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     100.35 us  max_rel 4.19e-07  frob 2.94e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 4.19e-07  frob 2.94e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       36.86 us  max_rel 4.19e-07  frob 2.94e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 2.80e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        16.38 us  max_rel 2.80e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 2.80e-04  frob 2.94e-04
+[16] NaCl 648 x 512 x 128  A R ld 512  B R ld 128  RR_4_4_4
+  cublas_ieee     -                            24.58 us  max_rel 2.27e-07  frob 1.55e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     101.38 us  max_rel 3.36e-07  frob 2.92e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 3.36e-07  frob 2.92e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       36.86 us  max_rel 3.36e-07  frob 2.92e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 2.70e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        16.38 us  max_rel 2.70e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 2.70e-04  frob 2.93e-04
+[17] NaCl 648 x 128 x 512  A R ld 128  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            20.48 us  max_rel 1.55e-07  frob 1.10e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      37.89 us  max_rel 3.73e-07  frob 2.73e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.73e-07  frob 2.73e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.73e-07  frob 2.73e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 3.03e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.03e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.03e-04  frob 2.94e-04
+[18] NaCl 1512 x 512 x 128  A R ld 512  B R ld 128  RR_4_4_4
+  cublas_ieee     -                            83.97 us  max_rel 1.95e-07  frob 1.54e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     101.38 us  max_rel 3.67e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 3.67e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       37.89 us  max_rel 3.67e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 3.07e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 3.07e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 3.07e-04  frob 2.93e-04
+[19] NaCl 216 x 2048 x 256  A R ld 9728  B R ld 256  RR_4_4_4
+  cublas_ieee     -                            39.94 us  max_rel 2.60e-07  frob 2.39e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     355.33 us  max_rel 5.37e-07  frob 3.42e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        61.44 us  max_rel 5.37e-07  frob 3.42e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      111.62 us  max_rel 5.37e-07  frob 3.42e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      74.75 us  max_rel 2.94e-04  frob 2.92e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        37.89 us  max_rel 2.94e-04  frob 2.92e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       51.20 us  max_rel 2.94e-04  frob 2.92e-04
+[20] NaCl 216 x 89 x 512  A R ld 89  B R ld 512  RR_1_4_4
+  cublas_ieee     -                            15.36 us  max_rel 1.40e-07  frob 9.51e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      39.94 us  max_rel 3.10e-07  frob 2.59e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.10e-07  frob 2.59e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.10e-07  frob 2.59e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      18.43 us  max_rel 3.08e-04  frob 2.92e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.08e-04  frob 2.92e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.08e-04  frob 2.92e-04
+[21] NaCl 216 x 256 x 2048  A R ld 256  B R ld 2048  RR_4_4_4
+  cublas_ieee     -                            32.77 us  max_rel 2.17e-07  frob 1.49e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      58.37 us  max_rel 3.74e-07  frob 2.83e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 3.74e-07  frob 2.83e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       25.60 us  max_rel 3.74e-07  frob 2.83e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      20.48 us  max_rel 2.90e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        16.38 us  max_rel 2.90e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 2.90e-04  frob 2.93e-04
+[22] NaCl 1512 x 128 x 512  A R ld 128  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            26.62 us  max_rel 4.55e-07  frob 2.03e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      37.89 us  max_rel 3.77e-07  frob 2.71e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 3.77e-07  frob 2.71e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.77e-07  frob 2.71e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 2.97e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 2.97e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       16.38 us  max_rel 2.97e-04  frob 2.93e-04
+[23] NaCl 1080 x 512 x 128  A R ld 512  B R ld 128  RR_4_4_4
+  cublas_ieee     -                            69.63 us  max_rel 2.11e-07  frob 1.55e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     101.38 us  max_rel 4.37e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 4.37e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       37.89 us  max_rel 4.37e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 2.94e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 2.94e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 2.94e-04  frob 2.94e-04
+[24] NaCl 216 x 128 x 512  A R ld 128  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            16.38 us  max_rel 1.47e-07  frob 1.10e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      37.89 us  max_rel 4.14e-07  frob 2.74e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 4.14e-07  frob 2.74e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 4.14e-07  frob 2.74e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 2.77e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 2.77e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 2.77e-04  frob 2.94e-04
+[25] NaCl 8192 x 10 x 128  A R ld 10  B C ld 10  RC_2_2_4
+  cublas_ieee     -                            16.38 us  max_rel 1.21e-07  frob 5.94e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      20.48 us  max_rel 3.00e-07  frob 1.89e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.00e-07  frob 1.89e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       16.38 us  max_rel 3.00e-07  frob 1.89e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      14.34 us  max_rel 4.07e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 4.07e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 4.07e-04  frob 2.93e-04
+[26] NaCl 216 x 512 x 89  A R ld 512  B R ld 89  RR_4_1_1
+  cublas_ieee     -                            19.46 us  max_rel 1.12e-07  frob 1.03e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     120.83 us  max_rel 3.26e-07  frob 2.90e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        24.58 us  max_rel 3.26e-07  frob 2.90e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       40.96 us  max_rel 3.26e-07  frob 2.90e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      33.79 us  max_rel 2.85e-04  frob 2.92e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        21.50 us  max_rel 2.85e-04  frob 2.92e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       29.70 us  max_rel 2.85e-04  frob 2.92e-04
+[27] NaCl 1080 x 128 x 512  A R ld 128  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            26.62 us  max_rel 4.84e-07  frob 2.02e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      37.89 us  max_rel 3.77e-07  frob 2.71e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        16.90 us  max_rel 3.77e-07  frob 2.71e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.77e-07  frob 2.71e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 3.14e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 3.14e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.14e-04  frob 2.93e-04
+[28] NaCl 648 x 128 x 130  A R ld 128  B C ld 128  RC_4_4_2
+  cublas_ieee     -                            15.36 us  max_rel 1.52e-07  frob 1.09e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      38.91 us  max_rel 3.35e-07  frob 2.70e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.35e-07  frob 2.70e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.35e-07  frob 2.70e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 3.32e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 3.32e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.32e-04  frob 2.94e-04
+[29] NaCl 1512 x 128 x 130  A R ld 128  B C ld 128  RC_4_4_2
+  cublas_ieee     -                            19.46 us  max_rel 1.58e-07  frob 1.10e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      38.91 us  max_rel 3.39e-07  frob 2.74e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.39e-07  frob 2.74e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.39e-07  frob 2.74e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 3.13e-04  frob 2.95e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.78 us  max_rel 3.13e-04  frob 2.95e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.13e-04  frob 2.95e-04
+[30] NaCl 1080 x 128 x 130  A R ld 128  B C ld 128  RC_4_4_2
+  cublas_ieee     -                            17.41 us  max_rel 2.34e-07  frob 1.09e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      38.91 us  max_rel 3.51e-07  frob 2.72e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.51e-07  frob 2.72e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.51e-07  frob 2.72e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 4.06e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 4.06e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 4.06e-04  frob 2.94e-04
+[31] NaCl 1512 x 130 x 128  A R ld 130  B R ld 128  RR_2_4_4
+  cublas_ieee     -                            17.41 us  max_rel 1.67e-07  frob 1.11e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      50.18 us  max_rel 4.12e-07  frob 2.70e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 4.12e-07  frob 2.70e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 4.12e-07  frob 2.70e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      18.43 us  max_rel 3.10e-04  frob 2.92e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.10e-04  frob 2.92e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.10e-04  frob 2.92e-04
+[32] NaCl 8192 x 64 x 1  A R ld 64  B C ld 64  RC_4_4_1
+  cublas_ieee     -                            12.29 us  max_rel 1.13e-07  frob 8.16e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 3.39e-07  frob 2.98e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.39e-07  frob 2.98e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.39e-07  frob 2.98e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      15.36 us  max_rel 2.66e-04  frob 2.80e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 2.66e-04  frob 2.80e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 2.66e-04  frob 2.80e-04
+[33] NaCl 216 x 512 x 96  A R ld 512  B R ld 96  RR_4_4_4
+  cublas_ieee     -                            19.46 us  max_rel 1.07e-07  frob 1.02e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     101.38 us  max_rel 3.75e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 3.75e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       36.86 us  max_rel 3.75e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      26.62 us  max_rel 2.77e-04  frob 2.91e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        16.38 us  max_rel 2.77e-04  frob 2.91e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       21.50 us  max_rel 2.77e-04  frob 2.91e-04
+[34] NaCl 1080 x 130 x 128  A R ld 130  B R ld 128  RR_2_4_4
+  cublas_ieee     -                            17.41 us  max_rel 1.64e-07  frob 1.11e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      50.18 us  max_rel 3.73e-07  frob 2.74e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.73e-07  frob 2.74e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.73e-07  frob 2.74e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      18.43 us  max_rel 3.37e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.37e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       16.38 us  max_rel 3.37e-04  frob 2.93e-04
+[35] NaCl 648 x 130 x 128  A R ld 130  B R ld 128  RR_2_4_4
+  cublas_ieee     -                            16.38 us  max_rel 1.68e-07  frob 1.11e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      50.18 us  max_rel 3.93e-07  frob 2.76e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.93e-07  frob 2.76e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.93e-07  frob 2.76e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      18.43 us  max_rel 3.25e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.25e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.25e-04  frob 2.93e-04
+[36] NaCl 216 x 6 x 512  A R ld 6  B R ld 512  RR_2_4_4
+  cublas_ieee     -                            12.29 us  max_rel 1.05e-07  frob 4.78e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      19.46 us  max_rel 3.25e-07  frob 1.86e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        10.24 us  max_rel 3.25e-07  frob 1.86e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       13.31 us  max_rel 3.25e-07  frob 1.86e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      14.34 us  max_rel 3.97e-04  frob 2.99e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        10.24 us  max_rel 3.97e-04  frob 2.99e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       13.31 us  max_rel 3.97e-04  frob 2.99e-04
+[37] NaCl 216 x 128 x 130  A R ld 2048  B C ld 128  RC_4_4_2
+  cublas_ieee     -                            15.36 us  max_rel 1.50e-07  frob 1.10e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      38.91 us  max_rel 3.02e-07  frob 2.70e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.02e-07  frob 2.70e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.02e-07  frob 2.70e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 2.67e-04  frob 2.91e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 2.67e-04  frob 2.91e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 2.67e-04  frob 2.91e-04
+[38] NaCl 216 x 130 x 128  A R ld 130  B R ld 128  RR_2_4_4
+  cublas_ieee     -                            15.36 us  max_rel 1.52e-07  frob 1.09e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      49.15 us  max_rel 3.76e-07  frob 2.71e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 3.76e-07  frob 2.71e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       20.48 us  max_rel 3.76e-07  frob 2.71e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      19.46 us  max_rel 3.09e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.09e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       16.38 us  max_rel 3.09e-04  frob 2.94e-04
+[39] NaCl 216 x 96 x 6  A R ld 96  B R ld 6  RR_4_2_2
+  cublas_ieee     -                            16.38 us  max_rel 9.98e-08  frob 9.27e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      33.79 us  max_rel 1.98e-07  frob 2.53e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 1.98e-07  frob 2.53e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 1.98e-07  frob 2.53e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      16.38 us  max_rel 2.04e-04  frob 2.85e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 2.04e-04  frob 2.85e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 2.04e-04  frob 2.85e-04
+[40] NaCl 216 x 96 x 512  A R ld 96  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            16.90 us  max_rel 1.32e-07  frob 9.85e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      32.77 us  max_rel 3.91e-07  frob 2.67e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.91e-07  frob 2.67e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.91e-07  frob 2.67e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 3.16e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 3.16e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.16e-04  frob 2.93e-04
+[41] NaCl 216 x 512 x 6  A R ld 2048  B R ld 6  RR_4_2_2
+  cublas_ieee     -                            23.55 us  max_rel 3.06e-07  frob 2.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     106.50 us  max_rel 4.05e-07  frob 2.83e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        23.55 us  max_rel 4.05e-07  frob 2.83e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       38.91 us  max_rel 4.05e-07  frob 2.83e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      27.65 us  max_rel 3.37e-04  frob 2.85e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        17.41 us  max_rel 3.37e-04  frob 2.85e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       24.58 us  max_rel 3.37e-04  frob 2.85e-04
+[42] NaCl 29 x 86 x 512  A C ld 29  B R ld 512  CR_1_4_4
+  cublas_ieee     -                            16.38 us  max_rel 1.27e-07  frob 9.22e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      33.79 us  max_rel 3.23e-07  frob 2.51e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.23e-07  frob 2.51e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.23e-07  frob 2.51e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      17.41 us  max_rel 3.34e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 3.34e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.34e-04  frob 2.93e-04
+[43] NaCl 13 x 28 x 512  A C ld 13  B R ld 512  CR_1_4_4
+  cublas_ieee     -                            13.31 us  max_rel 8.88e-08  frob 6.38e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      22.53 us  max_rel 3.23e-07  frob 2.36e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        10.24 us  max_rel 3.23e-07  frob 2.36e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       14.34 us  max_rel 3.23e-07  frob 2.36e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      14.34 us  max_rel 3.48e-04  frob 3.04e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        10.24 us  max_rel 3.48e-04  frob 3.04e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       13.31 us  max_rel 3.48e-04  frob 3.04e-04
+[44] NaCl 216 x 6 x 96  A R ld 6  B R ld 96  RR_2_4_4
+  cublas_ieee     -                            12.29 us  max_rel 8.43e-08  frob 4.77e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      19.46 us  max_rel 3.18e-07  frob 1.79e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        10.24 us  max_rel 3.18e-07  frob 1.79e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       13.31 us  max_rel 3.18e-07  frob 1.79e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      14.34 us  max_rel 4.36e-04  frob 2.85e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        10.24 us  max_rel 4.36e-04  frob 2.85e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       13.31 us  max_rel 4.36e-04  frob 2.85e-04
+[45] NaCl 216 x 89 x 6  A R ld 89  B C ld 89  RC_1_1_2
+  cublas_ieee     -                            14.34 us  max_rel 1.15e-07  frob 9.36e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      40.96 us  max_rel 3.00e-07  frob 2.75e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.00e-07  frob 2.75e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.00e-07  frob 2.75e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      18.43 us  max_rel 3.34e-04  frob 2.98e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.34e-04  frob 2.98e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       16.38 us  max_rel 3.34e-04  frob 2.98e-04
+[46] NbCl5 5832 x 512 x 512  A R ld 512  B R ld 512  RR_4_4_4
+  cublas_ieee     -                           187.39 us  max_rel 1.15e-06  frob 4.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     245.76 us  max_rel 4.76e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        97.28 us  max_rel 4.76e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      105.47 us  max_rel 4.76e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      45.06 us  max_rel 2.89e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        53.25 us  max_rel 2.89e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       52.22 us  max_rel 2.89e-04  frob 2.94e-04
+[47] NbCl5 13608 x 512 x 512  A R ld 512  B R ld 512  RR_4_4_4
+  cublas_ieee     -                           398.34 us  max_rel 9.39e-07  frob 4.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     560.13 us  max_rel 4.20e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       209.92 us  max_rel 4.20e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      198.66 us  max_rel 4.20e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      94.21 us  max_rel 3.05e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4       134.66 us  max_rel 3.05e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4      110.59 us  max_rel 3.05e-04  frob 2.94e-04
+[48] NbCl5 9720 x 512 x 512  A R ld 512  B R ld 512  RR_4_4_4
+  cublas_ieee     -                           303.10 us  max_rel 1.14e-06  frob 4.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     468.99 us  max_rel 3.96e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       157.70 us  max_rel 3.96e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      151.55 us  max_rel 3.96e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      70.66 us  max_rel 3.01e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        83.97 us  max_rel 3.01e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       75.78 us  max_rel 3.01e-04  frob 2.94e-04
+[49] NbCl5 56320 x 68 x 1280  A R ld 68  B C ld 68  RC_4_4_4
+  cublas_ieee     -                           594.94 us  max_rel 4.07e-07  frob 1.49e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3    1177.60 us  max_rel 4.18e-07  frob 2.57e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       514.05 us  max_rel 4.18e-07  frob 2.57e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      440.32 us  max_rel 4.18e-07  frob 2.57e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3     370.69 us  max_rel 3.50e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4       484.35 us  max_rel 3.50e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4      405.50 us  max_rel 3.50e-04  frob 2.93e-04
+[50] NbCl5 1944 x 512 x 512  A R ld 512  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            78.85 us  max_rel 3.88e-07  frob 2.07e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     103.42 us  max_rel 3.71e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        47.10 us  max_rel 3.71e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       60.42 us  max_rel 3.71e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      29.70 us  max_rel 2.85e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        28.67 us  max_rel 2.85e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       31.74 us  max_rel 2.85e-04  frob 2.94e-04
+[51] NbCl5 9720 x 384 x 512  A R ld 384  B R ld 512  RR_4_4_4
+  cublas_ieee     -                           230.40 us  max_rel 7.53e-07  frob 3.52e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     366.59 us  max_rel 3.80e-07  frob 2.89e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       122.88 us  max_rel 3.80e-07  frob 2.89e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      118.78 us  max_rel 3.80e-07  frob 2.89e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      56.32 us  max_rel 2.95e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        67.58 us  max_rel 2.95e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       62.46 us  max_rel 2.95e-04  frob 2.93e-04
+[52] NbCl5 9720 x 512 x 384  A R ld 512  B R ld 384  RR_4_4_4
+  cublas_ieee     -                           266.24 us  max_rel 1.08e-06  frob 4.05e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     459.78 us  max_rel 5.04e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       131.07 us  max_rel 5.04e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      138.24 us  max_rel 5.04e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      67.58 us  max_rel 2.84e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        73.73 us  max_rel 2.84e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       68.61 us  max_rel 2.84e-04  frob 2.94e-04
+[53] NbCl5 13608 x 512 x 256  A R ld 512  B R ld 256  RR_4_4_4
+  cublas_ieee     -                           205.82 us  max_rel 1.03e-06  frob 4.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     300.03 us  max_rel 4.08e-07  frob 2.92e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       111.62 us  max_rel 4.08e-07  frob 2.92e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      107.52 us  max_rel 4.08e-07  frob 2.92e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      55.30 us  max_rel 2.65e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        73.73 us  max_rel 2.65e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       64.51 us  max_rel 2.65e-04  frob 2.94e-04
+[54] NbCl5 56320 x 64 x 64  A R ld 64  B C ld 64  RC_4_4_4
+  cublas_ieee     -                            45.06 us  max_rel 3.05e-07  frob 1.44e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     122.88 us  max_rel 3.64e-07  frob 2.55e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        28.67 us  max_rel 3.64e-07  frob 2.55e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       44.03 us  max_rel 3.64e-07  frob 2.55e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 3.24e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        24.58 us  max_rel 3.24e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       29.70 us  max_rel 3.24e-04  frob 2.93e-04
+[55] NbCl5 56320 x 64 x 64  A R ld 64  B R ld 64  RR_4_4_4
+  cublas_ieee     -                            45.06 us  max_rel 4.25e-07  frob 1.44e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     116.74 us  max_rel 4.00e-07  frob 2.57e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        28.67 us  max_rel 4.00e-07  frob 2.57e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       46.08 us  max_rel 4.00e-07  frob 2.57e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      28.67 us  max_rel 3.43e-04  frob 2.92e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        24.58 us  max_rel 3.43e-04  frob 2.92e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       29.70 us  max_rel 3.43e-04  frob 2.92e-04
+[56] NbCl5 1944 x 384 x 2048  A R ld 384  B R ld 2048  RR_4_4_4
+  cublas_ieee     -                           193.54 us  max_rel 9.71e-07  frob 3.51e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     334.34 us  max_rel 3.86e-07  frob 2.88e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       103.42 us  max_rel 3.86e-07  frob 2.88e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      100.35 us  max_rel 3.86e-07  frob 2.88e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      49.15 us  max_rel 3.24e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        56.32 us  max_rel 3.24e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       51.20 us  max_rel 3.24e-04  frob 2.94e-04
+[57] NbCl5 1944 x 2048 x 384  A R ld 9728  B R ld 384  RR_4_4_4
+  cublas_ieee     -                           200.70 us  max_rel 4.28e-07  frob 3.35e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     359.42 us  max_rel 6.09e-07  frob 3.44e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       108.54 us  max_rel 6.09e-07  frob 3.44e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      116.74 us  max_rel 6.09e-07  frob 3.44e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      84.99 us  max_rel 2.89e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        62.46 us  max_rel 2.89e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       56.32 us  max_rel 2.89e-04  frob 2.94e-04
+[58] NbCl5 13608 x 256 x 512  A R ld 256  B R ld 512  RR_4_4_4
+  cublas_ieee     -                           206.85 us  max_rel 6.77e-07  frob 2.87e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     364.54 us  max_rel 4.53e-07  frob 2.82e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       139.26 us  max_rel 4.53e-07  frob 2.82e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      135.17 us  max_rel 4.53e-07  frob 2.82e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      62.46 us  max_rel 3.32e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        79.87 us  max_rel 3.32e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       72.70 us  max_rel 3.32e-04  frob 2.93e-04
+[59] NbCl5 13608 x 512 x 128  A R ld 512  B R ld 128  RR_4_4_4
+  cublas_ieee     -                           136.19 us  max_rel 1.51e-06  frob 4.07e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     174.08 us  max_rel 4.63e-07  frob 2.95e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        76.80 us  max_rel 4.63e-07  frob 2.95e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       77.82 us  max_rel 4.63e-07  frob 2.95e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      47.10 us  max_rel 2.95e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        55.30 us  max_rel 2.95e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       52.22 us  max_rel 2.95e-04  frob 2.94e-04
+[60] NbCl5 56320 x 128 x 10  A R ld 128  B R ld 10  RR_4_2_2
+  cublas_ieee     -                            58.37 us  max_rel 4.25e-07  frob 2.00e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     247.81 us  max_rel 3.42e-07  frob 2.70e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        53.25 us  max_rel 3.42e-07  frob 2.70e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       94.21 us  max_rel 3.42e-07  frob 2.70e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      46.08 us  max_rel 3.31e-04  frob 2.90e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        35.84 us  max_rel 3.31e-04  frob 2.90e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       52.22 us  max_rel 3.31e-04  frob 2.90e-04
+[61] NbCl5 1944 x 2048 x 256  A R ld 9728  B R ld 256  RR_4_4_4
+  cublas_ieee     -                           168.96 us  max_rel 4.65e-07  frob 3.35e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     460.80 us  max_rel 6.76e-07  frob 3.44e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4       137.22 us  max_rel 6.76e-07  frob 3.44e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4      141.31 us  max_rel 6.76e-07  frob 3.44e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      97.28 us  max_rel 2.67e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        76.80 us  max_rel 2.67e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       64.51 us  max_rel 2.67e-04  frob 2.94e-04
+[62] NbCl5 13608 x 128 x 512  A R ld 128  B R ld 512  RR_4_4_4
+  cublas_ieee     -                           125.95 us  max_rel 5.44e-07  frob 2.04e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     195.58 us  max_rel 3.97e-07  frob 2.73e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        75.78 us  max_rel 3.97e-07  frob 2.73e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       76.80 us  max_rel 3.97e-07  frob 2.73e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      45.06 us  max_rel 3.26e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        49.15 us  max_rel 3.26e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       47.10 us  max_rel 3.26e-04  frob 2.94e-04
+[63] NbCl5 1944 x 256 x 2048  A R ld 256  B R ld 2048  RR_4_4_4
+  cublas_ieee     -                           152.58 us  max_rel 7.39e-07  frob 2.87e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     270.34 us  max_rel 3.56e-07  frob 2.82e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        83.97 us  max_rel 3.56e-07  frob 2.82e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       83.46 us  max_rel 3.56e-07  frob 2.82e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      43.01 us  max_rel 2.98e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        49.15 us  max_rel 2.98e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       46.08 us  max_rel 2.98e-04  frob 2.93e-04
+[64] NbCl5 56320 x 10 x 128  A R ld 10  B C ld 10  RC_2_2_4
+  cublas_ieee     -                            42.50 us  max_rel 1.38e-07  frob 5.85e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      89.09 us  max_rel 5.61e-07  frob 1.90e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        37.89 us  max_rel 5.61e-07  frob 1.90e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       37.89 us  max_rel 5.61e-07  frob 1.90e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      34.82 us  max_rel 5.01e-04  frob 2.92e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        34.82 us  max_rel 5.01e-04  frob 2.92e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       36.86 us  max_rel 5.01e-04  frob 2.92e-04
+[65] NbCl5 9720 x 512 x 128  A R ld 512  B R ld 128  RR_4_4_4
+  cublas_ieee     -                           109.57 us  max_rel 2.50e-07  frob 1.74e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     120.83 us  max_rel 4.38e-07  frob 2.95e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        54.27 us  max_rel 4.38e-07  frob 2.95e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       69.63 us  max_rel 4.38e-07  frob 2.95e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      34.82 us  max_rel 3.01e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        37.89 us  max_rel 3.01e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       39.94 us  max_rel 3.01e-04  frob 2.94e-04
+[66] NbCl5 1944 x 512 x 128  A R ld 512  B R ld 128  RR_4_4_4
+  cublas_ieee     -                           108.03 us  max_rel 2.42e-07  frob 1.54e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     115.71 us  max_rel 3.95e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        25.60 us  max_rel 3.95e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       41.98 us  max_rel 3.95e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      31.74 us  max_rel 2.81e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        19.46 us  max_rel 2.81e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       24.58 us  max_rel 2.81e-04  frob 2.93e-04
+[67] NbCl5 5832 x 512 x 128  A R ld 512  B R ld 128  RR_4_4_4
+  cublas_ieee     -                            76.80 us  max_rel 2.68e-07  frob 1.88e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     115.71 us  max_rel 3.59e-07  frob 2.94e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        39.94 us  max_rel 3.59e-07  frob 2.94e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       43.01 us  max_rel 3.59e-07  frob 2.94e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      32.77 us  max_rel 2.66e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        27.65 us  max_rel 2.66e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       28.67 us  max_rel 2.66e-04  frob 2.94e-04
+[68] NbCl5 5832 x 128 x 512  A R ld 128  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            65.54 us  max_rel 5.40e-07  frob 2.03e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      91.14 us  max_rel 3.43e-07  frob 2.71e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        38.91 us  max_rel 3.43e-07  frob 2.71e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       44.03 us  max_rel 3.43e-07  frob 2.71e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      25.60 us  max_rel 3.06e-04  frob 2.95e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        28.67 us  max_rel 3.06e-04  frob 2.95e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       29.70 us  max_rel 3.06e-04  frob 2.95e-04
+[69] NbCl5 1944 x 89 x 512  A R ld 89  B R ld 512  RR_1_4_4
+  cublas_ieee     -                            29.70 us  max_rel 3.38e-07  frob 1.69e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      48.13 us  max_rel 3.31e-07  frob 2.62e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        21.50 us  max_rel 3.31e-07  frob 2.62e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       26.62 us  max_rel 3.31e-07  frob 2.62e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      20.48 us  max_rel 3.29e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        19.46 us  max_rel 3.29e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       20.48 us  max_rel 3.29e-04  frob 2.93e-04
+[70] NbCl5 9720 x 128 x 512  A R ld 128  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            98.30 us  max_rel 5.65e-07  frob 2.03e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     166.91 us  max_rel 3.91e-07  frob 2.73e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        59.39 us  max_rel 3.91e-07  frob 2.73e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       60.42 us  max_rel 3.91e-07  frob 2.73e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      35.84 us  max_rel 3.33e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        38.91 us  max_rel 3.33e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       37.89 us  max_rel 3.33e-04  frob 2.93e-04
+[71] NbCl5 1944 x 128 x 512  A R ld 128  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            36.86 us  max_rel 4.91e-07  frob 2.04e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      44.03 us  max_rel 3.85e-07  frob 2.73e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        23.55 us  max_rel 3.85e-07  frob 2.73e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       29.70 us  max_rel 3.85e-07  frob 2.73e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      19.46 us  max_rel 3.24e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        18.43 us  max_rel 3.24e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       20.48 us  max_rel 3.24e-04  frob 2.94e-04
+[72] NbCl5 1944 x 512 x 128  A R ld 512  B C ld 512  RC_4_4_4
+  cublas_ieee     -                            41.98 us  max_rel 3.34e-07  frob 2.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     118.78 us  max_rel 3.63e-07  frob 2.92e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        25.60 us  max_rel 3.63e-07  frob 2.92e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       38.91 us  max_rel 3.63e-07  frob 2.92e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      29.70 us  max_rel 3.29e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        19.46 us  max_rel 3.29e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       26.62 us  max_rel 3.29e-04  frob 2.94e-04
+[73] NbCl5 13608 x 128 x 130  A R ld 128  B C ld 128  RC_4_4_2
+  cublas_ieee     -                            53.25 us  max_rel 4.47e-07  frob 2.04e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     106.50 us  max_rel 3.69e-07  frob 2.73e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        36.86 us  max_rel 3.69e-07  frob 2.73e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       43.01 us  max_rel 3.69e-07  frob 2.73e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      25.60 us  max_rel 3.01e-04  frob 2.92e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        28.67 us  max_rel 3.01e-04  frob 2.92e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       32.77 us  max_rel 3.01e-04  frob 2.92e-04
+[74] NbCl5 13608 x 130 x 128  A R ld 130  B R ld 128  RR_2_4_4
+  cublas_ieee     -                            45.06 us  max_rel 5.24e-07  frob 2.05e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      68.10 us  max_rel 3.54e-07  frob 2.73e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        29.70 us  max_rel 3.54e-07  frob 2.73e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       30.72 us  max_rel 3.54e-07  frob 2.73e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      23.55 us  max_rel 3.20e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        25.60 us  max_rel 3.20e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       25.60 us  max_rel 3.20e-04  frob 2.93e-04
+[75] NbCl5 1944 x 512 x 89  A R ld 512  B R ld 89  RR_4_1_1
+  cublas_ieee     -                            97.28 us  max_rel 2.30e-07  frob 1.55e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     142.34 us  max_rel 4.40e-07  frob 2.93e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        27.65 us  max_rel 4.40e-07  frob 2.93e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       46.08 us  max_rel 4.40e-07  frob 2.93e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      37.89 us  max_rel 3.29e-04  frob 2.95e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        23.55 us  max_rel 3.29e-04  frob 2.95e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       32.77 us  max_rel 3.29e-04  frob 2.95e-04
+[76] NbCl5 9720 x 128 x 130  A R ld 128  B C ld 128  RC_4_4_2
+  cublas_ieee     -                            50.18 us  max_rel 5.04e-07  frob 2.04e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      98.30 us  max_rel 4.03e-07  frob 2.73e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        33.79 us  max_rel 4.03e-07  frob 2.73e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       38.91 us  max_rel 4.03e-07  frob 2.73e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      25.60 us  max_rel 3.32e-04  frob 2.95e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        24.58 us  max_rel 3.32e-04  frob 2.95e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       28.67 us  max_rel 3.32e-04  frob 2.95e-04
+[77] NbCl5 9720 x 130 x 128  A R ld 130  B R ld 128  RR_2_4_4
+  cublas_ieee     -                            40.96 us  max_rel 5.30e-07  frob 2.05e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      67.58 us  max_rel 3.57e-07  frob 2.73e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        26.62 us  max_rel 3.57e-07  frob 2.73e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       32.77 us  max_rel 3.57e-07  frob 2.73e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      23.55 us  max_rel 3.04e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        23.55 us  max_rel 3.04e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       24.58 us  max_rel 3.04e-04  frob 2.93e-04
+[78] NbCl5 56320 x 64 x 1  A R ld 64  B C ld 64  RC_4_4_1
+  cublas_ieee     -                            30.72 us  max_rel 2.18e-07  frob 1.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     141.31 us  max_rel 4.03e-07  frob 2.75e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        34.82 us  max_rel 4.03e-07  frob 2.75e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       55.30 us  max_rel 4.03e-07  frob 2.75e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      34.82 us  max_rel 3.65e-04  frob 3.01e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        24.58 us  max_rel 3.65e-04  frob 3.01e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       35.84 us  max_rel 3.65e-04  frob 3.01e-04
+[79] NbCl5 5832 x 128 x 130  A R ld 128  B C ld 128  RC_4_4_2
+  cublas_ieee     -                            40.96 us  max_rel 3.15e-07  frob 1.47e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      61.44 us  max_rel 4.41e-07  frob 2.72e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        24.58 us  max_rel 4.41e-07  frob 2.72e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       29.70 us  max_rel 4.41e-07  frob 2.72e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      20.48 us  max_rel 3.34e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        19.46 us  max_rel 3.34e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 3.34e-04  frob 2.93e-04
+[80] NbCl5 1944 x 512 x 96  A R ld 512  B R ld 96  RR_4_4_4
+  cublas_ieee     -                           104.45 us  max_rel 2.07e-07  frob 1.55e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     128.00 us  max_rel 4.02e-07  frob 2.94e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        27.65 us  max_rel 4.02e-07  frob 2.94e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       45.06 us  max_rel 4.02e-07  frob 2.94e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      32.77 us  max_rel 2.92e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        20.48 us  max_rel 2.92e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       25.60 us  max_rel 2.92e-04  frob 2.93e-04
+[81] NbCl5 1944 x 96 x 512  A R ld 96  B R ld 512  RR_4_4_4
+  cublas_ieee     -                            32.77 us  max_rel 3.78e-07  frob 1.76e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      40.96 us  max_rel 3.33e-07  frob 2.67e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        22.53 us  max_rel 3.33e-07  frob 2.67e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       28.67 us  max_rel 3.33e-07  frob 2.67e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      19.46 us  max_rel 2.90e-04  frob 2.95e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        18.43 us  max_rel 2.90e-04  frob 2.95e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       21.50 us  max_rel 2.90e-04  frob 2.95e-04
+[82] NbCl5 5832 x 130 x 128  A R ld 130  B R ld 128  RR_2_4_4
+  cublas_ieee     -                            32.77 us  max_rel 4.53e-07  frob 2.06e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      63.49 us  max_rel 3.92e-07  frob 2.71e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        21.50 us  max_rel 3.92e-07  frob 2.71e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       23.55 us  max_rel 3.92e-07  frob 2.71e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      21.50 us  max_rel 3.14e-04  frob 2.92e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        18.43 us  max_rel 3.14e-04  frob 2.92e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       19.46 us  max_rel 3.14e-04  frob 2.92e-04
+[83] NbCl5 1944 x 512 x 6  A R ld 2048  B R ld 6  RR_4_2_2
+  cublas_ieee     -                            28.16 us  max_rel 1.25e-07  frob 1.08e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3     133.12 us  max_rel 4.21e-07  frob 2.92e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        27.65 us  max_rel 4.21e-07  frob 2.92e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       46.08 us  max_rel 4.21e-07  frob 2.92e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      32.77 us  max_rel 3.15e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        20.48 us  max_rel 3.15e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       27.65 us  max_rel 3.15e-04  frob 2.93e-04
+[84] NbCl5 1944 x 128 x 130  A R ld 2048  B C ld 128  RC_4_4_2
+  cublas_ieee     -                            23.55 us  max_rel 1.59e-07  frob 1.10e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      47.10 us  max_rel 2.99e-07  frob 2.68e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        15.36 us  max_rel 2.99e-07  frob 2.68e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       21.50 us  max_rel 2.99e-07  frob 2.68e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      20.48 us  max_rel 3.03e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.03e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       17.41 us  max_rel 3.03e-04  frob 2.94e-04
+[85] NbCl5 1944 x 6 x 512  A R ld 6  B R ld 512  RR_2_4_4
+  cublas_ieee     -                            17.41 us  max_rel 1.30e-07  frob 4.68e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      23.55 us  max_rel 3.09e-07  frob 1.80e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 3.09e-07  frob 1.80e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       17.41 us  max_rel 3.09e-07  frob 1.80e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      16.38 us  max_rel 4.92e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 4.92e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       16.38 us  max_rel 4.92e-04  frob 2.94e-04
+[86] NbCl5 1944 x 130 x 128  A R ld 130  B R ld 128  RR_2_4_4
+  cublas_ieee     -                            24.58 us  max_rel 1.89e-07  frob 1.11e-07
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      62.46 us  max_rel 3.56e-07  frob 2.70e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        16.38 us  max_rel 3.56e-07  frob 2.70e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       22.53 us  max_rel 3.56e-07  frob 2.70e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      21.50 us  max_rel 3.39e-04  frob 2.95e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 3.39e-04  frob 2.95e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.39e-04  frob 2.95e-04
+[87] NbCl5 1944 x 96 x 6  A R ld 96  B R ld 6  RR_4_2_2
+  cublas_ieee     -                            16.38 us  max_rel 1.28e-07  frob 9.93e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      39.94 us  max_rel 3.68e-07  frob 2.72e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 3.68e-07  frob 2.72e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       20.48 us  max_rel 3.68e-07  frob 2.72e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      18.43 us  max_rel 2.98e-04  frob 2.83e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 2.98e-04  frob 2.83e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       17.41 us  max_rel 2.98e-04  frob 2.83e-04
+[88] NbCl5 1944 x 89 x 6  A R ld 89  B C ld 89  RC_1_1_2
+  cublas_ieee     -                            16.38 us  max_rel 1.39e-07  frob 9.21e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      50.18 us  max_rel 2.73e-07  frob 2.50e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        15.36 us  max_rel 2.73e-07  frob 2.50e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       20.48 us  max_rel 2.73e-07  frob 2.50e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      21.50 us  max_rel 3.09e-04  frob 3.03e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.09e-04  frob 3.03e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       18.43 us  max_rel 3.09e-04  frob 3.03e-04
+[89] NbCl5 1944 x 6 x 96  A R ld 6  B R ld 96  RR_2_4_4
+  cublas_ieee     -                            14.34 us  max_rel 9.85e-08  frob 4.65e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      22.02 us  max_rel 3.08e-07  frob 1.89e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 3.08e-07  frob 1.89e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       15.36 us  max_rel 3.08e-07  frob 1.89e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      15.36 us  max_rel 5.72e-04  frob 2.94e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 5.72e-04  frob 2.94e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       14.34 us  max_rel 5.72e-04  frob 2.94e-04
+[90] NbCl5 13 x 28 x 512  A C ld 13  B R ld 512  CR_1_4_4
+  cublas_ieee     -                            14.34 us  max_rel 9.53e-08  frob 6.60e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      26.62 us  max_rel 3.81e-07  frob 2.13e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        12.29 us  max_rel 3.81e-07  frob 2.13e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       16.38 us  max_rel 3.81e-07  frob 2.13e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      16.38 us  max_rel 3.13e-04  frob 3.08e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        11.26 us  max_rel 3.13e-04  frob 3.08e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       14.34 us  max_rel 3.13e-04  frob 3.08e-04
+[91] NbCl5 29 x 86 x 512  A C ld 29  B R ld 512  CR_1_4_4
+  cublas_ieee     -                            17.41 us  max_rel 1.50e-07  frob 9.38e-08
+  cutlass_3xtf32  128x128x16_w64x64x16_s3      39.94 us  max_rel 3.39e-07  frob 2.66e-07
+  cutlass_3xtf32  64x64x16_w32x32x16_s4        14.34 us  max_rel 3.39e-07  frob 2.66e-07
+  cutlass_3xtf32  64x128x16_w32x64x16_s4       20.48 us  max_rel 3.39e-07  frob 2.66e-07
+  cutlass_1xtf32  128x128x16_w64x64x16_s3      18.43 us  max_rel 3.77e-04  frob 2.93e-04
+  cutlass_1xtf32  64x64x16_w32x32x16_s4        13.31 us  max_rel 3.77e-04  frob 2.93e-04
+  cutlass_1xtf32  64x128x16_w32x64x16_s4       16.38 us  max_rel 3.77e-04  frob 2.93e-04

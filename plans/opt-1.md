@@ -162,6 +162,14 @@ recommendation.
     block, and needs ≥ 10 % whole-step gain on both GPUs before it grows
     beyond one interaction.
 
+- **Long-term direction, not in this round: a heterogeneous persistent megakernel**
+  (owner, 23 October 2026: "yes record it").
+  - **What:** one persistent force kernel that schedules CUDA-core and tensor-core work itself.
+  - **Record:** `docs/design/2026-10-23-heterogeneous-megakernel.md`.
+  - **Gate:** a one-day single-SM co-execution probe on sm_89, sm_120 and sm_80. The SIMT side must keep ≥ 90 % of
+    its rate while the MMA side adds useful throughput. Nothing starts before that passes.
+  - **OPT-T05** is its smaller, existing version.
+
 **Added 20 October 2026, from an outside review** (owner: "assess and
 implement how you like"). These two target setup and the subprocess
 lifecycle, not the steady-state step. Each starts with a short design note
