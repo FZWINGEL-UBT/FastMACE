@@ -246,3 +246,28 @@ def test_both_sides_report_extras_equal_to_their_kinetic_energy(tmp_path, monkey
         for row, extra in zip(rows, extras, strict=True):
             kinetic = row[tool.COLUMNS.index("kinetic_eV_atom")] * len(atoms)
             assert extra[1] == pytest.approx(kinetic, rel=1e-9), side
+
+
+def test_a_paired_ase_run_follows_the_fastmace_run(tmp_path, monkeypatch):
+    """``run_ase(paired=True)`` takes fastmace_side's start and noise: the two sample the same trajectory."""
+    pytest.importorskip("cuequivariance_torch")
+    pytest.importorskip("torch_dftd")
+    import torch
+    from ase.calculators.mixing import SumCalculator
+
+    from _support.mc_fixtures import cpu_planner, tiny_loaded
+    from _support.structures import nacl
+    from _support.tiny_models import FAMILIES, tiny_mace_model
+    from fastmace.reference.d3 import torch_dftd3_calculator
+
+    cpu_planner(monkeypatch)
+    path = tmp_path / "tiny-mh1-11-17.model"
+    torch.save(tiny_mace_model([11, 17], **FAMILIES["mh1"]), path)
+    settings = {**tool.SETTINGS, "head": None}
+    ours, theirs = [], []
+    tool.fastmace_side(path, nacl(1, rattle=0.05, seed=3), 300.0, 6, 20, 5, ours.append, settings=settings,
+                       precision="float64")
+    calculator = SumCalculator([tiny_loaded(tmp_path, (11, 17)).calculator, torch_dftd3_calculator(tool.d3_record())])
+    tool.run_ase(nacl(1, rattle=0.05, seed=3), calculator, 300.0, 6, 20, 5, theirs.append, settings=settings,
+                 paired=True)
+    np.testing.assert_allclose(np.array(ours)[:, 1:], np.array(theirs)[:, 1:], rtol=1e-9, atol=1e-9)

@@ -135,9 +135,15 @@ def kinetic_extras(step, masses, momenta):
     return (step, float((momenta ** 2 / (2.0 * masses[:, None])).sum()), float(total @ total / (2.0 * masses.sum())))
 
 
-def run_ase(atoms, calculator, temperature_K, seed, steps, sample_every, sink, settings=SETTINGS, extra=None):
+def run_ase(atoms, calculator, temperature_K, seed, steps, sample_every, sink, settings=SETTINGS, extra=None,
+            paired=False):
     """ASE ``LangevinBAOAB`` from ``atoms`` (velocities drawn here) for ``steps``; ``sink(row)`` per sample, and
-    ``extra(kinetic_extras row)`` if given."""
+    ``extra(kinetic_extras row)`` if given.
+
+    ``paired``: the velocities from ``default_rng(seed)`` and the noise from a fresh ``default_rng(seed)``, as
+    ``fastmace_side`` draws them, so the run gets the FastMACE run's start and noise stream of the same seed.
+    Langevin dynamics with one noise stream contracts: two correct engines then follow the same trajectory.
+    Otherwise one generator gives the velocities, then the noise (the comparison's independent runs)."""
     from ase import units
     from ase.md.langevinbaoab import LangevinBAOAB
     from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
@@ -149,6 +155,8 @@ def run_ase(atoms, calculator, temperature_K, seed, steps, sample_every, sink, s
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         MaxwellBoltzmannDistribution(atoms, temperature_K=temperature_K, rng=rng)
+        if paired:
+            rng = np.random.default_rng(seed)
         dyn = LangevinBAOAB(atoms, timestep=settings["timestep_fs"] * units.fs, temperature_K=temperature_K,
                             externalstress=-settings["pressure_GPa"] * units.GPa, hydrostatic=True,
                             T_tau=1.0 / settings["friction_per_ase_time"],
@@ -229,7 +237,8 @@ def command_run(args):
     root = args.structures or os.environ.get("FASTMACE_STRUCTURES", ".")
     atoms = source_atoms(root)
     steps = round((args.equilibration_ps + args.production_ps) * 1000.0 / SETTINGS["timestep_fs"])
-    record = dict(engine=args.engine, temperature_K=args.temperature_K, seed=args.seed, steps=steps,
+    record = dict(engine=args.engine, paired=bool(getattr(args, "paired", False)),
+                  temperature_K=args.temperature_K, seed=args.seed, steps=steps,
                   equilibration_ps=args.equilibration_ps, production_ps=args.production_ps,
                   sample_every=args.sample_every, settings=SETTINGS, natoms=len(atoms),
                   checkpoint=str(args.checkpoint), machine=args.machine or platform.node(),
@@ -255,7 +264,7 @@ def command_run(args):
 
         if args.engine == "ase":
             final = run_ase(atoms, calculator, args.temperature_K, args.seed, steps, args.sample_every, sink,
-                            extra=extras.writerow)
+                            extra=extras.writerow, paired=args.paired)
         else:
             simulation = fastmace_side(args.checkpoint, atoms, args.temperature_K, args.seed, steps,
                                        args.sample_every, sink, extra=extras.writerow, precision=args.precision)
@@ -460,6 +469,8 @@ def _run_arguments(run):
     run.add_argument("--production-ps", type=float, default=20.0)
     run.add_argument("--sample-every", type=int, default=10)
     run.add_argument("--device", default="cuda")
+    run.add_argument("--paired", action="store_true",
+                     help="run-ase: the FastMACE run's start and noise stream of the same seed (synchronisation test)")
     run.add_argument("--precision", choices=("float32", "float64"), default="float32",
                      help="run-fastmace: the force precision (float64: the control plan)")
     run.add_argument("--machine", help="the machine's name for the record (e.g. 'Modal L4')")
