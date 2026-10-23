@@ -98,6 +98,10 @@ resume is rerun if its run predates the merge.
   - `test_energy_gpu::test_float64_energy_replays_and_keeps_forces[default-dtype0]` (float32): the two fields
     differed by 1.6e-9 eV/Å with almost no scatter noise (7.5e-10); the bound's relative floor follows the precision
     (1e-8 in float32, 1e-12 in float64), and the 1e-6 eV/Å negative control still fails it.
+- **fm-ops-colab's G4 compatibility runs** (Colab RTX PRO 6000, sm_120, from main, cold and warm): one failure,
+  `test_combo_kernels_cuda::test_combo_kernels_change_no_value`, judged the same way: the noise estimate was one pair
+  of "off" evaluations (repeat 4.8e-7, 1 float32 ulp in [4, 8)) against a change of 1.2e-6. Corrected test-side
+  (5fa3f8a): the noise from three "off" repeats, the bound floored at 4 float32 ulps of the largest value.
 - **Timed jobs first, alone, on a quiet PC:** no other GPU job (the reservation) and no heavy CPU job (checked and
   recorded at each job's start). No CPU suite of the conductor's during the timed jobs (the conductor is told the
   window).
