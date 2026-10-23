@@ -1,12 +1,12 @@
 # Runbook: phase 5 acceptance
 
 Plan task 5-T11. **Revision 1, a draft**, written 23 October 2026 before any phase 5 task other than 5-T01 was
-merged, and before the owner's decisions D1–D6. Items that depend on an open decision are written for each option
-and marked **(D*n*)**; revision 2, at the go, keeps the decided branch and folds in the task reports. Every rule
+merged. The owner decided D1–D6 the same evening (recommendation (a) of each; SPEC decisions 51–56, main
+f26bd41), and this draft keeps only those branches. Revision 2, at the go, folds in the task reports. Every rule
 below is fixed before any run at the freeze, and nothing runs before it. Results go to `phase-5.md` and
 `results/5-T11-*/`. 5-T11 changes no library code; its tool and test changes are labelled tool-side or test-side.
 
-Sources: SPEC §16 row 5, §7.7, §9.1–§9.6, §10.6, §13, §18 decisions 3, 29, 35, 38, 39 (amended) and 50;
+Sources: SPEC §16 row 5, §7.7, §9.1–§9.6, §10.6, §13, §18 decisions 3, 29, 35, 38, 39 (amended), 50 and 51–56;
 `plans/phase-5.md` (D1–D6, the conductor's choices 1–8, task 5-T11 and its outline); `docs/design/planner-5.md`
 (5-T01); the task reports `5-T02.md` to `5-T10.md` as they land; `phase-4-runbook.md` and `phase-4.md` (template
 and baseline).
@@ -19,8 +19,23 @@ and baseline).
 - **Choice 8 and decision 39 (amended):** full acceptance on the RTX 5060 Ti; the compatibility check (`-m compat`)
   on Blackwell (local), Ada (Colab L4) and the Colab A100 if phase 4 made it a production type. Untimed runs may
   use the Colab A100; timed runs stay local.
-- **D1–D6:** open at revision 1. The items they shape: D1 item 8 and the corpus's rule 12 class; D2 and D3 item 6;
-  D4 item 7; D5 item 9; D6 item 3's scope (under D6 (b) 5-T10's corpus is the same tool, run at the freeze).
+- **51 (D1 (a)), rule 12's action:** above 90 % of the free GPU memory, the rewrites whose records declare an
+  edge-sized buffer are turned off, largest term first, each with rule 12's reason; still above, the plan is kept
+  with a warning, and an out-of-memory error carries the estimate. Rule 11's sizes, the tier, the precision and an
+  explicit user setting never change. Shapes item 8 and the corpus's rule 12 class.
+- **52 (D2 (a)), the trigger:** the re-capture budget exceeded **and** re-capturing above 20 % of the wall time over
+  the segments since the last switch; the one switch is graph → compiled (same backend, rewrites, precision) at the
+  next canonical point. Rebuild rate, build time and overflows are recorded, not acted on. Item 6.
+- **53 (D3 (a)), the limits:** one way, at most one switch per run; none under `reproducible=True`, with an
+  explicit `mode=`, during an MC block, or in a subprocess child without the parent's hand-off; validated before
+  activation (self-checks; the gate when requested; the move-energy part for MC) and logged. Items 4 and 6.
+- **54 (D4 (a)), mid-run fallbacks:** a capture error at a re-capture and a compile error of the compiled tier
+  during `run()`, from the last committed canonical point, output as on resume. Not triggers: out-of-memory,
+  non-finite values, refusals, process constraints. Item 7.
+- **55 (D5 (a)), calibration:** `calibrate=True`, off by default; the backend dimension only, each candidate in a
+  child, 50 steps after warm-up, alternating; it changes the choice only above 5 % in every pair; recorded as
+  measured, nothing read from earlier runs. Item 9.
+- **56 (D6 (a)):** `FixedPlanner`'s two stages stay; 5-T10 is closed, so 5-T11 creates `tools/plan_corpus.py`.
 
 ## Freeze, baseline and copies
 
@@ -83,8 +98,8 @@ Pytest jobs run through `tools/acceptance/stoppable_pytest.sh` (results per fini
 
 Choice 7 made checkable on the CPU: the same inputs planned by the baseline and by the freeze.
 
-- **One tool with 5-T10** (conductor, 23 October 2026): `tools/plan_corpus.py` is 5-T10's under D6 (b) and
-  5-T11's under D6 (a); both use one format (cases with stable ids in named sets, a `package=` argument so the
+- **The format agreed with 5-T10** (conductor, 23 October 2026; 5-T11 creates the tool since decision 56 closed
+  5-T10, and keeps 5-T10's `"auto"` set possible for phase 6): one format (cases with stable ids in named sets, a `package=` argument so the
   renamed `fastmace_4` export plans the same cases, canonical JSON records, `dump` and `compare
   --explain-codes`; agreed with 5-T10 in the session notes, `5-T11-plan-corpus-format.md`). 5-T11 adds the
   `"acceptance"` set and keeps its full records (`--full`) in `results/`, not hashes.
@@ -110,7 +125,8 @@ Choice 7 made checkable on the CPU: the same inputs planned by the baseline and 
   variant cap; D3 skin and list; k-space headroom; the stress path. **Ignored:** reason texts, rule numbers, and the
   phase 5 fields (`calibration`, `adaptation`, `predicted_memory_bytes`, `text`).
 - **Verdict per row:** identical, or **explained**: every difference is carried by a decision whose code belongs to
-  rule 12's action **(D1)** or rule 15's warning. Anything else fails and goes to the conductor. Expected
+  rule 12's action (decision 51: a rewrite turned off with rule 12's reason, or rule 12's warning) or rule 15's
+  warning. Anything else fails and goes to the conductor. Expected
   explained rows: none on the 16 GiB record unless 5-T03 finds a label that does not fit; the low-memory case's
   rule 12 rows.
 - **Output:** `results/5-T11-corpus/corpus.json` (every row, both sides) and a table in the report (counts per
@@ -132,10 +148,10 @@ Local RTX 5060 Ti, run ID `5-T11-local-<date>`, `python3 <copy>/tools/ci/local_g
 | `trajectories-reproducible` | 4 | yes | no | the same, reproducible plan, plain cuEq float64, MH-1 NaCl, 500 steps, every 50, NVT and NPT, D3 off | 20 min |
 | `restart-across` | 4 | no | no | `tools/restart_versions.py`: a Langevin restart written by the baseline (format 4, step 50) resumed at the freeze to step 100, CPU float64, tiny model; bitwise against the baseline's uninterrupted run, without `allow_plan_change` and without a new revision | 10 min |
 | `regression` | 5 | yes | yes | `tools/ab_fastmace.py --release 4`: MH-1 hybrid Langevin NVT, D3 off, NaCl and NbCl5, 300 K, 12 blocks of 300 steps after 300; ABAB 4 first, ABAB 5 first, ABBA 4 first (4-T13's protocol) | 40 min |
-| `adapt-storm` | 6 | yes | yes (D2) | 5-T07's forced re-capture storm, MH-1 hybrid NaCl, switched against unswitched, one block each | 30 min |
+| `adapt-storm` | 6 | yes | yes | 5-T07's forced re-capture storm, MH-1 hybrid NaCl, switched against unswitched, one block each | 30 min |
 | `adapt-production` | 6 | yes | no | through `fastmace run` with the default `adapt`, resume included: the shipped `npt_anneal_NbCl5_short` and `swap_anneal_NaNbOCl4_short` (the MC path), and an NVT anneal on NaCl 3×3×3 defined here from `main.py`'s `--profile anneal` (0 → 1000 K in 20 ps, then 3 K/ps to 250 K; samples and frames every 10 fs; no shipped profile is added) | 2 h |
 | `adapt-tests` | 6, 7 | yes | no | 5-T07's and 5-T08's GPU tests (switch at a canonical point, statistics against an unswitched compiled run, resume after a switch, broken capture) | 1 h |
-| `calibration` | 9 | yes | yes (D5) | 5-T09's NaCl smoke with MH-1: the record, the choice, the setup cost | 20 min |
+| `calibration` | 9 | yes | yes | 5-T09's NaCl smoke with MH-1: the record, the choice, the setup cost | 20 min |
 | `plans` | 10 | yes | no | one real plan printed per item 6–9 (`str(plan)` and `describe(full=True)`), from the runs above | 5 min |
 | `compat` | – | yes | no | `tools/acceptance/compat.py --provider local --label "RTX 5060 Ti"` | 45 min |
 | `acceptance-tier` | – | yes | (step-time assertions) | `pytest tests/gpu -m acceptance` | 5–6 h |
@@ -150,9 +166,9 @@ the freeze: the L4 compatibility check (`5-T11-colab-l4-<date>`) and, if it appl
 
 - **Item 5** (effect sought: under 1 %, since 5-T06 adds host timestamps around captures and a segment hook): the
   full same-process alternating design, three processes, the local floors (NaCl 1.1 %, NbCl5 0.4 %), as 4-T13.
-- **Item 6, the storm (D2 (a), (b), (c)):** the effect expected is large (compiled against re-capturing every few
-  steps): one block each side, one process per side; the switched run must be faster beyond the 3 % cross-process
-  floor. Under D2 (d) there is no switch and the job only records the warning.
+- **Item 6, the storm:** the effect expected is large (compiled against re-capturing every few steps): one block
+  each side, one process per side; the switched run must be faster beyond the 3 % cross-process floor. This is
+  also the owner's checkpoint 3 (whether decision 52's 20 % holds); 5-T07's own timed check is cited with it.
 - **Item 9, calibration:** a check, not an A/B: the smoke's own measured candidates are recorded; its choice is
   judged only on the RTX 5060 Ti. Off the reference GPU its numbers are recorded, not judged.
 - **Cross-process controls** are bounded at 3 % or left out.
@@ -176,9 +192,8 @@ acceptance` green here.
   positions, energy, temperature (under NPT, cell and pressure) equal.
 - `restart-across`: bitwise equal to the baseline's uninterrupted run, resumed without `allow_plan_change` and with
   no new plan revision.
-- The freeze side runs with the default `AdaptationConfig`; under a reproducible plan no switch happens (rule 5;
-  D3 (a), (b), (d)). **(D3 (c))**: a switch is allowed under `reproducible=True` with a deterministic trigger; the
-  runs here do not trigger it, and the job checks `counters.tier_switches == []`.
+- The freeze side runs with the default `AdaptationConfig`; under a reproducible plan no switch happens (rule 5,
+  decision 53), and every job checks `counters.tier_switches == []`.
 
 **Item 5: step time, no regression.**
 - Per structure, the median of the three processes' ratio 5/4 within ± the local floor, and no process slower than
@@ -187,50 +202,48 @@ acceptance` green here.
   `schema_minor`), and no tier switch, fallback or calibration in either side's run; any other engine-option
   difference makes the process invalid.
 
-**Item 6: runtime adaptation** (§9.6; D2, D3).
-- **D2 (a), (b) or (c):** on the storm the switch happens at the first canonical point after the trigger (forced if
-  the cadence puts it later; choice 2), as a new revision with step and reason; `counters.tier_switches` has one
-  entry `{step, from, to, reason, revision}`; the report line and the `fastmace.planner` log line are present; the
-  candidate was validated before activation (self-checks; the gate where the run asked for one; D3 (a)).
-  Energies and temperatures after the switch statistically equal to an unswitched compiled run (5-T07's measure);
-  interrupted against uninterrupted across the switch, statistical. A resume after the switch runs the compiled
-  revision and, under D3 (a), does not switch again. Timed: the switched run is faster (above).
-  **D2 (b)** adds: the skin re-plan's revision, recorded the same way.
+**Item 6: runtime adaptation** (§9.6; decisions 52, 53).
+- On the storm the switch happens at the first canonical point after the trigger (forced if the cadence puts it
+  later; choice 2), graph → compiled with the same backend, rewrites and precision, as a new revision with step and
+  reason; `counters.tier_switches` has one entry `{step, from, to, reason, revision}`; the report line and the
+  `fastmace.planner` log line are present; the candidate was validated before activation (self-checks; the gate
+  where the run asked for one). Energies and temperatures after the switch statistically equal to an unswitched
+  compiled run (5-T07's measure); interrupted against uninterrupted across the switch, statistical. A resume after
+  the switch runs the compiled revision and does not switch again. Timed: the switched run is faster (above).
 - **The production profiles** (`npt_anneal_NbCl5_short`, `swap_anneal_NaNbOCl4_short`, the NaCl NVT anneal): no
-  switch, `counters.tier_switches == []`, on every option; under D3 (a) none during an MC block in any case.
-  The re-capture time fraction per segment is recorded.
-- **D3's limits:** checked by 5-T07's CPU tests in the suite (cited), plus on the GPU: no switch with an explicit
-  `mode=` and none under `reproducible=True` (D3 (a), (b), (d)).
-- **D2 (d):** no switch exists; the item checks the warning and its recommendation on the storm, and that the
-  production profiles do not warn.
+  switch, `counters.tier_switches == []`, and none during an MC block in any case. The re-capture time fraction,
+  rebuild rate, build time and overflows per segment are recorded, with no action.
+- **Decision 53's limits:** checked by 5-T07's CPU tests in the suite (cited: one way, at most one switch, none
+  under `reproducible=True`, with an explicit `mode=`, during an MC block, or in a child without the hand-off),
+  plus on the GPU: no switch with an explicit `mode=` and none under `reproducible=True` on the storm.
 
-**Item 7: mid-run fallbacks** (§9.4 step 5; D4).
-- **D4 (a) or (b):** the broken capture (5-T08's GPU test, MH-1 hybrid NaCl) ends on a validated revision that
-  started from the last committed canonical point; the chain records both revisions; output chunks after the point
-  were deleted and written once (no duplicate or missing frame). **(b)** adds the failed overflow redo.
-- **D4 (c):** the run stops with the record and a resumable restart point; a resume with `allow_plan_change=True`
-  completes.
-- On every option: an out-of-memory error and a non-finite value are not fallback triggers (the run stops, with
-  rule 12's estimate in the out-of-memory message under D1 (a), (d)).
+**Item 7: mid-run fallbacks** (§9.4 step 5; decision 54).
+- The broken capture (5-T08's GPU test, MH-1 hybrid NaCl) ends on a validated revision that started from the last
+  committed canonical point; the chain records both revisions; output chunks after the point were deleted and
+  written once (no duplicate or missing frame). A compile error of the compiled tier at a new edge count, injected
+  during `run()`, ends the same way (5-T08's test; on the GPU if 5-T08 has one, else its CPU test cited).
+- With `fallback="refuse"` the run raises with the record and the last restart point stays resumable.
+- An out-of-memory error and a non-finite value are not fallback triggers: the run stops, the out-of-memory
+  message carrying rule 12's estimate (decision 51).
 
-**Item 8: rule 12** (D1).
+**Item 8: rule 12** (decision 51).
 - 5-T03's validation (`docs/validation/5-T03.md`) cited: the estimate never below the measured peak on any of the
   19 labels × NaCl, NbCl5 × NVT, NPT, and at most 1.5× above. Rerun (the same tool, the same cases) only if
   `planner/memory.py` or a rewrite's memory term changed between 5-T03's head and the freeze; the report gives the
   diff.
-- The action per D1, from 5-T03's CPU tests (cited) and the corpus's low-memory rows: **(a)** rewrites with an
-  edge-sized term dropped largest first until it fits, each with rule 12's reason, then a warning; never a change
-  of rule 11's sizes, the tier, the precision or an explicit user setting; **(b)** a warning only; **(c)** a
-  refusal naming the rewrites (with §9.3 amended); **(d)** (a) plus the one re-plan after an out-of-memory error.
+- The action, from 5-T03's CPU tests (cited) and the corpus's low-memory rows: above 90 % of the free memory, the
+  rewrites with an edge-sized term dropped largest first until it fits, each with rule 12's reason, then a warning
+  if it still does not fit; never a change of rule 11's sizes, the tier, the precision or an explicit user setting
+  (an explicit `"on"` is kept and warned). The 90 % margin is the owner's checkpoint 2, judged on 5-T03's numbers.
 - In `compat` on each GPU: the estimate against the measured peak on MH-1 NaCl (5-T03's test).
 
-**Item 9: calibration** (D5).
-- **D5 (a):** on NaCl with MH-1 the smoke keeps hybrid (or changes it only with a margin above 5 % in every pair,
-  judged on the RTX 5060 Ti only); `Plan.calibration` records each candidate's measured step times; the setup cost
-  is in the report; nothing is written outside the run directory and nothing is read from earlier runs (5-T09's
-  CPU test with a planted record, cited).
-- **D5 (b):** the same record; the plan is the rules' plan (`changed_plan` false).
-- **D5 (c):** no item; the report cites the SPEC change (§9.1, §7.7, §17).
+**Item 9: calibration** (decision 55).
+- On NaCl with MH-1 (`calibrate=True`, no backend set) the smoke measures hybrid and plain cuEq, each in a child,
+  50 steps after warm-up, alternating; it keeps hybrid, or changes it only with a margin above 5 % in every pair,
+  judged on the RTX 5060 Ti only; `Plan.calibration` records each candidate's measured step times; the setup cost
+  is in the report.
+- Without `calibrate`, and with a backend set, no calibration runs (5-T09's CPU tests, cited); nothing is written
+  outside the run directory and nothing is read from earlier runs (5-T09's CPU test with a planted record, cited).
 
 **Item 10: `str(plan)`.** 5-T05's golden texts green in the CPU suite (cited), each section present, no line over
 120 characters, at most about 30 lines; the real plans of items 6–9 printed in the report, each with the section
@@ -247,7 +260,7 @@ Ti and the Colab L4 (and on the A100 if that leg runs).
 - rule 6 on that GPU: the planner's fused-cuEq check loads (`test_loading_gpu.py` already holds the plain cuEq case;
   the planner-side check is added if no existing test asserts the decision);
 - rule 12: the estimate against the measured peak on MH-1 NaCl (5-T03's test);
-- the forced re-capture switch smoke, correctness only (5-T07's test; under D2 (d) the warning smoke).
+- the forced re-capture switch smoke, correctness only (5-T07's test).
 
 ## Tool-side additions (before the freeze, CPU-tested on `fastmace/5-T11`)
 
