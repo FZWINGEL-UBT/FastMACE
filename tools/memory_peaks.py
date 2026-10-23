@@ -141,14 +141,21 @@ def run_case(args):
         torch.cuda.memory._record_memory_history(stacks="python", max_entries=2_000_000)
     started = time.perf_counter()
     engine = planner.build(plan, force_field, atoms, temperature_K=args.temperature_K)
+    torch.cuda.synchronize()
+    # The build's peak, what stays live into the run, then the steps' own peak (the first step captures).
     record["after_build_bytes"] = int(torch.cuda.max_memory_allocated())
+    record["live_after_build_bytes"] = int(torch.cuda.memory_allocated())
+    build_peak = record["after_build_bytes"]
+    torch.cuda.reset_peak_memory_stats()
     for _ in range(args.steps):
         engine.step()
     torch.cuda.synchronize()
+    record["step_peak_bytes"] = int(torch.cuda.max_memory_allocated())
+    record["live_after_steps_bytes"] = int(torch.cuda.memory_allocated())
     if args.memory_history:
         record["at_peak"] = live_at_peak(torch.cuda.memory._snapshot())
         torch.cuda.memory._record_memory_history(enabled=None)
-    record.update(peak_bytes=int(torch.cuda.max_memory_allocated()),
+    record.update(peak_bytes=max(build_peak, record["step_peak_bytes"]),
                   peak_reserved_bytes=int(torch.cuda.max_memory_reserved()),
                   seconds=time.perf_counter() - started, torch=torch.__version__,
                   fastmace_commit=os.environ.get("FASTMACE_COMMIT"))
