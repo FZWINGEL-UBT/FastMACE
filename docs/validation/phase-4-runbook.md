@@ -6,7 +6,11 @@ merged): it folds in decisions 44–50, the owner's slow-tier ruling (8fe335e) a
 sets the rules the plan left to this runbook (variable-cell cells, item 2's citation). The phase 4 results that
 already exist are the tasks' own runs; every rule below is fixed before any run at the freeze. Results go to
 `phase-4.md` and `results/4-T13-*/`. 4-T13 changes no library code; its tool and test changes are labelled
-tool-side or test-side. Nothing runs before the freeze and the conductor's review of this revision.
+tool-side or test-side. Nothing runs before the freeze.
+
+**Review (23 October 2026):** the conductor accepted revision 2. It relayed the owner's approval of the soft-cell
+re-relaxation, FIRE with the cell filter judged on NaCl only, and the Ada spot check on Modal. The Modal launch
+spends the owner's money, so it is confirmed by the owner in the 4-T13 session itself before it starts (below).
 
 Sources: SPEC §16 row 4, §7.7, §10.2–§10.3, §10.6, §12.2 ("ASE equivalence", "Restart"), §18 decisions 6, 37,
 39 and 44–50; `plans/phase-4.md` (choices 1–10, task 4-T13); the task reports `4-T02.md` to `4-T12b.md`;
@@ -32,8 +36,8 @@ Sources: SPEC §16 row 4, §7.7, §10.2–§10.3, §10.6, §12.2 ("ASE equivalen
 
 - **Freeze:** the main commit with every phase 4 task merged, named by the conductor (main 184f572 has 4-T01 to
   T12b and 4-T08b). The report records it and the commit whose `fastmace/` it equals.
-- **Baseline:** tag `fastmace-3b`. It is not set yet (3b-T10 is still running); the conductor names the commit if
-  it is not set at the freeze, and the report says so. Exported as the renamed package with
+- **Baseline:** tag `fastmace-3b`; if it is not set at the freeze, the 3b freeze commit ff80ca2 (conductor), and the
+  report says so. Exported as the renamed package with
   `python -m fastmace.bench.versions export --ref <baseline> --name fastmace_3b --destination ~/fastmace-4-T13/versions`.
 - **Pinned copies:** `git archive` of the 4-T13 head with `.source_commit`, `fastmace/` equal to the freeze's, at
   `~/fastmace-4-T13/src-<sha>` (ext4, not `/mnt/d`: 1b-T21b and 4-T10 measured `/mnt/d` distorting timing). A
@@ -48,15 +52,16 @@ Sources: SPEC §16 row 4, §7.7, §10.2–§10.3, §10.6, §12.2 ("ASE equivalen
 
 ## Hardware and budget
 
-- **Everything runs on the local RTX 5060 Ti** (workstations off): through `tools/ci/local_gpu.py run
+- **Everything else runs on the local RTX 5060 Ti** (workstations off), after 3b-T10's queued jobs drain: through `tools/ci/local_gpu.py run
   --wait-minutes 600` from the pinned copy, as background tasks of the 4-T13 session. The queue is FIFO; 3b-T10's
   queued jobs run first, and no other session's job is stopped.
-- **The Ada spot check** (decision 39, choice 9) needs Modal (L4, sm_89): `pytest tests/gpu -m acceptance` under
-  the guard with `--limit-usd 3`, the phase 4 acceptance tests first. **October's Modal budget is nearly spent
-  (ceiling $29, about $26 metered or in flight), so it is not launched without the conductor's explicit OK.**
-  Without it, the Ada leg is recorded as not run (as phase 3's open finding 3), and the local acceptance tier runs
-  in full. The cited Ada evidence is then the tasks' L4 runs (4-T04 NVE and CSVR trajectories, 4-T07's frames,
-  4-T08's eight crystals, 4-T09's smoke), each at its own commit, context not citation.
+- **The Ada spot check** (decision 39, choice 9): `pytest tests/gpu -m acceptance` on the Modal L4 (sm_89) at the
+  freeze, the phase 4 acceptance tests first, with a function timeout whose worst case is at most $3. October's
+  budget is nearly spent (the owner's ceiling $29; $24.21 metered at the relay), above the guard's $27, so the launch
+  needs `--limit-usd 29` and an owner override. `modal billing summary` is read and recorded first, and the owner
+  confirms the launch in the 4-T13 session; if that session refuses it, 4-T13 stops and reports. Without it, the Ada
+  leg is recorded as not run (as phase 3's open finding 3) and the local acceptance tier runs in full. The tasks'
+  L4 runs (4-T04, 4-T07, 4-T08, 4-T09) stay context, each at its own commit.
 - **If the Ada check runs and passes at the freeze,** the local leg reruns only the tests corrected at acceptance,
   the GPU slow tier and the items' own runs (decision 39's last clause).
 - **Timed jobs first, alone, on a quiet PC:** no other GPU job (the reservation) and no heavy CPU job (checked and
