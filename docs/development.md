@@ -637,6 +637,20 @@ unattended. The driver keeps everything else in a local store, `~/.fastmace-cola
   `manifests/<stack>.json`, the `pip freeze` and its sha256. Every later job compares its own freeze against
   it (`env_matches_manifest` in `colab.json`).
 - **Compile caches:** Triton, Inductor, FastMACE's cache root with the OEq extension builds, MACE's compile
-  cache and the CUDA cache. They live in `caches/sm<capability>-py310-<stack>.tar.gz`, where `<stack>` is the
-  sha256 of the requirements. The driver uploads them before the commands, and downloads them after only when
-  a file changed. The capability comes from the VM's `nvidia-smi`, not from a table.
+  cache and the CUDA cache, under one root on the VM. The store keeps them per key
+  `sm<capability>-py310-<stack>`, where `<stack>` is the sha256 of the requirements and the capability comes
+  from the VM's `nvidia-smi`, not from a table. Each key is a directory of parts, `000.tar.gz` (the first
+  run's caches) and then one part per later run with only the files that run added or changed. The driver
+  uploads every part before the commands. Most of the volume is Inductor's FX graph cache: about 1.5 GB, or
+  513 MB gzipped, after the compatibility tier on a G4.
+- **Large uploads:** `colab upload` sends a file as one base64 JSON request, which fails above the Jupyter
+  server's request limit (a 513 MB file did). The driver uploads files over 48 MiB in chunks (64 MiB went up, 80 MiB failed with HTTP 400), and
+  `remote_step.py` joins them on the VM.
+- **Colab-only packages:** `EXTRAS` adds `dftd3==1.6.0` (simple-dftd3, the `[d3-reference]` extra), so that the
+  16 simple-dftd3 cross-check tests run instead of skipping.
+- **Driver library:** Colab keeps `libcuda.so.1` in `/usr/lib64-nvidia`. It is among OEq's driver candidates
+  (`fastmace/kernels/_oeq_runtime.py`), and `remote.sh` also sets `OEQ_CUDA_DRIVER_LIBRARY`. Without it, OEq
+  failed on the A100 pilot and the planner fell back to plain cuEq.
+- **Batch the tiers:** a cold tier is several times slower than a warm local one (A100 pilot: 43.5 min for
+  the fast tier, against 7.9 min locally warm). Give one call several `--command`s rather than one VM per
+  tier.
