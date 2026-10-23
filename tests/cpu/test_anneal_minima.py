@@ -139,14 +139,37 @@ def test_judge_fails_an_unconverged_frame(side):
     assert any("NbCl5 frame 3" in f and "converge" in f for f in verdict["failures"])
 
 
-def test_judge_fails_one_energy_difference_above_the_limit():
-    verdict = minima.judge(_rows({("NaCl", 7): {"dE_meV_atom": -0.0251}}), crystals=("NaCl", "NbCl5"))
+def test_judge_energy_clause_with_21_of_21():
+    verdict = minima.judge(_rows(), crystals=("NaCl", "NbCl5"))
+    assert verdict["crystals"]["NaCl"]["same_energy"] == 21
+    assert verdict["over_limit"] == []
+
+
+def test_judge_allows_one_energy_difference_above_the_limit_per_crystal():
+    # decision 46 as amended: |dE| <= 0.025 meV/atom in at least 20 of 21 frames per crystal
+    rows = _rows({("NaCl", 7): {"dE_meV_atom": -0.0251}, ("NbCl5", 12): {"dE_meV_atom": 0.188}})
+    verdict = minima.judge(rows, crystals=("NaCl", "NbCl5"))
+    assert verdict["passed"]
+    assert verdict["crystals"]["NaCl"]["same_energy"] == 20
+    assert verdict["crystals"]["NbCl5"]["same_energy"] == 20
+    # the frames over the limit stay listed
+    assert any("NaCl frame 7" in f and "0.0251" in f for f in verdict["over_limit"])
+    assert any("NbCl5 frame 12" in f and "0.188" in f for f in verdict["over_limit"])
+
+
+def test_judge_fails_two_energy_differences_above_the_limit_in_one_crystal():
+    rows = _rows({("NaCl", 7): {"dE_meV_atom": -0.0251}, ("NaCl", 8): {"dE_meV_atom": 0.03}})
+    verdict = minima.judge(rows, crystals=("NaCl", "NbCl5"))
     assert not verdict["passed"]
-    assert any("NaCl frame 7" in f and "0.0251" in f for f in verdict["failures"])
+    assert verdict["crystals"]["NaCl"]["same_energy"] == 19
+    assert any("NaCl" in f and "19/21" in f and "dE" in f for f in verdict["failures"])
+    assert len(verdict["over_limit"]) == 2
 
 
 def test_judge_accepts_the_energy_limit_itself():
-    assert minima.judge(_rows({("NaCl", 7): {"dE_meV_atom": 0.025}}), crystals=("NaCl", "NbCl5"))["passed"]
+    verdict = minima.judge(_rows({("NaCl", 7): {"dE_meV_atom": 0.025}}), crystals=("NaCl", "NbCl5"))
+    assert verdict["passed"]
+    assert verdict["over_limit"] == []
 
 
 def test_judge_allows_one_different_structure_per_crystal():
