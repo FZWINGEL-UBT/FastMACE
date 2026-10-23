@@ -6,8 +6,8 @@ f26bd41), and this draft keeps only those branches. Revision 2, at the go, folds
 below is fixed before any run at the freeze, and nothing runs before it. Results go to `phase-5.md` and
 `results/5-T11-*/`. 5-T11 changes no library code; its tool and test changes are labelled tool-side or test-side.
 
-Sources: SPEC §16 row 5, §7.7, §9.1–§9.6, §10.6, §13, §18 decisions 3, 29, 35, 38, 39 (amended), 50 and 51–56;
-`plans/phase-5.md` (D1–D6, the conductor's choices 1–8, task 5-T11 and its outline); `docs/design/planner-5.md`
+Sources: SPEC §16 row 5, §7.7, §9.1–§9.6, §10.6, §13, §18 decisions 3, 29, 35, 38, 39 (amended), 50 and
+51–56; `plans/phase-5.md` (D1–D6, the conductor's choices 1–8, task 5-T11 and its outline); `docs/design/planner-5.md`
 (5-T01); the task reports `5-T02.md` to `5-T10.md` as they land; `phase-4-runbook.md` and `phase-4.md` (template
 and baseline).
 
@@ -99,8 +99,8 @@ Pytest jobs run through `tools/acceptance/stoppable_pytest.sh` (results per fini
 Choice 7 made checkable on the CPU: the same inputs planned by the baseline and by the freeze.
 
 - **The format agreed with 5-T10** (conductor, 23 October 2026; 5-T11 creates the tool since decision 56 closed
-  5-T10, and keeps 5-T10's `"auto"` set possible for phase 6): one format (cases with stable ids in named sets, a `package=` argument so the
-  renamed `fastmace_4` export plans the same cases, canonical JSON records, `dump` and `compare
+  5-T10, and keeps 5-T10's `"auto"` set possible for phase 6): one format (cases with stable ids in named sets,
+  a `package=` argument so the renamed `fastmace_4` export plans the same cases, canonical JSON records, `dump` and `compare
   --explain-codes`; agreed with 5-T10 in the session notes, `5-T11-plan-corpus-format.md`). 5-T11 adds the
   `"acceptance"` set and keeps its full records (`--full`) in `results/`, not hashes.
 - **Model inputs:** per label of `fastmace.model.labels` (19), the stand-ins of `tools/plan_corpus_labels.py`
@@ -231,6 +231,9 @@ acceptance` green here.
   19 labels × NaCl, NbCl5 × NVT, NPT, and at most 1.5× above. Rerun (the same tool, the same cases) only if
   `planner/memory.py` or a rewrite's memory term changed between 5-T03's head and the freeze; the report gives the
   diff.
+- The estimate's safety factor, if 5-T03 uses one, is a single global number, the same for every model and GPU,
+  recorded with its fit (§9.3 rule 12 as amended, b8ef2ae); the run checks that `planner/memory.py` holds no
+  per-model, per-GPU or per-shape factor or table.
 - The action, from 5-T03's CPU tests (cited) and the corpus's low-memory rows: above 90 % of the free memory, the
   rewrites with an edge-sized term dropped largest first until it fits, each with rule 12's reason, then a warning
   if it still does not fit; never a change of rule 11's sizes, the tier, the precision or an explicit user setting
