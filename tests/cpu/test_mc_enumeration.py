@@ -445,9 +445,12 @@ def hybrid_run(loaded, pair, move, fixcm, *, seed=7):
         driver = MCDriver([move], seed=seed)
         driver.attach(engine)
     natoms = engine.state.natoms
-    # The integrator's convention (ASE's Langevin): with fixcm the noise is scaled by sqrt(N / (N - 1)), so the
-    # thermostat holds sum m v^2 at 3 N kT, the kinetic temperature over 3 N degrees of freedom.
-    dof = 3 * natoms
+    # The degrees of freedom the thermostat fills, as the library reports them (decision 37): 3N - 3 under the
+    # mass-weighted fixcm projection (the NVT fixcm default since 3-T22c), 3N under ASE's projection or without
+    # fixcm. The 3N - dof removed degrees are the centre of mass's; atom i loses m_i / M of them on average, so
+    # species s keeps 3 n_s - (3N - dof) M_s / M.
+    dof = sim.degrees_of_freedom
+    removed = 3 * natoms - dof
     names = {number: chemical_symbols[number] for number in PAIRS[pair]}
     split = tuple(names.values())
     samples = {"total": [], **{name: [] for name in names.values()}, "split": []}
@@ -461,7 +464,8 @@ def hybrid_run(loaded, pair, move, fixcm, *, seed=7):
             for number, name in names.items():
                 mask = state.species == number
                 if bool(mask.any()):  # a transmutation may empty a species for a while
-                    per_species[name] = float(twice_kinetic[mask].sum()) / (3 * int(mask.sum()) * K_B_EV_PER_K)
+                    species_dof = 3 * int(mask.sum()) - removed * float(state.masses[mask].sum() / state.masses.sum())
+                    per_species[name] = float(twice_kinetic[mask].sum()) / (species_dof * K_B_EV_PER_K)
                     samples[name].append(per_species[name])
             if len(per_species) == 2:
                 # The split T(second) - T(first): zero in equilibrium whatever the masses, without the run's
