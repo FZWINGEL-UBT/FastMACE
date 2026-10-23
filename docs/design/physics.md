@@ -165,8 +165,28 @@ now asks the record.
 
 - **`PositionsDOF(state)`:** fixed cell. `x` is a view of `state.positions`; `FixAtoms` comes
   in through `state.free_mask`.
-- **4-T07's `FrechetCellFilter`:** implements the same view, so FIRE and LBFGS run unchanged on
-  it.
+- **4-T07's `FrechetCellFilter`** (`fastmace/optimize/cell.py`): implements the same view, so FIRE
+  and LBFGS run unchanged on it.
+  - `x` is ASE's (N + 3) × 3 vector: positions in the original cell, then the cell rows
+    `ecf · logm(cf · F)`. ASE folds `UnitCellFilter`'s `cell_factor` cf = N into the log, so
+    the cell rows carry a constant `ecf · ln(N) · I`. FastMACE evaluates both directions in a
+    shifted form: `expm(X / ecf − ln(cf) I)`, and the log of F itself. Same values, but on
+    matrices of norm ~|log F| instead of ~ln N. Against 40-digit mpmath, ASE's own form costs
+    2e-14 relative in F; the shifted form is exact to 1e-17.
+  - Device matrix functions, no host syncs and no LAPACK:
+    - `expm_3x3` from `integrators/baoab.py`, now for any square size;
+    - `logm_3x3`, by inverse scaling and squaring. It is used only with a `mask`; without one,
+      log F is `X / ecf − ln(cf) I` itself;
+    - ASE's nine `expm_frechet` calls as one 6 × 6 exponential: the adjoint of `L_exp(A, ·)`
+      is `L_exp(Aᵀ, ·)`;
+    - 3 × 3 inverses by cofactors.
+  - `refresh` runs after each force call and in `OptimizerStepper.start`. It computes `x`'s
+    atom rows, the gradient (ASE's `get_forces`) and the energy E + pV.
+  - `set_x` moves positions and cell. It does nothing for a move to the current `x` (a
+    converged step) or for one outside |log F| ≤ 0.5 per element. In the second case
+    `cell_ok` drops, `max_force` becomes NaN, and `driver.relax` raises `FloatingPointError`
+    with the filter's `failure_reason`.
+  - `FixAtoms` and non-periodic cells are refused (D1).
 
 The `Optimizer(dof, config)` methods:
 
