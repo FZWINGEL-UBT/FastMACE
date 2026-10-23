@@ -393,6 +393,9 @@ def analyse(runs, sigmas=SIGMAS, min_block_tau=MIN_BLOCK_TAU):
             for name in OBSERVABLES:
                 blocks = [block for _, data in runs_ for block in blocks_of(data[name], length)]
                 stats[name] = dict(zip(("mean", "se"), block_mean(blocks), strict=True))
+                # Context, not the rule: the SE from the spread of the per-seed means (few degrees of freedom).
+                # With 3 seeds per engine it was larger than the pooled block SE (3b-T05).
+                stats[name]["between_seed_se"] = seed_mean([data[name].mean() for _, data in runs_])[1]
                 stats["blocks"] = len(blocks)
             blocks = [block for _, data in runs_ for block in blocks_of(data["volume_A3_atom"], length)]
             stats["volume_std"] = dict(zip(("mean", "se"), jackknife_std(blocks), strict=True))
@@ -412,6 +415,10 @@ def analyse(runs, sigmas=SIGMAS, min_block_tau=MIN_BLOCK_TAU):
         if len(entry["engines"]) == 2:
             first, second = (entry["engines"][name] for name in sorted(entry["engines"]))
             comparisons = {name: compare(first[name], second[name], sigmas) for name in (*OBSERVABLES, "volume_std")}
+            for name in OBSERVABLES:  # context only: the difference in between-seed SE
+                combined = math.hypot(first[name]["between_seed_se"], second[name]["between_seed_se"])
+                comparisons[name]["between_seed_sigmas"] = (abs(comparisons[name]["difference"]) / combined
+                                                            if combined else math.inf)
             drift = {"volume_drift": compare(first["volume_drift"], second["volume_drift"], sigmas)}
             drift.update({f"volume_window_{i + 1}": compare(a, b, sigmas) for i, (a, b) in
                           enumerate(zip(first["volume_windows"], second["volume_windows"], strict=True))})
@@ -438,7 +445,9 @@ def command_analyse(args):
               f"({entry.get('judged_on', 'no comparison')})")
         judged = entry.get("comparison", {}) if entry.get("stationary") else entry.get("drift_comparison", {})
         for name, item in judged.items():
-            print(f"  {name}: difference {item['difference']:+.4g}, {item['sigmas']:.2f} combined SE")
+            context = (f" ({item['between_seed_sigmas']:.2f} between-seed SE, context)"
+                       if "between_seed_sigmas" in item else "")
+            print(f"  {name}: difference {item['difference']:+.4g}, {item['sigmas']:.2f} combined SE{context}")
     return 0 if all(entry.get("passed") for entry in result["temperatures"].values()) else 1
 
 

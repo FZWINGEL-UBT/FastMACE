@@ -89,6 +89,8 @@ def test_equal_engines_pass_and_a_shifted_volume_fails():
     assert passed["passed"], passed["comparison"]
     assert passed["block_samples"] >= 2 * passed["tau_volume_samples"]
     assert passed["engines"]["ase"]["seeds"] == [101, 102, 103]
+    assert passed["engines"]["ase"]["volume_A3_atom"]["between_seed_se"] > 0  # context, not judged
+    assert "between_seed_sigmas" in passed["comparison"]["volume_A3_atom"]
     se = passed["comparison"]["volume_A3_atom"]["combined_se"]
     shifted = tool.analyse(synthetic_runs(rng, shift=6 * se))["300K"]
     assert not shifted["passed"]
