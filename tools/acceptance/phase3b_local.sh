@@ -117,6 +117,8 @@ case "$job" in
     [ -n "${SEEDS:-}" ] || { echo "npt-ase needs SEEDS" >&2; exit 2; }
     for temperature in ${TEMPERATURES:-300 600}; do
       for seed in $SEEDS; do
+        # seeds run on Modal instead (conductor, 23 October 2026): listed in $root/npt-compare/ase-on-modal
+        if grep -qx "$seed" "$root/npt-compare/ase-on-modal" 2>/dev/null; then note "npt-ase $seed: on Modal, skipped here"; continue; fi
         run npt-ase-${temperature}K-s$seed "$latest" tools/validation/npt_d3_comparison.py run-ase \
           --temperature-K $temperature --seed $seed --output "$root/npt-compare/ase-${temperature}K-s$seed" \
           --checkpoint "$checkpoint" --machine "RTX 5060 Ti (local)"

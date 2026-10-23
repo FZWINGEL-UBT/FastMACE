@@ -1,7 +1,7 @@
 # Phase 3b acceptance report
 
-**Status: draft, 23 October 2026.** Item 2's pre-declared extension is still running; its verdict is filled in when
-it ends. Plan task 3b-T10, branch `fastmace/3b-T10`. The runbook and pass rules were written before any result:
+**Status: complete, 23 October 2026.** Plan task 3b-T10, branch `fastmace/3b-T10`. Items 1, 2, 4 and 5 pass (item 5
+with one per-process timing clause missed); item 3 misses the 10 % cost target, recorded under decision 42. The runbook and pass rules were written before any result:
 [phase-3b-runbook.md](phase-3b-runbook.md).
 
 ## Freeze, copies and scope
@@ -27,7 +27,7 @@ it ends. Plan task 3b-T10, branch `fastmace/3b-T10`. The runbook and pass rules 
 | # | Item | Result |
 | --- | --- | --- |
 | 1 | D3 against torch-dftd and simple-dftd3 | **pass** |
-| 2 | GPU NPT + D3 against ASE (NbCl5 1×1×3, 300 and 600 K) | 600 K **pass** (non-stationary rule); 300 K PE missed at 3.45 SE on 3 seeds, so the pre-declared extension runs (result below) |
+| 2 | GPU NPT + D3 against ASE (NbCl5 1×1×3, 300 and 600 K) | **pass**: 600 K on 3 seeds (non-stationary rule); 300 K on 6 seeds after the pre-declared extension (every observable within 0.56 combined SE) |
 | 3 | Amortised D3 cost against 10 % | **missed, recorded** (decision 42): 24 % dense NVT, about 30 % on the D1 ramp at 0.1 GPa |
 | 4 | NbCl5 NPT melt–quench, end to end | **pass** (0.1 GPa, the owner's alternative (b)); outcome recorded, not judged |
 | 5 | No regression against `fastmace-3`, D3 off | **pass**, except one NbCl5 NVT per-process clause (1.0091 against 1.008), recorded as missed; bitwise CPU float64 and reproducible GPU, NVT and NPT: pass |
@@ -100,7 +100,23 @@ these files out.
 
 - **Pre-declared extension (300 K):** 3 more seeds per engine; the 6-seed comparison decides. FastMACE seeds 4–6
   (local), ASE seeds 104 (Modal L4) and 105–106 (local, the RTX 5060 Ti; `run-ase` with MACE cuEq float32 and
-  torch-dftd float64, as 3b-T05). **Result: pending.**
+  torch-dftd float64, as 3b-T05). The ASE side therefore spans two GPUs (L4 for 101–104, RTX 5060 Ti for 105–106);
+  both run the same float32 cuEq MACE and float64 torch-dftd.
+- **Result on 6 seeds per engine at 300 K: pass.** Blocks of 99 samples (2 τ of PE, τ = 49 samples; τ(V) = 39,
+  τ(P) = 5), 120 blocks per engine:
+
+| Observable | FastMACE | ASE | Difference | Combined SE |
+| --- | ---: | ---: | ---: | ---: |
+| V (Å³/atom) | 28.9992 | 29.0002 | −0.00095 | 0.06 |
+| P (GPa) | −0.00140 | −0.00079 | −0.00061 | 0.32 |
+| PE (eV/atom) | −10.67746 | −10.67737 | −0.00009 | 0.56 |
+| V fluctuation (Å³/atom) | 0.3064 | 0.3021 | +0.0043 | 0.26 |
+| T (K), context | 298.5 | 299.3 | | |
+
+  Both engines are stationary at 300 K (ASE's mean V drift 0.0003 ± 0.0018 Å³/atom/ps). The 3-seed PE miss
+  (3.45 SE) does not persist: the PE difference fell from −0.00077 to −0.00009 eV/atom with 6 seeds, as 3b-T05's
+  diagnosis (a seed-set temperature difference, paired runs equivalent) expected. 600 K stays on its 3-seed
+  verdict (pass).
 
 ## 3. Amortised D3 cost
 
@@ -221,7 +237,7 @@ stress **bitwise equal**, plans equal: **pass**.
 ## Open findings
 
 1. **D3 cost** (item 3): 24–30 % against 10 %. Follow-up: kernel optimisation (3b-T06, "Why it misses").
-2. **Item 2 at 300 K:** decided by the extension (pending).
+2. **Item 2 at 300 K:** passed only after the pre-declared extension; the 3-seed miss was seed noise in PE.
 3. **Item 5's NbCl5 per-process clause** missed by 0.11 points in one same-process A/B; the medians are equal.
 4. **Ada:** the full acceptance tier on an Ada workstation (murphy or leto) once the workstations are back. It also
    covers the two WSL-limited subprocess-worker tests.
