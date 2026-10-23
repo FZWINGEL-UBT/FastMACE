@@ -177,6 +177,19 @@ def next_part_name(parts):
     return f"{int(parts[-1].name[:3]) + 1:03d}.tar.gz" if parts else "000.tar.gz"
 
 
+def claim_part(directory, incoming):
+    """``incoming`` becomes the store's next part; ``os.link`` fails on an existing name, so two jobs finishing
+    together on the same key take different numbers."""
+    while True:
+        part = Path(directory) / next_part_name(cache_parts(directory))
+        try:
+            os.link(incoming, part)
+        except FileExistsError:
+            continue
+        os.unlink(incoming)
+        return part
+
+
 def requirements_text(text, overrides=OVERRIDES, extras=EXTRAS):
     out = []
     for line in text.splitlines():
@@ -408,10 +421,9 @@ def run_job(args, colab=run_colab):
         job.download(f"{REMOTE}/out.tar.gz", job.work / "out.tar.gz")
         if changed and not args.dry_run:
             cache.mkdir(parents=True, exist_ok=True)
-            part = cache / next_part_name(parts)
-            partial = part.with_suffix(".part")
-            job.download(f"{REMOTE}/cache-out.tar.gz", partial)
-            partial.replace(part)
+            incoming = cache / f".incoming-{job.session}"
+            job.download(f"{REMOTE}/cache-out.tar.gz", incoming)
+            part = claim_part(cache, incoming)
             record["cache_bytes_out"] = part.stat().st_size
         record["cache_saved"] = changed
         timings["pack_download_s"] = round(time.time() - t, 1)

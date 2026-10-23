@@ -310,3 +310,25 @@ def test_a_large_cache_part_goes_up_in_chunks(tmp_path, monkeypatch):
     fc.run_job(args, colab)
     assert [c[-1] for c in colab.calls if c[1] == "upload" and "cache-in" in c[-1]] == [
         f"/content/fm_cache-in-000.tar.gz.chunk{n:03d}" for n in range(3)]
+
+
+def test_a_part_claimed_meanwhile_is_not_overwritten(tmp_path):
+    cache = tmp_path / "k"
+    cache.mkdir()
+    (cache / "000.tar.gz").write_bytes(b"a")
+    incoming = cache / ".incoming-s"
+    incoming.write_bytes(b"b")
+    real_link = fc.os.link
+
+    def racing_link(src, dst):  # another job takes 001 between the listing and the link
+        if Path(dst).name == "001.tar.gz" and not Path(dst).exists():
+            Path(dst).write_bytes(b"other")
+        return real_link(src, dst)
+
+    fc.os.link = racing_link
+    try:
+        part = fc.claim_part(cache, incoming)
+    finally:
+        fc.os.link = real_link
+    assert part.name == "002.tar.gz" and part.read_bytes() == b"b"
+    assert (cache / "001.tar.gz").read_bytes() == b"other" and not incoming.exists()
