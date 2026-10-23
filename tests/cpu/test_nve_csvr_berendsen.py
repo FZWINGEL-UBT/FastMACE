@@ -539,3 +539,47 @@ def test_csvr_state_dict_round_trip():
         dyn.load_state_dict({})
     with pytest.raises(ValueError):
         build(NVE, new_state(atoms)).load_state_dict({"transferred_energy": 0.0})
+
+
+# -------------------------------------------------------------------------- through the planner and Simulation
+
+@pytest.fixture(scope="module")
+def loaded(tmp_path_factory):
+    pytest.importorskip("cuequivariance_torch")
+    from _support.tiny_models import tiny_mace_model
+    from fastmace.model import loading
+
+    path = tmp_path_factory.mktemp("models") / "tiny-mh1-11-17.model"
+    torch.save(tiny_mace_model([11, 17], **FAMILIES["mh1"]), path)
+    loading._LICENCES_SHOWN.add(str(path))  # no licence warning noise
+    return loading.load_pristine(str(path), trusted=True)
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+@pytest.mark.parametrize("record", [NVE, CSVR_RECORD, NVT_BERENDSEN, NPT_BERENDSEN, INHOMOGENEOUS],
+                         ids=["nve", "csvr", "nvt-berendsen", "npt-berendsen", "inhomogeneous"])
+def test_simulation_runs_each_scheme(loaded, monkeypatch, record):
+    """4-T01's planner dispatch builds these integrators from the public records; a short run moves the atoms."""
+    from fastmace.config import EngineConfig
+    from fastmace.engine import constraints
+    from fastmace.model.forcefield import ForceField
+    from fastmace.planner import minimal
+    from fastmace.planner.workload import Workload
+    from fastmace.simulation import Simulation
+
+    planner = minimal.MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"), environ={},
+                                     process=constraints.ProcessRecord())
+    monkeypatch.setattr(minimal, "default_planner", lambda force_field: planner)
+    atoms = nacl(seed=13)
+    sim = Simulation(atoms, ForceField(loaded, atoms, precision="float64"), integrator=record,
+                     workload=Workload(max_temperature_K=700.0), seed=SEED)
+    integrator = sim._engine.integrator
+    expected = {"nve": VelocityVerlet, "csvr": CSVR, "berendsen": Berendsen}[record.to_config(seed=0).scheme]
+    assert type(integrator) is expected and integrator.config.scheme == record.to_config(seed=0).scheme
+    assert sim.plan.integrator.dof == "ase"
+    before = sim.committed().positions.copy()
+    sim.run(steps=5)
+    after = sim.committed()
+    assert np.abs(after.positions - before).max() > 1e-4
+    if record.to_config(seed=0).variable_cell:
+        assert not np.allclose(after.cell, atoms.cell.array)
