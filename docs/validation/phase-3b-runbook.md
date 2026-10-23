@@ -153,9 +153,20 @@ above, with the result log and junit.
   ASE script, its environment and its settings are unchanged; the FastMACE side reruns at the freeze.
 - **Per temperature and observable** (mean V, V fluctuation as the standard deviation of V, mean P, mean PE
   per atom): |FastMACE − ASE| ≤ 3 √(SE_F² + SE_A²).
-- **SE of each engine:** block averages over blocks of at least twice the observable's decorrelation time,
-  pooled over the seeds (not the spread of 3 seed means, which has 2 degrees of freedom). For the V
-  fluctuation, a jackknife over the same blocks. The report gives the decorrelation times and block counts.
+- **SE of each engine:** block averages over one common block length of at least twice the longest
+  decorrelation time among V, P and PE (over all runs of both engines at that temperature), pooled over the
+  seeds (not the spread of 3 seed means, which has 2 degrees of freedom). For the V fluctuation, a jackknife
+  over the same blocks. The report gives every observable's decorrelation time and the block counts. (Why: at
+  300 K τ(PE) ≈ 49 samples ≈ the thermostat's T_tau, twice τ(V) ≈ 24. Blocks sized on τ(V) underestimated
+  the PE SE: 4.3 SE instead of 3.45.)
+- **Non-stationary temperature:** if for either engine |mean V drift| × production time exceeds the standard
+  deviation of V, the means depend on the window. That temperature is judged on the mean V drift per engine
+  and the mean V in 4 consecutive production windows, with SEs from the seed spread (the report states the
+  degrees of freedom). The stationary numbers are reported but not judged. (NbCl5 at 600 K: V grows
+  32 → 49 Å³/atom in 20 ps on both engines.)
+- **Provenance of these two bullets:** written on 23 October 2026 by 3b-T05, at the conductor's request,
+  after 3b-T05's own comparison runs (not before any result, as the rest of this runbook was). The tool is
+  `tools/validation/npt_d3_comparison.py analyse` (fastmace/3b-T05-rebased). The report says so.
 - **One pre-declared extension:** if a comparison misses, 3 more seeds per engine run for that temperature,
   and the 6-seed comparison decides. Still missing: the item fails and goes to the conductor.
 - Not judged: whether NbCl5 stays solid at 600 K (decision 6).
