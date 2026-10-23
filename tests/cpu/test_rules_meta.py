@@ -26,7 +26,7 @@ HELPERS = {("integrators/registry.py", "_reason"): (1, 1), ("planner/reproducibl
 # Rules whose codes the library still emits without the number (5-T02 numbers them, then removes the rule here).
 NUMBERLESS = {1, 5, 6, 8, 9, 14}
 # Rules without a test marked rule(n) yet (5-T02's conformance suite marks them, then removes the rule here).
-UNTESTED = set(rules.NUMBERS)
+UNTESTED = set(rules.NUMBERS) - {12}  # 12: 5-T03 (tests/cpu/test_memory_estimate.py)
 
 
 # --------------------------------------------------------------------------- the static scan

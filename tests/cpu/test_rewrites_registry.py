@@ -78,7 +78,8 @@ def test_record_has_exactly_the_spec_fields():
     names = [field.name for field in reg.dataclasses.fields(Rewrite)]
     assert names == ["name", "applies_to", "requires", "conflicts", "mace_versions", "source_hashes",
                      "exactness", "default", "workload_constraints", "apply", "selfcheck",  # SPEC §6.1
-                     "deterministic"]  # §9.3 "reproducible=True", 2-T01
+                     "deterministic",  # §9.3 "reproducible=True", 2-T01
+                     "memory"]  # §9.3 rule 12's term, 5-T03
 
 
 def test_record_normalises_and_validates():

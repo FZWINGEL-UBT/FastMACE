@@ -44,6 +44,7 @@ import inspect
 import types
 
 from fastmace.model.capabilities import first_inputs_species_only
+from fastmace.rewrites import memory as memory_terms
 from fastmace.rewrites.generic import modules as gm
 from fastmace.rewrites.registry import Support, check_tensors
 
@@ -347,12 +348,12 @@ def _selfcheck_streaming(original, rewritten, context):
 
 
 def _record(name, config_field, applies_to, exactness, constraints, apply, selfcheck, requires=(),
-            deterministic=True):
+            deterministic=True, memory=None):
     # deterministic as the MH-1 records (SPEC §9.3, 2-T16): the streaming and segmented variants are not.
     return dict(name=name, config_field=config_field, applies_to=applies_to, requires=requires, conflicts=(),
                 mace_versions=MACE_VERSIONS, source_hashes=gm.source_hashes(), exactness=exactness,
                 default="auto", workload_constraints=constraints, apply=apply, selfcheck=selfcheck,
-                deterministic=deterministic)
+                deterministic=deterministic, memory=memory)
 
 
 # In the research engine's order (generic_rewrites): skip, reassociation, fused backward, streaming.
@@ -362,7 +363,8 @@ RECORDS = {
         apply_species_skip, _selfcheck_species_skip),
     "generic_reassociate": _record(
         "generic_reassociate", "reassociate_first", _support_reassociate, "rounding",
-        ("single_graph", "fixed_species_superset"), apply_reassociate, _selfcheck_reassociate),
+        ("single_graph", "fixed_species_superset"), apply_reassociate, _selfcheck_reassociate,
+        memory=memory_terms.generic_reassociate),
     # GENERIC_REASSOCIATE builds its reassociation with segmented=SEGMENTED_FIRST_SUM.
     "generic_segmented_first_sum": _record(
         "generic_segmented_first_sum", "segmented_first_sum", _support_reassociate, "exact",
@@ -373,7 +375,8 @@ RECORDS = {
         apply_fused_radial_backward, _selfcheck_fused_radial_backward),
     "generic_streaming": _record(
         "generic_streaming", "streaming_conv", _support_streaming, "exact",
-        ("sort_receivers", "per_engine_edge_counter"), apply_streaming, _selfcheck_streaming, deterministic=False),
+        ("sort_receivers", "per_engine_edge_counter"), apply_streaming, _selfcheck_streaming, deterministic=False,
+        memory=memory_terms.streaming_conv),
 }
 
 __all__ = ["NODE_ATTRS", "RECORDS", "apply_fused_radial_backward", "apply_reassociate", "apply_species_skip",

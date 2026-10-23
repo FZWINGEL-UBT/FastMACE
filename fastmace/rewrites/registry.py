@@ -172,6 +172,10 @@ class Rewrite:
     # Bitwise-deterministic on CUDA under torch.use_deterministic_algorithms(True) (SPEC §9.3
     # "reproducible=True"): True, False, or None = undeclared, which a reproducible plan refuses.
     deterministic: bool | None = None
+    # Rule 12's term (5-T03): memory(dims, width) -> (bytes per edge, bytes per node) this rewrite adds to stock
+    # MACE's force call at its peak (negative: a stock tensor it does not keep), from the model's
+    # ``capabilities.ModelDims`` and the force precision's bytes per float. None: no change declared.
+    memory: Callable[[Any, int], Any] | None = None
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name:
@@ -198,6 +202,8 @@ class Rewrite:
         if self.deterministic is not None and not isinstance(self.deterministic, bool):
             raise ValueError(f"Rewrite {self.name}: deterministic must be True, False or None, "
                              f"got {self.deterministic!r}")
+        if self.memory is not None and not callable(self.memory):
+            raise ValueError(f"Rewrite {self.name}: memory is not callable")
 
     @classmethod
     def from_dict(cls, mapping):

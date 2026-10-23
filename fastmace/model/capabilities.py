@@ -72,6 +72,50 @@ class E0Class:
 
 
 @dataclass(frozen=True)
+class InteractionDims:
+    """One interaction's widths, in floats per edge or per node (SPEC §9.3 rule 12's estimate, 5-T03).
+
+    - ``sender``: the features gathered per edge (the tensor product's first input);
+    - ``edge_attrs``: the spherical harmonics, ``(lmax + 1)**2``; ``edge_feats``: the radial basis;
+    - ``radial``: the convolution's radial network's layer widths, input first and ``weight_numel`` last;
+    - ``radial_saved``: the floats its backward keeps per hidden unit (1 for e3nn's FullyConnectedNet,
+      whose activation keeps only its input; 2 for MACE's RadialMLP, Linear → LayerNorm → SiLU);
+    - ``other_radials``: ``(widths, saved)`` of the interaction's other per-edge networks (the density
+      normalisation ``density_fn``);
+    - ``messages``: the tensor product's output (``irreps_mid``) per edge;
+    - ``node_in``, ``target``, ``hidden``: node features in, after the convolution, after the product;
+    - ``correlation``: the product's body order.
+    """
+
+    sender: int
+    edge_attrs: int
+    edge_feats: int
+    radial: tuple[int, ...]
+    messages: int
+    node_in: int
+    target: int
+    hidden: int
+    correlation: int
+    radial_saved: int = 1
+    other_radials: tuple[tuple[tuple[int, ...], int], ...] = ()
+
+    @property
+    def weight_numel(self) -> int:
+        return self.radial[-1] if self.radial else 0
+
+
+@dataclass(frozen=True)
+class ModelDims:
+    """The dimensions of a model that its memory scales with (``model_dims``): parameter count, element
+    count, heads and one ``InteractionDims`` per interaction."""
+
+    parameters: int
+    elements: int
+    heads: int
+    interactions: tuple[InteractionDims, ...]
+
+
+@dataclass(frozen=True)
 class ModelTraits:
     """What the planner needs to know about a loaded model (SPEC §9.2 "Model traits").
 
@@ -95,6 +139,8 @@ class ModelTraits:
     e0: tuple[E0Class, ...]  # per head (in ``heads`` order), then per element (``atomic_numbers`` order)
     e0_dtype: str | None  # dtype of the stored E0 table (POLAR-1 float32, OMOL-0 and MH-1 float64)
     rewrite_support: Mapping[str, RewriteSupport]
+    # The widths rule 12's memory estimate reads (5-T03); None where the model's layout is not MACE's.
+    dims: ModelDims | None = None
 
     def _head(self, head):
         if head is None:
@@ -369,4 +415,73 @@ def model_traits(model: Any) -> ModelTraits:
         e0=e0,
         e0_dtype=e0_dtype,
         rewrite_support=MappingProxyType(rewrite_support(model)),
+        dims=model_dims(model),
     )
+
+
+def _dim(irreps) -> int:
+    """An irreps' dimension; MACE keeps some as strings (the last interaction's ``hidden_irreps``)."""
+    if isinstance(irreps, str):
+        total = 0
+        for term in filter(None, (part.strip() for part in irreps.split("+"))):
+            mul, _, irrep = term.rpartition("x")
+            total += int(mul or 1) * (2 * int(irrep[:-1]) + 1)
+        return total
+    return int(getattr(irreps, "dim", 0) or 0)
+
+
+def _radial(net, fallback: int = 0) -> tuple[tuple[int, ...], int]:
+    """A radial network's layer widths (input first; e3nn's FullyConnectedNet and MACE's RadialMLP keep
+    them in ``hs``) and the floats its backward keeps per hidden unit: the elementwise modules per hidden
+    layer of a ``torch.nn.Sequential`` (RadialMLP's LayerNorm and SiLU: 2), else 1 (e3nn's layers keep
+    only the activation's input)."""
+    widths = tuple(int(width) for width in (getattr(net, "hs", None) or ()))
+    if not widths:
+        return ((fallback,) if fallback else ()), 1
+    hidden_layers = max(1, len(widths) - 2)
+    sequential = getattr(net, "net", None)
+    children = list(sequential.children()) if sequential is not None and hasattr(sequential, "children") else []
+    elementwise = [child for child in children if type(child).__name__ != "Linear"]
+    return widths, max(1, len(elementwise) // hidden_layers) if elementwise else 1
+
+
+# Per-edge networks of an interaction besides the convolution's radial network (the density families
+# and MH-1's density normalisation).
+_OTHER_RADIALS = ("density_fn",)
+
+
+def _correlation(product) -> int:
+    contractions = getattr(getattr(product, "symmetric_contractions", None), "contractions", None) or ()
+    for contraction in contractions:
+        if getattr(contraction, "correlation", None):
+            return int(contraction.correlation)
+    return 1
+
+
+def model_dims(model: Any) -> ModelDims | None:
+    """The widths of a loaded MACE model (``ModelDims``), from its interactions' irreps; ``None`` when the
+    model has no MACE interactions (a stand-in)."""
+    if not hasattr(model, "interactions") and hasattr(model, "models"):
+        model = model.models[0]
+    interactions = list(getattr(model, "interactions", None) or ())
+    products = list(getattr(model, "products", None) or ())
+    if not interactions or not all(hasattr(block, "edge_attrs_irreps") for block in interactions):
+        return None
+    out = []
+    for index, block in enumerate(interactions):
+        conv_tp = getattr(block, "conv_tp", None)
+        sender = getattr(conv_tp, "irreps_in1", None) or getattr(block, "edge_irreps", None) or block.node_feats_irreps
+        product = products[index] if index < len(products) else None
+        radial, saved = _radial(getattr(block, "conv_tp_weights", None), int(getattr(conv_tp, "weight_numel", 0) or 0))
+        others = tuple(_radial(getattr(block, name)) for name in _OTHER_RADIALS if hasattr(block, name))
+        out.append(InteractionDims(
+            sender=_dim(sender), edge_attrs=_dim(block.edge_attrs_irreps),
+            edge_feats=_dim(getattr(block, "edge_feats_irreps", None)),
+            radial=radial, messages=_dim(getattr(conv_tp, "irreps_out", None)),
+            node_in=_dim(block.node_feats_irreps), target=_dim(block.target_irreps),
+            hidden=_dim(getattr(block, "hidden_irreps", None)), correlation=_correlation(product),
+            radial_saved=saved, other_radials=tuple(other for other in others if other[0])))
+    heads = getattr(model, "heads", None) or ("Default",)
+    return ModelDims(parameters=sum(int(p.numel()) for p in model.parameters()),
+                     elements=len(_ints(getattr(model, "atomic_numbers", None))), heads=len(heads),
+                     interactions=tuple(out))

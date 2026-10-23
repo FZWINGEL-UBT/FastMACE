@@ -51,6 +51,7 @@ record it enforces.
 from __future__ import annotations
 
 import dataclasses
+import functools
 import importlib.util
 import warnings
 from collections.abc import Mapping
@@ -173,6 +174,33 @@ def _cuda_initialised() -> bool:
 
     torch = sys.modules.get("torch")
     return torch is not None and bool(torch.cuda.is_initialized())
+
+
+def _on_cuda(model) -> bool:
+    """Whether a loaded model's weights are on a CUDA device already (rule 12 then counts them as resident)."""
+    parameters = getattr(model, "parameters", None)
+    if not callable(parameters):
+        return False
+    try:
+        return bool(next(iter(parameters())).is_cuda)
+    except (StopIteration, TypeError, AttributeError):
+        return False
+
+
+def _family_applies(record, traits) -> bool:
+    """Whether a record's family fits the model: the MH-1 records need its factored interactions, the generic
+    ones the generic interactions (the two families share their ``RewriteConfig`` fields)."""
+    family = record.apply.__module__.removeprefix("fastmace.rewrites.").split(".")[0]
+    return {"mh1": traits.factored, "generic": traits.generic}.get(family, True)
+
+
+@functools.lru_cache(maxsize=1)
+def _rewrite_registry():
+    """The default rewrite registry (``rewrites.registry.default_registry``), built once per process; rule 12
+    reads its records' memory terms and dependants."""
+    from fastmace.rewrites import registry as reg
+
+    return reg.default_registry()
 
 
 def _in_child(plan, reason):
@@ -593,6 +621,7 @@ class MinimalPlanner:
                                                       allow_naive_cueq, loaded)
         rule_11 = self._rule_11(traits, atoms, superset, integrator, workload)
         self._workload_decisions(book, workload, rule_11, mode)
+        d3_memory = None
         if reference:
             parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend,
                                           rule_11, mc=(workload.mc_moves, workload.mc_energy_precision),
@@ -606,18 +635,20 @@ class MinimalPlanner:
                                                                           workload.mc_energy_precision),
                                                                       optimizer=optimizer)
             if d3_cutoff_A is not None:
-                parts["neighbours"] = self._d3_list(book, parts["neighbours"], atoms, superset, integrator,
-                                                    workload, hardware, float(d3_cutoff_A))
+                parts["neighbours"], d3_memory = self._d3_list(book, parts["neighbours"], atoms, superset,
+                                                               integrator, workload, hardware, float(d3_cutoff_A))
                 parts["decisions"] = tuple(book.decisions)
         if mode == "eager":
             self._eager(book, parts, traits)
         elif mode == fixed.COMPILED_TIER:
             self._compiled(book, parts, traits, mode_reason)
+        predicted = self._rule_12(book, parts, traits, atoms, hardware, requested, d3_memory, loaded)
         book.raise_refusals()
         parts["requested"] = parts["requested"] + requested
         allowances = tuple(name for name, used in (("allow_naive_cueq", allow_naive_cueq),
                                                    ("allow_reference", allow_reference)) if used)
         plan = Plan(**parts, superset=superset, workload=workload, software=software, allowances=allowances,
+                    predicted_memory_bytes=predicted,
                     reason="reference tier (phase 2)" if reference else "minimal plan (phase 1b)")
         if workload.reproducible:
             plan = self._qualify(plan, traits)
@@ -754,7 +785,8 @@ class MinimalPlanner:
         return bool(workload.mc_moves or workload.species_changes), sized
 
     def _d3_list(self, book, neighbours, atoms, superset, integrator, workload, hardware, cutoff_A):
-        """Rules 11 and 12 for the D3 pair list (3b-T02): its skin into ``neighbours``, and its memory."""
+        """Rules 11 and 12 for the D3 pair list (3b-T02): ``neighbours`` with its skin, and its memory estimate
+        (``Rule12D3``, which the model's estimate adds; 5-T03)."""
         from ase import units
         from ase.data import atomic_masses
 
@@ -797,7 +829,7 @@ class MinimalPlanner:
             book.decide("d3 list memory", "warn", Reason(text, rule=12, code="rule-12-d3-warn"))
         else:
             book.decide("d3 list memory", "fits", Reason(memory.text(), rule=12, code="rule-12-d3"))
-        return dataclasses.replace(neighbours, d3_skin=skin)
+        return dataclasses.replace(neighbours, d3_skin=skin), memory
 
     def _free_memory_bytes(self, hardware):
         """Free device memory at plan time: CUDA's own count once this process has initialised CUDA (the planner
@@ -809,6 +841,92 @@ class MinimalPlanner:
 
             return int(torch.cuda.mem_get_info(torch.device(self.engine.device))[0])
         return hardware.memory_bytes
+
+    def _rule_12(self, book, parts, traits, atoms, hardware, requested, d3_memory=None, loaded=None):
+        """Rule 12 for the MACE model (5-T03, decision 51): the estimate (``planner.memory``) as the decision
+        ``memory``, and its action. Above ``memory.MARGIN`` of the free GPU memory the rewrites whose terms add
+        an edge-sized buffer go off, largest first, each with its dependants and rule 12's reason, until the
+        estimate fits; a rewrite the caller set is never turned off, nor are rule 11's sizes, the tier or the
+        precision. Still above, the plan stays and warns. Returns the predicted bytes (``None``: not
+        estimated)."""
+        from fastmace.planner import memory
+
+        dims = traits.dims
+        if dims is None or not traits.r_max:
+            book.decide("memory", "not estimated", Reason(
+                "rule 12: the model's widths are unknown (not a MACE interaction layout)", rule=12,
+                code="rule-12-memory"))
+            parts["decisions"] = tuple(book.decisions)
+            return None
+        registry = _rewrite_registry()
+        requests = registry.requested(parts["rewrites"])
+        enabled = [name for name in registry.order()
+                   if requests.get(name) == "on" and _family_applies(registry[name], traits)]
+        fields = {}
+        for name in registry.names():
+            fields.setdefault(registry.config_field(name), []).append(name)
+        explicit = {name for item, _ in (*parts["requested"], *requested) if item.startswith("RewriteConfig.")
+                    for name in fields.get(item.split(".", 1)[1], ())}
+        neighbours, dtype = parts["neighbours"], parts["precision"].dtype
+        natoms, volume = len(atoms), float(atoms.get_volume())
+        skin = float(neighbours.skin) if neighbours.skin != "auto" else 0.0
+        edges = memory.model_edges(natoms, volume, traits.r_max, neighbours.edge_bucket_fraction)
+        capacity = memory.list_capacity(natoms, volume, traits.r_max + skin, neighbours.capacity_headroom,
+                                        neighbours.edge_multiple)
+        cuda = str(self.engine.device).startswith("cuda")
+        resident = cuda and _cuda_initialised() and _on_cuda(loaded)
+        free = self._free_memory_bytes(hardware)
+        engine = parts["engine"]
+        # OEq's convolution (hybrid) and cuEq's fused one keep neither gathered senders nor messages per edge.
+        fused_conv = engine.backend == "hybrid" or engine.cueq_conv_fusion == "on"
+
+        def estimate(names):
+            terms = memory.rewrite_memory_terms(registry, dims, names, dtype)
+            return memory.estimate(dims, edges=edges, nodes=natoms, dtype=dtype, capacity=capacity, list_dtype=dtype,
+                                   rewrite_terms=terms, d3=d3_memory, resident_weights=resident, workspace=cuda,
+                                   fused_conv=fused_conv)
+
+        found = estimate(enabled)
+        dropped = []
+        if not memory.fits(found, free):
+            terms = dict(memory.rewrite_memory_terms(registry, dims, enabled, dtype))
+            edge_sized = {name for name, term in terms.items() if term.edge_sized}
+            for name in memory.drop_order(found.rewrite_terms, edge_sized, explicit):
+                if name not in enabled:
+                    continue
+                group = [name, *(other for other in registry.dependants(name) if other in enabled)]
+                if explicit.intersection(group):
+                    continue  # its dependants were set by the caller: never turned off by a rule
+                before = found
+                enabled = [other for other in enabled if other not in group]
+                found = estimate(enabled)
+                for other in group:
+                    dropped.append((other, name, before.total - found.total))
+                if memory.fits(found, free):
+                    break
+        for name, cause, saved in dropped:
+            field = registry.config_field(name)
+            parts["rewrites"] = dataclasses.replace(parts["rewrites"], **{field: "off"})
+            why = (f"off by rule 12: the estimate does not fit {memory.MARGIN:.0%} of the free GPU memory; turning "
+                   + (f"{name} off saves about {saved / 2**20:.0f} MiB" if cause == name else
+                      f"off {cause}, which {name} requires") + " (decision 51)")
+            book.decisions[:] = [entry for entry in book.decisions if entry[0] != f"RewriteConfig.{field}"]
+            book.decide(f"RewriteConfig.{field}", "off", Reason(why, rule=12, code="rule-12-memory-drop"))
+        text = found.text(free)
+        if memory.fits(found, free):
+            how = "fits" if free else "not checked"
+            why = text if free else f"{text}; no GPU memory to compare (device {self.engine.device})"
+            book.decide("memory", how, Reason(f"rule 12: {why}", rule=12, code="rule-12-memory"))
+        else:
+            kept = sorted(explicit.intersection(enabled))
+            why = (f"rule 12: {text}, above {memory.MARGIN:.0%} of the free memory"
+                   + (f" after turning off {', '.join(name for name, _, _ in dropped)}" if dropped else "")
+                   + (f"; kept as set: {', '.join(kept)}" if kept else "")
+                   + "; the run may run out of memory (decision 51)")
+            warnings.warn(why, ResourceWarning, stacklevel=4)
+            book.decide("memory", "warn", Reason(why, rule=12, code="rule-12-memory-warn"))
+        parts["decisions"] = tuple(book.decisions)
+        return found.total
 
     def _workload_decisions(self, book, workload, rule_11, mode="graph"):
         applies, sized = rule_11

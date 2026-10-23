@@ -335,6 +335,13 @@ def _propagates(error) -> bool:
     return type(error).__name__ == "OutOfMemoryError"  # torch.cuda.OutOfMemoryError, without importing torch
 
 
+def _with_estimate(error, plan):
+    """An out-of-memory error with rule 12's estimate in its message (decision 51); any other error as it is."""
+    from fastmace.planner.memory import annotate_out_of_memory
+
+    return annotate_out_of_memory(error, plan)
+
+
 def stage_of(error, default: str = "build") -> str:
     """The stage an error before the first step was raised in: ``"capture"`` for an error the graph
     engine tagged while capturing (``engine.graph.CAPTURE_STAGE``, 2-T15b), ``"self-check"``,
@@ -497,13 +504,13 @@ def activate(candidate: Any, planner: Any, force_field: Any, atoms: Any, *, refe
                                temperature_K=temperature_K)
     except Exception as error:
         if _propagates(error):
-            raise
+            raise _with_estimate(error, candidate)
         return failed(_build_stage(error), error)
     try:
         _prepare(engine)
     except Exception as error:
         if _propagates(error):
-            raise
+            raise _with_estimate(error, candidate)
         del engine
         return failed(stage_of(error, "capture"), error)
 
@@ -912,7 +919,7 @@ class Fallback:
             _prepare(engine)
         except Exception as error:
             if _propagates(error):
-                raise
+                raise _with_estimate(error, plan)
             return False, _build_stage(error), detach(error)
         extra = {} if quantities is None else {"quantities": tuple(quantities)}
         try:
