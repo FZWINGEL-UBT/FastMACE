@@ -105,7 +105,7 @@ case "$job" in
     ;;
   npt-compare)  # item 2: the FastMACE side at the freeze (3b-T05's tool and settings), seeds 1-3 (EXTRA_SEEDS: the
     # pre-declared extension, e.g. "4 5 6"); the ASE side is 3b-T05's (cited, unchanged), analysed together
-    for temperature in 300 600; do
+    for temperature in ${TEMPERATURES:-300 600}; do
       for seed in ${SEEDS:-1 2 3}; do
         run npt-fastmace-${temperature}K-s$seed "$hybrid" tools/validation/npt_d3_comparison.py run-fastmace \
           --temperature-K $temperature --seed $seed --output "$root/npt-compare/fastmace-${temperature}K-s$seed" \
