@@ -62,6 +62,7 @@ from fastmace.rewrites import versions
 
 from . import fixed, rules
 from . import reproducible as reproducible_mode
+from . import warnings as known_issues
 from .plan import Hardware, Plan, SelfCheck, SoftwareTraits
 
 MODES = ("graph", "compiled", "eager", "reference")
@@ -595,6 +596,9 @@ class MinimalPlanner:
                                                       allow_naive_cueq, loaded)
         rule_11 = self._rule_11(traits, atoms, superset, integrator, workload)
         self._workload_decisions(book, workload, rule_11, mode)
+        model_label = None if loaded is None else known_issues.label_of(
+            getattr(loaded, "label", None), getattr(loaded, "head", None), getattr(loaded, "sha256", None))
+        known_issues.decide(book, model_label, _symbols(superset).split(), variable_cell=npt, n_atoms=len(atoms))
         if reference:
             parts = self._reference_parts(book, traits, atoms, integrator, hardware, rewrites, precision, backend,
                                           rule_11, mc=(workload.mc_moves, workload.mc_energy_precision),
