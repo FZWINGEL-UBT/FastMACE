@@ -285,11 +285,11 @@ and the A100's (`4-T13-colab-a100-<date>`) with its untimed share.
 - **Trajectories, bitwise:** CPU float64 (NVT and NPT, D3 off and on) and the reproducible GPU plan (NVT and NPT,
   D3 off): every row's positions, energy, temperature (under NPT, cell and pressure) equal.
 - **Restart across versions:** `restart-across` equals the baseline's uninterrupted run bitwise.
-  - *Seen in the tools' CPU dry run before the freeze (ff80ca2 against 4-T13 at a2bfbb5, tiny model):* the
-    format-3 restart resumes only with `allow_plan_change=True` ("the plan differs from the restart's in
-    integrator": phase 4's new integrator plan fields), and is then bitwise equal. Reported to the conductor;
-    whether resuming without `allow_plan_change` is part of the pass rule is the conductor's call before the
-    freeze. The job records which way it resumed (`plan_change`).
+  - **And it resumes without `allow_plan_change`, with no new plan revision** (conductor, 23 October 2026: SPEC
+    §10.6 promises that older files load). The tools' CPU dry run before the freeze found the refusal ("the plan
+    differs from the restart's in integrator": a format-3 plan record has no `dof`, read back as `"auto"` against
+    the fresh plan's resolved `"fastmace"`). The fix is on `fastmace/4-T13-restart-compat` (de9fc21), merged
+    before the freeze. The job records which way it resumed (`plan_change`).
 
 **Recorded, not acceptance** (choices 7 and 8, decision 6).
 - NVE energy drift (float32 hybrid, NaCl and NbCl5, 20 ps): linear drift per ps and atom, RMS fluctuation;
