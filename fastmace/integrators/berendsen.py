@@ -88,7 +88,7 @@ class Berendsen(Integrator):
                 self.pressure_coefficient = self.dt * compressibility / taup / 3.0
                 flags = [float(bool(pbc)) * flag for pbc, flag in zip(state.pbc, self.mask)]
                 self.flags = torch.tensor(flags, **f64)
-            self.pressure = torch.zeros((), **f64)
+            self.berendsen_pressure = torch.zeros((), **f64)
             self.set_pressure(config.pressure_GPa)
         if temperature_K is None:
             temperature_K = 0.0 if config.temperature_K is None else config.temperature_K
@@ -106,7 +106,8 @@ class Berendsen(Integrator):
         """Fill the pressure target (GPa; a device fill between steps)."""
         if not self.barostat:
             raise NotImplementedError("NVT Berendsen keeps a fixed cell: it has no pressure target")
-        if isinstance(pressure_GPa, bool) or not isinstance(pressure_GPa, (int, float)) or not np.isfinite(pressure_GPa):
+        if (isinstance(pressure_GPa, bool) or not isinstance(pressure_GPa, (int, float))
+                or not np.isfinite(pressure_GPa)):
             raise ValueError(f"pressure_GPa must be a finite number of GPa, got {pressure_GPa!r}")
         self.restore_externalstress(-pressure_GPa * units.GPa)
 
@@ -123,7 +124,7 @@ class Berendsen(Integrator):
         value = np.asarray(externalstress, dtype=np.float64)
         if value.shape != () or not np.isfinite(value):
             raise ValueError(f"Berendsen's external stress is a finite scalar, got {externalstress!r}")
-        self.pressure.fill_(-float(value))
+        self.berendsen_pressure.fill_(-float(value))
         self.externalstress_host = value.copy()
 
     def prepare_step(self, state: SimulationState) -> None:
@@ -147,10 +148,10 @@ class Berendsen(Integrator):
         stress = state.stress - kinetic / volume
         if self.mask is None:
             old_pressure = -torch.diagonal(stress).sum() / 3
-            factor = 1.0 - self.pressure_coefficient * (self.pressure - old_pressure)
+            factor = 1.0 - self.pressure_coefficient * (self.berendsen_pressure - old_pressure)
             new_cell = factor * cell
         else:
-            factor = 1.0 - self.pressure_coefficient * (self.pressure + torch.diagonal(stress)) * self.flags
+            factor = 1.0 - self.pressure_coefficient * (self.berendsen_pressure + torch.diagonal(stress)) * self.flags
             new_cell = factor[:, None] * cell
         transform = inverse_3x3(cell) @ new_cell
         state.positions.copy_(times_3x3(state.positions, transform))

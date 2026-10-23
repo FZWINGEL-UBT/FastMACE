@@ -187,6 +187,15 @@ def test_buffers_have_policies_and_addresses_stay_fixed(record):
     assert set(dyn.state_dict()) == set(dyn.record.state_keys)
 
 
+def test_declared_buffer_policies_are_the_ones_the_registry_returns():
+    """No other scheme's record shadows a name these records declare (4-T03's MTK declares its own pressure)."""
+    reg = scheme_registry.registry()
+    for scheme in ("nve", "csvr", "berendsen"):
+        for name, restart, recompute in reg.integrator(scheme).buffers:
+            policy = policy_for(f"integrator.{name}")
+            assert (policy.restart, policy.recompute) == (restart, recompute), (scheme, name)
+
+
 def test_output_values_and_the_conserved_quantity():
     atoms = nacl(seed=3)
     for record in (NVE, CSVR_RECORD, NVT_BERENDSEN, NPT_BERENDSEN):
@@ -455,13 +464,13 @@ def test_berendsen_pressure_target_is_a_device_fill():
     atoms = nacl(seed=10)
     state = new_state(atoms, compute_stress=True)
     dyn = build(NPT_BERENDSEN, state)
-    pointer = dyn.pressure.data_ptr()
+    pointer = dyn.berendsen_pressure.data_ptr()
     dyn.set_pressure(2.5)
-    assert dyn.pressure.data_ptr() == pointer
-    assert float(dyn.pressure) == pytest.approx(2.5 * units.GPa, rel=1e-15)
+    assert dyn.berendsen_pressure.data_ptr() == pointer
+    assert float(dyn.berendsen_pressure) == pytest.approx(2.5 * units.GPa, rel=1e-15)
     np.testing.assert_array_equal(dyn.externalstress_host, -2.5 * units.GPa)
     dyn.restore_externalstress(-1.0 * units.GPa)
-    assert float(dyn.pressure) == -(-1.0 * units.GPa)
+    assert float(dyn.berendsen_pressure) == -(-1.0 * units.GPa)
 
 
 # -------------------------------------------------------------------------- restarts
