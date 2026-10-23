@@ -1,4 +1,4 @@
-"""ASE front end: the FastMACE calculator and ASE-compatible integrators (SPEC §7.4, §7.7)."""
+"""ASE front end: the FastMACE calculator, ASE-compatible integrators and optimisers (SPEC §7.4, §7.7)."""
 
 from fastmace.ase.calculator import FastMACECalculator, calc
 
@@ -20,6 +20,11 @@ from fastmace.ase.md import (  # noqa: E402
 
 __all__ += ["Langevin", "LangevinBAOAB", "VelocityVerlet", "Bussi", "NoseHooverChainNVT", "IsotropicMTKNPT", "MTKNPT",
             "NVTBerendsen", "NPTBerendsen", "Inhomogeneous_NPTBerendsen"]
+
+# The ASE-compatible optimisers (SPEC §7.7, decision 48; plan task 4-T10).
+from fastmace.ase.optimize import FIRE, LBFGS  # noqa: E402
+
+__all__ += ["LBFGS", "FIRE"]
 
 
 def __getattr__(name):
