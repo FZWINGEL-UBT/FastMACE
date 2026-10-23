@@ -4,8 +4,8 @@
 of each ``run()`` call, and keeps the difference since the previous one as a ``Segment``: re-captures and
 the host time they took, all captures, overflows redone, the re-capture budget's step, and per neighbour
 list the rebuilds and build time (MACE: counts only, its build overlaps on a side stream; D3: its own
-build time). It decides nothing yet (5-T07 adds the trigger). ``Simulation`` records the segments in
-``counters.segments`` and the totals in ``counters.neighbour_lists``; the report adds a line only when
+build time). Its trigger and the tier switch are 5-T07's (``test_adapt_switch.py``). ``Simulation`` records the
+segments in ``counters.segments`` and the totals in ``counters.neighbour_lists``; the report adds a line only when
 re-captures or overflows happened.
 """
 
@@ -92,7 +92,7 @@ def test_an_unknown_reason_is_refused():
     monitor = started()
     with pytest.raises(ValueError, match="reason"):
         monitor.observe(info(), step=1, wall_s=1.0, reason="sometimes")
-    assert set(adapt.SEGMENT_REASONS) == {"restart", "mc-block", "host-write", "run-end"}
+    assert set(adapt.SEGMENT_REASONS) == {"restart", "mc-block", "host-write", "run-end", "recapture"}
 
 
 def test_observe_before_start_takes_the_baseline_there():

@@ -1,9 +1,10 @@
 """The contracts of phase 5 (plan task 5-T01, docs/design/planner-5.md): names, fields and defaults the later
 phase 5 tasks build against.
 
-- ``AdaptationConfig`` and ``CalibrationConfig``: the fields an open owner decision fixes (D2, D3, D5) default
-  to ``config.PENDING``, and ``planner_options`` refuses any other value, and ``calibrate=True``, until 5-T07
-  and 5-T09 land. The defaults plan and run as before (conductor's choice 7).
+- ``AdaptationConfig``: the defaults are decisions 52 and 53 (5-T07); the options not chosen are refused
+  (``test_adapt_switch.py``). ``CalibrationConfig``: the fields the open decision D5 fixes default to
+  ``config.PENDING``, and ``planner_options`` refuses any other value, and ``calibrate=True``, until 5-T09
+  lands. The defaults plan as before (conductor's choice 7).
 - ``PlannerOptions`` records both and reads records from before phase 5.
 - ``Plan.calibration`` and ``Plan.adaptation`` default to ``None`` and stay out of the restart record (its
   version stays 2); ``CalibrationRecord`` and ``TierSwitch`` are the records 5-T09 and 5-T07 fill.
@@ -18,23 +19,24 @@ from fastmace import config
 from fastmace.errors import PlanRefused
 
 
-def test_adaptation_defaults_wait_for_d2_and_d3():
+def test_adaptation_defaults_are_decisions_52_and_53():
     adaptation = config.AdaptationConfig()
-    assert adaptation.adapt == "auto" and adaptation.trigger == config.PENDING == "pending"
-    assert adaptation.recapture_time_fraction == 0.2  # D2 (a)'s threshold, read only by the triggers that use it
+    assert adaptation.adapt == "auto" and adaptation.trigger == "recapture-time"
+    assert adaptation.recapture_time_fraction == 0.2  # decision 52's threshold
     assert config.ADAPTATION_TRIGGERS == ("recapture-time", "recapture-budget", "none")
     assert config.ADAPTATION_DECISION_FIELDS == ("trigger", "skin_replan", "max_switches", "switch_back_after",
                                                  "min_points_between", "reproducible")
-    assert all(getattr(adaptation, name) == config.PENDING for name in config.ADAPTATION_DECISION_FIELDS)
-    assert adaptation.decided() == ()
-    # Every option of D2 and D3 fits the record.
-    for fields in ({"trigger": "recapture-time", "skin_replan": False, "max_switches": 1, "switch_back_after": None,
-                    "min_points_between": None, "reproducible": False},  # D2 (a), D3 (a)
-                   {"trigger": "recapture-time", "skin_replan": True, "max_switches": 2, "switch_back_after": 3},
+    assert set(config.ADAPTATION_SUPPORTED) == set(config.ADAPTATION_DECISION_FIELDS)
+    assert all(getattr(adaptation, name) in config.ADAPTATION_SUPPORTED[name]
+               for name in config.ADAPTATION_DECISION_FIELDS)
+    assert adaptation.unsupported() == ()
+    # The options not chosen still fit the record (and are refused at planner_options).
+    for fields in ({"trigger": "recapture-time", "skin_replan": True, "max_switches": 2, "switch_back_after": 3},
                    {"trigger": "recapture-budget", "reproducible": True},  # D2 (c), D3 (c)
                    {"trigger": "none", "max_switches": None, "min_points_between": 4}):  # D2 (d), D3 (d)
-        assert config.AdaptationConfig(**fields).decided() == tuple(
-            name for name in config.ADAPTATION_DECISION_FIELDS if name in fields)
+        assert config.AdaptationConfig(**fields).unsupported() == tuple(
+            name for name in config.ADAPTATION_DECISION_FIELDS
+            if name in fields and fields[name] not in config.ADAPTATION_SUPPORTED[name])
 
 
 def test_calibration_defaults_wait_for_d5():
@@ -60,12 +62,12 @@ def test_planner_options_record_both_and_read_older_records():
 
 
 @pytest.mark.parametrize(("kwargs", "code"), [
-    ({"adaptation": config.AdaptationConfig(trigger="recapture-time")}, "adaptation-pending"),
-    ({"adaptation": config.AdaptationConfig(max_switches=1)}, "adaptation-pending"),
+    ({"adaptation": config.AdaptationConfig(trigger="recapture-budget")}, "adaptation-unsupported"),
+    ({"adaptation": config.AdaptationConfig(max_switches=2)}, "adaptation-unsupported"),
     ({"calibration": config.CalibrationConfig(calibrate=True)}, "calibration-pending"),
     ({"calibration": config.CalibrationConfig(choose=True)}, "calibration-pending"),
 ])
-def test_a_decision_not_taken_yet_is_refused(kwargs, code):
+def test_an_option_not_implemented_is_refused(kwargs, code):
     from fastmace.simulation import PHASE_5_PENDING_CODES, planner_options
 
     with pytest.raises(PlanRefused) as refused:

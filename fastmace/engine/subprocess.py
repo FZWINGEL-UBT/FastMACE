@@ -43,6 +43,13 @@ from the last good hand-off. The worker ends on ``close()`` (``CLOSE_GRACE_S``),
 collection and at the parent's exit (a ``weakref.finalize``, ``FINALIZE_GRACE_S``), and when the
 parent dies (EOF on stdin while idle; the heartbeat thread sees the parent change while busy).
 
+**A tier switch (5-T07, SPEC §9.6, decision 53)** is the parent's: a child never switches on its own. When
+the child's trigger fires, it stops at the next committed step, writes its hand-off there (a canonical
+point) and returns the request (``"switch"``) with the steps it ran. The parent ends the worker
+(``restart_worker()``) and runs the steps left in a fresh child with ``"switch"`` in its request; that child
+resumes the hand-off, makes the switch (``Simulation.switch_tier``) and runs. A request at a call's last step
+waits for the next ``run()`` call.
+
 The child imports the same FastMACE as the parent (its package directory goes first on
 ``PYTHONPATH``) and runs in the parent's working directory, so relative paths in the records hold.
 
@@ -165,6 +172,7 @@ class SubprocessRunner:
         self._owner = None  # the process that started the worker
         self._finalizer = None
         self._log = self._heartbeat = None  # the worker's log and heartbeat files
+        self._switch = None  # a child's tier switch request for the next child (5-T07), as its record
 
     # ------------------------------------------------------------------ Simulation's hooks
 
@@ -215,7 +223,15 @@ class SubprocessRunner:
         keeps (``...``) or detaches (``None``) the move set (3-T15). ``SubprocessRunnerError`` on any child
         failure."""
         simulation._queue.drain()  # frames queued at the committed step come before the steps
-        self._run_child(simulation, steps=steps, schedule=schedule, check="skip", gate=False, mc=mc)
+        first = self._step
+        result = self._run_child(simulation, steps=steps, schedule=schedule, check="skip", gate=False, mc=mc)
+        while result is not None and result.get("switch") is not None:  # the parent's switch (5-T07)
+            self._switch = result["switch"]
+            self.restart_worker()  # the next call starts a fresh child from the hand-off, which switches
+            left = int(steps or 0) - (self._step - first)
+            if left <= 0:
+                return
+            result = self._run_child(simulation, steps=left, schedule=None, check="skip", gate=False)
 
     def host_write(self, simulation: Any, kind: str, values: Any) -> None:
         """Queue a host write (``HOST_WRITE_KINDS``); the next child applies it after its resume."""
@@ -340,7 +356,8 @@ class SubprocessRunner:
             name = f"host-{index}-{kind}.npy"
             np.save(stage / name, np.asarray(values, dtype=np.float64))
             writes.append([kind, name])
-        request = {"action": "run", "source": str(self.current), "steps": steps,
+        switch, self._switch = self._switch, None
+        request = {"action": "run", "source": str(self.current), "steps": steps, "switch": switch,
                    "schedule": None if schedule is None else schedule.to_restart(), "started": sim._started,
                    "check": check, "host_writes": writes, "sinks": sorted({interval for interval, _ in sim._sinks}),
                    "mc": MC_KEEP if mc is ... else None if mc is None else [move_record(m) for m in mc_moves(mc)]}
@@ -352,6 +369,7 @@ class SubprocessRunner:
         self._replay_sinks(sim, stage)
         if self.current != stage:  # nothing to hand on: the previous hand-off stays the current one
             shutil.rmtree(stage, ignore_errors=True)
+        return result
 
     def _command(self, stage, *arguments):
         python = self.config.resolved_python()
@@ -947,6 +965,15 @@ def _child(directory, request, heartbeat, worker=None):
             worker.stage = request["source"]
         worker.simulation = sim
     sim._sinks = []  # this call's sinks only
+    sim._child = True  # a tier switch is the parent's (5-T07): the child returns the request
+    if request.get("switch") is not None:  # the parent's switch, at the hand-off it resumed
+        from fastmace.planner.adapt import SwitchRequest
+
+        sim._child = False
+        try:
+            sim.switch_tier(SwitchRequest.from_record(request["switch"]))
+        finally:
+            sim._child = True
     cursor = sim._monitor.cursor()  # the runtime monitor's segments of this call go to the parent (5-T06)
     heartbeat.simulation = sim
     heartbeat.mark("running")
@@ -987,7 +1014,8 @@ def _child(directory, request, heartbeat, worker=None):
             sim.run(steps=int(steps))
         else:  # attach or detach (3-T15); the parent checked the move set against the workload
             sim.run(steps=int(steps), mc=None if mc is None else [simulations.move_from_record(m) for m in mc])
-    saved = action == "setup" or bool(steps) or bool(request.get("host_writes"))
+    saved = (action == "setup" or bool(steps) or bool(request.get("host_writes"))
+             or request.get("switch") is not None)
     if saved:
         sim.save_restart(directory)  # the next hand-off: a canonical restart point (§10.6)
         worker.stage = str(directory)
@@ -1020,6 +1048,7 @@ def _child(directory, request, heartbeat, worker=None):
         "metadata": sim.metadata(),
         "mc": _mc_summary(sim),
         "monitor": sim._monitor.export(cursor),
+        "switch": None if sim._switch_request is None else sim._switch_request.record(),
         "recapture_budget": getattr(engine, "recapture_budget", None),
     }
 

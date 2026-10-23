@@ -23,8 +23,8 @@ and scheme ``parameters`` to ``IntegratorConfig``, the ``"nve"`` ensemble, and `
 
 Phase 5 (plan task 5-T01, ``docs/design/planner-5.md``) adds ``AdaptationConfig`` (SPEC §9.6) and
 ``CalibrationConfig`` (§9.1). The fields whose meaning an open owner decision of ``plans/phase-5.md``
-fixes (D2, D3, D5) default to ``PENDING``; ``Simulation`` refuses any other value until the task that
-implements the decision lands.
+fixes (D5) default to ``PENDING``; ``Simulation`` refuses any other value until the task that implements
+the decision lands. 5-T07 sets ``AdaptationConfig``'s defaults to decisions 52 and 53.
 
 This module holds no state: no caches, no registries, no switches.
 """
@@ -552,12 +552,12 @@ class MCConfig:
         _count(self, "max_move_sets", minimum=1)
 
 
-# A field whose meaning an open owner decision of plans/phase-5.md fixes (D2, D3, D5). Simulation refuses
-# any other value until the task implementing the decision lands (5-T07, 5-T09).
+# A field whose meaning an open owner decision of plans/phase-5.md fixes (D5). Simulation refuses any other
+# value until the task implementing the decision lands (5-T09).
 PENDING = "pending"
-# Which monitor triggers a tier switch (owner decision D2): "recapture-time", the re-capture budget exceeded
-# and the time spent re-capturing above ``recapture_time_fraction`` (D2 (a), (b)); "recapture-budget", the
-# budget alone (D2 (c)); "none", no automatic switch (D2 (d); mid-run fallbacks stay).
+# Which monitor triggers a tier switch: "recapture-time", the re-capture budget exceeded and the time spent
+# re-capturing above ``recapture_time_fraction`` (SPEC §18 decision 52, D2 (a)); "recapture-budget", the
+# budget alone (D2 (c), not chosen); "none", no automatic switch.
 ADAPTATION_TRIGGERS = ("recapture-time", "recapture-budget", "none")
 
 
@@ -567,40 +567,40 @@ def _flag_or_pending(instance, name):
         raise ValueError(f"{type(instance).__name__}.{name}: {value!r} is not a bool or {PENDING!r}")
 
 
-def _count_or_pending(instance, name, minimum):
-    if getattr(instance, name) not in (None, PENDING):
+def _count_or_none(instance, name, minimum):
+    if getattr(instance, name) is not None:
         _count(instance, name, minimum)
 
 
 @dataclass(frozen=True)
 class AdaptationConfig:
-    """Runtime adaptation (SPEC §9.6; plan task 5-T01, docs/design/planner-5.md): what the monitor may change
-    between segments, at a canonical restart point, as a new plan revision (§9.5).
+    """Runtime adaptation (SPEC §9.6; plan tasks 5-T01, 5-T07; docs/design/planner-5.md): what the monitor may
+    change at a canonical restart point, as a new plan revision (§9.5).
 
-    The trigger's shape (D2) and the limits (D3) are ``PENDING`` until the owner decides them; the threshold
-    carries the plan's recommended value, which only the triggers that use it read. Mid-run fallbacks are
-    ``FallbackConfig``'s (§9.4 step 5, D4), not this record's.
+    The defaults are the owner's decisions 52 (trigger, D2 (a)) and 53 (limits, D3 (a)): the re-capture budget
+    exceeded and more than ``recapture_time_fraction`` of the wall time re-capturing switch graph -> compiled,
+    one way, at most once per run. The record can hold the options not chosen (D2 (b)-(d), D3 (b)-(d));
+    ``Simulation`` refuses them (``unsupported``). Mid-run fallbacks are ``FallbackConfig``'s (§9.4 step 5).
     """
 
-    # "auto": adapt as §9.6 and the fields below say (until 5-T07: record only); "off": the monitor records,
-    # nothing switches.
+    # "auto": adapt as §9.6 and the fields below say; "off": the monitor records, nothing switches.
     adapt: Literal["auto", "off"] = "auto"
-    # The trigger (D2): one of ADAPTATION_TRIGGERS, or PENDING.
-    trigger: Literal["pending", "recapture-time", "recapture-budget", "none"] = PENDING
-    # D2 (a), (b): the share of wall time spent re-capturing, over the segments since the last switch, above
-    # which an exceeded re-capture budget switches tiers. Measured in the run, so no per-GPU number.
+    # The trigger: one of ADAPTATION_TRIGGERS ("none": no automatic switch).
+    trigger: Literal["recapture-time", "recapture-budget", "none"] = "recapture-time"
+    # The share of wall time spent re-capturing, over the segments since the last switch, above which an
+    # exceeded re-capture budget switches tiers (decision 52). Measured in the run, so no per-GPU number.
     recapture_time_fraction: float = 0.2
-    # D2 (b): rule 11 re-planned with the measured rebuild rate when a list rebuilds more often than every
-    # n*/2 steps (a re-capture follows).
-    skin_replan: bool | Literal["pending"] = PENDING
-    # D3: tier switches one run may make, a resume counting those in its revision chain; None: no limit.
-    max_switches: int | None | Literal["pending"] = PENDING
-    # D3 (b): back to the graph tier after this many quiet segments (no re-capture); None: one way.
-    switch_back_after: int | None | Literal["pending"] = PENDING
-    # D3 (d): canonical restart points between two switches; None: no minimum.
-    min_points_between: int | None | Literal["pending"] = PENDING
-    # D3 (c): switches under reproducible=True, with a deterministic trigger only.
-    reproducible: bool | Literal["pending"] = PENDING
+    # D2 (b), not chosen: rule 11 re-planned with the measured rebuild rate.
+    skin_replan: bool = False
+    # Tier switches one run may make, a resume counting those in its revision chain (decision 53: 1);
+    # None: no limit (D3 (d), not chosen).
+    max_switches: int | None = 1
+    # D3 (b), not chosen: back to the graph tier after this many quiet segments; None: one way.
+    switch_back_after: int | None = None
+    # D3 (d), not chosen: canonical restart points between two switches; None: no minimum.
+    min_points_between: int | None = None
+    # D3 (c), not chosen: switches under reproducible=True.
+    reproducible: bool = False
 
     def __post_init__(self):
         _check_choices(self)
@@ -608,20 +608,23 @@ class AdaptationConfig:
         if self.recapture_time_fraction >= 1:
             raise ValueError(f"AdaptationConfig.recapture_time_fraction must be below 1, "
                              f"got {self.recapture_time_fraction!r}")
-        _flag_or_pending(self, "skin_replan")
-        _flag_or_pending(self, "reproducible")
-        _count_or_pending(self, "max_switches", 0)
-        _count_or_pending(self, "switch_back_after", 1)
-        _count_or_pending(self, "min_points_between", 1)
+        _count_or_none(self, "max_switches", 0)
+        _count_or_none(self, "switch_back_after", 1)
+        _count_or_none(self, "min_points_between", 1)
 
-    def decided(self) -> tuple[str, ...]:
-        """The fields an owner decision fixes that are set to something other than ``PENDING``, in field order."""
-        return tuple(name for name in ADAPTATION_DECISION_FIELDS if getattr(self, name) != PENDING)
+    def unsupported(self) -> tuple[str, ...]:
+        """The fields set to an option decisions 52 and 53 did not choose, in field order (``Simulation`` refuses
+        them, code ``adaptation-unsupported``)."""
+        return tuple(name for name in ADAPTATION_DECISION_FIELDS
+                     if getattr(self, name) not in ADAPTATION_SUPPORTED[name])
 
 
-# The AdaptationConfig fields an open owner decision fixes: D2's trigger and skin re-plan, D3's limits.
+# The AdaptationConfig fields owner decisions 52 (D2) and 53 (D3) fixed, and the values implemented (5-T07):
+# the trigger of decision 52 or none; at most one switch, one way, never under reproducible=True.
 ADAPTATION_DECISION_FIELDS = ("trigger", "skin_replan", "max_switches", "switch_back_after", "min_points_between",
                               "reproducible")
+ADAPTATION_SUPPORTED = {"trigger": ("recapture-time", "none"), "skin_replan": (False,), "max_switches": (0, 1),
+                        "switch_back_after": (None,), "min_points_between": (None,), "reproducible": (False,)}
 
 
 @dataclass(frozen=True)
