@@ -232,11 +232,12 @@ def test_plan_and_its_revision_chain():
     assert plan["conv_fusion"] == plan["engine"]["cueq_conv_fusion"]
     assert all(set(entry) == {"key", "choice", "reason", "code", "rule"} for entry in plan["decisions"])
     assert {entry["key"] for entry in plan["decisions"]} >= {"mode", "EngineConfig.backend"}
-    assert "Plan revision 1" in plan["description"]
+    assert "Plan revision 1" in plan["description"] and "Plan revision 1" in plan["description_full"]
     revisions = record["plan_revisions"]
     assert [entry["revision"] for entry in revisions] == [0, 1]
     assert revisions[1]["step"] == 1200 and revisions[1]["reason"] == "edge bucket overflow"
     assert revisions[0]["description"].startswith("Plan revision 0")
+    assert revisions[0]["description_full"].startswith("Plan revision 0")
 
 
 def test_precision_records_float64_energy_from_the_plan():

@@ -186,8 +186,9 @@ revision's chain counts the switches already made. D3 (c) would need the monitor
 
 `Plan.describe()` prints these sections in this order, at most about 30 lines, no line over 120
 characters. A section with nothing to say is one line ("none") or left out where marked.
-`describe(full=True)` keeps today's list of every decision. Provenance stores both (`plan.text`,
-`plan.text_full`).
+`describe(full=True)` keeps today's list of every decision. Provenance stores both (`plan.description`, the
+sectioned text, and `plan.description_full`; the same two keys in each `plan_revisions` entry; conductor,
+24 October 2026).
 
 1. **Header** (2 lines): `Plan revision N, tier T (why this tier)`, then backend (plain: fused convolution
    or not), force precision, MC energy precision, runner.
@@ -203,6 +204,20 @@ characters. A section with nothing to say is one line ("none") or left out where
 8. **Warnings** (rule 15; 0–3 lines): each with its diagnosis. Left out when none.
 9. **History** (1–4 lines): the fallback candidates tried, the calibration record (`none` until 5-T09),
    the revision chain with step and reason (switches from 5-T07).
+
+As implemented (5-T05, `fastmace/planner/plan_text.py`; golden texts in `tests/cpu/golden/plan_text/`):
+
+- Every line is `  <section>: ...`, wrapped lines indented six spaces; a section's lines are capped and what
+  does not fit is counted, `(+n more; describe(full=True) lists them)`. A line over 120 characters is cut
+  with `…`. The whole text is cut at 30 lines (the caps keep it near 20).
+- Line caps: hard rules 3; rewrites on 4 and off 3 (25 rewrites do not fit in 4 lines at 120 characters);
+  workload 2, plus the `dispersion:` line with D3 and `rules 8-11:` (2); warnings 3; history: fallbacks
+  2, calibration 1, `self-checks:` 1 (built plans only), revisions 2.
+- A decision's rule is its reason's `rule`, else `rules.rule_of(code)`. Hard rules list the decisions of
+  rules 1-7 except the codes that record a rule did not apply (`no-allow-reference`, `fused-cueq`).
+- Rewrites off are grouped by reason code, else by the last clause of the reason ("only an explicit 'on'
+  enables it", "not supported by the model").
+- Rule 12's D3 list decision (`d3 list memory`) is on the memory line, not the sizes line.
 
 5-T05 writes the golden files; 5-T03, 5-T07 and 5-T09 update their sections.
 
