@@ -2361,7 +2361,15 @@ Open decisions for the owner:
    - the 1e-7 eV/Å³ stress floor stays. The in-library gate refusing
      POLAR-1-S NPT is accepted, since PolarMACE NPT is experimental; the
      precision of the hybrid polar stress path is investigated in phase 3b
-     (26);
+     (26). Resolved in part by 3b-T08 and 4-T11: the 4.4e-4 eV/Å³ gap on
+     NbCl5 3×3×3 came from the finite-difference reference, not from the
+     stress. A Bragg vector crossing graph_longrange's hard k-space cutoff
+     under the ±1e-4 strain steps the energy. The finite-difference
+     self-test (`ReferenceCalculator.check_stress_fix`) now holds the
+     unstrained cell's included k-set and runs on the run's own structure,
+     not on NaCl 3×3×3 only. POLAR-1-S float64 gives 8.3e-9 eV/Å³ on
+     NbCl5 and 6.9e-9 on NaCl (RTX 5060 Ti, 23 October 2026). The
+     PolarMACE stress rule of the gate (phase 4 D6) is still open;
    - NaCl's 1b/1a timing (0.5 % faster on murphy, 0.3 % slower on the RTX
      5060 Ti) is accepted as no regression (27);
    - ResearchModule's `main.py` moves to the 1b API (`Simulation`) as the
