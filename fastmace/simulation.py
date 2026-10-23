@@ -1030,7 +1030,9 @@ class Simulation:
             schedule_step = position.step - (self._engine.state.step - step)
             target, phase = position.resolved.target(schedule_step), position.resolved.phase(schedule_step)
         else:
-            target, phase = float(self._engine.integrator.temperature_K), CONSTANT_PHASE
+            target_K = self._engine.integrator.temperature_K
+            # NVE has no target: NaN in target_K, which no target temperature can be (4-T02)
+            target, phase = (math.nan if target_K is None else float(target_K)), CONSTANT_PHASE
         return (step, step * self._config.timestep_fs / 1000, phase, target)
 
     def _submit_output(self, step, *, row, frame):
