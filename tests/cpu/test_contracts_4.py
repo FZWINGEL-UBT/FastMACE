@@ -37,7 +37,8 @@ def test_the_public_namespaces():
 
 def test_the_phase_1a_records():
     langevin, baoab = reg.registry().integrator("langevin"), reg.registry().integrator("baoab")
-    assert (langevin.ensembles, langevin.cell_modes, langevin.constraints) == (("nvt",), ("fixed",), ("fixcm",))
+    assert (langevin.ensembles, langevin.cell_modes, langevin.constraints) == (("nvt",), ("fixed",),
+                                                                              ("fixcm", "fix_atoms"))
     assert (baoab.ensembles, baoab.cell_modes, baoab.variable_cell) == (("npt",), ("hydrostatic", "full"), True)
     assert langevin.load().__name__ == "Langevin" and baoab.load().__name__ == "LangevinBAOAB"
     assert "externalstress" in baoab.constructor_keywords(IntegratorConfig(ensemble="npt"))
@@ -101,10 +102,10 @@ def test_phase_1a_configs_pass():
     assert reg.integrator_refusals(IntegratorConfig(ensemble="npt", cell_mode="full"), variable_cell=True) == []
 
 
-def test_fix_atoms_is_refused_by_langevin_until_4_t04():
+def test_langevin_takes_fix_atoms_without_fixcm():  # 4-T04 (decision 44)
+    assert reg.integrator_refusals(IntegratorConfig(fixcm=False), fix_atoms=True) == []
     reasons = reg.integrator_refusals(IntegratorConfig(), fix_atoms=True)
-    assert _codes(reasons) == ["constraints"]
-    assert "FixAtoms" in reasons[0] and "4-T04" in reasons[0]
+    assert _codes(reasons) == ["fix-atoms-with-fixcm"] and "fixcm=False" in reasons[0]
 
 
 @pytest.mark.parametrize(("kwargs", "config", "codes"), [
@@ -164,9 +165,11 @@ def test_the_planner_takes_rule_1_from_the_registry():
     assert codes(caught.value) == ["scheme-unknown"]
     atoms = nacl()
     atoms.set_constraint(FixAtoms(indices=[0]))
+    assert plan_label("mh1-r2scan", atoms=atoms, integrator=IntegratorConfig(fixcm=False)).integrator.fixcm is False
     with pytest.raises(PlanRefused) as caught:
-        plan_label("mh1-r2scan", atoms=atoms, integrator=IntegratorConfig(fixcm=False))
-    assert codes(caught.value) == ["constraints"] and "4-T04" in caught.value.reasons[0]
+        plan_label("mh1-r2scan", atoms=atoms, integrator=IntegratorConfig(ensemble="npt", fixcm=False),
+                   variable_cell=True)
+    assert codes(caught.value) == ["constraints"] and "variable cell" in caught.value.reasons[0]
     plan = plan_label("mh1-r2scan")
     assert plan.integrator.dof == "fastmace" and plan.integrator.scheme == "langevin"
     assert dict((item, choice) for item, choice, _ in plan.decisions)["IntegratorConfig.dof"] == "fastmace"
@@ -372,6 +375,57 @@ def test_scheme_records_declare_their_buffer_policies(monkeypatch):
     assert runtime.policy_for("state.free_mask").restart == "derived"
     with pytest.raises(runtime.RegistryError):
         runtime.policy_for("integrator.p_eta")
+
+
+def test_two_schemes_may_not_give_one_buffer_different_policies():  # 4-T01b
+    from fastmace.engine.registry import RegistryError
+
+    derived = _record(scheme="toy_a", buffers=(("pressure", "derived", "Toy.set_pressure"),))
+    saved = _record(scheme="toy_b", buffers=(("pressure", "save", None),))
+    with pytest.raises(RegistryError, match=r"integrator\.pressure.*toy_a.*toy_b"):
+        reg.Registry([derived, saved])
+    other_owner = reg.OptimizerRecord(scheme="toy_o", implementation="x:Y", buffers=(("pressure", "save", None),))
+    assert len(reg.Registry([derived, other_owner]).records()) == 2  # optimizer.pressure is another buffer
+
+
+def test_one_buffer_of_two_schemes_lists_both_recompute_functions(monkeypatch):  # 4-T01b
+    from fastmace.engine import registry as runtime
+
+    a = _record(scheme="toy_a", buffers=(("chain_r", "reset", "ToyA.start"),))
+    b = _record(scheme="toy_b", buffers=(("chain_r", "reset", "ToyB.start"),))
+    records = reg.Registry([*reg.registry().records(), b, a])
+    monkeypatch.setattr(reg, "registry", lambda: records)
+    policy = runtime.policy_for("integrator.chain_r")
+    assert (policy.restart, policy.recompute) == ("reset", "ToyA.start | ToyB.start")
+
+
+def test_a_scheme_may_not_shadow_a_policy_table_buffer(monkeypatch):  # 4-T01b
+    from fastmace.engine import registry as runtime
+
+    shadow = _record(scheme="toy_s", buffers=(("eta", "save", None),))  # Langevin's integrator.eta is "derived"
+    records = reg.Registry([*reg.registry().records(), shadow])
+    monkeypatch.setattr(reg, "registry", lambda: records)
+    with pytest.raises(runtime.RegistryError, match=r"integrator\.eta.*toy_s.*derived"):
+        runtime.policy_for("integrator.eta")
+    same = _record(scheme="toy_s", buffers=(("eta", "derived", None),))  # the same policy is kept
+    records = reg.Registry([*reg.discover().records(), same])
+    monkeypatch.setattr(reg, "registry", lambda: records)
+    assert runtime.policy_for("integrator.eta").restart == "derived"
+
+
+def test_the_real_records_shadow_no_policy_table_buffer():  # 4-T01b
+    from fastmace.engine import registry as runtime
+
+    runtime.scheme_policies()  # raises RegistryError on a shadowing record
+
+
+def test_the_registered_schemes_have_no_buffer_clash():  # 4-T01b: the real records, every phase 4 task's
+    records = reg.discover()  # raises RegistryError on a clash
+    seen = {}
+    for record in records.records():
+        for name, restart, _ in record.buffers:
+            seen.setdefault((reg.BUFFER_OWNERS[record.kind], name), set()).add(restart)
+    assert {key: policies for key, policies in seen.items() if len(policies) > 1} == {}
 
 
 # --------------------------------------------------------------------------- restart format 4

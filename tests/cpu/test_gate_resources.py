@@ -631,6 +631,17 @@ def test_gate_lines_name_the_reduced_cell_and_a_later_device():
         "cell; 2 rattled (0.05 Å); 0.004 meV/atom, 2e-06 eV/Å; floors §12.3)")
 
 
+def test_gate_line_names_a_record_floor():
+    """4-T12: a floor the reference record raised (PolarMACE stress, SPEC decision 49) is named in the line."""
+    from fastmace import report
+
+    gate = {"status": "passed", "copies": "2 rattled (0.05 Å)", "stress_eV_per_A3": 3e-7,
+            "floors": {**selfcheck.FLOORS, "stress_eV_per_A3": 5e-7}}
+    assert report.gate_line(gate) == ("passed (2 rattled (0.05 Å); 3e-07 eV/Å³; floors §12.3, stress 5e-07 eV/Å³ "
+                                      "from the reference record)")
+    assert report.gate_line({**gate, "floors": dict(selfcheck.FLOORS)}).endswith("; floors §12.3)")
+
+
 # --------------------------------------------------------------------------- T15's reduced gate
 
 

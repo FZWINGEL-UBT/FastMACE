@@ -1,0 +1,65 @@
+{
+  "schema": 4,
+  "task": "4-T05/4-T06/4-T07",
+  "side": "ase",
+  "optimizer": "lbfgs",
+  "cell_filter": "frechet",
+  "pressure_GPa": 0.0,
+  "dispersion": "d3bj",
+  "structure_settings": {
+    "root": "/data/baseline/1a-T18",
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "strain": 0.02,
+    "rattle_A": 0.02,
+    "seed": 0,
+    "seed_rule": "seed + crc32(name)"
+  },
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T09:35:20+00:00",
+  "fastmace_commit": null,
+  "machine": "modal",
+  "gpu": "NVIDIA L4",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/cache/L4/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NbCl5": {
+      "traj": "/data/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl5.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 658,
+          "seconds": 185.08445909500006,
+          "initial_eV_atom": -10.690118144050901,
+          "energy_eV_atom": -10.7179269599998,
+          "fmax_eV_A": 0.009096822237091145,
+          "ms_per_step": 281.2833724848025,
+          "switch_flips": null,
+          "cell_lengths_A": [
+            55.71679257331969,
+            54.12837663027052,
+            17.62926299503131
+          ],
+          "cell_angles_deg": [
+            89.99993216463344,
+            90.35485182726553,
+            90.0000578006302
+          ],
+          "volume_A3": 53166.36118675566
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T09:38:26+00:00"
+}

@@ -40,9 +40,12 @@ EXPM_DEGREE = 14   # float64 for |A| <= 1, while a barostat half step moves |A| 
 
 
 def expm_3x3(a):
-    """Matrix exponential of a 3 x 3 tensor (fixed scaling and squaring, Taylor); CUDA-graph safe."""
+    """Matrix exponential of a square tensor (fixed scaling and squaring, Taylor); CUDA-graph safe.
+
+    Named for its 3 x 3 use here; ``optimize.cell`` also calls it on the 6 x 6 block of a Fréchet derivative.
+    """
     a = a / 2 ** EXPM_SCALING
-    eye = torch.eye(3, dtype=a.dtype, device=a.device)
+    eye = torch.eye(a.shape[-1], dtype=a.dtype, device=a.device)
     result, term = eye.clone(), eye
     for k in range(1, EXPM_DEGREE + 1):
         term = term @ a / k

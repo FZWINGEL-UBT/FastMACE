@@ -35,8 +35,24 @@ SPEC §4.4's support table is data: one record per scheme, in
 | `conserved` | what `output_values()["conserved"]` is, or `None` |
 | `ase_class`, `report` | for reports and the equivalence tests |
 
-Registered today: `langevin` and `baoab`, which declare `fixcm` only. 4-T04 adds their
-`fix_atoms` row after D1.
+`langevin`, `nve`, `csvr` and `berendsen` declare `fixcm` and `fix_atoms` (4-T04, decision 44);
+`baoab` declares `fixcm` only. The optimisers `lbfgs` and `fire` declare `fix_atoms`.
+
+**Shared buffer names (4-T01b).** A buffer name is per owner: `integrator.`, `optimizer.` or
+`dof.`. Two schemes of one owner may declare the same name only if it means the same thing in
+both: the same quantity, units and shape, and the same restart policy. Only one scheme runs per
+engine, but restart, capture and the gate read the policy by name alone.
+
+- **Different restart policies:** discovery refuses the pair with `RegistryError`, naming both
+  schemes and the buffer. Rename the buffer in one of the records. For example, Berendsen's
+  pressure target and MTK's barostat state cannot both be `integrator.pressure`.
+- **Same restart policy, different `recompute` functions:** this is allowed. The runtime-state
+  registry keeps one policy whose `recompute` lists both functions, sorted and joined with
+  ` | `. Example: LBFGS and FIRE's `optimizer.fmax` and `optimizer.status`.
+- **A name `engine.registry.POLICIES` already holds:** the table is matched first, by name or by
+  pattern, so the scheme must declare the table's restart policy. For example, a record with
+  `integrator.eta` must declare Langevin's `"derived"`. A different policy raises
+  `RegistryError`, naming the buffer, the scheme and the table entry with its owner.
 
 ## Constructors and dispatch
 
@@ -63,6 +79,7 @@ rule 1 and a stable code:
 | `variable-cell-without-barostat` | a variable cell and a non-`npt` config |
 | `constraints` | `FixAtoms` with a scheme that does not declare it (with the record's reason), any other ASE constraint, or `fixcm` with a scheme that does not declare it |
 | `fix-atoms-with-fixcm` | `FixAtoms` with `fixcm=True` (D1 (a); `FIX_ATOMS_WITH_FIXCM`) |
+| `fix-atoms-variable-cell` | `FixAtoms` with a variable cell for a scheme that takes `FixAtoms` at fixed cell (NPT Berendsen; decision 44) |
 | `mc-with-constraints` | MC moves with any constraint, also in the reference tier (decision 10) |
 
 The fixed planner's `_resolve` calls it for every MD plan, the reference tier included. The two
@@ -149,8 +166,28 @@ now asks the record.
 
 - **`PositionsDOF(state)`:** fixed cell. `x` is a view of `state.positions`; `FixAtoms` comes
   in through `state.free_mask`.
-- **4-T07's `FrechetCellFilter`:** implements the same view, so FIRE and LBFGS run unchanged on
-  it.
+- **4-T07's `FrechetCellFilter`** (`fastmace/optimize/cell.py`): implements the same view, so FIRE
+  and LBFGS run unchanged on it.
+  - `x` is ASE's (N + 3) × 3 vector: positions in the original cell, then the cell rows
+    `ecf · logm(cf · F)`. ASE folds `UnitCellFilter`'s `cell_factor` cf = N into the log, so
+    the cell rows carry a constant `ecf · ln(N) · I`. FastMACE evaluates both directions in a
+    shifted form: `expm(X / ecf − ln(cf) I)`, and the log of F itself. Same values, but on
+    matrices of norm ~|log F| instead of ~ln N. Against 40-digit mpmath, ASE's own form costs
+    2e-14 relative in F; the shifted form is exact to 1e-17.
+  - Device matrix functions, no host syncs and no LAPACK:
+    - `expm_3x3` from `integrators/baoab.py`, now for any square size;
+    - `logm_3x3`, by inverse scaling and squaring. It is used only with a `mask`; without one,
+      log F is `X / ecf − ln(cf) I` itself;
+    - ASE's nine `expm_frechet` calls as one 6 × 6 exponential: the adjoint of `L_exp(A, ·)`
+      is `L_exp(Aᵀ, ·)`;
+    - 3 × 3 inverses by cofactors.
+  - `refresh` runs after each force call and in `OptimizerStepper.start`. It computes `x`'s
+    atom rows, the gradient (ASE's `get_forces`) and the energy E + pV.
+  - `set_x` moves positions and cell. It does nothing for a move to the current `x` (a
+    converged step) or for one outside |log F| ≤ 0.5 per element. In the second case
+    `cell_ok` drops, `max_force` becomes NaN, and `driver.relax` raises `FloatingPointError`
+    with the filter's `failure_reason`.
+  - `FixAtoms` and non-periodic cells are refused (D1).
 
 The `Optimizer(dof, config)` methods:
 
@@ -174,8 +211,42 @@ The host reads `converged` and `max_force` each step (choice 5).
 - `fixed_indices`: sorted, unique, host;
 - `free_mask`: float64 `(N, 1)`, 1 for free atoms and 0 for fixed ones, or `None`.
 
-Any other constraint raises. `n_fixed` counts the fixed atoms. The runtime-state registry
-lists `state.free_mask` as derived. Whether a scheme takes fixed atoms is rule 1's decision.
+Any other constraint raises. `n_fixed` counts the fixed atoms. The fixed atoms' velocities
+start at zero, as ASE's `set_momenta` with the constraint leaves them. The runtime-state
+registry lists `state.free_mask` as derived. Whether a scheme takes fixed atoms is rule 1's
+decision. The constraint is fixed for the life of a `Simulation`: an observer of a
+`fastmace.ase` class that changes it is refused (`observer-constraints`), and a resume rebuilds
+it from the restart's `fixed_atoms`.
+
+## `FixAtoms` in the integrators (4-T04)
+
+ASE applies `FixAtoms` in three places: `set_positions` resets the fixed atoms to their old
+positions, `get_forces(md=True)` zeroes their forces, and `set_momenta` zeroes their momenta.
+The noise is drawn for every atom. The integrators reproduce that on a mask path that runs only
+with fixed atoms (`integrators.langevin.fixed_rows`, a bool `(N, 1)` from `free_mask`); without
+them every step is the unconstrained one, bit for bit.
+
+| Scheme | With `FixAtoms` |
+| --- | --- |
+| Langevin | after the drift, `x = where(fixed, x_old, x)`; then `v = (x - x_old - rnd_pos) / dt` as before (a fixed atom's mid-step velocity is `-rnd_pos / dt`, as ASE's); after the second kick the fixed velocities are zero. The fused Triton stage does the same reset in its drift kernel (`FIXED`) |
+| NVE, CSVR | after the first kick the fixed velocities are zero, then the drift, then every velocity from the displacement, `v = (x_new - x) / dt`: ASE's `VelocityVerlet` recomputes `p = (r_new - r) m / dt` whenever `atoms.constraints` is not empty. After the second kick the fixed velocities are zero |
+| NVT Berendsen | the fixed velocities are zero after each kick, so the drift leaves the fixed atoms in place; no recomputation, as ASE's `NVTBerendsen` |
+
+`state.forces` keeps every atom's forces, as the force field gives them: the gate compares all
+of them, and the reference's D3 part reads them without the constraint. The `fastmace.ase`
+observer cache's `get_forces()` applies the constraint, as ASE's does.
+
+**`fixcm="auto"`** (the default of `fm.integrators.Langevin`, `NVE`, `CSVR` and `Berendsen`):
+off when the structure has `FixAtoms`, on otherwise. `to_config(seed=, fixed_atoms=)` resolves
+it; `Simulation` passes whether its `Atoms` carry `FixAtoms`. An explicit `fixcm=True` with
+fixed atoms is refused (`fix-atoms-with-fixcm`); so is the `fastmace.ase` classes' default
+`fixcm=True`, which is ASE's: pass `fixcm=False`. `LangevinBAOAB`, `NoseHooverChain` and `MTK`
+keep `fixcm=True`, since they refuse `FixAtoms` anyway.
+
+**Degrees of freedom** with `FixAtoms`: 3(N − n_fixed), without a centre-of-mass projection
+(decision 45), in the targets (CSVR's `ndof`, Berendsen's temperature) and in every reported
+temperature (`Simulation.degrees_of_freedom`, the thermo rows, the `fastmace.ase` log, whose
+frames carry the `FixAtoms` constraint).
 
 ## Restart format 4
 
@@ -204,6 +275,6 @@ the same lists. 4-T10 splits each list into `SUPPORTED` and `REFUSED`.
 
 | Decision | Recommendation followed | Where |
 | --- | --- | --- |
-| D1 | `FixAtoms` with NVE, Langevin, CSVR, NVT Berendsen, FIRE and LBFGS at fixed cell; refused for NHC, MTK and every variable cell; `fixcm` with `FixAtoms` refused | each record's `constraints` and `refusals`; `registry.FIX_ATOMS_WITH_FIXCM` |
+| D1 (decision 44) | `FixAtoms` with NVE, Langevin, CSVR, NVT Berendsen, FIRE and LBFGS at fixed cell; refused for NHC, MTK and every variable cell; `fixcm` with `FixAtoms` refused | each record's `constraints` and `refusals`; `registry.FIX_ATOMS_WITH_FIXCM`; the `fix-atoms-variable-cell` rule in `registry.integrator_refusals` |
 | D2 | `dof="auto"` resolves to `"fastmace"`; `dof="ase"` for the equivalence tests | `registry.DOF_AUTO`; `registry.degrees_of_freedom` |
 | D5 | LBFGS and FIRE classes, `FrechetCellFilter` only | `ASE_OPTIMIZER_ARGUMENTS`; the optimiser records' `cell_filters` |

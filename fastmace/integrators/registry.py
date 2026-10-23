@@ -14,7 +14,8 @@ its module there, and changes no shared file.
 Owner decisions this module encodes (phase 4 plan, "Owner decisions"; recommendations until decided):
 
 - D1: ``FIX_ATOMS_WITH_FIXCM``: ``fixcm=True`` with ``FixAtoms`` is refused. Which schemes take
-  ``FixAtoms`` is each record's ``constraints``.
+  ``FixAtoms`` is each record's ``constraints``; a variable cell with ``FixAtoms`` is refused for every
+  scheme (decision 44, code ``fix-atoms-variable-cell``).
 - D2: ``degrees_of_freedom``: ``dof="fastmace"`` counts 3N - 3 under ``fixcm``, 3(N - n_fixed) with
   ``FixAtoms``, 3N otherwise; ``dof="ase"`` the count of the scheme's ASE class (``ase_dof``);
   ``dof="auto"`` resolves to ``DOF_AUTO`` (``"fastmace"``; ``"ase"`` under alternative (b)).
@@ -30,7 +31,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
-from fastmace.errors import Reason
+from fastmace.errors import Reason, RegistryError
 
 if TYPE_CHECKING:
     from fastmace.config import IntegratorConfig, OptimizerConfig
@@ -54,6 +55,9 @@ ASE_DOF = ("constraints", "3n")
 # D1 (recommended (a)): FixAtoms pins the frame already, and ASE's fixcm displacement moves fixed atoms
 # before the constraint resets them. Changing D1 here lifts the refusal for every scheme.
 FIX_ATOMS_WITH_FIXCM = "refused"
+
+# Whose attribute a record's ``buffers`` are, in the runtime-state registry's names (``engine.registry``).
+BUFFER_OWNERS = {"integrator": "integrator", "optimizer": "optimizer", "cell_filter": "dof"}
 
 _PACKAGES = {"integrator": "fastmace.integrators.schemes", "optimizer": "fastmace.optimize.schemes",
              "cell_filter": "fastmace.optimize.schemes"}
@@ -258,8 +262,26 @@ class Registry:
         key = (record.kind, record.scheme)
         if key in self._records and self._records[key] != record:
             raise ValueError(f"{record.kind} scheme {record.scheme!r} is registered twice")
+        self._check_buffers(record)
         self._records[key] = record
         return record
+
+    def _check_buffers(self, record: SchemeRecord) -> None:
+        """4-T01b: two schemes of one owner may name the same buffer only with the same restart policy. Their
+        ``recompute`` names may differ (one scheme runs per engine); ``engine.registry.scheme_policies`` joins
+        them."""
+        owner = BUFFER_OWNERS[record.kind]
+        for other in self._records.values():
+            if other.scheme == record.scheme and other.kind == record.kind or BUFFER_OWNERS[other.kind] != owner:
+                continue
+            theirs = {name: restart for name, restart, _ in other.buffers}
+            for name, restart, _ in record.buffers:
+                if name in theirs and theirs[name] != restart:
+                    raise RegistryError(
+                        f"the buffer {owner}.{name} has restart policy {theirs[name]!r} in {other.kind} scheme "
+                        f"{other.scheme!r} and {restart!r} in {record.kind} scheme {record.scheme!r}",
+                        why="A runtime buffer has one restart policy (SPEC §8.1); rename one of them in its "
+                            "scheme record.")
 
     def get(self, kind: str, scheme: str | None) -> SchemeRecord | None:
         return self._records.get((kind, scheme))
@@ -353,9 +375,9 @@ def integrator_refusals(config: IntegratorConfig, *, fix_atoms: bool = False, ot
 
     The scheme is registered and runs the config's ensemble and cell mode (``variable_cell``: the workload
     asks for a variable cell); its constraint rows cover ``fixcm`` and ``FixAtoms``; no other constraint;
-    no MC with constraints. Codes: ``scheme-unknown``, ``scheme-ensemble``, ``scheme-cell-mode``,
-    ``scheme-dof``, ``variable-cell-without-barostat``, ``constraints``, ``fix-atoms-with-fixcm``,
-    ``mc-with-constraints``.
+    no MC with constraints; no ``FixAtoms`` with a variable cell. Codes: ``scheme-unknown``,
+    ``scheme-ensemble``, ``scheme-cell-mode``, ``scheme-dof``, ``variable-cell-without-barostat``,
+    ``constraints``, ``fix-atoms-with-fixcm``, ``fix-atoms-variable-cell``, ``mc-with-constraints``.
     """
     records = records or registry()
     record = records.get("integrator", config.scheme)
@@ -380,6 +402,12 @@ def integrator_refusals(config: IntegratorConfig, *, fix_atoms: bool = False, ot
                                 f"{record.refusal('fixcm')}", "constraints"))
     refusals += _constraint_refusals(record, fix_atoms=fix_atoms, other=tuple(other_constraints),
                                      fixcm=config.fixcm, mc=mc, what=f"the {config.scheme} integrator")
+    if fix_atoms and "fix_atoms" in record.constraints and (variable_cell or record.cell_mode(config) != "fixed"):
+        # A scheme that takes FixAtoms at fixed cell (Berendsen) refuses it with its barostat: no ASE class
+        # holds fixed atoms in a moving cell (decision 44; alternative (c) was fractional coordinates).
+        refusals.append(_reason(f"FixAtoms constraints are refused with a variable cell ({config.scheme}, "
+                                f"cell mode {config.cell_mode!r}); FixAtoms runs at fixed cell only (owner decision "
+                                "44, SPEC §4.4)", "fix-atoms-variable-cell"))
     return refusals
 
 

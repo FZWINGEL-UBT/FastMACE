@@ -1,0 +1,422 @@
+{
+  "schema": 4,
+  "task": "4-T05/4-T06/4-T07",
+  "side": "gpu",
+  "optimizer": "lbfgs",
+  "cell_filter": "frechet",
+  "pressure_GPa": 0.0,
+  "dispersion": "none",
+  "structure_settings": {
+    "root": "/data/baseline/1a-T18",
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "strain": 0.02,
+    "rattle_A": 0.02,
+    "seed": 0,
+    "seed_rule": "seed + crc32(name)"
+  },
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T09:27:54+00:00",
+  "fastmace_commit": null,
+  "machine": "modal",
+  "gpu": "NVIDIA L4",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/cache/L4/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/__modal/volumes/vo-beuxVFdLA1HINpxj4Gw05O/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NbCl3O": {
+      "traj": "/data/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl3O.cif",
+      "runs": {
+        "graph-skin0.6": {
+          "setup_s": 139.53107501,
+          "tier": "graph",
+          "skin_A": 0.6,
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 209,
+              "seconds": 2.1527719630000774,
+              "initial_eV_atom": -11.582271226247151,
+              "energy_eV_atom": -11.608805233902402,
+              "fmax_eV_A": 0.008612389329317311,
+              "neighbour_rebuilds": 0,
+              "recaptures": 0,
+              "ms_per_step": 10.300344320574533,
+              "switch_flips": null,
+              "enthalpy_eV_atom": -11.608805233902402,
+              "cell_lengths_A": [
+                33.82463881224758,
+                33.824597816683166,
+                11.865499683083911
+              ],
+              "cell_angles_deg": [
+                89.99927118272049,
+                89.99898270435213,
+                89.99978061454453
+              ],
+              "volume_A3": 13575.375187349382,
+              "dE_vs_ase_meV_atom": 5.739705599694389e-06,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 1.6297920386737453e-05,
+              "max_cell_length_diff_A": 5.239467977702361e-06,
+              "volume_rel_diff": 5.381852643537854e-07
+            }
+          },
+          "engine": {
+            "edge_sizes_used": [
+              17408
+            ],
+            "neighbour_rebuilds": 0,
+            "graphs": [
+              "('B', 17408)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 0,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 17408)",
+                "reason": "first capture",
+                "counted": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    "TaCl3O": {
+      "traj": "/data/baseline/1a-T18/Structures/Benchmark/R2SCAN/TaCl3O.cif",
+      "runs": {
+        "graph-skin0.6": {
+          "setup_s": 50.41770692199998,
+          "tier": "graph",
+          "skin_A": 0.6,
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 203,
+              "seconds": 2.368473716000153,
+              "initial_eV_atom": -16.531185735155034,
+              "energy_eV_atom": -16.558170066497944,
+              "fmax_eV_A": 0.009982139261567885,
+              "neighbour_rebuilds": 0,
+              "recaptures": 2,
+              "ms_per_step": 11.667358206897307,
+              "switch_flips": null,
+              "enthalpy_eV_atom": -16.558170066497944,
+              "cell_lengths_A": [
+                33.877368151223116,
+                33.87713457547295,
+                11.415961042371709
+              ],
+              "cell_angles_deg": [
+                90.00086581811806,
+                89.9993843279805,
+                89.99994796313295
+              ],
+              "volume_A3": 13101.735000980285,
+              "dE_vs_ase_meV_atom": -2.428337353421739e-05,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 1.299302069753574e-05,
+              "max_cell_length_diff_A": 2.7909560103012154e-06,
+              "volume_rel_diff": -1.7218169412469564e-07
+            }
+          },
+          "engine": {
+            "edge_sizes_used": [
+              17408,
+              18432,
+              19456
+            ],
+            "neighbour_rebuilds": 0,
+            "graphs": [
+              "('B', 17408)",
+              "('B', 18432)",
+              "('B', 19456)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 2,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 17408)",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 132,
+                "key": "('B', 18432)",
+                "reason": "new variant of B",
+                "counted": true
+              },
+              {
+                "step": 186,
+                "key": "('B', 19456)",
+                "reason": "new variant of B",
+                "counted": true
+              }
+            ]
+          }
+        }
+      }
+    },
+    "NbCl2O": {
+      "traj": "/data/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl2O.cif",
+      "runs": {
+        "graph-skin0.6": {
+          "setup_s": 57.39491704400007,
+          "tier": "graph",
+          "skin_A": 0.6,
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 218,
+              "seconds": 2.2821479939998426,
+              "initial_eV_atom": -12.631851816618884,
+              "energy_eV_atom": -12.65919039260458,
+              "fmax_eV_A": 0.00815302100334034,
+              "neighbour_rebuilds": 0,
+              "recaptures": 2,
+              "ms_per_step": 10.468568779815792,
+              "switch_flips": null,
+              "enthalpy_eV_atom": -12.65919039260458,
+              "cell_lengths_A": [
+                40.557859680290555,
+                11.879449512815535,
+                20.287432885771455
+              ],
+              "cell_angles_deg": [
+                90.00020677516217,
+                105.70830706809845,
+                90.00004392174948
+              ],
+              "volume_A3": 9409.531165378485,
+              "dE_vs_ase_meV_atom": 2.207579896662537e-06,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 1.0410868854156796e-05,
+              "max_cell_length_diff_A": 2.667109505694043e-06,
+              "volume_rel_diff": 2.6579595635567443e-08
+            }
+          },
+          "engine": {
+            "edge_sizes_used": [
+              15360,
+              16128,
+              16896
+            ],
+            "neighbour_rebuilds": 0,
+            "graphs": [
+              "('B', 15360)",
+              "('B', 16128)",
+              "('B', 16896)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 2,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 15360)",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 26,
+                "key": "('B', 16128)",
+                "reason": "new variant of B",
+                "counted": true
+              },
+              {
+                "step": 163,
+                "key": "('B', 16896)",
+                "reason": "new variant of B",
+                "counted": true
+              }
+            ]
+          }
+        }
+      }
+    },
+    "NbCl5": {
+      "traj": "/data/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl5.cif",
+      "runs": {
+        "graph-skin0.6": {
+          "setup_s": 57.26991147999979,
+          "tier": "graph",
+          "skin_A": 0.6,
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 251,
+              "seconds": 8.29012161799983,
+              "initial_eV_atom": -10.603163163603089,
+              "energy_eV_atom": -10.623766820003956,
+              "fmax_eV_A": 0.009833666237569547,
+              "neighbour_rebuilds": 0,
+              "recaptures": 1,
+              "ms_per_step": 33.028372980079006,
+              "switch_flips": null,
+              "enthalpy_eV_atom": -10.623766820003956,
+              "cell_lengths_A": [
+                57.55871049782212,
+                54.983006033327314,
+                18.124969795868473
+              ],
+              "cell_angles_deg": [
+                90.00006372131733,
+                90.41974793602363,
+                90.00003883248573
+              ],
+              "volume_A3": 57359.475678581635,
+              "dE_vs_ase_meV_atom": -8.217099889407109e-06,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 3.769282868406311e-05,
+              "max_cell_length_diff_A": 5.960099564106258e-06,
+              "volume_rel_diff": -3.2768653179804375e-07
+            }
+          },
+          "engine": {
+            "edge_sizes_used": [
+              48640,
+              51200
+            ],
+            "neighbour_rebuilds": 0,
+            "graphs": [
+              "('B', 48640)",
+              "('B', 51200)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 1,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 48640)",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 13,
+                "key": "('B', 51200)",
+                "reason": "new variant of B",
+                "counted": true
+              }
+            ]
+          }
+        }
+      }
+    },
+    "TaCl5": {
+      "traj": "/data/baseline/1a-T18/Structures/Benchmark/R2SCAN/TaCl5.cif",
+      "runs": {
+        "graph-skin0.6": {
+          "setup_s": 55.95769298699997,
+          "tier": "graph",
+          "skin_A": 0.6,
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 284,
+              "seconds": 9.46911253799999,
+              "initial_eV_atom": -14.686893172224853,
+              "energy_eV_atom": -14.709294926237177,
+              "fmax_eV_A": 0.009718544207369416,
+              "neighbour_rebuilds": 0,
+              "recaptures": 1,
+              "ms_per_step": 33.341945556338,
+              "switch_flips": null,
+              "enthalpy_eV_atom": -14.709294926237177,
+              "cell_lengths_A": [
+                57.12154647130002,
+                54.61275844764028,
+                18.109044193955242
+              ],
+              "cell_angles_deg": [
+                89.99994069418841,
+                90.72140695632726,
+                89.99995210851458
+              ],
+              "volume_A3": 56487.866580465015,
+              "dE_vs_ase_meV_atom": 2.1707863950837236e-05,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 8.873174834747245e-05,
+              "max_cell_length_diff_A": 6.692230026317247e-05,
+              "volume_rel_diff": -3.23448247241398e-06
+            }
+          },
+          "engine": {
+            "edge_sizes_used": [
+              48640,
+              51200
+            ],
+            "neighbour_rebuilds": 0,
+            "graphs": [
+              "('B', 48640)",
+              "('B', 51200)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 1,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 48640)",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 1,
+                "key": "('B', 51200)",
+                "reason": "new variant of B",
+                "counted": true
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T09:34:26+00:00"
+}

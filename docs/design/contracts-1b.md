@@ -91,6 +91,7 @@ T04 registers them and adds anything its version-counter test finds. The table i
 | BAOAB `p_eps`, `force_eps` (move into the state, T05) | save | capture |
 | Langevin `x_old`, `rnd_pos`, `rnd_vel`, `xi`, `eta`; BAOAB `xi`, `zeta` | derived (written before read) | capture |
 | integrator `sqrt_kT` (target) | derived from the protocol position | capture |
+| `state.free_mask` and the integrators' `fixed_rows` (`FixAtoms`, 4-T01 and 4-T04) | derived from the restart's fixed atoms | capture |
 | BAOAB `externalstress` (pressure target, 3b-T05) | derived from the protocol position; the restart's integrator record keeps the current one | capture |
 | BAOAB `externalstress_step` (the target of the step in flight, 3b-T05) | derived (stage A copies the target; a resume fills it) | capture |
 | `neighbours.*` (candidates, edges, shifts, `count`, `reference_positions`, build cell h₀) | reset (`rebuild`) | capture |

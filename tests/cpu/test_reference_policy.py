@@ -121,12 +121,33 @@ def test_polar_record_carries_the_issue_1642_fix_and_its_validation():
     assert fix["name"] == "polar_kspace_stress" and fix["issue"] == "MACE issue 1642"
     assert fix["fixed_upstream"] == "MACE PR 1718, after 0.3.16"
     validation = fix["validation"]
-    assert validation["method"] == "central finite differences of the reference energy"
-    assert validation["structure"] == "NaCl 3x3x3" and validation["tolerance_eV_per_A3"] == 1e-6
-    # The qualified record's text is fixed (its id): 3b-T08 resolved this finding, the entry still states it.
-    assert "4.4e-4" in fix["open_findings"][0] and "phase 3b" in fix["open_findings"][0]
+    assert validation["method"].startswith("central finite differences of the reference energy")
+    assert "k-set held fixed" in validation["method"]
+    assert validation["structures"] == ["NaCl 3x3x3", "NbCl5 3x3x3"] and validation["tolerance_eV_per_A3"] == 1e-6
+    # 4-T12's record version restates it: 3b-T08 and 4-T11 resolved the NbCl5 finding; nothing is open.
+    assert "open_findings" not in fix
+    assert "4.4e-4" in fix["resolved_findings"][0] and "3b-T08" in fix["resolved_findings"][0]
     # A fix is a correction of a defect, not non-stock physics.
     assert record.is_stock
+
+
+def test_polar_record_carries_the_gate_stress_floor():
+    """SPEC decision 49 (4-T12): PolarMACE's stress floor of 5e-7 eV/A^3 is a gate entry of its record."""
+    from fastmace.config import PolarConfig
+
+    record = records.record_for("0.3.16", "polar")
+    assert [entry["name"] for entry in record.numerical] == ["float64_energy_accumulation",
+                                                             "polar_float32_stress_floor"]
+    entry = record.numerical[-1]
+    assert entry["applies_to"] == "gate" and entry["floors"] == {"stress_eV_per_A3": 5e-7}
+    assert "decision 49" in entry["decision"]
+    assert records.gate_floors(record) == {"stress_eV_per_A3": 5e-7}
+    assert record.is_stock  # a treatment of the comparison, not of the model
+    stabilised = records.record_for("0.3.16", "polar", polar=PolarConfig(fukui_regularisation=0.1))
+    assert records.gate_floors(stabilised) == {"stress_eV_per_A3": 5e-7}
+    for family in ("mh1", "omol", "residual", "density", "off", "unlabelled"):
+        assert records.gate_floors(records.record_for("0.3.16", family)) == {}, family
+        assert records.gate_floors(records.record_for("0.3.17", family)) == {}, family
 
 
 def test_record_ids_are_stable_and_change_with_every_entry():
@@ -252,6 +273,7 @@ def test_float64_reference_equals_stock_mace(family):
     info = reference.info()
     assert info["record_id"] == record.id and info["dtype"] == "float64" and info["role"] == "reference"
     assert info["corrections_active"] == (["polar_kspace_stress"] if family == "polar" else [])
+    assert info["gate_floors"] == ({"stress_eV_per_A3": 5e-7} if family == "polar" else {})
 
 
 @needs_polar
