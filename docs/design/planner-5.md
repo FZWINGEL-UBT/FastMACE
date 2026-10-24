@@ -32,7 +32,7 @@ planner decision, tier, rewrite, size or step changes with this task.
 | 11 | preference | — | `rule-11`, `rule-11-fixed`, `rule-11-md-only`, `rule-11-optimizer`, `rule-11-d3` (an explicit value is an `override`, 5-T02) |
 | 12 | preference | — | `rule-12-d3`, `rule-12-d3-memory`, `rule-12-d3-warn`, `rule-12-memory`, `rule-12-memory-drop`, `rule-12-memory-warn` (5-T03: the estimate and decision 51's action) |
 | 13 | reaction | — | `selfcheck-failed`, `selfcheck-dependant` |
-| 14 | reaction | — | `fallback-exhausted`, `fallback-rewrite-off`, `fallback-rewrite-on`, `runner-subprocess-fallback` |
+| 14 | reaction | — | `fallback-exhausted`, `fallback-rewrite-off`, `fallback-rewrite-on`, `runner-subprocess-fallback`, `fallback-mid-run`, `fallback-mid-run-limit` (5-T08) |
 | 15 | reaction | — | `model-structure-warning` (reserved for 5-T04) |
 
 The codes are those the library emits today for each rule (a static scan of `fastmace/`), plus the two
@@ -48,7 +48,9 @@ Codes later tasks add, each in the branch that emits them:
 - 5-T03: rule 12's action codes, once **D1** is decided (for example a rewrite dropped, a warning, a
   refusal under D1 (c), or the out-of-memory re-plan of D1 (d));
 - 5-T04: emits `model-structure-warning` (decisions `warn.model_structure...`);
-- 5-T08: rule 14's mid-run codes, once **D4** is decided.
+- 5-T08: rule 14's mid-run codes (decision 54): `fallback-mid-run` (the activated revision's decision
+  `fallback.mid_run`), `fallback-mid-run-limit` (a second failure before the next canonical point, or a candidate
+  that would run in a child).
 
 ### `Reason` checks (`errors.py`)
 
