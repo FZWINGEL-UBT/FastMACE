@@ -97,7 +97,8 @@ def main(argv=None):
     record = dict(tool="nve_drift", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                   python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), model=args.model,
                   structure=structure, natoms=n, temperature_K=args.temperature_K, timestep_fs=args.timestep_fs,
-                  ps=args.ps, every=args.every, rewrites=rewrites, plan=sim.plan.describe(), setup_s=setup_s, seconds=seconds,
+                  ps=args.ps, every=args.every, rewrites=rewrites, plan=sim.plan.describe(), setup_s=setup_s,
+                  seconds=seconds,
                   drift_meV_per_atom_per_ps=1e3 * slope, rms_meV_per_atom=1e3 * rms, range_meV_per_atom=1e3 * spread,
                   rows_step_conserved_kinetic_eV_per_atom=rows, gpu=torch.cuda.get_device_name(),
                   torch=torch.__version__)
