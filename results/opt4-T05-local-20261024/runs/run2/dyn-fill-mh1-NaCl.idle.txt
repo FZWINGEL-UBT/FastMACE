@@ -1,0 +1,10 @@
+2026-10-24T11:44:02Z
+ 13:44:02 up 12:58,  1 user,  load average: 209.90, 210.13, 210.37
+NVIDIA GeForce RTX 5060 Ti, 610.88, 0 %, 2499 MiB
+Mem:              39           1          23           0          14          37
+your 131072x1 screen size is bogus. expect trouble
+%CPU COMMAND
+ 0.0 /usr/lib/systemd/systemd-udevd
+ 0.0 bash -lc cd ~/fastmace-opt4/t04; seen=""; while true; do for f in "abset-mp0b3-medium,matpes-pbe" "abset-omat0-medium"; do [ -f "$f.log" ] || continue; if grep -q reserved "$f.log" && [[ "$seen" != *"S$f"* ]]; then echo "START $f $(date -u +%FT%TZ)"; seen+=" S$f"; fi; if grep -q "^.* $f exit=" run.log && [[ "$seen" != *"E$f"* ]]; then echo "END $(grep " $f exit=" run.log | tail -1)"; seen+=" E$f"; fi; done; if grep -q "done abset-omat0-medium" run.log; then echo ALLDONE; break; fi; sleep 5; done
+ 0.0 plan9 --control-socket 7 --log-level 4 --server-fd 8 --pipe-fd 10 --log-truncate
+ 0.0 python3 tools/ci/local_gpu.py run --wait-minutes 600 --purpose OPT4-T03 OMOL-0 XL accuracy + gate tf32x3 NaCl, fixed (<15 min, untimed) -- env FM=/home/fzwin/fastmace-opt4/src-t03-46b2cd2 bash results/opt4-T03/local.sh /home/fzwin/fastmace-opt4/t03-local-46b2cd2 omol-accuracy ogate-NaCl

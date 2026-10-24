@@ -22,8 +22,9 @@
 - ``grouped_launch`` (OPT-T03 candidate 2, ``docs/design/opt-T03-small-m.md``): in every block linear
   (``BlockLinear``, ``ResidualBlockLinear``, also inside the ``gated_rows`` chains), the products that the
   shared shape rule calls small run together in one Triton launch (``fastmace.kernels.triton.grouped_gemm``),
-  forward and input gradient; the others keep cuBLAS. ``rounding`` (another GEMM), deterministic. Opt-in
-  (``RewriteConfig.grouped_launch``).
+  forward and input gradient; the others keep cuBLAS. ``rounding`` (another GEMM), deterministic. The record's
+  own default is off; the planner's ``auto`` turns it on for the generic MACE family in float32 (owner decision
+  57, 24 October 2026, OPT4-T04: ``RewriteConfig.grouped_launch``).
 
 The self-check compares each chain with the unrewritten interaction's ``linear_2(gate(linear_1(x)
 + linear_res(y)))``, values and both input gradients, in the model's dtype (SPEC §6.4). The gate's

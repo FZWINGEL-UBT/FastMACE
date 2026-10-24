@@ -1,0 +1,10 @@
+2026-10-24T09:55:38Z
+ 11:55:38 up 11:10,  1 user,  load average: 210.68, 209.68, 206.80
+NVIDIA GeForce RTX 5060 Ti, 610.88, 0 %, 2601 MiB
+Mem:              39           1          31           0           6          37
+your 131072x1 screen size is bogus. expect trouble
+%CPU COMMAND
+35.2 /home/fzwin/environments/fastmace_cpu/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
+33.7 /home/fzwin/environments/fastmace_cpu/bin/python -u -c import sys;exec(eval(sys.stdin.readline()))
+10.1 /home/fzwin/environments/fastmace_cpu/bin/python -m pytest -n 2 -q tests/cpu/test_config.py tests/cpu/test_report.py tests/cpu/test_planner.py tests/cpu/test_minimal_planner.py tests/cpu/test_rewrites_mh1.py tests/cpu/test_rewrites_generic.py
+ 0.1 python3 /mnt/d/Margraf/FastMACE/tools/ci/local_gpu.py run --wait-minutes 600 --min-available-gib 6 --purpose OPT4-T04 force gate omat0-medium NaCl NbCl5 (<15 min) -- nice /home/fzwin/environments/mace_cueq_oeq/bin/python -W ignore /home/fzwin/fastmace-opt4/src-T04-13a1983/tools/force_stress_gate.py --output /home/fzwin/fastmace-opt4/t04/gate-omat0-medium --engine fastmace --structures-root /home/fzwin/fastmace-baseline/1a-T18 --checkpoint /home/fzwin/models/mace-omat-0-medium.model --model omat0-medium --structures NaCl NbCl5 --rewrites grouped_launch=on --reference-command /home/fzwin/environments/mace_cueq_latest/bin/python --production-command bash /home/fzwin/fastmace-baseline/1a-T18/Experiments/Langevin_Thermostat/studies/hybrid_oeq/scripts/oeq_no_nvcc.sh /home/fzwin/environments/mace_cueq_oeq /home/fzwin/fastmace-cache/opt4-t04/oeq-launcher /home/fzwin/environments/mace_cueq_oeq/bin/python

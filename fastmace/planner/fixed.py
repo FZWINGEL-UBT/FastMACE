@@ -97,8 +97,11 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
-    "RewriteConfig.grouped_launch": "never_automatic",
+    "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
     "RewriteConfig.combo_kernels": "never_automatic",
+    "RewriteConfig.tf32x3_gemms": "never_automatic",
+    "RewriteConfig.fx_e3nn_linear": "never_automatic",
+    "RewriteConfig.polar_graph_sums": "never_automatic",
     "RewriteConfig.species_tables": "on_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
@@ -124,7 +127,8 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
-                  "combo_kernels")
+                  "combo_kernels", "tf32x3_gemms",
+                  "fx_e3nn_linear", "polar_graph_sums")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
 SINGLE_GRAPH = "single_graph"  # one structure per evaluation: always, production is one structure
@@ -259,6 +263,16 @@ def _workload_text(atoms, pbc):
 
 def _toggle(value):
     return "on" if value else "off"
+
+
+def _generic_mace_family(traits):
+    """MP-0 / MPA-0 / OMAT-0 / MatPES-class models: every interaction MP-0's residual block or the density
+    family's (GENERIC_INTERACTIONS), not PolarMACE. MACE-OFF (a plain first interaction), MH-1, POLAR-1 and
+    OMOL-0 are other families (decision 57)."""
+    from fastmace.model.capabilities import GENERIC_INTERACTIONS
+
+    interactions = tuple(traits.interaction_classes)
+    return bool(interactions) and not traits.polar and all(name in GENERIC_INTERACTIONS for name in interactions)
 
 
 def _stress_text(config):
@@ -533,7 +547,7 @@ class FixedPlanner:
         hybrid = backend == "hybrid"
         values = self._stage1(book, hybrid, npt)
         self._stage2(book, values, traits, explicit)
-        self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible)
+        self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible, hardware.compute_capability)
         rewrite_values = {name: _toggle(values[name]) for name in REWRITE_FIELDS}
 
         rewrites = self.rewrites
@@ -828,9 +842,9 @@ class FixedPlanner:
         needs("merged_residual", r.merged_residual != "off", v["block_linear"], "block_linear")
         needs("gated_rows", r.gated_rows != "off", v["merged_residual"], "merged_residual")
         needs("segment_gemm", r.segment_gemm != "off", v["gated_rows"], "gated_rows")
-        needs("grouped_launch", r.grouped_launch == "on", v["block_linear"], "block_linear")
-        if r.grouped_launch == "auto":
-            v["_why"]["grouped_launch"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
+        # Owner decision 57, 24 October 2026 (OPT4-T04): on by default for the generic MACE family only; stage 2
+        # drops it for the other families, the FastMACE rules in float64 and reproducible plans.
+        needs("grouped_launch", r.grouped_launch != "off", v["block_linear"], "block_linear")
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
         # OPT-T08 records, on by default (owner decision, 21 October 2026, OPT-DEF-2); stage 2 keeps them only
         # where the model takes them, and the FastMACE rules drop them in float64 and reproducible plans.
@@ -843,6 +857,15 @@ class FixedPlanner:
         note("combo_kernels", r.combo_kernels == "on",
              "on: Inductor's pointwise combo kernels in the compiled model" if r.combo_kernels == "on"
              else "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)")
+        needs("tf32x3_gemms", r.tf32x3_gemms == "on", v["block_linear"], "block_linear")
+        if r.tf32x3_gemms == "auto":
+            v["_why"]["tf32x3_gemms"] = "off: only an explicit 'on' enables it (OPT4-T03, accuracy screen)"
+        note("fx_e3nn_linear", r.fx_e3nn_linear == "on",
+             "on: e3nn's o3.Linear as fx graphs, traced by dynamo" if r.fx_e3nn_linear == "on"
+             else "off: only an explicit 'on' enables it (OPT4-T02, opt-in)")
+        note("polar_graph_sums", r.polar_graph_sums == "on",
+             "on: PolarMACE's one-graph sums without scatter and index" if r.polar_graph_sums == "on"
+             else "off: only an explicit 'on' enables it (OPT4-T02, opt-in)")
         return v
 
     def _stage2(self, book, v, traits, explicit):
@@ -860,9 +883,28 @@ class FixedPlanner:
                 v["_why"][name] += f"; stage 2: off, not supported by the model ({reason})"
             elif v[name]:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
+        if v["grouped_launch"] and "grouped_launch" not in explicit and not _generic_mace_family(traits):
+            # Measured only on the generic family (OPT4-T04); MH-1 lost 0.5 % on sm_89 (OPT-T03b).
+            reason = (f"not the generic MACE family, decision 57 (interactions "
+                      f"{sorted(set(traits.interaction_classes))}{', PolarMACE' if traits.polar else ''})")
+            v["grouped_launch"] = False
+            v["_auto_off"]["grouped_launch"] = reason
+            v["_why"]["grouped_launch"] += f"; stage 2: off, {reason}"
 
-    def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False):
+    def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False, capability=None):
         """FastMACE's hard rules on the rewrites, then one decision per rewrite field and neighbour option."""
+        if v["tf32x3_gemms"]:
+            from fastmace.kernels.triton.tf32x3_gemm import MIN_CAPABILITY
+
+            # OPT4-T03: Triton's tf32x3 is float32 only and needs TF32 tensor cores (compute capability >= 8.0).
+            if dtype != "float32":
+                book.refuse(f"RewriteConfig.tf32x3_gemms='on' needs float32, not {dtype}", "tf32x3-needs-float32")
+            elif capability not in (None, (0, 0)) and tuple(capability) < MIN_CAPABILITY:  # (0, 0): the CPU, PyTorch
+                book.refuse(f"RewriteConfig.tf32x3_gemms='on' needs compute capability >= 8.0, the GPU has "
+                            f"{capability[0]}.{capability[1]}", "tf32x3-needs-sm80")
+            if v["grouped_launch"]:
+                book.refuse("RewriteConfig.tf32x3_gemms and grouped_launch both reroute the block linears' products",
+                            "rewrite-conflict")
         # OPT-DEF-2 (owner, 21 October 2026): the rounding-class OPT-T08 records keep the stock path in float64 and
         # reproducible plans. species_tables too: its tables are not bitwise the per-atom products on the GPU
         # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).
@@ -882,6 +924,11 @@ class FixedPlanner:
             v["segment_gemm"] = False
             v["_why"]["segment_gemm"] += ("; off: reproducible=True keeps the stock products" if reproducible
                                           else f"; off: {dtype} keeps the stock products (the Triton GEMM is float32)")
+        if v["grouped_launch"] and "grouped_launch" not in explicit and (dtype != "float32" or reproducible):
+            v["grouped_launch"] = False
+            v["_why"]["grouped_launch"] += ("; off: reproducible=True keeps the stock products" if reproducible
+                                            else f"; off: {dtype} keeps the stock products (the Triton GEMM is "
+                                                 "float32)")
         if not hybrid and v["reassociate_first"]:
             if "reassociate_first" in explicit:
                 book.refuse(f"RewriteConfig.reassociate_first='on' on plain cuEq: {PLAIN_CUEQ_REASSOCIATION}",

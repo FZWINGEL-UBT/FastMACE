@@ -1,0 +1,161 @@
+{
+  "tool": "tf32x3_accuracy",
+  "created_utc": "2026-10-24T11:57:42.604651+00:00",
+  "host": "Fabi-PC",
+  "fastmace_commit": "46b2cd2",
+  "model": "omol0-xl",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "capability": [
+    12,
+    0
+  ],
+  "torch": "2.14.1+cu130",
+  "cuda": "13.0",
+  "rattle_A": 0.05,
+  "seed": 20261024,
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "decision": [
+        "RewriteConfig.tf32x3_gemms",
+        "on",
+        "requested 'on': stage 1: on (with block_linear)"
+      ],
+      "products": 106,
+      "shapes": 37,
+      "max_rel": {
+        "tf32x3": 1.1919595079695539e-06,
+        "ieee": 1.2261241111975631e-06,
+        "tf32x3_over_ieee_median": 0.5813663610310786,
+        "tf32x3_over_ieee_max": 1.9959424159075936,
+        "tf32x3_worse_count": 28
+      },
+      "frob_rel": {
+        "tf32x3": 3.027547019393963e-07,
+        "ieee": 4.2544978067057755e-07,
+        "tf32x3_over_ieee_median": 0.6504109672351013,
+        "tf32x3_over_ieee_max": 2.0133147130163747,
+        "tf32x3_worse_count": 17
+      },
+      "cancellation_scaled": {
+        "tf32x3": 5.712805074923734e-07,
+        "ieee": 1.0390018255582636e-06,
+        "tf32x3_over_ieee_median": 0.67837574462523,
+        "tf32x3_over_ieee_max": 2.740301191484023,
+        "tf32x3_worse_count": 29
+      },
+      "cancellation_scaled_unfiltered": {
+        "tf32x3": 5.712805074923734e-07,
+        "ieee": 1.0390018255582636e-06,
+        "tf32x3_over_ieee_median": 0.67837574462523,
+        "tf32x3_over_ieee_max": 2.740301191484023,
+        "tf32x3_worse_count": 29
+      },
+      "cancellation_median_max": 55.21974808539964,
+      "cancellation_max": 274448656.6485647,
+      "cublas_products_left": [
+        {
+          "op": "aten::addmm",
+          "shapes": "[[128], [6912, 128], [128, 128], [], [], [6912, 128]]",
+          "count": 6
+        },
+        {
+          "op": "aten::addmm",
+          "shapes": "[[192], [216, 1024], [1024, 192], [], [], [216, 192]]",
+          "count": 3
+        },
+        {
+          "op": "aten::addmm",
+          "shapes": "[[1], [6912, 64], [64, 1], [], [], [6912, 1]]",
+          "count": 3
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[15, 20], [20, 1024], [15, 1024]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[216, 1024], [1024, 192], [216, 192]]",
+          "count": 3
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[216, 16], [16, 16]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[216, 16], [16, 1]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[216, 192], [192, 1024], [216, 1024]]",
+          "count": 4
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[216, 1], [1, 16]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[216, 2048], [2048, 1024], [216, 1024]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[216, 83], [83, 1], [216, 1]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[3, 216], [216, 3], [3, 3]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[3, 3], [3, 3], [3, 3]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[3, 6912], [6912, 3], [3, 3]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[5, 5], [5, 1024], [5, 1024]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 128], [128, 128], [6912, 128]]",
+          "count": 6
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 132], [132, 2176], [6912, 2176]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 192], [192, 8], [6912, 8]]",
+          "count": 3
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 3], [3, 3], [6912, 3]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 8], [8, 192], [6912, 192]]",
+          "count": 3
+        }
+      ]
+    }
+  },
+  "triton": "3.8.0"
+}

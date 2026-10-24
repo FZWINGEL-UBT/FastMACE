@@ -1,0 +1,72 @@
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/home/fzwin/fastmace-opt4-t05/src-13a1983/results/opt4-T05-probes/setup_md.py:68: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  return original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/fastmace-opt4-t05/src-13a1983/results/opt4-T05-probes/setup_md.py:68: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  return original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/fastmace-opt4-t05/src-13a1983/results/opt4-T05-probes/setup_md.py:68: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  return original(*args, **kwargs)
+/home/fzwin/fastmace-opt4-t05/src-13a1983/results/opt4-T05-probes/setup_md.py:68: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  return original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+W1024 13:14:47.061000 37866 torch/_inductor/utils.py:1806] [0/0_1] Not enough SMs to use max_autotune_gemm mode
+NaCl mh1-r2scan md 85.15 s, process 86.08 s
+  compile: first compiled call: self 29.417 s, total 29.417 s (1)
+  capture: B: self 21.813 s, total 21.813 s (2)
+  load: prepare_hybrid (OEq runtime): self 16.343 s, total 16.343 s (2)
+  load: loading.load: self 6.428 s, total 6.674 s (2)
+  self-check: segment_gemm: self 2.743 s, total 2.743 s (1)
+  self-check: fused_folded_backward: self 2.235 s, total 2.235 s (1)
+  build: private_copy: self 0.884 s, total 0.884 s (2)
+  run: Simulation.run: self 0.852 s, total 0.966 s (1)
+  build: MACEForceField.__init__: self 0.717 s, total 8.388 s (1)
+  self-check: reassociate_first: self 0.704 s, total 0.704 s (1)
+  self-check: factor_species: self 0.544 s, total 0.544 s (1)
+  capture: ACP: self 0.427 s, total 0.427 s (1)
+  rewrites: apply: self 0.294 s, total 7.226 s (1)
+  load: torch.load: self 0.212 s, total 0.212 s (3)
+  plan: MinimalPlanner.plan: self 0.184 s, total 0.184 s (1)
+  self-check: segmented_first_sum: self 0.136 s, total 0.136 s (1)
+  self-check: streaming_conv: self 0.088 s, total 0.088 s (1)
+  self-check: block_linear: self 0.080 s, total 0.080 s (1)
+  self-check: grouped_linear: self 0.074 s, total 0.074 s (1)
+  rewrites: resolve: self 0.066 s, total 0.066 s (1)
+  self-check: fold_cutoff: self 0.063 s, total 0.063 s (1)
+  self-check: folded_backward_tiles: self 0.060 s, total 0.060 s (1)
+  self-check: joint_radial_input: self 0.060 s, total 0.060 s (1)
+  self-check: density_first: self 0.056 s, total 0.056 s (1)
+  rest: metadata.json: self 0.050 s, total 0.050 s (2)
+  self-check: fold_product_linear: self 0.038 s, total 0.038 s (1)
+  load: sha256: self 0.034 s, total 0.034 s (2)
+  simulation: __init__: self 0.026 s, total 64.126 s (1)
+  build: GraphEngine.__init__: self 0.025 s, total 29.442 s (1)
+  self-check: gated_rows: self 0.022 s, total 0.022 s (1)

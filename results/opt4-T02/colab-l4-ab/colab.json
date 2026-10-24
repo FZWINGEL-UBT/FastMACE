@@ -1,0 +1,84 @@
+{
+  "provider": "colab",
+  "date_utc": "2026-10-24T12:04:16Z",
+  "session": "fm-opt4-t02-l4-ab-120416",
+  "gpu": "L4",
+  "commit": "9b9e3e0ef8b246e461be54be2c16b5a2c94a6ddf",
+  "requested_commit": "9b9e3e0",
+  "commands_text": [
+    "python tools/ab_rewrites.py --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-S.model --model polar1-s --structures NaCl NbCl5 --warmup 3000 --blocks 12 --b fx_e3nn_linear=on polar_graph_sums=on --output $OUT/ab-ab --order ab --pattern abab",
+    "python tools/ab_rewrites.py --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-S.model --model polar1-s --structures NaCl NbCl5 --warmup 3000 --blocks 12 --b fx_e3nn_linear=on polar_graph_sums=on --output $OUT/ab-ba --order ba --pattern abba"
+  ],
+  "commands": [
+    {
+      "command": "python tools/ab_rewrites.py --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-S.model --model polar1-s --structures NaCl NbCl5 --warmup 3000 --blocks 12 --b fx_e3nn_linear=on polar_graph_sums=on --output $OUT/ab-ab --order ab --pattern abab",
+      "exit": 0,
+      "wall_s": 1216
+    },
+    {
+      "command": "python tools/ab_rewrites.py --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-S.model --model polar1-s --structures NaCl NbCl5 --warmup 3000 --blocks 12 --b fx_e3nn_linear=on polar_graph_sums=on --output $OUT/ab-ba --order ba --pattern abba",
+      "exit": 0,
+      "wall_s": 961
+    }
+  ],
+  "exit": 0,
+  "stack": "f00d5798f8b5",
+  "models": [
+    "polar-1-s"
+  ],
+  "out": "/home/fzwin/fastmace-acceptance/colab-opt4-T02-l4-ab",
+  "timings": {
+    "allocate_s": 4.2,
+    "upload_s": 16.2,
+    "setup_step_s": 47,
+    "cache_restore_s": 400.9,
+    "pack_download_s": 68.2,
+    "unpack_s": 0.6,
+    "install_s": 40.3,
+    "models_s": 1.1
+  },
+  "cu_before": 43.9,
+  "rate_per_h": 5.3,
+  "active_before": 1,
+  "gpu_name": "NVIDIA L4",
+  "driver": "580.82.07",
+  "gpu_memory": "23034 MiB",
+  "capability": "8.9",
+  "cuda_driver": "13.0",
+  "cpus": 12,
+  "ram_gib": 53.0,
+  "cache_key": "sm89-py310-f00d5798f8b5",
+  "cache_hit": true,
+  "cache_bytes_in": 518600246,
+  "setup_s": 493.4,
+  "cache_bytes_out": 105255965,
+  "cache_saved": true,
+  "environment": {
+    "python": "3.10.22",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance_torch": "0.12.0",
+      "openequivariance": "0.7.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "ase": "3.27.0",
+      "numpy": "2.2.6",
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0"
+    },
+    "torch_cuda": "13.0",
+    "cuda_available": true,
+    "pip_freeze_sha256": "2b05fb7fcb3cfc72dd0880fc327e6e81c097f29c86389b2a5f416286392d0b08",
+    "unpack_s": 0.6,
+    "install_s": 40.3,
+    "models_s": 1.1
+  },
+  "env_matches_manifest": true,
+  "stopped": true,
+  "cu_after": 41.45,
+  "active_after": 0,
+  "wall_s": 2757.6,
+  "cu_used": 2.45
+}

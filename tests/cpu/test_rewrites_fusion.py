@@ -273,6 +273,36 @@ def test_grouped_launch_record_is_opt_in_and_applies_to_every_block_linear(monke
     assert torch.equal(new_energy, energy) and torch.equal(new_forces, forces)
 
 
+def test_grouped_launch_applies_to_generic_mace(monkeypatch):
+    """OPT4-T04: on a generic MACE model (MP-0 / OMAT-0 class, residual interaction) every block linear takes
+    the record, its equal-shape products share a launch, and energy and forces stay bitwise unchanged."""
+    from fastmace.kernels.triton import grouped_gemm, tile_rule
+    from fastmace.rewrites.linear.modules import BlockLinear, ResidualBlockLinear
+
+    model, batch = tiny("residual", backend="cueq")
+    regs = registry()
+    base = {name: "on" if name in LINEAR else "off" for name in regs.names()}
+    without = copy.deepcopy(model)
+    regs.apply(without, regs.resolve(without, base, strict=False), context(batch), original=model)
+    out = copy.deepcopy(model)
+    resolution = regs.resolve(out, base | {"grouped_launch": "on"}, strict=False)
+    assert resolution.decision("grouped_launch").enabled
+    applied = regs.apply(out, resolution, context(batch), original=model)
+    assert next(entry for entry in applied if entry.name == "grouped_launch").result.passed
+    blocks = [m for m in out.modules() if isinstance(m, (BlockLinear, ResidualBlockLinear))]
+    assert blocks and all(m.grouped_launch for m in blocks)
+    energy, forces = energy_and_forces(without, batch)
+    calls = []
+    real = grouped_gemm.grouped_products_op
+    monkeypatch.setattr(grouped_gemm, "grouped_products_op", lambda *a: calls.append(1) or real(*a))
+    monkeypatch.setattr(tile_rule, "MIN_TRITON_WAVES", 10 ** 9)
+    for m in blocks:
+        m.sms = 1
+    new_energy, new_forces = energy_and_forces(out, batch)
+    assert calls, "no grouped launch ran"
+    assert torch.equal(new_energy, energy) and torch.equal(new_forces, forces)
+
+
 def test_grouped_launch_needs_block_linear():
     model, _ = tiny("mh1", backend="cueq")
     asked = {name: "off" for name in registry().names()} | {"grouped_launch": "on"}

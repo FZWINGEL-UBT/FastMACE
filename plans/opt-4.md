@@ -81,7 +81,7 @@ linears, as OPT-T10 did.
 | FP32-accurate tensor cores (Triton `tf32x3`, cuBLAS BF16×9) | 1, OPT-T01 | rejected on sm_89, sm_120 and (Triton `tf32x3`) the A100 | 3×TF32 cannot beat SIMT FP32 on sm_89 and sm_120; Triton's `tf32x3` won 0 of 92 shapes on the A100 (§4); BF16×9 only on compute capability 10.0/10.3 |
 | Tensor-core work beside SIMT on two streams | 1, OPT-T01b | rejected | 0.77–0.85× |
 | BF16×6 (Triton) | 1, OPT-T01 §6 | rejected on G4 and L4; the A100 would need a CUTLASS-class kernel | |
-| **CUTLASS 3×TF32 on the A100** | 1, OPT-T01 §5, §7 | **open** | 0.75× (NaCl) and 0.55× (NbCl5) of cuBLAS GEMM time, but 7–14× worse than IEEE under cancellation. The force gate was never run. The A100 has since become a production GPU type (phase 4, decision 39 as amended) |
+| **CUTLASS 3×TF32 on the A100** | 1, OPT-T01 §5, §7 | **not built** (owner, 24 October 2026, after OPT4-T03) | 0.75× (NaCl) and 0.55× (NbCl5) of cuBLAS GEMM time, but 7–14× worse than IEEE under synthetic cancellation. OPT4-T03 stage 1 passed the force gate and NVE drift with Triton's `tf32x3` (`docs/validation/opt4-T03.md`). The A100 is Colab-only for FastMACE, so stage 2 waits until it becomes a production target; it can start from the opt-in record `tf32x3_gemms` |
 | `gated_rows` (stage A) | 1, OPT-T02 | **adopted** | |
 | `segment_gemm` (stage B) | 1, OPT-T02 | **adopted** | |
 | Gate in the GEMM prologue (stage C) | 1, OPT-T02 | rejected | NbCl5 +1.6 to +2.0 % |
@@ -184,8 +184,8 @@ CUDA-graph replays, median of 7 blocks of 50):
 | --- | --- | --- | --- | --- | --- |
 | OPT4-T01 | 1, radial last-layer forward kernel | one worker | `fastmace/opt4-T01` | microbenchmark, gate and A/B local; L4 A/B | the record and its tests are pushed with the gate and both-order A/Bs, or the cut is recorded |
 | OPT4-T02 | 2, POLAR-1's small kernels and the float64 scatter | one worker | `fastmace/opt4-T02` | module profile and A/B local (POLAR-1-S NaCl and NbCl5); POLAR-1 gate (S, M; L on the Colab A100) | as above, with the POLAR labels through the gate |
-| OPT4-T03 | 3, A100 3×TF32, stage 1 (accuracy through Triton `tf32x3`) | one worker | `fastmace/opt4-T03` | gate locally (TF32 is available on sm_120); NVE drift and OMOL-0 on the Colab A100 | a report with the gate and drift verdict. Stage 2 (CUTLASS) only after a pass **and** the owner's go |
-| OPT4-T04 | 4, `grouped_launch` on generic MACE | one worker (small) | `fastmace/opt4-T04` | gate and A/B local; L4 A/B if it gains | the A/B verdict; any applicability change pushed with tests |
+| OPT4-T03 | 3, A100 3×TF32, stage 1 (accuracy through Triton `tf32x3`) | one worker | `fastmace/opt4-T03` | gate locally (TF32 is available on sm_120); NVE drift and OMOL-0 on the Colab A100 | a report with the gate and drift verdict. Stage 2 (CUTLASS) only after a pass **and** the owner's go. **Done:** stage 1 passed (`docs/validation/opt4-T03.md`); stage 2 not built (owner, 24 October 2026); the record `tf32x3_gemms` stays opt-in |
+| OPT4-T04 | 4, `grouped_launch` on generic MACE | one worker (small) | `fastmace/opt4-T04` | gate and A/B local; L4 A/B if it gains | the A/B verdict; any applicability change pushed with tests. **Done 24 October 2026:** gate passed; NaCl b/a 0.946–0.955 on sm_120 (five generic labels), 0.957–0.959 on the L4; NbCl5 neutral. Default on for the generic MACE family by owner decision 57 (`docs/validation/opt4-T04.md`) |
 | OPT4-T05 | 5, setup and capture time | one worker | `fastmace/opt4-T05` | untimed local runs (cold and warm caches) | the breakdown, and any change ≥ 5 s warm / ≥ 15 s cold built as an option, or none |
 | OPT4-T06 | 6, OEq forward (reserve) | the first worker free | `fastmace/opt4-T06` | ncu on NbCl5 | the ncu verdict; build only with a shape-rule lever |
 | OPT4-T07 | 7, megakernel probe | one worker | `fastmace/opt4-T07` | local, Colab L4 and A100 (untimed microbenchmark) | the pass/fail table; `docs/design/2026-10-23-heterogeneous-megakernel.md` updated |

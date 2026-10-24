@@ -1,0 +1,10 @@
+2026-10-24T11:15:34Z
+ 13:15:34 up 12:30,  1 user,  load average: 210.51, 210.51, 210.49
+NVIDIA GeForce RTX 5060 Ti, 610.88, 0 %, 2543 MiB
+Mem:              39           1          24           0          13          37
+your 131072x1 screen size is bogus. expect trouble
+%CPU COMMAND
+ 0.2 python3 tools/colab/fastmace_colab.py --gpu L4 --commit 13a1983 --session fm-opt4t04-l4-1 --models medium-omat-0 --out /home/fzwin/fastmace-opt4/t04/colab-l4-13a1983 --timeout-min 40 --command python tools/ab_rewrites.py --output $OUT/ab-omat0-medium-ab --checkpoint $FASTMACE_MODELS/mace-omat-0-medium.model --model omat0-medium --structures NaCl --a grouped_launch=off --b grouped_launch=on --order ab --pattern abab --command python tools/ab_rewrites.py --output $OUT/ab-omat0-medium-ba --checkpoint $FASTMACE_MODELS/mace-omat-0-medium.model --model omat0-medium --structures NaCl --a grouped_launch=off --b grouped_launch=on --order ba --pattern abba
+ 0.1 /home/fzwin/.local/share/uv/tools/google-colab-cli/bin/python /home/fzwin/.local/bin/colab exec -s fm-opt4t04-l4-1 -f /mnt/d/Margraf/FastMACE/tools/colab/remote_step.py --timeout 1019 --env STEP=restore --env STAGE=restore --env ARG= --env WAIT_S=899 --env RESET=0 --env KILL=0
+ 0.0 /usr/lib/systemd/systemd-udevd
+ 0.0 python3 tools/ci/local_gpu.py run --quiet --purpose OPT4-T02 TIMED A/B POLAR-1-S order ba (<15 min, quiet) --wait-minutes 600 -- bash /home/fzwin/fastmace-opt4/t02_ab.sh ba abba

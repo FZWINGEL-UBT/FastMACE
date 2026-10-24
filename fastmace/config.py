@@ -144,7 +144,8 @@ class RewriteConfig:
     # not reproducible (owner, 20 Oct 2026).
     segment_gemm: Toggle = "auto"
     # A block linear's small per-l products (too few row tiles for the GPU by the shared shape rule) in one
-    # Triton launch (opt-1 OPT-T03 candidate 2); opt-in until its A/B on both GPUs.
+    # Triton launch (opt-1 OPT-T03 candidate 2); auto = on with block_linear for the generic MACE family, in
+    # float32, not reproducible (owner, 24 Oct 2026, decision 57).
     grouped_launch: Toggle = "auto"
     # Species-only atom-level products (embeddings, the first interaction's skip_tp and linear_up) as
     # per-species tables gathered each step (opt-1 OPT-T08 C1); auto = on where the model takes it, in float32
@@ -160,6 +161,18 @@ class RewriteConfig:
     # one launch; rounding (the energy moves by ~1e-9 relative), not adopted (opt-3 OPT3-T04,
     # fastmace.rewrites.inductor); opt-in, auto = off.
     combo_kernels: Toggle = "auto"
+    # Every atom GEMM (block linears, segment_gemm, species skip, reassociated first interaction) and its input
+    # gradients as 3xTF32 through Triton's tf32x3 (opt-4 OPT4-T03 stage 1, fastmace.rewrites.precision); rounding,
+    # not IEEE-equivalent under cancellation; float32 on compute capability >= 8.0 only; opt-in, auto = off.
+    tf32x3_gemms: Toggle = "auto"
+    # e3nn's o3.Linear code as an fx graph instead of the TorchScript a checkpoint restores, so dynamo traces it
+    # (a TorchScript Linear in a loop sends PolarMACE's whole forward back to eager); rounding (opt-4 OPT4-T02,
+    # fastmace.rewrites.codegen); opt-in, auto = off.
+    fx_e3nn_linear: Toggle = "auto"
+    # PolarMACE: per-graph sums of one graph (Fukui norms, total charges, barycentre) as a sum over atoms and a
+    # broadcast, not scatter_add_ and an index (float64 index_put backward); rounding (opt-4 OPT4-T02,
+    # fastmace.rewrites.polar.graph_sums); opt-in, auto = off.
+    polar_graph_sums: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
     # MACE PR 1498 one-graph strain in the stress path (upstream_mace.use_single_graph_strain).
@@ -208,8 +221,11 @@ class EngineConfig:
     empty_cache_before_capture: bool = True
     # Eager warm-ups after the first capture run inside the graph pool.
     warmup_in_graph_pool: bool = True
-    # Evaluation plans compile with the edge dimension dynamic from the first call, so a changed edge
-    # count does not recompile (2-T13). No effect until 2-T13.
+    # The edge dimension is dynamic from the first compiled call, so a changed edge count does not compile
+    # again. Evaluation and compiled-tier plans set it (2-T13, 3-T06). Graph-tier MD plans take it on request
+    # (OPT4-T05): the edges stay padded, and the padded first capture reuses the first call's graph instead
+    # of compiling again (8-9 s per warm start, about 22 s cold, locally); the steps replay the same compiled
+    # code as without it. Opt-in.
     dynamic_edges: bool = False
     # Keep each conversion's model as a template and give later plans a private copy of it instead of
     # reloading and converting the checkpoint (CUDA cuEq and hybrid only; opt-1 OPT-T06).

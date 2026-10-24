@@ -1,0 +1,10 @@
+2026-10-24T11:46:35Z
+ 13:46:35 up 13:01,  1 user,  load average: 210.56, 210.36, 210.43
+NVIDIA GeForce RTX 5060 Ti, 610.88, 0 %, 2513 MiB
+Mem:              39           1          23           0          15          37
+your 131072x1 screen size is bogus. expect trouble
+%CPU COMMAND
+ 5.2 /home/fzwin/.local/share/uv/tools/google-colab-cli/bin/python /home/fzwin/.local/bin/colab upload -s fm-opt4-t02-a100-gate-114430 /home/fzwin/fastmace-acceptance/colab-opt4-T02-a100-gate/.colab-work/chunks/001.tar.gz.chunk000 /content/fm_cache-in-001.tar.gz.chunk000
+ 1.5 python3 tools/colab/fastmace_colab.py --gpu A100 --commit 9b9e3e0 --session fm-opt4-t02-a100-gate-114430 --models polar-1-l --timeout-min 30 --out /home/fzwin/fastmace-acceptance/colab-opt4-T02-a100-gate --command python tools/force_stress_gate.py --output $OUT/gate-polar1-l --engine fastmace --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-L.model --model polar1-l --structures NaCl NbCl5@2x2x2 --structures-root $FASTMACE_STRUCTURES --rewrites fx_e3nn_linear=on polar_graph_sums=on
+ 0.0 python3 tools/ci/local_gpu.py run --quiet --purpose OPT4-T02 TIMED A/B POLAR-1-S NaCl rerun both orders warmup 3000 (<13 min, quiet) --wait-minutes 600 -- bash /home/fzwin/fastmace-opt4/t02_ab_nacl.sh
+ 0.0 python3 tools/ci/local_gpu.py run --wait-minutes 600 --purpose OPT4-T08 precision screen smoke NaCl (<8 min, untimed) -- /home/fzwin/environments/mace_cueq_latest/bin/python tools/precision_screen.py --output /home/fzwin/fastmace-opt4-t08/smoke1 --model mh1-r2scan --structures NaCl --stages radial-basis i0-scatter i0-linears
