@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="17" time="7760.409" timestamp="2026-10-23T19:31:20.164969+00:00" hostname="2f37cf3e5b70"><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[nve]" time="641.870" /><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[csvr]" time="615.917" /><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[nvt-berendsen]" time="615.602" /><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[npt-berendsen]" time="628.874" /><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[inhomogeneous-berendsen]" time="624.462" /><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_matches_ase_on_mh1[nhc]" time="615.822" /><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_matches_ase_on_mh1[hydrostatic]" time="632.483" /><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_matches_ase_on_mh1[full]" time="644.723" /><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_extended_energy_over_20_ps[nhc]" time="15.956"><failure message="fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 65 of 65 allocator segments are not expandable. Call configure_allocator before anything touches CUDA&#10;Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).&#10;Environment: run `fastmace doctor` to check this installation.">name = 'nhc'
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @cuda
+    @needs_mh1
+    @pytest.mark.parametrize("name", SCHEMES)
+    def test_extended_energy_over_20_ps(name):
+        """Recorded, not acceptance (plan 4-T03): the drift of the conserved quantity in the default plan."""
+        import fastmace as fm
+        from fastmace.integrators.base import CONSERVED_KEY
+    
+        atoms = nacl()
+        n = len(atoms)
+&gt;       sim = fm.Simulation(atoms, fm.ForceField(fm.load("mh1-r2scan"), atoms),
+                            integrator=record(name, timestep_fs=1.0, dof="auto", fixcm=True), seed=SEED,
+                            workload=fm.Workload(max_temperature_K=TEMPERATURE_K))
+
+tests/gpu/test_nose_hoover_mtk_mh1_gpu.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+fastmace/simulation.py:470: in __init__
+    failure = self._failure("build", error, stored)
+fastmace/simulation.py:564: in _failure
+    raise error
+fastmace/simulation.py:468: in __init__
+    self._engine = planner.build(self._plan, ff, atoms)
+fastmace/planner/minimal.py:919: in build
+    engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
+fastmace/planner/fixed.py:986: in build
+    return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
+fastmace/engine/graph.py:202: in __init__
+    self.process = process.check_engine(config, force_field, record=constraints, owner=type(self).__name__,
+fastmace/engine/constraints.py:198: in check_engine
+    facts = {"allocator": check_allocator(config, segments),
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+config = EngineConfig(backend='cueq', compile_mode='default', device='cuda:0', pipelined='on', async_output='on', speculative_g...e_cache=True, overlap_rebuild=True, step_graph=False, fused_integrator=True, recapture_budget=64, graph_variant_cap=64)
+segments = [{'device': 0, 'address': 134581357379584, 'total_size': 77594624, 'allocated_size': 0, ...}, {'device': 0, 'address':...cated_size': 0, ...}, {'device': 0, 'address': 134581760032768, 'total_size': 75497472, 'allocated_size': 0, ...}, ...]
+environ = environ({'UV_CACHE_DIR': '/content/fm/uv-cache', 'CUDA_CACHE_PATH': '/content/fm/cache/nv', 'UV_PYTHON_INSTALL_DIR': '...r_mtk_mh1_gpu.py::test_extended_energy_over_20_ps[nhc] (call)', 'PYTORCH_CUDA_ALLOC_CONF': 'expandable_segments:True'})
+torch_version = None
+
+    def check_allocator(config, segments: list[Mapping[str, Any]] | None, environ: Mapping[str, str] | None = None,
+                        torch_version: str | None = None) -&gt; str:
+        """Refuse an engine whose allocator setting did not take effect; returns what is in effect.
+    
+        ``segments`` is ``torch.cuda.memory_snapshot()`` (None on the CPU: nothing to check). Every
+        segment of an allocator with expandable segments is expandable; one that is not means the
+        variable was set after the first CUDA allocation (or not at all).
+        """
+        if segments is None:
+            return "cpu"
+        environ = os.environ if environ is None else environ
+        if not wants_expandable_segments(config, environ, torch_version):
+            return "default"
+        if EXPANDABLE not in (environ.get("PYTORCH_CUDA_ALLOC_CONF") or ""):
+            raise ProcessConstraintError(
+                f"EngineConfig.expandable_segments={config.expandable_segments!r} needs "
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} before the first CUDA allocation "
+                "(fastmace.model.compile.configure_allocator), and it is not set")
+        fixed = [segment for segment in segments if not segment.get("is_expandable", False)]
+        if fixed:
+&gt;           raise ProcessConstraintError(
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} was set after the first CUDA allocation: {len(fixed)} of "
+                f"{len(segments)} allocator segments are not expandable. Call configure_allocator before "
+                "anything touches CUDA")
+E           fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 65 of 65 allocator segments are not expandable. Call configure_allocator before anything touches CUDA
+E           Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).
+E           Environment: run `fastmace doctor` to check this installation.
+
+fastmace/engine/constraints.py:142: ProcessConstraintError</failure></testcase><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_extended_energy_over_20_ps[hydrostatic]" time="10.135"><failure message="fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 65 of 65 allocator segments are not expandable. Call configure_allocator before anything touches CUDA&#10;Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).&#10;Environment: run `fastmace doctor` to check this installation.">name = 'hydrostatic'
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @cuda
+    @needs_mh1
+    @pytest.mark.parametrize("name", SCHEMES)
+    def test_extended_energy_over_20_ps(name):
+        """Recorded, not acceptance (plan 4-T03): the drift of the conserved quantity in the default plan."""
+        import fastmace as fm
+        from fastmace.integrators.base import CONSERVED_KEY
+    
+        atoms = nacl()
+        n = len(atoms)
+&gt;       sim = fm.Simulation(atoms, fm.ForceField(fm.load("mh1-r2scan"), atoms),
+                            integrator=record(name, timestep_fs=1.0, dof="auto", fixcm=True), seed=SEED,
+                            workload=fm.Workload(max_temperature_K=TEMPERATURE_K))
+
+tests/gpu/test_nose_hoover_mtk_mh1_gpu.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+fastmace/simulation.py:470: in __init__
+    failure = self._failure("build", error, stored)
+fastmace/simulation.py:564: in _failure
+    raise error
+fastmace/simulation.py:468: in __init__
+    self._engine = planner.build(self._plan, ff, atoms)
+fastmace/planner/minimal.py:919: in build
+    engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
+fastmace/planner/fixed.py:986: in build
+    return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
+fastmace/engine/graph.py:202: in __init__
+    self.process = process.check_engine(config, force_field, record=constraints, owner=type(self).__name__,
+fastmace/engine/constraints.py:198: in check_engine
+    facts = {"allocator": check_allocator(config, segments),
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+config = EngineConfig(backend='cueq', compile_mode='default', device='cuda:0', pipelined='on', async_output='on', speculative_g...e_cache=True, overlap_rebuild=True, step_graph=False, fused_integrator=True, recapture_budget=64, graph_variant_cap=64)
+segments = [{'device': 0, 'address': 134581357379584, 'total_size': 77594624, 'allocated_size': 0, ...}, {'device': 0, 'address':...cated_size': 0, ...}, {'device': 0, 'address': 134581760032768, 'total_size': 75497472, 'allocated_size': 0, ...}, ...]
+environ = environ({'UV_CACHE_DIR': '/content/fm/uv-cache', 'CUDA_CACHE_PATH': '/content/fm/cache/nv', 'UV_PYTHON_INSTALL_DIR': '...YTEST_CURRENT_TEST': 'tests/gpu/test_nose_hoover_mtk_mh1_gpu.py::test_extended_energy_over_20_ps[hydrostatic] (call)'})
+torch_version = None
+
+    def check_allocator(config, segments: list[Mapping[str, Any]] | None, environ: Mapping[str, str] | None = None,
+                        torch_version: str | None = None) -&gt; str:
+        """Refuse an engine whose allocator setting did not take effect; returns what is in effect.
+    
+        ``segments`` is ``torch.cuda.memory_snapshot()`` (None on the CPU: nothing to check). Every
+        segment of an allocator with expandable segments is expandable; one that is not means the
+        variable was set after the first CUDA allocation (or not at all).
+        """
+        if segments is None:
+            return "cpu"
+        environ = os.environ if environ is None else environ
+        if not wants_expandable_segments(config, environ, torch_version):
+            return "default"
+        if EXPANDABLE not in (environ.get("PYTORCH_CUDA_ALLOC_CONF") or ""):
+            raise ProcessConstraintError(
+                f"EngineConfig.expandable_segments={config.expandable_segments!r} needs "
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} before the first CUDA allocation "
+                "(fastmace.model.compile.configure_allocator), and it is not set")
+        fixed = [segment for segment in segments if not segment.get("is_expandable", False)]
+        if fixed:
+&gt;           raise ProcessConstraintError(
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} was set after the first CUDA allocation: {len(fixed)} of "
+                f"{len(segments)} allocator segments are not expandable. Call configure_allocator before "
+                "anything touches CUDA")
+E           fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 65 of 65 allocator segments are not expandable. Call configure_allocator before anything touches CUDA
+E           Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).
+E           Environment: run `fastmace doctor` to check this installation.
+
+fastmace/engine/constraints.py:142: ProcessConstraintError</failure></testcase><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_extended_energy_over_20_ps[full]" time="10.125"><failure message="fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 65 of 65 allocator segments are not expandable. Call configure_allocator before anything touches CUDA&#10;Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).&#10;Environment: run `fastmace doctor` to check this installation.">name = 'full'
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @cuda
+    @needs_mh1
+    @pytest.mark.parametrize("name", SCHEMES)
+    def test_extended_energy_over_20_ps(name):
+        """Recorded, not acceptance (plan 4-T03): the drift of the conserved quantity in the default plan."""
+        import fastmace as fm
+        from fastmace.integrators.base import CONSERVED_KEY
+    
+        atoms = nacl()
+        n = len(atoms)
+&gt;       sim = fm.Simulation(atoms, fm.ForceField(fm.load("mh1-r2scan"), atoms),
+                            integrator=record(name, timestep_fs=1.0, dof="auto", fixcm=True), seed=SEED,
+                            workload=fm.Workload(max_temperature_K=TEMPERATURE_K))
+
+tests/gpu/test_nose_hoover_mtk_mh1_gpu.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+fastmace/simulation.py:470: in __init__
+    failure = self._failure("build", error, stored)
+fastmace/simulation.py:564: in _failure
+    raise error
+fastmace/simulation.py:468: in __init__
+    self._engine = planner.build(self._plan, ff, atoms)
+fastmace/planner/minimal.py:919: in build
+    engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
+fastmace/planner/fixed.py:986: in build
+    return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
+fastmace/engine/graph.py:202: in __init__
+    self.process = process.check_engine(config, force_field, record=constraints, owner=type(self).__name__,
+fastmace/engine/constraints.py:198: in check_engine
+    facts = {"allocator": check_allocator(config, segments),
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+config = EngineConfig(backend='cueq', compile_mode='default', device='cuda:0', pipelined='on', async_output='on', speculative_g...e_cache=True, overlap_rebuild=True, step_graph=False, fused_integrator=True, recapture_budget=64, graph_variant_cap=64)
+segments = [{'device': 0, 'address': 134581357379584, 'total_size': 77594624, 'allocated_size': 0, ...}, {'device': 0, 'address':...cated_size': 0, ...}, {'device': 0, 'address': 134581760032768, 'total_size': 75497472, 'allocated_size': 0, ...}, ...]
+environ = environ({'UV_CACHE_DIR': '/content/fm/uv-cache', 'CUDA_CACHE_PATH': '/content/fm/cache/nv', 'UV_PYTHON_INSTALL_DIR': '...ue', 'PYTEST_CURRENT_TEST': 'tests/gpu/test_nose_hoover_mtk_mh1_gpu.py::test_extended_energy_over_20_ps[full] (call)'})
+torch_version = None
+
+    def check_allocator(config, segments: list[Mapping[str, Any]] | None, environ: Mapping[str, str] | None = None,
+                        torch_version: str | None = None) -&gt; str:
+        """Refuse an engine whose allocator setting did not take effect; returns what is in effect.
+    
+        ``segments`` is ``torch.cuda.memory_snapshot()`` (None on the CPU: nothing to check). Every
+        segment of an allocator with expandable segments is expandable; one that is not means the
+        variable was set after the first CUDA allocation (or not at all).
+        """
+        if segments is None:
+            return "cpu"
+        environ = os.environ if environ is None else environ
+        if not wants_expandable_segments(config, environ, torch_version):
+            return "default"
+        if EXPANDABLE not in (environ.get("PYTORCH_CUDA_ALLOC_CONF") or ""):
+            raise ProcessConstraintError(
+                f"EngineConfig.expandable_segments={config.expandable_segments!r} needs "
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} before the first CUDA allocation "
+                "(fastmace.model.compile.configure_allocator), and it is not set")
+        fixed = [segment for segment in segments if not segment.get("is_expandable", False)]
+        if fixed:
+&gt;           raise ProcessConstraintError(
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} was set after the first CUDA allocation: {len(fixed)} of "
+                f"{len(segments)} allocator segments are not expandable. Call configure_allocator before "
+                "anything touches CUDA")
+E           fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 65 of 65 allocator segments are not expandable. Call configure_allocator before anything touches CUDA
+E           Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).
+E           Environment: run `fastmace doctor` to check this installation.
+
+fastmace/engine/constraints.py:142: ProcessConstraintError</failure></testcase><testcase classname="tests.gpu.test_ase_equivalence_gpu" name="test_langevin_reproduces_ase_in_every_50_K_bin" time="547.991" /><testcase classname="tests.gpu.test_ase_equivalence_gpu" name="test_baoab_variants_reproduce_their_references" time="679.817" /><testcase classname="tests.gpu.test_fix_atoms_gpu" name="test_the_fused_stage_writes_the_pytorch_stage_bytes_with_fixed_atoms" time="240.167" /><testcase classname="tests.gpu.test_fix_atoms_gpu" name="test_trajectories_with_fixed_atoms_are_bitwise_equal[langevin]" time="437.269" /><testcase classname="tests.gpu.test_fix_atoms_gpu" name="test_trajectories_with_fixed_atoms_are_bitwise_equal[nve-csvr]" time="349.026" /><testcase classname="tests.gpu.test_fix_atoms_gpu" name="test_langevin_with_fixed_atoms_reproduces_ase_in_every_50_K_bin" time="447.642" /></testsuite></testsuites>

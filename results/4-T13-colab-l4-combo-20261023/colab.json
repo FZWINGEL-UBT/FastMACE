@@ -1,0 +1,78 @@
+{
+  "provider": "colab",
+  "date_utc": "2026-10-23T21:11:37Z",
+  "session": "fm-4t13-l4-combo",
+  "gpu": "L4",
+  "commit": "636787bd5612366bf7c55552858f1362c94be571",
+  "requested_commit": "636787bd5612366bf7c55552858f1362c94be571",
+  "commands_text": [
+    "export PYTHONPATH=$PYTHONPATH:$PWD/tools/acceptance; python -m pytest -p no:cacheprovider -p resultlog --result-log=$OUT/results.jsonl --junitxml=$OUT/junit.xml -rfEs --durations=40 tests/gpu/test_combo_kernels_cuda.py"
+  ],
+  "commands": [
+    {
+      "command": "export PYTHONPATH=$PYTHONPATH:$PWD/tools/acceptance; python -m pytest -p no:cacheprovider -p resultlog --result-log=$OUT/results.jsonl --junitxml=$OUT/junit.xml -rfEs --durations=40 tests/gpu/test_combo_kernels_cuda.py",
+      "exit": 0,
+      "wall_s": 255
+    }
+  ],
+  "exit": 0,
+  "stack": "f00d5798f8b5",
+  "models": [
+    "mh-1",
+    "medium",
+    "polar-1-s"
+  ],
+  "out": "/home/fzwin/fastmace-acceptance/4-T13-colab-l4-combo-20261023",
+  "timings": {
+    "allocate_s": 5.3,
+    "upload_s": 25.2,
+    "setup_step_s": 41,
+    "cache_restore_s": 322.6,
+    "pack_download_s": 18.9,
+    "unpack_s": 0.8,
+    "install_s": 32.4,
+    "models_s": 2.5
+  },
+  "cu_before": 136.66,
+  "rate_per_h": 19.5,
+  "gpu_name": "NVIDIA L4",
+  "driver": "580.82.07",
+  "gpu_memory": "23034 MiB",
+  "capability": "8.9",
+  "cuda_driver": "13.0",
+  "cpus": 12,
+  "ram_gib": 53.0,
+  "cache_key": "sm89-py310-f00d5798f8b5",
+  "cache_hit": true,
+  "cache_bytes_in": 459535285,
+  "setup_s": 409.4,
+  "cache_bytes_out": 24106511,
+  "cache_saved": true,
+  "environment": {
+    "python": "3.10.22",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance_torch": "0.12.0",
+      "openequivariance": "0.7.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "ase": "3.27.0",
+      "numpy": "2.2.6",
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0"
+    },
+    "torch_cuda": "13.0",
+    "cuda_available": true,
+    "pip_freeze_sha256": "2b05fb7fcb3cfc72dd0880fc327e6e81c097f29c86389b2a5f416286392d0b08",
+    "unpack_s": 0.8,
+    "install_s": 32.4,
+    "models_s": 2.5
+  },
+  "env_matches_manifest": true,
+  "stopped": true,
+  "cu_after": 133.21,
+  "wall_s": 690.0,
+  "cu_used": 3.45
+}

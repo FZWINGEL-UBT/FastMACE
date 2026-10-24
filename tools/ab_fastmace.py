@@ -27,6 +27,10 @@ one for a control or an alternating-process run):
     3b  this checkout, as above, D3 off (no dispersion)
     3   the release at tag ``fastmace-3``, exported as ``fastmace_3``, through its minimal planner. The tag
         was not set when this was written, so its commit has no default: give --expected-commit
+  --release 3b (4-T13, phase 4 item 5):
+    4   this checkout, as above, D3 off
+    3b  the release at tag ``fastmace-3b`` (or the 3b freeze commit, ff80ca2, while the tag is not set),
+        exported as ``fastmace_3b``, through its minimal planner; give --expected-commit
 
 ``--engine-option FIELD=VALUE`` (repeatable) sets an ``EngineConfig`` field on this checkout's side only
 (``fused_integrator=on``: an option the release does not have); ``on``/``off`` read as booleans.
@@ -89,6 +93,7 @@ RELEASES = {
     "2": Release("fastmace-2", "e52c482", "fastmace_2", "minimal", "3"),
     "p3b": Release("phase-3-baseline", "156ab76", "fastmace_p3b", "minimal", "3"),
     "3": Release("fastmace-3", None, "fastmace_3", "minimal", "3b"),  # commit: --expected-commit (tag not set yet)
+    "3b": Release("fastmace-3b", None, "fastmace_3b", "minimal", "4"),  # commit: --expected-commit (tag not set yet)
 }
 # IntegratorConfig fields this checkout's side pins against a release unless --integrator-option sets them.
 RELEASE_INTEGRATOR_PINS = {"p3b": {"fixcm_projection": "ase"}}
@@ -111,7 +116,7 @@ def parse_args(argv=None):
     p.add_argument("--output", required=True, type=Path, help="Fresh directory")
     p.add_argument("--release", choices=sorted(RELEASES), default="1a",
                    help="The earlier release timed against this checkout (1a: sides 1a and 1b; 1b: sides 1b and 2)")
-    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b", "3b"),
+    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b", "3b", "4"),
                    help="Build order; two sides for an A/B process, one for a control (default: release, checkout)")
     p.add_argument("--renamed", type=Path, help="Directory holding the release's exported renamed package")
     p.add_argument("--expected-commit", help="Commit (prefix) the release's copy must be (default: the release's)")
@@ -261,8 +266,12 @@ class Version:
         if self.minimal:
             ForceField = self.module("model.forcefield").ForceField
             Workload = self.module("planner.workload").Workload
+            # tools/trajectory_versions.py --dispersion d3bj (4-T13): D3(BJ) with r2SCAN's parameters, explicit,
+            # since a checkpoint outside the label table (the tests' tiny model) names no training functional
+            dispersion = getattr(self.args, "dispersion", None)
+            extra_ff = {} if dispersion in (None, "none") else {"dispersion": self.package.D3(functional="r2scan")}
             force_field = ForceField(self.loaded, base, precision="float32" if self.args.backend == "hybrid"
-                                     else "float64")
+                                     else "float64", **extra_ff)
             integrator = dataclasses.replace(integrator, temperature_K=self.args.temperature_K)
             # A ramped run (tools/trajectory_versions.py) plans for its highest target.
             highest = getattr(self.args, "max_temperature_K", None) or self.args.temperature_K

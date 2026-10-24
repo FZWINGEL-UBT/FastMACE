@@ -1,0 +1,2608 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/4-T13/inductor, triton /home/fzwin/fastmace-cache/4-T13/triton
+rootdir: /home/fzwin/fastmace-4-T13/src-636787b
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 43 items / 18 deselected / 25 selected
+
+tests/gpu/test_isolation_gpu.py ...                                      [ 12%]
+tests/gpu/test_fused_integrator_gpu.py ....                              [ 28%]
+tests/gpu/test_engine_gpu.py .....                                       [ 48%]
+tests/gpu/test_registry_gpu.py ....                                      [ 64%]
+tests/gpu/test_fixed_costs_gpu.py .                                      [ 68%]
+tests/gpu/test_polar_gpu.py ...                                          [ 80%]
+tests/gpu/test_reference_tier_gpu.py .                                   [ 84%]
+tests/gpu/test_reference_gpu.py ..                                       [ 92%]
+tests/gpu/test_gate_resources_gpu.py stoppable_pytest: SIGHUP, forwarding SIGINT to pytest 308027
+
+
+=============================== warnings summary ===============================
+tests/gpu/test_polar_gpu.py: 25 warnings
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/_fontconfig_pattern.py:64: PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'
+    prop = Group((name + Suppress("=") + comma_separated(value)) | oneOf(_CONSTANTS))
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/_fontconfig_pattern.py:85: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/_fontconfig_pattern.py:89: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+tests/gpu/test_reference_gpu.py::test_polar1s_stress_check_passes_on_the_gate_configuration[NbCl5]
+tests/gpu/test_reference_gpu.py::test_polar1s_stress_check_passes_on_the_gate_configuration[NaCl]
+  /home/fzwin/fastmace-4-T13/src-636787b/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+    "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/graph_longrange/gto_utils.py:58: DeprecationWarning: __array_wrap__ must accept context and return_scalar arguments (positionally) in the future. (Deprecated NumPy 2.0)
+    * scipy.special.gamma((2 * ls + 3) / 2)
+
+tests/gpu/test_polar_gpu.py: 23 warnings
+  /home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/ast.py:418: UserWarning: The TorchScript type system doesn't support instance-level annotations on empty non-base types in `__init__`. Instead, either 1) use a type annotation in the class body, or 2) wrap the type in `torch.jit.Attribute`.
+    return visitor(node)
+
+tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+  /home/fzwin/fastmace-4-T13/src-636787b/tests/gpu/test_polar_gpu.py:193: ModelLicenceWarning: polar1-s (MACE-POLAR-1-S.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    return loading.load("polar1-s", backend="cueq", dtype="float64", device=DEVICE)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+==================================== PASSES ====================================
+______________ test_a_b_a_equals_fresh_instances[mh1-plain-cueq] _______________
+----------------------------- Captured stdout call -----------------------------
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "dtype": "float64",
+ "backend": "cueq",
+ "polar": false,
+ "shared_A_A2": true,
+ "shared_A_B": true,
+ "species_dependent": false,
+ "streaming": {
+  "A": 0,
+  "B": 0,
+  "A2": 0
+ },
+ "cache_entries": 1,
+ "evaluation_errors": {
+  "A": [
+   1.1239386136801264e-15,
+   1.2472599168633838e-15,
+   1.1784987405578023e-15
+  ],
+  "B": [
+   9.008628199078805e-16,
+   9.438471691291016e-16
+  ],
+  "A2": [
+   1.1606404339452294e-15,
+   1.2885926110341344e-15
+  ]
+ },
+ "compiled_in_last_round": 0,
+ "engines": {
+  "A": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 12,
+   "edge_sizes": 1,
+   "captured": 2,
+   "force_error": 9.213429584129982e-16,
+   "position_deviation": 8.171241461241152e-14
+  },
+  "B": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 13,
+   "edge_sizes": 1,
+   "captured": 2,
+   "force_error": 1.5258731245791529e-15,
+   "position_deviation": 2.0250467969162855e-13
+  },
+  "A2": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 11,
+   "edge_sizes": 2,
+   "captured": 3,
+   "force_error": 8.172481948373394e-16,
+   "position_deviation": 3.907985046680551e-14
+  }
+ }
+}
+________________ test_a_b_a_equals_fresh_instances[mh1-hybrid] _________________
+----------------------------- Captured stdout call -----------------------------
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "dtype": "float32",
+ "backend": "hybrid",
+ "polar": false,
+ "shared_A_A2": true,
+ "shared_A_B": false,
+ "species_dependent": true,
+ "streaming": {
+  "A": 2,
+  "B": 2,
+  "A2": 2
+ },
+ "cache_entries": 2,
+ "evaluation_errors": {
+  "A": [
+   5.155354740428357e-07,
+   4.78297902300192e-07,
+   4.452351821279036e-07
+  ],
+  "B": [
+   5.181955739188713e-07,
+   3.076551329290962e-07
+  ],
+  "A2": [
+   5.040917688983444e-07,
+   6.149385799346362e-07
+  ]
+ },
+ "compiled_in_last_round": 0,
+ "engines": {
+  "A": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 12,
+   "edge_sizes": 1,
+   "captured": 2,
+   "force_error": 4.946417578267872e-07,
+   "position_deviation": 2.4559803257773183e-07
+  },
+  "B": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 13,
+   "edge_sizes": 1,
+   "captured": 2,
+   "force_error": 6.032277240959717e-07,
+   "position_deviation": 1.2490974903300867e-06
+  },
+  "A2": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 11,
+   "edge_sizes": 2,
+   "captured": 3,
+   "force_error": 3.250050359530321e-07,
+   "position_deviation": 1.774852655955783e-07
+  }
+ }
+}
+______________ test_a_b_a_equals_fresh_instances[polar1-s-hybrid] ______________
+----------------------------- Captured stdout call -----------------------------
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "dtype": "float32",
+ "backend": "hybrid",
+ "polar": true,
+ "recompiled_after_polar_reset": 21,
+ "fresh_after_reset": 2.650110558003592e-06,
+ "shared_A_A2": false,
+ "shared_A_B": false,
+ "species_dependent": true,
+ "streaming": {
+  "A": 1,
+  "B": 1,
+  "A2": 1
+ },
+ "cache_entries": 0,
+ "evaluation_errors": {
+  "A": [
+   2.1316106662202807e-06,
+   1.8021504663637744e-06,
+   1.9702995887765837e-06
+  ],
+  "B": [
+   1.1681257935617651e-06,
+   1.0395950569334234e-06
+  ],
+  "A2": [
+   2.71119651500631e-06,
+   2.0302817290886636e-06
+  ]
+ },
+ "compiled_in_last_round": 0,
+ "engines": {
+  "A": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 12,
+   "edge_sizes": 1,
+   "captured": 2,
+   "force_error": 1.4902421181466932e-07,
+   "position_deviation": 4.047805120810377e-07
+  },
+  "B": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 15,
+   "edge_sizes": 1,
+   "captured": 2,
+   "force_error": 2.2387696152038605e-07,
+   "position_deviation": 8.107739795093494e-07
+  },
+  "A2": {
+   "mode": "pipelined",
+   "capture": true,
+   "neighbour_rebuilds": 10,
+   "edge_sizes": 2,
+   "captured": 3,
+   "force_error": 2.336184724662608e-07,
+   "position_deviation": 3.4194193521130956e-07
+  }
+ }
+}
+__________ test_the_fused_stage_writes_the_pytorch_stage_bytes[True] ___________
+----------------------------- Captured stdout call -----------------------------
+
+opt3-T03-fused-stage-fixcm-True: {
+ "trials": [
+  {
+   "trial": 0,
+   "move": 0.0,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7416
+   ],
+   "pipe_flags": [
+    0,
+    7416,
+    0
+   ]
+  },
+  {
+   "trial": 0,
+   "move": 0.0,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7412
+   ],
+   "pipe_flags": [
+    0,
+    7416,
+    0
+   ]
+  },
+  {
+   "trial": 1,
+   "move": 0.0,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    1,
+    7406
+   ],
+   "pipe_flags": [
+    1,
+    7406,
+    1
+   ]
+  },
+  {
+   "trial": 1,
+   "move": 0.0,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    1,
+    7402
+   ],
+   "pipe_flags": [
+    1,
+    7406,
+    1
+   ]
+  },
+  {
+   "trial": 2,
+   "move": 0.0,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7404
+   ],
+   "pipe_flags": [
+    0,
+    7404,
+    0
+   ]
+  },
+  {
+   "trial": 2,
+   "move": 0.0,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7420
+   ],
+   "pipe_flags": [
+    0,
+    7404,
+    0
+   ]
+  },
+  {
+   "trial": 3,
+   "move": 0.135,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7434
+   ],
+   "pipe_flags": [
+    0,
+    7434,
+    1
+   ]
+  },
+  {
+   "trial": 3,
+   "move": 0.135,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7426
+   ],
+   "pipe_flags": [
+    0,
+    7434,
+    1
+   ]
+  },
+  {
+   "trial": 4,
+   "move": 0.18,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    1,
+    7428
+   ],
+   "pipe_flags": [
+    1,
+    7428,
+    1
+   ]
+  },
+  {
+   "trial": 4,
+   "move": 0.18,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    1,
+    7434
+   ],
+   "pipe_flags": [
+    1,
+    7428,
+    1
+   ]
+  }
+ ],
+ "dtype": "torch.float32",
+ "backend": "hybrid",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti"
+}
+__________ test_the_fused_stage_writes_the_pytorch_stage_bytes[False] __________
+----------------------------- Captured stdout call -----------------------------
+
+opt3-T03-fused-stage-fixcm-False: {
+ "trials": [
+  {
+   "trial": 0,
+   "move": 0.0,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7416
+   ],
+   "pipe_flags": [
+    0,
+    7416,
+    0
+   ]
+  },
+  {
+   "trial": 0,
+   "move": 0.0,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7412
+   ],
+   "pipe_flags": [
+    0,
+    7416,
+    0
+   ]
+  },
+  {
+   "trial": 1,
+   "move": 0.0,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    1,
+    7406
+   ],
+   "pipe_flags": [
+    1,
+    7406,
+    1
+   ]
+  },
+  {
+   "trial": 1,
+   "move": 0.0,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    1,
+    7402
+   ],
+   "pipe_flags": [
+    1,
+    7406,
+    1
+   ]
+  },
+  {
+   "trial": 2,
+   "move": 0.0,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7404
+   ],
+   "pipe_flags": [
+    0,
+    7404,
+    0
+   ]
+  },
+  {
+   "trial": 2,
+   "move": 0.0,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7420
+   ],
+   "pipe_flags": [
+    0,
+    7404,
+    0
+   ]
+  },
+  {
+   "trial": 3,
+   "move": 0.135,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7434
+   ],
+   "pipe_flags": [
+    0,
+    7434,
+    1
+   ]
+  },
+  {
+   "trial": 3,
+   "move": 0.135,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    0,
+    7426
+   ],
+   "pipe_flags": [
+    0,
+    7434,
+    1
+   ]
+  },
+  {
+   "trial": 4,
+   "move": 0.18,
+   "pipelined": true,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    1,
+    7428
+   ],
+   "pipe_flags": [
+    1,
+    7428,
+    1
+   ]
+  },
+  {
+   "trial": 4,
+   "move": 0.18,
+   "pipelined": false,
+   "mismatched_bytes": {
+    "positions": 0,
+    "velocities": 0,
+    "x_old": 0,
+    "rnd_pos": 0,
+    "rnd_vel": 0,
+    "edge_index": 0,
+    "unit_shifts": 0,
+    "shifts": 0,
+    "count": 0,
+    "rebuild_needed": 0,
+    "flags": 0,
+    "pipe_flags": 0,
+    "mid": 0
+   },
+   "flags": [
+    1,
+    7434
+   ],
+   "pipe_flags": [
+    1,
+    7428,
+    1
+   ]
+  }
+ ],
+ "dtype": "torch.float32",
+ "backend": "hybrid",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti"
+}
+___________ test_trajectories_are_bitwise_equal_with_the_option[nvt] ___________
+----------------------------- Captured stdout call -----------------------------
+
+opt3-T03-fused-integrator-mh1-nacl-nvt: {
+ "on-False": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "fused": null,
+  "rebuilds": 161,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "on-True": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "fused": true,
+  "rebuilds": 161,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "off-False": {
+  "step": 600,
+  "energy": -1461.4094561957786,
+  "fused": null,
+  "rebuilds": 134,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "AC",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "off-True": {
+  "step": 600,
+  "energy": -1461.4094561957786,
+  "fused": true,
+  "rebuilds": 134,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "AC",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ }
+}
+_______ test_trajectories_are_bitwise_equal_with_the_option[restart-npt] _______
+----------------------------- Captured stdout call -----------------------------
+
+opt3-T03-fused-integrator-mh1-nacl-restart-npt: {
+ "restart-False": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "fused": null,
+  "rebuilds": 82,
+  "graphs": [
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "restart-True": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "fused": true,
+  "rebuilds": 82,
+  "graphs": [
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "npt-False": {
+  "step": 600,
+  "energy": -1456.9443879830474,
+  "fused": null,
+  "rebuilds": 134,
+  "graphs": [
+   "('B', 7680)",
+   "('B', 7168)",
+   "AC",
+   "C",
+   "('B', 6656)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "npt-True": {
+  "step": 600,
+  "energy": -1456.9443879830474,
+  "fused": "variable cell (LangevinBAOAB keeps the PyTorch stage)",
+  "rebuilds": 134,
+  "graphs": [
+   "('B', 7680)",
+   "('B', 7168)",
+   "AC",
+   "C",
+   "('B', 6656)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ }
+}
+___________ test_mh1_plain_cueq_float64_against_the_research_engine ____________
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-cueq-float64-nvt: {
+ "replay_vs_eager_200": 4.973799150320701e-14,
+ "fastmace_repeat_500": 2.540190280342358e-13,
+ "baseline_repeat_500": 2.540190280342358e-13,
+ "pipelined_vs_checked_500": 2.1671553440683056e-13,
+ "speculative_vs_pipelined_200": 3.941291737419306e-15,
+ "baseline_checked_500": 2.540190280342358e-13,
+ "baseline_pipelined_500": 2.1671553440683056e-13,
+ "kernels": {
+  "checked": {
+   "C": [
+    23,
+    23,
+    true
+   ],
+   "('B', 7168)": [
+    238,
+    250,
+    true
+   ]
+  },
+  "pipelined": {
+   "('B', 7168)": [
+    238,
+    250,
+    true
+   ]
+  }
+ },
+ "ms_per_step": {
+  "checked": {
+   "fastmace": 77.46015321987215,
+   "baseline": 77.37788305006688
+  },
+  "pipelined": {
+   "fastmace": 77.7503876000992,
+   "baseline": 77.14535813996918
+  }
+ },
+ "info": {
+  "eager": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": false,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 0,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 0
+    }
+   ]
+  },
+  "checked": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "repeat": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "pipelined": {
+   "rebuilds_beside": 18,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 18,
+   "graphs": [
+    "ACP",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 18,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "ACP",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 19,
+     "key": "ACP",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 19,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 19,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "speculative": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "speculative",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "('ACB', 7168, 0)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 200,
+   "speculative_rollbacks": 5,
+   "speculative_rebuild_rollbacks": 5,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "autograd-in-graph"
+   },
+   "energy_graphs": {
+    "float64": {
+     "copy": false,
+     "backend": "cueq",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 1,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "('ACB', 7168, 0)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 25,
+     "key": "('ACB', 7168, 0)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 1
+    }
+   ]
+  }
+ },
+ "baseline_edge_sizes": {
+  "checked": [
+   7168
+  ],
+  "repeat": [
+   7168
+  ],
+  "pipelined": [
+   7168
+  ]
+ },
+ "baseline_builds": {
+  "checked": 15,
+  "repeat": 15,
+  "pipelined": 19
+ },
+ "warmups": {
+  "checked": [],
+  "pipelined": [],
+  "speculative": []
+ },
+ "allocator": [
+  "expandable_segments:True",
+  "expandable_segments:True"
+ ],
+ "torch": "2.14.1+cu130"
+}
+_________ test_mh1_plain_cueq_float64_npt_against_the_research_engine __________
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-cueq-float64-npt: {
+ "checked": {
+  "baseline_500": 7.105427357601002e-15,
+  "kernels": {
+   "C": [
+    28,
+    28,
+    true
+   ],
+   "('B', 7168)": [
+    295,
+    308,
+    true
+   ]
+  },
+  "ms_per_step": [
+   78.75398249001591,
+   78.82093792999513
+  ],
+  "builds": [
+   15,
+   15
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined": {
+  "baseline_500": 7.105427357601002e-15,
+  "kernels": {
+   "('B', 7168)": [
+    295,
+    308,
+    true
+   ]
+  },
+  "ms_per_step": [
+   78.61563824000768,
+   77.99517585997819
+  ],
+  "builds": [
+   18,
+   18
+  ],
+  "edge_sizes": [
+   [
+    7168
+   ],
+   [
+    7168
+   ]
+  ]
+ },
+ "pipelined_vs_checked_500": 7.105427357601002e-15
+}
+_____________ test_mh1_hybrid_float32_against_the_research_engine ______________
+----------------------------- Captured stdout call -----------------------------
+
+1a-T13-mh1-hybrid-float32-nvt: {
+ "replay_vs_eager_200": 3.770751888509949e-08,
+ "fastmace_repeat_500": 9.161309577621068e-08,
+ "pipelined_vs_checked_500": 8.009053864554971e-08,
+ "speculative_vs_pipelined_200": 4.163603151141615e-08,
+ "baseline_scatter_500": 8.652910565842831e-08,
+ "baseline_checked_500": 1.0665490002281786e-07,
+ "baseline_scatter_per_record": [
+  5.860869123353041e-09,
+  1.885759459696601e-08,
+  4.276520471080403e-08,
+  6.009758735103787e-08,
+  4.683485066436788e-08,
+  6.255469742200148e-08,
+  7.658477407801456e-08,
+  7.199478524455571e-08,
+  8.479132240779563e-08,
+  8.652910565842831e-08
+ ],
+ "fastmace_per_record": [
+  5.392851436247792e-09,
+  1.682436057137693e-08,
+  3.1021704316458454e-08,
+  3.8979074190592655e-08,
+  5.281238912857589e-08,
+  6.433220001156315e-08,
+  6.9506020494714e-08,
+  6.464723689703078e-08,
+  7.918129618644798e-08,
+  1.0665490002281786e-07
+ ],
+ "kernels": {
+  "C": [
+   23,
+   23,
+   true
+  ],
+  "('B', 7168)": [
+   313,
+   315,
+   true
+  ]
+ },
+ "ms_per_step": {
+  "fastmace": {
+   "eager": 12.49375975006842,
+   "checked": 3.7418681099370588,
+   "repeat": 3.999477190081962,
+   "pipelined": 3.8333416199020576,
+   "speculative": 5.738014389935415
+  },
+  "baseline": [
+   3.756351739866659,
+   3.569412380020367
+  ]
+ },
+ "info": {
+  "eager": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": false,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 0,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 0
+    }
+   ]
+  },
+  "checked": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "repeat": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "checked",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 14,
+   "graphs": [
+    "C",
+    "AC",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "AC",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 25,
+     "key": "AC",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "pipelined": {
+   "rebuilds_beside": 18,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "pipelined",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 18,
+   "graphs": [
+    "ACP",
+    "('B', 7168)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 0,
+   "speculative_rollbacks": 0,
+   "speculative_rebuild_rollbacks": 0,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 18,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 2,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "ACP",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 0,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 19,
+     "key": "ACP",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    },
+    {
+     "step": 19,
+     "key": "('B', 7168)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 19,
+     "reason": "the neighbour capacity grew",
+     "graphs": 2
+    }
+   ]
+  },
+  "speculative": {
+   "rebuilds_beside": 0,
+   "fused_integrator": true,
+   "engine": "graph",
+   "mode": "speculative",
+   "capture": true,
+   "pad_edges": true,
+   "variable_cell": false,
+   "initial_edges": 6912,
+   "edge_bucket": 512,
+   "edge_sizes_used": [
+    7168
+   ],
+   "neighbour_rebuilds": 5,
+   "graphs": [
+    "C",
+    "('B', 7168)",
+    "('ACB', 7168, 0)"
+   ],
+   "pool_resets": 0,
+   "speculative_launches": 200,
+   "speculative_rollbacks": 5,
+   "speculative_rebuild_rollbacks": 5,
+   "speculative_bucket_rollbacks": 0,
+   "pipelined_redos": 0,
+   "pipelined_rebuild_redos": 0,
+   "pipelined_early_rebuilds": 0,
+   "canonical_points": 0,
+   "polar_overflow_steps": [],
+   "process": {
+    "allocator": "expandable_segments:True",
+    "dynamo_cache_size_limit": 64,
+    "compile_family": "oeq"
+   },
+   "energy_graphs": {
+    "float32": {
+     "copy": false,
+     "backend": "hybrid",
+     "compile_mode": "default"
+    }
+   },
+   "overflow_check": "edges",
+   "overflows_redone": 0,
+   "overflow_log": [],
+   "recaptures": 1,
+   "recapture_budget": 64,
+   "recapture_budget_exceeded_at": null,
+   "graph_variant_cap": 64,
+   "graph_evictions": 0,
+   "recapture_log": [
+    {
+     "step": 0,
+     "key": "('ACB', 7168, 0)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "C",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 24,
+     "key": "('B', 7168)",
+     "reason": "first capture",
+     "counted": false
+    },
+    {
+     "step": 25,
+     "key": "('ACB', 7168, 0)",
+     "reason": "the neighbour capacity grew",
+     "counted": true
+    }
+   ],
+   "invalidations": [
+    {
+     "step": 24,
+     "reason": "the neighbour capacity grew",
+     "graphs": 1
+    }
+   ]
+  }
+ },
+ "baseline_builds": [
+  15,
+  15
+ ],
+ "streaming": 2,
+ "warmups": {
+  "checked": [],
+  "pipelined": [],
+  "speculative": []
+ }
+}
+______________ test_no_compile_at_a_later_edge_bucket_plain_cueq _______________
+----------------------------- Captured stdout call -----------------------------
+{
+ "after_warmup": {
+  "unique_graphs": 2,
+  "frames_ok": 3
+ },
+ "end": {
+  "unique_graphs": 2,
+  "frames_ok": 3
+ },
+ "sizes_after_warmup": [
+  7168
+ ],
+ "sizes": [
+  7168,
+  7680
+ ],
+ "events": [
+  {
+   "step": 66,
+   "new_sizes": [
+    7680
+   ],
+   "after": {
+    "unique_graphs": 2,
+    "frames_ok": 3
+   },
+   "step_s": 0.5486737110040849
+  }
+ ],
+ "edge_bucket": 512,
+ "initial_edges": 6912
+}
+________________ test_no_compile_at_a_later_edge_bucket_hybrid _________________
+----------------------------- Captured stdout call -----------------------------
+{
+ "after_warmup": {
+  "unique_graphs": 4,
+  "frames_ok": 9
+ },
+ "end": {
+  "unique_graphs": 4,
+  "frames_ok": 9
+ },
+ "sizes_after_warmup": [
+  7168
+ ],
+ "sizes": [
+  7168,
+  7680
+ ],
+ "events": [
+  {
+   "step": 66,
+   "new_sizes": [
+    7680
+   ],
+   "after": {
+    "unique_graphs": 4,
+    "frames_ok": 9
+   },
+   "step_s": 0.11188378199585713
+  }
+ ],
+ "edge_bucket": 512,
+ "initial_edges": 6912
+}
+________________________ test_mh1_hybrid_pipelined_nvt _________________________
+----------------------------- Captured stdout call -----------------------------
+
+1b-T04-registry-mh1-hybrid-nvt: {
+ "warmup_mismatches": [],
+ "captured": [
+  "ACP",
+  "('B', 7168)",
+  "AC",
+  "C"
+ ],
+ "sticky": [
+  "engine.flags",
+  "engine.overflow",
+  "engine.pipe_flags",
+  "engine.rebuild_needed",
+  "engine.spec_flags"
+ ],
+ "unregistered": [],
+ "mode": "pipelined",
+ "graphs_after_run": [
+  "ACP",
+  "('B', 7168)"
+ ],
+ "pool_resets": 1,
+ "neighbour_rebuilds": 2,
+ "backend": "hybrid",
+ "dtype": "float32",
+ "registered": [
+  "derived.force_field.node_attrs",
+  "derived.force_field.sender_groups",
+  "derived.force_field.species_feats.interactions.0",
+  "derived.force_field.total_charge",
+  "derived.force_field.total_spin",
+  "derived.fused.coefficients",
+  "derived.fused.total_mass",
+  "derived.integrator.c3_unit",
+  "derived.integrator.c4_unit",
+  "derived.integrator.c5_unit",
+  "engine.flags",
+  "engine.flags_host",
+  "engine.mid.0",
+  "engine.overflow",
+  "engine.pipe_flags",
+  "engine.pipe_flags_host",
+  "engine.rebuild_needed",
+  "engine.spec_flags",
+  "engine.spec_flags_host",
+  "engine.status_host",
+  "force_field.neighbours.candidate_index",
+  "force_field.neighbours.candidate_shifts",
+  "force_field.neighbours.candidate_shifts64",
+  "force_field.neighbours.candidate_unit_shifts",
+  "force_field.neighbours.count",
+  "force_field.neighbours.edge_index",
+  "force_field.neighbours.reference_positions",
+  "force_field.neighbours.shifts",
+  "force_field.neighbours.unit_shifts",
+  "force_field.node_e0",
+  "force_field.positions",
+  "integrator.eta",
+  "integrator.rnd_pos",
+  "integrator.rnd_vel",
+  "integrator.sqrt_kT",
+  "integrator.x_old",
+  "integrator.xi",
+  "state.cell",
+  "state.energy",
+  "state.forces",
+  "state.masses",
+  "state.positions",
+  "state.rng.batch",
+  "state.species",
+  "state.velocities"
+ ],
+ "torch": "2.14.1+cu130",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti"
+}
+_________________________ test_mh1_plain_cueq_float64 __________________________
+----------------------------- Captured stdout call -----------------------------
+
+1b-T04-registry-mh1-cueq-float64: {
+ "warmup_mismatches": [],
+ "captured": [
+  "ACP",
+  "('B', 7168)",
+  "AC",
+  "C"
+ ],
+ "sticky": [
+  "engine.flags",
+  "engine.overflow",
+  "engine.pipe_flags",
+  "engine.rebuild_needed",
+  "engine.spec_flags"
+ ],
+ "unregistered": [],
+ "mode": "pipelined",
+ "graphs_after_run": [
+  "ACP",
+  "('B', 7168)"
+ ],
+ "pool_resets": 1,
+ "neighbour_rebuilds": 2,
+ "backend": "cueq",
+ "dtype": "float64",
+ "registered": [
+  "derived.force_field.node_attrs",
+  "derived.force_field.sender_groups",
+  "derived.force_field.total_charge",
+  "derived.force_field.total_spin",
+  "derived.fused.coefficients",
+  "derived.fused.total_mass",
+  "derived.integrator.c3_unit",
+  "derived.integrator.c4_unit",
+  "derived.integrator.c5_unit",
+  "engine.flags",
+  "engine.flags_host",
+  "engine.mid.0",
+  "engine.overflow",
+  "engine.pipe_flags",
+  "engine.pipe_flags_host",
+  "engine.rebuild_needed",
+  "engine.spec_flags",
+  "engine.spec_flags_host",
+  "engine.status_host",
+  "force_field.neighbours.candidate_index",
+  "force_field.neighbours.candidate_shifts",
+  "force_field.neighbours.candidate_shifts64",
+  "force_field.neighbours.candidate_unit_shifts",
+  "force_field.neighbours.count",
+  "force_field.neighbours.edge_index",
+  "force_field.neighbours.reference_positions",
+  "force_field.neighbours.shifts",
+  "force_field.neighbours.unit_shifts",
+  "force_field.node_e0",
+  "force_field.positions",
+  "integrator.eta",
+  "integrator.rnd_pos",
+  "integrator.rnd_vel",
+  "integrator.sqrt_kT",
+  "integrator.x_old",
+  "integrator.xi",
+  "state.cell",
+  "state.energy",
+  "state.forces",
+  "state.masses",
+  "state.positions",
+  "state.rng.batch",
+  "state.species",
+  "state.velocities"
+ ],
+ "torch": "2.14.1+cu130",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti"
+}
+_________________________ test_mh1_npt_baoab_full_cell _________________________
+----------------------------- Captured stdout call -----------------------------
+
+1b-T04-registry-mh1-hybrid-npt-full: {
+ "warmup_mismatches": [],
+ "captured": [
+  "ACP",
+  "('B', 7168)",
+  "AC",
+  "C"
+ ],
+ "sticky": [
+  "engine.flags",
+  "engine.overflow",
+  "engine.pipe_flags",
+  "engine.rebuild_needed",
+  "engine.spec_flags"
+ ],
+ "unregistered": [],
+ "mode": "pipelined",
+ "graphs_after_run": [
+  "ACP",
+  "('B', 7168)"
+ ],
+ "pool_resets": 1,
+ "neighbour_rebuilds": 2,
+ "backend": "hybrid",
+ "dtype": "float32",
+ "registered": [
+  "derived.force_field.node_attrs",
+  "derived.force_field.sender_groups",
+  "derived.force_field.species_feats.interactions.0",
+  "derived.force_field.total_charge",
+  "derived.force_field.total_spin",
+  "derived.integrator.inv_sqrt_masses",
+  "engine.flags",
+  "engine.flags_host",
+  "engine.mid.0",
+  "engine.mid.1",
+  "engine.overflow",
+  "engine.pipe_flags",
+  "engine.pipe_flags_host",
+  "engine.rebuild_needed",
+  "engine.spec_flags",
+  "engine.spec_flags_host",
+  "engine.status_host",
+  "force_field.cell",
+  "force_field.neighbours.build_cell",
+  "force_field.neighbours.candidate_index",
+  "force_field.neighbours.candidate_shifts",
+  "force_field.neighbours.candidate_shifts64",
+  "force_field.neighbours.candidate_unit_shifts",
+  "force_field.neighbours.cell",
+  "force_field.neighbours.count",
+  "force_field.neighbours.edge_index",
+  "force_field.neighbours.reference_positions",
+  "force_field.neighbours.shifts",
+  "force_field.neighbours.unit_shifts",
+  "force_field.node_e0",
+  "force_field.positions",
+  "force_field.rcell",
+  "force_field.volume",
+  "integrator.externalstress",
+  "integrator.externalstress_step",
+  "integrator.sqrt_kT",
+  "integrator.xi",
+  "integrator.zeta",
+  "state.cell",
+  "state.energy",
+  "state.force_eps",
+  "state.forces",
+  "state.masses",
+  "state.p_eps",
+  "state.positions",
+  "state.rng.batch",
+  "state.species",
+  "state.stress",
+  "state.velocities"
+ ],
+ "torch": "2.14.1+cu130",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti"
+}
+________________________________ test_polar_1_s ________________________________
+----------------------------- Captured stdout call -----------------------------
+
+1b-T04-registry-polar-1-s: {
+ "warmup_mismatches": [],
+ "captured": [
+  "AC",
+  "C",
+  "ACP",
+  "('B', 7168)"
+ ],
+ "sticky": [
+  "engine.flags",
+  "engine.overflow",
+  "engine.pipe_flags",
+  "engine.rebuild_needed",
+  "engine.spec_flags",
+  "force_field.polar.overflow"
+ ],
+ "unregistered": [],
+ "mode": "pipelined",
+ "graphs_after_run": [],
+ "pool_resets": 0,
+ "neighbour_rebuilds": 2,
+ "backend": "hybrid",
+ "dtype": "float32",
+ "registered": [
+  "derived.force_field.node_attrs",
+  "derived.force_field.sender_groups",
+  "derived.force_field.species_feats.interactions.0",
+  "derived.force_field.total_charge",
+  "derived.force_field.total_spin",
+  "derived.fused.coefficients",
+  "derived.fused.total_mass",
+  "derived.integrator.c3_unit",
+  "derived.integrator.c4_unit",
+  "derived.integrator.c5_unit",
+  "engine.flags",
+  "engine.flags_host",
+  "engine.mid.0",
+  "engine.overflow",
+  "engine.pipe_flags",
+  "engine.pipe_flags_host",
+  "engine.rebuild_needed",
+  "engine.spec_flags",
+  "engine.spec_flags_host",
+  "engine.status_host",
+  "force_field.neighbours.candidate_index",
+  "force_field.neighbours.candidate_shifts",
+  "force_field.neighbours.candidate_shifts64",
+  "force_field.neighbours.candidate_unit_shifts",
+  "force_field.neighbours.count",
+  "force_field.neighbours.edge_index",
+  "force_field.neighbours.reference_positions",
+  "force_field.neighbours.shifts",
+  "force_field.neighbours.unit_shifts",
+  "force_field.node_e0",
+  "force_field.polar.bounds",
+  "force_field.polar.coefficients",
+  "force_field.polar.integer",
+  "force_field.polar.inverse_cell0",
+  "force_field.polar.k0_mask",
+  "force_field.polar.overflow",
+  "force_field.polar.part",
+  "force_field.positions",
+  "integrator.eta",
+  "integrator.rnd_pos",
+  "integrator.rnd_vel",
+  "integrator.sqrt_kT",
+  "integrator.x_old",
+  "integrator.xi",
+  "state.cell",
+  "state.energy",
+  "state.forces",
+  "state.masses",
+  "state.positions",
+  "state.rng.batch",
+  "state.species",
+  "state.velocities"
+ ],
+ "torch": "2.14.1+cu130",
+ "gpu": "NVIDIA GeForce RTX 5060 Ti"
+}
+_________ test_the_fixed_cost_options_are_bitwise_equal_to_the_default _________
+----------------------------- Captured stdout call -----------------------------
+
+opt2-T04-fixed-costs-mh1-nacl: {
+ "default": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "no_overlap": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": null,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "overlap_rebuild": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "step_graph": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "('ACPB', 7168)",
+   "C",
+   "('B', 7680)",
+   "('ACPB', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "both": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "pipelined": true,
+  "early_rebuilds": 118,
+  "rebuilds": 161,
+  "beside": 118,
+  "graphs": [
+   "('B', 7168)",
+   "('ACPB', 7168)",
+   "C",
+   "('B', 7680)",
+   "('ACPB', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ }
+}
+___________________ test_polar1_s_float64_forces_and_stress ____________________
+---------------------------- Captured stdout setup -----------------------------
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+------------------------------ Captured log setup ------------------------------
+WARNING  cuequivariance_ops.triton.cache_manager:cache_manager.py:147 Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+WARNING  matplotlib.style.core:core.py:205 In /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/mpl-data/stylelib/classic.mplstyle: 'parseString' deprecated - use 'parse_string'
+WARNING  matplotlib.style.core:core.py:205 In /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/mpl-data/stylelib/classic.mplstyle: 'resetCache' deprecated - use 'reset_cache'
+WARNING  root:mace.py:313 Default dtype float64 does not match model dtype float32, converting models to float64.
+_______ test_mh1_reference_tier_agrees_with_the_graph_tier_statistically _______
+----------------------------- Captured stdout call -----------------------------
+
+2-T03-reference-tier-mh1-nacl: {
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "reference": {
+  "tier": "reference",
+  "backend": "cueq",
+  "dtype": "float32",
+  "gate": "passed",
+  "setup_s": 27.185183394991327,
+  "run_s": 9.250883870990947
+ },
+ "graph": {
+  "tier": "graph",
+  "backend": "cueq",
+  "dtype": "float32",
+  "gate": "skipped",
+  "setup_s": 26.695169761995203,
+  "run_s": 1.5373493960069027
+ },
+ "mean_temperature_K": {
+  "reference": 207.5041754164588,
+  "graph": 207.5041866365859
+ },
+ "std_temperature_K": {
+  "reference": 15.558813506701387,
+  "graph": 15.558814870538791
+ },
+ "mean_potential_eV_atom": {
+  "reference": -6.861086128825023,
+  "graph": -6.86108622279432
+ },
+ "std_potential_eV_atom": {
+  "reference": 0.0026013805931565954,
+  "graph": 0.0026013869605048894
+ },
+ "temperature_limit_K": 15.811388300841896,
+ "final_position_deviation_A": 6.605464459852328e-07,
+ "reference_report": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    reference, plain cuEq (unfused convolution), float32, 0 rewrites on, 24 off (reasons in run.plan)\ngate:    passed (2 rattled (0.05 \u00c5); 0.00067 meV/atom, 3.2e-06 eV/\u00c5; floors \u00a712.3)\nsetup:   26 s (plan 0.021 s, build 6.8 s, gate 19 s, provenance 0.0048 s)\nspeed:   46.1 ms/step, whole-run mean over steps 1\u2013200\noutput:  /home/fzwin/fastmace-cache/4-T13/pytest-preflight/test_mh1_reference_tier_agrees0/reference\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+}
+______ test_polar1s_stress_check_passes_on_the_gate_configuration[NbCl5] _______
+----------------------------- Captured stdout call -----------------------------
+{"structure": "NbCl5", "natoms": 1944, "max_abs": 8.324229668413285e-09, "strain": 0.0001, "kset": "frozen", "k_vectors_included": 2894}
+------------------------------ Captured log call -------------------------------
+WARNING  root:mace.py:313 Default dtype float64 does not match model dtype float32, converting models to float64.
+_______ test_polar1s_stress_check_passes_on_the_gate_configuration[NaCl] _______
+----------------------------- Captured stdout call -----------------------------
+{"structure": "NaCl", "natoms": 216, "max_abs": 6.928687545579293e-09, "strain": 0.0001, "kset": "frozen", "k_vectors_included": 231}
+------------------------------ Captured log call -------------------------------
+WARNING  root:mace.py:313 Default dtype float64 does not match model dtype float32, converting models to float64.
+- generated xml file: /home/fzwin/fastmace-acceptance/4-T13-local-20261023/preflight/junit.xml -
+============================= slowest 60 durations =============================
+513.14s call     tests/gpu/test_fixed_costs_gpu.py::test_the_fixed_cost_options_are_bitwise_equal_to_the_default
+413.41s call     tests/gpu/test_fused_integrator_gpu.py::test_trajectories_are_bitwise_equal_with_the_option[restart-npt]
+407.98s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+383.05s call     tests/gpu/test_fused_integrator_gpu.py::test_trajectories_are_bitwise_equal_with_the_option[nvt]
+360.97s call     tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[polar1-s-hybrid]
+310.03s call     tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+235.36s call     tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+234.33s call     tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[mh1-plain-cueq]
+216.88s call     tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[mh1-hybrid]
+114.76s call     tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_plain_cueq
+112.98s call     tests/gpu/test_reference_gpu.py::test_polar1s_stress_check_passes_on_the_gate_configuration[NbCl5]
+108.67s call     tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_hybrid
+74.48s call     tests/gpu/test_reference_tier_gpu.py::test_mh1_reference_tier_agrees_with_the_graph_tier_statistically
+51.19s call     tests/gpu/test_registry_gpu.py::test_mh1_npt_baoab_full_cell
+42.22s call     tests/gpu/test_registry_gpu.py::test_mh1_hybrid_pipelined_nvt
+40.05s call     tests/gpu/test_registry_gpu.py::test_mh1_plain_cueq_float64
+37.57s call     tests/gpu/test_registry_gpu.py::test_polar_1_s
+37.32s call     tests/gpu/test_fused_integrator_gpu.py::test_the_fused_stage_writes_the_pytorch_stage_bytes[True]
+36.05s call     tests/gpu/test_fused_integrator_gpu.py::test_the_fused_stage_writes_the_pytorch_stage_bytes[False]
+10.48s call     tests/gpu/test_polar_gpu.py::test_polar1_s_hybrid_float32_in_a_fresh_process
+6.29s setup    tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+5.79s call     tests/gpu/test_reference_gpu.py::test_polar1s_stress_check_passes_on_the_gate_configuration[NaCl]
+4.95s call     tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+0.32s call     tests/gpu/test_polar_gpu.py::test_polar1_s_uvu_self_check
+0.06s setup    tests/gpu/test_fused_integrator_gpu.py::test_trajectories_are_bitwise_equal_with_the_option[nvt]
+
+(35 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+PASSED tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[mh1-plain-cueq]
+PASSED tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[mh1-hybrid]
+PASSED tests/gpu/test_isolation_gpu.py::test_a_b_a_equals_fresh_instances[polar1-s-hybrid]
+PASSED tests/gpu/test_fused_integrator_gpu.py::test_the_fused_stage_writes_the_pytorch_stage_bytes[True]
+PASSED tests/gpu/test_fused_integrator_gpu.py::test_the_fused_stage_writes_the_pytorch_stage_bytes[False]
+PASSED tests/gpu/test_fused_integrator_gpu.py::test_trajectories_are_bitwise_equal_with_the_option[nvt]
+PASSED tests/gpu/test_fused_integrator_gpu.py::test_trajectories_are_bitwise_equal_with_the_option[restart-npt]
+PASSED tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_against_the_research_engine
+PASSED tests/gpu/test_engine_gpu.py::test_mh1_plain_cueq_float64_npt_against_the_research_engine
+PASSED tests/gpu/test_engine_gpu.py::test_mh1_hybrid_float32_against_the_research_engine
+PASSED tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_plain_cueq
+PASSED tests/gpu/test_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_hybrid
+PASSED tests/gpu/test_registry_gpu.py::test_mh1_hybrid_pipelined_nvt
+PASSED tests/gpu/test_registry_gpu.py::test_mh1_plain_cueq_float64
+PASSED tests/gpu/test_registry_gpu.py::test_mh1_npt_baoab_full_cell
+PASSED tests/gpu/test_registry_gpu.py::test_polar_1_s
+PASSED tests/gpu/test_fixed_costs_gpu.py::test_the_fixed_cost_options_are_bitwise_equal_to_the_default
+PASSED tests/gpu/test_polar_gpu.py::test_polar1_s_float64_forces_and_stress
+PASSED tests/gpu/test_polar_gpu.py::test_polar1_s_uvu_self_check
+PASSED tests/gpu/test_polar_gpu.py::test_polar1_s_hybrid_float32_in_a_fresh_process
+PASSED tests/gpu/test_reference_tier_gpu.py::test_mh1_reference_tier_agrees_with_the_graph_tier_statistically
+PASSED tests/gpu/test_reference_gpu.py::test_polar1s_stress_check_passes_on_the_gate_configuration[NbCl5]
+PASSED tests/gpu/test_reference_gpu.py::test_polar1s_stress_check_passes_on_the_gate_configuration[NaCl]
+!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt: stopped by SIGTERM !!!!!!!!!!!!!!!!!!!!!
+/home/fzwin/fastmace-4-T13/src-636787b/tools/acceptance/resultlog.py:33: KeyboardInterrupt: stopped by SIGTERM
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+========= 23 passed, 18 deselected, 62 warnings in 5684.37s (1:34:44) ==========

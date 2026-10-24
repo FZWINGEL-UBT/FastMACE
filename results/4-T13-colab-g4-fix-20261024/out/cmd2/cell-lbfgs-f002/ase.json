@@ -1,0 +1,66 @@
+{
+  "schema": 4,
+  "task": "4-T05/4-T06/4-T07/4-T08",
+  "side": "ase",
+  "optimizer": "lbfgs",
+  "cell_filter": "frechet",
+  "pressure_GPa": 0.0,
+  "dispersion": "none",
+  "structure_settings": {
+    "root": "/content/fm/baseline/1a-T18",
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "strain": 0.02,
+    "rattle_A": 0.02,
+    "seed": 0,
+    "seed_rule": "seed + crc32(name)"
+  },
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-24T03:43:27+00:00",
+  "fastmace_commit": null,
+  "machine": "9de0fe971fbc",
+  "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/content/fm/cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/content/fm/models/mace-mh-1.model",
+  "fmax": 0.002,
+  "steps": 5000,
+  "structures": {
+    "NaNbO3": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NaNbO3.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 277,
+          "seconds": 57.03788149100001,
+          "initial_eV_atom": -11.846965341656297,
+          "energy_eV_atom": -11.87888017076033,
+          "fmax_eV_A": 0.001985550266885476,
+          "ms_per_step": 205.91292957039713,
+          "switch_flips": null,
+          "warm_up": true,
+          "cell_lengths_A": [
+            16.574770423925848,
+            16.851053695827684,
+            46.59693119736796
+          ],
+          "cell_angles_deg": [
+            90.0000040709223,
+            89.9999366429808,
+            89.99994837895403
+          ],
+          "volume_A3": 13014.632218897876
+        }
+      }
+    }
+  },
+  "finished": "2026-10-24T03:44:24+00:00"
+}
