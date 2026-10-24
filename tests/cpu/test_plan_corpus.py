@@ -114,10 +114,12 @@ def test_planted_differences_are_classified(small_dump):
     entry = new["cases"][case_id]
     entry["configs"]["rewrites"]["planted"] = "off"
     assert corpus.compare(small_dump, new)["rows"][case_id]["verdict"] == "different"
-    entry["decisions"]["memory"] = "drop planted"
-    entry["decision_codes"]["memory"] = [12, "rule-12-planted"]
+    # A planted key: main's plans already carry rule 12's "memory" decision (5-T03).
+    entry["decisions"]["planted.memory"] = "drop planted"
+    entry["decision_codes"]["planted.memory"] = [12, "rule-12-planted"]
     row = corpus.compare(small_dump, new, frozenset({"rule-12-planted"}))["rows"][case_id]
-    assert row["verdict"] == "explained" and row["by"] == ["memory"] and row["added_decisions"] == ["memory"]
+    assert row["verdict"] == "explained" and row["by"] == ["planted.memory"]
+    assert row["added_decisions"] == ["planted.memory"]
 
     # An explaining code does not excuse a change outside the rewrite set.
     entry["tier"] = "compiled"
