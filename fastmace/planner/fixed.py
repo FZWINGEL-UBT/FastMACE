@@ -439,10 +439,14 @@ class FixedPlanner:
         """Set the expandable-segments allocator when it resolves on; returns PYTORCH_CUDA_ALLOC_CONF.
 
         Must run before the first CUDA allocation of the process (``hardware``, ``load`` and ``build``
-        call it); the engine's process constraints refuse an allocator that was set too late.
+        call it); the engine's process constraints refuse an allocator that was set too late. It also puts
+        the Inductor and Triton caches under the cache root where the environment names none (SPEC §14,
+        ``kernels.triton.cache.configure_defaults``; OPT4-T05b), before any compilation or Triton kernel.
         """
+        from fastmace.kernels.triton import cache as compiler_caches
         from fastmace.model import compile as compiling
 
+        compiler_caches.configure_defaults(self.environ)
         if engine is None:
             engine = dataclasses.replace(self.engine, expandable_segments=self._expandable_segments(_Book()))
         if engine.expandable_segments == "on":

@@ -706,6 +706,27 @@ def test_force_field_is_plan_free(pristine):
 
 
 @pytest.mark.filterwarnings("ignore::UserWarning")
+def test_a_fresh_build_puts_the_compiler_caches_under_the_cache_root(pristine, tmp_path):
+    """OPT4-T05b (SPEC §14): plan and build set Inductor's and Triton's cache directories under FASTMACE_CACHE
+    before anything compiles, where the environment names none; an explicit directory is kept."""
+    pytest.importorskip("cuequivariance_torch")
+    from fastmace.model.forcefield import ForceField
+
+    loaded, atoms = pristine(), nacl(rattle=0.05, seed=1)
+    for explicit in (False, True):
+        environ = {"FASTMACE_CACHE": str(tmp_path / "root")}
+        if explicit:
+            environ["TORCHINDUCTOR_CACHE_DIR"] = str(tmp_path / "mine")
+        planner = MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode="none"), environ=environ,
+                                 process=constraints.ProcessRecord())
+        ff = ForceField(loaded, atoms, precision="float64")
+        planner.build(planner.plan(ff, atoms, IntegratorConfig(temperature_K=300.0), WORKLOAD, CPU), ff, atoms)
+        root = (tmp_path / "root").resolve()
+        assert environ["TORCHINDUCTOR_CACHE_DIR"] == str(tmp_path / "mine" if explicit else root / "inductor")
+        assert environ["TRITON_CACHE_DIR"] == str(root / "triton")
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
 @pytest.mark.parametrize(("family", "npt"), [("mh1", False), ("density", False), ("mh1", True)])
 def test_minimal_engine_equals_the_fixed_engine_on_the_cpu(pristine, tmp_path, family, npt):
     pytest.importorskip("cuequivariance_torch")

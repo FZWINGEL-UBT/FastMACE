@@ -45,6 +45,7 @@ from fastmace.config import (
     RewriteConfig,
 )
 from fastmace.engine import constraints
+from fastmace.kernels.triton import cache
 from fastmace.model import capabilities, labels
 from fastmace.planner import fixed
 from fastmace.planner.fixed import FixedPlanner, PlanRefused
@@ -418,8 +419,10 @@ def test_expandable_segments_rule_and_allocator(environ, version, choice):
     value = p.configure_process(plan.engine)
     if choice == "on":
         assert environ["PYTORCH_CUDA_ALLOC_CONF"] == value and "expandable_segments:True" in value
-    else:
-        assert environ == before  # the allocator is left alone
+    else:  # the allocator is left alone (the compiler cache variables are set: OPT4-T05b, SPEC §14)
+        assert environ.get("PYTORCH_CUDA_ALLOC_CONF") == before.get("PYTORCH_CUDA_ALLOC_CONF")
+        assert set(environ) - set(before) <= set(cache.VARIABLES) <= set(environ)
+        assert all(environ[key] == value for key, value in before.items())
 
 
 def test_expandable_segments_is_off_on_the_cpu():

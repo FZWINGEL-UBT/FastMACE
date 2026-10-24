@@ -177,9 +177,9 @@ or `Simulation(engine=...)`.
 - **Fewer graph variants up front.** `prepare()` captures 2 graphs (ACP, B), and ACP costs 0.04–0.4 s.
   There is nothing to remove.
 
-## Findings (reported, not fixed)
+## Findings
 
-1. **Inductor's cache is not under `FASTMACE_CACHE`.**
+1. **Inductor's cache was not under `FASTMACE_CACHE`. Fixed in OPT4-T05b (owner "Yes").**
    - `fastmace.kernels.triton.cache.configure()`, which puts `TORCHINDUCTOR_CACHE_DIR` and
      `TRITON_CACHE_DIR` under the cache root (SPEC §14 "Caches"), has no caller in `fastmace/` since 1a-T04
      added it.
@@ -252,3 +252,37 @@ The owner answered "Yes" to "`dynamic_edges` on by default" (24 October 2026). B
 - In "Verdict" and the tables above, "default" means `dynamic_edges=False` and "the option" means the new
   default.
 - SPEC §8.1, §18 decision 58 and §19's sixteenth amendment record it.
+
+## Follow-up OPT4-T05b: the compiler caches under `FASTMACE_CACHE` (finding 1)
+
+The owner answered "Yes" to "fix the Inductor cache to live under FASTMACE_CACHE".
+
+- `FixedPlanner.configure_process` now calls `fastmace.kernels.triton.cache.configure_defaults`.
+  `hardware()`, `load()` and every MD and evaluation build run it before the first CUDA allocation, so
+  before any self-check, Triton kernel or `torch.compile`.
+- It sets `TORCHINDUCTOR_CACHE_DIR` and `TRITON_CACHE_DIR` under the cache root, and turns on Inductor's
+  FX-graph and AOT-autograd caches, wherever the environment does not set them already. A variable set
+  by the caller wins (SPEC §14 now says so). It creates no directory: Inductor and Triton create theirs
+  when they first write.
+- **Inductor's own default counts as unset.** Importing `torch._dynamo` runs `torch/_dynamo/package.py`,
+  which calls Inductor's `cache_dir()`, and that writes the default `$TMPDIR/torchinductor_$USER` into
+  `os.environ`. MACE imports `torch._dynamo` while `fm.load` runs, so the variable is always set before the
+  planner's setup.
+  - A first version that kept every set value still compiled into `$TMPDIR` in the GPU smoke.
+  - A value equal to torch's `default_cache_dir()` is therefore replaced; any other value is the caller's.
+- **GPU smoke** (local RTX 5060 Ti, `mace_cueq_oeq`, export of `1da9315`, a fresh `FASTMACE_CACHE`, no
+  compiler-cache variable set; MH-1 NaCl `fm.md`, 300 steps, default plan):
+  - one compile: B's first capture took 0.08 s, and `('B', 7680)` later 0.07 s;
+  - Inductor's 52 MB, Triton's 57 MB and the OEq build all under `FASTMACE_CACHE`, and nothing new under
+    `~/.triton`;
+  - `$TMPDIR/torchinductor_$USER` exists but is empty. `torch/_dynamo/package.py` creates it when torch is
+    imported, before FastMACE can act. Only a `TORCHINDUCTOR_CACHE_DIR` set before torch is imported avoids
+    the empty directory; `import fastmace` sets nothing (SPEC §14). Workstation scripts that must not create
+    even an empty directory in `/tmp` can export it themselves.
+- On the workstations, a run therefore writes its compile caches under the cache root (`FASTMACE_CACHE`, else
+  `~/.cache/fastmace`) instead of under `/tmp`. Our runs set `FASTMACE_CACHE` under `/mnt/homes/zwingel`, so
+  they write nothing outside it.
+- Tests:
+  - `tests/cpu/test_kernels_cache.py`: the defaults, explicit variables, Inductor's own default (also in a
+    fresh process that imports `torch._dynamo` first), the planner's process setup;
+  - `tests/cpu/test_minimal_planner.py::test_a_fresh_build_puts_the_compiler_caches_under_the_cache_root`.

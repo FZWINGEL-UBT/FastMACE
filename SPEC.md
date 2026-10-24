@@ -2191,7 +2191,10 @@ This is today's provenance block, made complete and schema-versioned.
 - **Caches:**
   - Triton and Inductor caches, the OEq extension cache and compile caches go
     under a configurable cache root (`FASTMACE_CACHE`), never inside
-    environments.
+    environments. The planner sets Inductor's and Triton's directories before
+    a plan's first compilation; a `TORCHINDUCTOR_CACHE_DIR` or
+    `TRITON_CACHE_DIR` already set in the environment wins, except Inductor's
+    own default, which importing `torch._dynamo` writes there.
   - Respect read-only and NFS homes; pytest's ownership check on the NAS is a
     known problem.
   - **No kernel file locks on network filesystems.** NFS locking on the
@@ -3076,3 +3079,8 @@ optimisation round 4, OPT4-T05):** one engine default for setup time.
   7–9 s shorter and cold starts 16–22 s shorter (local). §8.1 says so. Plans
   that compile nothing record it off (`dynamic-edges-uncompiled`); an explicit
   `False` is recorded as `dynamic-edges-graph-off`.
+- **Compiler caches under `FASTMACE_CACHE` (§14, conformance, owner "Yes"):**
+  `FixedPlanner.configure_process` now sets `TORCHINDUCTOR_CACHE_DIR` and
+  `TRITON_CACHE_DIR` under the cache root when the environment names none.
+  Before, nothing called the 1a-T04 helper, so Inductor wrote to
+  `$TMPDIR/torchinductor_$USER`, which the workstation rule forbids.
