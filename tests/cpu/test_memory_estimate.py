@@ -122,12 +122,19 @@ def test_estimate_bounds_the_tiny_models_peak(family, dtype):
 def test_estimate_terms_and_text():
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
     found = memory.estimate(dims, edges=10_000, nodes=500, dtype="float32", capacity=20_000,
-                            rewrite_terms=(("x", memory.MemoryTerm(edge_bytes=8.0)),), resident_weights=True)
-    assert found.term("weights") == dims.parameters * 4 == found.resident
+                            rewrite_terms=(("x", memory.MemoryTerm(edge_bytes=8.0)),), resident_weights=True,
+                            resident_terms=(("block_linear", 1000),), selfcheck_terms=(("a", 5), ("b", 7)))
+    assert found.term("weights (pristine and execution copy)") == 2 * dims.parameters * 4
+    assert found.resident == dims.parameters * 4 and found.term("rewrites' buffers") == 1000
     assert found.term("rewrites") == pytest.approx(memory.SAFETY * 80_000, abs=1)
     assert found.term("neighbour list") == 20_000 * (32 + 12 * 4 + 24)
     assert found.term("workspace") == memory.WORKSPACE_BYTES
-    assert found.total == sum(value for _, value in found.terms) and found.needed == found.total - found.resident
+    assert found.total == found.run == sum(value for _, value in found.terms) > found.build
+    assert found.needed == found.total - found.resident
+    # The build holds both weight copies, the rewrites' buffers, the workspace and the largest self-check.
+    assert dict(found.build_terms) == {"weights (pristine and execution copy)": 2 * dims.parameters * 4,
+                                       "rewrites' buffers": 1000, "workspace": memory.WORKSPACE_BYTES,
+                                       "self-check b": 7}
     assert "10000 edges" in found.text(2**30) and "GiB free" in found.text(2**30)
     # float64 doubles the activations; a fused convolution keeps neither senders nor messages.
     wide = memory.estimate(dims, edges=10_000, nodes=500, dtype="float64", workspace=False)
@@ -220,6 +227,26 @@ def test_declared_terms():
     assert terms.streaming_conv(dims, 4) == (8, 0)
     with pytest.raises(ValueError, match="memory is not callable"):
         dataclasses.replace(mh1.RECORDS["fold_cutoff"], memory=3)
+    assert {name for name, record in linear.RECORDS.items() if record.resident_memory is not None} == {
+        "block_linear", "merged_residual"}
+
+
+@pytest.mark.rule(12)
+def test_block_linear_resident_term_matches_its_buffers():
+    """block_linear keeps each converted linear's weight and its transpose: the buffers of the rewritten tiny
+    model against the term from the pristine model's ``linear_weights``."""
+    pytest.importorskip("cuequivariance_torch")
+    from test_rewrites_mh1 import apply as apply_rewrites
+    from test_rewrites_mh1 import only
+    from test_rewrites_mh1 import tiny as tiny_cueq
+
+    pristine = tiny_mace_model([8, 11, 17, 26], **FAMILIES["mh1"])  # test_rewrites_mh1.Z_VALUES
+    model, batch = tiny_cueq("mh1", backend="cueq")
+    rewritten, _, _ = apply_rewrites(model, batch, only("block_linear"), families=(linear,))
+    held = sum(buffer.numel() * buffer.element_size() for name, buffer in rewritten.named_buffers()
+               if name.rsplit(".", 1)[-1].startswith("weight_"))
+    dims = capabilities.model_dims(pristine)
+    assert dims.linear_weights > 0 and held == terms.block_linear_resident(dims, 8)
 
 
 @pytest.mark.rule(12)
@@ -259,6 +286,36 @@ def test_the_build_estimate_wins_when_a_selfcheck_dominates():
                                   precision="float32", rewrites=RewriteConfig(segment_gemm="off"))
     assert "(run;" in str(without.decision("memory")[2])
     assert without.predicted_memory_bytes < planned.predicted_memory_bytes
+
+
+@pytest.mark.rule(5)
+@pytest.mark.rule(12)
+@pytest.mark.precedence(5, 12)
+def test_rule_5_wins_over_the_models_rule_12(monkeypatch):
+    """A reproducible plan that does not fit: rule 12 may turn rewrites off and warns, but rule 5's backend,
+    convolution and qualification decisions stay as they are (tests/cpu/test_rules_precedence.py's pair for
+    the MACE model's estimate)."""
+    import test_rules_precedence as trp
+
+    from fastmace.planner import minimal as minimal_module
+
+    monkeypatch.setattr(minimal_module, "_cuda_initialised", lambda: False)
+    traits = dataclasses.replace(tmp.tp.traits("mh1-r2scan"), dims=mh1_traits().dims, r_max=mh1_traits().r_max)
+    workload = Workload(max_temperature_K=300.0, reproducible=True)
+
+    def planned(memory_bytes):
+        planner = tmp.minimal(versions=trp.PINNED)
+        planner._free_memory_bytes = lambda hardware: hardware.memory_bytes
+        return planner.plan_traits(traits, nacl(), IntegratorConfig(), workload,
+                                   dataclasses.replace(tmp.GPU, memory_bytes=int(memory_bytes)), precision="float64")
+
+    base = planned(tmp.GPU.memory_bytes)
+    assert base.decision("memory")[1] == "fits"
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = planned(2**20)
+    assert tight.decision("memory")[1] == "warn"
+    assert trp.rule_5_decisions(tight) == trp.rule_5_decisions(base)
+    assert tight.engine.backend == base.engine.backend and tight.precision == base.precision
 
 
 def test_case_errors_equal_check_tensors():
@@ -332,7 +389,7 @@ def test_rule_12_turns_off_the_largest_edge_sized_rewrite_and_its_dependants():
     assert without.predicted_memory_bytes < full.predicted_memory_bytes
     free = (full.predicted_memory_bytes + without.predicted_memory_bytes) / 2 / memory.MARGIN
     tight = plan(memory_bytes=free)
-    assert tight.predicted_memory_bytes == without.predicted_memory_bytes
+    assert tight.predicted_memory_bytes <= memory.MARGIN * free < full.predicted_memory_bytes
     assert tight.rewrites.factor_species == "off"
     for field in ("factor_species", "fold_cutoff", "joint_radial_input"):
         _, choice, reason = tight.decision(f"RewriteConfig.{field}")

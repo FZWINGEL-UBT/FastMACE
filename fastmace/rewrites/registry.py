@@ -179,6 +179,9 @@ class Rewrite:
     # Its self-check's transient at build (5-T03): selfcheck_memory(dims, width, sms) -> bytes, from the model's
     # widths, the bytes per float and the device's SM count (None off CUDA). None: no more than a force call.
     selfcheck_memory: Callable[[Any, int, int | None], int] | None = None
+    # The device memory it keeps beside the model's weights (5-T03): resident_memory(dims, width) -> bytes, from
+    # the model's widths and the bytes per float (block_linear's weight and transposed weight buffers).
+    resident_memory: Callable[[Any, int], int] | None = None
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name:
@@ -205,7 +208,7 @@ class Rewrite:
         if self.deterministic is not None and not isinstance(self.deterministic, bool):
             raise ValueError(f"Rewrite {self.name}: deterministic must be True, False or None, "
                              f"got {self.deterministic!r}")
-        for name in ("memory", "selfcheck_memory"):
+        for name in ("memory", "selfcheck_memory", "resident_memory"):
             if getattr(self, name) is not None and not callable(getattr(self, name)):
                 raise ValueError(f"Rewrite {self.name}: {name} is not callable")
 

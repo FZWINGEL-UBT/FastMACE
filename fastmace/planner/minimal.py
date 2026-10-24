@@ -888,9 +888,10 @@ class MinimalPlanner:
         def estimate(names):  # a rewrite turned off takes its run term and its self-check's transient with it
             terms = memory.rewrite_memory_terms(registry, dims, names, dtype)
             checks = memory.selfcheck_memory_terms(registry, dims, names, dtype, getattr(hardware, "sms", None))
+            held = memory.resident_memory_terms(registry, dims, names, dtype)
             return memory.estimate(dims, edges=edges, nodes=natoms, dtype=dtype, capacity=capacity, list_dtype=dtype,
                                    rewrite_terms=terms, d3=d3_memory, resident_weights=resident, workspace=cuda,
-                                   fused_conv=fused_conv, selfcheck_terms=checks)
+                                   fused_conv=fused_conv, selfcheck_terms=checks, resident_terms=held)
 
         found = estimate(enabled)
         dropped = []

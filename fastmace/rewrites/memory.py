@@ -74,6 +74,18 @@ def streaming_conv(dims, width):
     return _STREAMING_INDEX_BYTES, 0
 
 
+def block_linear_resident(dims, width):
+    """Each converted linear keeps its extracted weight and a contiguous transposed copy as buffers
+    (``BlockLinear.weight_k``, ``weight_t_k``), beside the execution copy's own parameters."""
+    return 2 * dims.linear_weights * width
+
+
+def merged_residual_resident(dims, width):
+    """The merged layer stacks ``linear_1``'s and ``linear_res``'s weights again, with their transpose
+    (``ResidualBlockLinear``)."""
+    return 2 * dims.residual_weights * width
+
+
 def segment_gemm_selfcheck(dims, width, sms):
     """``segment_gemm``'s self-check (rewrites/fusion): per interaction it probes enough atoms that every product
     takes Triton on this device, ``MIN_TRITON_WAVES x sms x BLOCK_M`` rows for the scalar segment (irrep
@@ -91,5 +103,6 @@ def segment_gemm_selfcheck(dims, width, sms):
 _SEGMENT_SELFCHECK_TENSORS = 9
 
 
-__all__ = ["factor_species", "fold_cutoff", "fused_radial_hidden", "generic_reassociate", "joint_radial_input",
-           "reassociate_first", "segment_gemm_selfcheck", "streaming_conv"]
+__all__ = ["block_linear_resident", "factor_species", "fold_cutoff", "fused_radial_hidden", "generic_reassociate",
+           "joint_radial_input", "merged_residual_resident", "reassociate_first", "segment_gemm_selfcheck",
+           "streaming_conv"]

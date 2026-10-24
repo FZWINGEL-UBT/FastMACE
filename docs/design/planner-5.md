@@ -252,7 +252,15 @@ overflows redone M`. The step-time effect of the host timestamps is measured in 
 
 - **5-T02** (conformance suite): the table, the marker, the meta-test's two lists.
 - **5-T03** (rule 12): `rule-12-memory`, `Plan.predicted_memory_bytes`, section 6 of the layout; the action
-  waits for D1.
+  waits for D1. As built (decision 51): the prediction is max(build, run). The run term covers a force
+  call, the rewrites' terms (`Rewrite.memory`) and the lists. Both terms hold the two weight copies, the
+  rewrites' resident buffers (`Rewrite.resident_memory`: `block_linear`, `merged_residual`) and the
+  workspace. The build term adds the largest self-check transient (`Rewrite.selfcheck_memory`, with
+  `Hardware.sms`). PolarMACE's long range needs no term of its own: its 64 MiB at the build's peak were
+  cuBLAS workspaces. Deviations from the
+  file list: `model/capabilities.py`, `planner/fallback.py`, `planner/plan.py` and `planner/fixed.py`
+  (`Hardware.sms`), and `rewrites/fusion/__init__.py` (the `segment_gemm` self-check frees each
+  interaction's tensors; `docs/validation/5-T03.md`).
 - **5-T04** (rule 15): `model-structure-warning`.
 - **5-T05** (`str(plan)`): the layout above.
 - **5-T06** (monitor): `AdaptationConfig`, `counters.tier_switches`, `TierSwitch`.

@@ -24,6 +24,7 @@ The research engine's in-place variant (``INPLACE_BLOCK_LINEAR``; opt-in, slower
 from __future__ import annotations
 
 from fastmace.model.capabilities import FACTORED_INTERACTIONS
+from fastmace.rewrites import memory as memory_terms
 from fastmace.rewrites.registry import Rewrite, Support, check_tensors
 
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
@@ -233,7 +234,8 @@ RECORDS = {
     "block_linear": Rewrite(
         name="block_linear", applies_to=_block_linear_support, requires=(), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
-        deterministic=True, workload_constraints=(), apply=_apply_block_linear, selfcheck=_block_linear_selfcheck),
+        deterministic=True, workload_constraints=(), apply=_apply_block_linear, selfcheck=_block_linear_selfcheck,
+        resident_memory=memory_terms.block_linear_resident),
     "grouped_linear": Rewrite(
         name="grouped_linear", applies_to=_block_linear_support, requires=("block_linear",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
@@ -242,7 +244,7 @@ RECORDS = {
         name="merged_residual", applies_to=_merged_residual_support, requires=("block_linear", "density_first"),
         conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
         deterministic=True, workload_constraints=(), apply=_apply_merged_residual,
-        selfcheck=_merged_residual_selfcheck),
+        selfcheck=_merged_residual_selfcheck, resident_memory=memory_terms.merged_residual_resident),
 }
 
 __all__ = ["READS_RESIDUAL_LINEAR", "RECORDS", "block_linears", "group_linears", "merge_residual_linears"]

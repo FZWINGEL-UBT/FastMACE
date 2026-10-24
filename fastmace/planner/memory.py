@@ -1,9 +1,12 @@
 """Rule 12's memory estimate for the MACE model (SPEC §9.3 rule 12, decision 51; plan task 5-T03).
 
-The estimate counts what a force call keeps on the device, from the model's own widths
-(``capabilities.ModelDims``) and the plan's sizes. It contains no GPU table:
+The prediction is the larger of two estimates from the model's own widths (``capabilities.ModelDims``), the
+plan's sizes and the device's SM count; it contains no GPU table. The **run** counts what a force call keeps
+on the device:
 
-- **weights**: the parameters at the force precision;
+- **weights**: the parameters at the force precision, twice (the pristine model and the execution copy);
+- **rewrites' buffers**: what enabled rewrites keep beside the weights (``Rewrite.resident_memory``:
+  block_linear's weight and transposed weight, merged_residual's stacked layers);
 - **activations**: per interaction, the per-edge tensors of stock MACE (the gathered sender features, the
   radial network's layers, the tensor product's weights and messages) times the edge count, and the
   per-node tensors (node features in, the scattered messages, the product's terms, the features out)
@@ -15,6 +18,10 @@ The estimate counts what a force call keeps on the device, from the model's own 
 - **neighbour list**: the MACE pair buffers at their capacity;
 - **D3 list**: its buffers and build transient (``neighbors.adaptive.rule_12_d3``), where D3 is on;
 - **workspace**: the library workspaces a capture allocates (cuBLAS, 32-64 MiB; ``engine/graph.py``).
+
+The **build** holds the weights, the rewrites' buffers and the workspace, and the largest transient of a
+rewrite's self-check (``Rewrite.selfcheck_memory``: segment_gemm's probes, sized to the device's SM count).
+On POLAR-1-L the build was the larger (5-T03's memory history: 3.9 GB on an A100 against a 0.8 GB run).
 
 The activations and rewrite terms are multiplied by ``SAFETY``, one factor for every model and GPU,
 fitted on the 19 labels (SPEC §9.3 rule 12 as amended 23 October 2026; fit and residuals in
@@ -168,7 +175,8 @@ def interaction_floats(dims, fused_conv: bool = False) -> list[tuple[int, int]]:
 def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, list_dtype: str | None = None,
              rewrite_terms: tuple[tuple[str, MemoryTerm], ...] = (), d3=None, resident_weights: bool = False,
              workspace: bool = True, fused_conv: bool = False,
-             selfcheck_terms: tuple[tuple[str, int], ...] = ()) -> MemoryEstimate:
+             selfcheck_terms: tuple[tuple[str, int], ...] = (),
+             resident_terms: tuple[tuple[str, int], ...] = ()) -> MemoryEstimate:
     """Rule 12's estimate for one force call of a model with ``dims`` on ``edges`` and ``nodes``.
 
     ``dtype`` is the force precision; ``capacity`` the MACE pair list's slots (0: no list), whose shifts are
@@ -176,7 +184,9 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
     ``d3`` a ``neighbors.adaptive.Rule12D3`` or ``None``; ``resident_weights`` whether the weights are on
     the device already; ``fused_conv`` as ``interaction_floats``; ``selfcheck_terms`` the enabled rewrites'
     ``(name, bytes)`` of their self-checks' transients (``Rewrite.selfcheck_memory``), of which the build
-    holds the largest beside both copies of the weights.
+    holds the largest beside both copies of the weights; ``resident_terms`` the enabled rewrites'
+    ``(name, bytes)`` they keep beside the weights (``Rewrite.resident_memory``), held by both the build and
+    the run.
     """
     width = DTYPE_BYTES[dtype]
     floats = interaction_floats(dims, fused_conv)
@@ -192,7 +202,11 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
     list_width = DTYPE_BYTES[list_dtype or dtype]
     pair_list = capacity * (_INDEX_BYTES_PER_SLOT + _SHIFT_FLOATS_PER_SLOT * list_width + _SHIFT64_BYTES_PER_SLOT)
     weights = dims.parameters * width
-    terms = [("weights", weights),
+    held = [("weights (pristine and execution copy)", 2 * weights)]
+    resident = sum(value for _, value in resident_terms)
+    if resident:
+        held.append(("rewrites' buffers", int(resident)))
+    terms = [*held,
              ("activations", int(math.ceil(SAFETY * activations))),
              ("rewrites", int(math.ceil(SAFETY * sum(value for _, value in rewrites)))),
              ("neighbour list", int(pair_list))]
@@ -200,13 +214,25 @@ def estimate(dims, *, edges: int, nodes: int, dtype: str, capacity: int = 0, lis
         terms.append(("d3 list", int(d3.list_bytes + d3.build_bytes)))
     if workspace:
         terms.append(("workspace", WORKSPACE_BYTES))
-    build = [("weights (pristine and execution copy)", 2 * weights)]
+    build = [*held, *([("workspace", WORKSPACE_BYTES)] if workspace else [])]
     largest = max(selfcheck_terms, key=lambda item: item[1], default=None)
     if largest is not None and largest[1] > 0:
         build.append((f"self-check {largest[0]}", int(largest[1])))
     return MemoryEstimate(terms=tuple(terms), edges=int(edges), nodes=int(nodes), capacity=int(capacity),
                           dtype=dtype, resident=weights if resident_weights else 0, rewrite_terms=rewrites,
                           build_terms=tuple(build))
+
+
+def resident_memory_terms(records: Any, dims, enabled: list[str], dtype: str) -> tuple[tuple[str, int], ...]:
+    """``(name, bytes)`` of every enabled record that declares buffers it keeps: ``Rewrite.resident_memory``."""
+    width = DTYPE_BYTES[dtype]
+    out = []
+    for name in enabled:
+        record = records[name] if name in records else None
+        declare = getattr(record, "resident_memory", None)
+        if declare is not None:
+            out.append((name, int(declare(dims, width))))
+    return tuple(out)
 
 
 def selfcheck_memory_terms(records: Any, dims, enabled: list[str], dtype: str, sms: int | None
@@ -267,4 +293,4 @@ def annotate_out_of_memory(error, plan) -> Any:
 
 __all__ = ["DTYPE_BYTES", "MARGIN", "MemoryEstimate", "MemoryTerm", "SAFETY", "WORKSPACE_BYTES",
            "annotate_out_of_memory", "drop_order", "estimate", "fits", "interaction_floats", "list_capacity",
-           "model_edges", "rewrite_memory_terms", "selfcheck_memory_terms"]
+           "model_edges", "resident_memory_terms", "rewrite_memory_terms", "selfcheck_memory_terms"]

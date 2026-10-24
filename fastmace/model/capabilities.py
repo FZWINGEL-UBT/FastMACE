@@ -107,12 +107,16 @@ class InteractionDims:
 @dataclass(frozen=True)
 class ModelDims:
     """The dimensions of a model that its memory scales with (``model_dims``): parameter count, element
-    count, heads and one ``InteractionDims`` per interaction."""
+    count, heads, one ``InteractionDims`` per interaction, and the weights of its shared-weight equivariant
+    linears (``linear_weights``; ``residual_weights``: those of the factored interactions' ``linear_1`` and
+    ``linear_res``), which the linear rewrites copy (rewrites/memory.py)."""
 
     parameters: int
     elements: int
     heads: int
     interactions: tuple[InteractionDims, ...]
+    linear_weights: int = 0
+    residual_weights: int = 0
 
     def record(self) -> dict[str, Any]:
         """A JSON-able record (lists for tuples); ``from_record`` reads it back."""
@@ -131,7 +135,9 @@ class ModelDims:
                                             for widths, saved in fields.get("other_radials", ()))
             blocks.append(InteractionDims(**fields))
         return cls(parameters=int(record["parameters"]), elements=int(record["elements"]),
-                   heads=int(record["heads"]), interactions=tuple(blocks))
+                   heads=int(record["heads"]), interactions=tuple(blocks),
+                   linear_weights=int(record.get("linear_weights", 0)),
+                   residual_weights=int(record.get("residual_weights", 0)))
 
 
 def _json_ready(value):
@@ -510,6 +516,22 @@ def model_dims(model: Any) -> ModelDims | None:
             hidden=_dim(getattr(block, "hidden_irreps", None)), correlation=_correlation(product),
             radial_saved=saved, other_radials=tuple(other for other in others if other[0])))
     heads = getattr(model, "heads", None) or ("Default",)
+    residual = sum(_linear_weights(getattr(block, name, None)) for block in interactions
+                   if type(block).__name__ in FACTORED_INTERACTIONS for name in ("linear_1", "linear_res"))
     return ModelDims(parameters=sum(int(p.numel()) for p in model.parameters()),
                      elements=len(_ints(getattr(model, "atomic_numbers", None))), heads=len(heads),
-                     interactions=tuple(out))
+                     interactions=tuple(out),
+                     linear_weights=sum(_linear_weights(module) for module in model.modules()),
+                     residual_weights=residual)
+
+
+def _linear_weights(module) -> int:
+    """The weights of a shared-weight equivariant linear (e3nn's or cuEquivariance's ``Linear`` with internal
+    weights, what block_linear converts), else 0."""
+    if module is None or type(module).__name__ != "Linear" or not type(module).__module__.startswith(
+            ("e3nn", "cuequivariance_torch")):
+        return 0
+    weight = getattr(module, "weight", None)
+    if weight is None or not getattr(module, "internal_weights", True):
+        return 0
+    return int(weight.numel())
