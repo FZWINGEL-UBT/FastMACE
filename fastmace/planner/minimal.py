@@ -932,6 +932,8 @@ class MinimalPlanner:
 
         def estimate(names):  # a rewrite turned off takes its run term and its self-check's transient with it
             terms = memory.rewrite_memory_terms(registry, dims, names, dtype)
+            if traits.polar and "streaming_conv" in names:
+                terms += (memory.polar_streaming_backward_term(dims, dtype),)
             checks = memory.selfcheck_memory_terms(registry, dims, names, dtype, getattr(hardware, "sms", None))
             held = memory.resident_memory_terms(registry, dims, names, dtype)
             return memory.estimate(dims, edges=edges, nodes=natoms, dtype=dtype, capacity=capacity, list_dtype=dtype,

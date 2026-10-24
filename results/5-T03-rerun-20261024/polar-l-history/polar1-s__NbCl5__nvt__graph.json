@@ -1,0 +1,672 @@
+{
+ "label": "polar1-s",
+ "structure": "NbCl5",
+ "repeat": "3x3x3",
+ "ensemble": "nvt",
+ "mode": "graph",
+ "steps": 100,
+ "temperature_K": 600.0,
+ "safety": 0.9,
+ "margin": 0.9,
+ "started": "2026-10-25T00:24:54+0200",
+ "natoms": 1944,
+ "volume_A3": 55909.94847866195,
+ "tier": "graph",
+ "backend": "hybrid",
+ "precision": "float32",
+ "predicted_bytes": 1660679408,
+ "parts": {
+  "run_terms": {
+   "weights (pristine and execution copy)": 64413680,
+   "rewrites' buffers": 69539072,
+   "activations": 1843148974,
+   "rewrites": -1124892684,
+   "neighbour list": 8493056,
+   "workspace": 167772160
+  },
+  "build_terms": {
+   "weights (pristine and execution copy)": 64413680,
+   "rewrites' buffers": 69539072,
+   "workspace": 167772160,
+   "self-check segment_gemm": 1358954496
+  },
+  "safety": 0.9,
+  "run_scaled_unit": 798062544.4444444,
+  "run_fixed": 310217968,
+  "run": 1028474258,
+  "build": 1660679408,
+  "sms": 36
+ },
+ "memory_decision": [
+  "fits",
+  "rule 12: predicted 1.55 GiB (build; run 0.96, build 1.55) at 64215 edges, 1944 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 66 MiB); needs 1.55 of 14.80 GiB free"
+ ],
+ "rewrites_off_by_rule_12": [],
+ "hardware": [
+  "NVIDIA GeForce RTX 5060 Ti",
+  [
+   12,
+   0
+  ],
+  17102864384
+ ],
+ "rule_13_revisions": [],
+ "after_build_bytes": 1422886400,
+ "live_after_build_bytes": 243798016,
+ "step_peak_bytes": 772752384,
+ "live_after_steps_bytes": 310906880,
+ "at_peak": {
+  "traced_peak_bytes": 1422695843,
+  "events": 26320,
+  "peak_event": 16473,
+  "by_site": [
+   {
+    "site": "rewrites/registry.py:328:relative_error",
+    "bytes": 301989888,
+    "count": 2
+   },
+   {
+    "site": "rewrites/fusion/__init__.py:177:<listcomp>",
+    "bytes": 150994944,
+    "count": 4
+   },
+   {
+    "site": "rewrites/fusion/__init__.py:179:_segment_selfcheck",
+    "bytes": 150994944,
+    "count": 1
+   },
+   {
+    "site": "rewrites/linear/modules.py:212:join_rows",
+    "bytes": 150994944,
+    "count": 1
+   },
+   {
+    "site": "rewrites/linear/modules.py:38:backward",
+    "bytes": 150994944,
+    "count": 4
+   },
+   {
+    "site": "kernels/triton/segment_gemm.py:89:joined_products_op",
+    "bytes": 150994944,
+    "count": 1
+   },
+   {
+    "site": "kernels/triton/segment_gemm.py:117:joined_products_input_grads",
+    "bytes": 150994944,
+    "count": 4
+   },
+   {
+    "site": "model/compile.py:141:private_copy",
+    "bytes": 43175914,
+    "count": 372
+   },
+   {
+    "site": "longrange/polar.py:210:_bounds",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "_native/registry.py:958:eager_router",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "model/loading.py:696:load",
+    "bytes": 32242077,
+    "count": 216
+   },
+   {
+    "site": "rewrites/linear/modules.py:87:<listcomp>",
+    "bytes": 20779008,
+    "count": 21
+   },
+   {
+    "site": "rewrites/linear/modules.py:116:__init__",
+    "bytes": 20772864,
+    "count": 18
+   },
+   {
+    "site": "rewrites/linear/modules.py:186:__init__",
+    "bytes": 11534336,
+    "count": 4
+   },
+   {
+    "site": "rewrites/linear/modules.py:188:__init__",
+    "bytes": 11534336,
+    "count": 4
+   },
+   {
+    "site": "rewrites/mh1/modules.py:225:identity_species_feats",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "model/forces.py:337:__init__",
+    "bytes": 2766855,
+    "count": 33
+   },
+   {
+    "site": "rewrites/mh1/modules.py:43:__init__",
+    "bytes": 524288,
+    "count": 2
+   },
+   {
+    "site": "rewrites/fusion/__init__.py:165:_segment_selfcheck",
+    "bytes": 163840,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:248:__init__",
+    "bytes": 71736,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:247:__init__",
+    "bytes": 35868,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:251:__init__",
+    "bytes": 23912,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:254:__init__",
+    "bytes": 11956,
+    "count": 1
+   },
+   {
+    "site": "rewrites/mh1/modules.py:62:__init__",
+    "bytes": 4096,
+    "count": 2
+   },
+   {
+    "site": "rewrites/mh1/__init__.py:195:joint_radial_input",
+    "bytes": 4096,
+    "count": 1
+   },
+   {
+    "site": "rewrites/mh1/modules.py:45:__init__",
+    "bytes": 512,
+    "count": 1
+   },
+   {
+    "site": "model/compile.py:146:private_copy",
+    "bytes": 336,
+    "count": 42
+   },
+   {
+    "site": "longrange/polar.py:246:__init__",
+    "bytes": 36,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:257:__init__",
+    "bytes": 24,
+    "count": 1
+   },
+   {
+    "site": "rewrites/mh1/__init__.py:340:reassociate_first_interaction",
+    "bytes": 16,
+    "count": 1
+   },
+   {
+    "site": "rewrites/mh1/modules.py:347:attach_streaming_kernels",
+    "bytes": 8,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:256:__init__",
+    "bytes": 1,
+    "count": 1
+   }
+  ],
+  "by_stage": [
+   {
+    "site": "planner/minimal.py:1095:build",
+    "bytes": 1022667369,
+    "count": 305
+   },
+   {
+    "site": "rewrites/linear/modules.py:38:backward",
+    "bytes": 150994944,
+    "count": 4
+   },
+   {
+    "site": "kernels/triton/segment_gemm.py:142:backward",
+    "bytes": 150994944,
+    "count": 4
+   },
+   {
+    "site": "planner/minimal.py:1092:build",
+    "bytes": 64484154,
+    "count": 432
+   },
+   {
+    "site": "?",
+    "bytes": 33554432,
+    "count": 1
+   }
+  ]
+ },
+ "at_step_peak": {
+  "traced_peak_bytes": 772507896,
+  "events": 26320,
+  "peak_event": 23078,
+  "by_site": [
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9128:call",
+    "bytes": 63700992,
+    "count": 1
+   },
+   {
+    "site": "kernels/triton/segment_gemm.py:89:joined_products_op",
+    "bytes": 63700992,
+    "count": 1
+   },
+   {
+    "site": "model/compile.py:141:private_copy",
+    "bytes": 43175778,
+    "count": 369
+   },
+   {
+    "site": "longrange/polar.py:210:_bounds",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "_native/registry.py:958:eager_router",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:8933:call",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10680:call",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "engine/registry.py:222:<dictcomp>",
+    "bytes": 33187222,
+    "count": 48
+   },
+   {
+    "site": "model/loading.py:696:load",
+    "bytes": 32242077,
+    "count": 216
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9216:call",
+    "bytes": 27869184,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:8985:call",
+    "bytes": 27525120,
+    "count": 1
+   },
+   {
+    "site": "integrators/langevin.py:40:allocate_noise",
+    "bytes": 23887872,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9399:call",
+    "bytes": 23338080,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9402:call",
+    "bytes": 23338080,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9403:call",
+    "bytes": 23338080,
+    "count": 1
+   },
+   {
+    "site": "rewrites/linear/modules.py:87:<listcomp>",
+    "bytes": 20779008,
+    "count": 21
+   },
+   {
+    "site": "rewrites/linear/modules.py:116:__init__",
+    "bytes": 20772864,
+    "count": 18
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9203:call",
+    "bytes": 19906560,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9177:call",
+    "bytes": 15925248,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9045:call",
+    "bytes": 13977600,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9023:call",
+    "bytes": 13762560,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9037:call",
+    "bytes": 13762560,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9190:call",
+    "bytes": 11943936,
+    "count": 1
+   },
+   {
+    "site": "rewrites/linear/modules.py:186:__init__",
+    "bytes": 11534336,
+    "count": 4
+   },
+   {
+    "site": "rewrites/linear/modules.py:188:__init__",
+    "bytes": 11534336,
+    "count": 4
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10745:call",
+    "bytes": 7962624,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10940:call",
+    "bytes": 7962624,
+    "count": 1
+   },
+   {
+    "site": "neighbors/skin.py:161:new",
+    "bytes": 7907328,
+    "count": 7
+   },
+   {
+    "site": "?:None:None",
+    "bytes": 4626432,
+    "count": 2
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:8958:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9247:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9616:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9624:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9896:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:9900:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:10095:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/s2/cs2lyyknv7myce36jxnwwxtzl63xol4dlfcsjfpvb722uscuw5ni.py:10107:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10750:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10751:call",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10757:call",
+    "bytes": 3981312,
+    "count": 1
+   }
+  ],
+  "by_stage": [
+   {
+    "site": "engine/graph.py:333:step",
+    "bytes": 454710688,
+    "count": 151
+   },
+   {
+    "site": "planner/minimal.py:1095:build",
+    "bytes": 145562878,
+    "count": 323
+   },
+   {
+    "site": "planner/minimal.py:1092:build",
+    "bytes": 64484154,
+    "count": 432
+   },
+   {
+    "site": "?",
+    "bytes": 38180864,
+    "count": 3
+   },
+   {
+    "site": "longrange/polar.py:471:coulomb_energy_float64",
+    "bytes": 33724244,
+    "count": 6
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10745:call",
+    "bytes": 7962624,
+    "count": 1
+   },
+   {
+    "site": "rewrites/polar/uvu.py:67:uvu_forward",
+    "bytes": 7962624,
+    "count": 2
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10940:call",
+    "bytes": 7962624,
+    "count": 1
+   },
+   {
+    "site": "rewrites/polar/uvu.py:66:uvu_forward",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10847:call",
+    "bytes": 1244160,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10848:call",
+    "bytes": 1244160,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10697:call",
+    "bytes": 995328,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10837:call",
+    "bytes": 746496,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10852:call",
+    "bytes": 746496,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10874:call",
+    "bytes": 497664,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10910:call",
+    "bytes": 497664,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10830:call",
+    "bytes": 248832,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10843:call",
+    "bytes": 248832,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10970:call",
+    "bytes": 124416,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11008:call",
+    "bytes": 95648,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11011:call",
+    "bytes": 95648,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11014:call",
+    "bytes": 95648,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11017:call",
+    "bytes": 95648,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10814:call",
+    "bytes": 77760,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10654:call",
+    "bytes": 62208,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10658:call",
+    "bytes": 62208,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10662:call",
+    "bytes": 62208,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10666:call",
+    "bytes": 62208,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10785:call",
+    "bytes": 62208,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10821:call",
+    "bytes": 62208,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11038:call",
+    "bytes": 47824,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11039:call",
+    "bytes": 47824,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11040:call",
+    "bytes": 47824,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11041:call",
+    "bytes": 47824,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10638:call",
+    "bytes": 31104,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10642:call",
+    "bytes": 31104,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10646:call",
+    "bytes": 31104,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:10650:call",
+    "bytes": 31104,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11048:call",
+    "bytes": 31104,
+    "count": 1
+   },
+   {
+    "site": "inductor/4q/c4qisf43tu7rg656pqh5usxpvdptx4nmjtkbbc5nylgxmwoca2nd.py:11033:call",
+    "bytes": 23912,
+    "count": 1
+   }
+  ]
+ },
+ "peak_bytes": 1422886400,
+ "peak_reserved_bytes": 1484783616,
+ "seconds": 22.417819319000046,
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": null,
+ "edge_sizes_used": [
+  51200,
+  53760
+ ],
+ "capacity": 76032,
+ "ratio": 1.167120163633583
+}

@@ -56,3 +56,13 @@ def test_the_prediction_stays_within_the_fit(case):
     found = predicted(case)
     ratio = found.total / case["peak_bytes"]
     assert LOW <= ratio <= HIGH, (ratio, found.text(), case["peak_bytes"])
+
+
+def test_polar_streaming_backward_term():
+    """5-T03 rerun (24 October 2026): PolarMACE on the streaming convolution keeps one more [E, W_max] buffer
+    (the convolution backward's weight gradient) live at the steps' peak. The term is W_max floats per edge."""
+    dims = ModelDims.from_record(FIT["dims"]["polar1-l"])
+    name, term = memory.polar_streaming_backward_term(dims, "float32")
+    w_max = max(block.weight_numel for block in dims.interactions)
+    assert name == memory.POLAR_STREAMING_BACKWARD and term.edge_bytes == 4 * w_max and term.node_bytes == 0
+    assert term.edge_sized

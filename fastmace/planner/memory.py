@@ -281,6 +281,20 @@ def rewrite_memory_terms(records: Any, dims, enabled: list[str], dtype: str) -> 
     return tuple(out)
 
 
+POLAR_STREAMING_BACKWARD = "PolarMACE: streaming convolution's weight gradient"
+
+
+def polar_streaming_backward_term(dims, dtype: str) -> tuple[str, MemoryTerm]:
+    """PolarMACE on OEq's streaming convolution keeps one more ``[E, W_max]`` buffer live at the steps' peak:
+    the convolution backward's weight gradient stays allocated into the long-range backward (memory history,
+    POLAR-1-L NbCl5 3x3x3 on the RTX 5060 Ti, 24 October 2026: three ``[E, W]`` buffers live against MH-1's
+    two; 5-T03 rerun). Per model edge, as the stock per-edge terms (the edge estimate is already above the
+    edges a crystal uses, docs/validation/5-T03.md)."""
+    width = DTYPE_BYTES[dtype]
+    w_max = max((block.weight_numel for block in dims.interactions), default=0)
+    return POLAR_STREAMING_BACKWARD, MemoryTerm(w_max * width, 0.0)
+
+
 def annotate_out_of_memory(error, plan) -> Any:
     """Decision 51: an out-of-memory error carries rule 12's estimate. Appends the plan's ``memory`` decision
     to ``error``'s message (once) and returns ``error``; any other error is returned unchanged."""
@@ -297,7 +311,7 @@ def annotate_out_of_memory(error, plan) -> Any:
     return error
 
 
-__all__ = ["DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN", "MemoryEstimate", "MemoryTerm",
+__all__ = ["DTYPE_BYTES", "POLAR_STREAMING_BACKWARD", "polar_streaming_backward_term", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN", "MemoryEstimate", "MemoryTerm",
            "SAFETY", "WORKSPACE_BYTES", "annotate_out_of_memory", "drop_order", "estimate", "fits",
            "interaction_floats", "list_capacity", "model_edges", "resident_memory_terms", "rewrite_memory_terms",
            "selfcheck_memory_terms"]

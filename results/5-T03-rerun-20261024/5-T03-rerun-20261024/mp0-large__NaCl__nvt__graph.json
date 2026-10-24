@@ -1,0 +1,67 @@
+{
+ "label": "mp0-large",
+ "structure": "NaCl",
+ "repeat": "3x3x3",
+ "ensemble": "nvt",
+ "mode": "graph",
+ "steps": 100,
+ "temperature_K": 600.0,
+ "safety": 0.9,
+ "margin": 0.9,
+ "started": "2026-10-24T23:03:34+0200",
+ "natoms": 216,
+ "volume_A3": 4711.535161809033,
+ "tier": "graph",
+ "backend": "hybrid",
+ "precision": "float32",
+ "predicted_bytes": 425287627,
+ "parts": {
+  "run_terms": {
+   "weights (pristine and execution copy)": 126779520,
+   "rewrites' buffers": 10702976,
+   "activations": 133133577,
+   "rewrites": -13659710,
+   "neighbour list": 559104,
+   "workspace": 167772160
+  },
+  "build_terms": {
+   "weights (pristine and execution copy)": 126779520,
+   "rewrites' buffers": 10702976,
+   "workspace": 167772160
+  },
+  "safety": 0.9,
+  "run_scaled_unit": 132748741.1111111,
+  "run_fixed": 305813760,
+  "run": 425287627,
+  "build": 305254656,
+  "sms": 36
+ },
+ "memory_decision": [
+  "fits",
+  "rule 12: predicted 0.40 GiB (run; run 0.40, build 0.28) at 3969 edges, 216 atoms, float32 (workspace 160 MiB, activations 127 MiB, weights (pristine and execution copy) 121 MiB); needs 0.40 of 14.80 GiB free"
+ ],
+ "rewrites_off_by_rule_12": [],
+ "hardware": [
+  "NVIDIA GeForce RTX 5060 Ti",
+  [
+   12,
+   0
+  ],
+  17102864384
+ ],
+ "rule_13_revisions": [],
+ "after_build_bytes": 339321856,
+ "live_after_build_bytes": 221033472,
+ "step_peak_bytes": 404125696,
+ "live_after_steps_bytes": 288142336,
+ "peak_bytes": 404125696,
+ "peak_reserved_bytes": 484442112,
+ "seconds": 30.620769180000934,
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": null,
+ "edge_sizes_used": [
+  4096
+ ],
+ "capacity": 4608,
+ "ratio": 1.0523647251571946
+}

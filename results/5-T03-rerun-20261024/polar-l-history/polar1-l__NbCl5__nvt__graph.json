@@ -1,0 +1,720 @@
+{
+ "label": "polar1-l",
+ "structure": "NbCl5",
+ "repeat": "3x3x3",
+ "ensemble": "nvt",
+ "mode": "graph",
+ "steps": 100,
+ "temperature_K": 600.0,
+ "safety": 0.9,
+ "margin": 0.9,
+ "started": "2026-10-25T00:22:37+0200",
+ "natoms": 1944,
+ "volume_A3": 55909.94847866195,
+ "tier": "graph",
+ "backend": "hybrid",
+ "precision": "float32",
+ "predicted_bytes": 3307802146,
+ "parts": {
+  "run_terms": {
+   "weights (pristine and execution copy)": 205751592,
+   "rewrites' buffers": 212905344,
+   "activations": 4813789306,
+   "rewrites": -2100909312,
+   "neighbour list": 8493056,
+   "workspace": 167772160
+  },
+  "build_terms": {
+   "weights (pristine and execution copy)": 205751592,
+   "rewrites' buffers": 212905344,
+   "workspace": 167772160,
+   "self-check segment_gemm": 1358954496
+  },
+  "safety": 0.9,
+  "run_scaled_unit": 3014311104.444444,
+  "run_fixed": 594922152,
+  "run": 3307802146,
+  "build": 1945383592,
+  "sms": 36
+ },
+ "memory_decision": [
+  "fits",
+  "rule 12: predicted 3.08 GiB (run; run 3.08, build 1.81) at 64215 edges, 1944 atoms, float32 (activations 4591 MiB, rewrites' buffers 203 MiB, weights (pristine and execution copy) 196 MiB); needs 3.08 of 14.80 GiB free"
+ ],
+ "rewrites_off_by_rule_12": [],
+ "hardware": [
+  "NVIDIA GeForce RTX 5060 Ti",
+  [
+   12,
+   0
+  ],
+  17102864384
+ ],
+ "rule_13_revisions": [],
+ "after_build_bytes": 3240302592,
+ "live_after_build_bytes": 540757504,
+ "step_peak_bytes": 3923075584,
+ "live_after_steps_bytes": 631251968,
+ "at_peak": {
+  "traced_peak_bytes": 3922715180,
+  "events": 105564,
+  "peak_event": 97572,
+  "by_site": [
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13198:call",
+    "bytes": 601620480,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13486:call",
+    "bytes": 601620480,
+    "count": 1
+   },
+   {
+    "site": "kernels/oeq_streaming/runtime.py:170:streaming_conv_backward",
+    "bytes": 601620480,
+    "count": 1
+   },
+   {
+    "site": "model/compile.py:141:private_copy",
+    "bytes": 133425162,
+    "count": 497
+   },
+   {
+    "site": "kernels/triton/segment_gemm.py:89:joined_products_op",
+    "bytes": 127401984,
+    "count": 2
+   },
+   {
+    "site": "?:None:None",
+    "bytes": 108324864,
+    "count": 2
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13029:call",
+    "bytes": 107495424,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16294:call",
+    "bytes": 107495424,
+    "count": 1
+   },
+   {
+    "site": "model/loading.py:696:load",
+    "bytes": 103167731,
+    "count": 388
+   },
+   {
+    "site": "rewrites/linear/modules.py:87:<listcomp>",
+    "bytes": 71321600,
+    "count": 87
+   },
+   {
+    "site": "rewrites/linear/modules.py:116:__init__",
+    "bytes": 71260160,
+    "count": 72
+   },
+   {
+    "site": "kernels/oeq_streaming/runtime.py:145:streaming_conv_forward",
+    "bytes": 70668288,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16646:call",
+    "bytes": 70668288,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12884:call",
+    "bytes": 63700992,
+    "count": 1
+   },
+   {
+    "site": "kernels/triton/segment_gemm.py:117:joined_products_input_grads",
+    "bytes": 59719680,
+    "count": 3
+   },
+   {
+    "site": "engine/registry.py:222:<dictcomp>",
+    "bytes": 55977366,
+    "count": 48
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13000:call",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15247:call",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15408:call",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12781:call",
+    "bytes": 35389440,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13123:call",
+    "bytes": 35389440,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13410:call",
+    "bytes": 35389440,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:210:_bounds",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "_native/registry.py:958:eager_router",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12642:call",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15100:call",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "neighbors/skin.py:161:new",
+    "bytes": 30697472,
+    "count": 7
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16596:call",
+    "bytes": 29859840,
+    "count": 1
+   },
+   {
+    "site": "rewrites/linear/modules.py:186:__init__",
+    "bytes": 28311552,
+    "count": 12
+   },
+   {
+    "site": "rewrites/linear/modules.py:188:__init__",
+    "bytes": 28311552,
+    "count": 12
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12960:call",
+    "bytes": 27869184,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13251:call",
+    "bytes": 27869184,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16583:call",
+    "bytes": 27869184,
+    "count": 1
+   },
+   {
+    "site": "integrators/langevin.py:40:allocate_noise",
+    "bytes": 23887872,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12951:call",
+    "bytes": 19906560,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13024:call",
+    "bytes": 19906560,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16263:call",
+    "bytes": 19906560,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16278:call",
+    "bytes": 19906560,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12838:call",
+    "bytes": 17971200,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16608:call",
+    "bytes": 17915904,
+    "count": 1
+   }
+  ],
+  "by_stage": [
+   {
+    "site": "engine/graph.py:333:step",
+    "bytes": 2151438574,
+    "count": 149
+   },
+   {
+    "site": "rewrites/mh1/modules.py:278:cutoff_folded_forward",
+    "bytes": 704507860,
+    "count": 7
+   },
+   {
+    "site": "planner/minimal.py:1095:build",
+    "bytes": 290639664,
+    "count": 511
+   },
+   {
+    "site": "planner/minimal.py:1092:build",
+    "bytes": 206335462,
+    "count": 776
+   },
+   {
+    "site": "?",
+    "bytes": 141879296,
+    "count": 3
+   },
+   {
+    "site": "rewrites/mh1/modules.py:289:cutoff_folded_forward",
+    "bytes": 139345920,
+    "count": 7
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16294:call",
+    "bytes": 107495424,
+    "count": 1
+   },
+   {
+    "site": "rewrites/linear/modules.py:123:forward",
+    "bytes": 63700992,
+    "count": 4
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15247:call",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "rewrites/polar/uvu.py:57:uvu_forward",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:471:coulomb_energy_float64",
+    "bytes": 33577760,
+    "count": 2
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15181:call",
+    "bytes": 7962624,
+    "count": 1
+   },
+   {
+    "site": "rewrites/polar/uvu.py:66:uvu_forward",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16045:call",
+    "bytes": 62208,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16012:call",
+    "bytes": 31104,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16126:call",
+    "bytes": 31104,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15991:call",
+    "bytes": 23328,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15997:call",
+    "bytes": 23328,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15994:call",
+    "bytes": 7776,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16000:call",
+    "bytes": 7776,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:746:graph_gather",
+    "bytes": 24,
+    "count": 2
+   },
+   {
+    "site": "longrange/polar.py:728:graph_sum",
+    "bytes": 16,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15071:call",
+    "bytes": 12,
+    "count": 1
+   }
+  ]
+ },
+ "at_step_peak": {
+  "traced_peak_bytes": 3922715180,
+  "events": 105564,
+  "peak_event": 97572,
+  "by_site": [
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13198:call",
+    "bytes": 601620480,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13486:call",
+    "bytes": 601620480,
+    "count": 1
+   },
+   {
+    "site": "kernels/oeq_streaming/runtime.py:170:streaming_conv_backward",
+    "bytes": 601620480,
+    "count": 1
+   },
+   {
+    "site": "model/compile.py:141:private_copy",
+    "bytes": 133425162,
+    "count": 497
+   },
+   {
+    "site": "kernels/triton/segment_gemm.py:89:joined_products_op",
+    "bytes": 127401984,
+    "count": 2
+   },
+   {
+    "site": "?:None:None",
+    "bytes": 108324864,
+    "count": 2
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13029:call",
+    "bytes": 107495424,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16294:call",
+    "bytes": 107495424,
+    "count": 1
+   },
+   {
+    "site": "model/loading.py:696:load",
+    "bytes": 103167731,
+    "count": 388
+   },
+   {
+    "site": "rewrites/linear/modules.py:87:<listcomp>",
+    "bytes": 71321600,
+    "count": 87
+   },
+   {
+    "site": "rewrites/linear/modules.py:116:__init__",
+    "bytes": 71260160,
+    "count": 72
+   },
+   {
+    "site": "kernels/oeq_streaming/runtime.py:145:streaming_conv_forward",
+    "bytes": 70668288,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16646:call",
+    "bytes": 70668288,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12884:call",
+    "bytes": 63700992,
+    "count": 1
+   },
+   {
+    "site": "kernels/triton/segment_gemm.py:117:joined_products_input_grads",
+    "bytes": 59719680,
+    "count": 3
+   },
+   {
+    "site": "engine/registry.py:222:<dictcomp>",
+    "bytes": 55977366,
+    "count": 48
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13000:call",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15247:call",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15408:call",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12781:call",
+    "bytes": 35389440,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13123:call",
+    "bytes": 35389440,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13410:call",
+    "bytes": 35389440,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:210:_bounds",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "_native/registry.py:958:eager_router",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12642:call",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15100:call",
+    "bytes": 33554432,
+    "count": 1
+   },
+   {
+    "site": "neighbors/skin.py:161:new",
+    "bytes": 30697472,
+    "count": 7
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16596:call",
+    "bytes": 29859840,
+    "count": 1
+   },
+   {
+    "site": "rewrites/linear/modules.py:186:__init__",
+    "bytes": 28311552,
+    "count": 12
+   },
+   {
+    "site": "rewrites/linear/modules.py:188:__init__",
+    "bytes": 28311552,
+    "count": 12
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12960:call",
+    "bytes": 27869184,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13251:call",
+    "bytes": 27869184,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16583:call",
+    "bytes": 27869184,
+    "count": 1
+   },
+   {
+    "site": "integrators/langevin.py:40:allocate_noise",
+    "bytes": 23887872,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12951:call",
+    "bytes": 19906560,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:13024:call",
+    "bytes": 19906560,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16263:call",
+    "bytes": 19906560,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16278:call",
+    "bytes": 19906560,
+    "count": 1
+   },
+   {
+    "site": "inductor/5u/c5ubv2zji5vsgjr7phm65cstn7k73amlt34ejp4wbyzcxv5cjh4o.py:12838:call",
+    "bytes": 17971200,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16608:call",
+    "bytes": 17915904,
+    "count": 1
+   }
+  ],
+  "by_stage": [
+   {
+    "site": "engine/graph.py:333:step",
+    "bytes": 2151438574,
+    "count": 149
+   },
+   {
+    "site": "rewrites/mh1/modules.py:278:cutoff_folded_forward",
+    "bytes": 704507860,
+    "count": 7
+   },
+   {
+    "site": "planner/minimal.py:1095:build",
+    "bytes": 290639664,
+    "count": 511
+   },
+   {
+    "site": "planner/minimal.py:1092:build",
+    "bytes": 206335462,
+    "count": 776
+   },
+   {
+    "site": "?",
+    "bytes": 141879296,
+    "count": 3
+   },
+   {
+    "site": "rewrites/mh1/modules.py:289:cutoff_folded_forward",
+    "bytes": 139345920,
+    "count": 7
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16294:call",
+    "bytes": 107495424,
+    "count": 1
+   },
+   {
+    "site": "rewrites/linear/modules.py:123:forward",
+    "bytes": 63700992,
+    "count": 4
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15247:call",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "rewrites/polar/uvu.py:57:uvu_forward",
+    "bytes": 35831808,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:471:coulomb_energy_float64",
+    "bytes": 33577760,
+    "count": 2
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15181:call",
+    "bytes": 7962624,
+    "count": 1
+   },
+   {
+    "site": "rewrites/polar/uvu.py:66:uvu_forward",
+    "bytes": 3981312,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16045:call",
+    "bytes": 62208,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16012:call",
+    "bytes": 31104,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16126:call",
+    "bytes": 31104,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15991:call",
+    "bytes": 23328,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15997:call",
+    "bytes": 23328,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15994:call",
+    "bytes": 7776,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:16000:call",
+    "bytes": 7776,
+    "count": 1
+   },
+   {
+    "site": "longrange/polar.py:746:graph_gather",
+    "bytes": 24,
+    "count": 2
+   },
+   {
+    "site": "longrange/polar.py:728:graph_sum",
+    "bytes": 16,
+    "count": 1
+   },
+   {
+    "site": "inductor/f3/cf37vvltuux7sv45svjgvhgmiacboswyvxnkrrgvtckovlq3g2eu.py:15071:call",
+    "bytes": 12,
+    "count": 1
+   }
+  ]
+ },
+ "peak_bytes": 3923075584,
+ "peak_reserved_bytes": 4460642304,
+ "seconds": 81.91044679700099,
+ "torch": "2.14.1+cu130",
+ "fastmace_commit": null,
+ "edge_sizes_used": [
+  2560,
+  51200,
+  53760,
+  66560,
+  69120
+ ],
+ "capacity": 295168,
+ "ratio": 0.8431655407024653
+}
