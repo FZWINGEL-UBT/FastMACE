@@ -136,6 +136,17 @@ def _evaluate(calc, model, atoms):
 
 
 @needs_polar
+def test_qualified_after_the_polar_wrappers_are_installed():
+    # The force field installs polar's class-level wrappers before resolving the rewrites; a pin on
+    # PolarMACE.forward would then hash the wrapper (the first local gate refused the record so).
+    polar.install()
+    record = reg.default_registry()["polar_graph_sums"]
+    assert reg.qualify(record).supported
+    calc = tiny_family_calculator("polar", [11, 17])
+    assert graph_sums.applies_to(calc.models[0]).supported
+
+
+@needs_polar
 @pytest.mark.parametrize("config", [PolarConfig(), PolarConfig(fukui_regularisation=0.1)])
 def test_enabled_path_with_graph_sums(tiny_polar, config):
     calc, model, atoms = tiny_polar

@@ -20,10 +20,10 @@ from __future__ import annotations
 
 NAME = "polar_graph_sums"
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
-# The forward the source rewrite edits (the same pin as fastmace.longrange.polar.SOURCE_HASHES).
-SOURCE_HASHES = {
-    "mace.modules.extensions:PolarMACE.forward": "3c623c88b8dabb556cd78c4f0d800f080df5545ec9e66a275727f0891263731f",
-}
+# No pin of its own: once fastmace.longrange.polar is installed, PolarMACE.forward is its wrapper, which the
+# registry would hash. applies_to checks polar's pins (SOURCE_HASHES there, MACE's unwrapped originals) and the
+# edit's site counts instead.
+SOURCE_HASHES: dict = {}
 
 
 def applies_to(model):
@@ -35,6 +35,9 @@ def applies_to(model):
         return Support(False, f"{type(model).__name__} is not PolarMACE")
     import inspect
 
+    problems = polar.source_problems()
+    if problems:
+        return Support(False, "unqualified MACE/graph_longrange source: " + "; ".join(problems))
     try:
         original = polar._original("mace.modules.extensions:PolarMACE.forward")
         polar.graph_sums_source(inspect.getsource(original))

@@ -141,10 +141,8 @@ def main(argv=None):
     MaxwellBoltzmannDistribution(atoms, temperature_K=args.temperature_K, rng=np.random.default_rng(args.velocity_seed))
     Stationary(atoms)
     engine, plan = step_breakdown.build_engine(args, atoms)
-    start = engine.state.positions.detach().clone()
-    out = engine.force_field(start)
-    torch.save({"energy": out.energy.detach().cpu(), "forces": out.forces.detach().cpu()},
-               args.output / "start_outputs.pt")  # the starting structure's outputs, to compare variants
+    start = engine.state.positions.detach().clone()  # its outputs are saved last (an eager call before the
+    # engine's first capture keeps an autograd graph alive and the capture fails: stale capture stream)
     for _ in range(args.equilibrate_steps):
         engine.step()
     engine.flush()
@@ -161,6 +159,9 @@ def main(argv=None):
         torch.cuda.synchronize()
     trace = args.output / "trace.json"
     prof.export_chrome_trace(str(trace))
+    out = field(start)
+    torch.save({"energy": out.energy.detach().cpu(), "forces": out.forces.detach().cpu()},
+               args.output / "start_outputs.pt")  # the starting structure's outputs, to compare variants
     table = attribute(step_breakdown.read_trace(trace))
     totals = defaultdict(lambda: [0, 0.0])
     with (args.output / "sources.csv").open("w", newline="") as handle:
