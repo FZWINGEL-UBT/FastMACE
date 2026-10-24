@@ -187,6 +187,20 @@ Behaviours tested **only in the acceptance tier** (1b-T27):
   into each process's own extension directory. Only the first process after a change of
   environment builds it. Delete that directory to force a rebuild.
 
+### Golden texts
+
+`tests/cpu/test_plan_text.py` compares `str(plan)` for seven plans with the files in
+`tests/cpu/golden/plan_text/` (plan task 5-T05). A change that alters the text on purpose
+rewrites them:
+
+```bash
+FASTMACE_UPDATE_GOLDEN=1 CUDA_VISIBLE_DEVICES='' ~/environments/fastmace_cpu/bin/python -m pytest tests/cpu/test_plan_text.py
+```
+
+Review the diff of the golden files and commit it with the change. Tasks that fill a section
+of the plan text (5-T03's memory line, 5-T07's tier switches, 5-T09's calibration line) update
+the files this way.
+
 ## Bitwise equality in CPU float64 tests
 
 Found in task 0-T04 (17 October 2026, `fastmace_cpu`, torch 2.14.1+cpu,

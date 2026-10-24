@@ -668,7 +668,8 @@ def _plan(plan):
         "tier": plan.tier,
         "reason": str(plan.reason),
         "step": plan.step,
-        "description": plan.describe(),
+        "description": plan.describe(),  # str(plan): the sectioned text (5-T05)
+        "description_full": plan.describe(full=True),  # every decision, one line each
         "backend": plan.engine.backend,
         "conv_fusion": plan.engine.cueq_conv_fusion,
         "rewrites": config(plan.rewrites, "rewrites"),
@@ -698,7 +699,7 @@ def _plan_revisions(plan):
     # ``fallback``: the tried candidate that became this revision (§9.4, 2-T15), else null.
     activated = {tried.revision: tried for tried in plan.fallbacks if tried.outcome == "activated"}
     return [{"revision": entry.revision, "tier": entry.tier, "step": entry.step, "reason": str(entry.reason),
-             "description": entry.describe(), "runner": entry.runner,
+             "description": entry.describe(), "description_full": entry.describe(full=True), "runner": entry.runner,
              "fallback": _plain(activated.get(entry.revision), "plan.fallbacks")}
             for entry in (*plan.chain(), plan)]
 

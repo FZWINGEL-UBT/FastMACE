@@ -302,7 +302,7 @@ def main(argv=None):
                      events_timed=sides["events"].events - events_before, events_total=sides["events"].events,
                      setup_s=setup, compile_during_timing=dict(changes=changes, recompiled=recompiled),
                      sides={side: _side_record(sims[side]) for side in SIDES},
-                     plans={side: sims[side].plan.describe() for side in SIDES},
+                     plans={side: sims[side].plan.describe(full=True) for side in SIDES},
                      timed=timed, load_after=list(os.getloadavg()), other_gpu_processes=others, valid=valid,
                      invalid_reasons=reasons)
         meta["structures"][name] = entry

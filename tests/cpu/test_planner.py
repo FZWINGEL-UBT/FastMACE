@@ -306,8 +306,8 @@ def test_reasons_name_the_stage_2_verdict():
 
 def test_describe_lists_every_decision():
     plan = plan_for("mh1-r2scan")
-    text = plan.describe()
-    assert str(plan) == text
+    text = plan.describe(full=True)  # str(plan) is the sectioned text (5-T05, tests/cpu/test_plan_text.py)
+    assert str(plan) == plan.describe() != text
     assert text.splitlines()[0].startswith("Plan revision 0, tier graph")
     for item, choice, reason in plan.decisions:
         assert f"{item} = {choice}" in text and reason in text

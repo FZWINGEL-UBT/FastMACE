@@ -188,7 +188,8 @@ def test_plan_lists_its_overrides():
         ("mode", "graph", Reason("graph tier", code="mode-graph"))),
         requested=(("NeighbourConfig.skin", "0.5"),))
     assert plan.overrides() == (("NeighbourConfig.skin", "0.5", 11, "1.0"),)
-    assert "NeighbourConfig.skin = 0.5  (override; rule 11 would give 1.0: requested)" in str(plan)
+    assert "NeighbourConfig.skin = 0.5  (override; rule 11 would give 1.0: requested)" in plan.describe(full=True)
+    assert "skin 0.5 (override; rule 11 would give 1.0)" in str(plan)  # the sectioned text (5-T05)
 
 
 # --------------------------------------------------------------------------- the code against the table

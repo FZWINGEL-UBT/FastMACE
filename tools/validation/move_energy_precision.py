@@ -159,7 +159,7 @@ def main(argv=None):
                     key = f"{name}@{temperature:g}K"
                     entry = meta["runs"][key] = dict(structure=name, natoms=len(base), temperature_K=temperature,
                                                      build_s=build_s, plan_backend=plan.engine.backend,
-                                                     describe=plan.describe())
+                                                     describe=plan.describe(full=True))
                     started = time.perf_counter()
                     engine.integrator.set_temperature(temperature)
                     engine.run(args.md_steps)

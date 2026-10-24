@@ -298,7 +298,7 @@ def main(argv=None):
             owners[name], runner, plans[name], gates[name] = BUILDERS[name](args, atoms, loaded)
             meta["setup_s"][name] = time.perf_counter() - started
             sides[name] = ChunkSide(runner, torch.cuda.synchronize)
-            meta["plans"][name] = plans[name].describe() if plans[name] is not None else None
+            meta["plans"][name] = plans[name].describe(full=True) if plans[name] is not None else None
             meta["gates"][name] = gates[name].to_metadata() if gates[name] is not None else None
             save()
         # Only after the first build: the planner sets the CUDA allocator before anything touches CUDA.

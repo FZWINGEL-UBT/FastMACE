@@ -45,7 +45,7 @@ def parse_args(argv=None):
 def case_record(ensemble, sim):
     """What one gated Simulation records: its gate, plan and setup times."""
     gate = sim.gate.to_metadata()
-    return dict(ensemble=ensemble, status=gate["status"], gate=gate, plan=sim.plan.describe(),
+    return dict(ensemble=ensemble, status=gate["status"], gate=gate, plan=sim.plan.describe(full=True),
                 setup_s=dict(getattr(sim, "_setup_s", {})))
 
 
