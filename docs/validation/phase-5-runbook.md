@@ -59,9 +59,15 @@ and baseline).
 - **The full acceptance runs on the local RTX 5060 Ti** (workstations off), through
   `tools/ci/local_gpu.py run --wait-minutes 600` from the pinned copy, as background tasks of the 5-T11 session. The
   queue is FIFO; no other session's job is stopped.
-- **Colab** (`tools/colab/`, each VM stopped afterwards): the L4 compatibility check (Ada, correctness only); the
-  A100's compatibility check if A100 is a production type after phase 4; on the A100 also the untimed share of the
-  tiers, split by file. A step-time assertion that runs on the A100 is reported, not judged.
+- **Colab** (`tools/colab/`, each VM stopped afterwards): the L4 compatibility check (Ada, correctness only), the
+  A100's compatibility check if A100 is a production type after phase 4, and on both the rule 12 peak check
+  (item 8). **Budget** (owner, 24 October 2026): about 20 compute units of the month's 56 are reserved for these
+  legs; Modal only as a fallback, through its guard (about $4 usable). Estimate, to be confirmed against the
+  account's units before the first leg and reported to the conductor before starting: L4 compat about 1 h plus
+  the peak check about 0.3 h, about 3 CU; A100 compat about 0.75 h plus the peak check about 0.3 h, about 13 CU;
+  together about 16 CU. The untimed share of the tiers therefore stays on the local GPU (no A100 split). A leg
+  stops if the ledger (`results/colab-ledger.csv`) shows it heading past its share; the units used are recorded
+  per leg.
 - **Timed jobs alone, on a quiet PC:** no other GPU job (the reservation) and no heavy CPU job, checked and recorded
   at each job's start; the conductor is told the window so that no CPU suite runs in it.
 - **CPU work** (corpus capture, CPU suite) never during a timed stretch, the 5-T11 ones or another task's.
@@ -168,7 +174,7 @@ Local RTX 5060 Ti, run ID `5-T11-local-<date>`, `python3 <copy>/tools/ci/local_g
 **Order:** the CPU jobs and the corpus first (no GPU); `preflight`; the timed jobs (`regression`, `adapt-storm`,
 `calibration`) in one quiet stretch; then the rest, the acceptance and slow tiers overnight. Colab, in parallel from
 the freeze: the L4 compatibility check (`5-T11-colab-l4-<date>`) and, if it applies, the A100's
-(`5-T11-colab-a100-<date>`) with its untimed share; on both, the rule 12 peak check (item 8): `python
+(`5-T11-colab-a100-<date>`); on both, the rule 12 peak check (item 8): `python
 tools/memory_peaks.py run --labels mh1-r2scan polar1-l --structures NaCl NbCl5 --output <run>/memory-peaks`
 (graph tier, NVT and NPT, 100 steps), each VM stopped afterwards.
 
