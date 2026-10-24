@@ -318,6 +318,19 @@ def test_rule_5_wins_over_the_models_rule_12(monkeypatch):
     assert tight.engine.backend == base.engine.backend and tight.precision == base.precision
 
 
+@pytest.mark.rule(12)
+def test_plan_text_memory_line():
+    """str(plan)'s rule 12 line: the prediction, build or run, the decision and the rewrites it turned off."""
+    full = plan()
+    line = next(line for line in full.describe().splitlines() if "memory (rule 12)" in line)
+    assert f"{full.predicted_memory_bytes / 2**30:.2f} GiB predicted (run; run" in line
+    assert ", fits (" in line and "GiB free)" in line and len(line) <= 120
+    without = plan(rewrites=RewriteConfig(factor_species="off"))
+    free = (full.predicted_memory_bytes + without.predicted_memory_bytes) / 2 / memory.MARGIN
+    tight = next(line for line in plan(memory_bytes=free).describe().splitlines() if "memory (rule 12)" in line)
+    assert "turned off factor_species" in tight and len(tight) <= 120
+
+
 def test_case_errors_equal_check_tensors():
     expected, got = torch.ones(3), torch.tensor([1.0, 1.0, 1.0 + 1e-3])
     cases = [("a", expected, expected), ("b", expected, got)]

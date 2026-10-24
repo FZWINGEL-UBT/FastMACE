@@ -242,9 +242,31 @@ def _kernels(plan: Any) -> str:
 
 # --------------------------------------------------------------------------- 6. memory (rule 12)
 
+_SPLIT = re.compile(r"\((?:build|run); run [0-9.]+, build [0-9.]+\)")
+_FREE = re.compile(r"of ([0-9.]+) GiB free")
+
+
 def _memory(plan: Any) -> str:
+    """Rule 12's line: the prediction, which of build and run it is, the decision against the free memory and
+    the rewrites the decision turned off (5-T03)."""
     predicted = plan.predicted_memory_bytes
-    parts = ["not estimated" if predicted is None else f"{predicted / 2**30:.2f} GiB predicted"]
+    if predicted is None:
+        parts = ["not estimated"]
+    else:
+        head = f"{predicted / 2**30:.2f} GiB predicted"
+        decision = _decision(plan, "memory")
+        if decision is not None and decision[1] != "not estimated":
+            reason = str(decision[2])
+            split, free = _SPLIT.search(reason), _FREE.search(reason)
+            head += (f" {split.group(0)}" if split else "") + f", {decision[1]}"
+            if free is not None:
+                head += f" ({free.group(1)} GiB free)"
+        parts = [head]
+        dropped = [_name(key) for key, _, reason in plan.decisions
+                   if getattr(reason, "code", None) == "rule-12-memory-drop"]
+        if dropped:  # the first one turned off and its dependants
+            parts.append("turned off " + ", ".join(dropped[:2]) + (f" +{len(dropped) - 2} more"
+                                                                    if len(dropped) > 2 else ""))
     hardware = _decision(plan, "hardware")
     if hardware is not None:
         parts.append(f"GPU {hardware[1]}")
