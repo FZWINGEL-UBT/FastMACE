@@ -177,9 +177,14 @@ def test_new_errors_are_exported():
 def test_rewrite_deterministic_defaults_to_undeclared():
     from fastmace.rewrites.registry import Rewrite
 
-    field = {f.name: f for f in dataclasses.fields(Rewrite)}["deterministic"]
-    assert field.default is None
-    assert list(f.name for f in dataclasses.fields(Rewrite))[-1] == "deterministic"
+    fields = list(dataclasses.fields(Rewrite))
+    names = [f.name for f in fields]
+    assert {f.name: f for f in fields}["deterministic"].default is None
+    # Positional construction stays compatible: every field from deterministic on has a default (5-T03 appends
+    # rule 12's memory, selfcheck_memory and resident_memory after it, all None).
+    after = fields[names.index("deterministic"):]
+    assert all(f.default is not dataclasses.MISSING for f in after), [f.name for f in after]
+    assert names[names.index("deterministic"):] == ["deterministic", "memory", "selfcheck_memory", "resident_memory"]
 
 
 def _toy_fields(name="toy"):
