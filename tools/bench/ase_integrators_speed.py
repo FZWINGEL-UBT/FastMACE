@@ -83,9 +83,11 @@ def fastmace_dynamics(args, atoms, label):
     import fastmace.ase
 
     frontends = _tool("ab_frontends")
+    # Each run its own output directory: the shim's default, ./fastmace-run, refuses a second run (4-T13).
+    output = args.output / f"run-fastmace-{args.integrator}-{Path(str(args.structure)).stem}"
     return getattr(fastmace.ase, args.integrator)(atoms, args.timestep_fs * units.fs,
                                                   **frontends.ase_arguments(args.integrator, args.temperature_K),
-                                                  model=args.model, seed=args.seed)
+                                                  model=args.model, seed=args.seed, output=str(output))
 
 
 def measure(dyn, synchronize, warmup, block, clock=time.perf_counter):
