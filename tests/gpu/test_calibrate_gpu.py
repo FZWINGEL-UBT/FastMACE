@@ -97,6 +97,7 @@ def test_the_calibration_measures_both_backends_in_children(calibrated):
     assert result["step"] == 100 and not result["handoff_left"]
 
 
+@pytest.mark.slow
 @pytest.mark.acceptance
 def test_the_calibration_keeps_hybrid_on_nacl(calibrated):
     """Timed: judged only on the reference GPU in a quiet window (plans/phase-5.md, runbook item 9)."""
