@@ -311,7 +311,7 @@ def annotate_out_of_memory(error, plan) -> Any:
     return error
 
 
-__all__ = ["DTYPE_BYTES", "POLAR_STREAMING_BACKWARD", "polar_streaming_backward_term", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN", "MemoryEstimate", "MemoryTerm",
-           "SAFETY", "WORKSPACE_BYTES", "annotate_out_of_memory", "drop_order", "estimate", "fits",
-           "interaction_floats", "list_capacity", "model_edges", "resident_memory_terms", "rewrite_memory_terms",
-           "selfcheck_memory_terms"]
+__all__ = ["DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN", "MemoryEstimate", "MemoryTerm",
+           "POLAR_STREAMING_BACKWARD", "SAFETY", "WORKSPACE_BYTES", "annotate_out_of_memory", "drop_order",
+           "estimate", "fits", "interaction_floats", "list_capacity", "model_edges", "polar_streaming_backward_term",
+           "resident_memory_terms", "rewrite_memory_terms", "selfcheck_memory_terms"]
