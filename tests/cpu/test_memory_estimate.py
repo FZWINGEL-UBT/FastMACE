@@ -331,6 +331,36 @@ def test_plan_text_memory_line():
     assert "turned off factor_species" in tight and len(tight) <= 120
 
 
+@pytest.mark.rule(12)
+@pytest.mark.rule(13)
+def test_a_rule_13_revision_re_estimates_memory():
+    """Rule 13 turns a memory-saving rewrite off without a re-plan; rule 12 runs again for the revision
+    (``fallback.memory_revised``, as a rewrite candidate and the rule 13 path call it), and the prediction rises
+    by what the rewrite saved instead of keeping the old, too low one."""
+    from types import SimpleNamespace
+
+    from fastmace.planner import fallback, reactions
+
+    planned = plan()
+    assert planned.rewrites.joint_radial_input == "on"
+    failure = SimpleNamespace(rewrite="joint_radial_input", disabled=("joint_radial_input",),
+                              fields=("joint_radial_input",), reason="relative error 2e-4 > 1e-4")
+    revised = reactions.selfcheck_revision(planned, failure)
+    assert revised.rewrites.joint_radial_input == "off"
+    assert revised.predicted_memory_bytes == planned.predicted_memory_bytes  # the revision alone keeps the old one
+    planner = tmp.minimal()
+    planner._free_memory_bytes = lambda hardware: hardware.memory_bytes
+    planner.hardware = lambda: tmp.GPU
+    again = fallback.memory_revised(revised, SimpleNamespace(traits=mh1_traits()), nacl(repeat=3), planner)
+    assert again.predicted_memory_bytes > planned.predicted_memory_bytes
+    assert again.decision("memory")[2].code == "rule-12-memory" and again.decision("memory")[1] == "fits"
+    assert [entry[0] for entry in again.decisions].count("memory") == 1
+    assert again.decision("RewriteConfig.joint_radial_input") == revised.decision("RewriteConfig.joint_radial_input")
+    # Without an estimate (stand-in traits) nothing changes.
+    stand_in = tmp.plan_label("mh1-r2scan")
+    assert fallback.memory_revised(stand_in, SimpleNamespace(traits=None), nacl()) is stand_in
+
+
 def test_case_errors_equal_check_tensors():
     expected, got = torch.ones(3), torch.tensor([1.0, 1.0, 1.0 + 1e-3])
     cases = [("a", expected, expected), ("b", expected, got)]

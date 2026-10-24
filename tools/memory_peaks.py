@@ -89,11 +89,11 @@ def integrator_for(ensemble, temperature_K):
     return IntegratorConfig(timestep_fs=1.0, friction=0.02, temperature_K=temperature_K)
 
 
-def plan_with_parts(planner, force_field, atoms, integrator, workload, hardware, mode):
-    """(plan, parts): the plan, and the run's and the build's terms of rule 12's final estimate (the planner's
-    last ``memory.estimate``, after any drops), with the run's activations and rewrite terms unscaled
-    (divided by ``SAFETY``), so ``fit`` can judge the run against the steps' peak and the build against the
-    build's peak separately."""
+def with_parts(call, hardware):
+    """(call(), parts): the result of ``call`` (a plan or a revision), and the run's and the build's terms of
+    rule 12's final estimate while it ran (the planner's last ``memory.estimate``, after any drops), with the
+    run's activations and rewrite terms unscaled (divided by ``SAFETY``), so ``fit`` can judge the run against
+    the steps' peak and the build against the build's peak separately."""
     from fastmace.planner import memory
 
     found, original = [], memory.estimate
@@ -104,19 +104,18 @@ def plan_with_parts(planner, force_field, atoms, integrator, workload, hardware,
 
     memory.estimate = spy  # this measurement only
     try:
-        plan = planner.plan(force_field, atoms, integrator, workload, hardware, mode=mode,
-                            variable_cell=integrator.ensemble == "npt")
+        result = call()
     finally:
         memory.estimate = original
     if not found:
-        return plan, None
+        return result, None
     final = found[-1]
     scaled = {"activations", "rewrites"}
     run = dict(final.terms)
-    return plan, {"run_terms": run, "build_terms": dict(final.build_terms), "safety": memory.SAFETY,
-                  "run_scaled_unit": sum(run[name] for name in scaled if name in run) / memory.SAFETY,
-                  "run_fixed": sum(value for name, value in run.items() if name not in scaled),
-                  "run": final.run, "build": final.build, "sms": getattr(hardware, "sms", None)}
+    return result, {"run_terms": run, "build_terms": dict(final.build_terms), "safety": memory.SAFETY,
+                    "run_scaled_unit": sum(run[name] for name in scaled if name in run) / memory.SAFETY,
+                    "run_fixed": sum(value for name, value in run.items() if name not in scaled),
+                    "run": final.run, "build": final.build, "sms": getattr(hardware, "sms", None)}
 
 
 def run_case(args):
@@ -140,7 +139,8 @@ def run_case(args):
     integrator = integrator_for(args.ensemble, args.temperature_K)
     workload = Workload(max_temperature_K=args.temperature_K)
     mode = None if args.mode == JUDGED_MODE else args.mode
-    plan, parts = plan_with_parts(planner, force_field, atoms, integrator, workload, hardware, mode)
+    plan, parts = with_parts(lambda: planner.plan(force_field, atoms, integrator, workload, hardware, mode=mode,
+                                                  variable_cell=integrator.ensemble == "npt"), hardware)
     record.update(tier=plan.tier, backend=plan.engine.backend, precision=plan.precision.dtype,
                   predicted_bytes=plan.predicted_memory_bytes, parts=parts,
                   memory_decision=[str(part) for part in plan.decision("memory")[1:]],
@@ -154,6 +154,7 @@ def run_case(args):
         torch.cuda.memory._record_memory_history(stacks="python", max_entries=2_000_000)
     started = time.perf_counter()
     from fastmace.errors import SelfCheckError
+    from fastmace.planner.fallback import memory_revised
     from fastmace.planner.reactions import selfcheck_revision
 
     # A self-check that fails turns its rewrite off and the build retries, as a Simulation does (rule 13); the
@@ -166,8 +167,11 @@ def run_case(args):
         except SelfCheckError as error:
             if len(record["rule_13_revisions"]) >= 3:
                 raise
-            plan = selfcheck_revision(plan, error)
+            revised = selfcheck_revision(plan, error)
+            plan, parts = with_parts(lambda: memory_revised(revised, force_field, atoms, planner), hardware)
             record["rule_13_revisions"].append(str(error).splitlines()[0])
+            record.update(predicted_bytes=plan.predicted_memory_bytes, parts=parts,
+                          memory_decision=[str(part) for part in plan.decision("memory")[1:]])
     torch.cuda.synchronize()
     # The build's peak, what stays live into the run, then the steps' own peak (the first step captures).
     record["after_build_bytes"] = int(torch.cuda.max_memory_allocated())
