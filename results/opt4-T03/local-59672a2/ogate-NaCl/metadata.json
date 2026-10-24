@@ -1,0 +1,232 @@
+{
+  "status": "failed",
+  "created_utc": "2026-10-24T11:26:32.633082+00:00",
+  "host": "Fabi-PC",
+  "engine": "fastmace",
+  "planner": "minimal",
+  "baseline": null,
+  "structures_root": "/home/fzwin/fastmace-baseline/1a-T18",
+  "fastmace_commit": "59672a2",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "checkpoint": "/home/fzwin/models/MACE-omol-0-extra-large-1024.model",
+  "checkpoint_sha256": "9b64b4fd5153ca578c694abc57806d8111050de6ff652e695c9b525bc4d36469",
+  "tf32": false,
+  "model": "omol0-xl",
+  "backend": "auto",
+  "dtype": "auto",
+  "rule": {
+    "ratio": 2.0,
+    "floors": {
+      "energy": 0.01,
+      "forces": 1e-05,
+      "stress": 1e-07
+    },
+    "gated": [
+      "energy",
+      "forces",
+      "stress"
+    ],
+    "source": "fastmace.planner.selfcheck"
+  },
+  "energy_gated": true,
+  "references": "fastmace.reference (1b-T13): float64 reference, float32 yardstick with float64 energy",
+  "processes_rule": "every reference in a fresh process that builds no production engine, before the production process (scope 'calculator'); conductor decision after T10",
+  "protocol": "unrelaxed 3x3x3 supercells, symmetric strain +-0.02 (hydrostatic: isotropic; full: anisotropic and shear), Gaussian rattle 0.05 A; float64 reference; gate: max error <= max(2 x that of the float32 yardstick, floor), for energy, forces, stress",
+  "args": {
+    "output": "/home/fzwin/fastmace-opt4/t03-local-59672a2/ogate-NaCl",
+    "engine": "fastmace",
+    "planner": "minimal",
+    "baseline": null,
+    "structures_root": "/home/fzwin/fastmace-baseline/1a-T18",
+    "checkpoint": "/home/fzwin/models/MACE-omol-0-extra-large-1024.model",
+    "model": "omol0-xl",
+    "structures": [
+      "NaCl"
+    ],
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "configs": 3,
+    "rattle_A": 0.05,
+    "strain": 0.02,
+    "backend": "auto",
+    "dtype": "auto",
+    "main_args": "",
+    "seed": 20261015,
+    "reference_scope": "calculator",
+    "rewrites": {
+      "tf32x3_gemms": "on"
+    },
+    "engine_config": {},
+    "reference_command": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+    "production_command": "/home/fzwin/environments/mace_cueq_oeq/bin/python"
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "source": "/home/fzwin/fastmace-baseline/1a-T18/Structures/Benchmark/R2SCAN/NaCl.cif",
+      "repeat": [
+        3,
+        3,
+        3
+      ],
+      "source_sha256": "087450f068b69d8cb848e91ea2b888e8b2e4a451160c0c1de8d2efd1c1b29d9e",
+      "configurations": "/home/fzwin/fastmace-opt4/t03-local-59672a2/ogate-NaCl/configs/NaCl.npz",
+      "configs": []
+    }
+  },
+  "processes": [
+    {
+      "name": "reference-NaCl-f64",
+      "kind": "reference",
+      "argv": [
+        "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "/home/fzwin/fastmace-opt4/src-t03-59672a2/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/fzwin/fastmace-opt4/t03-local-59672a2/ogate-NaCl/jobs/reference-NaCl-f64.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 18.265152756001044,
+      "result": {
+        "name": "reference-NaCl-f64",
+        "kind": "reference",
+        "pid": 42897,
+        "host": "Fabi-PC",
+        "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-24T11:26:32.896749+00:00",
+        "hybrid_launcher": false,
+        "load_s": 6.740466326002206,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/omol/fb04d91bc2a91209",
+          "role": "reference",
+          "dtype": "float64",
+          "float64_energy": false,
+          "energy_bound": "float64 accumulation",
+          "e0_table": null,
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/fzwin/models/MACE-omol-0-extra-large-1024.model",
+            "sha256": "9b64b4fd5153ca578c694abc57806d8111050de6ff652e695c9b525bc4d36469",
+            "label": "omol0-xl",
+            "head": "omol"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float64",
+        "role": "reference",
+        "record_id": "fastmace.reference/0.3.16/omol/fb04d91bc2a91209",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 3122659328,
+        "status": "complete",
+        "wall_s": 17.363266001004376
+      }
+    },
+    {
+      "name": "reference-NaCl-ase_f32",
+      "kind": "reference",
+      "argv": [
+        "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "/home/fzwin/fastmace-opt4/src-t03-59672a2/tools/force_stress_gate.py",
+        "reference",
+        "--job",
+        "/home/fzwin/fastmace-opt4/t03-local-59672a2/ogate-NaCl/jobs/reference-NaCl-ase_f32.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 0,
+      "wall_s": 13.067532101005781,
+      "result": {
+        "name": "reference-NaCl-ase_f32",
+        "kind": "reference",
+        "pid": 43172,
+        "host": "Fabi-PC",
+        "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+        "started_utc": "2026-10-24T11:26:51.315641+00:00",
+        "hybrid_launcher": false,
+        "load_s": 5.23793683200347,
+        "reference": {
+          "record_id": "fastmace.reference/0.3.16/omol/fb04d91bc2a91209",
+          "role": "yardstick",
+          "dtype": "float32",
+          "float64_energy": true,
+          "energy_bound": "float64 accumulation",
+          "e0_table": "checkpoint",
+          "backend": "cueq",
+          "cueq_conv_fusion": false,
+          "model": {
+            "path": "/home/fzwin/models/MACE-omol-0-extra-large-1024.model",
+            "sha256": "9b64b4fd5153ca578c694abc57806d8111050de6ff652e695c9b525bc4d36469",
+            "label": "omol0-xl",
+            "head": "omol"
+          },
+          "patches": [
+            "single_graph_strain"
+          ],
+          "corrections_active": [],
+          "optional_physics": [],
+          "gate_floors": {},
+          "stock": true,
+          "polar": null,
+          "dispersion": null
+        },
+        "dtype": "float32",
+        "role": "yardstick",
+        "record_id": "fastmace.reference/0.3.16/omol/fb04d91bc2a91209",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "torch": "2.14.1+cu130",
+        "peak_memory_bytes": 1568669696,
+        "status": "complete",
+        "wall_s": 12.222637124003086
+      }
+    },
+    {
+      "name": "production-fastmace",
+      "kind": "production",
+      "argv": [
+        "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+        "/home/fzwin/fastmace-opt4/src-t03-59672a2/tools/force_stress_gate.py",
+        "production",
+        "--job",
+        "/home/fzwin/fastmace-opt4/t03-local-59672a2/ogate-NaCl/jobs/production-fastmace.json"
+      ],
+      "gpu_processes_before": [],
+      "exit_code": 1,
+      "wall_s": 43.83213084000454,
+      "result": {
+        "name": "production-fastmace",
+        "kind": "production",
+        "pid": 43414,
+        "host": "Fabi-PC",
+        "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+        "started_utc": "2026-10-24T11:27:04.549498+00:00",
+        "hybrid_launcher": false,
+        "load_s": 4.497905890006223,
+        "planner": "minimal",
+        "checkpoint_sha256": "9b64b4fd5153ca578c694abc57806d8111050de6ff652e695c9b525bc4d36469",
+        "edges": {},
+        "setup_s": {},
+        "plans": {},
+        "force_fields": {},
+        "status": "failed",
+        "error": "BackendCompilerFailed: backend='inductor' raised:\nRuntimeError: Trying to backward through fastmace.tf32x3_mm.default but no autograd formula was registered. Please use register_autograd to add one.\n\nSet TORCHDYNAMO_VERBOSE=1 for the internal stack trace (please do this especially if you're reporting a bug to PyTorch). For even more developer context, set TORCH_LOGS=\"+dynamo\"\n",
+        "wall_s": 41.68487270300102
+      }
+    }
+  ],
+  "summary": {},
+  "error": "GateJobError: production-fastmace exited with 1; see logs/production-fastmace.log",
+  "finished_utc": "2026-10-24T11:27:48.271178+00:00"
+}

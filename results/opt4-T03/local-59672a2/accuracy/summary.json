@@ -1,0 +1,238 @@
+{
+  "tool": "tf32x3_accuracy",
+  "created_utc": "2026-10-24T11:00:44.339710+00:00",
+  "host": "Fabi-PC",
+  "fastmace_commit": "59672a2",
+  "model": "mh1-r2scan",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "capability": [
+    12,
+    0
+  ],
+  "torch": "2.14.1+cu130",
+  "cuda": "13.0",
+  "rattle_A": 0.05,
+  "seed": 20261024,
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "decision": [
+        "RewriteConfig.tf32x3_gemms",
+        "on",
+        "requested 'on': stage 1: on (with block_linear)"
+      ],
+      "products": 52,
+      "shapes": 35,
+      "max_rel": {
+        "tf32x3": 9.13925732698767e-07,
+        "ieee": 8.451529770438734e-07,
+        "tf32x3_over_ieee_median": 0.6715973095504533,
+        "tf32x3_over_ieee_max": 6.73197442010877,
+        "tf32x3_worse_count": 10
+      },
+      "frob_rel": {
+        "tf32x3": 2.237739640701954e-07,
+        "ieee": 3.41310522589263e-07,
+        "tf32x3_over_ieee_median": 0.7214084620904289,
+        "tf32x3_over_ieee_max": 5.87385411414123,
+        "tf32x3_worse_count": 11
+      },
+      "cancellation_scaled": {
+        "tf32x3": 5.178224927617696e-07,
+        "ieee": 6.441525311089176e-07,
+        "tf32x3_over_ieee_median": 0.6044671888465727,
+        "tf32x3_over_ieee_max": 6.898007084423565,
+        "tf32x3_worse_count": 9
+      },
+      "cancellation_scaled_unfiltered": {
+        "tf32x3": 0.6309114615667945,
+        "ieee": 0.6309114615667945,
+        "tf32x3_over_ieee_median": 0.6044671888465727,
+        "tf32x3_over_ieee_max": 6.898007084423565,
+        "tf32x3_worse_count": 9
+      },
+      "cancellation_median_max": 30.363710297849323,
+      "cancellation_max": 49881291.29174059,
+      "cublas_products_left": [
+        {
+          "op": "aten::addmm",
+          "shapes": "[[1], [6912, 64], [64, 1], [], [], [6912, 1]]",
+          "count": 2
+        },
+        {
+          "op": "aten::addmm",
+          "shapes": "[[64], [6912, 64], [64, 64], [], [], [6912, 64]]",
+          "count": 4
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[13, 28], [28, 512], [13, 512]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[216, 89], [89, 6], [216, 6]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[29, 86], [86, 512], [29, 512]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[3, 216], [216, 3], [3, 3]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[3, 3], [3, 3], [3, 3]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[3, 6912], [6912, 3], [3, 3]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 10], [10, 128], [6912, 128]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 128], [128, 10], [6912, 10]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 3], [3, 3], [6912, 3]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 64], [64, 64], [6912, 64]]",
+          "count": 4
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[6912, 68], [68, 1280], [6912, 1280]]",
+          "count": 1
+        }
+      ]
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "decision": [
+        "RewriteConfig.tf32x3_gemms",
+        "on",
+        "requested 'on': stage 1: on (with block_linear)"
+      ],
+      "products": 52,
+      "shapes": 35,
+      "max_rel": {
+        "tf32x3": 7.877087725845683e-07,
+        "ieee": 1.7334850819583e-06,
+        "tf32x3_over_ieee_median": 0.3201510739228529,
+        "tf32x3_over_ieee_max": 6.73197442010877,
+        "tf32x3_worse_count": 7
+      },
+      "frob_rel": {
+        "tf32x3": 2.1719063227276755e-07,
+        "ieee": 4.798122030515596e-07,
+        "tf32x3_over_ieee_median": 0.509920534998282,
+        "tf32x3_over_ieee_max": 5.873854114141231,
+        "tf32x3_worse_count": 6
+      },
+      "cancellation_scaled": {
+        "tf32x3": 4.6603153022661153e-07,
+        "ieee": 1.0157802670745122e-06,
+        "tf32x3_over_ieee_median": 0.30946949038098237,
+        "tf32x3_over_ieee_max": 6.898007084423565,
+        "tf32x3_worse_count": 7
+      },
+      "cancellation_scaled_unfiltered": {
+        "tf32x3": 0.5045077899885002,
+        "ieee": 0.5045077899885002,
+        "tf32x3_over_ieee_median": 0.30946949038098237,
+        "tf32x3_over_ieee_max": 6.898007084423565,
+        "tf32x3_worse_count": 7
+      },
+      "cancellation_median_max": 33.3445048792697,
+      "cancellation_max": 616027886.8272913,
+      "cublas_products_left": [
+        {
+          "op": "aten::addmm",
+          "shapes": "[[1], [52422, 64], [64, 1], [], [], [52422, 1]]",
+          "count": 2
+        },
+        {
+          "op": "aten::addmm",
+          "shapes": "[[64], [52422, 64], [64, 64], [], [], [52422, 64]]",
+          "count": 4
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[13, 28], [28, 512], [13, 512]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[1944, 3], [3, 3], [1944, 3]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[1944, 89], [89, 6], [1944, 6]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[29, 86], [86, 512], [29, 512]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[3, 1944], [1944, 3], [3, 3]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[3, 3], [3, 3], [3, 3]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[3, 52422], [52422, 3], [3, 3]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[52422, 10], [10, 128], [52422, 128]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[52422, 128], [128, 10], [52422, 10]]",
+          "count": 2
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[52422, 3], [3, 3], [52422, 3]]",
+          "count": 1
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[52422, 64], [64, 64], [52422, 64]]",
+          "count": 4
+        },
+        {
+          "op": "aten::mm",
+          "shapes": "[[52422, 68], [68, 1280], [52422, 1280]]",
+          "count": 1
+        }
+      ]
+    }
+  },
+  "triton": "3.8.0"
+}
