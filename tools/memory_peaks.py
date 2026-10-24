@@ -3,14 +3,14 @@
 ``run`` measures, for each label x structure x ensemble x tier, the peak of ``torch.cuda.max_memory_allocated``
 over the build, the capture and ``--steps`` steps of the minimal planner's engine, each case in its own child
 process (a fresh allocator and one compile family, SPEC §8.7). Every case writes ``<output>/<case>.json`` with
-the plan's prediction, its parts, and the measured peak. The prediction is split into the part ``SAFETY``
-multiplies (activations and rewrite terms, ``scaled``) and the rest (``fixed``) by planning twice, with
-``SAFETY`` 1 and 2, so ``fit`` can choose the one global factor (SPEC §9.3 rule 12 as amended 23 October 2026).
+the plan's prediction, the estimate's run and build terms (the planner's final ``memory.estimate``, captured
+while it plans), the build's peak, the steps' own peak and the overall peak.
 
-``fit`` reads the case files and prints the markdown table of ``docs/validation/5-T03.md``: per case the
-measured peak, the prediction at the library's ``SAFETY``, their ratio, and the smallest factor that keeps
-that case's prediction at or above its peak; then the fitted factor (the largest of those over the judged
-cases, the graph tier) and the ratios it gives. Pass: no ratio below 1, none above 1.5.
+``fit`` reads the case files and prints the markdown table of ``docs/validation/5-T03.md``. The run's estimate
+is judged against the steps' peak: the smallest ``SAFETY`` (one global factor, SPEC §9.3 rule 12 as amended 23
+October 2026) that keeps every graph-tier case's run at or above it. The build's estimate is judged against the
+build's peak, with no factor. Then the prediction, max(build, run), at the fitted factor against the overall
+peak. Pass: no ratio below 1, none above 1.5.
 
 Untimed. GPU runs go through ``tools/ci/local_gpu.py run`` (local) or ``tools/colab`` (the large models).
 
@@ -89,16 +89,33 @@ def integrator_for(ensemble, temperature_K):
     return IntegratorConfig(timestep_fs=1.0, friction=0.02, temperature_K=temperature_K)
 
 
-def plan_with_safety(planner, force_field, atoms, integrator, workload, hardware, mode, safety):
+def with_parts(call, hardware):
+    """(call(), parts): the result of ``call`` (a plan or a revision), and the run's and the build's terms of
+    rule 12's final estimate while it ran (the planner's last ``memory.estimate``, after any drops), with the
+    run's activations and rewrite terms unscaled (divided by ``SAFETY``), so ``fit`` can judge the run against
+    the steps' peak and the build against the build's peak separately."""
     from fastmace.planner import memory
 
-    kept = memory.SAFETY
-    memory.SAFETY = safety  # this measurement only: the split of the prediction into its parts
+    found, original = [], memory.estimate
+
+    def spy(*args, **kwargs):
+        found.append(original(*args, **kwargs))
+        return found[-1]
+
+    memory.estimate = spy  # this measurement only
     try:
-        return planner.plan(force_field, atoms, integrator, workload, hardware, mode=mode,
-                            variable_cell=integrator.ensemble == "npt")
+        result = call()
     finally:
-        memory.SAFETY = kept
+        memory.estimate = original
+    if not found:
+        return result, None
+    final = found[-1]
+    scaled = {"activations", "rewrites"}
+    run = dict(final.terms)
+    return result, {"run_terms": run, "build_terms": dict(final.build_terms), "safety": memory.SAFETY,
+                    "run_scaled_unit": sum(run[name] for name in scaled if name in run) / memory.SAFETY,
+                    "run_fixed": sum(value for name, value in run.items() if name not in scaled),
+                    "run": final.run, "build": final.build, "sms": getattr(hardware, "sms", None)}
 
 
 def run_case(args):
@@ -122,14 +139,10 @@ def run_case(args):
     integrator = integrator_for(args.ensemble, args.temperature_K)
     workload = Workload(max_temperature_K=args.temperature_K)
     mode = None if args.mode == JUDGED_MODE else args.mode
-    once = plan_with_safety(planner, force_field, atoms, integrator, workload, hardware, mode, 1.0)
-    twice = plan_with_safety(planner, force_field, atoms, integrator, workload, hardware, mode, 2.0)
-    plan = planner.plan(force_field, atoms, integrator, workload, hardware, mode=mode,
-                        variable_cell=args.ensemble == "npt")
-    scaled = twice.predicted_memory_bytes - once.predicted_memory_bytes
+    plan, parts = with_parts(lambda: planner.plan(force_field, atoms, integrator, workload, hardware, mode=mode,
+                                                  variable_cell=integrator.ensemble == "npt"), hardware)
     record.update(tier=plan.tier, backend=plan.engine.backend, precision=plan.precision.dtype,
-                  predicted_bytes=plan.predicted_memory_bytes, scaled_bytes=scaled,
-                  fixed_bytes=once.predicted_memory_bytes - scaled,
+                  predicted_bytes=plan.predicted_memory_bytes, parts=parts,
                   memory_decision=[str(part) for part in plan.decision("memory")[1:]],
                   rewrites_off_by_rule_12=[key for key, _, reason in plan.decisions
                                            if getattr(reason, "code", None) == "rule-12-memory-drop"],
@@ -140,7 +153,25 @@ def run_case(args):
     if args.memory_history:
         torch.cuda.memory._record_memory_history(stacks="python", max_entries=2_000_000)
     started = time.perf_counter()
-    engine = planner.build(plan, force_field, atoms, temperature_K=args.temperature_K)
+    from fastmace.errors import SelfCheckError
+    from fastmace.planner.fallback import memory_revised
+    from fastmace.planner.reactions import selfcheck_revision
+
+    # A self-check that fails turns its rewrite off and the build retries, as a Simulation does (rule 13); the
+    # peak keeps the failed attempts' allocations, as production pays them too.
+    record["rule_13_revisions"] = []
+    while True:
+        try:
+            engine = planner.build(plan, force_field, atoms, temperature_K=args.temperature_K)
+            break
+        except SelfCheckError as error:
+            if len(record["rule_13_revisions"]) >= 3:
+                raise
+            revised = selfcheck_revision(plan, error)
+            plan, parts = with_parts(lambda: memory_revised(revised, force_field, atoms, planner), hardware)
+            record["rule_13_revisions"].append(str(error).splitlines()[0])
+            record.update(predicted_bytes=plan.predicted_memory_bytes, parts=parts,
+                          memory_decision=[str(part) for part in plan.decision("memory")[1:]])
     torch.cuda.synchronize()
     # The build's peak, what stays live into the run, then the steps' own peak (the first step captures).
     record["after_build_bytes"] = int(torch.cuda.max_memory_allocated())
@@ -259,32 +290,47 @@ def run(args):
 
 
 def fit(args):
+    """The judged (graph-tier) cases: the run's estimate against the steps' own peak, giving the smallest
+    ``SAFETY`` that keeps every run at or above it, and the build's estimate against the build's peak (no
+    factor); then the prediction, max(build, run), at the fitted factor against the overall peak."""
     cases = [json.loads(path.read_text()) for path in sorted(args.directory.glob("*.json"))
              if not path.name.endswith(".failed.json")]
+    cases = [case for case in cases if case.get("parts")]
     if not cases:
-        print("no case files")
+        print("no case files with the estimate's parts")
         return 1
 
-    def needed(case):  # the factor that makes this case's prediction equal its peak
-        return (case["peak_bytes"] - case["fixed_bytes"]) / case["scaled_bytes"] if case["scaled_bytes"] else 0.0
+    def needed(case):  # the factor that makes this case's run estimate equal its steps' peak
+        parts = case["parts"]
+        unit = parts["run_scaled_unit"]
+        return (case["step_peak_bytes"] - parts["run_fixed"]) / unit if unit else 0.0
+
+    def predicted(case, factor):
+        parts = case["parts"]
+        return max(parts["build"], parts["run_fixed"] + factor * parts["run_scaled_unit"])
 
     judged = [case for case in cases if case["mode"] == JUDGED_MODE]
     factor = max((needed(case) for case in judged), default=float("nan"))
-    print("| label | structure | ensemble | tier | backend | precision | peak (MiB) | predicted (MiB) | ratio "
-          "| factor needed | ratio at the fitted factor |")
-    print("| --- | --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |")
-    worst = []
+    print("| label | structure | ensemble | backend | precision | build peak / est. (MiB) | steps' peak / run est. "
+          "(MiB) | factor needed | ratio now | ratio at the fitted factor |")
+    print("| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |")
+    ratios, builds = [], []
     for case in sorted(cases, key=lambda c: (c["mode"] != JUDGED_MODE, c["label"], c["structure"], c["ensemble"])):
-        fitted = (case["fixed_bytes"] + factor * case["scaled_bytes"]) / case["peak_bytes"]
+        parts = case["parts"]
+        fitted = predicted(case, factor) / case["peak_bytes"]
         if case["mode"] == JUDGED_MODE:
-            worst.append(fitted)
-        print(f"| {case['label']} | {case['structure']} | {case['ensemble']} | {case['tier']} | {case['backend']} "
-              f"| {case['precision']} | {case['peak_bytes'] / 2**20:.0f} | {case['predicted_bytes'] / 2**20:.0f} "
-              f"| {case['ratio']:.2f} | {needed(case):.3f} | {fitted:.2f} |")
-    print(f"\nfitted SAFETY (largest factor needed over {len(judged)} graph-tier cases): {factor:.3f}")
-    if worst:
-        print(f"ratios at the fitted factor: min {min(worst):.2f}, max {max(worst):.2f}; "
-              f"pass (never below 1, at most {PASS_RATIO}): {min(worst) >= 1.0 - 1e-9 and max(worst) <= PASS_RATIO}")
+            ratios.append(fitted)
+            builds.append(parts["build"] / case["after_build_bytes"])
+        mib = 2**20
+        print(f"| {case['label']} | {case['structure']} | {case['ensemble']} | {case['backend']} "
+              f"| {case['precision']} | {case['after_build_bytes'] / mib:.0f} / {parts['build'] / mib:.0f} "
+              f"| {case['step_peak_bytes'] / mib:.0f} / {parts['run'] / mib:.0f} | {needed(case):.3f} "
+              f"| {case['ratio']:.2f} | {fitted:.2f} |")
+    print(f"\nfitted SAFETY (largest factor the run needs over {len(judged)} graph-tier cases): {factor:.3f}")
+    if ratios:
+        print(f"build estimate / build peak: min {min(builds):.2f}, max {max(builds):.2f}")
+        print(f"prediction / peak at the fitted factor: min {min(ratios):.2f}, max {max(ratios):.2f}; "
+              f"pass (never below 1, at most {PASS_RATIO}): {min(ratios) >= 1.0 - 1e-9 and max(ratios) <= PASS_RATIO}")
     return 0
 
 
