@@ -44,7 +44,7 @@ from fastmace.planner.workload import Workload
 from fastmace.simulation import Simulation
 
 SPEC = {spec!r}
-loaded = loading.load_pristine(SPEC["path"], trusted=True)
+loaded = loading.load_pristine(SPEC["label"])  # the label names the head (MH-1 has six)
 out = {{"gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "runs": {{}}}}
 for tag, cap in SPEC["runs"]:
     atoms = bulk("NaCl", "rocksalt", a=5.64, cubic=True).repeat((3, 3, 3))
@@ -74,7 +74,7 @@ print(json.dumps(out))
 @pytest.mark.slow
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_a_recapture_storm_moves_the_monitor_counters(tmp_path):
-    spec = {"path": str(ENGINE._mh1_path()), "steps": 60, "directory": str(tmp_path),
+    spec = {"label": "mh1-r2scan", "steps": 60, "directory": str(tmp_path),
             "runs": [["storm", 1], ["control", None]]}
     result = ENGINE.run_fresh(CHILD.format(spec=spec), python=sys.executable)
     print({tag: (run["plan"], run["totals"], run["engine"]) for tag, run in result["runs"].items()}, result["gpu"])
