@@ -5,7 +5,8 @@ edge count changed and dynamo's automatic dynamic shapes compiled the model agai
 edge dimension. Evaluation plans now set ``EngineConfig.dynamic_edges``, and their force field
 marks the edge dimension dynamic from the first call:
 
-- the evaluation plan sets ``dynamic_edges`` when it compiles; MD (graph tier) plans do not;
+- the evaluation plan sets ``dynamic_edges`` when it compiles; MD (graph tier) plans do not, unless the
+  caller asks (OPT4-T05: the first compiled call then serves the padded capture, so a start compiles once);
 - ``mark_edges_dynamic`` makes one compiled function serve every edge count;
 - the force field marks its edges and keys its compiled model by ``dynamic_edges``;
 - slow: a compiled tiny MACE compiles once across calls with three edge counts and matches the
@@ -76,6 +77,29 @@ def test_md_plans_keep_static_edges():
     plan = minimal().plan_traits(tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(),
                                  Workload(max_temperature_K=300.0), GPU, precision="float32")
     assert plan.engine.dynamic_edges is False
+    assert "EngineConfig.dynamic_edges" not in {entry[0] for entry in plan.decisions}
+
+
+def test_md_plans_take_dynamic_edges_on_request():
+    """OPT4-T05's opt-in: a graph-tier MD plan keeps a requested dynamic edge dimension, still pads and
+    captures, and records why (the padded capture reuses the first compiled call's graph)."""
+    plan = minimal(engine=EngineConfig(dynamic_edges=True)).plan_traits(
+        tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(), Workload(max_temperature_K=300.0), GPU,
+        precision="float32")
+    assert plan.tier == "graph" and plan.engine.dynamic_edges is True
+    assert plan.engine.compile_mode == "default"
+    _, choice, reason = plan.decision("EngineConfig.dynamic_edges")
+    assert choice == "on" and "compiles once" in str(reason)
+    assert ("EngineConfig.dynamic_edges", "True") in plan.requested
+
+
+def test_eager_md_plans_record_no_dynamic_edges():
+    """Nothing is compiled on the eager tier: a requested dynamic edge dimension has nothing to mark."""
+    plan = minimal(engine=EngineConfig(dynamic_edges=True)).plan_traits(
+        tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(), Workload(max_temperature_K=300.0), GPU,
+        precision="float32", mode="eager")
+    assert plan.engine.compile_mode == "none"
+    assert "EngineConfig.dynamic_edges" not in {entry[0] for entry in plan.decisions}
 
 
 # --------------------------------------------------------------------------- marking

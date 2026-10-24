@@ -90,6 +90,11 @@ MODE_TIERS = {
 }
 EAGER_CAPTURE = "eager tier: no CUDA graphs"
 COMPILED_CAPTURE = "compiled tier: no CUDA graphs"
+# A requested dynamic edge dimension on the graph tier (OPT4-T05): the edges stay padded to buckets.
+DYNAMIC_EDGES_GRAPH = Reason(
+    "requested: the edge dimension is dynamic from the first compiled call, so the model compiles once and the "
+    "padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets",
+    code="dynamic-edges-graph")
 REFERENCE_TIER = "reference"
 # The reference tier's reasons (plan task 2-T03; SPEC §8.4).
 REFERENCE_REASONS = {
@@ -648,6 +653,9 @@ class MinimalPlanner:
             self._eager(book, parts, traits)
         elif mode == fixed.COMPILED_TIER:
             self._compiled(book, parts, traits, mode_reason)
+        elif not reference and parts["engine"].dynamic_edges and parts["engine"].compile_mode != "none":
+            book.decide("EngineConfig.dynamic_edges", "on", DYNAMIC_EDGES_GRAPH)
+            parts["decisions"] = tuple(book.decisions)
         predicted = self._rule_12(book, parts, traits, atoms, hardware, requested, d3_memory, loaded)
         book.raise_refusals()
         parts["requested"] = parts["requested"] + requested
