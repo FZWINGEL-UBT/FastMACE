@@ -88,6 +88,31 @@ def test_tf32x3_matmul_on_the_cpu_is_the_product_and_its_gradients():
     assert torch.equal(only_a, grad @ b.detach().t())
 
 
+def test_the_op_traced_by_fx_has_first_and_second_derivatives():
+    """A block linear inside an fx-traced module calls the op itself (OMOL-0's joint embedding on CUDA: "no
+    autograd formula"); its gradients must equal the plain product's, twice."""
+    from fastmace.kernels.triton.tf32x3_gemm import tf32x3_matmul
+
+    weight = torch.randn((5, 4), dtype=torch.float64)
+
+    class Linear(torch.nn.Module):
+        def forward(self, x):
+            return tf32x3_matmul(x, weight, weight.t().contiguous())
+
+    traced = torch.fx.symbolic_trace(Linear())
+    for module, product in ((traced, lambda x: x @ weight), (Linear(), lambda x: x @ weight)):
+        values = []
+        for function in (module, product):
+            x = torch.randn((6, 5), generator=torch.Generator().manual_seed(4), dtype=torch.float64,
+                            requires_grad=True)
+            energy = (torch.tanh(function(x)) ** 2).sum()
+            (forces,) = torch.autograd.grad(energy, x, create_graph=True)
+            (second,) = torch.autograd.grad(forces.square().sum(), x)
+            values.append((forces, second))
+        for a, b in zip(*values):
+            assert torch.equal(a, b)
+
+
 def test_supported_needs_cuda():
     from fastmace.kernels.triton.tf32x3_gemm import supported
 

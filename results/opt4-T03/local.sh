@@ -11,6 +11,8 @@
 #   gate-NbCl5     the same on NbCl5 3x3x3
 #   gate0-NaCl     the gate with the default plan (the same seeds), for the comparison
 #   gate0-NbCl5
+#   omol-accuracy  tools/tf32x3_accuracy.py, OMOL-0 XL, NaCl 3x3x3
+#   ogate-NaCl     the gate on OMOL-0 XL, NaCl 3x3x3, tf32x3; ogate0-NaCl the same with the default plan
 set -u -o pipefail
 ROOT=$1; shift
 FM=${FM:?set FM to a pinned source copy}
@@ -19,6 +21,7 @@ PY=$HOME/environments/mace_cueq_oeq/bin/python
 REF=$HOME/environments/mace_cueq_latest/bin/python
 CACHE=$HOME/fastmace-cache/opt4-T03
 CK=$HOME/models/mace-mh-1.model
+OMOL=$HOME/models/MACE-omol-0-extra-large-1024.model
 mkdir -p "$ROOT/tmp" "$CACHE"
 export PYTHONPATH=$FM PYTHONDONTWRITEBYTECODE=1 FASTMACE_CACHE=$CACHE FASTMACE_MODELS=$HOME/models \
   FASTMACE_STRUCTURES=$B TORCHINDUCTOR_CACHE_DIR=$CACHE/inductor TRITON_CACHE_DIR=$CACHE/triton \
@@ -38,7 +41,7 @@ run() {  # name command...
 gate() {  # name structure rewrites...
   local name=$1 structure=$2; shift 2
   run "$name" "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/$name" --engine fastmace \
-    --checkpoint "$CK" --model mh1-r2scan --structures "$structure" --structures-root "$B" \
+    --checkpoint "${GATE_CK:-$CK}" --model "${GATE_MODEL:-mh1-r2scan}" --structures "$structure" --structures-root "$B" \
     --reference-command "$REF" --production-command "$PY" "$@"
 }
 note "fastmace=$(cat "$FM/.source_commit") source=$FM host=$(hostname) gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader)"
@@ -51,6 +54,10 @@ for job in "$@"; do
     gate-NbCl5) gate $job NbCl5 --rewrites tf32x3_gemms=on ;;
     gate0-NaCl) gate $job NaCl ;;
     gate0-NbCl5) gate $job NbCl5 ;;
+    omol-accuracy) run $job "$PY" "$FM/tools/tf32x3_accuracy.py" --output "$ROOT/omol-accuracy" --model omol0-xl \
+                     --structures NaCl ;;
+    ogate-NaCl) GATE_CK=$OMOL GATE_MODEL=omol0-xl gate $job NaCl --rewrites tf32x3_gemms=on ;;
+    ogate0-NaCl) GATE_CK=$OMOL GATE_MODEL=omol0-xl gate $job NaCl ;;
     *) note "unknown job $job" ;;
   esac
 done

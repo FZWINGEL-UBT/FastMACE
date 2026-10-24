@@ -95,6 +95,22 @@ def _(a, b):
     return a.new_empty((a.shape[0], b.shape[1]))
 
 
+def _setup_context(ctx, inputs, output):
+    ctx.save_for_backward(*inputs)
+
+
+def _backward(ctx, grad):
+    a, b = ctx.saved_tensors
+    grad_a = tf32x3_mm(grad, b.t()) if ctx.needs_input_grad[0] else None
+    grad_b = tf32x3_mm(a.t(), grad) if ctx.needs_input_grad[1] else None
+    return grad_a, grad_b
+
+
+# The op's own gradients (through itself, so differentiable again): a module that fx traces records the op, not
+# Tf32x3Matmul (OMOL-0's joint embedding block), and the compiled force call differentiates that trace twice.
+tf32x3_mm.register_autograd(_backward, setup_context=_setup_context)
+
+
 class Tf32x3Matmul(torch.autograd.Function):
     """``a @ b`` through ``tf32x3_mm``, both input gradients through it as well (``b_t``: b's contiguous
     transpose for the gradient of ``a``, or None)."""
