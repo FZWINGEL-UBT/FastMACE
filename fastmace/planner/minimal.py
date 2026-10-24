@@ -662,8 +662,10 @@ class MinimalPlanner:
             self._compiled(book, parts, traits, mode_reason)
         elif parts["engine"].compile_mode != "none":  # the graph tier (OPT4-T05, decision 59)
             dynamic = parts["engine"].dynamic_edges
+            off = (fixed.DYNAMIC_EDGES_POLAR_NPT if self.engine.dynamic_edges and traits.polar and npt
+                   else DYNAMIC_EDGES_GRAPH_OFF)
             book.decide("EngineConfig.dynamic_edges", "on" if dynamic else "off",
-                        DYNAMIC_EDGES_GRAPH if dynamic else DYNAMIC_EDGES_GRAPH_OFF)
+                        DYNAMIC_EDGES_GRAPH if dynamic else off)
             parts["decisions"] = tuple(book.decisions)
         if mode != fixed.COMPILED_TIER and parts["engine"].compile_mode == "none":
             parts["engine"] = dataclasses.replace(parts["engine"], dynamic_edges=False)

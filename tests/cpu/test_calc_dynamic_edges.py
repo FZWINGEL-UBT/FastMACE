@@ -202,3 +202,21 @@ def test_compiled_evaluation_compiles_once_across_edge_counts(dynamic_edges):
     else:
         assert graphs[1] > graphs[0], graphs  # 1b-T18's second compile
     torch._dynamo.reset()
+
+
+@pytest.mark.parametrize("label", ["polar1-s", "polar1-m", "polar1-l"])
+def test_polar_variable_cell_md_keeps_static_edges(label):
+    """Decision 59's exception (5-T03 rerun): PolarMACE's NPT capture fails with a dynamic edge dimension, so the
+    planner keeps it off there, with its own reason; PolarMACE NVT and other families' NPT keep it on."""
+    npt = IntegratorConfig(ensemble="npt", temperature_K=600.0)
+    plan = minimal().plan_traits(tp.traits(label), nacl(), npt, Workload(max_temperature_K=600.0), GPU,
+                                 precision="float32")
+    assert plan.tier == "graph" and plan.engine.dynamic_edges is False
+    _, choice, reason = plan.decision("EngineConfig.dynamic_edges")
+    assert choice == "off" and reason.code == "dynamic-edges-polar-npt"
+    nvt = minimal().plan_traits(tp.traits(label), nacl(), IntegratorConfig(), Workload(max_temperature_K=300.0),
+                                GPU, precision="float32")
+    assert nvt.engine.dynamic_edges is True
+    other = minimal().plan_traits(tp.traits("mh1-r2scan"), nacl(), npt, Workload(max_temperature_K=600.0), GPU,
+                                  precision="float32")
+    assert other.engine.dynamic_edges is True

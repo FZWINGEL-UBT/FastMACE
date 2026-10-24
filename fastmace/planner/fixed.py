@@ -265,6 +265,15 @@ def _toggle(value):
     return "on" if value else "off"
 
 
+# Decision 59's exception (5-T03 rerun, 24 October 2026): PolarMACE's variable-cell MD fails its CUDA graph
+# capture with a dynamic edge dimension ("AccumulateGrad has a stale reference to the default stream"), on
+# POLAR-1-S, -M and -L, NaCl and NbCl5; fixed-cell PolarMACE and every other family capture. Off until the cause
+# is found.
+DYNAMIC_EDGES_POLAR_NPT = Reason(
+    "off: PolarMACE's variable-cell MD fails its CUDA graph capture with a dynamic edge dimension (stale "
+    "default-stream reference in AccumulateGrad; 5-T03 rerun, 24 October 2026), so the first capture compiles "
+    "again as before decision 59", code="dynamic-edges-polar-npt")
+
 # Owner decision 58, 24 October 2026 (OPT4-T02): the POLAR-1 checkpoints whose force gate passed with
 # fx_e3nn_linear and polar_graph_sums on (S and M on NaCl and NbCl5 2x2x2; L, the owner's condition, after its
 # local NbCl5 2x2x2 gate). They are label-table labels, which identify a checkpoint by its SHA-256
@@ -615,6 +624,8 @@ class FixedPlanner:
         else:
             book.decide("EngineConfig.compile_mode", engine.compile_mode, "main.py's --compile-mode")
         if engine.compile_mode == "none" and engine.dynamic_edges:  # nothing to mark (decision 59, OPT4-T05)
+            engine = dataclasses.replace(engine, dynamic_edges=False)
+        if engine.dynamic_edges and traits.polar and npt and not evaluation:  # decision 59's exception (5-T03c)
             engine = dataclasses.replace(engine, dynamic_edges=False)
         if evaluation:
             pipelined = async_output = False
