@@ -144,7 +144,8 @@ class RewriteConfig:
     # not reproducible (owner, 20 Oct 2026).
     segment_gemm: Toggle = "auto"
     # A block linear's small per-l products (too few row tiles for the GPU by the shared shape rule) in one
-    # Triton launch (opt-1 OPT-T03 candidate 2); opt-in until its A/B on both GPUs.
+    # Triton launch (opt-1 OPT-T03 candidate 2); auto = on with block_linear for the generic MACE family, in
+    # float32, not reproducible (owner, 24 Oct 2026, decision 57).
     grouped_launch: Toggle = "auto"
     # Species-only atom-level products (embeddings, the first interaction's skip_tp and linear_up) as
     # per-species tables gathered each step (opt-1 OPT-T08 C1); auto = on where the model takes it, in float32

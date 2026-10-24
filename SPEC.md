@@ -451,6 +451,7 @@ class Rewrite:
 | `merged_residual` | rounding | with `block_linear` + `density_first` | included above | — |
 | `gated_rows` (residual products, gate and `linear_2` on per-segment rows; FastMACE optimisation round 1, OPT-T02 stage A) | exact (bitwise on the CPU and in the reproducible GPU mode) | with `merged_residual`, MACE's `GatedEquivariantBlock` in the folded MH-1 forward | MH-1: NaCl −4.4 % (sm_89) / −3.7 % (sm_120), NbCl5 −9.0 % / −10.6 %, on top of the rest | default on by owner decision, 20 October 2026; switched off for any model that fails the 19-label gate in the combined acceptance |
 | `segment_gemm` (`linear_2`'s products in the `gated_rows` chains write straight into the joined output, Triton gathered-row GEMM where the shared shape rule picks it; OPT-T02 stage B) | rounding (another GEMM; deterministic, no atomics) | with `gated_rows`, float32, not `reproducible=True` | MH-1 NbCl5 −4.8 to −5.2 % (sm_89) / −4.2 to −4.3 % (sm_120) on top of `gated_rows`; NaCl neutral (stock path below the rule's threshold) | default on by owner decision, 20 October 2026; float64 and the reproducible mode keep the stock path; switched off for any model that fails the 19-label gate in the combined acceptance |
+| `grouped_launch` (a block linear's small products of equal weight shape in one Triton launch, forward and input gradient; FastMACE optimisation round 1, OPT-T03 candidate 2) | rounding (another GEMM; deterministic) | with `block_linear`, float32, not `reproducible=True`; by default the generic MACE family only (every interaction MP-0's residual or the density family's, not PolarMACE) | generic NaCl −4.5 to −5.4 % (sm_120, five labels) / −4.1 to −4.3 % (sm_89 L4, OMAT-0); NbCl5 neutral (products above the shape rule's threshold); MH-1 NaCl −1.8 to −2.3 % (sm_120), +0.3 to +0.5 % (sm_89) | default on for the generic family by owner decision 57, 24 October 2026; MH-1, MACE-OFF, POLAR-1 and OMOL-0 stay off unless requested |
 | `streaming_conv` (OEq PR 223 kernels, NVRTC) | exact (summation order; atomic sums, not bitwise reproducible) | folded MH-1 class, `GENERIC_*` with OEq fusion | −7.7% NaNbO3; generic −16 to −28% with reassociation | OEq present; per-engine edge counter (§8.1) |
 | `generic_species_skip` | exact (absent columns multiply zeros) | MP-0/density family | −7 to −39% | fixed species superset |
 | `generic_fused_radial_backward` | rounding | MP-0/density family | −3 to −5% large cells | — |
@@ -2624,6 +2625,17 @@ Open decisions for the owner:
      they are in phase 5, covered by the conformance suite. Reconsider in phase
      6. Task 5-T10 is closed.
 
+57. Decided (user, 24 October 2026, optimisation round 4, OPT4-T04: "Go
+   ahead and do it as you recommended"): `RewriteConfig.grouped_launch` is on
+   by default for the generic MACE family only (MP-0, MPA-0, OMAT-0, MatPES
+   and the like: every interaction MP-0's residual block or the density
+   family's, not PolarMACE). MH-1 and the other families (MACE-OFF, POLAR-1,
+   OMOL-0) stay off until each is measured. Float64 and `reproducible=True`
+   plans keep the stock products; an explicit `on` or `off` overrides the
+   rule for any family. Same-process A/Bs on NaCl gained 4.5–5.4 % on the
+   RTX 5060 Ti (five labels, both orders) and 4.1–4.3 % on the L4 (OMAT-0);
+   NbCl5 was neutral (`docs/validation/opt4-T04.md`).
+
 ---
 
 ## 19. Revision history
@@ -3024,3 +3036,15 @@ OPT3-T02 (symmetric contraction) were screened and not built, OPT3-T04's
 `combo_kernels` was rejected (NbCl5 slower), and OPT3-T05's layout records
 stay opt-in (no gain above noise). Details in `plans/opt-3.md` and
 `docs/rewrites.md`.
+
+**Draft 0.12, fifteenth amendment (24 October 2026, owner decision 57, "Go
+ahead and do it as you recommended"; optimisation round 4, OPT4-T04):** one
+more FastMACE-only rewrite default, scoped to a model family.
+- **`RewriteConfig.grouped_launch`:** on with `block_linear` in float32,
+  non-reproducible plans for the generic MACE family (every interaction
+  MP-0's residual or the density family's, not PolarMACE). Stage 2 turns it
+  off for MH-1, MACE-OFF, POLAR-1 and OMOL-0 with the reason "not the generic
+  MACE family"; an explicit `on` keeps it for any family. Rounding class,
+  deterministic; the record itself is unchanged since OPT-T03b. NaCl −4.5 to
+  −5.4 % on the RTX 5060 Ti (five generic labels, both orders), −4.1 to
+  −4.3 % on the L4 (OMAT-0), NbCl5 neutral. §6.2's table has its row.

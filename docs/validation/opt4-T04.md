@@ -15,7 +15,30 @@ OPT-T03b (`f2531cb`): `RewriteConfig.grouped_launch`, `never_automatic`, roundin
 - The plan's falsifier (b/a ≤ 0.98 in both orders on `omat0-medium` NaCl) passes. Against the opt-4 default
   rule (a gain on sm_120 and no loss on the L4), `grouped_launch` qualifies **for generic MACE**. On MH-1 the
   earlier result stands: sm_120 0.977 / 0.982, sm_89 1.005 / 1.003 (`docs/design/opt-T03b-diagnosis.md`).
-  The owner decides the default.
+- **Owner decision 57 (24 October 2026, "Go ahead and do it as you recommended"):** on by default for the
+  generic MACE family only. MH-1 and the other families stay off until each is measured.
+
+## The default (decision 57)
+
+`FixedPlanner`'s rule `on_with_block_linear_float32_unless_reproducible_for_generic_mace_family`
+(`fastmace/planner/fixed.py`, `docs/design/switch-map.md`):
+
+- **Stage 1:** on when `block_linear` is on (the hybrid backend).
+- **Stage 2:** off unless every interaction of the model is a `GENERIC_INTERACTIONS` class (MP-0's
+  `RealAgnosticResidualInteractionBlock`, the density family's two blocks) and the model is not PolarMACE.
+  That is MP-0 (medium, large), MP-0b3, MPA-0, OMAT-0 and MatPES (PBE, r²SCAN). The others get the reason
+  "not the generic MACE family, decision 57" in `auto_options_off`:
+  - MACE-OFF: its first interaction is MACE's plain `RealAgnosticInteractionBlock`;
+  - MH-1, POLAR-1 and OMOL-0: the factored interaction.
+- **FastMACE rules:** off in float64 and `reproducible=True` plans, as `segment_gemm` (the Triton GEMM is
+  float32; the reproducible mode keeps the stock products).
+- An explicit `"on"` keeps it for any family and in float64; an explicit `"off"` turns it off.
+
+The float64 and reproducible part follows the `segment_gemm` and OPT-DEF-2 precedent. Decision 57 does not
+spell it out; float64 plans would run the stock products anyway (`module.sms` is None outside float32 CUDA).
+`mp0-large` and `matpes-r2scan` take the default by the family rule. Neither was measured here.
+
+The record's own `default` stays `"off"`: the planner always passes it an explicit on/off.
 
 ## Why it gains here
 
@@ -91,6 +114,18 @@ showed none live afterwards.
 
 ## Changes on the branch
 
+- `fastmace/planner/fixed.py`: the rule above (`_generic_mace_family`, stage 1, stage 2, FastMACE rules,
+  `AUTO_RULES`); comments in `fastmace/config.py` and `fastmace/rewrites/fusion/__init__.py`.
+- `tests/cpu/test_planner.py`:
+  - `grouped_launch` joins `FASTMACE_ONLY_DEFAULTS`, so `test_default_plans_equal_main_py` checks all
+    19 labels on both backends: on for the 7 generic-family labels on the hybrid, dropped by stage 2 for the
+    other 12;
+  - `test_grouped_launch_default_is_the_generic_mace_family`: OMAT-0 on; MH-1, POLAR-1, OMOL-0 and MACE-OFF
+    off with the family reason; explicit on/off; float64; plain cuEq.
+- `tests/cpu/test_config.py`: the rule name.
+- The six golden plan texts (`tests/cpu/golden/plan_text/`): the new off reason.
+- `SPEC.md`: the §6.2 table row, §18 decision 57, the §19 fifteenth amendment.
+- `docs/design/switch-map.md`: the option's row and the rule's row.
 - `tests/cpu/test_rewrites_fusion.py::test_grouped_launch_applies_to_generic_mace`: on a tiny generic model
   (residual interaction, cuEq naive kernel) the record applies to every block linear, the grouped launch runs
   (fake one-SM device), and energy and forces are bitwise unchanged.
@@ -101,7 +136,8 @@ showed none live afterwards.
 Test command (WSL, no other pytest running):
 
 ```bash
-CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 nice ~/environments/fastmace_cpu/bin/python -m pytest -n 2 -q -p no:cacheprovider tests/cpu/test_rewrites_fusion.py -k grouped
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 nice ~/environments/fastmace_cpu/bin/python -m pytest -n 6 -q -p no:cacheprovider tests/cpu/test_planner.py tests/cpu/test_config.py tests/cpu/test_rewrites_fusion.py tests/cpu/test_plan_text.py tests/cpu/test_minimal_planner.py tests/cpu/test_provenance.py tests/cpu/test_research_surface.py tests/cpu/test_combo_kernels.py tests/cpu/test_folded_backward_tiles.py tests/cpu/test_layout_records.py tests/cpu/test_report.py tests/cpu/test_memory_estimate.py tests/cpu/test_registry.py
 ```
 
-Output: `4 passed, 18 warnings in 8.34s`.
+Output: `494 passed, 24 skipped, 149 warnings in 43.69s`. Before the planner change, the new planner and config tests
+failed as expected: 22 failures, from the 12 non-generic labels' default-plan checks and the rule name.

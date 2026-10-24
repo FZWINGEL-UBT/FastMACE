@@ -214,13 +214,19 @@ FASTMACE_ONLY_DEFAULTS = {
     "species_tables": "on_float32_unless_reproducible_if_model_supports",
     "fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
     "fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
+    # Owner decision 57, 24 October 2026 (OPT4-T04): the generic MACE family only, float32, not reproducible.
+    "grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
 }
 # Where each FastMACE-only default applies (labels): the factored interaction, or the OPT-T08 records' own scope
 # (docs/design/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
 MH1_LABELS = ("mh1-omat", "mh1-mp", "mh1-r2scan")
+# The generic MACE family (decision 57): every interaction MP-0's residual or the density family's (MACE-OFF's
+# plain first interaction, MH-1, POLAR-1 and OMOL-0 are other families).
+GENERIC_FAMILY_LABELS = tuple(label for label, facts in LABEL_FACTS.items()
+                              if facts[0] != "PolarMACE" and set(facts[1]) <= {RESIDUAL, DENSITY_FIRST, DENSITY})
 APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "folded_backward_tiles": FACTORED_LABELS,
            "species_tables": MH1_LABELS, "fold_product_linear": MH1_LABELS,
-           "fold_readout_tail": (*MH1_LABELS, "omol0-xl")}
+           "fold_readout_tail": (*MH1_LABELS, "omol0-xl"), "grouped_launch": GENERIC_FAMILY_LABELS}
 
 
 def fastmace_only_expected(name, label, backend):
@@ -292,6 +298,29 @@ def test_segment_gemm_default_keeps_the_stock_path_in_float64():
                         rewrites=RewriteConfig(segment_gemm="on"))
     assert on(explicit.rewrites.segment_gemm)
     assert on(plan_for("mh1-r2scan").rewrites.segment_gemm)
+
+def test_grouped_launch_default_is_the_generic_mace_family():
+    """Owner decision 57 (OPT4-T04): auto turns grouped_launch on for the generic MACE family only, in float32
+    plans; explicit 'on' and 'off' override it."""
+    assert set(GENERIC_FAMILY_LABELS) == {"mp0-medium", "mp0-large", "mp0b3-medium", "mpa0-medium", "omat0-medium",
+                                          "matpes-pbe", "matpes-r2scan"}
+    plan = plan_for("omat0-medium")
+    item, choice, reason = decision(plan, "RewriteConfig.grouped_launch")
+    assert choice == "on" and "generic_mace_family" in reason
+    for label in ("mh1-r2scan", "polar1-s", "omol0-xl", "off23-medium"):
+        plan = plan_for(label)
+        item, choice, reason = decision(plan, "RewriteConfig.grouped_launch")
+        assert choice == "off" and "not the generic MACE family" in reason, label
+        assert "grouped_launch" in dict(plan.auto_options_off), label
+        assert on(plan_for(label, rewrites=RewriteConfig(grouped_launch="on")).rewrites.grouped_launch), label
+    assert not on(plan_for("omat0-medium", rewrites=RewriteConfig(grouped_launch="off")).rewrites.grouped_launch)
+    float64 = plan_for("omat0-medium", precision=PrecisionConfig(dtype="float64"))
+    item, choice, reason = decision(float64, "RewriteConfig.grouped_launch")
+    assert choice == "off" and "float64 keeps the stock products" in reason
+    assert on(plan_for("omat0-medium", precision=PrecisionConfig(dtype="float64"),
+                       rewrites=RewriteConfig(grouped_launch="on")).rewrites.grouped_launch)
+    assert not on(plan_for("omat0-medium", backend="cueq").rewrites.grouped_launch)  # block_linear is hybrid-only
+
 
 def test_reasons_name_the_stage_2_verdict():
     plan = plan_for("mp0-medium")

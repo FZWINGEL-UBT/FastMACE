@@ -97,7 +97,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.merged_residual": "on_with_block_linear",
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
-    "RewriteConfig.grouped_launch": "never_automatic",
+    "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
     "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.species_tables": "on_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
@@ -259,6 +259,16 @@ def _workload_text(atoms, pbc):
 
 def _toggle(value):
     return "on" if value else "off"
+
+
+def _generic_mace_family(traits):
+    """MP-0 / MPA-0 / OMAT-0 / MatPES-class models: every interaction MP-0's residual block or the density
+    family's (GENERIC_INTERACTIONS), not PolarMACE. MACE-OFF (a plain first interaction), MH-1, POLAR-1 and
+    OMOL-0 are other families (decision 57)."""
+    from fastmace.model.capabilities import GENERIC_INTERACTIONS
+
+    interactions = tuple(traits.interaction_classes)
+    return bool(interactions) and not traits.polar and all(name in GENERIC_INTERACTIONS for name in interactions)
 
 
 def _stress_text(config):
@@ -828,9 +838,9 @@ class FixedPlanner:
         needs("merged_residual", r.merged_residual != "off", v["block_linear"], "block_linear")
         needs("gated_rows", r.gated_rows != "off", v["merged_residual"], "merged_residual")
         needs("segment_gemm", r.segment_gemm != "off", v["gated_rows"], "gated_rows")
-        needs("grouped_launch", r.grouped_launch == "on", v["block_linear"], "block_linear")
-        if r.grouped_launch == "auto":
-            v["_why"]["grouped_launch"] = "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)"
+        # Owner decision 57, 24 October 2026 (OPT4-T04): on by default for the generic MACE family only; stage 2
+        # drops it for the other families, the FastMACE rules in float64 and reproducible plans.
+        needs("grouped_launch", r.grouped_launch != "off", v["block_linear"], "block_linear")
         note("species_skip", r.species_skip != "off", "stage 1: graph engine, any backend")
         # OPT-T08 records, on by default (owner decision, 21 October 2026, OPT-DEF-2); stage 2 keeps them only
         # where the model takes them, and the FastMACE rules drop them in float64 and reproducible plans.
@@ -860,6 +870,13 @@ class FixedPlanner:
                 v["_why"][name] += f"; stage 2: off, not supported by the model ({reason})"
             elif v[name]:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
+        if v["grouped_launch"] and "grouped_launch" not in explicit and not _generic_mace_family(traits):
+            # Measured only on the generic family (OPT4-T04); MH-1 lost 0.5 % on sm_89 (OPT-T03b).
+            reason = (f"not the generic MACE family, decision 57 (interactions "
+                      f"{sorted(set(traits.interaction_classes))}{', PolarMACE' if traits.polar else ''})")
+            v["grouped_launch"] = False
+            v["_auto_off"]["grouped_launch"] = reason
+            v["_why"]["grouped_launch"] += f"; stage 2: off, {reason}"
 
     def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False):
         """FastMACE's hard rules on the rewrites, then one decision per rewrite field and neighbour option."""
@@ -882,6 +899,11 @@ class FixedPlanner:
             v["segment_gemm"] = False
             v["_why"]["segment_gemm"] += ("; off: reproducible=True keeps the stock products" if reproducible
                                           else f"; off: {dtype} keeps the stock products (the Triton GEMM is float32)")
+        if v["grouped_launch"] and "grouped_launch" not in explicit and (dtype != "float32" or reproducible):
+            v["grouped_launch"] = False
+            v["_why"]["grouped_launch"] += ("; off: reproducible=True keeps the stock products" if reproducible
+                                            else f"; off: {dtype} keeps the stock products (the Triton GEMM is "
+                                                 "float32)")
         if not hybrid and v["reassociate_first"]:
             if "reassociate_first" in explicit:
                 book.refuse(f"RewriteConfig.reassociate_first='on' on plain cuEq: {PLAIN_CUEQ_REASSOCIATION}",

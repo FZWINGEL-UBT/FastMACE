@@ -5,9 +5,9 @@ Plan revision 0, tier compiled (rule 4: no mode given: padded edges would change
       fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, block_linear, grouped_linear,
       merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,
       fold_product_linear, polar_uvu
-  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, grouped_launch,
-      combo_kernels (only an explicit 'on' enables it); species_skip (not supported by the model);
-      inplace_block_linear (not carried over in 1a)
+  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants,
+      combo_kernels (only an explicit 'on' enables it); grouped_launch (not the generic MACE family, decision 57);
+      species_skip (not supported by the model); inplace_block_linear (not carried over in 1a)
   sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, no CUDA graphs
   sizes: D3: no list; k-space headroom n/a
   kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes
