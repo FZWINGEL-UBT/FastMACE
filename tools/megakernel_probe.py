@@ -26,7 +26,8 @@ Variants, from a pure-issue test towards a real GEMM's registers and shared-memo
 Pass rule (design note): the SIMT side keeps >= 90 % of its standalone rate, and the MMA side adds enough
 useful throughput to pay for an FP32-accurate decomposition. The useful FP32 rate of the MMA side is its rate
 divided by the products the decomposition needs (``c``: 3 for 3xTF32, 6 for BF16x6; BF16x3 is shown as well),
-with the split's own SIMT cost left out, so the gain is an upper bound (``x3`` measures that cost). The row's verdict is ``pass`` when
+with the split's own SIMT cost left out, so the gain is an upper bound (``x3`` measures that cost). The row's
+verdict is ``pass`` when
 
     keep = simt_both / simt_alone >= 0.90  and
     gain = (simt_both + mma_both / c) / max(simt_best, mma_best / c) >= 1.10,
@@ -66,6 +67,8 @@ def decompositions(variant, kind):
 
 def primary(variant, kind):
     return next(iter(X3)) if variant == "x3" else PRIMARY[kind]
+
+
 KEEP_MIN = 0.90
 GAIN_MIN = 1.10
 REC = 6  # per-warp record: role, chunks, start, end (clock64), gstart, gend (globaltimer)
@@ -77,11 +80,13 @@ SOURCE = r"""
 
 __device__ __forceinline__ void mma_op(int kind, float* d, const unsigned* a, const unsigned* b) {
   if (kind == 0) {
-    asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32 {%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"
+    asm volatile("mma.sync.aligned.m16n8k8.row.col.f32.tf32.tf32.f32 "
+                 "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"
                  : "+f"(d[0]), "+f"(d[1]), "+f"(d[2]), "+f"(d[3])
                  : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
   } else {
-    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 {%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 "
+                 "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"
                  : "+f"(d[0]), "+f"(d[1]), "+f"(d[2]), "+f"(d[3])
                  : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
   }
@@ -262,8 +267,8 @@ __device__ void body(int s_warps, long long budget, unsigned fill, const float* 
 
 // The gemm variant's 128 MMA accumulators need up to 255 registers, hence at most 256 threads.
 #define PROBE(NAME, VAR, KIND) \
-extern "C" __global__ void __launch_bounds__(VAR >= 2 ? 256 : 512) NAME(int s, long long budget, unsigned fill, const float* in, \
-    float* out, long long* rec, int* smid) { body<VAR, KIND>(s, budget, fill, in, out, rec, smid); }
+extern "C" __global__ void __launch_bounds__(VAR >= 2 ? 256 : 512) NAME(int s, long long budget, unsigned fill, \
+    const float* in, float* out, long long* rec, int* smid) { body<VAR, KIND>(s, budget, fill, in, out, rec, smid); }
 PROBE(probe_reg_tf32, 0, 0)
 PROBE(probe_reg_bf16, 0, 1)
 PROBE(probe_smem_tf32, 1, 0)
@@ -439,8 +444,9 @@ def main(argv=None):
     # Warm-up: clocks up, module resident.
     for _ in range(3):
         launch(torch, kernels[("reg", "tf32")], sms, 4, 4, args.budget, fills["tf32"], buffers)
-    print(f"{'variant':6} {'kind':4} {'grid':>4} {'SxM':>4} {'regs':>4} | {'simt':>6} {'mma':>6} {'s_all':>6} {'m_all':>6} | {'s_both':>6} "
-          f"{'m_both':>6} | {'keep':>5} {'mma%':>5} {'gain':>5} {'decomp':>7} | verdict", flush=True)
+    print(f"{'variant':6} {'kind':4} {'grid':>4} {'SxM':>4} {'regs':>4} | "
+          f"{'simt':>6} {'mma':>6} {'s_all':>6} {'m_all':>6} | {'s_both':>6} {'m_both':>6} | "
+          f"{'keep':>5} {'mma%':>5} {'gain':>5} {'decomp':>7} | verdict", flush=True)
     for variant in args.variants:
         for kind in args.kinds:
             if (variant, kind) not in kernels:
@@ -464,7 +470,8 @@ def main(argv=None):
                     print(f"{variant:6} {kind:4} {grid:>4} {config:>4} {row['regs']:>4} | "
                           f"{md['simt_alone']['simt_flop_per_cycle_sm']:6.1f} "
                           f"{md['mma_alone']['mma_flop_per_cycle_sm']:6.1f} "
-                          f"{md['simt_all']['simt_flop_per_cycle_sm']:6.1f} {md['mma_all']['mma_flop_per_cycle_sm']:6.1f} | "
+                          f"{md['simt_all']['simt_flop_per_cycle_sm']:6.1f} "
+                          f"{md['mma_all']['mma_flop_per_cycle_sm']:6.1f} | "
                           f"{md['both']['simt_flop_per_cycle_sm']:6.1f} {md['both']['mma_flop_per_cycle_sm']:6.1f} | "
                           f"{row['keep']:5.2f} {row['mma_share']:5.2f} {d['gain_vs_best_single']:5.2f} "
                           f"{primary(variant, kind)[:7]:>7} | {'PASS' if row['pass'] else 'fail'}"
