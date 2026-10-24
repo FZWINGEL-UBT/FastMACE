@@ -172,6 +172,16 @@ class Rewrite:
     # Bitwise-deterministic on CUDA under torch.use_deterministic_algorithms(True) (SPEC §9.3
     # "reproducible=True"): True, False, or None = undeclared, which a reproducible plan refuses.
     deterministic: bool | None = None
+    # Rule 12's term (5-T03): memory(dims, width) -> (bytes per edge, bytes per node) this rewrite adds to stock
+    # MACE's force call at its peak (negative: a stock tensor it does not keep), from the model's
+    # ``capabilities.ModelDims`` and the force precision's bytes per float. None: no change declared.
+    memory: Callable[[Any, int], Any] | None = None
+    # Its self-check's transient at build (5-T03): selfcheck_memory(dims, width, sms) -> bytes, from the model's
+    # widths, the bytes per float and the device's SM count (None off CUDA). None: no more than a force call.
+    selfcheck_memory: Callable[[Any, int, int | None], int] | None = None
+    # The device memory it keeps beside the model's weights (5-T03): resident_memory(dims, width) -> bytes, from
+    # the model's widths and the bytes per float (block_linear's weight and transposed weight buffers).
+    resident_memory: Callable[[Any, int], int] | None = None
 
     def __post_init__(self):
         if not isinstance(self.name, str) or not self.name:
@@ -198,6 +208,9 @@ class Rewrite:
         if self.deterministic is not None and not isinstance(self.deterministic, bool):
             raise ValueError(f"Rewrite {self.name}: deterministic must be True, False or None, "
                              f"got {self.deterministic!r}")
+        for name in ("memory", "selfcheck_memory", "resident_memory"):
+            if getattr(self, name) is not None and not callable(getattr(self, name)):
+                raise ValueError(f"Rewrite {self.name}: {name} is not callable")
 
     @classmethod
     def from_dict(cls, mapping):
@@ -317,21 +330,40 @@ def check_tensors(cases, dtype=None):
 
     ``dtype`` defaults to the dtype of the first expected tensor. Each name counts as one module.
     """
-    cases = list(cases)
-    if not cases:
-        return CheckResult(True, 0.0, threshold_for(dtype or "float64"), 0, "nothing to check",
-                           str(dtype or "float64").removeprefix("torch."))
-    dtype = str(dtype or cases[0][1].dtype).removeprefix("torch.")
-    threshold = threshold_for(dtype)
-    worst, problems, names = 0.0, [], []
+    errors = CaseErrors()
     for name, expected, got in cases:
-        error = relative_error(got, expected)
-        worst = max(worst, error)
-        if name not in names:
-            names.append(name)
-        if not error <= threshold:
-            problems.append(f"{name}: relative error {error:.3g} > {threshold:g}")
-    return CheckResult(not problems, worst, threshold, len(names), "; ".join(problems) or "ok", dtype)
+        errors.add(name, expected, got)
+    return errors.result(dtype)
+
+
+class CaseErrors:
+    """``check_tensors`` one case at a time: ``add`` keeps only the case's relative error, so a self-check can
+    free its tensors before computing the next case (5-T03: the segment_gemm self-check held every
+    interaction's probes and gradients at once); ``result`` is ``check_tensors``' result for the same cases."""
+
+    def __init__(self):
+        self.errors: list[tuple[str, float]] = []
+        self.first_dtype = None
+
+    def add(self, name, expected, got):
+        if self.first_dtype is None:
+            self.first_dtype = expected.dtype
+        self.errors.append((name, relative_error(got, expected)))
+
+    def result(self, dtype=None):
+        if not self.errors:
+            return CheckResult(True, 0.0, threshold_for(dtype or "float64"), 0, "nothing to check",
+                               str(dtype or "float64").removeprefix("torch."))
+        dtype = str(dtype or self.first_dtype).removeprefix("torch.")
+        threshold = threshold_for(dtype)
+        worst, problems, names = 0.0, [], []
+        for name, error in self.errors:
+            worst = max(worst, error)
+            if name not in names:
+                names.append(name)
+            if not error <= threshold:
+                problems.append(f"{name}: relative error {error:.3g} > {threshold:g}")
+        return CheckResult(not problems, worst, threshold, len(names), "; ".join(problems) or "ok", dtype)
 
 
 # --------------------------------------------------------------------------- planner-facing records

@@ -159,7 +159,8 @@ def detect_hardware(device: str = "cuda:0") -> Hardware:
     if torch.device(device).type != "cuda":
         return Hardware("cpu", (0, 0), 0)
     properties = torch.cuda.get_device_properties(torch.device(device))
-    return Hardware(properties.name, (properties.major, properties.minor), int(properties.total_memory))
+    return Hardware(properties.name, (properties.major, properties.minor), int(properties.total_memory),
+                    int(properties.multi_processor_count))
 
 
 def integrator_keywords(config: IntegratorConfig) -> dict[str, Any]:

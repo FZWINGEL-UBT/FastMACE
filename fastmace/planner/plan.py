@@ -51,11 +51,13 @@ _PARTS = (("rewrites", "RewriteConfig"), ("engine", "EngineConfig"), ("precision
 
 @dataclass(frozen=True)
 class Hardware:
-    """What the planner knows about the GPU: name, compute capability, memory (bytes)."""
+    """What the planner knows about the GPU: name, compute capability, memory (bytes) and its SM count (``None``
+    off CUDA or where not detected; rule 12's build estimate reads it, 5-T03)."""
 
     name: str
     compute_capability: tuple[int, int]
     memory_bytes: int
+    sms: int | None = None
 
 
 @dataclass(frozen=True)
