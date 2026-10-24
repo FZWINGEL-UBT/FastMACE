@@ -10,7 +10,10 @@ records every GEMM the record reroutes during one more evaluation (forward produ
 Each product's tf32x3 result (the launch's own output) and cuBLAS IEEE's product of the same float32 operands are
 compared with a float64 product: max relative (max |c - c64| / max |c64|), relative Frobenius and the
 cancellation-scaled error max |c - c64| / sum_k |a_ik b_kj| (``docs/validation/opt-T01-tensor-cores.md`` §6-§7),
-plus how much the real operands cancel (the median and largest sum |a b| / |c64|). A profiler pass of a third
+plus how much the real operands cancel (the median and largest sum |a b| / |c64|). The cancellation-scaled error
+counts only outputs whose sum |a b| is at least ``SCALE_FLOOR`` (2^-103: below it one float32 unit roundoff of the
+sum is subnormal, and both modes lose digits to underflow, not to the split); the unfiltered value and the sum
+|a b| at its worst output are recorded beside it. A profiler pass of a third
 evaluation lists the matrix products still on cuBLAS (``aten::mm``/``addmm``/``bmm``), to show which GEMMs the
 record leaves alone (the edge-level radial networks). Output: ``<output>/<structure>.json`` and
 ``summary.json``. Measurement only; any TF32 GPU (compute capability >= 8.0).
@@ -29,6 +32,7 @@ from pathlib import Path
 import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
 
 TOOLS = Path(__file__).resolve().parent
+SCALE_FLOOR = 2.0 ** -103  # float32's smallest normal (2^-126) over its unit roundoff (2^-23)
 
 
 def parse_args(argv=None):
@@ -43,14 +47,19 @@ def parse_args(argv=None):
 
 
 def errors(torch, got, reference, absolute):
-    """(max relative, relative Frobenius, cancellation-scaled max) of ``got`` against the float64 ``reference``;
+    """(max relative, relative Frobenius, cancellation-scaled max over sums >= SCALE_FLOOR, the same over every
+    nonzero sum, the sum |a b| at that unfiltered worst output) of ``got`` against the float64 ``reference``;
     ``absolute`` is sum_k |a_ik b_kj|."""
     diff = (got.double() - reference).abs()
     scale = float(reference.abs().max())
     frob = float(reference.norm())
+    normal = absolute >= SCALE_FLOOR
+    cancel = float((diff[normal] / absolute[normal]).max()) if bool(normal.any()) else 0.0
     positive = absolute > 0
-    cancel = float((diff[positive] / absolute[positive]).max()) if bool(positive.any()) else 0.0
-    return (float(diff.max()) / scale if scale else 0.0, float(diff.norm()) / frob if frob else 0.0, cancel)
+    scaled = torch.where(positive, diff / absolute.clamp_min(torch.finfo(torch.float64).tiny), 0.0)
+    worst = int(scaled.argmax())
+    return (float(diff.max()) / scale if scale else 0.0, float(diff.norm()) / frob if frob else 0.0, cancel,
+            float(scaled.reshape(-1)[worst]), float(absolute.reshape(-1)[worst]))
 
 
 class Recorder:
@@ -108,9 +117,9 @@ def cublas_products(torch, ff, atoms):
     for event in prof.events():
         if event.name in ("aten::mm", "aten::addmm", "aten::bmm", "aten::baddbmm"):
             found[(event.name, str(event.input_shapes))] += 1
-    tf32x3 = sum(1 for event in prof.events() if event.name == "fastmace::tf32x3_mm")
-    joined = sum(1 for event in prof.events() if event.name.startswith("fastmace::joined_products"))
-    return [dict(op=op, shapes=shapes, count=count) for (op, shapes), count in sorted(found.items())], tf32x3, joined
+    names = Counter(event.name for event in prof.events() if "tf32x3" in event.name or "joined_products" in event.name
+                    or event.name.startswith("gemm"))
+    return [dict(op=op, shapes=shapes, count=count) for (op, shapes), count in sorted(found.items())], dict(names)
 
 
 def worst(rows, mode, index):
@@ -121,7 +130,7 @@ def summarise(rows):
     import statistics
 
     out = dict(products=len(rows), shapes=len({(r["kind"], r["m"], r["k"], r["n"]) for r in rows}))
-    for index, name in enumerate(("max_rel", "frob_rel", "cancellation_scaled")):
+    for index, name in enumerate(("max_rel", "frob_rel", "cancellation_scaled", "cancellation_scaled_unfiltered")):
         out[name] = {mode: worst(rows, mode, index) for mode in ("tf32x3", "ieee")}
         ratios = [row["tf32x3"][index] / row["ieee"][index] for row in rows if row["ieee"][index] > 0]
         out[name]["tf32x3_over_ieee_median"] = statistics.median(ratios) if ratios else None
@@ -173,10 +182,9 @@ def main(argv=None):
         torch.cuda.synchronize()
         recorder.active = False
         rows = recorder.rows
-        left, tf32x3_calls, joined_calls = cublas_products(torch, ff, atoms)
+        left, launches = cublas_products(torch, ff, atoms)
         record = dict(structure=str(name), natoms=len(atoms), decision=list(decision), summary=summarise(rows),
-                      products=rows, cublas_products_left=left, tf32x3_op_calls=tf32x3_calls,
-                      joined_op_calls=joined_calls)
+                      products=rows, cublas_products_left=left, rerouted_events=launches)
         stem = Path(str(name)).stem
         (args.output / f"{stem}.json").write_text(json.dumps(record, indent=2, default=str) + "\n")
         summary["structures"][stem] = dict(natoms=len(atoms), decision=list(decision), **record["summary"],
