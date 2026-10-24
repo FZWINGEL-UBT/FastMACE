@@ -408,6 +408,20 @@ after another and would pay it per crystal, so it stays off by default: for unfa
   file list: `model/capabilities.py`, `planner/fallback.py`, `planner/plan.py` and `planner/fixed.py`
   (`Hardware.sms`), and `rewrites/fusion/__init__.py` (the `segment_gemm` self-check frees each
   interaction's tensors; `docs/validation/5-T03.md`).
+  The fit on 60 measured cases (14 labels × NaCl/NbCl5 × NVT/NPT on the RTX 5060 Ti and the A100, plus 4
+  plain-cuEq cases) sets:
+  - the run term stock-structured (what stock MACE keeps per edge and per node);
+  - `LIBRARY_WORKSPACES` = 5 × 32 MiB, the cuBLAS workspaces observed;
+  - `SAFETY` = 0.90, one factor for every model and GPU (decision 51 and §9.3's rule 12 row). It is fitted
+    on the 14 labels that run on Na, Nb and Cl; the 5 MACE-OFF models have no Na embedding.
+
+  The factor is below 1 because the fused paths keep less than stock and the uniform-density edge estimate
+  is 1.2–1.3× high. The prediction is 1.05–1.48 of the measured peak on every case, with thin margins at
+  both ends. `tests/cpu/test_memory_fit.py` keeps every case in [1.0, 1.5].
+
+  Known limitation, a plan follow-up: per-path structural run terms (the fused OEq path, the folded MH-1
+  backward, PolarMACE's long range), declared where each path is chosen. No structural per-path term fitted
+  all families at one factor in 5-T03's diagnostics.
 - **5-T04** (rule 15): `model-structure-warning`.
 - **5-T05** (`str(plan)`): the layout above.
 - **5-T06** (monitor): `AdaptationConfig`, `counters.tier_switches`, `TierSwitch`.

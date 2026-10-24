@@ -553,6 +553,10 @@ class Simulation:
         self._last_point = None  # the last committed canonical point (HandOver; 5-T08's mid-run fallbacks)
         self._setup_point = None  # the setup's point of a fresh run (its output starts with no chunk)
         self._mid_run_interval = None  # the mid-run fallback made since the last canonical point (decision 54)
+        # The move-set attachments since the last canonical point, (step, attached state or None, carried record):
+        # a mid-run fallback redoes them at their steps (5-T08b). _mc_pending: those still to redo.
+        self._mc_events = []
+        self._mc_pending = []
         self._child = False  # set by the subprocess runner's child: switches are the parent's
         started = time.perf_counter()
         stored = getattr(self, "_resume_plan", None)  # a resume of a fallback revision (2-T15)
@@ -672,6 +676,7 @@ class Simulation:
             self._open_output()
         if optimizer is None and not getattr(self, "_resuming", False):  # a fresh build is canonical (§10.6)
             self._last_point = self._setup_point = self._hand_over(canonicalise=False)
+            self._mc_events = []
         self._write_metadata()
 
     def _attach_engine(self):
@@ -882,8 +887,10 @@ class Simulation:
             return
         if mc is None:
             self._detach_mc()
+            self._mc_attached_event(None)
         elif moves is not None:
             self._attach_mc(moves)
+            self._mc_attached_event(self._mc.state_dict())
         self._schedule = position
         self._engine.state.protocol = position
         self._advance(count)
@@ -1115,12 +1122,15 @@ class Simulation:
         end = int(engine.state.step) + count  # a mid-run fallback redoes the steps since its point (5-T08)
         try:
             while int(engine.state.step) < end:
+                if self._mc_pending and int(engine.state.step) >= self._mc_pending[0][0]:
+                    self._redo_mc_event(self._mc_pending.pop(0))  # a move-set change redone at its step (5-T08b)
+                    driver = self._mc
                 if position is not None:
                     self._fill(resolved.target(position.step + 1))
                 try:
                     engine.step()
                 except Exception as error:
-                    if not self._mid_run_fallback(error):
+                    if not self._mid_run_fallback(error, end):
                         raise
                     # The validated revision continues from the committed point (SPEC §9.4 step 5).
                     engine, driver, position = self._engine, self._mc, self._schedule
@@ -1423,7 +1433,7 @@ class Simulation:
 
     # ------------------------------------------------------------------ mid-run fallbacks (§9.4 step 5; 5-T08)
 
-    def _mid_run_fallback(self, error):
+    def _mid_run_fallback(self, error, end):
         """The fallback of SPEC §9.4 for ``error``, raised by a step during ``run()`` (decision 54); whether the run
         continues. ``False``: not a trigger (the caller raises it again unchanged).
 
@@ -1487,12 +1497,13 @@ class Simulation:
         protocol = restart.protocol_record(stored)
         if self._schedule is not None and protocol is not None:  # the schedule's position at the point
             self._schedule = ScheduleState.from_restart(protocol)
+        # The move set attached at the point, with its streams, counters and cycle position from the point's
+        # record; the attachments made since are redone at their steps (_mc_events, 5-T08b).
+        attached = restart.mc_record(stored)
+        self._mc_moves = None if attached is None else tuple(move_from_record(entry) for entry in attached["moves"])
         self._restore(point, result.engine, plan)
-        if self._mc is None and self._mc_moves is not None:  # attached after the point: attached again
-            self._attach_mc(self._mc_moves)
-        self._mc_ranges = [[first, min(last, point.step)] for first, last in self._mc_ranges if first < point.step]
-        if self._mc is not None:
-            self._mc_ranges.append([point.step, point.step])  # the steps redone with the move set attached
+        self._mc_pending = [event for event in self._mc_events if event[0] >= point.step]
+        self._mc_ranges = self._redone_mc_ranges(point.step, end, attached is not None)
         if self._writer is not None:  # chunks after the point deleted, never rewritten (§10.6)
             self._writer.close()
             self._open_output(resume_from=point.outputs if point.outputs is not None else
@@ -1517,6 +1528,46 @@ class Simulation:
         self._report.plan = plan
         self._write_metadata()
         return True
+
+    def _mc_attached_event(self, state):
+        """Record a move-set change of ``run(mc=...)`` at the current step (``state``: the attached driver's
+        ``state_dict`` right after the attach, ``None`` for a detach), for a mid-run fallback to redo (5-T08b)."""
+        import copy
+
+        step = int(self._engine.state.step)
+        self._mc_events.append((step, copy.deepcopy(state), copy.deepcopy(self._mc_record)))
+
+    def _redo_mc_event(self, event):
+        """Redo a move-set change at its step: the attach with the streams, counters and cycle position it had
+        then (``_resume_mc``), or the detach with the record it left."""
+        _, state, carried = event
+        if self._mc is not None:
+            self._mc.detach()
+            self._mc = None
+        if state is None:
+            self._detach_mc()
+            self._mc_record = carried
+        else:
+            self._resume_mc(state)
+
+    def _redone_mc_ranges(self, point, end, attached):
+        """``_mc_ranges`` after a fallback to ``point``: the ranges before it, then the redone steps up to ``end``
+        with the move set attached from the point (``attached``) and at each pending attach."""
+        ranges = [[first, min(last, point)] for first, last in self._mc_ranges if first < point]
+        start = point if attached else None
+        for step, state, _ in self._mc_pending:
+            if start is not None and step > start:
+                ranges.append([start, step])
+            start = step if state is not None else None
+        if start is not None and end > start:
+            ranges.append([start, end])
+        merged = []
+        for first, last in ranges:
+            if merged and merged[-1][1] == first:
+                merged[-1][1] = last
+            elif last > first:
+                merged.append([first, last])
+        return merged
 
     def _mid_run_stop(self):
         """A mid-run failure stops the run: the output so far flushed, the metadata written; no restart."""
@@ -1789,6 +1840,7 @@ class Simulation:
         arrays = restart.write_engine_restart(path, self._engine, name=ENGINE_NAME, plan=self._plan,
                                               outputs=outputs)
         self._last_point = HandOver(step=int(self._engine.state.step), arrays=arrays, outputs=outputs)
+        self._mc_events = []  # the record holds the attached move set (5-T08b)
         self._mid_run_interval = None  # a new canonical interval (decision 54)
         if outputs is not None:
             point = {"step": int(self._engine.state.step), **outputs}
@@ -1964,6 +2016,7 @@ class Simulation:
         if output is not None:
             self._open_output(resume_from=restart.output_indices(stored))
         # resume_engine canonicalised (§10.6); the output continues after the restart's chunks.
+        self._mc_events = []
         self._last_point = dataclasses.replace(self._hand_over(canonicalise=False),
                                                outputs=None if output is None else restart.output_indices(stored))
         self._write_metadata()
