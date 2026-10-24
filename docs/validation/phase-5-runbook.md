@@ -271,8 +271,10 @@ Ti and the Colab L4 (and on the A100 if that leg runs).
 - rule 6 on that GPU (5-T11, written): `test_compat_gpu.py`'s graph-kernel test, already in the tier, also asserts
   that the planner's software check found cuEquivariance's fused kernels and the plan's `allow_naive_cueq`
   decision is `off` with code `fused-cueq` (the loading side, `fused_cueq["naive"]`, is `test_loading_gpu.py`'s);
-- rule 12: the estimate against the measured peak on MH-1 NaCl (5-T03's test);
-- the forced re-capture switch smoke, correctness only (5-T07's test).
+- rule 12: the estimate against the measured peak on MH-1 NaCl (5-T03's `test_memory_gpu.py`, requested by the
+  conductor; listed when it lands);
+- the forced re-capture switch smoke, correctness only: 5-T07's
+  `test_adapt_switch_gpu.py::test_a_forced_recapture_storm_switches_once_to_the_compiled_tier` (listed).
 
 ## Tool-side additions (before the freeze, CPU-tested on `fastmace/5-T11`)
 
