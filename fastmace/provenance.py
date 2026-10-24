@@ -14,7 +14,8 @@ Phase 5 (plan task 5-T01) adds keys and changes none, so the schema stays versio
 version (``SCHEMA_MINOR``, key ``schema_minor``) becomes 1: ``counters.tier_switches`` is a list
 (``TIER_SWITCH_KEYS``; empty without a switch), and the plan records ``calibration`` and ``adaptation``.
 Plan task 5-T06 adds, within minor 1, the runtime monitor's ``counters.segments`` (``SEGMENT_KEYS``; empty
-without a segment) and fills ``counters.neighbour_lists`` from its totals.
+without a segment) and fills ``counters.neighbour_lists`` from its totals. Plan task 5-T08 adds, within minor 1,
+``counters.fallbacks``: the mid-run fallbacks (``FALLBACK_KEYS``; empty without one).
 
 Phase 1a's blocks stay as they were, so that ``main.py`` on FastMACE (1a-T17) writes the same files:
 
@@ -498,7 +499,7 @@ CHECKPOINT_KEYS = ("path", "sha256", "head", "licence", "label", "trust")
 SUBPROCESS_KEYS = ("python", "reason", "directory", "children", "calls", "persistent", "seconds", "failed", "last")
 SUBPROCESS_CHILD_KEYS = ("action", "stage", "pid", "exit_code", "seconds", "steps")
 # Counters the caller fills; tier_switches (phase 5, §9.6) is a list of TIER_SWITCH_KEYS records, [] without one.
-COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone", "mc", "tier_switches", "segments")
+COUNTER_KEYS = ("recaptures", "neighbour_lists", "overflows_redone", "mc", "tier_switches", "segments", "fallbacks")
 # Counters the engine's info() carries (the graph engine's re-capture policy and overflow redos, 3-T04),
 # taken from it when the caller gives none.
 ENGINE_COUNTER_KEYS = ("recaptures", "overflows_redone")
@@ -506,6 +507,9 @@ ENGINE_COUNTER_KEYS = ("recaptures", "overflows_redone")
 LATER_COUNTER_KEYS = ()
 # One tier switch (planner.plan.TierSwitch.record(); 5-T07): its step, the tiers, the reason and the revision.
 TIER_SWITCH_KEYS = ("step", "from", "to", "reason", "revision")
+# One mid-run fallback (planner.fallback.mid_run_fallbacks; 5-T08, SPEC §9.4 step 5): the committed point's step it
+# went back to, the tiers, the activated revision's reason and number.
+FALLBACK_KEYS = ("step", "from", "to", "reason", "revision")
 # One runtime-monitor segment (planner.adapt.Segment.record(); 5-T06): the steps it covers, where it ended,
 # its loop wall time, re-captures and captures with their host time, overflows redone, the step the
 # re-capture budget was exceeded at, and per neighbour list {rebuilds, build_time_s}.
@@ -792,6 +796,7 @@ def _counters(counters, engine_info):
     if given.get("mc") is not None:
         given["mc"] = _mc_counters(given["mc"])
     given["tier_switches"] = _tier_switches(given.get("tier_switches"))
+    given["fallbacks"] = _tier_switches(given.get("fallbacks"), name="fallbacks", keys=FALLBACK_KEYS)
     given["segments"] = _segments(given.get("segments"))
     for key in ENGINE_COUNTER_KEYS:
         if given.get(key) is None and isinstance(engine_info, Mapping) and engine_info.get(key) is not None:
@@ -802,22 +807,23 @@ def _counters(counters, engine_info):
     return out
 
 
-def _tier_switches(switches):
-    """``counters.tier_switches``: ``TierSwitch`` records or mappings with exactly ``TIER_SWITCH_KEYS``."""
+def _tier_switches(switches, name="tier_switches", keys=TIER_SWITCH_KEYS):
+    """``counters.tier_switches``: ``TierSwitch`` records or mappings with exactly ``TIER_SWITCH_KEYS``; with
+    ``name="fallbacks"`` and ``FALLBACK_KEYS``, ``counters.fallbacks`` (5-T08)."""
     if switches is None:
         return []
     if not isinstance(switches, (list, tuple)):
-        raise ValueError(f"counters.tier_switches must be a list of tier switches, got {switches!r}")
+        raise ValueError(f"counters.{name} must be a list of records, got {switches!r}")
     out = []
     for index, switch in enumerate(switches):
         if callable(getattr(switch, "record", None)):
             switch = switch.record()
-        if not isinstance(switch, Mapping) or set(switch) != set(TIER_SWITCH_KEYS):
-            raise ValueError(f"counters.tier_switches[{index}] must have the keys {TIER_SWITCH_KEYS}, got {switch!r}")
+        if not isinstance(switch, Mapping) or set(switch) != set(keys):
+            raise ValueError(f"counters.{name}[{index}] must have the keys {keys}, got {switch!r}")
         for key in ("step", "revision"):
             if isinstance(switch[key], bool) or not isinstance(switch[key], int) or switch[key] < 0:
-                raise ValueError(f"counters.tier_switches[{index}].{key} must be an integer >= 0, got {switch[key]!r}")
-        out.append({key: _plain(switch[key], f"counters.tier_switches[{index}].{key}") for key in TIER_SWITCH_KEYS})
+                raise ValueError(f"counters.{name}[{index}].{key} must be an integer >= 0, got {switch[key]!r}")
+        out.append({key: _plain(switch[key], f"counters.{name}[{index}].{key}") for key in keys})
     return out
 
 
