@@ -44,6 +44,8 @@ def parse_args(argv=None):
     run.add_argument("--repeat", default="3x3x3")
     run.add_argument("--ensembles", nargs="+", choices=ENSEMBLES, default=list(ENSEMBLES))
     run.add_argument("--modes", nargs="+", choices=MODES, default=[JUDGED_MODE])
+    run.add_argument("--backend", choices=("auto", "hybrid", "cueq"), default="auto",
+                     help="the planner's backend (default: its own choice)")
     run.add_argument("--precision", choices=("float32", "float64"), default=None,
                      help="the ForceField's force precision (default: its own)")
     run.add_argument("--steps", type=int, default=100)
@@ -59,6 +61,7 @@ def parse_args(argv=None):
     case.add_argument("--ensemble", choices=ENSEMBLES, required=True)
     case.add_argument("--mode", choices=MODES, required=True)
     case.add_argument("--precision", default=None)
+    case.add_argument("--backend", choices=("auto", "hybrid", "cueq"), default="auto")
     case.add_argument("--steps", type=int, default=100)
     case.add_argument("--temperature-K", type=float, default=600.0)
     case.add_argument("--memory-history", action="store_true",
@@ -134,7 +137,7 @@ def run_case(args):
     record.update(natoms=len(atoms), volume_A3=float(atoms.get_volume()))
     options = {} if args.precision is None else {"precision": args.precision}
     force_field = ForceField(pristine, atoms, **options)
-    planner = minimal.MinimalPlanner(engine=EngineConfig())
+    planner = minimal.MinimalPlanner(engine=EngineConfig(backend=args.backend))
     hardware = planner.hardware()
     integrator = integrator_for(args.ensemble, args.temperature_K)
     workload = Workload(max_temperature_K=args.temperature_K)
@@ -178,13 +181,16 @@ def run_case(args):
     record["live_after_build_bytes"] = int(torch.cuda.memory_allocated())
     build_peak = record["after_build_bytes"]
     torch.cuda.reset_peak_memory_stats()
+    steps_begin = len(torch.cuda.memory._snapshot()["device_traces"][0]) if args.memory_history else 0
     for _ in range(args.steps):
         engine.step()
     torch.cuda.synchronize()
     record["step_peak_bytes"] = int(torch.cuda.max_memory_allocated())
     record["live_after_steps_bytes"] = int(torch.cuda.memory_allocated())
     if args.memory_history:
-        record["at_peak"] = live_at_peak(torch.cuda.memory._snapshot())
+        snapshot = torch.cuda.memory._snapshot()
+        record["at_peak"] = live_at_peak(snapshot)
+        record["at_step_peak"] = live_at_peak(snapshot, start=steps_begin)
         torch.cuda.memory._record_memory_history(enabled=None)
     record.update(peak_bytes=max(build_peak, record["step_peak_bytes"]),
                   peak_reserved_bytes=int(torch.cuda.max_memory_reserved()),
@@ -219,20 +225,24 @@ def _outer(frames):
     return f"{frame['filename'].split('/fastmace/')[-1]}:{frame.get('line')}:{frame.get('name')}"
 
 
-def live_at_peak(snapshot, top=40):
+def live_at_peak(snapshot, top=40, start=0):
     """The allocations live at the largest point of the recorded history, by site, largest first: replays the
-    device trace's alloc and free events (``torch.cuda.memory._snapshot``)."""
-    events = [event for event in snapshot.get("device_traces", [[]])[0]
+    device trace's alloc and free events (``torch.cuda.memory._snapshot``). ``start``: the trace index from
+    which the peak is sought (the steps' own peak: the trace's length when the steps began); the allocations
+    live then still count."""
+    trace = snapshot.get("device_traces", [[]])[0]
+    events = [(index >= start, event) for index, event in enumerate(trace)
               if event.get("action") in ("alloc", "free_completed")]
     live, current, peak, peak_index = {}, 0, 0, -1
-    for index, event in enumerate(events):
+    for index, (after, event) in enumerate(events):
         if event["action"] == "alloc":
             live[event["addr"]] = event["size"]
             current += event["size"]
         else:
             current -= live.pop(event["addr"], 0)
-        if current > peak:
+        if after and current > peak:
             peak, peak_index = current, index
+    events = [event for _, event in events]
     alive = {}
     for event in events[:peak_index + 1]:
         if event["action"] == "alloc":
@@ -271,6 +281,8 @@ def run(args):
                                "--temperature-K", str(args.temperature_K)]
                     if args.precision:
                         command += ["--precision", args.precision]
+                    if args.backend != "auto":
+                        command += ["--backend", args.backend]
                     if args.memory_history:
                         command.append("--memory-history")
                     log = args.output / f"{name}.log"
