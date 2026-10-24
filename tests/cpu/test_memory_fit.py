@@ -1,8 +1,8 @@
-"""Rule 12's fit on the measured GPU peaks, as a regression test (plan task 5-T03; SPEC §9.3 rule 12, decision 56).
+"""Rule 12's fit on the measured GPU peaks, as a regression test (plan task 5-T03; SPEC §9.3 rule 12, decision 51).
 
 ``tests/_support/data/rule12_fit.json`` holds 60 measured cases from docs/validation/5-T03.md:
-- 14 labels on NaCl and NbCl5 3x3x3, NVT and NPT, graph tier, hybrid float32, on the RTX 5060 Ti and the
-  A100;
+- the 14 labels that run on Na, Nb and Cl (the 5 MACE-OFF models have no Na embedding), on NaCl and NbCl5
+  3x3x3, NVT and NPT, graph tier, hybrid float32, on the RTX 5060 Ti and the A100;
 - MH-1 and MP-0 medium on the plain cuEq backend.
 
 For each it keeps the inputs of the planner's final ``memory.estimate`` (re-planned on the CPU with the

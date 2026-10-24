@@ -364,7 +364,8 @@ the recorded `PlannerOptions.adaptation`, which `simulation.json` and a resume c
   plain-cuEq cases) sets:
   - the run term stock-structured (what stock MACE keeps per edge and per node);
   - `LIBRARY_WORKSPACES` = 5 × 32 MiB, the cuBLAS workspaces observed;
-  - `SAFETY` = 0.90, one factor for every model and GPU (decision 56).
+  - `SAFETY` = 0.90, one factor for every model and GPU (decision 51 and §9.3's rule 12 row). It is fitted
+    on the 14 labels that run on Na, Nb and Cl; the 5 MACE-OFF models have no Na embedding.
 
   The factor is below 1 because the fused paths keep less than stock and the uniform-density edge estimate
   is 1.2–1.3× high. The prediction is 1.05–1.48 of the measured peak on every case, with thin margins at
