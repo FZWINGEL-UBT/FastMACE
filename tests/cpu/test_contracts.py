@@ -413,8 +413,10 @@ def test_md_signature():
     expected = {"model", "head", "charge", "spin_multiplicity", "sha256", "trusted", "ensemble", "temperature_K",
                 "schedule", "pressure_GPa", "cell_mode", "timestep_fs", "steps", "mc", "min_mc_temperature_K",
                 "dispersion", "repeat", "output", "seed", "check", "integrator",
-                "mode", "allow_reference", "fallback", "gate", "runner", "engine", "neighbours"}  # 2-T01
+                "mode", "allow_reference", "fallback", "gate", "runner", "engine", "neighbours",  # 2-T01
+                "calibrate"}  # 5-T09
     assert set(_keyword_only(signature)) == expected
+    assert signature.parameters["calibrate"].default is False
     assert signature.parameters["repeat"].default == (1, 1, 1)
     assert signature.parameters["check"].default == "skip"
     assert signature.parameters["ensemble"].default == "NVT"

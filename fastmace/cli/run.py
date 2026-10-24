@@ -26,6 +26,8 @@ it. A file with a ``[relax]`` or ``[quench]`` table, or a run with ``--steps``, 
 (``fastmace.protocols.runner``): the relaxation, ``fm.md`` for at most ``--steps`` steps of the
 schedule with a restart at the end, and the quench once the schedule is done. ``--resume RUN_DIR``
 continues it for at most ``--steps`` more steps. ``--output`` sets the output directory.
+``--calibrate`` is the file's ``calibrate = true`` (``fm.md``'s, SPEC §9.1, plan task 5-T09); a resume never
+calibrates, so it is refused with ``--resume``.
 """
 
 import dataclasses
@@ -48,6 +50,9 @@ def add_arguments(parser):
     parser.add_argument("--steps", type=int, help="run at most this many MD steps, then write a restart and stop "
                         "(a protocol run; continue it with --resume)")
     parser.add_argument("--output", metavar="DIR", help="the output directory (in place of the file's)")
+    parser.add_argument("--calibrate", action="store_true",
+                        help="measure hybrid against plain cuEq on this structure before the MD run and take the "
+                        "faster where the rules rank them equal (fm.md's calibrate=True; SPEC §9.1)")
 
 
 def _tomllib():
@@ -232,6 +237,9 @@ def run(args):
     if args.resume is not None:
         if args.config is not None:
             return usage_error("run", "give CONFIG.toml or --resume RUN_DIR, not both")
+        if getattr(args, "calibrate", False):
+            return usage_error("run", "--calibrate with --resume: a resume plans the run's recorded backend and "
+                               "never calibrates")
         from fastmace.protocols import runner
 
         try:
@@ -253,6 +261,8 @@ def run(args):
             data["structure"] = str(shipped / data["structure"])
         if "output" in data or args.output is not None:
             data["output"] = _with_output(data, args.output)
+        if getattr(args, "calibrate", False):
+            data["calibrate"] = True
         stages, rest = runner.split_stages(data)
         structure, options = md_arguments(rest)
     except ValueError as error:
