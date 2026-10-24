@@ -189,6 +189,7 @@ CUDA-graph replays, median of 7 blocks of 50):
 | OPT4-T05 | 5, setup and capture time | one worker | `fastmace/opt4-T05` | untimed local runs (cold and warm caches) | the breakdown, and any change ≥ 5 s warm / ≥ 15 s cold built as an option, or none |
 | OPT4-T06 | 6, OEq forward (reserve) | the first worker free | `fastmace/opt4-T06` | ncu on NbCl5 | the ncu verdict; build only with a shape-rule lever |
 | OPT4-T07 | 7, megakernel probe | one worker | `fastmace/opt4-T07` | local, Colab L4 and A100 (untimed microbenchmark) | the pass/fail table; `docs/design/2026-10-23-heterogeneous-megakernel.md` updated |
+| OPT4-T08 | owner's request (24 October): per-stage precision sensitivity, measurement only | one worker | `opt4-T08-precision-screen` | untimed local runs, MH-1 (NaCl, NbCl5, NaNbO3) and omat0-medium (NaCl, NbCl5) | **done 24 October:** no stage with a real share passes the gate alone in bf16, fp16 or TF32; only ZBL (fp16 storage) and MH-1's interaction-0 symmetric-contraction backward (TF32) pass. `docs/validation/opt4-T08-precision-sensitivity.md` |
 | OPT4-REP | round report and default proposals | the conductor | `fastmace/opt4-report` | – | `docs/validation/opt-4.md`; the owner's default decisions recorded |
 
 **Order and parallelism** (at most five workers at once; GPU work queues through the reservation):
