@@ -33,8 +33,8 @@ one for a control or an alternating-process run):
         exported as ``fastmace_3b``, through its minimal planner; give --expected-commit
   --release 4 (5-T11, phase 5 item 5):
     5   this checkout, as above, D3 off
-    4   the release at tag ``fastmace-4`` (or phase 4's acceptance freeze, dae3848, while the tag is not set),
-        exported as ``fastmace_4``, through its minimal planner; give --expected-commit
+    4   the release at tag ``fastmace-4`` (dae3848, phase 4's acceptance freeze), exported as ``fastmace_4``,
+        through its minimal planner
 
 ``--engine-option FIELD=VALUE`` (repeatable) sets an ``EngineConfig`` field on this checkout's side only
 (``fused_integrator=on``: an option the release does not have); ``on``/``off`` read as booleans.
@@ -98,7 +98,7 @@ RELEASES = {
     "p3b": Release("phase-3-baseline", "156ab76", "fastmace_p3b", "minimal", "3"),
     "3": Release("fastmace-3", None, "fastmace_3", "minimal", "3b"),  # commit: --expected-commit (tag not set yet)
     "3b": Release("fastmace-3b", None, "fastmace_3b", "minimal", "4"),  # commit: --expected-commit (tag not set yet)
-    "4": Release("fastmace-4", None, "fastmace_4", "minimal", "5"),  # commit: --expected-commit (tag not set yet)
+    "4": Release("fastmace-4", "dae3848", "fastmace_4", "minimal", "5"),
 }
 # IntegratorConfig fields this checkout's side pins against a release unless --integrator-option sets them.
 RELEASE_INTEGRATOR_PINS = {"p3b": {"fixcm_projection": "ase"}}

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 5-T11: phase 5 acceptance jobs on the local RTX 5060 Ti (WSL), one job per call, from the pinned copy.
 #
-#   FASTMACE_4_COMMIT=<sha of tag fastmace-4, else dae3848> bash tools/acceptance/phase5_local.sh SRC JOB [ARGS...]
+#   bash tools/acceptance/phase5_local.sh SRC JOB [ARGS...]   (baseline: tag fastmace-4, dae3848; FASTMACE_4_COMMIT
+#   overrides it, FASTMACE_REPOSITORY names the checkout that holds the tag, default /mnt/d/Margraf/FastMACE)
 #
 # SRC is the pinned copy (git archive of the 5-T11 head, with .source_commit); its fastmace/ equals the freeze's.
 # GPU jobs run under the reservation: python3 SRC/tools/ci/local_gpu.py run --wait-minutes 600 --purpose "5-T11 JOB"
@@ -54,8 +55,8 @@ cpu_pytest() {  # name pytest-arguments...: CPU only, at most two workers (AGENT
   CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 pytest_job "$name" "$cpu" -n "${CPU_WORKERS:-2}" "$@"
 }
 need_baseline() {  # the fastmace-4 commit and its renamed export: $base
-  [ -n "${FASTMACE_4_COMMIT:-}" ] || { echo "set FASTMACE_4_COMMIT (tag fastmace-4, else dae3848)" >&2; exit 2; }
-  base=$FASTMACE_4_COMMIT
+  base=${FASTMACE_4_COMMIT:-$(git -C "${FASTMACE_REPOSITORY:-/mnt/d/Margraf/FastMACE}" rev-parse --short     "fastmace-4^{commit}" 2>/dev/null)}
+  [ -n "$base" ] || { echo "the tag fastmace-4 is not in FASTMACE_REPOSITORY; set FASTMACE_4_COMMIT" >&2; exit 2; }
   [ -d "$versions/fastmace_4" ] || { echo "export the baseline first: python -m fastmace.bench.versions export" \
     "--repository /mnt/d/Margraf/FastMACE --ref $base --name fastmace_4 --destination $versions" >&2; exit 2; }
 }

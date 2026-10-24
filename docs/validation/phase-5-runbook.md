@@ -41,9 +41,9 @@ and baseline).
 
 - **Freeze:** the main commit with every phase 5 task merged, named by the conductor. The report records it and the
   commit whose `fastmace/` it equals.
-- **Baseline:** tag `fastmace-4` if the owner has set it by the freeze; otherwise phase 4's acceptance freeze,
-  main **dae3848** (conductor, 23 October 2026), and the report says so. Exported as the renamed package with
-  `python -m fastmace.bench.versions export --ref <baseline> --name fastmace_4 --destination ~/fastmace-5-T11/versions`.
+- **Baseline:** tag `fastmace-4`, phase 4's acceptance freeze **dae3848** (set by the owner, 24 October 2026).
+  Exported as the renamed package with `python -m fastmace.bench.versions export --ref fastmace-4 --name fastmace_4
+  --destination ~/fastmace-5-T11/versions`; the tools' release side defaults to the tag's commit.
 - **Pinned copies:** `git -c core.autocrlf=false archive` of the 5-T11 head with `.source_commit`, `fastmace/`
   equal to the freeze's, at `~/fastmace-5-T11/src-<sha>` (ext4, not `/mnt/d`: 1b-T21b and 4-T10 measured `/mnt/d`
   distorting timing). A later test correction makes a new copy; the report lists each copy and what ran from it.
@@ -292,7 +292,7 @@ Ti and the Colab L4 (and on the A100 if that leg runs).
   `trajectories-cpu`, `trajectories-reproducible`, `restart-across`, as 4-T13's against 3b), the pytest jobs and
   the tiers; the jobs that call 5-T07's and 5-T09's tools exit 3 until they are filled in at the freeze.
 - `tools/ab_fastmace.py --release 4` and `tools/trajectory_versions.py --against 4` (sides 4 and 5, the baseline
-  exported as `fastmace_4`, `--expected-commit` while the tag is not set) (written); `tools/restart_versions.py`
+  exported as `fastmace_4`; its commit defaults to the tag's, dae3848) (written); `tools/restart_versions.py`
   takes any release root, unchanged. CPU tests: `tests/cpu/test_acceptance_5.py`.
 - `tests/_support/tiers.py`: 5-T03's and 5-T07's compat tests, when they merge.
 
