@@ -168,7 +168,9 @@ Local RTX 5060 Ti, run ID `5-T11-local-<date>`, `python3 <copy>/tools/ci/local_g
 **Order:** the CPU jobs and the corpus first (no GPU); `preflight`; the timed jobs (`regression`, `adapt-storm`,
 `calibration`) in one quiet stretch; then the rest, the acceptance and slow tiers overnight. Colab, in parallel from
 the freeze: the L4 compatibility check (`5-T11-colab-l4-<date>`) and, if it applies, the A100's
-(`5-T11-colab-a100-<date>`) with its untimed share.
+(`5-T11-colab-a100-<date>`) with its untimed share; on both, the rule 12 peak check (item 8): `python
+tools/memory_peaks.py run --labels mh1-r2scan polar1-l --structures NaCl NbCl5 --output <run>/memory-peaks`
+(graph tier, NVT and NPT, 100 steps), each VM stopped afterwards.
 
 ## Timing design (decision 39: repeats sized to the effect)
 
@@ -247,6 +249,11 @@ acceptance` green here.
   if it still does not fit; never a change of rule 11's sizes, the tier, the precision or an explicit user setting
   (an explicit `"on"` is kept and warned). The 90 % margin is the owner's checkpoint 2, judged on 5-T03's numbers.
 - In `compat` on each GPU: the estimate against the measured peak on MH-1 NaCl (5-T03's test).
+- **On the Colab A100 and L4** (conductor, 24 October 2026): `tools/memory_peaks.py` for MH-1 and POLAR-1-L on
+  NaCl and NbCl5 3×3×3 (NVT and NPT, graph tier). Pass: predicted / measured peak within [1.0, 1.5] in every
+  case, with the fit at the freeze (5-T03: 160 MiB workspace, `SAFETY` 0.90; still one global factor, §9.3 rule 12
+  and decision 56's generality). A ratio below 1.0 is a rule 12 failure and goes to the conductor; above 1.5 is a
+  failure of the estimate's accuracy (checkpoint 2). The table goes in the report with GPU and provider.
 
 **Item 9: calibration** (decision 55).
 - On NaCl with MH-1 (`calibrate=True`, no backend set) the smoke measures hybrid and plain cuEq, each in a child,
