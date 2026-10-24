@@ -105,7 +105,7 @@ def test_runner_config_validation(kwargs):
 
 
 def test_new_fields_of_existing_records():
-    assert config.EngineConfig().dynamic_edges is False  # 2-T13
+    assert config.EngineConfig().dynamic_edges is True  # 2-T13; on by default since decision 58 (OPT4-T05)
     assert config.RewriteConfig().selfcheck_cache == "use"  # 2-T19, inert until then
     assert config.RewriteConfig(selfcheck_cache="refresh").selfcheck_cache == "refresh"
     with pytest.raises(ValueError):

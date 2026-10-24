@@ -222,11 +222,12 @@ class EngineConfig:
     # Eager warm-ups after the first capture run inside the graph pool.
     warmup_in_graph_pool: bool = True
     # The edge dimension is dynamic from the first compiled call, so a changed edge count does not compile
-    # again. Evaluation and compiled-tier plans set it (2-T13, 3-T06). Graph-tier MD plans take it on request
-    # (OPT4-T05): the edges stay padded, and the padded first capture reuses the first call's graph instead
-    # of compiling again (8-9 s per warm start, about 22 s cold, locally); the steps replay the same compiled
-    # code as without it. Opt-in.
-    dynamic_edges: bool = False
+    # again. Evaluation and compiled-tier plans always set it (2-T13, 3-T06). On graph-tier MD plans the edges
+    # stay padded, and the padded first capture reuses the first call's graph instead of compiling again
+    # (7-9 s per warm start, 16-22 s cold, locally); the steps replay the same compiled code as without it, and
+    # reproducible-mode trajectories are bitwise equal (OPT4-T05). On by default (owner decision 58, 24 October
+    # 2026); False restores the second compile. Plans that compile nothing turn it off.
+    dynamic_edges: bool = True
     # Keep each conversion's model as a template and give later plans a private copy of it instead of
     # reloading and converting the checkpoint (CUDA cuEq and hybrid only; opt-1 OPT-T06).
     model_template_cache: bool = True

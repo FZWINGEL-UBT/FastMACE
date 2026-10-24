@@ -1019,7 +1019,9 @@ stream. Each step replays captured graphs:
 
 **Edges.** Padded edge capacities come in buckets (`EDGE_MULTIPLE = 256`,
 bucket fraction 5%). Padding must be exact (`padding_is_exact`); otherwise
-this tier is refused.
+this tier is refused. The compiled model sees the edge dimension as dynamic
+from its first call (`EngineConfig.dynamic_edges`, on by default, decision
+58), so the padded first capture reuses that graph and a start compiles once.
 
 **Neighbour list.** Skin list with a GPU build; rebuilds are triggered by a
 displacement test on the GPU. In variable-cell runs the test is
@@ -2636,6 +2638,21 @@ Open decisions for the owner:
    RTX 5060 Ti (five labels, both orders) and 4.1–4.3 % on the L4 (OMAT-0);
    NbCl5 was neutral (`docs/validation/opt4-T04.md`).
 
+58. Decided (user, 24 October 2026, optimisation round 4, OPT4-T05: "Yes",
+   to "`dynamic_edges` on by default"): `EngineConfig.dynamic_edges` is on by
+   default, so a graph-tier MD plan's compiled model sees the edge dimension as
+   dynamic from its first call. Before, that call specialised on the exact
+   initial edge count, and capturing B at the padded count compiled the whole
+   model again. The edges stay padded to buckets and every graph is still
+   captured. The steps replay the same compiled code: the default's second
+   compile and the option's single compile wrote and read the same Inductor
+   and AOT-autograd cache entries. `reproducible=True` trajectories are bitwise
+   equal with it off. A start is 7–9 s shorter warm and 16–22 s shorter cold
+   (RTX 5060 Ti, MH-1 NaCl and NbCl5, OMAT-0 NaCl;
+   `docs/validation/opt4-T05.md`). Plans that compile nothing (eager,
+   reference, `compile_mode="none"`) turn it off with a reason; an explicit
+   `False` restores the second compile.
+
 ---
 
 ## 19. Revision history
@@ -3048,3 +3065,14 @@ more FastMACE-only rewrite default, scoped to a model family.
   deterministic; the record itself is unchanged since OPT-T03b. NaCl −4.5 to
   −5.4 % on the RTX 5060 Ti (five generic labels, both orders), −4.1 to
   −4.3 % on the L4 (OMAT-0), NbCl5 neutral. §6.2's table has its row.
+
+**Draft 0.12, sixteenth amendment (24 October 2026, owner decision 58, "Yes";
+optimisation round 4, OPT4-T05):** one engine default for setup time.
+- **`EngineConfig.dynamic_edges`:** on by default on graph-tier MD plans as
+  well as on evaluation and compiled-tier plans. The first compiled call marks
+  the edge dimension dynamic, and the padded first capture of B reuses its graph
+  instead of compiling the model again. Exact: the same compiled code per
+  step, and bitwise-equal reproducible-mode trajectories. Warm starts are
+  7–9 s shorter and cold starts 16–22 s shorter (local). §8.1 says so. Plans
+  that compile nothing record it off (`dynamic-edges-uncompiled`); an explicit
+  `False` is recorded as `dynamic-edges-graph-off`.

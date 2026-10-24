@@ -90,11 +90,17 @@ MODE_TIERS = {
 }
 EAGER_CAPTURE = "eager tier: no CUDA graphs"
 COMPILED_CAPTURE = "compiled tier: no CUDA graphs"
-# A requested dynamic edge dimension on the graph tier (OPT4-T05): the edges stay padded to buckets.
+# The dynamic edge dimension on the graph tier (OPT4-T05; on by default, owner decision 58): the edges stay
+# padded to buckets.
 DYNAMIC_EDGES_GRAPH = Reason(
-    "requested: the edge dimension is dynamic from the first compiled call, so the model compiles once and the "
-    "padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets",
+    "the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first "
+    "capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 58)",
     code="dynamic-edges-graph")
+DYNAMIC_EDGES_GRAPH_OFF = Reason(
+    "requested off: the first compiled call specialises on the exact edge count, and the padded first capture "
+    "compiles the model again with a dynamic edge dimension", code="dynamic-edges-graph-off")
+DYNAMIC_EDGES_UNCOMPILED = Reason("nothing is compiled (compile_mode='none'): no edge dimension to mark",
+                                  code="dynamic-edges-uncompiled")
 REFERENCE_TIER = "reference"
 # The reference tier's reasons (plan task 2-T03; SPEC §8.4).
 REFERENCE_REASONS = {
@@ -653,8 +659,14 @@ class MinimalPlanner:
             self._eager(book, parts, traits)
         elif mode == fixed.COMPILED_TIER:
             self._compiled(book, parts, traits, mode_reason)
-        elif not reference and parts["engine"].dynamic_edges and parts["engine"].compile_mode != "none":
-            book.decide("EngineConfig.dynamic_edges", "on", DYNAMIC_EDGES_GRAPH)
+        elif parts["engine"].compile_mode != "none":  # the graph tier (OPT4-T05, decision 58)
+            dynamic = parts["engine"].dynamic_edges
+            book.decide("EngineConfig.dynamic_edges", "on" if dynamic else "off",
+                        DYNAMIC_EDGES_GRAPH if dynamic else DYNAMIC_EDGES_GRAPH_OFF)
+            parts["decisions"] = tuple(book.decisions)
+        if mode != fixed.COMPILED_TIER and parts["engine"].compile_mode == "none":
+            parts["engine"] = dataclasses.replace(parts["engine"], dynamic_edges=False)
+            book.decide("EngineConfig.dynamic_edges", "off", DYNAMIC_EDGES_UNCOMPILED)
             parts["decisions"] = tuple(book.decisions)
         predicted = self._rule_12(book, parts, traits, atoms, hardware, requested, d3_memory, loaded)
         book.raise_refusals()

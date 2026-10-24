@@ -585,6 +585,8 @@ class FixedPlanner:
             book.decide("EngineConfig.compile_mode", "none", Reason(support.reason, code=versions.COMPILE_CODE))
         else:
             book.decide("EngineConfig.compile_mode", engine.compile_mode, "main.py's --compile-mode")
+        if engine.compile_mode == "none" and engine.dynamic_edges:  # nothing to mark (decision 58, OPT4-T05)
+            engine = dataclasses.replace(engine, dynamic_edges=False)
         if evaluation:
             pipelined = async_output = False
             for name in ("speculative_graph", "pipelined", "async_output"):

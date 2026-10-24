@@ -150,8 +150,8 @@ def _ff(loaded, atoms):
     return ForceField(loaded, atoms, precision="float64")
 
 
-def _planner(compile_mode="none"):
-    return MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode=compile_mode), environ={},
+def _planner(compile_mode="none", **engine):
+    return MinimalPlanner(engine=EngineConfig(device="cpu", compile_mode=compile_mode, **engine), environ={},
                           process=constraints.ProcessRecord())
 
 
@@ -236,12 +236,14 @@ def test_compiled_equals_graph_bitwise_on_the_cpu(loaded, npt):
 
 @pytest.mark.slow
 def test_compiled_equals_graph_to_rounding_with_inductor_on_the_cpu(loaded):
-    """Inductor on both sides (3-T06 conductor answer 2): static edge shapes against dynamic ones.
-    The differences are recorded in ``docs/validation/3-T06.md``; they must stay at float64 rounding."""
+    """Inductor on both sides (3-T06 conductor answer 2): static edge shapes against dynamic ones (the graph
+    side asks for ``dynamic_edges=False``, off by default since decision 58). The differences are recorded in
+    ``docs/validation/3-T06.md``; they must stay at float64 rounding."""
     pytest.importorskip("torch._inductor")
     torch._dynamo.reset()
     try:
-        engines = _trajectories(loaded, _integrator(False), ("graph", "compiled"), lambda: _planner("default"))
+        engines = _trajectories(loaded, _integrator(False), ("graph", "compiled"),
+                                lambda: _planner("default", dynamic_edges=False))
     finally:
         torch._dynamo.reset()
     graph, compiled = engines["graph"], engines["compiled"]

@@ -1,13 +1,13 @@
 # OPT4-T05: setup and capture time of an `fm.md` start
 
-**Status: measured, one option built, 24 October 2026.** Plan `plans/opt-4.md` §3 candidate 5, task OPT4-T05,
+**Status: measured, one option built, 24 October 2026; on by default since owner decision 58 (OPT4-T05b, see the last section).** Plan `plans/opt-4.md` §3 candidate 5, task OPT4-T05,
 branch `fastmace/opt4-T05`.
 
 ## Verdict
 
 | Item | Cost per start (local) | Rule (≥ 5 s warm or ≥ 15 s cold) | Outcome |
 | --- | --- | --- | --- |
-| **Second compile at the first B capture** | warm 8.0–9.7 s, cold 18–24 s | passes both | **built: `EngineConfig.dynamic_edges` as an opt-in on graph-tier MD plans** (exact) |
+| **Second compile at the first B capture** | warm 8.0–9.7 s, cold 18–24 s | passes both | **built: `EngineConfig.dynamic_edges` on graph-tier MD plans** (exact; opt-in here, default since decision 58) |
 | OEq extension build | cold 16 s, warm 0 | passes cold | not built: it is cached under `FASTMACE_CACHE` already; prebuilt wheels are SPEC §14's 1.0 plan |
 | Inductor's cold compile (first compiled call) | cold 24–30 s, warm 9–10 s | passes cold | not built here; its cache lies outside `FASTMACE_CACHE` (finding 1) |
 | Checkpoint load, conversion | 3 + 4 s, warm and cold | fails | none |
@@ -24,7 +24,7 @@ With the option, a warm start is **7–9 s shorter** and a cold start **16–22 
 | cold, `dynamic_edges=True` (n = 2) | **65.4 s** | **70.5 s** | **55.4 s** |
 
 The option is exact. The steps replay the same compiled code, and `reproducible=True` trajectories are bitwise
-the default's. The default is the owner's call.
+the default's. The owner made it the default (decision 58).
 
 ## Method
 
@@ -238,3 +238,17 @@ python3 tools/ci/local_gpu.py run --wait-minutes 600 --purpose "OPT4-T05 setup" 
 
 Sets: `cold-N`, `fill`, `warm-N`, `dyn-fill`, `ab-N`, `cold-dyn-N`. Use a new N for each cold set, because a
 cache root is named after its set. `SRC` selects the source export.
+
+## Follow-up OPT4-T05b: the default (owner decision 58)
+
+The owner answered "Yes" to "`dynamic_edges` on by default" (24 October 2026). Branch `fastmace/opt4-T05b`:
+
+- `EngineConfig.dynamic_edges` defaults to `True`.
+- Graph-tier MD plans record `EngineConfig.dynamic_edges: on` (`dynamic-edges-graph`), or `off`
+  (`dynamic-edges-graph-off`) when the caller passes `False`, which restores the second compile.
+- Plans that compile nothing (the eager and reference tiers, `compile_mode="none"`) turn it off and record
+  `dynamic-edges-uncompiled`. `FixedPlanner` turns it off for an uncompiled engine too, so both planners
+  still give equal engines.
+- In "Verdict" and the tables above, "default" means `dynamic_edges=False` and "the option" means the new
+  default.
+- SPEC §8.1, §18 decision 58 and §19's sixteenth amendment record it.
