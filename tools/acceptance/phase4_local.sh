@@ -268,7 +268,7 @@ torch.save(tiny_mace_model([11, 17], **FAMILIES['mh1']), sys.argv[1])" "$tiny")
     run restart-across-compare "$hybrid" tools/restart_versions.py compare "$root/restart-across/uninterrupted"       "$root/restart-across/resume"
     ;;
   compat)  # the GPU compatibility check on this Blackwell GPU (SPEC decision 39, amended; tests/_support/tiers.py)
-    PYTEST_PYTHON=${PYTEST_PYTHON:-$hybrid}
+    PYTEST_PYTHON=${PYTEST_PYTHON:-$latest}  # pytest lives here; hybrid children use FASTMACE_HYBRID_PYTHON
     run compat "$PYTEST_PYTHON" tools/acceptance/compat.py --provider local --label "RTX 5060 Ti (local)"       --output "$root/compat"
     ;;
   cpu-acceptance)  # recorded: the sampling checks (choice 8), CPU, in the GPU environment's ASE 3.27
