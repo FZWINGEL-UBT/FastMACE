@@ -233,6 +233,31 @@ class SubprocessRunner:
                 return
             result = self._run_child(simulation, steps=left, schedule=None, check="skip", gate=False)
 
+    def calibrate(self, simulation: Any, options: Any, *, warmup_steps: int, steps: int) -> float:
+        """One block of the optional calibration (SPEC §9.1; plan task 5-T09): a fresh child builds ``simulation``'s
+        run with the planner ``options`` (the candidate's backend), runs ``warmup_steps`` steps, then times
+        ``steps`` steps between synchronisations; returns its seconds per step. It writes no output and hands
+        nothing over: the stage is removed after the block, the hand-off directory by ``close()``."""
+        from ase.io import write
+
+        sim = simulation
+        if self.root is None:
+            self.root = handoff_root(None if sim.output is None else Path(sim.output.directory).resolve())
+            self.root.mkdir(parents=True, exist_ok=True)
+        stage = self._stage()
+        write(stage / START_NAME, sim._atoms)
+        record = sim._simulation_record(stage)
+        record["output"] = None
+        record["planner_options"] = options.to_record()
+        request = {"action": "calibrate", "simulation": record, "check": "skip", "warmup_steps": int(warmup_steps),
+                   "steps": int(steps)}
+        result = self._launch(stage, request)["calibration"]
+        shutil.rmtree(stage, ignore_errors=True)
+        backend = options.engine.backend
+        if result["backend"] != backend:
+            raise RuntimeError(f"the calibration child planned the {result['backend']} backend, not {backend}")
+        return float(result["seconds_per_step"])
+
     def host_write(self, simulation: Any, kind: str, values: Any) -> None:
         """Queue a host write (``HOST_WRITE_KINDS``); the next child applies it after its resume."""
         from fastmace.simulation import HOST_WRITE_WARNING
@@ -948,6 +973,8 @@ def _child(directory, request, heartbeat, worker=None):
         raise ValueError(f"hand-off request version {request.get('request_version')!r} is not {REQUEST_VERSION}")
     worker = _Worker(persistent=False) if worker is None else worker
     action = request["action"]
+    if action == "calibrate":
+        return _calibrate(directory, request, heartbeat)
     if action not in ("setup", "run"):
         raise ValueError(f"unknown hand-off action {action!r}")
     if worker.simulation is not None:  # the worker's next call: the engine it has (OPT-T07)
@@ -1061,6 +1088,23 @@ def _mc_summary(sim):
     if summary is None:
         return None
     return {**summary, "moves": [move_record(move) for move in summary["moves"]]}
+
+
+def _calibrate(directory, request, heartbeat):
+    """A calibration block (``SubprocessRunner.calibrate``, 5-T09): build, warm up, time the steps."""
+    heartbeat.mark("setup")
+    sim = _construct(directory, request)
+    sim._child = True  # a tier switch is the parent's; this child hands nothing over
+    heartbeat.simulation = sim
+    heartbeat.mark("running")
+    if request["warmup_steps"]:
+        sim.run(steps=int(request["warmup_steps"]))
+    steps = int(request["steps"])
+    started = sim._synchronised_time()
+    sim.run(steps=steps)
+    seconds = sim._synchronised_time() - started
+    return {"status": "ok", "calibration": {"backend": sim.plan.engine.backend, "seconds_per_step": seconds / steps,
+                                            "setup_s": {name: float(s) for name, s in sim._setup_s.items()}}}
 
 
 def _construct(directory, request):

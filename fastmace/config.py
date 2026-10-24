@@ -22,9 +22,8 @@ Phase 4 (plan task 4-T01, ``docs/design/physics.md``) adds the integrator ``sche
 and scheme ``parameters`` to ``IntegratorConfig``, the ``"nve"`` ensemble, and ``OptimizerConfig``.
 
 Phase 5 (plan task 5-T01, ``docs/design/planner-5.md``) adds ``AdaptationConfig`` (SPEC §9.6) and
-``CalibrationConfig`` (§9.1). The fields whose meaning an open owner decision of ``plans/phase-5.md``
-fixes (D5) default to ``PENDING``; ``Simulation`` refuses any other value until the task that implements
-the decision lands. 5-T07 sets ``AdaptationConfig``'s defaults to decisions 52 and 53.
+``CalibrationConfig`` (§9.1). 5-T07 sets ``AdaptationConfig``'s defaults to decisions 52 and 53, and 5-T09
+``CalibrationConfig``'s to decision 55; ``Simulation`` refuses the options they did not choose.
 
 This module holds no state: no caches, no registries, no switches.
 """
@@ -552,19 +551,13 @@ class MCConfig:
         _count(self, "max_move_sets", minimum=1)
 
 
-# A field whose meaning an open owner decision of plans/phase-5.md fixes (D5). Simulation refuses any other
-# value until the task implementing the decision lands (5-T09).
+# The placeholder of 5-T01 for a field an open owner decision of plans/phase-5.md fixed; every such field has its
+# decided default now (5-T07, 5-T09), and no record accepts it.
 PENDING = "pending"
 # Which monitor triggers a tier switch: "recapture-time", the re-capture budget exceeded and the time spent
 # re-capturing above ``recapture_time_fraction`` (SPEC §18 decision 52, D2 (a)); "recapture-budget", the
 # budget alone (D2 (c), not chosen); "none", no automatic switch.
 ADAPTATION_TRIGGERS = ("recapture-time", "recapture-budget", "none")
-
-
-def _flag_or_pending(instance, name):
-    value = getattr(instance, name)
-    if value != PENDING and not isinstance(value, bool):
-        raise ValueError(f"{type(instance).__name__}.{name}: {value!r} is not a bool or {PENDING!r}")
 
 
 def _count_or_none(instance, name, minimum):
@@ -629,19 +622,21 @@ ADAPTATION_SUPPORTED = {"trigger": ("recapture-time", "none"), "skin_replan": (F
 
 @dataclass(frozen=True)
 class CalibrationConfig:
-    """The optional calibration of SPEC §9.1 (plan task 5-T01; 5-T09 under owner decision D5): off by default,
-    it measures candidate plans the rules rank equal on this run's structure, and nothing it measures is ever
-    persisted or read by another run."""
+    """The optional calibration of SPEC §9.1 (plan tasks 5-T01, 5-T09; owner decision 55, D5 (a)): off by
+    default, it measures the backends the rules rank equal on this run's structure (``planner.calibrate``), and
+    nothing it measures is ever persisted or read by another run. Its warm-up and pair count are
+    ``planner.calibrate``'s constants."""
 
-    # Off by default (§9.1). True is refused until 5-T09 implements D5.
+    # Off by default (§9.1): True measures the tie, MD runs only.
     calibrate: bool = False
     # Measured steps per candidate, after warm-up (§9.1: about 50).
     steps: int = 50
-    # D5 (a): another candidate replaces the rules' choice only when faster by more than this share in every
-    # pair (above the 3 % cross-process noise); unused if D5 decides that calibration only reports.
+    # Decision 55: the other candidate replaces the rules' choice only when faster by more than this share in
+    # every pair (above the 3 % cross-process noise).
     margin: float = 0.05
-    # D5: True, the measurement may change the plan (a); False, it is recorded only (b).
-    choose: bool | Literal["pending"] = PENDING
+    # True, the measurement may change the plan (decision 55, D5 (a)); False, recorded only (D5 (b), not chosen:
+    # Simulation refuses it, code calibration-unsupported).
+    choose: bool = True
 
     def __post_init__(self):
         _check_choices(self)
@@ -649,7 +644,6 @@ class CalibrationConfig:
         _positive(self, "margin")
         if self.margin >= 1:
             raise ValueError(f"CalibrationConfig.margin must be below 1, got {self.margin!r}")
-        _flag_or_pending(self, "choose")
 
 
 @dataclass(frozen=True)

@@ -343,6 +343,22 @@ def test_run_reads_standard_input(monkeypatch, capsys):
     assert "no target temperature" in capsys.readouterr().err
 
 
+def test_run_calibrate_reaches_fm_md(monkeypatch, tmp_path, capsys):
+    """5-T09: ``--calibrate`` is the file's ``calibrate = true``; with ``--resume`` it is a usage error."""
+    calls = []
+    monkeypatch.setattr(run_command, "run_md", lambda structure, options, **kwargs: calls.append(options) or 0)
+    config = tmp_path / "run.toml"
+    config.write_text('structure = "a.xyz"\nmodel = "mh1"\nhead = "matpes_r2scan"\ntemperature_K = 300.0\n'
+                      "steps = 10\n", encoding="utf-8")
+    assert cli.main(["run", str(config)]) == 0 and "calibrate" not in calls[0]
+    assert cli.main(["run", str(config), "--calibrate"]) == 0 and calls[1]["calibrate"] is True
+    config.write_text(config.read_text(encoding="utf-8") + "calibrate = true\n", encoding="utf-8")
+    assert cli.main(["run", str(config)]) == 0 and calls[2]["calibrate"] is True
+    capsys.readouterr()
+    assert cli.main(["run", "--resume", str(tmp_path), "--calibrate"]) == 2
+    assert "never calibrates" in capsys.readouterr().err
+
+
 def test_run_bad_toml_is_a_usage_error(tmp_path, capsys):
     config = tmp_path / "bad.toml"
     config.write_text("structure = \n", encoding="utf-8")
