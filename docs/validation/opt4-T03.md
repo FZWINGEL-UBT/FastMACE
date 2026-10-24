@@ -239,3 +239,10 @@ record and its dependants off) and builds again. The gate tool now does the same
 the revisions in the plan record (`rule13_revisions`). CPU test with an injected self-check failure in
 `tests/cpu/test_gate_rewrites_option.py`. The threshold itself is SPEC §6.4 and unchanged. The A100 build of
 OMOL-0 XL is exercised by the 5-T03 memory rerun.
+
+**A100 check (24 October 2026, conductor, main `3e06d24`):** Colab A100-SXM4-40GB (sm_80, driver 580.82.07),
+VM `fm-a100-20261024-210615-832ff1`, OMOL-0 XL on NaCl, default plan, `tools/force_stress_gate.py --engine
+fastmace`. **Passed:** energy / forces / stress ratios 1.14 / 1.14 / 0.89. Every self-check passed on this VM,
+so `rule13_revisions` is empty and the rule 13 path ran only in the CPU test. `reassociate_first`'s margin on
+sm_80 stays narrow (1.2–1.3e-4 against 1e-4 on the earlier VM). Colab: 41.45 → 38.16 CU (3.29), wall 41.6 min,
+of which 10 min setup.
