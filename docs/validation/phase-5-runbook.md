@@ -251,8 +251,8 @@ acceptance` green here.
 - In `compat` on each GPU: the estimate against the measured peak on MH-1 NaCl (5-T03's test).
 - **On the Colab A100 and L4** (conductor, 24 October 2026): `tools/memory_peaks.py` for MH-1 and POLAR-1-L on
   NaCl and NbCl5 3×3×3 (NVT and NPT, graph tier). Pass: predicted / measured peak within [1.0, 1.5] in every
-  case, with the fit at the freeze (5-T03: 160 MiB workspace, `SAFETY` 0.90; still one global factor, §9.3 rule 12;
-  the conductor notes decision 56 still holds). A ratio below 1.0 is a rule 12 failure and goes to the conductor; above 1.5 is a
+  case, with the fit at the freeze (5-T03: 160 MiB workspace, `SAFETY` 0.90; decision 51, and §9.3's rule 12 row:
+  one global safety factor, the same for every model and GPU; per-model, per-GPU or per-shape factors stay forbidden). A ratio below 1.0 is a rule 12 failure and goes to the conductor; above 1.5 is a
   failure of the estimate's accuracy (checkpoint 2). The table goes in the report with GPU and provider.
 
 **Item 9: calibration** (decision 55).
