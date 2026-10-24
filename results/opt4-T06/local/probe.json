@@ -1,0 +1,175 @@
+{
+  "created_utc": "2026-10-24T10:00:57.876463+00:00",
+  "structure": "NbCl5",
+  "device": "NVIDIA GeForce RTX 5060 Ti",
+  "sms": 36,
+  "nodes": 1944,
+  "edges": 51084,
+  "real_edges": 51084,
+  "x": [
+    1944,
+    512
+  ],
+  "sh": [
+    51084,
+    16
+  ],
+  "weights": [
+    51084,
+    1280
+  ],
+  "out": [
+    1944,
+    5120
+  ],
+  "channels": 128,
+  "layout": "ir_mul",
+  "degree": {
+    "mean": 26.27777671813965,
+    "min": 24.0,
+    "max": 30.0,
+    "std": 1.6937413215637207
+  },
+  "bytes": {
+    "weights": 261550080,
+    "x": 3981312,
+    "sh": 3269376,
+    "out": 39813120
+  },
+  "variants": [
+    {
+      "label": "default-128",
+      "num_threads": 128,
+      "options": [],
+      "registers": 80,
+      "local_bytes": 0,
+      "blocks": 1944,
+      "blocks_per_sm": 6,
+      "theoretical_occupancy_pct": 50.0,
+      "waves": 9.0,
+      "median_us": 801.8950653076172,
+      "min_us": 797.9673767089844,
+      "max_us": 803.7625885009766,
+      "bitwise_equal": true,
+      "max_abs_diff": 0.0,
+      "weights_read_gbs": 326.1649701007526
+    },
+    {
+      "label": "block-32",
+      "num_threads": 32,
+      "options": [],
+      "registers": 80,
+      "local_bytes": 0,
+      "blocks": 7776,
+      "blocks_per_sm": 24,
+      "theoretical_occupancy_pct": 50.0,
+      "waves": 9.0,
+      "median_us": 802.6406097412109,
+      "min_us": 798.8722991943359,
+      "max_us": 812.3635101318359,
+      "bitwise_equal": true,
+      "max_abs_diff": 0.0,
+      "weights_read_gbs": 325.8620070124904
+    },
+    {
+      "label": "block-64",
+      "num_threads": 64,
+      "options": [],
+      "registers": 80,
+      "local_bytes": 0,
+      "blocks": 3888,
+      "blocks_per_sm": 12,
+      "theoretical_occupancy_pct": 50.0,
+      "waves": 9.0,
+      "median_us": 800.8230590820312,
+      "min_us": 797.7350616455078,
+      "max_us": 805.533447265625,
+      "bitwise_equal": true,
+      "max_abs_diff": 0.0,
+      "weights_read_gbs": 326.60158449958976
+    },
+    {
+      "label": "block-256",
+      "num_threads": 256,
+      "options": [],
+      "registers": 80,
+      "local_bytes": 0,
+      "blocks": 972,
+      "blocks_per_sm": 3,
+      "theoretical_occupancy_pct": 50.0,
+      "waves": 9.0,
+      "median_us": 801.5955352783203,
+      "min_us": 798.5491180419922,
+      "max_us": 810.5881500244141,
+      "bitwise_equal": true,
+      "max_abs_diff": 0.0,
+      "weights_read_gbs": 326.28684728039025
+    },
+    {
+      "label": "block-512",
+      "num_threads": 512,
+      "options": [],
+      "registers": 80,
+      "local_bytes": 0,
+      "blocks": 486,
+      "blocks_per_sm": 1,
+      "theoretical_occupancy_pct": 33.333333333333336,
+      "waves": 13.5,
+      "median_us": 830.6771087646484,
+      "min_us": 829.7299194335938,
+      "max_us": 840.3091430664062,
+      "bitwise_equal": true,
+      "max_abs_diff": 0.0,
+      "weights_read_gbs": 314.8637144810303
+    },
+    {
+      "label": "maxreg-64",
+      "num_threads": 128,
+      "options": [
+        "--maxrregcount=64"
+      ],
+      "registers": 64,
+      "local_bytes": 104,
+      "blocks": 1944,
+      "blocks_per_sm": 8,
+      "theoretical_occupancy_pct": 66.66666666666667,
+      "waves": 6.75,
+      "median_us": 818.3968353271484,
+      "min_us": 816.0377502441406,
+      "max_us": 819.6934509277344,
+      "bitwise_equal": true,
+      "max_abs_diff": 0.0,
+      "weights_read_gbs": 319.58833259105546
+    },
+    {
+      "label": "maxreg-72",
+      "num_threads": 128,
+      "options": [
+        "--maxrregcount=72"
+      ],
+      "registers": 72,
+      "local_bytes": 8,
+      "blocks": 1944,
+      "blocks_per_sm": 7,
+      "theoretical_occupancy_pct": 58.333333333333336,
+      "waves": 7.714285714285714,
+      "median_us": 806.11328125,
+      "min_us": 804.5932769775391,
+      "max_us": 815.6511688232422,
+      "bitwise_equal": true,
+      "max_abs_diff": 0.0,
+      "weights_read_gbs": 324.4582195624258
+    }
+  ],
+  "weights_sum": {
+    "median_us": 647.7247619628906,
+    "min_us": 647.2128295898438,
+    "max_us": 657.6102447509766
+  },
+  "weights_copy": {
+    "median_us": 1451.5577697753906,
+    "min_us": 1447.9833984375,
+    "max_us": 1461.1622619628906
+  },
+  "weights_read_floor_gbs": 403.79817996673205
+}
