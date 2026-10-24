@@ -36,3 +36,32 @@ def test_the_option_belongs_to_fastmace_s_minimal_planner():
         gate.parse_args([*BASE, "--engine", "fastmace", "--planner", "fixed", "--rewrites", "gated_rows=on"])
     with pytest.raises(SystemExit):
         gate.parse_args([*BASE, "--baseline", ".", "--rewrites", "gated_rows=on"])
+
+
+def test_the_gate_applies_rule_13_as_production_does():
+    """A self-check failure at the build revises the plan (rule 13) and builds again, as production's fallback
+    does; before, the gate tool's direct ``planner.build`` ended the run (OMOL-0 on the A100, OPT4-T03)."""
+    from types import SimpleNamespace
+
+    import test_fallback_candidates as tfc
+
+    from fastmace.errors import SelfCheckError
+
+    _, plan = tfc.gpu_plan()
+    failed = tfc.enabled_fields(plan)[0]
+    error = SelfCheckError("self-check failed: 1.3e-4 > 1e-4")
+    error.reaction = SimpleNamespace(rewrite=failed.upper(), disabled=(failed.upper(),), fields=(failed,),
+                                     reason="1.3e-4 > 1e-4")
+    built = []
+
+    def build(candidate):
+        built.append(candidate)
+        if getattr(candidate.rewrites, failed) not in ("off", False):
+            raise error
+        return "engine"
+
+    engine, final, revisions = gate.build_with_rule13(build, plan)
+    assert engine == "engine" and len(built) == 2 and final.predecessor is plan
+    assert getattr(final.rewrites, failed) in ("off", False) and revisions == [final.reason]
+    assert revisions[0].startswith("rule 13:")
+    assert gate.build_with_rule13(lambda candidate: "first", plan) == ("first", plan, [])

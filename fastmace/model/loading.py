@@ -742,8 +742,13 @@ def load_pristine(source, head=None, *, sha256=None, trusted=False, download=Fal
     ``provenance()``. The plan converts the model to its backend and precision; the
     pristine model itself is never changed (``fm.ForceField``). Before MACE is
     imported, the OEq runtime is prepared where the hybrid is possible
-    (``prepare_hybrid_if_possible``; the outcome is ``oeq_runtime``).
+    (``prepare_hybrid_if_possible``; the outcome is ``oeq_runtime``). The expandable-segments
+    allocator is configured first (``configure_allocator``, a no-op if ``PYTORCH_CUDA_ALLOC_CONF`` is
+    set): preparing the hybrid can touch CUDA, and the allocator reads the variable only once (5-T07).
     """
+    from fastmace.model.compile import configure_allocator
+
+    configure_allocator(environ=environ)
     oeq_runtime = prepare_hybrid_if_possible()
     loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
                   sha256=sha256, trusted=trusted, download=download, charge=charge,
