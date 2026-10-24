@@ -46,7 +46,7 @@ from fastmace.planner.workload import Workload
 from fastmace.simulation import Simulation
 
 SPEC = {spec!r}
-loaded = loading.load_pristine(SPEC["path"], trusted=True)
+loaded = loading.load_pristine("mh1-r2scan")  # the label names the head (a path alone does not)
 out = {{"gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "runs": {{}}}}
 
 
