@@ -13,7 +13,7 @@ keep MACE's form otherwise. FastMACE's polar path has one graph per batch (``wor
 
 - **Rounding, not exact:** a reduction sums in another order than the atomics and the serial ``index_put``.
 - **Deterministic:** no atomics, no index_put (MACE's form is not, on CUDA, without the reproducible mode).
-- **Default** (owner decision 58): as ``fx_e3nn_linear``, on under ``auto`` for POLAR-1-S and -M in hybrid
+- **Default** (owner decision 58): as ``fx_e3nn_linear``, on under ``auto`` for POLAR-1-S, -M and -L in hybrid
   float32 plans that are not reproducible. On top of ``fx_e3nn_linear`` it adds no speed; it keeps those sums
   deterministic.
 """

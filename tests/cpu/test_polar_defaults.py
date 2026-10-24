@@ -1,8 +1,8 @@
-"""Decision 58 (OPT4-T02): ``fx_e3nn_linear`` and ``polar_graph_sums`` on by default for POLAR-1-S and -M.
+"""Decision 58 (OPT4-T02): ``fx_e3nn_linear`` and ``polar_graph_sums`` on by default for POLAR-1-S, -M and -L.
 
 - under ``auto`` the planner turns both on for PolarMACE with a qualified checkpoint (``POLAR_GRAPH_LABELS``),
-  found by label or by SHA-256 and head as rule 15 finds it, and off for POLAR-1-L, MH-1, a generic model and a
-  model of unknown identity, with the reason;
+  found by label or by SHA-256 and head as rule 15 finds it (L after its NbCl5 gate), and off for MH-1, a generic
+  model and a model of unknown identity, with the reason;
 - an explicit ``on`` or ``off`` overrides the rule; float64 plans keep MACE's code, and reproducible POLAR-1 is
   refused anyway (rule 5).
 """
@@ -34,30 +34,29 @@ def states(plan):
 
 
 def test_the_rule_and_the_qualified_labels():
-    assert fixed.POLAR_GRAPH_LABELS == ("polar1-s", "polar1-m")
+    assert fixed.POLAR_GRAPH_LABELS == ("polar1-s", "polar1-m", "polar1-l")
     assert set(fixed.POLAR_GRAPH_LABELS) <= set(labels.LABELS)
     for name in RECORDS:
         assert fixed.AUTO_RULES[f"RewriteConfig.{name}"] == RULE
 
 
-@pytest.mark.parametrize("label", ["polar1-s", "polar1-m"])
+@pytest.mark.parametrize("label", ["polar1-s", "polar1-m", "polar1-l"])
 @pytest.mark.parametrize("by_hash", [False, True])
-def test_minimal_planner_turns_both_on_for_s_and_m(label, by_hash):
+def test_minimal_planner_turns_both_on_for_polar1(label, by_hash):
     plan = tm.plan_label(label, loaded=loaded(label, by_hash=by_hash))
     assert states(plan) == dict.fromkeys(RECORDS, "on")
     off = dict(plan.auto_options_off)
     assert not set(RECORDS) & set(off)
 
 
-@pytest.mark.parametrize("label", ["polar1-l", "mh1-r2scan", "omat0-medium"])
+@pytest.mark.parametrize("label", ["mh1-r2scan", "omol0-xl", "omat0-medium"])
 def test_minimal_planner_leaves_other_models_off(label):
     plan = tm.plan_label(label, loaded=loaded(label))
     assert states(plan) == dict.fromkeys(RECORDS, "off")
     off = dict(plan.auto_options_off)
     for name in RECORDS:
         assert off[name].startswith("not a qualified POLAR-1 checkpoint, decision 58"), off[name]
-        if label.startswith("polar"):
-            assert f"label {label}" in off[name]
+        assert "label" not in off[name]  # a non-PolarMACE model is named by its class
 
 
 def test_unknown_identity_stays_off():
@@ -67,13 +66,13 @@ def test_unknown_identity_stays_off():
 
 
 def test_fixed_planner_reads_the_label():
-    for label, want in (("polar1-s", "on"), ("polar1-m", "on"), ("polar1-l", "off")):
+    for label, want in (("polar1-s", "on"), ("polar1-m", "on"), ("polar1-l", "on"), ("mh1-r2scan", "off")):
         plan = tp.planner().plan(tp.traits(label), tp.nacl(), tp.IntegratorConfig(), tp.GPU, model_label=label)
         assert states(plan) == dict.fromkeys(RECORDS, want), label
 
 
 def test_explicit_requests_override_the_rule():
-    on = tm.plan_label("polar1-l", loaded=loaded("polar1-l"),
+    on = tm.plan_label("omat0-medium", loaded=loaded("omat0-medium"),
                        rewrites=RewriteConfig(fx_e3nn_linear="on", polar_graph_sums="on"))
     assert states(on) == dict.fromkeys(RECORDS, "on")
     off = tm.plan_label("polar1-s", loaded=loaded("polar1-s"), rewrites=RewriteConfig(fx_e3nn_linear="off"))

@@ -266,9 +266,10 @@ def _toggle(value):
 
 
 # Owner decision 58, 24 October 2026 (OPT4-T02): the POLAR-1 checkpoints whose force gate passed with
-# fx_e3nn_linear and polar_graph_sums on (S and M on NaCl and NbCl5 2x2x2). They are label-table labels, which
-# identify a checkpoint by its SHA-256 (fastmace.model.labels), not by its file name.
-POLAR_GRAPH_LABELS = ("polar1-s", "polar1-m")
+# fx_e3nn_linear and polar_graph_sums on (S and M on NaCl and NbCl5 2x2x2; L, the owner's condition, after its
+# local NbCl5 2x2x2 gate). They are label-table labels, which identify a checkpoint by its SHA-256
+# (fastmace.model.labels), not by its file name.
+POLAR_GRAPH_LABELS = ("polar1-s", "polar1-m", "polar1-l")
 POLAR_GRAPH_RECORDS = ("fx_e3nn_linear", "polar_graph_sums")
 
 
@@ -915,7 +916,7 @@ class FixedPlanner:
             v["_why"]["grouped_launch"] += f"; stage 2: off, {reason}"
         for name in POLAR_GRAPH_RECORDS:
             if v[name] and name not in explicit and not _qualified_polar(traits, model_label):
-                # Gated and A/B-measured on POLAR-1-S and -M only (OPT4-T02); POLAR-1-L's NbCl5 gate is open.
+                # Gated on the three POLAR-1 checkpoints (OPT4-T02); other models were not screened.
                 found = f"PolarMACE, label {model_label}" if traits.polar else traits.model_class
                 reason = (f"not a qualified POLAR-1 checkpoint, decision 58 ({found}; qualified: "
                           f"{', '.join(POLAR_GRAPH_LABELS)})")
