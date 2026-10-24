@@ -46,7 +46,7 @@ def test_eager_plan_is_the_graph_plan_without_graphs_or_compilation():
     for part in SAME_PARTS:
         assert getattr(eager, part) == getattr(graph, part), part
     assert eager.engine.compile_mode == "none" and graph.engine.compile_mode == "default"
-    assert eager.engine == dataclasses.replace(graph.engine, compile_mode="none")
+    assert eager.engine == dataclasses.replace(graph.engine, compile_mode="none", dynamic_edges=False)  # decision 59
     assert eager.engine.backend == "hybrid"
     assert eager.engine.pipelined == graph.engine.pipelined  # resolved value kept (conductor answer T02)
     mode = eager.decision("mode")

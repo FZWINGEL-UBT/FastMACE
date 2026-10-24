@@ -1,4 +1,4 @@
-"""PolarMACE model rewrites (SPEC §6.2 ``polar_uvu``; opt-4 OPT4-T02 ``polar_graph_sums``, opt-in).
+"""PolarMACE model rewrites (SPEC §6.2 ``polar_uvu``; opt-4 OPT4-T02 ``polar_graph_sums``, decision 58).
 
 ``RECORDS`` maps each rewrite name to a plain dict with the fields of SPEC §6.1's ``Rewrite``
 record (plus ``config_field``), for the rewrite registry of plan task 1a-T06 to register. The

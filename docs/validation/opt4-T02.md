@@ -5,8 +5,8 @@ Records and run scripts: `results/opt4-T02/`.
 
 ## Verdict
 
-**Two opt-in records. Both pass the POLAR-1 gate: S and M on NaCl and NbCl5 2×2×2, and L on NaCl. L on
-NbCl5 timed out cold-compiling on the Colab A100. Locally the pair cuts POLAR-1-S's MD step by 24 % on NaCl and
+**Two records, on by default for POLAR-1 (decision 58, §8). Both pass the POLAR-1 gate: S, M and L on NaCl
+and NbCl5 2×2×2. L's NbCl5 ran locally after it timed out cold-compiling on the Colab A100. Locally the pair cuts POLAR-1-S's MD step by 24 % on NaCl and
 18 % on NbCl5; on the Colab L4 by 19 % and 16 %.** One record does the work:
 
 - `fx_e3nn_linear` makes e3nn's `o3.Linear` traceable. PolarMACE's forward then compiles as one frame instead of
@@ -14,7 +14,8 @@ NbCl5 timed out cold-compiling on the Colab A100. Locally the pair cuts POLAR-1-
 - `polar_graph_sums` removes the float64 `index_put` backward. It gains 8–9 % alone, nothing on top of
   `fx_e3nn_linear`, and makes those sums deterministic.
 
-Both records are `never_automatic`; the owner decides defaults.
+**Owner decision 58 (24 October 2026, "Yes"):** both records are on by default for POLAR-1-S and POLAR-1-M
+(§8), and for POLAR-1-L since its local NbCl5 gate passed.
 
 | Same-process A/B, POLAR-1-S, default (a) against both records (b) | NaCl b/a | NbCl5 b/a |
 | --- | ---: | ---: |
@@ -132,7 +133,8 @@ Ratio = production error / float32 yardstick error against float64; the limit is
 | POLAR-1-M, NaCl | 1.13 | 1.11 | 0.86 | yes | 1.44 / 1.15 / 0.81 (murphy) |
 | POLAR-1-M, NbCl5 2×2×2 | 1.07 | 1.01 | 0.68 | yes | – |
 | POLAR-1-L, NaCl (local, 13:04–13:12 UTC) | 0.72 | 0.91 (4.8e-6 eV/Å) | 0.95 | yes | 0.93 / 0.91 / 0.94 (leto) |
-| POLAR-1-L, NbCl5 2×2×2 (Colab A100) | – | – | – | **not run to the end** | 1.12 / 0.98 / 0.70 (leto) |
+| POLAR-1-L, NbCl5 2×2×2 (Colab A100) | – | – | – | **not run to the end** | |
+| POLAR-1-L, NbCl5 2×2×2 (local, 14:13–14:23 UTC, the owner's condition for decision 58) | 0.88 | 0.96 (2.8e-3 eV/Å) | 0.75 | yes | 1.12 / 0.98 / 0.70 (leto) |
 
 **POLAR-1-L on NbCl5 2×2×2 (Colab A100) timed out cold-compiling at the 30-minute cap** (`fm-opt4-t02-a100-gate-114430`,
 NVIDIA A100-SXM4-40GB, sm_80):
@@ -140,8 +142,8 @@ NVIDIA A100-SXM4-40GB, sm_80):
 - The four references (NaCl and NbCl5, float64 and float32) finished in 3.5 min.
 - The production child was still compiling 22 min later: there was no sm80 compile cache for POLAR-1-L, and
   every POLAR engine build resets dynamo (below).
-- The conductor ruled out a rerun (Colab budget), so POLAR-1-L is gated on NaCl only. A default proposal is
-  scoped to POLAR-1-S and POLAR-1-M.
+- The conductor ruled out a rerun (Colab budget). The owner's decision 58 asked for a local NbCl5 2×2×2 gate
+  instead, which passed (table above).
 
 **MH-1** (`mh1-r2scan`, NaCl, `fx_e3nn_linear=on`, the conductor's check): refused at plan time with "no e3nn
 o3.Linear runs TorchScript". The hybrid MH-1 model has no such Linear, so the record has nothing to change there
@@ -199,7 +201,7 @@ L4 numbers compare only within this container (OPT-T10).
   minutes for POLAR-1-L. This is a setup-time question for OPT4-T05, not for these records.
 
 - **Defaults.** `fx_e3nn_linear` is a candidate for a default wherever it applies. It gains on sm_120 and on
-  the L4, rounding class, gate passed on POLAR-1-S and -M (POLAR-1-L on NaCl only), and it is a no-op where the
+  the L4, rounding class, gate passed on POLAR-1-S, -M and -L, and it is a no-op where the
   model has no TorchScript Linear (MH-1 hybrid).
   `polar_graph_sums` is worth having only for determinism once `fx_e3nn_linear` is on.
 - **Other families.** Any model loaded with e3nn TorchScript Linears on the executed path takes
@@ -207,3 +209,29 @@ L4 numbers compare only within this container (OPT-T10).
   beyond POLAR and MH-1.
 - **Reproducible mode.** Not run for these records. `polar_graph_sums` removes atomics; `fx_e3nn_linear` changes
   only what Inductor compiles.
+
+## 8. Default (owner decision 58, branch `fastmace/opt4-T02b`)
+
+The owner answered "Yes" to "both T02 records on by default for POLAR-1-S and -M; POLAR-1-L only after a local
+NbCl5 gate passes".
+
+- **Rule** (`fastmace/planner/fixed.py`, `on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints`):
+  - stage 1: on with the hybrid backend;
+  - stage 2: off unless the model is PolarMACE and its checkpoint is one of `POLAR_GRAPH_LABELS` = (`polar1-s`,
+    `polar1-m`, `polar1-l`), with the reason "not a qualified POLAR-1 checkpoint, decision 58";
+  - an explicit `on` or `off` overrides.
+- **Identity.** The checkpoint is the loaded model's label-table label, found by label or by SHA-256 and head,
+  as rule 15 finds it. The table identifies checkpoints by SHA-256, not by file name. A model of unknown identity
+  stays off. main.py's fixed planner, which plans from traits alone, therefore keeps the research engine's
+  plan; its `plan()` takes `model_label` or reads a `LoadedModel`'s.
+- **Float64 and `reproducible=True`:** off, as under decision 57. Reproducible plans run plain cuEq, where these
+  compiled-path records were neither gated nor timed. `polar_graph_sums` is deterministic and would be allowed
+  there, but it goes with `fx_e3nn_linear` on the hybrid path, where its gate is. An explicit `on` still
+  enables it.
+- **Tests:** `tests/cpu/test_polar_defaults.py`, and `tests/cpu/test_planner.py` with both records in
+  `FASTMACE_ONLY_DEFAULTS`. The latter's 19-label default plans and the research-engine comparison were run with
+  `FASTMACE_BASELINE` set.
+- **POLAR-1-L, NbCl5 2×2×2, local** (the owner's condition; untimed reservation, 14:13–14:23 UTC, source
+  `9b9e3e0`, both records on): energy 0.88, forces 0.96 (2.8e-3 eV/Å, yardstick 3.0e-3), stress 0.75, **passed**.
+  Phase 1b on leto, without the records: 1.12 / 0.98 / 0.70. POLAR-1-L therefore joined `POLAR_GRAPH_LABELS` in the
+  commit after the S and M default (`results/opt4-T02/gates/polar1-l-NbCl5/`).

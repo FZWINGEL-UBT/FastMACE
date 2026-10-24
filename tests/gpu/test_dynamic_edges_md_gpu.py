@@ -1,6 +1,7 @@
-"""A graph-tier MD start compiles once with ``EngineConfig.dynamic_edges`` (opt-4 OPT4-T05).
+"""A graph-tier MD start compiles once with ``EngineConfig.dynamic_edges``, the default since decision 59
+(opt-4 OPT4-T05).
 
-Without it the first compiled call specialises on the exact initial edge count, and capturing B at the
+With ``dynamic_edges=False`` the first compiled call specialises on the exact initial edge count, and capturing B at the
 padded count makes dynamo compile the model again with a dynamic edge dimension (8-9 s warm, about 22 s
 cold, locally). With it the edges are marked dynamic from the first call and the capture reuses that
 graph; the edges stay padded and the graphs are still captured.
@@ -34,7 +35,7 @@ from fastmace.config import EngineConfig
 counters.clear()
 integrator = fm.integrators.Langevin(timestep_fs=2.0, temperature_K=SPEC["temperature"],
                                      friction_per_fs=0.02 * units.fs)
-engine = EngineConfig(dynamic_edges=True) if SPEC["dynamic_edges"] else None
+engine = None if SPEC["dynamic_edges"] else EngineConfig(dynamic_edges=False)  # None: the default
 sim = fm.Simulation(structure(), fm.load(SPEC["label"]), integrator=integrator, seed=SPEC["seed"], engine=engine)
 setup_graphs = counters["stats"]["unique_graphs"]
 sim.run(steps=SPEC["steps"])
@@ -61,12 +62,12 @@ def test_dynamic_edges_md_start_compiles_once():
     if not ENGINE._has_oeq():
         pytest.skip("OpenEquivariance is not installed (hybrid environment needed)")
     static, dynamic = _run(False), _run(True)
-    ENGINE.report("opt4-T05-dynamic-edges-md", {"default": static, "dynamic_edges": dynamic})
+    ENGINE.report("opt4-T05-dynamic-edges-md", {"dynamic_edges_off": static, "default": dynamic})
     for side in (static, dynamic):
         assert (side["tier"], side["capture"]) == ("graph", True), side
-    assert static["dynamic_edges"] is False and static["decision"] is None
+    assert static["dynamic_edges"] is False and static["decision"] == "off"
     assert dynamic["dynamic_edges"] is True and dynamic["decision"] == "on"
-    # The default compiles the model twice (the static first call, then the padded capture); the option once.
+    # Off compiles the model twice (the static first call, then the padded capture); the default once.
     assert dynamic["setup_graphs"] < static["setup_graphs"], (static, dynamic)
     assert dynamic["run_graphs"] == dynamic["setup_graphs"], dynamic  # nothing compiled during the steps
     assert abs(dynamic["energy"] - static["energy"]) / 216 < 1e-3, (static["energy"], dynamic["energy"])
@@ -101,16 +102,17 @@ print(json.dumps(out))
 @pytest.mark.slow
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_dynamic_edges_reproducible_trajectories():
-    """``reproducible=True`` (plain cuEq float64): the option's trajectory is bitwise the default's, through the
-    run's neighbour rebuilds (the steps replay the same compiled code; the first forces come from the dynamic
-    graph instead of the static one, with the same bits here), and repeats bitwise."""
+    """``reproducible=True`` (plain cuEq float64): the default's trajectory is bitwise the one with ``False``,
+    through the run's neighbour rebuilds (the steps replay the same compiled code; the first forces come from
+    the dynamic graph instead of the static one, with the same bits here), and repeats bitwise."""
     runs = {name: ENGINE.run_fresh(REPRODUCIBLE.format(spec={"dynamic_edges": dynamic, "steps": 300}))
-            for name, dynamic in (("default", False), ("dynamic", True), ("dynamic_again", True))}
+            for name, dynamic in (("static", False), ("dynamic", True), ("dynamic_again", True))}
     summary = {name: {k: v for k, v in run.items() if k not in ("positions", "momenta")} for name, run in runs.items()}
-    summary["dynamic_equals_default"] = all(runs["dynamic"][k] == runs["default"][k] for k in ("positions", "momenta"))
+    summary["dynamic_equals_static"] = all(runs["dynamic"][k] == runs["static"][k] for k in ("positions", "momenta"))
     ENGINE.report("opt4-T05-dynamic-edges-reproducible", summary)
-    assert runs["default"]["tier"] == "graph" and runs["dynamic"]["dynamic_edges"] is True, summary
-    assert runs["default"]["rebuilds"] > 0, summary  # the edge count changed during the run
+    assert runs["static"]["tier"] == "graph" and runs["static"]["dynamic_edges"] is False, summary
+    assert runs["dynamic"]["dynamic_edges"] is True, summary
+    assert runs["static"]["rebuilds"] > 0, summary  # the edge count changed during the run
     for key in ("step", "positions", "momenta"):
-        assert runs["dynamic"][key] == runs["default"][key], (key, summary)
+        assert runs["dynamic"][key] == runs["static"][key], (key, summary)
         assert runs["dynamic_again"][key] == runs["dynamic"][key], (key, summary)

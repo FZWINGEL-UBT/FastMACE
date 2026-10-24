@@ -1,7 +1,8 @@
 """The ``fx_e3nn_linear`` record: e3nn's ``o3.Linear`` code as an fx graph, not TorchScript (opt-4 OPT4-T02).
 
-- the record is rounding-class (Inductor then compiles code that ran eagerly), deterministic, opt-in
-  (``never_automatic``) and pins e3nn's code generator;
+- the record is rounding-class (Inductor then compiles code that ran eagerly), deterministic, default only for
+  the qualified POLAR-1 checkpoints (decision 58, ``tests/cpu/test_polar_defaults.py``) and pins e3nn's code
+  generator;
 - it applies to models with TorchScript ``o3.Linear`` modules and refuses models without any, and ones whose
   Linears have ``f_in``/``f_out`` batch dimensions (their code cannot be rebuilt from the module);
 - applied, every such Linear runs an ``fx.GraphModule``; the model's energy and forces stay bitwise equal on
@@ -52,7 +53,8 @@ def test_the_record_is_rounding_opt_in_and_pinned():
     from fastmace.planner import fixed
 
     assert RewriteConfig().fx_e3nn_linear == "auto"
-    assert fixed.AUTO_RULES["RewriteConfig.fx_e3nn_linear"] == "never_automatic"
+    assert fixed.AUTO_RULES["RewriteConfig.fx_e3nn_linear"] == (
+        "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints")  # decision 58
     assert "fx_e3nn_linear" in fixed.REWRITE_FIELDS
 
 

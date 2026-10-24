@@ -167,11 +167,12 @@ class RewriteConfig:
     tf32x3_gemms: Toggle = "auto"
     # e3nn's o3.Linear code as an fx graph instead of the TorchScript a checkpoint restores, so dynamo traces it
     # (a TorchScript Linear in a loop sends PolarMACE's whole forward back to eager); rounding (opt-4 OPT4-T02,
-    # fastmace.rewrites.codegen); opt-in, auto = off.
+    # fastmace.rewrites.codegen); auto = on for the qualified POLAR-1 checkpoints (S, M, L) in hybrid float32 plans
+    # that are not reproducible (owner decision 58, 24 October 2026), off for every other model.
     fx_e3nn_linear: Toggle = "auto"
     # PolarMACE: per-graph sums of one graph (Fukui norms, total charges, barycentre) as a sum over atoms and a
     # broadcast, not scatter_add_ and an index (float64 index_put backward); rounding (opt-4 OPT4-T02,
-    # fastmace.rewrites.polar.graph_sums); opt-in, auto = off.
+    # fastmace.rewrites.polar.graph_sums); auto as fx_e3nn_linear (owner decision 58).
     polar_graph_sums: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
@@ -222,11 +223,12 @@ class EngineConfig:
     # Eager warm-ups after the first capture run inside the graph pool.
     warmup_in_graph_pool: bool = True
     # The edge dimension is dynamic from the first compiled call, so a changed edge count does not compile
-    # again. Evaluation and compiled-tier plans set it (2-T13, 3-T06). Graph-tier MD plans take it on request
-    # (OPT4-T05): the edges stay padded, and the padded first capture reuses the first call's graph instead
-    # of compiling again (8-9 s per warm start, about 22 s cold, locally); the steps replay the same compiled
-    # code as without it. Opt-in.
-    dynamic_edges: bool = False
+    # again. Evaluation and compiled-tier plans always set it (2-T13, 3-T06). On graph-tier MD plans the edges
+    # stay padded, and the padded first capture reuses the first call's graph instead of compiling again
+    # (7-9 s per warm start, 16-22 s cold, locally); the steps replay the same compiled code as without it, and
+    # reproducible-mode trajectories are bitwise equal (OPT4-T05). On by default (owner decision 59, 24 October
+    # 2026); False restores the second compile. Plans that compile nothing turn it off.
+    dynamic_edges: bool = True
     # Keep each conversion's model as a template and give later plans a private copy of it instead of
     # reloading and converting the checkpoint (CUDA cuEq and hybrid only; opt-1 OPT-T06).
     model_template_cache: bool = True

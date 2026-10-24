@@ -1,13 +1,13 @@
 # OPT4-T05: setup and capture time of an `fm.md` start
 
-**Status: measured, one option built, 24 October 2026.** Plan `plans/opt-4.md` §3 candidate 5, task OPT4-T05,
+**Status: measured, one option built, 24 October 2026; on by default since owner decision 59 (OPT4-T05b, see the last section).** Plan `plans/opt-4.md` §3 candidate 5, task OPT4-T05,
 branch `fastmace/opt4-T05`.
 
 ## Verdict
 
 | Item | Cost per start (local) | Rule (≥ 5 s warm or ≥ 15 s cold) | Outcome |
 | --- | --- | --- | --- |
-| **Second compile at the first B capture** | warm 8.0–9.7 s, cold 18–24 s | passes both | **built: `EngineConfig.dynamic_edges` as an opt-in on graph-tier MD plans** (exact) |
+| **Second compile at the first B capture** | warm 8.0–9.7 s, cold 18–24 s | passes both | **built: `EngineConfig.dynamic_edges` on graph-tier MD plans** (exact; opt-in here, default since decision 59) |
 | OEq extension build | cold 16 s, warm 0 | passes cold | not built: it is cached under `FASTMACE_CACHE` already; prebuilt wheels are SPEC §14's 1.0 plan |
 | Inductor's cold compile (first compiled call) | cold 24–30 s, warm 9–10 s | passes cold | not built here; its cache lies outside `FASTMACE_CACHE` (finding 1) |
 | Checkpoint load, conversion | 3 + 4 s, warm and cold | fails | none |
@@ -24,7 +24,7 @@ With the option, a warm start is **7–9 s shorter** and a cold start **16–22 
 | cold, `dynamic_edges=True` (n = 2) | **65.4 s** | **70.5 s** | **55.4 s** |
 
 The option is exact. The steps replay the same compiled code, and `reproducible=True` trajectories are bitwise
-the default's. The default is the owner's call.
+the default's. The owner made it the default (decision 59).
 
 ## Method
 
@@ -177,9 +177,9 @@ or `Simulation(engine=...)`.
 - **Fewer graph variants up front.** `prepare()` captures 2 graphs (ACP, B), and ACP costs 0.04–0.4 s.
   There is nothing to remove.
 
-## Findings (reported, not fixed)
+## Findings
 
-1. **Inductor's cache is not under `FASTMACE_CACHE`.**
+1. **Inductor's cache was not under `FASTMACE_CACHE`. Fixed in OPT4-T05b (owner "Yes").**
    - `fastmace.kernels.triton.cache.configure()`, which puts `TORCHINDUCTOR_CACHE_DIR` and
      `TRITON_CACHE_DIR` under the cache root (SPEC §14 "Caches"), has no caller in `fastmace/` since 1a-T04
      added it.
@@ -238,3 +238,51 @@ python3 tools/ci/local_gpu.py run --wait-minutes 600 --purpose "OPT4-T05 setup" 
 
 Sets: `cold-N`, `fill`, `warm-N`, `dyn-fill`, `ab-N`, `cold-dyn-N`. Use a new N for each cold set, because a
 cache root is named after its set. `SRC` selects the source export.
+
+## Follow-up OPT4-T05b: the default (owner decision 59)
+
+The owner answered "Yes" to "`dynamic_edges` on by default" (24 October 2026). Branch `fastmace/opt4-T05b`:
+
+- `EngineConfig.dynamic_edges` defaults to `True`.
+- Graph-tier MD plans record `EngineConfig.dynamic_edges: on` (`dynamic-edges-graph`), or `off`
+  (`dynamic-edges-graph-off`) when the caller passes `False`, which restores the second compile.
+- Plans that compile nothing (the eager and reference tiers, `compile_mode="none"`) turn it off and record
+  `dynamic-edges-uncompiled`. `FixedPlanner` turns it off for an uncompiled engine too, so both planners
+  still give equal engines.
+- In "Verdict" and the tables above, "default" means `dynamic_edges=False` and "the option" means the new
+  default.
+- SPEC §8.1, §18 decision 59 and §19's seventeenth amendment record it.
+
+## Follow-up OPT4-T05b: the compiler caches under `FASTMACE_CACHE` (finding 1)
+
+The owner answered "Yes" to "fix the Inductor cache to live under FASTMACE_CACHE".
+
+- `FixedPlanner.configure_process` now calls `fastmace.kernels.triton.cache.configure_defaults`.
+  `hardware()`, `load()` and every MD and evaluation build run it before the first CUDA allocation, so
+  before any self-check, Triton kernel or `torch.compile`.
+- It sets `TORCHINDUCTOR_CACHE_DIR` and `TRITON_CACHE_DIR` under the cache root, and turns on Inductor's
+  FX-graph and AOT-autograd caches, wherever the environment does not set them already. A variable set
+  by the caller wins (SPEC §14 now says so). It creates no directory: Inductor and Triton create theirs
+  when they first write.
+- **Inductor's own default counts as unset.** Importing `torch._dynamo` runs `torch/_dynamo/package.py`,
+  which calls Inductor's `cache_dir()`, and that writes the default `$TMPDIR/torchinductor_$USER` into
+  `os.environ`. MACE imports `torch._dynamo` while `fm.load` runs, so the variable is always set before the
+  planner's setup.
+  - A first version that kept every set value still compiled into `$TMPDIR` in the GPU smoke.
+  - A value equal to torch's `default_cache_dir()` is therefore replaced; any other value is the caller's.
+- **GPU smoke** (local RTX 5060 Ti, `mace_cueq_oeq`, export of `1da9315`, a fresh `FASTMACE_CACHE`, no
+  compiler-cache variable set; MH-1 NaCl `fm.md`, 300 steps, default plan):
+  - one compile: B's first capture took 0.08 s, and `('B', 7680)` later 0.07 s;
+  - Inductor's 52 MB, Triton's 57 MB and the OEq build all under `FASTMACE_CACHE`, and nothing new under
+    `~/.triton`;
+  - `$TMPDIR/torchinductor_$USER` exists but is empty. `torch/_dynamo/package.py` creates it when torch is
+    imported, before FastMACE can act. Only a `TORCHINDUCTOR_CACHE_DIR` set before torch is imported avoids
+    the empty directory; `import fastmace` sets nothing (SPEC §14). Workstation scripts that must not create
+    even an empty directory in `/tmp` can export it themselves.
+- On the workstations, a run therefore writes its compile caches under the cache root (`FASTMACE_CACHE`, else
+  `~/.cache/fastmace`) instead of under `/tmp`. Our runs set `FASTMACE_CACHE` under `/mnt/homes/zwingel`, so
+  they write nothing outside it.
+- Tests:
+  - `tests/cpu/test_kernels_cache.py`: the defaults, explicit variables, Inductor's own default (also in a
+    fresh process that imports `torch._dynamo` first), the planner's process setup;
+  - `tests/cpu/test_minimal_planner.py::test_a_fresh_build_puts_the_compiler_caches_under_the_cache_root`.

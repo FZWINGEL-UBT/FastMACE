@@ -5,8 +5,9 @@ edge count changed and dynamo's automatic dynamic shapes compiled the model agai
 edge dimension. Evaluation plans now set ``EngineConfig.dynamic_edges``, and their force field
 marks the edge dimension dynamic from the first call:
 
-- the evaluation plan sets ``dynamic_edges`` when it compiles; MD (graph tier) plans do not, unless the
-  caller asks (OPT4-T05: the first compiled call then serves the padded capture, so a start compiles once);
+- the evaluation plan sets ``dynamic_edges`` when it compiles; graph-tier MD plans keep the default, on
+  since decision 59 (OPT4-T05: the first compiled call then serves the padded capture, so a start compiles
+  once), and plans that compile nothing turn it off;
 - ``mark_edges_dynamic`` makes one compiled function serve every edge count;
 - the force field marks its edges and keys its compiled model by ``dynamic_edges``;
 - slow: a compiled tiny MACE compiles once across calls with three edge counts and matches the
@@ -72,34 +73,38 @@ def test_uncompiled_evaluation_plans_leave_dynamic_edges_off():
     assert plan.decision("EngineConfig.dynamic_edges")[1] == "off"
 
 
-def test_md_plans_keep_static_edges():
-    """The graph tier pads edges to buckets and captures graphs: its plans are unchanged."""
+def test_md_plans_mark_edges_dynamic_by_default():
+    """Decision 59 (OPT4-T05): a graph-tier MD plan compiles with a dynamic edge dimension, still pads to
+    buckets and captures, and records why (the padded first capture reuses the first compiled call's graph)."""
     plan = minimal().plan_traits(tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(),
                                  Workload(max_temperature_K=300.0), GPU, precision="float32")
-    assert plan.engine.dynamic_edges is False
-    assert "EngineConfig.dynamic_edges" not in {entry[0] for entry in plan.decisions}
-
-
-def test_md_plans_take_dynamic_edges_on_request():
-    """OPT4-T05's opt-in: a graph-tier MD plan keeps a requested dynamic edge dimension, still pads and
-    captures, and records why (the padded capture reuses the first compiled call's graph)."""
-    plan = minimal(engine=EngineConfig(dynamic_edges=True)).plan_traits(
-        tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(), Workload(max_temperature_K=300.0), GPU,
-        precision="float32")
     assert plan.tier == "graph" and plan.engine.dynamic_edges is True
     assert plan.engine.compile_mode == "default"
     _, choice, reason = plan.decision("EngineConfig.dynamic_edges")
-    assert choice == "on" and "compiles once" in str(reason)
-    assert ("EngineConfig.dynamic_edges", "True") in plan.requested
+    assert choice == "on" and "compiles once" in str(reason) and reason.code == "dynamic-edges-graph"
+    assert not any(entry[0] == "EngineConfig.dynamic_edges" for entry in plan.requested)
 
 
-def test_eager_md_plans_record_no_dynamic_edges():
-    """Nothing is compiled on the eager tier: a requested dynamic edge dimension has nothing to mark."""
-    plan = minimal(engine=EngineConfig(dynamic_edges=True)).plan_traits(
+def test_md_plans_keep_static_edges_when_asked():
+    """An explicit ``dynamic_edges=False`` restores the static first compile (and the second at the capture)."""
+    plan = minimal(engine=EngineConfig(dynamic_edges=False)).plan_traits(
         tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(), Workload(max_temperature_K=300.0), GPU,
-        precision="float32", mode="eager")
-    assert plan.engine.compile_mode == "none"
-    assert "EngineConfig.dynamic_edges" not in {entry[0] for entry in plan.decisions}
+        precision="float32")
+    assert plan.tier == "graph" and plan.engine.dynamic_edges is False
+    _, choice, reason = plan.decision("EngineConfig.dynamic_edges")
+    assert choice == "off" and reason.code == "dynamic-edges-graph-off"
+    assert ("EngineConfig.dynamic_edges", "False") in plan.requested
+
+
+@pytest.mark.parametrize("mode", ["eager", "reference"])
+def test_uncompiled_md_plans_turn_dynamic_edges_off(mode):
+    """Nothing is compiled on the eager and reference tiers: no edge dimension to mark, and the plan says so."""
+    plan = minimal().plan_traits(tp.traits("mh1-r2scan"), nacl(), IntegratorConfig(),
+                                 Workload(max_temperature_K=300.0), GPU, precision="float32", mode=mode,
+                                 allow_reference=mode == "reference")
+    assert plan.engine.compile_mode == "none" and plan.engine.dynamic_edges is False
+    _, choice, reason = plan.decision("EngineConfig.dynamic_edges")
+    assert choice == "off" and reason.code == "dynamic-edges-uncompiled"
 
 
 # --------------------------------------------------------------------------- marking
@@ -147,7 +152,7 @@ def test_force_field_marks_edges_and_keys_its_compiled_model_by_dynamic_edges():
             kwargs["prepare"](private)
         return private
 
-    cache, static = fc.CompiledModelCache(), EngineConfig(compile_mode="default")
+    cache, static = fc.CompiledModelCache(), EngineConfig(compile_mode="default", dynamic_edges=False)
     dynamic = dataclasses.replace(static, dynamic_edges=True)
     with mock.patch.object(fc, "compile_model", side_effect=fake_compile), \
             mock.patch.object(fc, "mark_edges_dynamic", wraps=fc.mark_edges_dynamic) as marked:
