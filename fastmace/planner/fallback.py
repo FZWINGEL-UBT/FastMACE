@@ -323,7 +323,21 @@ def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: An
                              f"{plan.precision.dtype} -> {planned.precision.dtype}); a fallback never does")
         fields = {f.name: getattr(planned, f.name) for f in dataclasses.fields(planned)
                   if f.name not in _NOT_REPLANNED}
-    return plan.revise(f"{PREFIX}{change}: {why}", step, selfchecks=(), **fields)
+    revised = plan.revise(f"{PREFIX}{change}: {why}", step, selfchecks=(), **fields)
+    return memory_revised(revised, force_field, atoms, planner) if dimension == "rewrites" else revised
+
+
+def memory_revised(plan: Any, force_field: Any, atoms: Any, planner: Any = None) -> Any:
+    """``plan`` with rule 12 run again for its rewrites (5-T03): a revision that turns a rewrite off without a
+    re-plan (a rewrite candidate, rule 13) would otherwise keep a prediction that counted the memory the rewrite
+    saved. Unchanged when the plan has no estimate or the force field no traits."""
+    from fastmace.planner import minimal
+
+    traits = getattr(force_field, "traits", None)
+    if plan.predicted_memory_bytes is None or traits is None:
+        return plan
+    reviser = planner if isinstance(planner, minimal.MinimalPlanner) else minimal.MinimalPlanner(engine=plan.engine)
+    return reviser.revise_memory(plan, traits, atoms, reviser.hardware())
 
 
 def _parse(candidate_plan):
@@ -1011,6 +1025,7 @@ class Fallback:
                 if rule13 is not None:
                     plan = dataclasses.replace(plan, decisions=reactions.selfcheck_revision(
                         self.failed, rule13).decisions)
+                    plan = memory_revised(plan, self.force_field, self.atoms, self.planner)
             if mode != plan.tier:
                 plan = candidate(plan, {"mode": mode, "reason": why}, self.force_field, self.atoms,
                                  planner=self.planner, **self._at())

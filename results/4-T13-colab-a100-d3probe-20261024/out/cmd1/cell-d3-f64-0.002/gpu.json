@@ -1,0 +1,147 @@
+{
+  "schema": 4,
+  "task": "4-T05/4-T06/4-T07/4-T08",
+  "side": "gpu",
+  "optimizer": "lbfgs",
+  "cell_filter": "frechet",
+  "pressure_GPa": 0.0,
+  "dispersion": "d3bj",
+  "structure_settings": {
+    "root": "/content/fm/baseline/1a-T18",
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "strain": 0.02,
+    "rattle_A": 0.02,
+    "seed": 0,
+    "seed_rule": "seed + crc32(name)"
+  },
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-24T04:23:19+00:00",
+  "fastmace_commit": null,
+  "machine": "b5f60ec50db9",
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float64",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/content/fm/cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/content/fm/models/mace-mh-1.model",
+  "fmax": 0.002,
+  "steps": 5000,
+  "structures": {
+    "NbCl5": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl5.cif",
+      "runs": {
+        "graph-skinauto": {
+          "setup_s": 75.64931527099998,
+          "tier": "graph",
+          "skin_A": "auto",
+          "frames": {
+            "0": {
+              "converged": true,
+              "steps": 876,
+              "seconds": 26.332654610999953,
+              "initial_eV_atom": -10.690118677381713,
+              "energy_eV_atom": -10.717945500169474,
+              "fmax_eV_A": 0.001922956952310111,
+              "neighbour_rebuilds": 7,
+              "recaptures": 4,
+              "ms_per_step": 30.060108003424606,
+              "switch_flips": null,
+              "warm_up": true,
+              "enthalpy_eV_atom": -10.717945500169474,
+              "cell_lengths_A": [
+                55.63404856453188,
+                54.16077792386647,
+                17.62838435540338
+              ],
+              "cell_angles_deg": [
+                89.99996105237324,
+                90.32979497589069,
+                90.00005516266735
+              ],
+              "volume_A3": 53116.67428173465,
+              "dE_vs_ase_meV_atom": -1.3585577107733116e-08,
+              "dsteps_vs_ase": 0,
+              "max_distance_vs_ase_A": 5.243362076617766e-06,
+              "max_cell_length_diff_A": 2.938326744583719e-06,
+              "volume_rel_diff": -1.2932044113345142e-07
+            }
+          },
+          "planned_skin_A": 0.6000000000000001,
+          "engine": {
+            "edge_sizes_used": [
+              48640,
+              51200,
+              53760,
+              56320,
+              58880
+            ],
+            "neighbour_rebuilds": 7,
+            "graphs": [
+              "('B', 48640)",
+              "('B', 51200)",
+              "('B', 53760)",
+              "('B', 56320)",
+              "C",
+              "('B', 58880)",
+              "AC"
+            ],
+            "pool_resets": 0,
+            "recaptures": 4,
+            "recapture_log": [
+              {
+                "step": 0,
+                "key": "AC",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 0,
+                "key": "('B', 48640)",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 12,
+                "key": "('B', 51200)",
+                "reason": "new variant of B",
+                "counted": true
+              },
+              {
+                "step": 71,
+                "key": "C",
+                "reason": "first capture",
+                "counted": false
+              },
+              {
+                "step": 168,
+                "key": "('B', 53760)",
+                "reason": "new variant of B",
+                "counted": true
+              },
+              {
+                "step": 252,
+                "key": "('B', 56320)",
+                "reason": "new variant of B",
+                "counted": true
+              },
+              {
+                "step": 409,
+                "key": "('B', 58880)",
+                "reason": "new variant of B",
+                "counted": true
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "finished": "2026-10-24T04:25:02+00:00"
+}

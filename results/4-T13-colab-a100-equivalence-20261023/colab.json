@@ -1,0 +1,78 @@
+{
+  "provider": "colab",
+  "date_utc": "2026-10-23T19:29:46Z",
+  "session": "fm-4t13-a100-equivalence",
+  "gpu": "A100",
+  "commit": "269674154d504e732ea3f19f25d9d1a4901c0aa9",
+  "requested_commit": "269674154d504e732ea3f19f25d9d1a4901c0aa9",
+  "commands_text": [
+    "export PYTHONPATH=$PYTHONPATH:$PWD/tools/acceptance; python -m pytest -p no:cacheprovider -p resultlog --result-log=$OUT/results.jsonl --junitxml=$OUT/junit.xml -rfEs --durations=40 tests/gpu/test_nve_csvr_berendsen_gpu.py tests/gpu/test_nose_hoover_mtk_mh1_gpu.py tests/gpu/test_ase_equivalence_gpu.py tests/gpu/test_fix_atoms_gpu.py -m 'slow or acceptance'"
+  ],
+  "commands": [
+    {
+      "command": "export PYTHONPATH=$PYTHONPATH:$PWD/tools/acceptance; python -m pytest -p no:cacheprovider -p resultlog --result-log=$OUT/results.jsonl --junitxml=$OUT/junit.xml -rfEs --durations=40 tests/gpu/test_nve_csvr_berendsen_gpu.py tests/gpu/test_nose_hoover_mtk_mh1_gpu.py tests/gpu/test_ase_equivalence_gpu.py tests/gpu/test_fix_atoms_gpu.py -m 'slow or acceptance'",
+      "exit": 1,
+      "wall_s": 7768
+    }
+  ],
+  "exit": 1,
+  "stack": "f00d5798f8b5",
+  "models": [
+    "mh-1",
+    "medium",
+    "polar-1-s"
+  ],
+  "out": "/home/fzwin/fastmace-acceptance/4-T13-colab-a100-equivalence-20261023",
+  "timings": {
+    "allocate_s": 2.6,
+    "upload_s": 28.7,
+    "setup_step_s": 41,
+    "cache_restore_s": 3.5,
+    "pack_download_s": 47.3,
+    "unpack_s": 0.8,
+    "install_s": 33.7,
+    "models_s": 1.4
+  },
+  "cu_before": 183.97,
+  "rate_per_h": 8.9,
+  "gpu_name": "NVIDIA A100-SXM4-40GB",
+  "driver": "580.82.07",
+  "gpu_memory": "40960 MiB",
+  "capability": "8.0",
+  "cuda_driver": "13.0",
+  "cpus": 12,
+  "ram_gib": 83.5,
+  "cache_key": "sm80-py310-f00d5798f8b5",
+  "cache_hit": false,
+  "cache_bytes_in": 0,
+  "setup_s": 87.5,
+  "cache_bytes_out": 115099328,
+  "cache_saved": true,
+  "environment": {
+    "python": "3.10.22",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance_torch": "0.12.0",
+      "openequivariance": "0.7.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "ase": "3.27.0",
+      "numpy": "2.2.6",
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0"
+    },
+    "torch_cuda": "13.0",
+    "cuda_available": true,
+    "pip_freeze_sha256": "2b05fb7fcb3cfc72dd0880fc327e6e81c097f29c86389b2a5f416286392d0b08",
+    "unpack_s": 0.8,
+    "install_s": 33.7,
+    "models_s": 1.4
+  },
+  "env_matches_manifest": true,
+  "stopped": true,
+  "cu_after": 127.04,
+  "wall_s": 7907.4,
+  "cu_used": 56.93
+}

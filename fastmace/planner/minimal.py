@@ -836,6 +836,28 @@ class MinimalPlanner:
             book.decide("d3 list memory", "fits", Reason(memory.text(), rule=12, code="rule-12-d3"))
         return dataclasses.replace(neighbours, d3_skin=skin), memory
 
+    def revise_memory(self, plan, traits, atoms, hardware):
+        """Rule 12 again for a revision whose rewrites changed without a re-plan (rule 13's revision, a fallback's
+        rewrite candidate): its ``predicted_memory_bytes`` and ``memory`` decision for the rewrites it runs, and
+        decision 51's action on them. A rewrite turned off can raise the estimate (the memory it saved), so the
+        old prediction would under-predict. ``traits`` are the ForceField's, ``hardware`` the device's."""
+        book = fixed._Book()
+        book.decisions = [entry for entry in plan.decisions if entry[0] != "memory"]
+        parts = {"rewrites": plan.rewrites, "neighbours": plan.neighbours, "precision": plan.precision,
+                 "engine": plan.engine, "requested": plan.requested, "decisions": tuple(book.decisions)}
+        d3_memory = None
+        if plan.dispersion is not None:
+            from fastmace.longrange.d3_term import cutoff_A
+            from fastmace.neighbors.adaptive import rule_12_d3
+            from fastmace.neighbors.d3_list import DEFAULT_HEADROOM
+
+            d3_memory = rule_12_d3(natoms=len(atoms), volume_A3=float(atoms.get_volume()),
+                                   radius_A=cutoff_A(plan.dispersion) + float(plan.neighbours.d3_skin),
+                                   headroom=DEFAULT_HEADROOM, gpu_memory_bytes=hardware.memory_bytes)
+        predicted = self._rule_12(book, parts, traits, atoms, hardware, (), d3_memory)
+        return dataclasses.replace(plan, rewrites=parts["rewrites"], decisions=parts["decisions"],
+                                   predicted_memory_bytes=predicted)
+
     def _free_memory_bytes(self, hardware):
         """Free device memory at plan time: CUDA's own count once this process has initialised CUDA (the planner
         never initialises it for this), else the device's total memory; ``None`` off CUDA."""

@@ -1,0 +1,88 @@
+{
+  "provider": "colab",
+  "date_utc": "2026-10-24T03:33:20Z",
+  "session": "fm-4t13-g4-fix",
+  "gpu": "G4",
+  "commit": "ba1d5be27b93dd9a7f5c762c0317ff241807c582",
+  "requested_commit": "ba1d5be27b93dd9a7f5c762c0317ff241807c582",
+  "commands_text": [
+    "export PYTHONPATH=$PYTHONPATH:$PWD/tools/acceptance FASTMACE_RESULTS=$OUT/results; python -m pytest -p no:cacheprovider -p resultlog --result-log=$OUT/results.jsonl --junitxml=$OUT/junit.xml -rfEs --durations=40 tests/gpu/test_mc_evaluator_gpu.py tests/gpu/test_template_cache_gpu.py",
+    "ckpt=$FASTMACE_MODELS/mace-mh-1.model; S=$FASTMACE_STRUCTURES; A=$S/anneal-minima\npair() { name=$1; opt=$2; shift 2; mkdir -p $OUT/$name\n  python tools/bench/optimizer_frames.py --side ase --optimizer $opt --checkpoint $ckpt --modes graph --skins auto \"$@\" --output $OUT/$name/ase > $OUT/$name/ase.log 2>&1; echo \"$name ase $?\"\n  python tools/bench/optimizer_frames.py --side gpu --optimizer $opt --checkpoint $ckpt --modes graph --skins auto \"$@\" --compare $OUT/$name/ase.json --output $OUT/$name/gpu > $OUT/$name/gpu.log 2>&1; echo \"$name gpu $?\"; }\npair cell-lbfgs-f002 lbfgs --cell-filter frechet --structures NaNbO3 --structures-root $S --fmax 0.002\npair cell-d3-f002 lbfgs --cell-filter frechet --structures NbCl5 --structures-root $S --dispersion d3bj --fmax 0.002",
+    "ckpt=$FASTMACE_MODELS/mace-mh-1.model; S=$FASTMACE_STRUCTURES; A=$S/anneal-minima\nfor c in NaCl NaNbCl6 NaTaCl6 NaNbO3 NaTaO3 NbCl3O TaCl3O NbCl2O NbCl5 TaCl5; do mkdir -p $OUT/minima/$c; cp $S/minima-ase/$c/ase.json $S/minima-ase/$c/ase.npz $OUT/minima/$c/\n  python tools/bench/optimizer_frames.py --side gpu --checkpoint $ckpt --traj $c=$A/$c/captured.traj --frames all --modes graph --skins auto --compare $OUT/minima/$c/ase.json --output $OUT/minima/$c/gpu > $OUT/minima/$c/gpu.log 2>&1; echo \"$c gpu $?\"; done\npython tools/validation/anneal_minima.py evaluate --data $A --runs $OUT/minima > $OUT/evaluate.log 2>&1; echo \"evaluate $?\"; tail -30 $OUT/evaluate.log"
+  ],
+  "commands": [
+    {
+      "command": "export PYTHONPATH=$PYTHONPATH:$PWD/tools/acceptance FASTMACE_RESULTS=$OUT/results; python -m pytest -p no:cacheprovider -p resultlog --result-log=$OUT/results.jsonl --junitxml=$OUT/junit.xml -rfEs --durations=40 tests/gpu/test_mc_evaluator_gpu.py tests/gpu/test_template_cache_gpu.py",
+      "exit": 0,
+      "wall_s": 351
+    },
+    {
+      "command": "ckpt=$FASTMACE_MODELS/mace-mh-1.model; S=$FASTMACE_STRUCTURES; A=$S/anneal-minima\npair() { name=$1; opt=$2; shift 2; mkdir -p $OUT/$name\n  python tools/bench/optimizer_frames.py --side ase --optimizer $opt --checkpoint $ckpt --modes graph --skins auto \"$@\" --output $OUT/$name/ase > $OUT/$name/ase.log 2>&1; echo \"$name ase $?\"\n  python tools/bench/optimizer_frames.py --side gpu --optimizer $opt --checkpoint $ckpt --modes graph --skins auto \"$@\" --compare $OUT/$name/ase.json --output $OUT/$name/gpu > $OUT/$name/gpu.log 2>&1; echo \"$name gpu $?\"; }\npair cell-lbfgs-f002 lbfgs --cell-filter frechet --structures NaNbO3 --structures-root $S --fmax 0.002\npair cell-d3-f002 lbfgs --cell-filter frechet --structures NbCl5 --structures-root $S --dispersion d3bj --fmax 0.002",
+      "exit": 0,
+      "wall_s": 364
+    },
+    {
+      "command": "ckpt=$FASTMACE_MODELS/mace-mh-1.model; S=$FASTMACE_STRUCTURES; A=$S/anneal-minima\nfor c in NaCl NaNbCl6 NaTaCl6 NaNbO3 NaTaO3 NbCl3O TaCl3O NbCl2O NbCl5 TaCl5; do mkdir -p $OUT/minima/$c; cp $S/minima-ase/$c/ase.json $S/minima-ase/$c/ase.npz $OUT/minima/$c/\n  python tools/bench/optimizer_frames.py --side gpu --checkpoint $ckpt --traj $c=$A/$c/captured.traj --frames all --modes graph --skins auto --compare $OUT/minima/$c/ase.json --output $OUT/minima/$c/gpu > $OUT/minima/$c/gpu.log 2>&1; echo \"$c gpu $?\"; done\npython tools/validation/anneal_minima.py evaluate --data $A --runs $OUT/minima > $OUT/evaluate.log 2>&1; echo \"evaluate $?\"; tail -30 $OUT/evaluate.log",
+      "exit": 0,
+      "wall_s": 1061
+    }
+  ],
+  "exit": 0,
+  "stack": "f00d5798f8b5",
+  "models": [
+    "mh-1"
+  ],
+  "out": "/home/fzwin/fastmace-acceptance/4-T13-colab-g4-fix-20261024",
+  "timings": {
+    "allocate_s": 4.4,
+    "upload_s": 15.0,
+    "setup_step_s": 23,
+    "cache_restore_s": 163.6,
+    "pack_download_s": 73.0,
+    "unpack_s": 0.6,
+    "install_s": 18.6,
+    "models_s": 0.9
+  },
+  "cu_before": 62.45,
+  "rate_per_h": 0.0,
+  "gpu_name": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "driver": "580.82.07",
+  "gpu_memory": "97887 MiB",
+  "capability": "12.0",
+  "cuda_driver": "13.0",
+  "cpus": 48,
+  "ram_gib": 176.9,
+  "cache_key": "sm120-py310-f00d5798f8b5",
+  "cache_hit": true,
+  "cache_bytes_in": 531759233,
+  "setup_s": 228.5,
+  "cache_bytes_out": 295261182,
+  "cache_saved": true,
+  "environment": {
+    "python": "3.10.22",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance_torch": "0.12.0",
+      "openequivariance": "0.7.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "ase": "3.27.0",
+      "numpy": "2.2.6",
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0"
+    },
+    "torch_cuda": "13.0",
+    "cuda_available": true,
+    "pip_freeze_sha256": "2b05fb7fcb3cfc72dd0880fc327e6e81c097f29c86389b2a5f416286392d0b08",
+    "unpack_s": 0.6,
+    "install_s": 18.6,
+    "models_s": 0.9
+  },
+  "env_matches_manifest": true,
+  "stopped": true,
+  "cu_after": 58.0,
+  "wall_s": 2087.5,
+  "cu_used": 4.45
+}
