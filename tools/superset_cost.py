@@ -119,7 +119,7 @@ def main(argv=None):
                 kept_bytes=torch.cuda.memory_allocated() - before, warmup_peak_bytes=torch.cuda.max_memory_allocated(),
                 reassociation_slots=[int(r.columns.numel()) for r in reassociation],
                 sender_group_count=field.neighbours.group_count if field.neighbours.sender_groups is not None else None,
-                rewrites=[entry.name for entry in field.applied], describe=plan.describe())
+                rewrites=[entry.name for entry in field.applied], describe=plan.describe(full=True))
             sides[side] = timed
             save()
         result = ab.run_ab(sides, step_time.TimingProtocol(warmup=0, block=args.block, blocks=args.blocks),

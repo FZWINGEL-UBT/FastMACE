@@ -446,7 +446,8 @@ does not change the step time while `overlap_rebuild` is on.
 **5-T05 `str(plan)`.**
 - `Plan.describe()` by the sections of the inventory, at most about 30
   lines; `describe(full=True)` keeps today's every-decision list.
-  Provenance stores both (`plan.text`, `plan.text_full`).
+  Provenance stores both (`plan.description`, `plan.description_full`, and both in each
+  `plan_revisions` entry).
 - Lines that T03, T07 and T09 fill (memory, revision chain with switches,
   calibration) exist with a placeholder ("not estimated", "none"). Those
   tasks update the golden files.

@@ -26,6 +26,7 @@ import math
 from collections.abc import Mapping
 
 from fastmace.model import labels as label_table
+from fastmace.planner import warnings as known_issues
 from fastmace.planner.fixed import REWRITE_FIELDS
 
 INDENT = 9  # "licence: " is the longest field name
@@ -115,25 +116,8 @@ DOWNGRADES = {
                               "build: two evaluations bitwise equal)",
 }
 
-# SPEC §4.3 model-level known issues, as data (conductor answer for 1b): labels, the species the
-# structure must contain (all of them), an extra condition ("" for none), and the warning.
-KNOWN_ISSUES = (
-    (("polar1-s",), ("Na", "Nb", "O"), "",
-     "POLAR-1-S has a Fukui charge runaway on NaNbO3 (SPEC §4.3)"),
-    (("polar1-s", "polar1-m", "polar1-l"), ("Na", "Ta", "O"), "",
-     "POLAR-1 gives huge forces and pressures on NaTaO3 (SPEC §4.3)"),
-    (("omol0-xl",), ("Na", "Cl"), "",
-     "OMOL-0 is outside its training domain on dense inorganic solids and collapses in NaCl MD (SPEC §4.3)"),
-    (("omol0-xl",), ("O",), "inorganic",
-     "OMOL-0 is outside its training domain on dense oxides (SPEC §4.3)"),
-    (("off23-small", "off23-medium", "off23-large", "off23b-medium"), (), "npt",
-     "MACE-OFF23 relaxes molecular crystals to 5.5-9.2% below the experimental volume; OFF24-medium is closest "
-     "(SPEC §4.3)"),
-    (("off23-large",), (), "large",
-     "MACE-OFF23-large on about 2,000 atoms or more needs more than 16 GB in some engines (SPEC §4.3)"),
-)
-_LARGE_ATOMS = 2000
-_ORGANIC = frozenset(("H", "C"))
+# SPEC §4.3 model-level known issues: rule 15 of §9.3, in the planner since 5-T04 (planner/warnings.py).
+KNOWN_ISSUES = known_issues.KNOWN_ISSUES
 
 
 def _number(value):
@@ -237,16 +221,6 @@ def licence(model=None, sha256=None):
         return None, f"not a label of the FastMACE table{digest}; check the model's release"
     text = {label_table.ASL: "ASL (non-commercial)"}.get(entry.licence, entry.licence)
     return entry.licence, f"{text}, from the label table (§4.3)"
-
-
-def _label_of(model, head, sha256):
-    """The label-table label for ``model`` (a label, or a checkpoint found by SHA-256 and head), or None."""
-    if model is not None and str(model) in label_table.LABELS:
-        return str(model)
-    for name, entry in label_table.LABELS.items():
-        if sha256 and entry.checkpoint.sha256 == sha256 and entry.head in (head, None):
-            return name
-    return None
 
 
 def _floors_text(floors):
@@ -520,20 +494,17 @@ class Report:
         return lines
 
     def _known_issues(self):
-        label = _label_of(self.model, self.head, self.sha256)
-        npt = self.integrator is not None and self.integrator.ensemble == "npt"
-        lines = []
-        for names, needed, condition, text in KNOWN_ISSUES:
-            if label not in names or not self.species >= set(needed):
-                continue
-            if condition == "npt" and not npt:
-                continue
-            if condition == "large" and self.n_atoms < _LARGE_ATOMS:
-                continue
-            if condition == "inorganic" and self.species & _ORGANIC:
-                continue
-            lines.append(text)
-        return lines
+        """Rule 15's warnings: the plan's decisions (5-T04), or the same rows matched here for a run without
+        them (a refusal, a plan from a restart written before 5-T04)."""
+        decided = known_issues.decisions(self.plan)
+        if decided:
+            return [str(reason) for _key, _choice, reason in decided]
+        label = known_issues.label_of(self.model, self.head, self.sha256)
+        optimizer = getattr(self.plan, "optimizer", None)
+        variable_cell = (optimizer.variable_cell if optimizer is not None
+                         else self.integrator is not None and self.integrator.ensemble == "npt")
+        return [issue.text for issue in known_issues.matching(label, self.species, variable_cell=variable_cell,
+                                                              n_atoms=self.n_atoms)]
 
     def _small_cell(self):
         if self.cell_heights_A is None or self.cutoff_A is None:

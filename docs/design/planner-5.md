@@ -30,7 +30,7 @@ planner decision, tier, rewrite, size or step changes with this task.
 | 9 | preference | — | `host-callbacks-graph-sync`, `host-callbacks-compiled`, `no-host-callbacks` |
 | 10 | preference | — | `rule-10-optimizer` |
 | 11 | preference | — | `rule-11`, `rule-11-fixed`, `rule-11-md-only`, `rule-11-optimizer`, `rule-11-d3` (an explicit value is an `override`, 5-T02) |
-| 12 | preference | — | `rule-12-d3`, `rule-12-d3-memory`, `rule-12-d3-warn`, `rule-12-memory` (reserved for 5-T03's estimate) |
+| 12 | preference | — | `rule-12-d3`, `rule-12-d3-memory`, `rule-12-d3-warn`, `rule-12-memory`, `rule-12-memory-drop`, `rule-12-memory-warn` (5-T03: the estimate and decision 51's action) |
 | 13 | reaction | — | `selfcheck-failed`, `selfcheck-dependant` |
 | 14 | reaction | — | `fallback-exhausted`, `fallback-rewrite-off`, `fallback-rewrite-on`, `runner-subprocess-fallback` |
 | 15 | reaction | — | `model-structure-warning` (reserved for 5-T04) |
@@ -190,8 +190,9 @@ revision's chain counts the switches already made. D3 (c) would need the monitor
 
 `Plan.describe()` prints these sections in this order, at most about 30 lines, no line over 120
 characters. A section with nothing to say is one line ("none") or left out where marked.
-`describe(full=True)` keeps today's list of every decision. Provenance stores both (`plan.text`,
-`plan.text_full`).
+`describe(full=True)` keeps today's list of every decision. Provenance stores both (`plan.description`, the
+sectioned text, and `plan.description_full`; the same two keys in each `plan_revisions` entry; conductor,
+24 October 2026).
 
 1. **Header** (2 lines): `Plan revision N, tier T (why this tier)`, then backend (plain: fused convolution
    or not), force precision, MC energy precision, runner.
@@ -207,6 +208,20 @@ characters. A section with nothing to say is one line ("none") or left out where
 8. **Warnings** (rule 15; 0–3 lines): each with its diagnosis. Left out when none.
 9. **History** (1–4 lines): the fallback candidates tried, the calibration record (`none` until 5-T09),
    the revision chain with step and reason (switches from 5-T07).
+
+As implemented (5-T05, `fastmace/planner/plan_text.py`; golden texts in `tests/cpu/golden/plan_text/`):
+
+- Every line is `  <section>: ...`, wrapped lines indented six spaces; a section's lines are capped and what
+  does not fit is counted, `(+n more; describe(full=True) lists them)`. A line over 120 characters is cut
+  with `…`. The whole text is cut at 30 lines (the caps keep it near 20).
+- Line caps: hard rules 3; rewrites on 4 and off 3 (25 rewrites do not fit in 4 lines at 120 characters);
+  workload 2, plus the `dispersion:` line with D3 and `rules 8-11:` (2); warnings 3; history: fallbacks
+  2, calibration 1, `self-checks:` 1 (built plans only), revisions 2.
+- A decision's rule is its reason's `rule`, else `rules.rule_of(code)`. Hard rules list the decisions of
+  rules 1-7 except the codes that record a rule did not apply (`no-allow-reference`, `fused-cueq`).
+- Rewrites off are grouped by reason code, else by the last clause of the reason ("only an explicit 'on'
+  enables it", "not supported by the model").
+- Rule 12's D3 list decision (`d3 list memory`) is on the memory line, not the sizes line.
 
 5-T05 writes the golden files; 5-T03, 5-T07 and 5-T09 update their sections.
 
@@ -336,7 +351,15 @@ the recorded `PlannerOptions.adaptation`, which `simulation.json` and a resume c
 
 - **5-T02** (conformance suite): the table, the marker, the meta-test's two lists.
 - **5-T03** (rule 12): `rule-12-memory`, `Plan.predicted_memory_bytes`, section 6 of the layout; the action
-  waits for D1.
+  waits for D1. As built (decision 51): the prediction is max(build, run). The run term covers a force
+  call, the rewrites' terms (`Rewrite.memory`) and the lists. Both terms hold the two weight copies, the
+  rewrites' resident buffers (`Rewrite.resident_memory`: `block_linear`, `merged_residual`) and the
+  workspace. The build term adds the largest self-check transient (`Rewrite.selfcheck_memory`, with
+  `Hardware.sms`). PolarMACE's long range needs no term of its own: its 64 MiB at the build's peak were
+  cuBLAS workspaces. Deviations from the
+  file list: `model/capabilities.py`, `planner/fallback.py`, `planner/plan.py` and `planner/fixed.py`
+  (`Hardware.sms`), and `rewrites/fusion/__init__.py` (the `segment_gemm` self-check frees each
+  interaction's tensors; `docs/validation/5-T03.md`).
 - **5-T04** (rule 15): `model-structure-warning`.
 - **5-T05** (`str(plan)`): the layout above.
 - **5-T06** (monitor): `AdaptationConfig`, `counters.tier_switches`, `TierSwitch`.

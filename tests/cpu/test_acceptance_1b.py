@@ -509,7 +509,7 @@ class _FakeSimulation:
 
         self.gate = selfcheck.GateRecord(status="passed", check="gate", copies="2 rattled (0.05 Å), 2 strained "
                                          "(±2 %, hydrostatic)", energy_meV_per_atom=0.001, mode="graph (captured)")
-        self.plan = types.SimpleNamespace(describe=lambda: "graph plan")
+        self.plan = types.SimpleNamespace(describe=lambda full=False: "graph plan")
         self._setup_s = {"plan": 0.1, "gate": 2.0}
 
 

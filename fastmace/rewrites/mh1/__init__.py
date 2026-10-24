@@ -46,6 +46,7 @@ from __future__ import annotations
 
 from fastmace.model.capabilities import FACTORED_INTERACTIONS, first_inputs_species_only, radial_cutoff_passed
 from fastmace.model.capabilities import rewrite_support as _model_support
+from fastmace.rewrites import memory as memory_terms
 from fastmace.rewrites.registry import Rewrite, RewriteError, Support, check_tensors, source_sha256
 
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
@@ -564,11 +565,11 @@ def _apply_reassociate(model, context):
 
 
 def _record(name, applies_to, apply, requires=(), exactness="rounding", default="auto", constraints=(),
-            hashes=None, deterministic=True):
+            hashes=None, deterministic=True, memory=None):
     # deterministic (SPEC §9.3, 2-T16): torch reformulations, MACE's scatter_add_ and FastMACE's Triton
     # kernels without atomics are; the streaming convolution and the segmented forward are not.
     return Rewrite(name=name, applies_to=applies_to, requires=requires, conflicts=(), mace_versions=MACE_VERSIONS,
-                   deterministic=deterministic,
+                   deterministic=deterministic, memory=memory,
                    source_hashes=hashes or {}, exactness=exactness, default=default,
                    workload_constraints=constraints, apply=apply, selfcheck=_selfcheck)
 
@@ -578,18 +579,20 @@ _FIRST = (SINGLE_GRAPH, FIXED_SPECIES_SUPERSET)
 
 RECORDS = {
     "factor_species": _record("factor_species", _factor_support, _apply(factor_species_radial),
-                              hashes={**_FORWARD_PIN, RADIAL_MLP_FORWARD: RADIAL_MLP_FORWARD_SHA256}),
+                              hashes={**_FORWARD_PIN, RADIAL_MLP_FORWARD: RADIAL_MLP_FORWARD_SHA256},
+                              memory=memory_terms.factor_species),
     "fold_cutoff": _record("fold_cutoff", _fold_support, _apply(fold_radial_cutoff), ("factor_species",),
-                           hashes=_FORWARD_PIN),
+                           hashes=_FORWARD_PIN, memory=memory_terms.fold_cutoff),
     "density_first": _record("density_first", _density_support, _apply(density_before_linear), ("fold_cutoff",)),
-    "joint_radial_input": _record("joint_radial_input", _fold_support, _apply(joint_radial_input), ("fold_cutoff",)),
+    "joint_radial_input": _record("joint_radial_input", _fold_support, _apply(joint_radial_input), ("fold_cutoff",),
+                                  memory=memory_terms.joint_radial_input),
     "fused_folded_backward": _record("fused_folded_backward", _fold_support, _apply(fused_folded_backward),
                                      ("fold_cutoff",)),
     # Same reduction order (BLOCK_K unchanged): bitwise the fixed tiles' results (opt-2 OPT2-T03).
     "folded_backward_tiles": _record("folded_backward_tiles", _fold_support, _apply(folded_backward_tiles),
                                      ("fused_folded_backward",), exactness="exact", default="off"),
     "fused_radial_hidden": _record("fused_radial_hidden", _hidden_support, _apply(fuse_radial_hidden),
-                                   ("fold_cutoff",), default="off"),
+                                   ("fold_cutoff",), default="off", memory=memory_terms.fused_radial_hidden),
     # Layout audit (opt-3 OPT3-T05): the same values without a copy, so bitwise the results without them.
     "direct_node_feats": _record("direct_node_feats", _fold_support, _apply(direct_node_feats), ("fold_cutoff",),
                                  exactness="exact", default="off"),
@@ -598,9 +601,10 @@ RECORDS = {
     "streaming_conv": _record("streaming_conv", _streaming_support, _apply(streaming_convolutions),
                               ("fold_cutoff",), exactness="exact",
                               constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
-                              deterministic=False),  # OEq kernels add sender gradients atomically
+                              deterministic=False,  # OEq kernels add sender gradients atomically
+                              memory=memory_terms.streaming_conv),
     "reassociate_first": _record("reassociate_first", _reassociate_support, _apply_reassociate, ("fold_cutoff",),
-                                 constraints=_FIRST),
+                                 constraints=_FIRST, memory=memory_terms.reassociate_first),
     "segmented_first_sum": _record("segmented_first_sum", _reassociate_support, _apply(segment_first_sum),
                                    ("reassociate_first",), exactness="exact", constraints=(*_FIRST, SORT_RECEIVERS),
                                    deterministic=False),  # float32 Triton forward: relaxed atomics across chunks

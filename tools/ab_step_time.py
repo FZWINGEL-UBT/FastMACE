@@ -367,7 +367,7 @@ def main(argv=None):
                     engine = planner.build(plan, loaded[name], base.copy(), temperature_K=args.temperature_K,
                                            compile_cache=cache)
                     sides[name] = FastMACESide(engine, torch)
-                    entry["plans"][name] = plan.describe()
+                    entry["plans"][name] = plan.describe(full=True)
                 else:
                     engine = experiment.GPUEngine(base.copy(), calcs[name], timestep_fs=md.timestep_fs,
                                                   friction=md.friction, seed=args.seed, skin=md.skin,
