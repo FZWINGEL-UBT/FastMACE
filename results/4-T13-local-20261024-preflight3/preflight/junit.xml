@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="2" time="5803.696" timestamp="2026-10-24T00:51:02.475195+02:00" hostname="Fabi-PC"><testcase classname="tests.gpu.test_gate_resources_gpu" name="test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[polar1-l]" time="402.273" /><testcase classname="tests.gpu.test_gate_resources_gpu" name="test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[omol0-xl]" time="5400.544"><failure message="subprocess.TimeoutExpired: Command '['/home/fzwin/environments/mace_cueq_oeq/bin/python', '-c', '\nimport json, sys, time\nimport fastmace  # before MACE, so the planner may choose the hybrid backend\nfrom fastmace.config import GateConfig, IntegratorConfig\nfrom fastmace.errors import GateFailed\nfrom fastmace.model import loading\nfrom fastmace.model.forcefield import ForceField\nfrom fastmace.planner import minimal, selfcheck\nfrom fastmace.planner.workload import Workload\nfrom _support import structures\nimport torch\n\nSPEC = json.loads(sys.argv[1])\nloaded = loading.load_pristine(SPEC[&quot;label&quot;])\natoms = structures.nbcl5(repeat=1).repeat(tuple(SPEC[&quot;repeat&quot;]))\natoms.rattle(0.03, seed=1)\nintegrator = IntegratorConfig(temperature_K=300.0)\nff = ForceField(loaded, atoms)\nplanner = minimal.default_planner(ff)\nplan = planner.plan(ff, atoms, integrator, Workload(max_temperature_K=300.0), planner.hardware())\nstarted = time.perf_counter()\nreferences = selfcheck.references(plan, ff, atoms, integrator, check=&quot;allow_unavailable&quot;, seed=1,\n                                  gate=GateConfig(**SPEC.get(&quot;gate&quot;, {})))\nreferenced = time.perf_counter()\nengine = planner.build(plan, ff, atoms)\ntry:\n    record = selfcheck.production(engine, references, check=&quot;allow_unavailable&quot;).to_metadata()\nexcept GateFailed as error:\n    record = error.gate_record.to_metadata()\nout = {&quot;backend&quot;: plan.engine.backend, &quot;dtype&quot;: plan.precision.dtype, &quot;atoms&quot;: len(atoms),\n       &quot;gpu&quot;: torch.cuda.get_device_name(), &quot;gpu_bytes&quot;: torch.cuda.get_device_properties(0).total_memory,\n       &quot;gate&quot;: record, &quot;seconds&quot;: {&quot;references&quot;: referenced - started,\n                                   &quot;total&quot;: time.perf_counter() - started}}\nprint(json.dumps(out, default=str))\n', '{&quot;label&quot;: &quot;omol0-xl&quot;, &quot;repeat&quot;: [3, 3, 6]}']' timed out after 5400 seconds">label = 'omol0-xl'
+
+    @pytest.mark.parametrize("label", list(CASES))
+    def test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell(label):
+        torch = pytest.importorskip("torch")
+        if not torch.cuda.is_available():
+            pytest.skip("needs a CUDA GPU")
+        if not _available(label):
+            pytest.skip(f"{label} is not under FASTMACE_MODELS")
+&gt;       out = run_gate({"label": label, "repeat": [3, 3, 6]})
+
+tests/gpu/test_gate_resources_gpu.py:96: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/gpu/test_gate_resources_gpu.py:79: in run_gate
+    result = subprocess.run([python, "-c", CHILD, json.dumps(spec)], cwd=REPOSITORY_ROOT, env=env,
+../../.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/subprocess.py:505: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+../../.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/subprocess.py:1154: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+../../.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/subprocess.py:2022: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;Popen: returncode: -9 args: ['/home/fzwin/environments/mace_cueq_oeq/bin/py...&gt;
+endtime = 6147.673221543, orig_timeout = 5400
+stdout_seq = [b'GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100\n']
+stderr_seq = [b'/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The p...rning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.\n  warnings.warn(\n', ...]
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() &gt; endtime:
+&gt;           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/home/fzwin/environments/mace_cueq_oeq/bin/python', '-c', '\nimport json, sys, time\nimport fastmace  # before MACE, so the planner may choose the hybrid backend\nfrom fastmace.config import GateConfig, IntegratorConfig\nfrom fastmace.errors import GateFailed\nfrom fastmace.model import loading\nfrom fastmace.model.forcefield import ForceField\nfrom fastmace.planner import minimal, selfcheck\nfrom fastmace.planner.workload import Workload\nfrom _support import structures\nimport torch\n\nSPEC = json.loads(sys.argv[1])\nloaded = loading.load_pristine(SPEC["label"])\natoms = structures.nbcl5(repeat=1).repeat(tuple(SPEC["repeat"]))\natoms.rattle(0.03, seed=1)\nintegrator = IntegratorConfig(temperature_K=300.0)\nff = ForceField(loaded, atoms)\nplanner = minimal.default_planner(ff)\nplan = planner.plan(ff, atoms, integrator, Workload(max_temperature_K=300.0), planner.hardware())\nstarted = time.perf_counter()\nreferences = selfcheck.references(plan, ff, atoms, integrator, check="allow_unavailable", seed=1,\n                                  gate=GateConfig(**SPEC.get("gate", {})))\nreferenced = time.perf_counter()\nengine = planner.build(plan, ff, atoms)\ntry:\n    record = selfcheck.production(engine, references, check="allow_unavailable").to_metadata()\nexcept GateFailed as error:\n    record = error.gate_record.to_metadata()\nout = {"backend": plan.engine.backend, "dtype": plan.precision.dtype, "atoms": len(atoms),\n       "gpu": torch.cuda.get_device_name(), "gpu_bytes": torch.cuda.get_device_properties(0).total_memory,\n       "gate": record, "seconds": {"references": referenced - started,\n                                   "total": time.perf_counter() - started}}\nprint(json.dumps(out, default=str))\n', '{"label": "omol0-xl", "repeat": [3, 3, 6]}']' timed out after 5400 seconds
+
+../../.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/lib/python3.10/subprocess.py:1198: TimeoutExpired</failure></testcase></testsuite></testsuites>

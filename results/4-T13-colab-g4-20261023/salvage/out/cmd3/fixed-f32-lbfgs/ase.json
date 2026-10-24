@@ -1,0 +1,104 @@
+{
+  "schema": 4,
+  "task": "4-T05/4-T06/4-T07/4-T08",
+  "side": "ase",
+  "optimizer": "lbfgs",
+  "cell_filter": "none",
+  "pressure_GPa": 0.0,
+  "dispersion": "none",
+  "structure_settings": null,
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T21:39:39+00:00",
+  "fastmace_commit": null,
+  "machine": "82b449450a30",
+  "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/content/fm/cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/content/fm/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NaCl": {
+      "traj": "/content/fm/baseline/1a-T18/anneal-minima/NaCl/captured.traj",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 51,
+          "seconds": 37.897604383000726,
+          "initial_eV_atom": -6.826207293404473,
+          "energy_eV_atom": -6.887279895720659,
+          "fmax_eV_A": 0.009329276901847632,
+          "ms_per_step": 743.0902820196221,
+          "switch_flips": null,
+          "warm_up": true
+        },
+        "10": {
+          "converged": true,
+          "steps": 56,
+          "seconds": 0.5534005380013696,
+          "initial_eV_atom": -6.759718619011067,
+          "energy_eV_atom": -6.88728063415598,
+          "fmax_eV_A": 0.00931260718874648,
+          "ms_per_step": 9.88215246431017,
+          "switch_flips": null,
+          "warm_up": false
+        },
+        "20": {
+          "converged": true,
+          "steps": 44,
+          "seconds": 0.43526427399956447,
+          "initial_eV_atom": -6.854242122835583,
+          "energy_eV_atom": -6.887274305025737,
+          "fmax_eV_A": 0.009457669219911338,
+          "ms_per_step": 9.892369863626465,
+          "switch_flips": null,
+          "warm_up": false
+        }
+      }
+    },
+    "NbCl5": {
+      "traj": "/content/fm/baseline/1a-T18/anneal-minima/NbCl5/captured.traj",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 169,
+          "seconds": 53.2724618379998,
+          "initial_eV_atom": -10.561086080815075,
+          "energy_eV_atom": -10.623391369120084,
+          "fmax_eV_A": 0.009345410367644084,
+          "ms_per_step": 315.2216676804722,
+          "switch_flips": null,
+          "warm_up": false
+        },
+        "10": {
+          "converged": true,
+          "steps": 314,
+          "seconds": 3.9463402910005243,
+          "initial_eV_atom": -10.498799213043457,
+          "energy_eV_atom": -10.623420913400963,
+          "fmax_eV_A": 0.009676760497830037,
+          "ms_per_step": 12.567962710192752,
+          "switch_flips": null,
+          "warm_up": false
+        },
+        "20": {
+          "converged": true,
+          "steps": 168,
+          "seconds": 2.072760267999911,
+          "initial_eV_atom": -10.590692900335839,
+          "energy_eV_atom": -10.623407820492615,
+          "fmax_eV_A": 0.009706370258686944,
+          "ms_per_step": 12.337858738094708,
+          "switch_flips": null,
+          "warm_up": false
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T21:41:17+00:00"
+}

@@ -1,0 +1,93 @@
+{
+  "schema": 4,
+  "task": "4-T05/4-T06/4-T07/4-T08",
+  "side": "ase",
+  "optimizer": "fire",
+  "cell_filter": "frechet",
+  "pressure_GPa": 0.0,
+  "dispersion": "none",
+  "structure_settings": {
+    "root": "/content/fm/baseline/1a-T18",
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "strain": 0.02,
+    "rattle_A": 0.02,
+    "seed": 0,
+    "seed_rule": "seed + crc32(name)"
+  },
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T22:04:49+00:00",
+  "fastmace_commit": null,
+  "machine": "82b449450a30",
+  "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/content/fm/cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/content/fm/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NaCl": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NaCl.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 43,
+          "seconds": 33.487035600001036,
+          "initial_eV_atom": -6.882520638130329,
+          "energy_eV_atom": -6.887616469904229,
+          "fmax_eV_A": 0.004123372084955274,
+          "ms_per_step": 778.768269767466,
+          "switch_flips": 1,
+          "warm_up": true,
+          "cell_lengths_A": [
+            16.83764557787517,
+            16.83770227847245,
+            16.837648094266807
+          ],
+          "cell_angles_deg": [
+            90.00005955172155,
+            89.99998273838759,
+            89.99997134825176
+          ],
+          "volume_A3": 4773.595531790819
+        }
+      }
+    },
+    "NbCl5": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl5.cif",
+      "frames": {
+        "0": {
+          "converged": false,
+          "steps": 5000,
+          "seconds": 104.6610433019996,
+          "initial_eV_atom": -10.603163721384826,
+          "energy_eV_atom": -10.623760048254036,
+          "fmax_eV_A": 0.010037598814190663,
+          "ms_per_step": 20.93220866039992,
+          "switch_flips": 446,
+          "warm_up": false,
+          "cell_lengths_A": [
+            57.6432634372048,
+            55.110453801186495,
+            18.153624255044676
+          ],
+          "cell_angles_deg": [
+            89.99995838682234,
+            90.39162248707339,
+            90.0000101046809
+          ],
+          "volume_A3": 57668.113505591624
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T22:07:08+00:00"
+}

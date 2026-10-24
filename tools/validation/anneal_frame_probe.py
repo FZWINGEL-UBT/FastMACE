@@ -17,7 +17,13 @@ eV/A, at most 5,000 steps, fixed cell, MH-1 ``matpes_r2scan``):
 
 Writes ``<output>.json`` (per-step energies, steps, the re-relaxation) and ``<output>.npz`` (per-step positions).
 ``compare`` reads two outputs and reports the first step where the trajectories differ by more than each of
-1e-6, 1e-4, 1e-2 and 0.1 A, and the two minima's difference.
+1e-6, 1e-4, 1e-2 and 0.1 A, the largest difference over the first ``FIRST_STEPS`` steps, and the two minima's
+difference.
+
+For the phase 4 acceptance (4-T13, item 1): ``--optimizer fire`` (ASE 3.27 ``FIRE`` and ``fm.optimize.FIRE``),
+``--fix-every K`` (``FixAtoms`` on atoms 0, K, 2K, ... on both sides; ``compare`` then checks that the fixed
+atoms' positions are bitwise those of the start on both sides), and ``--ase-calculator mace`` (the ASE side on
+MACE's own calculator with cuEquivariance at ``--precision``, since ``fm.calc`` refuses constraints, 4-T04).
 """
 
 from __future__ import annotations
@@ -31,6 +37,7 @@ from pathlib import Path
 import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
 
 THRESHOLDS_A = (1e-6, 1e-4, 1e-2, 0.1)
+FIRST_STEPS = 50
 
 
 def parse_args(argv=None):
@@ -50,6 +57,10 @@ def parse_args(argv=None):
     run.add_argument("--fmax", type=float, default=0.01)
     run.add_argument("--steps", type=int, default=5000)
     run.add_argument("--output", required=True, type=Path)
+    run.add_argument("--optimizer", choices=("lbfgs", "fire"), default="lbfgs")
+    run.add_argument("--fix-every", type=int, default=0, help="FixAtoms on every K-th atom (0: none)")
+    run.add_argument("--ase-calculator", choices=("fastmace", "mace"), default="fastmace",
+                     help="the ASE side's calculator: fm.calc, or MACE's own (constraints)")
     compare = sub.add_parser("compare")
     compare.add_argument("a", type=Path)
     compare.add_argument("b", type=Path)
@@ -81,13 +92,23 @@ def _other_positions(args, name):
     raise KeyError(f"no {name} frame {args.frame} in {args.other}")
 
 
+def ase_calculator(args, loaded):
+    if args.ase_calculator == "fastmace":
+        from fastmace.ase.calculator import FastMACECalculator
+
+        return FastMACECalculator(loaded, precision=args.precision)
+    from mace.calculators import MACECalculator
+
+    head = None if args.head == "none" else args.head
+    return MACECalculator(model_paths=str(args.checkpoint.expanduser()), head=head, device="cuda",
+                          default_dtype=args.precision, enable_cueq=True)
+
+
 def ase_side(args, loaded, atoms, name, record, trajectory):
     import numpy as np
-    from ase.optimize import LBFGS
+    from ase.optimize import FIRE, LBFGS
 
-    from fastmace.ase.calculator import FastMACECalculator
-
-    calc = FastMACECalculator(loaded, precision=args.precision)
+    calc = ase_calculator(args, loaded)
 
     def relax(start, keep):
         relaxed = atoms.copy()
@@ -95,7 +116,7 @@ def ase_side(args, loaded, atoms, name, record, trajectory):
         relaxed.set_momenta(np.zeros((len(relaxed), 3)))
         relaxed.calc = calc
         started = time.perf_counter()
-        run = LBFGS(relaxed, logfile=None)
+        run = (LBFGS if args.optimizer == "lbfgs" else FIRE)(relaxed, logfile=None)
         energies, converged = [], False
         for converged in run.irun(fmax=args.fmax, steps=args.steps):
             energies.append(float(relaxed.get_potential_energy()) / len(relaxed))
@@ -126,7 +147,8 @@ def gpu_side(args, loaded, atoms, name, record, trajectory):
     from fastmace.model.forcefield import ForceField
 
     sim = fm.Simulation(atoms.copy(), ForceField(loaded, atoms, precision=args.precision),
-                        optimizer=fm.optimize.LBFGS(), seed=0, neighbours=NeighbourConfig(skin="auto"))
+                        optimizer=fm.optimize.LBFGS() if args.optimizer == "lbfgs" else fm.optimize.FIRE(), seed=0,
+                        neighbours=NeighbourConfig(skin="auto"))
     record["plan"] = {"tier": sim.plan.tier, "skin_A": sim.plan.neighbours.skin, "precision": args.precision}
 
     def relax(start, keep):
@@ -181,7 +203,13 @@ def run(args):
     atoms = read(path, index=args.frame)
     atoms.calc = None
     atoms.set_constraint()
-    record = {"schema": 1, "task": "4-T08 probe", "side": args.side, "structure": name, "traj": path,
+    fixed = list(range(0, len(atoms), args.fix_every)) if args.fix_every else []
+    if fixed:
+        from ase.constraints import FixAtoms
+
+        atoms.set_constraint(FixAtoms(indices=fixed))
+    record = {"schema": 2, "task": "4-T08 probe, 4-T13", "side": args.side, "structure": name, "traj": path,
+              "optimizer": args.optimizer, "fixed": len(fixed), "ase_calculator": args.ase_calculator,
               "frame": args.frame, "precision": args.precision, "fmax": args.fmax, "steps_limit": args.steps,
               "gpu": torch.cuda.get_device_name(0), "torch": torch.__version__, "ase": __import__("ase").__version__,
               "cuda_allocator": allocator, "oeq_runtime": oeq, "checkpoint": str(checkpoint)}
@@ -189,7 +217,7 @@ def run(args):
     minimum = (ase_side if args.side == "ase" else gpu_side)(args, loaded, atoms, name, record, trajectory)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     np.savez(args.output.with_suffix(".npz"), trajectory=np.asarray(trajectory), minimum=minimum,
-             cell=atoms.cell.array)
+             cell=atoms.cell.array, fixed=np.asarray(fixed, dtype=np.int64))
     args.output.with_suffix(".json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     r = record["relaxation"]
     print(f"{name} frame {args.frame} {args.side} {args.precision}: {r['steps']} steps, converged {r['converged']}, "
@@ -212,7 +240,12 @@ def compare(a, b):
     final = float(divergence(sa["cell"], sa["minimum"][None], sb["minimum"][None])[0][0])
     n = min(len(ra["energies_eV_atom"]), len(rb["energies_eV_atom"]))
     de = [1000 * (rb["energies_eV_atom"][i] - ra["energies_eV_atom"][i]) for i in range(n)]
+    fixed = sa["fixed"] if "fixed" in sa.files else np.zeros(0, dtype=np.int64)
+    in_place = {side: bool(np.array_equal(s["minimum"][fixed], s["trajectory"][0][fixed]))
+                for side, s in (("a", sa), ("b", sb))} if len(fixed) else None
     return {"first_step_above_A": first, "largest_by_step_A": [float(x) for x in largest],
+            f"largest_first_{FIRST_STEPS}_steps_A": float(largest[:FIRST_STEPS + 1].max()),
+            "fixed_atoms": int(len(fixed)), "fixed_in_place": in_place,
             "dE_by_step_meV_atom": de, "steps": [ra["steps"], rb["steps"]],
             "minima_max_distance_A": final,
             "minima_dE_meV_atom": 1000 * (rb["energies_eV_atom"][-1] - ra["energies_eV_atom"][-1])}

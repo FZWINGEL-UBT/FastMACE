@@ -1,0 +1,55 @@
+{
+  "tool": "compat",
+  "tier": "-m compat (tests/_support/tiers.py)",
+  "provider": "local",
+  "label": "RTX 5060 Ti (local)",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "capability": [
+    12,
+    0
+  ],
+  "driver": "610.88",
+  "cuda": "13.0",
+  "versions": {
+    "torch": "2.14.1+cu130",
+    "triton": "3.8.0",
+    "cuequivariance": "0.12.0",
+    "cuequivariance_torch": "0.12.0",
+    "openequivariance": "0.7.0",
+    "mace": null,
+    "ase": "3.27.0",
+    "numpy": "2.2.6"
+  },
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "ba1d5be27b93dd9a7f5c762c0317ff241807c582",
+  "started_utc": "2026-10-24T03:44:13+00:00",
+  "command": [
+    "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+    "-m",
+    "pytest",
+    "tests/gpu",
+    "-m",
+    "compat",
+    "-p",
+    "no:cacheprovider",
+    "-rfEs",
+    "--durations=30",
+    "--junitxml=/home/fzwin/fastmace-acceptance/4-T13-local-20261024-final/compat/junit.xml",
+    "-p",
+    "resultlog",
+    "--result-log=/home/fzwin/fastmace-acceptance/4-T13-local-20261024-final/compat/results.jsonl"
+  ],
+  "exit_code": 1,
+  "wall_s": 0.048727778001193656,
+  "finished_utc": "2026-10-24T03:44:13+00:00",
+  "counts": {
+    "passed": 0,
+    "failed": 0,
+    "error": 0,
+    "skipped": 0
+  },
+  "failures": [],
+  "slowest": [],
+  "junit": null
+}
