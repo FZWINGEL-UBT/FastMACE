@@ -39,6 +39,7 @@ from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from fastmace import integrators
 from fastmace.config import EngineConfig
 from fastmace.io.output import Output
+from fastmace.model import compile as compiling
 from fastmace.model import loading
 from fastmace.model.forcefield import ForceField
 from fastmace.planner import adapt
@@ -46,6 +47,9 @@ from fastmace.planner.workload import Workload
 from fastmace.simulation import Simulation
 
 SPEC = {spec!r}
+# The allocator first, before the load touches CUDA: three engines are built in this process, and each checks
+# that the expandable-segments allocator took effect (5-T07's first GPU run was refused there).
+compiling.configure_allocator()
 loaded = loading.load_pristine("mh1-r2scan")  # the label names the head (a path alone does not)
 out = {{"gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "runs": {{}}}}
 
