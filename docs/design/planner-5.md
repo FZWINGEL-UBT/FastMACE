@@ -32,7 +32,7 @@ planner decision, tier, rewrite, size or step changes with this task.
 | 11 | preference | — | `rule-11`, `rule-11-fixed`, `rule-11-md-only`, `rule-11-optimizer`, `rule-11-d3` (an explicit value is an `override`, 5-T02) |
 | 12 | preference | — | `rule-12-d3`, `rule-12-d3-memory`, `rule-12-d3-warn`, `rule-12-memory`, `rule-12-memory-drop`, `rule-12-memory-warn` (5-T03: the estimate and decision 51's action) |
 | 13 | reaction | — | `selfcheck-failed`, `selfcheck-dependant` |
-| 14 | reaction | — | `fallback-exhausted`, `fallback-rewrite-off`, `fallback-rewrite-on`, `runner-subprocess-fallback` |
+| 14 | reaction | — | `fallback-exhausted`, `fallback-rewrite-off`, `fallback-rewrite-on`, `runner-subprocess-fallback`, `fallback-mid-run`, `fallback-mid-run-limit` (5-T08) |
 | 15 | reaction | — | `model-structure-warning` (reserved for 5-T04) |
 
 The codes are those the library emits today for each rule (a static scan of `fastmace/`), plus the two
@@ -48,7 +48,9 @@ Codes later tasks add, each in the branch that emits them:
 - 5-T03: rule 12's action codes, once **D1** is decided (for example a rewrite dropped, a warning, a
   refusal under D1 (c), or the out-of-memory re-plan of D1 (d));
 - 5-T04: emits `model-structure-warning` (decisions `warn.model_structure...`);
-- 5-T08: rule 14's mid-run codes, once **D4** is decided.
+- 5-T08: rule 14's mid-run codes (decision 54): `fallback-mid-run` (the activated revision's decision
+  `fallback.mid_run`), `fallback-mid-run-limit` (a second failure before the next canonical point, or a candidate
+  that would run in a child).
 
 ### `Reason` checks (`errors.py`)
 
@@ -360,6 +362,20 @@ the recorded `PlannerOptions.adaptation`, which `simulation.json` and a resume c
   file list: `model/capabilities.py`, `planner/fallback.py`, `planner/plan.py` and `planner/fixed.py`
   (`Hardware.sms`), and `rewrites/fusion/__init__.py` (the `segment_gemm` self-check frees each
   interaction's tensors; `docs/validation/5-T03.md`).
+  The fit on 60 measured cases (14 labels × NaCl/NbCl5 × NVT/NPT on the RTX 5060 Ti and the A100, plus 4
+  plain-cuEq cases) sets:
+  - the run term stock-structured (what stock MACE keeps per edge and per node);
+  - `LIBRARY_WORKSPACES` = 5 × 32 MiB, the cuBLAS workspaces observed;
+  - `SAFETY` = 0.90, one factor for every model and GPU (decision 51 and §9.3's rule 12 row). It is fitted
+    on the 14 labels that run on Na, Nb and Cl; the 5 MACE-OFF models have no Na embedding.
+
+  The factor is below 1 because the fused paths keep less than stock and the uniform-density edge estimate
+  is 1.2–1.3× high. The prediction is 1.05–1.48 of the measured peak on every case, with thin margins at
+  both ends. `tests/cpu/test_memory_fit.py` keeps every case in [1.0, 1.5].
+
+  Known limitation, a plan follow-up: per-path structural run terms (the fused OEq path, the folded MH-1
+  backward, PolarMACE's long range), declared where each path is chosen. No structural per-path term fitted
+  all families at one factor in 5-T03's diagnostics.
 - **5-T04** (rule 15): `model-structure-warning`.
 - **5-T05** (`str(plan)`): the layout above.
 - **5-T06** (monitor): `AdaptationConfig`, `counters.tier_switches`, `TierSwitch`.

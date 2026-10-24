@@ -80,9 +80,10 @@ RULES: tuple[Rule, ...] = (
         "rule-12-memory-warn")),
     Rule(13, "reaction", "a rewrite self-check fails: disable it and its dependants", (
         "selfcheck-failed", "selfcheck-dependant")),
-    # 5-T08 adds the mid-run fallback's codes once D4 is decided.
+    # 5-T08: the mid-run fallback's codes (decision 54).
     Rule(14, "reaction", "the gate fails: the fallback of §9.4", (
-        "fallback-exhausted", "fallback-rewrite-off", "fallback-rewrite-on", "runner-subprocess-fallback")),
+        "fallback-exhausted", "fallback-rewrite-off", "fallback-rewrite-on", "runner-subprocess-fallback",
+        "fallback-mid-run", "fallback-mid-run-limit")),
     # 5-T04 emits it (planner/warnings.py, the decisions "warn.model_structure...").
     Rule(15, "reaction", "known model-structure warning: warn, never refuse", ("model-structure-warning",)),
 )

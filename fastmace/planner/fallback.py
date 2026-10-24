@@ -40,6 +40,13 @@ Candidates and activation (2-T06):
   classified by the stage that raised it; ``ProcessConstraintError`` (2-T15 routes it to the
   runner), out-of-memory and non-finite errors propagate.
 
+Mid-run (plan task 5-T08, §9.4 step 5, decision 54): ``Simulation`` runs the same search for a capture error at a
+re-capture or a compile error of the compiled tier during ``run()`` (``mid_run_stage``), on the committed
+structure of its last canonical point, with ``Fallback(step=, note=)``: every candidate revision is made at the
+point's step and carries ``mid_run_note``'s text. ``mid_run_fallbacks`` reads them back from a plan chain
+(``counters.fallbacks``), ``mid_run_revision`` adds the decision ``fallback.mid_run``, and ``mid_run_limit`` is
+the stop at a second failure in one canonical interval.
+
 This module imports neither torch nor MACE at import time.
 """
 
@@ -231,7 +238,8 @@ def _replanned(plan, planner, force_field, atoms, *, mode, subprocess):
     return _keep_off(plan, planned)
 
 
-def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: Any, *, planner: Any = None) -> Any:
+def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: Any, *, planner: Any = None,
+              step: int = 0, note: str | None = None) -> Any:
     """A plan revision of ``plan`` with one dimension changed, built from the pristine ``force_field``
     (decision 24). Not active until ``activate`` validated it.
 
@@ -247,9 +255,10 @@ def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: An
       backend; with ``"runner": "subprocess"`` the candidate runs in a child and claims no compile
       family here.
 
-    The revision is ``plan.revise("fallback: <change>: <reason>", 0, ...)``. Raises ``ValueError`` for
-    anything else, or when the candidate would change nothing or the physics; refusals and
-    ``ProcessConstraintError`` of the re-plan propagate.
+    The revision is ``plan.revise("fallback: <change>: <reason>", step, ...)``; a mid-run fallback (5-T08) passes
+    the committed point's ``step`` and its ``note`` (``mid_run_note``), which goes before the reason. Raises
+    ``ValueError`` for anything else, or when the candidate would change nothing or the physics; refusals
+    and ``ProcessConstraintError`` of the re-plan propagate.
     """
     from fastmace.planner import minimal
 
@@ -267,6 +276,8 @@ def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: An
         raise ValueError(f"a candidate changes one dimension, one of {DIMENSIONS}; got {dimensions or 'none'}")
     if not why:
         raise ValueError("a candidate needs changes['reason']: why it is tried")
+    if note:
+        why = f"{note}: {why}"
     dimension = dimensions[0]
     value = changes[dimension]
     if dimension == "mc_energy":
@@ -276,7 +287,7 @@ def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: An
                              f"precision), got {value!r}")
         if plan.precision.mc_energy == value:
             raise ValueError("changes['mc_energy'] changes nothing: the plan's MC energies are float64 already")
-        return plan.revise(f"{PREFIX}mc_energy {value}: {why}", 0, selfchecks=(),
+        return plan.revise(f"{PREFIX}mc_energy {value}: {why}", step, selfchecks=(),
                            precision=dataclasses.replace(plan.precision, mc_energy=value))
     if dimension == "rewrites":
         change, fields = _rewrite_candidate(plan, value, why)
@@ -312,7 +323,7 @@ def candidate(plan: Any, changes: Mapping[str, Any], force_field: Any, atoms: An
                              f"{plan.precision.dtype} -> {planned.precision.dtype}); a fallback never does")
         fields = {f.name: getattr(planned, f.name) for f in dataclasses.fields(planned)
                   if f.name not in _NOT_REPLANNED}
-    revised = plan.revise(f"{PREFIX}{change}: {why}", 0, selfchecks=(), **fields)
+    revised = plan.revise(f"{PREFIX}{change}: {why}", step, selfchecks=(), **fields)
     return memory_revised(revised, force_field, atoms, planner) if dimension == "rewrites" else revised
 
 
@@ -836,7 +847,10 @@ class Fallback:
     - ``references``: the gate's (``selfcheck.references``); the reduced gate takes their first copy
       and the failing quantity. Under ``check="skip"`` they are skipped, and the search computes one
       rattled copy's references once, at the first run that needs them (``seed``, ``gate``);
-    - ``failure``: a ``Failure``.
+    - ``failure``: a ``Failure``;
+    - ``step`` and ``note``: a mid-run fallback's (5-T08): the committed point's step, at which every candidate
+      revision is made, and ``mid_run_note``'s text in each candidate's reason. ``atoms`` is then the committed
+      structure and ``references`` the gate's on it.
 
     The loop keeps (mode, rewrites off) and, per round, reacts to the last failure: rule 13 for a
     self-check failure; otherwise ``diagnose``: the mode (compiled for a graph plan, then eager), or
@@ -847,7 +861,8 @@ class Fallback:
     """
 
     def __init__(self, planner: Any, force_field: Any, atoms: Any, integrator: Any, references: Any,
-                 config: Any = None, *, seed: int = 0, gate: Any = None, moves: Any = None):
+                 config: Any = None, *, seed: int = 0, gate: Any = None, moves: Any = None, step: int = 0,
+                 note: str | None = None):
         from fastmace.config import FallbackConfig
 
         self.planner = planner
@@ -859,12 +874,17 @@ class Fallback:
         self.seed = seed
         self.gate = gate
         self.moves = moves  # an MC plan's move-energy references: every run and candidate passes them too (3-T11)
+        self.step, self.note = int(step), note
         self.budget = Budget(limit=self.config.diagnosis_budget)
         self.tried: list[TriedCandidate] = []
         self.revisions: list[Any] = []
         self._cache: dict[tuple, bool] = {}
         self._bases: dict[str, Any] = {}
         self._one_copy = None
+
+    def _at(self):
+        """The step and the mid-run note of every candidate revision (``candidate``)."""
+        return {"step": self.step, "note": self.note}
 
     # ---- references
 
@@ -906,7 +926,7 @@ class Fallback:
         if mode not in self._bases:
             try:
                 self._bases[mode] = candidate(self.failed, {"mode": mode, "reason": "diagnosis"}, self.force_field,
-                                              self.atoms, planner=self.planner)
+                                              self.atoms, planner=self.planner, **self._at())
             except (PlanRefused, ProcessConstraintError, ValueError):
                 self._bases[mode] = None
         return self._bases[mode]
@@ -1001,18 +1021,18 @@ class Fallback:
             here = [name for name in enabled_rewrites(plan) if name in off]
             if here:
                 plan = candidate(plan, {"rewrites": {name: "off" for name in here}, "reason": why},
-                                 self.force_field, self.atoms)
+                                 self.force_field, self.atoms, **self._at())
                 if rule13 is not None:
                     plan = dataclasses.replace(plan, decisions=reactions.selfcheck_revision(
                         self.failed, rule13).decisions)
                     plan = memory_revised(plan, self.force_field, self.atoms, self.planner)
             if mode != plan.tier:
                 plan = candidate(plan, {"mode": mode, "reason": why}, self.force_field, self.atoms,
-                                 planner=self.planner)
+                                 planner=self.planner, **self._at())
                 left = [name for name in enabled_rewrites(plan) if name in off]
                 if left:
                     plan = candidate(plan, {"rewrites": {name: "off" for name in left}, "reason": why},
-                                     self.force_field, self.atoms)
+                                     self.force_field, self.atoms, **self._at())
         except (PlanRefused, ProcessConstraintError, ValueError) as error:
             self._skipped("mode" if mode != self.failed.tier else "rewrites", change,
                           f"{why}; not planned: {_text(error)}")
@@ -1110,7 +1130,8 @@ class Fallback:
                 or plan.workload.mc_energy_precision != "auto" or plan.precision.mc_energy == "float64"):
             return None
         why = f"{MC_ENERGY_WHY}: only the move-energy part failed ({_text(failure.error)})"
-        revised = candidate(plan, {"mc_energy": "float64", "reason": why}, self.force_field, self.atoms)
+        revised = candidate(plan, {"mc_energy": "float64", "reason": why}, self.force_field, self.atoms,
+                            **self._at())
         self.revisions.append(revised)
         activation = activate(revised, self.planner, self.force_field, self.atoms,
                               references=self._validation_references(), budget=self.budget, moves=self.moves)
@@ -1190,3 +1211,129 @@ class Fallback:
         error.budget = self.budget
         error.failure = self.first
         return error
+
+
+# --------------------------------------------------------------------------- 5-T08: mid-run fallbacks
+
+# SPEC §9.4 step 5 and decision 54 (D4 (a)): during run(), a capture error at a re-capture and a compile error
+# of the compiled tier fall back from the last committed canonical point. The candidate revisions carry the
+# point's step and MID_RUN_NOTE's text; the plan's decision "fallback.mid_run" carries MID_RUN_CODE.
+MID_RUN_CODE = "fallback-mid-run"
+# A second trigger before the next canonical point: the run stops (decision 54, conductor's answer).
+MID_RUN_LIMIT_CODE = "fallback-mid-run-limit"
+MID_RUN_NOTE = "mid-run on the "
+# Fallbacks per canonical interval (decision 54: one, each recorded).
+MID_RUN_PER_INTERVAL = 1
+# The stages of an error raised by a step that are mid-run triggers (decision 54).
+MID_RUN_STAGES = ("capture", "compile")
+
+
+def mid_run_stage(error: BaseException) -> str | None:
+    """The trigger stage of an error a step raised during ``run()`` (decision 54): ``"capture"`` for an error the
+    graph engine tagged while capturing (a re-capture), ``"compile"`` for a Dynamo or Inductor error (the
+    compiled tier at a new edge count); ``None`` for anything else. Out-of-memory, non-finite values, refusals
+    and process constraints are never triggers."""
+    from fastmace.errors import FastMACEError
+
+    if _propagates(error) or isinstance(error, FastMACEError):
+        return None
+    stage = stage_of(error, default="")
+    return stage if stage in MID_RUN_STAGES else None
+
+
+def mid_run_note(tier: str, point: int, failed: int, stage: str, error: BaseException, *, setup: bool) -> str:
+    """The text every candidate of a mid-run fallback carries in its reason (``candidate(note=)``): the failed
+    tier, the committed point it starts from, and the failure."""
+    where = "the setup state" if setup else "the last restart point"
+    return (f"{MID_RUN_NOTE}{tier} tier from step {int(point):,} ({where}; {stage} error at step {int(failed):,}: "
+            f"{_text(error)})")
+
+
+def _mid_run(entry) -> str | None:
+    """The head of a fallback revision's mid-run note, ``"mid-run on the <tier> tier from step <n>"`` (a plan or a
+    chain summary), or ``None``. One fallback per canonical interval: the head names it."""
+    reason = str(getattr(entry, "reason", ""))
+    if not reason.startswith(PREFIX):
+        return None
+    parts = reason.split(": ", 2)
+    if len(parts) < 3 or not parts[2].startswith(MID_RUN_NOTE):
+        return None
+    return parts[2].split(" (", 1)[0]
+
+
+def is_mid_run(plan: Any) -> bool:
+    """Whether ``plan`` (a revision or a chain summary) is a candidate revision of a mid-run fallback."""
+    return _mid_run(plan) is not None
+
+
+def mid_run_fallbacks(plan: Any) -> list[dict[str, Any]]:
+    """``counters.fallbacks``: one ``{step, from, to, reason, revision}`` per mid-run fallback in ``plan``'s chain,
+    oldest first. A fallback's candidate chain (rewrites off, then the mode) counts once, as its last revision;
+    ``from`` is the tier the note names, ``to`` the tier of that revision's mode change, else ``from``."""
+    entries = [] if plan is None else [*plan.chain(), plan]
+    out = []
+    for index, entry in enumerate(entries):
+        note = _mid_run(entry)
+        if note is None:
+            continue
+        following = entries[index + 1] if index + 1 < len(entries) else None
+        if following is not None and _mid_run(following) == note:
+            continue  # the next revision of the same fallback's candidate chain
+        from_tier = note[len(MID_RUN_NOTE):].split(" ", 1)[0]
+        to_tier = from_tier
+        for revision in entries[:index + 1]:
+            if _mid_run(revision) == note:
+                change = str(revision.reason)[len(PREFIX):].split(": ", 1)[0]
+                if change.startswith("mode "):
+                    to_tier = change[len("mode "):].split(" ", 1)[0]
+        out.append({"step": int(entry.step or 0), "from": from_tier, "to": to_tier, "reason": str(entry.reason),
+                    "revision": int(entry.revision)})
+    return out
+
+
+def mid_run_limit(error: BaseException, point: int, failed: int, previous: Mapping[str, Any]) -> BaseException:
+    """The error that stops a run at a second trigger before the next canonical point (decision 54):
+    ``FallbackExhausted`` with rule 14's ``MID_RUN_LIMIT_CODE``, ``previous`` the interval's fallback record,
+    raised from ``error``."""
+    from fastmace.errors import FallbackExhausted, Reason
+
+    stopped = FallbackExhausted(
+        [Reason(f"a second mid-run failure before the next canonical point ({stage_of(error, 'step')} error at step "
+                f"{int(failed):,}: {_text(error)}), after the fallback to plan revision {previous['revision']} from "
+                f"step {int(point):,}: at most {MID_RUN_PER_INTERVAL} fallback per canonical interval (SPEC §9.4 "
+                "step 5, decision 54)", rule=14, code=MID_RUN_LIMIT_CODE)],
+        why="the fallback's validated revision failed again before the run reached a new committed point, so the "
+            "planner stops rather than search again from the same state",
+        next_step="Resume from the last restart point (Simulation.resume); the record names both failures.",
+        revisions=())
+    stopped.failure = error
+    stopped.previous = dict(previous)
+    return stopped
+
+
+def mid_run_revision(plan: Any) -> Any:
+    """The activated revision of a mid-run fallback with the decision ``fallback.mid_run`` (rule 14,
+    ``MID_RUN_CODE``): ``"<from> -> <to>"`` and the revision's reason. An earlier interval's decision is replaced."""
+    from fastmace.errors import Reason
+
+    (record,) = mid_run_fallbacks(plan)[-1:]
+    reason = Reason(f"{record['reason'][len(PREFIX):]} (SPEC §9.4 step 5, decision 54)", rule=14, code=MID_RUN_CODE)
+    decisions = tuple(entry for entry in plan.decisions if entry[0] != "fallback.mid_run")
+    return dataclasses.replace(plan, decisions=(*decisions, ("fallback.mid_run", f"{record['from']} -> {record['to']}",
+                                                             reason)))
+
+
+def mid_run_runner(candidate_plan: Any, error: BaseException) -> BaseException:
+    """The error for a mid-run fallback whose validated candidate runs in a child (§9.4 step 3): not handed over
+    to the subprocess runner during a run yet (a 5-T08 follow-up), so the run stops with the record."""
+    from fastmace.errors import FallbackExhausted, Reason
+
+    stopped = FallbackExhausted(
+        [Reason(f"the mid-run fallback's candidate (plan revision {candidate_plan.revision}, {candidate_plan.reason}) "
+                "runs in a child process, which a run cannot hand over to mid-run yet (SPEC §8.7, §9.4 step 3)",
+                rule=14, code=MID_RUN_LIMIT_CODE)],
+        why=f"the failure ({_text(error)}) needs a backend that this process cannot compile next to its own",
+        next_step="Resume from the last restart point (Simulation.resume), which plans in a fresh process.",
+        revisions=(candidate_plan,))
+    stopped.failure = error
+    return stopped
