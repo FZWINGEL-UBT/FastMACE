@@ -1,0 +1,12 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for 'OPT4-T04 grouped GEMM GPU test (<5 min)' (pid 1389)
+Cannot read termcap database;
+using dumb terminal settings.
+..                                                                       [100%]
+=============================== warnings summary ===============================
+tests/gpu/test_grouped_gemm_cuda.py::test_grouped_products_match_cublas_and_repeat_bitwise
+  /home/fzwin/fastmace-opt4/src-T04-13a1983/tests/gpu/test_grouped_gemm_cuda.py:27: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+  Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:820.)
+    return float((a - b).abs().max() / b.abs().max())
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+2 passed, 1 warning in 5.56s
