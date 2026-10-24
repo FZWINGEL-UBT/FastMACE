@@ -353,6 +353,10 @@ does not change the step time while `overlap_rebuild` is on.
    the RTX 5060 Ti; `-m compat` on Blackwell (local), Ada (Colab L4) and
    the Colab A100 if phase 4's check made it a production type. Untimed
    runs may use the Colab A100 to finish sooner; timed runs stay local.
+   **Amended 24 October 2026:** the A100 is not a production type (owner,
+   CUTLASS decision after OPT4-T03), so `-m compat` runs on local
+   Blackwell and the Colab L4 only. Colab budget for the acceptance:
+   about 20 CU of the roughly 41 left in October.
 
 ## Tasks
 
@@ -609,7 +613,19 @@ conformance test in the same branch.
      variable cell) planned at the baseline and at the freeze with the same
      injected hardware and software. Tier, backend, rewrites, sizes and
      precision identical; only texts and new fields differ. A difference is
-     listed and explained by a rule (rule 12 or 15) or fails;
+     listed and explained by a rule (rule 12 or 15) or fails. **Amended
+     24 October 2026 (optimisation round 4):** a difference is also
+     accepted when it is exactly one of the owner's decisions 57–59,
+     named per label and workload:
+     - decision 57, `grouped_launch` on: the generic MACE family
+       (mp0, mp0b3, mpa0, omat0, matpes), hybrid float32, not reproducible;
+     - decision 58, `fx_e3nn_linear` and `polar_graph_sums` on: POLAR-1-S,
+       -M and -L, hybrid float32, not reproducible;
+     - decision 59, `EngineConfig.dynamic_edges` on: every graph-tier MD
+       plan, every model (off with a reason on eager, reference and
+       `compile_mode="none"`).
+     Any other difference still fails. Item 4 is unaffected: all three are
+     off in float64 and reproducible plans (57, 58) or exact (59);
   4. **bitwise:** Langevin and BAOAB trajectories against the baseline,
      CPU float64 and reproducible on the GPU (as 4-T13);
   5. **timed, local, quiet PC:** MH-1 hybrid Langevin NVT, NaCl and NbCl5,
@@ -623,7 +639,9 @@ conformance test in the same branch.
   7. mid-run fallback: T08's broken capture ends on a validated revision
      from the committed point, no duplicate output;
   8. rule 12: T03's validation cited, rerun only if `planner/memory.py` or
-     a memory term changed since;
+     a memory term changed since. Round 4's defaults (decisions 57–59)
+     change memory terms, so the runbook cites the dated rerun section of
+     `docs/validation/5-T03.md` (24 October 2026), not the original run;
   9. calibration (D5 (a) or (b)): the NaCl smoke, its record and setup
      cost; its choice is judged only on the reference GPU;
   10. `str(plan)`: the golden texts, and one real plan per item 6–9
@@ -631,9 +649,10 @@ conformance test in the same branch.
 - **Full acceptance tiers:** `-m acceptance` and `-m "slow and not
   acceptance"` on the RTX 5060 Ti, after the stale-test listing against
   `fastmace-4` (phase 3's lesson). Their untimed share may split by file
-  with the Colab A100; step-time assertions stay local.
-- **Compatibility check** (`-m compat`, 30–60 min each): local Blackwell,
-  Colab L4 for Ada, Colab A100 if it is a production type. The compat tier
+  with the Colab A100 only where a model does not fit locally (OMOL-0 XL,
+  POLAR-1-L); step-time assertions stay local.
+- **Compatibility check** (`-m compat`, 30–60 min each): local Blackwell
+  and Colab L4 for Ada (the A100 is not a production type, item 8 above). The compat tier
   gains: the planner's rule 6 check on that GPU (fused cuEq loads), rule
   12's estimate against the measured peak on MH-1 NaCl, and the forced
   re-capture switch smoke (correctness only).
