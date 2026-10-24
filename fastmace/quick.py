@@ -92,7 +92,7 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
        dispersion: Any = None, repeat: tuple[int, int, int] = (1, 1, 1), output: Any = None,
        seed: int | None = None, check: str = "skip", integrator: Any = None, mode: str | None = None,
        allow_reference: bool = False, fallback: Any = None, gate: Any = None, runner: Any = None,
-       engine: Any = None, neighbours: Any = None) -> RunResult:
+       engine: Any = None, neighbours: Any = None, calibrate: bool = False) -> RunResult:
     """Run MD on ``structure`` (path or ``Atoms``) with ``model`` and return a ``RunResult``.
 
     Arguments as SPEC §7.7 level 2:
@@ -115,7 +115,11 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     - ``seed``: the noise seed; ``None`` draws one, recorded in ``metadata.json``;
     - ``check``: as ``Simulation`` (the gate is opt-in, ``check="gate"``);
     - ``mode``, ``allow_reference``, ``fallback``, ``gate``, ``runner``, ``engine``, ``neighbours``:
-      the planner inputs, passed to ``Simulation`` as they are (``simulation.PlannerOptions``).
+      the planner inputs, passed to ``Simulation`` as they are (``simulation.PlannerOptions``);
+    - ``calibrate``: ``True`` measures the backends the rules rank equal (hybrid against plain cuEq) on this
+      structure before the run and takes plain cuEq only if it is faster by more than 5 % in every pair (SPEC
+      §9.1, decision 55; ``CalibrationConfig``, ``planner.calibrate``). Off by default: it costs four child
+      builds. Refused with MC moves.
 
     Every ``ValueError`` and refusal comes before the model is loaded.
     """
@@ -127,8 +131,13 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
     from fastmace.simulation import Simulation, _steps, check_mode, mc_moves, planner_options
 
     check_mode(check)
+    if not isinstance(calibrate, bool):
+        raise TypeError(f"calibrate must be a bool, got {calibrate!r}")
+    from fastmace.config import CalibrationConfig
+
     planner_inputs = planner_options(mode=mode, allow_reference=allow_reference, fallback=fallback, gate=gate,
-                                     runner=runner, engine=engine, neighbours=neighbours)
+                                     runner=runner, engine=engine, neighbours=neighbours,
+                                     calibration=CalibrationConfig(calibrate=True) if calibrate else None)
     repeat = _repeat(repeat)
     if not isinstance(ensemble, str) or ensemble.upper() not in ENSEMBLES:
         raise ValueError(f"ensemble={ensemble!r} is not one of {ENSEMBLES} (SPEC §7.7)")

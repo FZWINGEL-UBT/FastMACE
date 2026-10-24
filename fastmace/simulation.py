@@ -145,8 +145,7 @@ class PlannerOptions:
     - ``engine``, ``neighbours``: the planner-level options; ``None`` keeps the default planner's
       (``planner.minimal.default_planner``: CUDA if available, else the CPU without compilation);
     - ``adaptation``, ``calibration``: runtime adaptation (§9.6) and the optional calibration (§9.1) of
-      phase 5 (plan task 5-T01). Adaptation options decisions 52 and 53 did not choose are refused (5-T07);
-      calibration's fields stay ``config.PENDING``, and ``calibrate=True`` is refused, until 5-T09 lands
+      phase 5 (plan task 5-T01). Options decisions 52, 53 (5-T07) and 55 (5-T09) did not choose are refused
       (``phase_5_pending``).
     """
 
@@ -196,15 +195,15 @@ class PlannerOptions:
                                calibration=part("calibration", CalibrationConfig))
 
 
-# The refusals of phase 5's placeholders (plan task 5-T01): a field an open owner decision fixes, set before the
-# task implementing it lands (5-T09, D5), and an adaptation option decisions 52 and 53 did not choose (5-T07).
-PHASE_5_PENDING_CODES = {"adaptation": "adaptation-unsupported", "calibration": "calibration-pending"}
+# The refusals of phase 5's options the owner did not choose: an adaptation option outside decisions 52 and 53
+# (5-T07), and the calibration that only reports (D5 (b), not chosen by decision 55; 5-T09).
+PHASE_5_PENDING_CODES = {"adaptation": "adaptation-unsupported", "calibration": "calibration-unsupported"}
 
 
 def phase_5_pending(adaptation: AdaptationConfig, calibration: CalibrationConfig) -> list[Any]:
     """The ``Reason`` for each phase 5 option that asks for behaviour not implemented: an adaptation option the
-    owner did not choose (decisions 52, 53), or the calibration that waits for D5."""
-    from fastmace.config import ADAPTATION_SUPPORTED, PENDING
+    owner did not choose (decisions 52, 53), or a calibration that only reports (decision 55 chose D5 (a))."""
+    from fastmace.config import ADAPTATION_SUPPORTED
     from fastmace.errors import Reason
 
     reasons = []
@@ -215,9 +214,9 @@ def phase_5_pending(adaptation: AdaptationConfig, calibration: CalibrationConfig
             "runtime adaptation implements owner decisions 52 and 53 only (SPEC §18): "
             + "; ".join(f"{name} one of {ADAPTATION_SUPPORTED[name]}" for name in unsupported)
             + "; or pass adapt='off'", code=PHASE_5_PENDING_CODES["adaptation"]))
-    if calibration.calibrate or calibration.choose != PENDING:
-        reasons.append(Reason("CalibrationConfig(calibrate=True) or choose=...: the optional calibration waits for "
-                              "owner decision D5 (plans/phase-5.md, task 5-T09)",
+    if calibration.choose is not True:
+        reasons.append(Reason("CalibrationConfig(choose=False): the calibration's measurement breaks the backend's tie "
+                              "(owner decision 55, D5 (a)); a calibration that only reports, D5 (b), was not chosen",
                               code=PHASE_5_PENDING_CODES["calibration"]))
     return reasons
 
@@ -488,6 +487,12 @@ class Simulation:
                 f"the integrator's temperature_K={integrator.temperature_K:g} K is above "
                 f"Workload.max_temperature_K={workload.max_temperature_K:g} K, which sized the skin and the buckets "
                 "(rule 11, SPEC §7.6)", code="target-above-max-temperature")])
+        if options.calibration.calibrate:  # MD plans only (5-T09)
+            from fastmace.planner import calibrate
+
+            refusal = calibrate.workload_refusal(optimizer=optimizer, workload=workload)
+            if refusal is not None:
+                raise PlanRefused.from_reasons([refusal])
 
         self.force_field = ff
         self.integrator = integrator
@@ -548,13 +553,14 @@ class Simulation:
         self._last_point = None  # the last committed canonical point (HandOver; 5-T08's mid-run fallbacks)
         self._setup_point = None  # the setup's point of a fresh run (its output starts with no chunk)
         self._mid_run_interval = None  # the mid-run fallback made since the last canonical point (decision 54)
-        # The move-set attachments since the last canonical point, (step, attached state or None, carried record):
-        # a mid-run fallback redoes them at their steps (5-T08b). _mc_pending: those still to redo.
-        self._mc_events = []
-        self._mc_pending = []
         self._child = False  # set by the subprocess runner's child: switches are the parent's
         started = time.perf_counter()
         stored = getattr(self, "_resume_plan", None)  # a resume of a fallback revision (2-T15)
+        calibrated = None
+        if options.calibration.calibrate and stored is None and not getattr(self, "_resuming", False):
+            calibrated = self._calibrate(planner, workload)  # the optional calibration (SPEC §9.1, 5-T09)
+            planner = self._planner = calibrated.planner
+            started = time.perf_counter()
         self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq,
                                   allow_reference=options.allow_reference,
                                   mode=options.mode if stored is None else stored.tier,
@@ -563,6 +569,13 @@ class Simulation:
             from fastmace.planner.fallback import replay_off
 
             self._plan = replay_off(stored, self._plan)
+        if calibrated is not None:
+            from fastmace.planner import calibrate
+
+            self._plan = calibrate.apply(self._plan, calibrated)
+            if calibrated.record is not None:
+                setup["calibration"] = calibrated.record.setup_s
+        self._calibrated = calibrated
         setup["plan"] = time.perf_counter() - started
         if self._plan.runner == "subprocess":
             if optimizer is not None:
@@ -659,7 +672,6 @@ class Simulation:
             self._open_output()
         if optimizer is None and not getattr(self, "_resuming", False):  # a fresh build is canonical (§10.6)
             self._last_point = self._setup_point = self._hand_over(canonicalise=False)
-            self._mc_events = []
         self._write_metadata()
 
     def _attach_engine(self):
@@ -870,10 +882,8 @@ class Simulation:
             return
         if mc is None:
             self._detach_mc()
-            self._mc_attached_event(None)
         elif moves is not None:
             self._attach_mc(moves)
-            self._mc_attached_event(self._mc.state_dict())
         self._schedule = position
         self._engine.state.protocol = position
         self._advance(count)
@@ -1105,15 +1115,12 @@ class Simulation:
         end = int(engine.state.step) + count  # a mid-run fallback redoes the steps since its point (5-T08)
         try:
             while int(engine.state.step) < end:
-                if self._mc_pending and int(engine.state.step) >= self._mc_pending[0][0]:
-                    self._redo_mc_event(self._mc_pending.pop(0))  # a move-set change redone at its step (5-T08b)
-                    driver = self._mc
                 if position is not None:
                     self._fill(resolved.target(position.step + 1))
                 try:
                     engine.step()
                 except Exception as error:
-                    if not self._mid_run_fallback(error, end):
+                    if not self._mid_run_fallback(error):
                         raise
                     # The validated revision continues from the committed point (SPEC §9.4 step 5).
                     engine, driver, position = self._engine, self._mc, self._schedule
@@ -1416,7 +1423,7 @@ class Simulation:
 
     # ------------------------------------------------------------------ mid-run fallbacks (§9.4 step 5; 5-T08)
 
-    def _mid_run_fallback(self, error, end):
+    def _mid_run_fallback(self, error):
         """The fallback of SPEC §9.4 for ``error``, raised by a step during ``run()`` (decision 54); whether the run
         continues. ``False``: not a trigger (the caller raises it again unchanged).
 
@@ -1480,13 +1487,12 @@ class Simulation:
         protocol = restart.protocol_record(stored)
         if self._schedule is not None and protocol is not None:  # the schedule's position at the point
             self._schedule = ScheduleState.from_restart(protocol)
-        # The move set attached at the point, with its streams, counters and cycle position from the point's
-        # record; the attachments made since are redone at their steps (_mc_events, 5-T08b).
-        attached = restart.mc_record(stored)
-        self._mc_moves = None if attached is None else tuple(move_from_record(entry) for entry in attached["moves"])
         self._restore(point, result.engine, plan)
-        self._mc_pending = [event for event in self._mc_events if event[0] >= point.step]
-        self._mc_ranges = self._redone_mc_ranges(point.step, end, attached is not None)
+        if self._mc is None and self._mc_moves is not None:  # attached after the point: attached again
+            self._attach_mc(self._mc_moves)
+        self._mc_ranges = [[first, min(last, point.step)] for first, last in self._mc_ranges if first < point.step]
+        if self._mc is not None:
+            self._mc_ranges.append([point.step, point.step])  # the steps redone with the move set attached
         if self._writer is not None:  # chunks after the point deleted, never rewritten (§10.6)
             self._writer.close()
             self._open_output(resume_from=point.outputs if point.outputs is not None else
@@ -1511,46 +1517,6 @@ class Simulation:
         self._report.plan = plan
         self._write_metadata()
         return True
-
-    def _mc_attached_event(self, state):
-        """Record a move-set change of ``run(mc=...)`` at the current step (``state``: the attached driver's
-        ``state_dict`` right after the attach, ``None`` for a detach), for a mid-run fallback to redo (5-T08b)."""
-        import copy
-
-        step = int(self._engine.state.step)
-        self._mc_events.append((step, copy.deepcopy(state), copy.deepcopy(self._mc_record)))
-
-    def _redo_mc_event(self, event):
-        """Redo a move-set change at its step: the attach with the streams, counters and cycle position it had
-        then (``_resume_mc``), or the detach with the record it left."""
-        _, state, carried = event
-        if self._mc is not None:
-            self._mc.detach()
-            self._mc = None
-        if state is None:
-            self._detach_mc()
-            self._mc_record = carried
-        else:
-            self._resume_mc(state)
-
-    def _redone_mc_ranges(self, point, end, attached):
-        """``_mc_ranges`` after a fallback to ``point``: the ranges before it, then the redone steps up to ``end``
-        with the move set attached from the point (``attached``) and at each pending attach."""
-        ranges = [[first, min(last, point)] for first, last in self._mc_ranges if first < point]
-        start = point if attached else None
-        for step, state, _ in self._mc_pending:
-            if start is not None and step > start:
-                ranges.append([start, step])
-            start = step if state is not None else None
-        if start is not None and end > start:
-            ranges.append([start, end])
-        merged = []
-        for first, last in ranges:
-            if merged and merged[-1][1] == first:
-                merged[-1][1] = last
-            elif last > first:
-                merged.append([first, last])
-        return merged
 
     def _mid_run_stop(self):
         """A mid-run failure stops the run: the output so far flushed, the metadata written; no restart."""
@@ -1661,7 +1627,7 @@ class Simulation:
         reads_charge = model.charge is not None or model.spin_multiplicity is not None
         heights = 1.0 / np.linalg.norm(atoms.cell.reciprocal(), axis=1)
         outputs = () if self.output is None else (str(Path(self.output.directory)),)
-        return reports.Report(
+        report = reports.Report(
             model=model.label or Path(str(model.path)).name, head=model.head, sha256=model.sha256,
             structure=atoms.get_chemical_formula(), n_atoms=len(atoms), pbc=tuple(bool(p) for p in atoms.pbc),
             species=_symbols(self._plan.superset).split(), plan=self._plan,
@@ -1673,6 +1639,41 @@ class Simulation:
             cell_heights_A=tuple(float(h) for h in heights), cutoff_A=self.force_field.traits.r_max,
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,
             start_step=int(self._engine.state.step) if start_step is None else start_step)
+        calibrated = getattr(self, "_calibrated", None)
+        if calibrated is not None:  # calibrate=True (SPEC §9.1, 5-T09): measured, or why not
+            from fastmace.planner import calibrate
+
+            report.calibration = calibrate.report_line(self._plan.calibration, calibrated.note)
+            if calibrated.warning is not None:
+                report.add_warning(calibrated.warning)
+        return report
+
+    def _calibrate(self, planner, workload):
+        """The optional calibration (SPEC §9.1, decision 55; plan task 5-T09) before this process plans: the
+        backend's tie measured in children (``planner.calibrate``); returns its ``Outcome``. A changed backend is
+        set in ``self.options`` too (``simulation.json``), so a resume plans it again."""
+        from fastmace.planner import calibrate
+
+        started = time.perf_counter()
+        config = self.options.calibration
+
+        def plan_with(candidate):
+            return candidate.plan(self.force_field, self._atoms, self._config, workload,
+                                  allow_naive_cueq=self.allow_naive_cueq, allow_reference=self.options.allow_reference,
+                                  mode=self.options.mode)
+
+        found = calibrate.tie(planner, plan_with, workload)
+        if found.alternative is None:
+            return calibrate.calibrate(planner, found, None, config)
+        self._plan = found.rules  # the children's record (_simulation_record) reads it
+        launcher = calibrate.ChildLauncher(self, planner, found, config)
+        try:
+            outcome = calibrate.calibrate(planner, found, launcher, config, setup_s=time.perf_counter() - started)
+        finally:
+            launcher.close()
+        if outcome.changed:
+            self.options = dataclasses.replace(self.options, engine=outcome.planner.engine)
+        return outcome
 
     def add_metadata_block(self, name: str, provider: Any) -> None:
         """Add ``{name: provider()}`` to every ``metadata.json`` record this Simulation builds, evaluated at each
@@ -1788,7 +1789,6 @@ class Simulation:
         arrays = restart.write_engine_restart(path, self._engine, name=ENGINE_NAME, plan=self._plan,
                                               outputs=outputs)
         self._last_point = HandOver(step=int(self._engine.state.step), arrays=arrays, outputs=outputs)
-        self._mc_events = []  # the record holds the attached move set (5-T08b)
         self._mid_run_interval = None  # a new canonical interval (decision 54)
         if outputs is not None:
             point = {"step": int(self._engine.state.step), **outputs}
@@ -1916,7 +1916,7 @@ class Simulation:
                      allow_naive_cueq=record["allow_naive_cueq"], mode=options.mode,
                      allow_reference=options.allow_reference, fallback=options.fallback, gate=options.gate,
                      runner=options.runner, engine=options.engine, neighbours=options.neighbours,
-                     adaptation=options.adaptation)
+                     adaptation=options.adaptation, calibration=options.calibration)  # a resume never calibrates
         del sim._resuming
         sim.__dict__.pop("_resume_plan", None)
         sim._resume(stored, record, output, allow_plan_change, versions, source=directory)
@@ -1964,7 +1964,6 @@ class Simulation:
         if output is not None:
             self._open_output(resume_from=restart.output_indices(stored))
         # resume_engine canonicalised (§10.6); the output continues after the restart's chunks.
-        self._mc_events = []
         self._last_point = dataclasses.replace(self._hand_over(canonicalise=False),
                                                outputs=None if output is None else restart.output_indices(stored))
         self._write_metadata()

@@ -128,16 +128,14 @@ hand-off, none for a relaxation. Validation before activation follows choice 3: 
 gate by the same policy as an unoverridden plan (opt-in for MD, decision 3; the move-energy part for MC,
 decision 35).
 
-### `CalibrationConfig` (SPEC §9.1; D5)
+### `CalibrationConfig` (SPEC §9.1; decision 55)
 
 | Field | Default | Meaning | Decided by |
 | --- | --- | --- | --- |
-| `calibrate` | `False` | `True` measures the tied candidates; refused until 5-T09 | — |
-| `steps` | `50` | measured steps per candidate after warm-up (§9.1) | — |
-| `margin` | `0.05` | the "faster in every pair" margin of D5 (a); unused under (b) | D5 (a) |
-| `choose` | `"pending"` | `True`: the measurement may change the plan (a); `False`: record only (b) | D5 |
-
-Under D5 (c) (no calibration in 1.0) 5-T09 removes the record and its switch-map rows.
+| `calibrate` | `False` | `True` measures the backends' tie, MD runs only (5-T09, below) | — |
+| `steps` | `50` | measured steps per block after warm-up (§9.1) | — |
+| `margin` | `0.05` | plain cuEq must be faster by more than this share in every pair | decision 55 |
+| `choose` | `True` | `True`: the measurement may change the plan (D5 (a)); `False`, record only (D5 (b)), is refused | decision 55 |
 
 ### `PlannerOptions` and `Simulation` (`simulation.py`)
 
@@ -157,9 +155,10 @@ it needs no note.
 `PHASE_5_PENDING_CODES`):
 - `adaptation-unsupported` (5-T07; it replaced 5-T01's `adaptation-pending`): an `AdaptationConfig` field
   set to an option decisions 52 and 53 did not choose;
-- `calibration-pending`: `calibrate=True` or `choose` other than `"pending"` (D5; 5-T09 removes it).
+- `calibration-unsupported` (5-T09; it replaced 5-T01's `calibration-pending`): `choose=False`, the
+  calibration that only reports (D5 (b)), which decision 55 did not choose.
 
-`fm.md(calibrate=)` and `fastmace run --calibrate` are 5-T09's.
+`fm.md(calibrate=)` and `fastmace run --calibrate` are 5-T09's (below).
 
 ## Plan (`planner/plan.py`)
 
@@ -349,6 +348,53 @@ none of them (conductor, 24 October 2026: this list is enough).
 built plan (`engine.plan`, which carries the self-checks) and the active one differ. The limits come from
 the recorded `PlannerOptions.adaptation`, which `simulation.json` and a resume carry.
 
+## Calibration (5-T09; `planner/calibrate.py`, `simulation.py`, `engine/subprocess.py`)
+
+SPEC §9.1 and decision 55 (D5 (a)); conductor's answers to 5-T09 (23 October 2026).
+
+**Scope.** The backend dimension only: the rules' hybrid (`EngineConfig.backend="auto"`, reason code
+`backend-hybrid`: OEq builds and the process allows it) against plain cuEq, where plain cuEq passes the hard
+rules. MD runs only: `calibrate=True` with an optimiser or MC moves is refused (`calibration-workload`),
+before anything is loaded.
+
+**The tie.** `calibrate.tie(planner, plan_with, workload)` plans the rules' plan and the plain cuEq plan on
+`probe` copies of the run's planner (a copied process record), so the probes claim no compile family here.
+No tie, and no child, when: `reproducible=True` (not planned at all: its plan prepares the process), the
+caller set the backend, the rules chose plain cuEq (CPU, OEq unavailable, MACE imported first, the process's
+compile family), the tier is reference, the plan runs in a child, or plain cuEq is refused (rule 3 for
+PolarMACE) or would run in a child. The report says why: `backend: calibration not run: no tie, ...`.
+
+**The blocks.** `calibrate.ChildLauncher` runs each block in a fresh child of the subprocess runner
+(`SubprocessRunner.calibrate`, request action `"calibrate"`), one child at a time, in the order A B A B
+(`PAIRS = 2`, the rules' plan first). The child builds the run from the parent's `simulation.json` record
+with the candidate's backend, no output, no gate, adaptation off and calibration off; runs `WARMUP_STEPS =
+50` steps, then times `CalibrationConfig.steps` steps between two synchronisations
+(`Simulation._synchronised_time`), and returns the seconds per step in `result.json` (`"calibration"`). Its
+stage is removed after the block, and the hand-off directory (`<output>/.fastmace-handoff/<run>/`, or the
+cache's `handoff/<run>/` without output) on `close()`; a failed child's directory is kept with its log.
+
+**The choice.** `calibrate.calibrate` takes plain cuEq only when it is faster than the rules' plan by more
+than `margin` in every pair (`faster_in_every_pair`). A block that fails ends the measurement: the rules'
+plan stays, the record keeps the blocks measured, and the report warns.
+
+**The plan.** The run then plans in this process as usual, with the backend set where the calibration
+changed it (the winning child is not kept). `calibrate.apply` puts the `CalibrationRecord` in
+`Plan.calibration` (initial revision; fallback and switch revisions keep it). A changed backend's decision
+`EngineConfig.backend` has code `backend-calibrated` (no §9.3 rule: the backend rule is §9.4's), its
+reason names the measured means, and `Plan.requested` keeps only the caller's options. `Simulation.options`
+gets the backend too, so `simulation.json` records it, and a resume plans the same backend. A resume, and
+the subprocess runner's own children, never calibrate.
+
+**Reported.** `report.setup_s["calibration"]` is the record's `setup_s`: the probes and every child's wall
+time. The report's `backend:` line shows each block's measured ms/step and the verdict, with no predicted
+speed-up (§7.7); `str(plan)`'s history shows the record; provenance's `plan.calibration` holds it.
+
+**Nothing persists.** Nothing is written outside the run's hand-off directory, and nothing is read from an
+earlier run (a test plants records in the cache and model directories and watches every `open`).
+
+**The cost.** Four child builds and four times `WARMUP_STEPS + steps` steps. Production runs crystals one
+after another and would pay it per crystal, so it stays off by default: for unfamiliar GPUs and benchmarks.
+
 ## What this unblocks
 
 - **5-T02** (conformance suite): the table, the marker, the meta-test's two lists.
@@ -362,20 +408,6 @@ the recorded `PlannerOptions.adaptation`, which `simulation.json` and a resume c
   file list: `model/capabilities.py`, `planner/fallback.py`, `planner/plan.py` and `planner/fixed.py`
   (`Hardware.sms`), and `rewrites/fusion/__init__.py` (the `segment_gemm` self-check frees each
   interaction's tensors; `docs/validation/5-T03.md`).
-  The fit on 60 measured cases (14 labels × NaCl/NbCl5 × NVT/NPT on the RTX 5060 Ti and the A100, plus 4
-  plain-cuEq cases) sets:
-  - the run term stock-structured (what stock MACE keeps per edge and per node);
-  - `LIBRARY_WORKSPACES` = 5 × 32 MiB, the cuBLAS workspaces observed;
-  - `SAFETY` = 0.90, one factor for every model and GPU (decision 51 and §9.3's rule 12 row). It is fitted
-    on the 14 labels that run on Na, Nb and Cl; the 5 MACE-OFF models have no Na embedding.
-
-  The factor is below 1 because the fused paths keep less than stock and the uniform-density edge estimate
-  is 1.2–1.3× high. The prediction is 1.05–1.48 of the measured peak on every case, with thin margins at
-  both ends. `tests/cpu/test_memory_fit.py` keeps every case in [1.0, 1.5].
-
-  Known limitation, a plan follow-up: per-path structural run terms (the fused OEq path, the folded MH-1
-  backward, PolarMACE's long range), declared where each path is chosen. No structural per-path term fitted
-  all families at one factor in 5-T03's diagnostics.
 - **5-T04** (rule 15): `model-structure-warning`.
 - **5-T05** (`str(plan)`): the layout above.
 - **5-T06** (monitor): `AdaptationConfig`, `counters.tier_switches`, `TierSwitch`.

@@ -58,6 +58,8 @@ SCALARS = (
     ("mode", 'Execution mode: unset lets the planner choose ("graph", or "compiled" where rules 4 and 9 need '
              'it); or "graph", "compiled", "eager", "reference".', '"compiled"'),
     ("allow_reference", "Allow the reference tier where rule 1 needs it (SPEC §9.3).", "false"),
+    ("calibrate", "Time hybrid against plain cuEq on this structure first and take the faster where the rules tie "
+                  "(SPEC §9.1; four child builds; MD only).", "true"),
 )
 
 # (comment, commented table lines): the records, after every top-level key; "" is an empty comment line.

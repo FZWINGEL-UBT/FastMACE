@@ -246,9 +246,10 @@ three MC streams' seeds derive from the simulation's `seed` (`config.mc_stream_s
 New in the library (plan task 5-T01, `docs/design/planner-5.md`); the research engine has neither. They
 reach the planner through `Simulation(adaptation=, calibration=)` (`PlannerOptions`). `AdaptationConfig`'s
 defaults are the owner's decisions 52 and 53 (SPEC §18; plan task 5-T07); `Simulation` refuses the options
-they did not choose (`adaptation-unsupported`, `config.ADAPTATION_SUPPORTED`). A `CalibrationConfig` field
-the open decision D5 fixes defaults to `"pending"` (`config.PENDING`), and `Simulation` refuses any other
-value (`calibration-pending`) until 5-T09 implements it.
+they did not choose (`adaptation-unsupported`, `config.ADAPTATION_SUPPORTED`). `CalibrationConfig`'s defaults
+are decision 55 (plan task 5-T09, `fastmace.planner.calibrate`): off, and `choose=False` (D5 (b), not chosen)
+is refused (`calibration-unsupported`). Its warm-up (50 steps) and pairs (2, A B A B) are the module's
+constants.
 
 | Research engine | FastMACE field | Default | `auto` rule | Kind |
 | --- | --- | --- | --- | --- |
@@ -260,10 +261,10 @@ value (`calibration-pending`) until 5-T09 implements it.
 | none (new, SPEC §9.6, D3 (b), not chosen) | `AdaptationConfig.switch_back_after` | `None` | — | runtime adaptation (only `None`: one way) |
 | none (new, SPEC §9.6, D3 (d), not chosen) | `AdaptationConfig.min_points_between` | `None` | — | runtime adaptation (only `None`) |
 | none (new, SPEC §9.6, D3 (c), not chosen) | `AdaptationConfig.reproducible` | `False` | — | runtime adaptation (only `False`) |
-| none (new, SPEC §9.1) | `CalibrationConfig.calibrate` | `False` | — | calibration (`True` refused until 5-T09) |
+| none (new, SPEC §9.1, decision 55) | `CalibrationConfig.calibrate` | `False` | — | calibration (`True`: MD runs only; `fm.md(calibrate=)`, `fastmace run --calibrate`) |
 | none (new, SPEC §9.1) | `CalibrationConfig.steps` | `50` | — | calibration (measured steps per candidate) |
-| none (new, SPEC §9.1, D5 (a)) | `CalibrationConfig.margin` | `0.05` | — | calibration |
-| none (new, SPEC §9.1, D5) | `CalibrationConfig.choose` | `"pending"` | — | calibration (`False`: record only) |
+| none (new, SPEC §9.1, decision 55) | `CalibrationConfig.margin` | `0.05` | — | calibration (faster by more, in every pair) |
+| none (new, SPEC §9.1, decision 55) | `CalibrationConfig.choose` | `True` | — | calibration (only `True`; `False`, record only, is D5 (b)) |
 
 ## Auto resolution rules
 
