@@ -19,12 +19,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import fastmace  # noqa: F401,E402
+import fastmace  # noqa: F401,E402  (before torch: soft file locks, SPEC §14)
+
+# isort: split
 import torch  # noqa: E402
 import triton  # noqa: E402
 import triton.language as tl  # noqa: E402
-
-from radial_forward_bench import EDGES, P, Q, timed  # noqa: E402
+from radial_forward_bench import EDGES, P, Q, timed  # noqa: E402  (tools/, the script's directory)
 
 
 @triton.jit
