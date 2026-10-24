@@ -15,7 +15,7 @@
 #   untimed GPU: preflight TEST..., trajectories-reproducible (item 4), adapt-production, adapt-tests (items 6, 7),
 #     compat, acceptance-tier, slow-tier, targeted TEST...
 # The release side is tools/ab_fastmace.py --release 4 and tools/trajectory_versions.py --against 4 (sides 4 and
-# 5), as 4-T13's jobs against 3b; the jobs that call 5-T07's and 5-T09's tools exit 3 until the freeze.
+# 5), as 4-T13's jobs against 3b; items 6 and 9 use tools/validation/adapt_runs.py and 5-T09's GPU test.
 set -uo pipefail
 src=$(cd "${1:?SRC}" && pwd); job=${2:?JOB}; shift 2
 run_id=5-T11-local-${RUN_DATE:-$(date -u +%Y%m%d)}
@@ -60,7 +60,6 @@ need_baseline() {  # the fastmace-4 commit and its renamed export: $base
   [ -d "$versions/fastmace_4" ] || { echo "export the baseline first: python -m fastmace.bench.versions export" \
     "--repository /mnt/d/Margraf/FastMACE --ref $base --name fastmace_4 --destination $versions" >&2; exit 2; }
 }
-not_yet() { echo "$job: filled in at the freeze ($*)" >&2; exit 3; }
 ab() {  # name blocks pattern sides...: tools/ab_fastmace.py --release 4, MH-1 hybrid Langevin NVT, 4-T13's protocol
   local name=$1 blocks=$2 pattern=$3; shift 3
   run "$name" "$hybrid" tools/ab_fastmace.py --release 4 --expected-commit "$base" --renamed "$versions"     --output "$root/$name" --model mh1-r2scan --checkpoint "$checkpoint" --structures NaCl NbCl5 --sides "$@"     --warmup 300 --block 300 --blocks "$blocks" --pattern "$pattern"
@@ -129,12 +128,29 @@ torch.save(tiny_mace_model([11, 17], **FAMILIES['mh1']), sys.argv[1])" "$tiny")
     run restart-across-resume env CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=4 "$hybrid" tools/restart_versions.py run       --stage resume --source "$root/restart-across/write" "${common[@]}" --output "$root/restart-across/resume"
     run restart-across-compare "$hybrid" tools/restart_versions.py compare "$root/restart-across/uninterrupted"       "$root/restart-across/resume"
     ;;
-  adapt-storm|adapt-production|calibration)  # items 6 and 9: 5-T07's storm tool, the profiles, 5-T09's smoke
-    not_yet "5-T07's and 5-T09's tools"
+  adapt-storm)  # item 6, timed: 5-T07's forced re-capture storm, unswitched then switched, one process per side
+    for side in ${STORM_SIDES:-unswitched switched}; do
+      run adapt-storm-$side "$hybrid" tools/validation/adapt_runs.py storm --side $side         --steps "${STORM_STEPS:-2000}" --output "$root/adapt-storm"
+    done
     ;;
-  adapt-tests)  # items 6 and 7: 5-T07's and 5-T08's GPU tests, by file (named at the freeze)
-    [ $# -gt 0 ] || not_yet "the GPU test files of 5-T07 and 5-T08"
-    pytest_job adapt-tests "$latest" -rA "$@"
+  adapt-production)  # item 6: the profiles with the default adaptation, each started and resumed in two pieces
+    # through 3-T14's run.sh (relaxation, half the steps; resume: the rest, and the quench where the profile has one),
+    # then no tier switch in any of them (adapt_runs.py check)
+    export FASTMACE_COMMIT=$FASTMACE_SOURCE_COMMIT
+    nacl=$("$hybrid" tools/validation/adapt_runs.py nacl-config "$root/adapt-production/nacl-config")
+    for entry in "npt_anneal_NbCl5_short:13500" "swap_anneal_NaNbOCl4_short:13500" "$nacl:135000"; do
+      profile=${entry%:*}; half=${entry##*:}; name=$(basename "$profile" .toml)
+      run adapt-production-$name-start bash results/3-T14-protocol/run.sh start "$root/adapt-production/$name"         "$profile" "$half"
+      run adapt-production-$name-resume bash results/3-T14-protocol/run.sh resume "$root/adapt-production/$name" "$half"
+    done
+    p=$root/adapt-production
+    run adapt-production-check "$hybrid" tools/validation/adapt_runs.py check "$p/npt_anneal_NbCl5_short"       "$p/swap_anneal_NaNbOCl4_short" "$p/nvt_anneal_NaCl" --out "$p/check.json"
+    ;;
+  calibration)  # item 9, timed as a check: 5-T09's NaCl smoke (MH-1, calibrate=True, hybrid against plain cuEq)
+    pytest_job calibration "$latest" -rA tests/gpu/test_calibrate_gpu.py
+    ;;
+  adapt-tests)  # items 6 and 7: 5-T06's, 5-T07's and 5-T08's GPU tests (monitor, switch, fallbacks), untimed
+    pytest_job adapt-tests "$latest" -rA tests/gpu/test_monitor_gpu.py tests/gpu/test_adapt_switch_gpu.py       tests/gpu/test_fallback_gpu.py tests/gpu/test_fallback_mid_run_gpu.py "$@"
     ;;
   preflight)  # the GPU tests whose covered code changed after they last ran (runbook, "stale expectations")
     [ $# -gt 0 ] || { echo "preflight needs the selected tests (runbook: the stale-expectation listing)" >&2; exit 2; }

@@ -156,10 +156,10 @@ Local RTX 5060 Ti, run ID `5-T11-local-<date>`, `python3 <copy>/tools/ci/local_g
 | `trajectories-reproducible` | 4 | yes | no | the same, reproducible plan, plain cuEq float64, MH-1 NaCl, 500 steps, every 50, NVT and NPT, D3 off | 20 min |
 | `restart-across` | 4 | no | no | `tools/restart_versions.py`: a Langevin restart written by the baseline (format 4, step 50) resumed at the freeze to step 100, CPU float64, tiny model; bitwise against the baseline's uninterrupted run, without `allow_plan_change` and without a new revision | 10 min |
 | `regression` | 5 | yes | yes | `tools/ab_fastmace.py --release 4`: MH-1 hybrid Langevin NVT, D3 off, NaCl and NbCl5, 300 K, 12 blocks of 300 steps after 300; ABAB 4 first, ABAB 5 first, ABBA 4 first (4-T13's protocol) | 40 min |
-| `adapt-storm` | 6 | yes | yes | 5-T07's forced re-capture storm, MH-1 hybrid NaCl, switched against unswitched, one block each | 30 min |
-| `adapt-production` | 6 | yes | no | through `fastmace run` with the default `adapt`, resume included: the shipped `npt_anneal_NbCl5_short` and `swap_anneal_NaNbOCl4_short` (the MC path), and an NVT anneal on NaCl 3×3×3 defined here from `main.py`'s `--profile anneal` (0 → 1000 K in 20 ps, then 3 K/ps to 250 K; samples and frames every 10 fs; no shipped profile is added) | 2 h |
-| `adapt-tests` | 6, 7 | yes | no | 5-T07's and 5-T08's GPU tests (switch at a canonical point, statistics against an unswitched compiled run, resume after a switch, broken capture) | 1 h |
-| `calibration` | 9 | yes | yes | 5-T09's NaCl smoke with MH-1: the record, the choice, the setup cost | 20 min |
+| `adapt-storm` | 6 | yes | yes | `tools/validation/adapt_runs.py storm`: 5-T07's forced re-capture storm (MH-1 hybrid NaCl 3×3×3, 600 K, `graph_variant_cap=1`), `--side unswitched` (`adapt="off"`) then `--side switched` (default), 2,000 steps each, one process per side, the clock around `run()` | 30 min |
+| `adapt-production` | 6 | yes | no | through `fastmace run` (`results/3-T14-protocol/run.sh` start and resume, half the steps each) with the default `adapt`, then `adapt_runs.py check` (no tier switch; re-capture fractions recorded): the shipped `npt_anneal_NbCl5_short` and `swap_anneal_NaNbOCl4_short` (the MC path), and an NVT anneal on NaCl 3×3×3 defined here from `main.py`'s `--profile anneal` (0 → 1000 K in 20 ps, then 3 K/ps to 250 K; samples and frames every 10 fs; no shipped profile is added) | 2 h |
+| `adapt-tests` | 6, 7 | yes | no | `test_monitor_gpu.py`, `test_adapt_switch_gpu.py`, `test_fallback_gpu.py`, `test_fallback_mid_run_gpu.py` (monitor, switch at a canonical point, statistics against an unswitched compiled run, resume after a switch, broken capture, mid-run fallback) | 1 h |
+| `calibration` | 9 | yes | yes | `tests/gpu/test_calibrate_gpu.py`: 5-T09's NaCl smoke with MH-1 (hybrid against plain cuEq in children, A B A B): the record, the choice, the setup cost | 20 min |
 | `plans` | 10 | yes | no | one real plan printed per item 6–9 (`str(plan)` and `describe(full=True)`), from the runs above | 5 min |
 | `compat` | – | yes | no | `tools/acceptance/compat.py --provider local --label "RTX 5060 Ti"` | 45 min |
 | `acceptance-tier` | – | yes | (step-time assertions) | `pytest tests/gpu -m acceptance` | 5–6 h |
@@ -290,7 +290,9 @@ Ti and the Colab L4 (and on the A100 if that leg runs).
   differences, the renamed export, the dims of all 19 checkpoints, the job script).
 - `tools/acceptance/phase5_local.sh` (written): the CPU jobs, the corpus, the release-side jobs (`regression`,
   `trajectories-cpu`, `trajectories-reproducible`, `restart-across`, as 4-T13's against 3b), the pytest jobs and
-  the tiers; the jobs that call 5-T07's and 5-T09's tools exit 3 until they are filled in at the freeze.
+  the tiers, and items 6 and 9 (`adapt-storm`, `adapt-production`, `adapt-tests`, `calibration`).
+- `tools/validation/adapt_runs.py` (written): `storm --side`, `nacl-config` (the NaCl NVT anneal protocol and CIF),
+  `check` (no tier switch; the monitor's re-capture fractions); CPU-tested in `tests/cpu/test_acceptance_5.py`.
 - `tools/ab_fastmace.py --release 4` and `tools/trajectory_versions.py --against 4` (sides 4 and 5, the baseline
   exported as `fastmace_4`; its commit defaults to the tag's, dae3848) (written); `tools/restart_versions.py`
   takes any release root, unchanged. CPU tests: `tests/cpu/test_acceptance_5.py`.

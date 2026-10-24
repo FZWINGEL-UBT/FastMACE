@@ -1,6 +1,7 @@
 """Phase 5's acceptance tools (5-T11): ``tools/acceptance/phase5_local.sh`` parses and has a case for every job of
-the runbook, and the release side against phase 4 (``tools/ab_fastmace.py --release 4``,
-``tools/trajectory_versions.py --against 4``) takes sides 4 and 5."""
+the runbook; the release side against phase 4 (``tools/ab_fastmace.py --release 4``,
+``tools/trajectory_versions.py --against 4``) takes sides 4 and 5; ``tools/validation/adapt_runs.py check`` fails a
+run that switched tiers and records the re-capture fractions, and its NaCl anneal protocol loads."""
 
 import importlib.util
 import re
@@ -33,12 +34,10 @@ def test_every_job_of_the_runbook_has_a_case():
 
 
 @needs_bash
-def test_jobs_refuse_what_is_not_ready(tmp_path):
+def test_jobs_refuse_without_their_baseline(tmp_path):
     env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin", "FASTMACE_REPOSITORY": str(tmp_path)}  # no tag here
     unknown = subprocess.run(["bash", str(SCRIPT), str(tmp_path), "no-such-job"], env=env, capture_output=True)
     assert unknown.returncode == 2
-    pending = subprocess.run(["bash", str(SCRIPT), str(tmp_path), "adapt-storm"], env=env, capture_output=True)
-    assert pending.returncode == 3 and b"filled in at the freeze" in pending.stderr
     for job in ("corpus", "regression", "trajectories-cpu", "restart-across"):
         baseline = subprocess.run(["bash", str(SCRIPT), str(tmp_path), job], env=env, capture_output=True)
         assert baseline.returncode == 2 and b"fastmace-4" in baseline.stderr, job
@@ -77,3 +76,30 @@ def test_trajectory_runs_against_4(tmp_path):
     with pytest.raises(SystemExit):
         tv.parse_args([*common, "--against", "4", "--side", "4b"])
     assert tv.parse_args([*common, "--against", "4", "--side", "4", "--renamed", "v"]).expected_commit == "dae3848"
+
+
+def test_adapt_runs_checks_switches_and_writes_the_nacl_protocol(tmp_path):
+    import json
+
+    spec = importlib.util.spec_from_file_location("_adapt_runs_5t11", ROOT / "tools" / "validation" / "adapt_runs.py")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    for name, switches in (("quiet", []), ("switched", [{"step": 50, "from": "graph", "to": "compiled"}])):
+        (tmp_path / name).mkdir()
+        segments = [{"wall_s": 10.0, "recapture_s": 0.5}, {"wall_s": 10.0, "recapture_s": 1.5}]
+        (tmp_path / name / "metadata.json").write_text(json.dumps(
+            {"counters": {"tier_switches": switches, "segments": segments, "recaptures": 3}}))
+    assert module.main(["check", str(tmp_path / "quiet")]) == 0
+    assert module.main(["check", str(tmp_path / "quiet"), str(tmp_path / "switched")]) == 1
+    entry = module.check([tmp_path / "quiet"])[str(tmp_path / "quiet")]
+    assert entry["recapture_fraction"] == pytest.approx(0.1) and entry["max_segment_recapture_fraction"] == 0.15
+    # The protocol reads as fastmace run reads it: stages split off, the rest fm.md's arguments.
+    from fastmace.cli.run import md_arguments, parse_config
+    from fastmace.protocols import runner
+
+    path = module.nacl_config(tmp_path / "nacl")
+    stages, md_data = runner.split_stages(parse_config(str(path), path.read_text()))
+    md_data["output"] = {**md_data["output"], "directory": str(tmp_path / "out")}  # fastmace run's --output
+    structure, options = md_arguments(md_data)
+    assert Path(structure).is_file() and options["ensemble"] == "NVT" and stages["relax"] is not None
