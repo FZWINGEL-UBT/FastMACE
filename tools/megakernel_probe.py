@@ -18,11 +18,15 @@ Variants, from a pure-issue test towards a real GEMM's registers and shared-memo
   MMA is a 32x32 warp tile (fragments by ``ldmatrix.x4``, 8 MMAs per k-step, 32 accumulators).
 - ``gemm``: as ``smem``, with a 64x64 MMA warp tile (32 MMAs per k-step, 128 accumulators), the register use of a
   CUTLASS-class tensor-core GEMM.
+- ``x3`` (TF32 only): as ``gemm``, with the 3xTF32 decomposition done in the kernel as CUTLASS does it. Every
+  loaded FP32 fragment is split into ``big = cvt.rna.tf32(x)`` and ``small = cvt.rna.tf32(x - big)`` on the MMA
+  warps, then ``big*big + big*small + small*big``: three MMAs per product. Its MMA rate counts each product once
+  (``c = 1``), so the split's FP32 instructions, which share the issue slots with the SIMT side, are paid for.
 
 Pass rule (design note): the SIMT side keeps >= 90 % of its standalone rate, and the MMA side adds enough
 useful throughput to pay for an FP32-accurate decomposition. The useful FP32 rate of the MMA side is its rate
 divided by the products the decomposition needs (``c``: 3 for 3xTF32, 6 for BF16x6; BF16x3 is shown as well),
-with the split's own SIMT cost left out, so the gain is an upper bound. The row's verdict is ``pass`` when
+with the split's own SIMT cost left out, so the gain is an upper bound (``x3`` measures that cost). The row's verdict is ``pass`` when
 
     keep = simt_both / simt_alone >= 0.90  and
     gain = (simt_both + mma_both / c) / max(simt_best, mma_best / c) >= 1.10,
@@ -47,12 +51,21 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-VARIANTS = ("reg", "smem", "gemm")
+VARIANTS = ("reg", "smem", "gemm", "x3")
 KINDS = ("tf32", "bf16")
 CONFIGS = ("4x4", "8x4", "4x8", "8x8")  # S x M warps per block
 # FP32-equivalent products per MMA product for an FP32-accurate decomposition.
 DECOMPOSITIONS = {"tf32": {"3xTF32": 3}, "bf16": {"BF16x6": 6, "BF16x3": 3}}
 PRIMARY = {"tf32": "3xTF32", "bf16": "BF16x6"}
+X3 = {"3xTF32 in kernel": 1}  # the x3 variant's MMA rate already counts useful products
+
+
+def decompositions(variant, kind):
+    return X3 if variant == "x3" else DECOMPOSITIONS[kind]
+
+
+def primary(variant, kind):
+    return next(iter(X3)) if variant == "x3" else PRIMARY[kind]
 KEEP_MIN = 0.90
 GAIN_MIN = 1.10
 REC = 6  # per-warp record: role, chunks, start, end (clock64), gstart, gend (globaltimer)
@@ -85,18 +98,25 @@ __device__ __forceinline__ float4 lds4(unsigned addr) {
   return v;
 }
 
+__device__ __forceinline__ void split_tf32(unsigned x, unsigned& big, unsigned& small) {
+  asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(big) : "f"(__uint_as_float(x)));
+  const float r = __uint_as_float(x) - __uint_as_float(big);
+  asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(small) : "f"(r));
+}
+
 __device__ __forceinline__ unsigned long long gtimer() {
   unsigned long long t;
   asm volatile("mov.u64 %0, %globaltimer;" : "=l"(t));
   return t;
 }
 
-// VAR: 0 reg, 1 smem (32x32 MMA warp tile), 2 gemm (64x64 MMA warp tile). KIND: 0 tf32, 1 bf16.
+// VAR: 0 reg, 1 smem (32x32 MMA warp tile), 2 gemm (64x64 MMA warp tile), 3 x3 (gemm with the 3xTF32 split).
+// KIND: 0 tf32, 1 bf16.
 template <int VAR, int KIND>
 __device__ void body(int s_warps, long long budget, unsigned fill, const float* __restrict__ in,
                      float* __restrict__ out, long long* __restrict__ rec, int* __restrict__ smid) {
-  constexpr int MT = VAR == 2 ? 4 : 2;  // m16 tiles per warp tile
-  constexpr int NT = VAR == 2 ? 8 : 4;  // n8 tiles per warp tile
+  constexpr int MT = VAR >= 2 ? 4 : 2;  // m16 tiles per warp tile
+  constexpr int NT = VAR >= 2 ? 8 : 4;  // n8 tiles per warp tile
   __shared__ __align__(16) float sA[KS * 32];        // SIMT A: 8 float4 per k-step
   __shared__ __align__(16) float sB[KS * 64];        // SIMT B: 16 float4 per k-step
   __shared__ __align__(16) unsigned mA[KS * 4 * 128];  // MMA A: KS x up to 4 fragments of 512 B
@@ -198,10 +218,30 @@ __device__ void body(int s_warps, long long budget, unsigned fill, const float* 
           for (int m = 0; m < MT; ++m) ldsm_x4(fa[m], a_base + (k * 4 + m) * 512);
 #pragma unroll
           for (int n = 0; n < NT / 2; ++n) ldsm_x4(fb[n], b_base + (k * 4 + n) * 512);
+          if (VAR == 3) {
+            unsigned ab[MT][4], as[MT][4], bb[NT / 2][4], bs[NT / 2][4];
 #pragma unroll
-          for (int m = 0; m < MT; ++m)
+            for (int m = 0; m < MT; ++m)
 #pragma unroll
-            for (int n = 0; n < NT; ++n) mma_op(KIND, d[m][n], fa[m], &fb[n >> 1][(n & 1) * 2]);
+              for (int i = 0; i < 4; ++i) split_tf32(fa[m][i], ab[m][i], as[m][i]);
+#pragma unroll
+            for (int n = 0; n < NT / 2; ++n)
+#pragma unroll
+              for (int i = 0; i < 4; ++i) split_tf32(fb[n][i], bb[n][i], bs[n][i]);
+#pragma unroll
+            for (int m = 0; m < MT; ++m)
+#pragma unroll
+              for (int n = 0; n < NT; ++n) {
+                mma_op(0, d[m][n], as[m], &bb[n >> 1][(n & 1) * 2]);
+                mma_op(0, d[m][n], ab[m], &bs[n >> 1][(n & 1) * 2]);
+                mma_op(0, d[m][n], ab[m], &bb[n >> 1][(n & 1) * 2]);
+              }
+          } else {
+#pragma unroll
+            for (int m = 0; m < MT; ++m)
+#pragma unroll
+              for (int n = 0; n < NT; ++n) mma_op(KIND, d[m][n], fa[m], &fb[n >> 1][(n & 1) * 2]);
+          }
         }
         ++chunks;
       } while (clock64() < deadline);
@@ -222,7 +262,7 @@ __device__ void body(int s_warps, long long budget, unsigned fill, const float* 
 
 // The gemm variant's 128 MMA accumulators need up to 255 registers, hence at most 256 threads.
 #define PROBE(NAME, VAR, KIND) \
-extern "C" __global__ void __launch_bounds__(VAR == 2 ? 256 : 512) NAME(int s, long long budget, unsigned fill, const float* in, \
+extern "C" __global__ void __launch_bounds__(VAR >= 2 ? 256 : 512) NAME(int s, long long budget, unsigned fill, const float* in, \
     float* out, long long* rec, int* smid) { body<VAR, KIND>(s, budget, fill, in, out, rec, smid); }
 PROBE(probe_reg_tf32, 0, 0)
 PROBE(probe_reg_bf16, 0, 1)
@@ -230,6 +270,7 @@ PROBE(probe_smem_tf32, 1, 0)
 PROBE(probe_smem_bf16, 1, 1)
 PROBE(probe_gemm_tf32, 2, 0)
 PROBE(probe_gemm_bf16, 2, 1)
+PROBE(probe_x3_tf32, 3, 0)
 """
 
 
@@ -240,7 +281,7 @@ def ops_per_chunk(variant, kind, role):
         return 32 * 2 * (32 * 16 if variant == "reg" else 8 * 64)
     if variant == "reg":
         return 8 * 8 * mma_flops
-    mt, nt = (4, 8) if variant == "gemm" else (2, 4)
+    mt, nt = (4, 8) if variant in ("gemm", "x3") else (2, 4)
     return 8 * mt * nt * mma_flops
 
 
@@ -269,6 +310,8 @@ def compile_module(capability):
     kernels = {}
     for variant in VARIANTS:
         for kind in KINDS:
+            if variant == "x3" and kind != "tf32":
+                continue
             name = f"probe_{variant}_{kind}"
             fn = check(driver.cuModuleGetFunction(module, name.encode()), name)
             attr = driver.CUfunction_attribute
@@ -342,12 +385,12 @@ def measure(torch, kernel, variant, kind, grid, s, m, budget, fill, buffers, rep
     row = {"variant": variant, "kind": kind, "grid": grid, "simt_warps": s, "mma_warps": m,
            "regs": kernel["regs"], "one_block_per_sm": unique, "modes": raw,
            "keep": sb / sa, "mma_share": mb / ma, "decompositions": {}}
-    for name, c in DECOMPOSITIONS[kind].items():
+    for name, c in decompositions(variant, kind).items():
         useful = sb + mb / c
         row["decompositions"][name] = {"c": c, "useful_vs_simt": useful / sa,
                                        "gain_vs_best_single": useful / max(s_all, m_all / c),
                                        "mma_alone_fp32_equiv_vs_simt": (ma / c) / sa}
-    p = row["decompositions"][PRIMARY[kind]]
+    p = row["decompositions"][primary(variant, kind)]
     row["pass"] = bool(row["keep"] >= KEEP_MIN and p["gain_vs_best_single"] >= GAIN_MIN)
     return row
 
@@ -400,6 +443,8 @@ def main(argv=None):
           f"{'m_both':>6} | {'keep':>5} {'mma%':>5} {'gain':>5} {'decomp':>7} | verdict", flush=True)
     for variant in args.variants:
         for kind in args.kinds:
+            if (variant, kind) not in kernels:
+                continue
             kernel = kernels[(variant, kind)]
             for config in args.configs:
                 s, m = (int(v) for v in config.split("x"))
@@ -415,20 +460,22 @@ def main(argv=None):
                                   args.repeats)
                     rows.append(row)
                     md = row["modes"]
-                    d = row["decompositions"][PRIMARY[kind]]
+                    d = row["decompositions"][primary(variant, kind)]
                     print(f"{variant:6} {kind:4} {grid:>4} {config:>4} {row['regs']:>4} | "
                           f"{md['simt_alone']['simt_flop_per_cycle_sm']:6.1f} "
                           f"{md['mma_alone']['mma_flop_per_cycle_sm']:6.1f} "
                           f"{md['simt_all']['simt_flop_per_cycle_sm']:6.1f} {md['mma_all']['mma_flop_per_cycle_sm']:6.1f} | "
                           f"{md['both']['simt_flop_per_cycle_sm']:6.1f} {md['both']['mma_flop_per_cycle_sm']:6.1f} | "
                           f"{row['keep']:5.2f} {row['mma_share']:5.2f} {d['gain_vs_best_single']:5.2f} "
-                          f"{PRIMARY[kind]:>7} | {'PASS' if row['pass'] else 'fail'}"
+                          f"{primary(variant, kind)[:7]:>7} | {'PASS' if row['pass'] else 'fail'}"
                           f"{'' if row['one_block_per_sm'] else ' (shared SM!)'}", flush=True)
     measured = [r for r in rows if "skipped" not in r]
-    realistic = [r for r in measured if r["variant"] == "gemm"] or [r for r in measured if r["variant"] == "smem"]
+    # The decomposition measured in the kernel where it ran, else the gemm variant's upper bound.
+    realistic = ([r for r in measured if r["variant"] == "x3"] or [r for r in measured if r["variant"] == "gemm"]
+                 or [r for r in measured if r["variant"] == "smem"])
     verdict = {"pass_any": any(r["pass"] for r in measured), "pass_realistic": any(r["pass"] for r in realistic),
                "best_realistic": max(realistic, key=lambda r: (r["keep"] >= KEEP_MIN,
-                                     r["decompositions"][PRIMARY[r["kind"]]]["gain_vs_best_single"]),
+                                     r["decompositions"][primary(r["variant"], r["kind"])]["gain_vs_best_single"]),
                                      default=None)}
     summary = {"meta": meta, "rows": rows, "verdict": verdict}
     (args.output / "summary.json").write_text(json.dumps(summary, indent=1) + "\n", encoding="utf-8")
