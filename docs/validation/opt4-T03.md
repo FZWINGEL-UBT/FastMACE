@@ -229,3 +229,13 @@ gain needs stage 2's CUTLASS kernel (OPT-T01 §5: 0.55–0.75× of cuBLAS GEMM t
   (`never_automatic`). Stage 2 can start from it if the A100 becomes a production target.
 
 No default changes, so SPEC §19 has no entry, as for OPT4-T07's close.
+
+## 9. Follow-up: the gate tool applies rule 13 (24 October 2026, conductor, branch `fastmace/opt4-T03d`)
+
+The OMOL-0 failure on the A100 (§6) was the gate tool's, not production's: `tools/force_stress_gate.py` called
+`planner.build` once, so `reassociate_first`'s self-check (1.2–1.3e-4 against SPEC §6.4's float32 threshold of
+1e-4) ended the run. Production's fallback revises the plan by rule 13 (`reactions.selfcheck_revision`: the
+record and its dependants off) and builds again. The gate tool now does the same (`build_with_rule13`) and records
+the revisions in the plan record (`rule13_revisions`). CPU test with an injected self-check failure in
+`tests/cpu/test_gate_rewrites_option.py`. The threshold itself is SPEC §6.4 and unchanged. The A100 build of
+OMOL-0 XL is exercised by the 5-T03 memory rerun.

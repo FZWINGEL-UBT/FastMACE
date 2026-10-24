@@ -823,8 +823,27 @@ def fastmace_values(engine, atoms):
             out.stress.detach().double().cpu().numpy(), dict(edges=count, padded_edges=padded))
 
 
+def build_with_rule13(build, plan, limit=8):
+    """``build(plan)`` with SPEC §9.3 rule 13 as production applies it: a failed self-check revises the plan
+    (``reactions.selfcheck_revision``: the record and its dependants off) and builds again. Returns the
+    engine, the plan it was built from and the revisions' texts (empty when the first build passed)."""
+    from fastmace.errors import SelfCheckError
+    from fastmace.planner import reactions
+
+    revisions = []
+    for _ in range(limit):
+        try:
+            return build(plan), plan, revisions
+        except SelfCheckError as error:
+            plan = reactions.selfcheck_revision(plan, error)
+            revisions.append(plan.reason)
+    raise GateJobError(f"rule 13 revised the plan {limit} times and the build still fails its self-checks")
+
+
 def _fastmace_build(job, result):
-    """``build(structure, base, cell_mode) -> (engine, plan record)`` through the planner the job names."""
+    """``build(structure, base, cell_mode) -> (engine, plan record)`` through the planner the job names.
+
+    The build applies rule 13 as production does (``build_with_rule13``); the record lists its revisions."""
     import fastmace  # noqa: F401  (before torch: soft file locks, SPEC §14)
     from fastmace import config
 
@@ -844,9 +863,10 @@ def _fastmace_build(job, result):
         def build(structure, base, cell_mode):
             plan = planner.plan(loaded, base, config.IntegratorConfig(ensemble="npt", cell_mode=cell_mode, seed=0),
                                 hardware)
-            engine = planner.build(plan, loaded, base.copy(), temperature_K=0.0, compile_cache=cache)
+            engine, plan, revisions = build_with_rule13(
+                lambda p: planner.build(p, loaded, base.copy(), temperature_K=0.0, compile_cache=cache), plan)
             return engine, dict(describe=plan.describe(full=True), enabled=list(enabled_options(plan)),
-                                auto_options_off=auto_options_off(plan))
+                                auto_options_off=auto_options_off(plan), rule13_revisions=revisions)
     else:
         from fastmace.model import loading
         from fastmace.model.forcefield import ForceField
@@ -867,10 +887,11 @@ def _fastmace_build(job, result):
             plan = planner.plan(force_field, base, config.IntegratorConfig(ensemble="npt", cell_mode=cell_mode,
                                                                            seed=0, temperature_K=300.0),
                                 Workload(max_temperature_K=300.0), hardware)
-            engine = planner.build(plan, force_field, base.copy(), temperature_K=0.0)
+            engine, plan, revisions = build_with_rule13(
+                lambda p: planner.build(p, force_field, base.copy(), temperature_K=0.0), plan)
             return engine, dict(describe=plan.describe(full=True), enabled=list(enabled_options(plan)),
                                 auto_options_off=auto_options_off(plan), backend=plan.engine.backend,
-                                float64_energy=plan.precision.float64_energy)
+                                float64_energy=plan.precision.float64_energy, rule13_revisions=revisions)
     result.update(load_s=time.perf_counter() - started, planner=job.get("planner", "fixed"),
                   checkpoint_sha256=loaded.sha256)
     if loaded.sha256 != job.get("checkpoint_sha256", loaded.sha256):
