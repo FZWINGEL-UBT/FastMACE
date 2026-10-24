@@ -31,6 +31,10 @@ one for a control or an alternating-process run):
     4   this checkout, as above, D3 off
     3b  the release at tag ``fastmace-3b`` (or the 3b freeze commit, ff80ca2, while the tag is not set),
         exported as ``fastmace_3b``, through its minimal planner; give --expected-commit
+  --release 4 (5-T11, phase 5 item 5):
+    5   this checkout, as above, D3 off
+    4   the release at tag ``fastmace-4`` (or phase 4's acceptance freeze, dae3848, while the tag is not set),
+        exported as ``fastmace_4``, through its minimal planner; give --expected-commit
 
 ``--engine-option FIELD=VALUE`` (repeatable) sets an ``EngineConfig`` field on this checkout's side only
 (``fused_integrator=on``: an option the release does not have); ``on``/``off`` read as booleans.
@@ -94,6 +98,7 @@ RELEASES = {
     "p3b": Release("phase-3-baseline", "156ab76", "fastmace_p3b", "minimal", "3"),
     "3": Release("fastmace-3", None, "fastmace_3", "minimal", "3b"),  # commit: --expected-commit (tag not set yet)
     "3b": Release("fastmace-3b", None, "fastmace_3b", "minimal", "4"),  # commit: --expected-commit (tag not set yet)
+    "4": Release("fastmace-4", None, "fastmace_4", "minimal", "5"),  # commit: --expected-commit (tag not set yet)
 }
 # IntegratorConfig fields this checkout's side pins against a release unless --integrator-option sets them.
 RELEASE_INTEGRATOR_PINS = {"p3b": {"fixcm_projection": "ase"}}
@@ -116,7 +121,7 @@ def parse_args(argv=None):
     p.add_argument("--output", required=True, type=Path, help="Fresh directory")
     p.add_argument("--release", choices=sorted(RELEASES), default="1a",
                    help="The earlier release timed against this checkout (1a: sides 1a and 1b; 1b: sides 1b and 2)")
-    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b", "3b", "4"),
+    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b", "3b", "4", "5"),
                    help="Build order; two sides for an A/B process, one for a control (default: release, checkout)")
     p.add_argument("--renamed", type=Path, help="Directory holding the release's exported renamed package")
     p.add_argument("--expected-commit", help="Commit (prefix) the release's copy must be (default: the release's)")

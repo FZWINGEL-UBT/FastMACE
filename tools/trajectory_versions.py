@@ -26,6 +26,9 @@ add the cell and the stress, and ``compare --bitwise`` compares them too.
 
 Phase 4 (4-T13, item 5) runs it against the 3b release with ``run --against 3b --side 3b|4 --expected-commit SHA``,
 in NVT and NPT, with ``--dispersion none`` and ``d3bj`` (D3(BJ) on both sides; ``compare`` checks it matches).
+
+Phase 5 (5-T11, item 4) runs it against the phase 4 release with ``run --against 4 --side 4|5 --expected-commit
+SHA`` (tag ``fastmace-4``, or phase 4's freeze dae3848), the same cases as phase 4.
 """
 
 from __future__ import annotations
@@ -59,11 +62,11 @@ def parse_args(argv=None):
     sub = p.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="One version's runs in this process")
     run.add_argument("--output", required=True, type=Path, help="Fresh directory")
-    run.add_argument("--against", choices=("1b", "p3b", "3", "3b"), default="1b",
+    run.add_argument("--against", choices=("1b", "p3b", "3", "3b", "4"), default="1b",
                      help="The earlier version (tools/ab_fastmace.py's releases): 1b (sides 1b, 2), p3b (p3b, 3), "
-                          "3 (3, 3b) or 3b (3b, 4)")
-    run.add_argument("--side", required=True, choices=("1b", "2", "p3b", "3", "3b", "4"),
-                     help="The release copy (1b, p3b, 3, 3b) or this checkout (2, 3, 3b, 4)")
+                          "3 (3, 3b), 3b (3b, 4) or 4 (4, 5)")
+    run.add_argument("--side", required=True, choices=("1b", "2", "p3b", "3", "3b", "4", "5"),
+                     help="The release copy (1b, p3b, 3, 3b, 4) or this checkout (2, 3, 3b, 4, 5)")
     run.add_argument("--renamed", type=Path, help="Directory holding the exported release package (release side)")
     run.add_argument("--expected-commit", default=None, help="Commit (prefix) of the release copy (default: its own)")
     run.add_argument("--device", choices=("cuda", "cpu"), default="cuda",

@@ -7,8 +7,6 @@
   change carried by an explaining code is ``explained``, without one ``different``; a refusal's reasons in
   another order are identical; decisions only the new side has are listed, not judged.
 - ``tools/plan_corpus_dims.json`` holds the sizes of all 19 checkpoints, read from the released files.
-- ``tools/acceptance/phase5_local.sh`` parses; a job that waits for the freeze exits 3, one without its
-  baseline 2.
 """
 
 from __future__ import annotations
@@ -16,8 +14,6 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -173,19 +169,6 @@ def test_a_renamed_exports_package_name_reads_back_as_fastmace():
     assert corpus._unrenamed(entry, "fastmace_4") == {"configs": {"integrator": {"dof": "fastmace"}},
                                                       "texts": {"x": "fastmace.planner said so"}}
     assert corpus._unrenamed({"a": "fastmace_40"}, "fastmace_4") == {"a": "fastmace_40"}
-
-
-@pytest.mark.skipif(shutil.which("bash") is None, reason="needs bash")
-def test_the_phase_5_job_script_parses_and_refuses_what_is_not_ready(tmp_path):
-    script = ROOT / "tools" / "acceptance" / "phase5_local.sh"
-    subprocess.run(["bash", "-n", str(script)], check=True)
-    env = {"HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}
-    unknown = subprocess.run(["bash", str(script), str(tmp_path), "no-such-job"], env=env, capture_output=True)
-    assert unknown.returncode == 2
-    pending = subprocess.run(["bash", str(script), str(tmp_path), "adapt-storm"], env=env, capture_output=True)
-    assert pending.returncode == 3 and b"filled in at the freeze" in pending.stderr
-    baseline = subprocess.run(["bash", str(script), str(tmp_path), "corpus"], env=env, capture_output=True)
-    assert baseline.returncode == 2 and b"FASTMACE_4_COMMIT" in baseline.stderr
 
 
 def test_rule_12_sizes_reach_traits_that_carry_them(monkeypatch):

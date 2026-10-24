@@ -281,10 +281,12 @@ Ti and the Colab L4 (and on the A100 if that leg runs).
 - `tools/plan_corpus.py`, `plan_corpus_labels.py`, `plan_corpus_capture.py`, `plan_corpus_dims.json` and
   `tests/cpu/test_plan_corpus.py` (written: the set, planning and refusals, compare's verdicts on planted
   differences, the renamed export, the dims of all 19 checkpoints, the job script).
-- `tools/acceptance/phase5_local.sh` (written): the CPU jobs, the corpus, the pytest jobs and the tiers; the jobs
-  that need the `--release 4` side or 5-T07's and 5-T09's tools exit 3 until they are filled in at the freeze.
-- After 4-T13's tools merge: `tools/ab_fastmace.py --release 4`, `tools/trajectory_versions.py --against 4`,
-  `tools/restart_versions.py` with the baseline `fastmace_4` (format 4 on both sides).
+- `tools/acceptance/phase5_local.sh` (written): the CPU jobs, the corpus, the release-side jobs (`regression`,
+  `trajectories-cpu`, `trajectories-reproducible`, `restart-across`, as 4-T13's against 3b), the pytest jobs and
+  the tiers; the jobs that call 5-T07's and 5-T09's tools exit 3 until they are filled in at the freeze.
+- `tools/ab_fastmace.py --release 4` and `tools/trajectory_versions.py --against 4` (sides 4 and 5, the baseline
+  exported as `fastmace_4`, `--expected-commit` while the tag is not set) (written); `tools/restart_versions.py`
+  takes any release root, unchanged. CPU tests: `tests/cpu/test_acceptance_5.py`.
 - `tests/_support/tiers.py`: 5-T03's and 5-T07's compat tests, when they merge.
 
 ## Recorded, not judged
