@@ -100,27 +100,31 @@ refusal. The overrides that exist today keep their decision keys; 5-T02 moves th
 
 `config.PENDING = "pending"` marks a field whose meaning an open owner decision fixes.
 
-### `AdaptationConfig` (SPEC §9.6; D2, D3)
+### `AdaptationConfig` (SPEC §9.6; decisions 52, 53)
 
-| Field | Default | Meaning | Decided by |
+The defaults are the owner's decisions 52 (D2 (a)) and 53 (D3 (a)), set by 5-T07. The record still holds the
+options not chosen; `Simulation` refuses them (`adaptation-unsupported`, `config.ADAPTATION_SUPPORTED`).
+
+| Field | Default | Meaning | Implemented values |
 | --- | --- | --- | --- |
-| `adapt` | `"auto"` | `"auto"`: adapt as §9.6 and the fields say; until 5-T07 this records only. `"off"`: nothing switches | — |
-| `trigger` | `"pending"` | `"recapture-time"` (D2 (a), (b)), `"recapture-budget"` (D2 (c)), `"none"` (D2 (d)) | D2 |
-| `recapture_time_fraction` | `0.2` | the re-capture share of wall time that, with the budget exceeded, triggers; read by `"recapture-time"` only | D2 (a), (b) |
-| `skin_replan` | `"pending"` | rule 11 re-planned from the measured rebuild rate | D2 (b) |
-| `max_switches` | `"pending"` | switches per run, a resume counting its chain's; `None`: no limit | D3 |
-| `switch_back_after` | `"pending"` | quiet segments before switching back to graph; `None`: one way | D3 (b) |
-| `min_points_between` | `"pending"` | canonical points between switches; `None`: no minimum | D3 (d) |
-| `reproducible` | `"pending"` | switches allowed under `reproducible=True` | D3 (c) |
+| `adapt` | `"auto"` | `"auto"`: adapt as §9.6 and the fields say. `"off"`: the monitor records, nothing switches | both |
+| `trigger` | `"recapture-time"` | the budget exceeded and re-capturing above `recapture_time_fraction` of the wall time (decision 52); `"recapture-budget"` (D2 (c)); `"none"` | `"recapture-time"`, `"none"` |
+| `recapture_time_fraction` | `0.2` | the re-capture share of wall time that, with the budget exceeded, triggers | any in (0, 1) |
+| `skin_replan` | `False` | rule 11 re-planned from the measured rebuild rate (D2 (b)) | `False` |
+| `max_switches` | `1` | switches per run, a resume counting its chain's; `None`: no limit | `0`, `1` |
+| `switch_back_after` | `None` | quiet segments before switching back to graph; `None`: one way (D3 (b)) | `None` |
+| `min_points_between` | `None` | canonical points between switches; `None`: no minimum (D3 (d)) | `None` |
+| `reproducible` | `False` | switches allowed under `reproducible=True` (D3 (c)) | `False` |
 
-`ADAPTATION_TRIGGERS`, `ADAPTATION_DECISION_FIELDS`, `AdaptationConfig.decided()` (the decision fields
-not `"pending"`).
+`ADAPTATION_TRIGGERS`, `ADAPTATION_DECISION_FIELDS`, `ADAPTATION_SUPPORTED`, `AdaptationConfig.unsupported()`
+(the decision fields set to a value not implemented). `decided()` and the `"pending"` values of 5-T01 are
+gone.
 
-D3 (a)'s other limits are not fields, since every option keeps them: no switch during an MC block, none with
-an explicit `mode=` (the user's override of rules 4 and 9), none on a subprocess child without the
-parent's `restart_worker()` hand-off. Validation before activation follows choice 3: the self-checks
-always, the gate by the same policy as an unoverridden plan (opt-in for MD, decision 3; the move-energy
-part for MC, decision 35).
+D3 (a)'s other limits are not fields: no switch during an MC block, none with an explicit `mode=` (the
+user's override of rules 4 and 9), none in a subprocess child without the parent's `restart_worker()`
+hand-off, none for a relaxation. Validation before activation follows choice 3: the self-checks always, the
+gate by the same policy as an unoverridden plan (opt-in for MD, decision 3; the move-energy part for MC,
+decision 35).
 
 ### `CalibrationConfig` (SPEC §9.1; D5)
 
@@ -149,8 +153,8 @@ it needs no note.
 
 **Placeholders.** `planner_options` raises `PlanRefused` (`simulation.phase_5_pending`, codes in
 `PHASE_5_PENDING_CODES`):
-- `adaptation-pending`: any field of `ADAPTATION_DECISION_FIELDS` other than `"pending"` (D2, D3; 5-T07
-  removes it);
+- `adaptation-unsupported` (5-T07; it replaced 5-T01's `adaptation-pending`): an `AdaptationConfig` field
+  set to an option decisions 52 and 53 did not choose;
 - `calibration-pending`: `calibrate=True` or `choose` other than `"pending"` (D5; 5-T09 removes it).
 
 `fm.md(calibrate=)` and `fastmace run --calibrate` are 5-T09's.
@@ -233,6 +237,7 @@ path gains no synchronisation (conductor's answers to 5-T06, 23 October 2026):
 | `mc-block` | after an MC block that ran | yes |
 | `host-write` | after a host write's transaction (`update`, `set_*`) | yes |
 | `run-end` | at the end of each `run()` call, also when it stops (non-finite, cell diverged) | no |
+| `recapture` | past the re-capture budget, after each re-capture (5-T07's trigger reading; the capture synchronised) | no |
 
 The first `run()` takes the baseline, so the setup's captures are not in any segment; a reading without
 a baseline takes it. A reading at the same step as the previous one closes nothing.
@@ -262,6 +267,85 @@ monitor `export(cursor)`s each call's segments with their sum, the parent `absor
 parent's `metadata.json` has every call's segments. The report's `runtime` line appears only when
 re-captures or overflows happened: `re-captures N (S s, P % of the loop; budget B exceeded at step K);
 overflows redone M`. The step-time effect of the host timestamps is measured in 5-T11 (item 5).
+
+## Tier switch (5-T07; `planner/adapt.py`, `simulation.py`)
+
+SPEC §9.6 and decisions 52 and 53; conductor's choices 2 and 3, and answers to 5-T07 (23 October 2026).
+
+**Trigger.** `Monitor.decide(window)` returns a `SwitchRequest(step, recaptures, recapture_s, wall_s,
+budget_exceeded_at, threshold)` when, over the window since the last switch (`mark`), the re-capture budget
+was exceeded and `recapture_s / wall_s > recapture_time_fraction`; `None` otherwise, and always with
+`adapt="off"` or `trigger="none"`. Both are measured in this run: no per-GPU number.
+
+**Readings.** `_observe` calls `decide` at every reading. Past the budget, the loop also reads after each
+re-capture (reason `recapture`): the capture synchronised already, and the loop clock is synchronised once
+more there. A run within its budget never reads in the loop, so default runs gain nothing on the step path.
+
+**Limits.** `adapt.blocked(plan, adaptation, mode=, in_mc_block=)` says why the active plan may not switch:
+adaptation off, a tier other than graph (one way), the chain's switches at `max_switches` (a resume counts
+them: `adapt.switches(plan)`), `reproducible=True`, an explicit `mode=`, an MC block, a relaxation.
+`Simulation` adds: no engine in this process (the subprocess parent), and a switch that failed in this run.
+
+**Where.** A request makes the switch due. It is made at the next committed step outside an MC block and not
+uncommitted: at the end of a loop iteration (after the step's MC block, output and restart write), at the
+end of `run()`, or at the start of the next `run()`. That step becomes a canonical point (choice 2): forced
+there when no restart write is at it, and no file is written. A stop (non-finite, cell diverged) never
+switches.
+
+**Revision.** `adapt.compiled_revision(plan, planner, force_field, atoms, step=, request=)` re-plans through
+the run's planner in mode `"compiled"` (as `fallback._replanned`, every rewrite off kept off) and refuses
+(`ValueError`) any change of the physics, rewrites, runner, backend or force precision. The plan keeps the
+predecessor's precision record (MC energy precision included), `adaptation` and `calibration`. The reason
+is `adapt: graph -> compiled: <trigger>` (`adapt.PREFIX`); the decisions `mode` and `adaptation` carry
+`Reason(..., code="adapt-tier-switch")` with no rule number (a switch is §9.6, not a §9.3 row), and
+`requested` has no `mode` entry (the user did not request it).
+
+**Hand-over** (`Simulation`, agreed with 5-T08):
+- `HandOver(step, arrays, outputs=None)`: the restart entries in memory (`io.restart.engine_arrays`, host
+  copies of their own), `restart()` reading them as `read_restart` reads a file (`io.restart.in_memory`);
+- `_hand_over(canonicalise=True)`: drained output, canonical point, entries; no file;
+- `_last_point`: the setup's state (step 0; a fresh build is canonical), then each restart write's (with the
+  output chunk indices), and the resume's;
+- `_drop_engine()` (before the new build, for memory; conductor's answer Q3), `_build_for(plan, atoms)` (from
+  the pristine model, not validated), `_validate(engine, plan)` (the gate's production half under
+  `check="gate"`, the move-energy part for MC plans at the plan's MC energy precision; the self-checks run in
+  the build), `_restore(point, engine, plan)` (`resume_engine`, targets, schedule, MC move set, target fill;
+  5-T08 calls it with its own validated engine);
+- `_take_over(point, plan, atoms)`: drop, build, validate, restore. A failure rebuilds the previous revision
+  from the same point and records it.
+
+`Simulation.switch_tier(request)` composes them at the committed step, then re-baselines the monitor
+(`start`) and marks the window at the switch step.
+
+**A failed candidate** (the re-plan refused, the build or a validation failed) leaves the run on its
+revision with a report warning and a `fastmace.planner` warning, both with the code `adapt-switch-failed`,
+and no second attempt in this run (until 5-T08's mid-run fallbacks, conductor's answer Q4).
+
+**Records.** `counters.tier_switches` is read from the plan chain (`adapt.tier_switches(plan)`), so it
+survives a resume and comes back from a subprocess child. The report's revision lines show `plan revision N
+(tier switch at step S): graph -> compiled, reason ...`, and the `fastmace.planner` logger logs
+`adapt.switch_line(switch)` at INFO.
+
+**Resume.** `Simulation.resume` treats a chain with a switch as a fallback revision
+(`adapt.stored_switch_plan`): it re-plans on the stored tier, keeps the stored rewrites off, and continues the
+restart's revision without `allow_plan_change`. Its chain counts the switch, so it does not switch again.
+Interrupted after the switch, the run continues bit for bit on the CPU (the same restart cadence). Interrupted
+before it, the resumed monitor starts empty (format 4), so the switch comes at a step of its own:
+statistically equal only (conductor's answer Q5).
+
+**Subprocess runner.** The child never switches on its own (`Simulation._child`). When its trigger fires, it
+stops at the next committed step, writes its hand-off there and returns `"switch": request.record()`. The
+parent's `run()` ends the worker (`restart_worker()`) and runs the steps left in a fresh child whose request
+carries `"switch"`; that child resumes the hand-off, calls `switch_tier` and runs. A request at the call's
+last step waits for the next call.
+
+**Codes outside the rule table.** `adapt-tier-switch` and `adapt-switch-failed` (`planner/adapt.py`) and
+`adaptation-unsupported` (`simulation.py`) belong to no §9.3 rule and carry `rule=None`; `rules.py` lists
+none of them (conductor, 24 October 2026: this list is enough).
+
+**`Plan.adaptation`** stays `None` (conductor, 24 October 2026). Setting it on the active plan would make the
+built plan (`engine.plan`, which carries the self-checks) and the active one differ. The limits come from
+the recorded `PlannerOptions.adaptation`, which `simulation.json` and a resume carry.
 
 ## What this unblocks
 

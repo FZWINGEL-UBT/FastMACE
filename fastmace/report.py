@@ -31,6 +31,7 @@ from fastmace.planner.fixed import REWRITE_FIELDS
 
 INDENT = 9  # "licence: " is the longest field name
 FALLBACK_PREFIX = "fallback: "  # planner.fallback.PREFIX: the reason of a fallback revision (2-T15)
+SWITCH_PREFIX = "adapt: "  # planner.adapt.PREFIX: the reason of a tier switch's revision (5-T07)
 DEFAULT_WARMUP_STEPS = 1000
 DEFAULT_WINDOW_STEPS = 1000
 SETUP_STAGES = ("load", "rewrites", "compilation", "capture", "gate")  # SPEC §12.5; others are kept as given
@@ -298,8 +299,9 @@ def move_energy_line(gate) -> str | None:
 
 
 def revision_lines(plan) -> list[str]:
-    """One line per fallback revision of ``plan``'s chain, oldest first (SPEC §9.4, §9.5; 2-T15):
-    ``plan revision 1 (fallback): rewrites X, Y off, reason …``. Empty when nothing fell back."""
+    """One line per fallback or tier switch revision of ``plan``'s chain, oldest first (SPEC §9.4, §9.5, §9.6;
+    2-T15, 5-T07): ``plan revision 1 (fallback): rewrites X, Y off, reason …``, ``plan revision 1 (tier switch at
+    step 1,200): graph -> compiled, reason …``. Empty when nothing fell back or switched."""
     if plan is None:
         return []
     lines = []
@@ -308,6 +310,10 @@ def revision_lines(plan) -> list[str]:
         if reason.startswith(FALLBACK_PREFIX):
             change, _, why = reason[len(FALLBACK_PREFIX):].partition(": ")
             lines.append(f"plan revision {revision.revision} (fallback): {change}" + (f", reason {why}" if why else ""))
+        elif reason.startswith(SWITCH_PREFIX):
+            change, _, why = reason[len(SWITCH_PREFIX):].partition(": ")
+            lines.append(f"plan revision {revision.revision} (tier switch at step {int(revision.step or 0):,}): "
+                         f"{change}" + (f", reason {why}" if why else ""))
     return lines
 
 class Report:

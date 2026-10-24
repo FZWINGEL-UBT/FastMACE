@@ -2,7 +2,9 @@
 
 Fresh processes (one per run) run MH-1 through ``Simulation`` with the production defaults (CUDA graphs, pipelined) on
 NaCl 3x3x3 at 600 K, a restart every 20 steps. ``EngineConfig(graph_variant_cap=1)`` forces a re-capture
-storm: each stage's replay evicts the other's graph, so every step re-captures. The counters must move:
+storm: each stage's replay evicts the other's graph, so every step re-captures; runtime adaptation is off
+(``AdaptationConfig(adapt="off")``), so the storm stays on the graph tier (5-T07's switch has its own test,
+``test_adapt_switch_gpu.py``). The counters must move:
 re-captures with their host time (from ``GraphEngine._capture``'s own synchronisations, none added to
 the step), a segment per restart write and one at the end of ``run()``, ``counters.segments`` in
 ``metadata.json`` and the report's ``runtime`` line. The control run (the default cap) re-captures
@@ -36,7 +38,7 @@ from ase.build import bulk
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 
 from fastmace import integrators
-from fastmace.config import EngineConfig
+from fastmace.config import AdaptationConfig, EngineConfig
 from fastmace.io.output import Output
 from fastmace.model import loading
 from fastmace.model.forcefield import ForceField
@@ -52,7 +54,7 @@ directory = SPEC["directory"]
 # Nothing touches CUDA before the Simulation: the allocator is configured at its build (SPEC §8.7).
 sim = Simulation(atoms, ForceField(loaded, atoms, precision="float32"),
                  integrator=integrators.Langevin(timestep_fs=2.0, temperature_K=600.0, friction_per_fs=0.02),
-                 seed=7, workload=Workload(max_temperature_K=600.0),
+                 seed=7, workload=Workload(max_temperature_K=600.0), adaptation=AdaptationConfig(adapt="off"),
                  output=Output(directory, thermo_every=20, trajectory_every=None, restart_every=20), **engine)
 sim.run(steps=SPEC["steps"])
 totals = sim._monitor.totals()
