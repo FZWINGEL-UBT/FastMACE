@@ -101,9 +101,9 @@ print(json.dumps(out))
 @pytest.mark.slow
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_dynamic_edges_reproducible_trajectories():
-    """``reproducible=True`` (plain cuEq float64): with the option, two runs are bitwise equal, and the report
-    records whether they equal the default's (the steps replay the same compiled code; the first forces
-    come from the dynamic graph instead of the static one)."""
+    """``reproducible=True`` (plain cuEq float64): the option's trajectory is bitwise the default's, through the
+    run's neighbour rebuilds (the steps replay the same compiled code; the first forces come from the dynamic
+    graph instead of the static one, with the same bits here), and repeats bitwise."""
     runs = {name: ENGINE.run_fresh(REPRODUCIBLE.format(spec={"dynamic_edges": dynamic, "steps": 300}))
             for name, dynamic in (("default", False), ("dynamic", True), ("dynamic_again", True))}
     summary = {name: {k: v for k, v in run.items() if k not in ("positions", "momenta")} for name, run in runs.items()}
@@ -112,4 +112,5 @@ def test_dynamic_edges_reproducible_trajectories():
     assert runs["default"]["tier"] == "graph" and runs["dynamic"]["dynamic_edges"] is True, summary
     assert runs["default"]["rebuilds"] > 0, summary  # the edge count changed during the run
     for key in ("step", "positions", "momenta"):
+        assert runs["dynamic"][key] == runs["default"][key], (key, summary)
         assert runs["dynamic_again"][key] == runs["dynamic"][key], (key, summary)

@@ -1,0 +1,10 @@
+2026-10-24T11:48:57Z
+ 13:48:57 up 13:03,  1 user,  load average: 211.12, 211.01, 210.68
+NVIDIA GeForce RTX 5060 Ti, 610.88, 0 %, 2513 MiB
+Mem:              39           1          23           0          14          37
+your 131072x1 screen size is bogus. expect trouble
+%CPU COMMAND
+ 0.7 /home/fzwin/.local/share/uv/tools/google-colab-cli/bin/python /home/fzwin/.local/bin/colab exec -s fm-opt4-t02-a100-gate-114430 -f /mnt/d/Margraf/FastMACE/tools/colab/remote_step.py --timeout 1019 --env STEP=restore --env STAGE=restore --env ARG= --env WAIT_S=899 --env RESET=0 --env KILL=0
+ 0.7 python3 tools/colab/fastmace_colab.py --gpu A100 --commit 9b9e3e0 --session fm-opt4-t02-a100-gate-114430 --models polar-1-l --timeout-min 30 --out /home/fzwin/fastmace-acceptance/colab-opt4-T02-a100-gate --command python tools/force_stress_gate.py --output $OUT/gate-polar1-l --engine fastmace --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-L.model --model polar1-l --structures NaCl NbCl5@2x2x2 --structures-root $FASTMACE_STRUCTURES --rewrites fx_e3nn_linear=on polar_graph_sums=on
+ 0.0 /usr/lib/systemd/systemd-udevd
+ 0.0 bash -lc cd ~/fastmace-opt4/t04; seen=""; while true; do for f in "abset-mp0b3-medium,matpes-pbe" "abset-omat0-medium"; do [ -f "$f.log" ] || continue; if grep -q reserved "$f.log" && [[ "$seen" != *"S$f"* ]]; then echo "START $f $(date -u +%FT%TZ)"; seen+=" S$f"; fi; if grep -q "^.* $f exit=" run.log && [[ "$seen" != *"E$f"* ]]; then echo "END $(grep " $f exit=" run.log | tail -1)"; seen+=" E$f"; fi; done; if grep -q "done abset-omat0-medium" run.log; then echo ALLDONE; break; fi; sleep 5; done

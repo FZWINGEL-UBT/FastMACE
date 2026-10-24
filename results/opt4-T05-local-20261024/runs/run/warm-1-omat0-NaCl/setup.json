@@ -1,0 +1,423 @@
+{
+ "schema": 1,
+ "tool": "opt4-T05 setup_md",
+ "created_utc": "2026-10-24T10:13:57.640326+00:00",
+ "host": "Fabi-PC",
+ "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+ "fastmace": "/home/fzwin/fastmace-opt4-t05/src-13a1983/fastmace/__init__.py",
+ "fastmace_commit": null,
+ "torch": "2.14.1+cu130",
+ "label": "warm-1",
+ "model": "omat0-medium",
+ "structure": "NaCl",
+ "natoms": 216,
+ "steps": 300,
+ "check": "skip",
+ "environment": {
+  "FASTMACE_CACHE": "/home/fzwin/fastmace-opt4-t05/run/cache-warm",
+  "TORCHINDUCTOR_CACHE_DIR": null,
+  "TRITON_CACHE_DIR": null,
+  "TORCHINDUCTOR_COMPILE_THREADS": "4",
+  "XDG_CACHE_HOME": "/home/fzwin/fastmace-opt4-t05/run/cache-warm/xdg",
+  "CUDA_VISIBLE_DEVICES": null
+ },
+ "wrapped": {
+  "fastmace.model.loading.prepare_hybrid": true,
+  "fastmace.model.loading.sha256_of": true,
+  "fastmace.model.loading.check_oeq": true,
+  "fastmace.model.loading.check_cueq": true,
+  "fastmace.model.loading.load": true,
+  "fastmace.model.loading.load_pristine": true,
+  "torch.load": true,
+  "ForceField.__init__": true,
+  "ForceField.execution_model": true,
+  "MinimalPlanner.plan": true,
+  "MinimalPlanner.build": true,
+  "FixedPlanner.build": true,
+  "Registry.resolve": true,
+  "Registry.apply": true,
+  "Registry.selfcheck": true,
+  "fastmace.model.compile.private_copy": true,
+  "fastmace.model.compile.simplify_traceable": true,
+  "MACEForceField.__init__": true,
+  "GraphEngine.__init__": true,
+  "GraphEngine._initial_forces": true,
+  "GraphEngine.prepare": true,
+  "GraphEngine._capture": true,
+  "GraphEngine._warm_up": true,
+  "fastmace.planner.selfcheck.references": true,
+  "fastmace.planner.selfcheck.production": true,
+  "fastmace.provenance.fastmace_block": true,
+  "Simulation.__init__": true,
+  "Simulation.run": true,
+  "Simulation._write_metadata": true,
+  "Simulation._open_output": true,
+  "fastmace.quick.md": true
+ },
+ "import_fastmace_s": 0.0007052419969113544,
+ "import_torch_s": 0.6597262790019158,
+ "before_md_s": 0.936171879999165,
+ "process_start_to_main_s": 0.043763843008491676,
+ "md_s": 28.831530534000194,
+ "since_process_start_s": 29.80999999999767,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "stages": {
+  "load: prepare_hybrid (OEq runtime)": {
+   "total_s": 0.007456519000697881,
+   "self_s": 0.007456519000697881,
+   "calls": 2,
+   "each_s": [
+    0.007445950999681372,
+    1.0568001016508788e-05
+   ]
+  },
+  "load: sha256": {
+   "total_s": 0.047995282999181654,
+   "self_s": 0.047995282999181654,
+   "calls": 2,
+   "each_s": [
+    0.023471173000871204,
+    0.02452410999831045
+   ]
+  },
+  "load: torch.load": {
+   "total_s": 0.20962061900354456,
+   "self_s": 0.20962061900354456,
+   "calls": 3,
+   "each_s": [
+    0.0036711520006065257,
+    0.07977842100081034,
+    0.1261710460021277
+   ]
+  },
+  "load: loading.load": {
+   "total_s": 6.143320597002457,
+   "self_s": 5.885359396997956,
+   "calls": 2,
+   "each_s": [
+    2.8151883440004895,
+    3.328132253001968
+   ]
+  },
+  "load: load_pristine": {
+   "total_s": 2.8227432839994435,
+   "self_s": 0.00010898899927269667,
+   "calls": 1,
+   "each_s": [
+    2.8227432839994435
+   ]
+  },
+  "load: ForceField.__init__": {
+   "total_s": 0.0009194910016958602,
+   "self_s": 0.0009194910016958602,
+   "calls": 1,
+   "each_s": [
+    0.0009194910016958602
+   ]
+  },
+  "plan: MinimalPlanner.plan": {
+   "total_s": 0.17661406000115676,
+   "self_s": 0.17661406000115676,
+   "calls": 1,
+   "each_s": [
+    0.17661406000115676
+   ]
+  },
+  "gate: references": {
+   "total_s": 1.91710059880279e-05,
+   "self_s": 1.91710059880279e-05,
+   "calls": 1,
+   "each_s": [
+    1.91710059880279e-05
+   ]
+  },
+  "load: check_cueq": {
+   "total_s": 0.00018511799862608314,
+   "self_s": 0.00018511799862608314,
+   "calls": 1,
+   "each_s": [
+    0.00018511799862608314
+   ]
+  },
+  "load: check_oeq": {
+   "total_s": 0.00014961200213292614,
+   "self_s": 0.00014961200213292614,
+   "calls": 1,
+   "each_s": [
+    0.00014961200213292614
+   ]
+  },
+  "build: private_copy": {
+   "total_s": 0.7730123920046026,
+   "self_s": 0.7730123920046026,
+   "calls": 2,
+   "each_s": [
+    0.3872537010029191,
+    0.3857586910016835
+   ]
+  },
+  "build: execution model (template / conversion)": {
+   "total_s": 3.7169804090008256,
+   "self_s": 0.0015944549959385768,
+   "calls": 1,
+   "each_s": [
+    3.7169804090008256
+   ]
+  },
+  "rewrites: resolve": {
+   "total_s": 0.02705724900442874,
+   "self_s": 0.02705724900442874,
+   "calls": 1,
+   "each_s": [
+    0.02705724900442874
+   ]
+  },
+  "self-check: generic_species_skip": {
+   "total_s": 0.3237486750003882,
+   "self_s": 0.3237486750003882,
+   "calls": 1,
+   "each_s": [
+    0.3237486750003882
+   ]
+  },
+  "self-check: generic_reassociate": {
+   "total_s": 0.341349813999841,
+   "self_s": 0.341349813999841,
+   "calls": 1,
+   "each_s": [
+    0.341349813999841
+   ]
+  },
+  "self-check: generic_segmented_first_sum": {
+   "total_s": 0.027356898004654795,
+   "self_s": 0.027356898004654795,
+   "calls": 1,
+   "each_s": [
+    0.027356898004654795
+   ]
+  },
+  "self-check: generic_fused_radial_backward": {
+   "total_s": 0.03595663299347507,
+   "self_s": 0.03595663299347507,
+   "calls": 1,
+   "each_s": [
+    0.03595663299347507
+   ]
+  },
+  "self-check: generic_streaming": {
+   "total_s": 0.050880916001915466,
+   "self_s": 0.050880916001915466,
+   "calls": 1,
+   "each_s": [
+    0.050880916001915466
+   ]
+  },
+  "self-check: block_linear": {
+   "total_s": 0.041788381000515074,
+   "self_s": 0.041788381000515074,
+   "calls": 1,
+   "each_s": [
+    0.041788381000515074
+   ]
+  },
+  "self-check: grouped_linear": {
+   "total_s": 0.041385693999473006,
+   "self_s": 0.041385693999473006,
+   "calls": 1,
+   "each_s": [
+    0.041385693999473006
+   ]
+  },
+  "self-check: single_graph_strain": {
+   "total_s": 0.0013397950024227612,
+   "self_s": 0.0013397950024227612,
+   "calls": 1,
+   "each_s": [
+    0.0013397950024227612
+   ]
+  },
+  "rewrites: apply": {
+   "total_s": 1.2324718630043208,
+   "self_s": 0.36866505700163543,
+   "calls": 1,
+   "each_s": [
+    1.2324718630043208
+   ]
+  },
+  "build: simplify_traceable": {
+   "total_s": 0.002569713004049845,
+   "self_s": 0.002569713004049845,
+   "calls": 1,
+   "each_s": [
+    0.002569713004049845
+   ]
+  },
+  "build: MACEForceField.__init__": {
+   "total_s": 2.3146802189949085,
+   "self_s": 0.6938799519848544,
+   "calls": 1,
+   "each_s": [
+    2.3146802189949085
+   ]
+  },
+  "compile: first compiled call": {
+   "total_s": 9.725204276001023,
+   "self_s": 9.725204276001023,
+   "calls": 1,
+   "each_s": [
+    9.725204276001023
+   ]
+  },
+  "build: GraphEngine.__init__": {
+   "total_s": 9.751760204002494,
+   "self_s": 0.02655592800147133,
+   "calls": 1,
+   "each_s": [
+    9.751760204002494
+   ]
+  },
+  "build: FixedPlanner.build": {
+   "total_s": 12.100085195001157,
+   "self_s": 0.0065875229993253015,
+   "calls": 1,
+   "each_s": [
+    12.100085195001157
+   ]
+  },
+  "build: MinimalPlanner.build": {
+   "total_s": 15.817500245997508,
+   "self_s": 0.00043464199552545324,
+   "calls": 1,
+   "each_s": [
+    15.817500245997508
+   ]
+  },
+  "capture: ACP": {
+   "total_s": 0.06846154599770671,
+   "self_s": 0.06846154599770671,
+   "calls": 1,
+   "each_s": [
+    0.06846154599770671
+   ]
+  },
+  "capture: B": {
+   "total_s": 8.662208747999102,
+   "self_s": 8.662208747999102,
+   "calls": 2,
+   "each_s": [
+    8.572732373999315,
+    0.08947637399978703
+   ]
+  },
+  "capture: prepare (setup)": {
+   "total_s": 8.641318924004736,
+   "self_s": 0.00012500400771386921,
+   "calls": 1,
+   "each_s": [
+    8.641318924004736
+   ]
+  },
+  "gate: production": {
+   "total_s": 2.557300467742607e-05,
+   "self_s": 2.557300467742607e-05,
+   "calls": 1,
+   "each_s": [
+    2.557300467742607e-05
+   ]
+  },
+  "rest: provenance block": {
+   "total_s": 0.004987290005374234,
+   "self_s": 0.004987290005374234,
+   "calls": 3,
+   "each_s": [
+    0.0048330549980164506,
+    6.365900480886921e-05,
+    9.05760025489144e-05
+   ]
+  },
+  "rest: open output": {
+   "total_s": 0.0014306550001492724,
+   "self_s": 0.0014306550001492724,
+   "calls": 1,
+   "each_s": [
+    0.0014306550001492724
+   ]
+  },
+  "rest: metadata.json": {
+   "total_s": 0.06675268099934328,
+   "self_s": 0.0665984459919855,
+   "calls": 2,
+   "each_s": [
+    0.03613544299878413,
+    0.030617238000559155
+   ]
+  },
+  "simulation: __init__": {
+   "total_s": 24.706047300001956,
+   "self_s": 0.027250681989244185,
+   "calls": 1,
+   "each_s": [
+    24.706047300001956
+   ]
+  },
+  "run: Simulation.run": {
+   "total_s": 0.6466787199969986,
+   "self_s": 0.5265851079966524,
+   "calls": 1,
+   "each_s": [
+    0.6466787199969986
+   ]
+  },
+  "fm.md": {
+   "total_s": 28.187444121002045,
+   "self_s": 0.011974817003647331,
+   "calls": 1,
+   "each_s": [
+    28.187444121002045
+   ]
+  }
+ },
+ "simulation_setup_s": {
+  "plan": 0.17663009699754184,
+  "build": 15.820588101996691,
+  "capture": 8.641372980004235,
+  "provenance": 0.00484601900097914
+ },
+ "plan": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (10): reassociate_first, fused_folded_backward, segmented_first_sum, streaming_conv, block_linear,\n      grouped_linear, merged_residual, species_skip, single_graph_strain, polar_uvu\n  rewrites off: factor_species, fold_cutoff, density_first, joint_radial_input, folded_backward_tiles, gated_rows,\n      segment_gemm (not supported by the model (interactions ['RealAgnosticDensityInteractionBlock', 'RealAgnosticDensi\u2026\n      fused_radial_hidden, direct_node_feats, folded_constants (+6 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 0.34 GiB predicted (run; run 0.34, build 0.23), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 5060\u2026\n  workload: Langevin NVT, fixcm=True; 216 atoms, 3D PBC, no constraints; up to 1000 K\n  rules 8-11: superset Na Cl (8), max_temperature_K 1000 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)",
+ "engine": {
+  "capture_count": 3,
+  "capture_seconds": 8.665908002993092,
+  "recapture_log": [
+   {
+    "step": 0,
+    "key": "ACP",
+    "reason": "first capture",
+    "counted": false,
+    "s": 0.04236093100189464
+   },
+   {
+    "step": 0,
+    "key": "('B', 7168)",
+    "reason": "first capture",
+    "counted": false,
+    "s": 8.553126490995055
+   },
+   {
+    "step": 272,
+    "key": "('B', 7680)",
+    "reason": "new variant of B",
+    "counted": true,
+    "s": 0.07042058099614223
+   }
+  ]
+ },
+ "summary": "FastMACE 0.0.1.dev0  |  omat0-medium (head default)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 0.5 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 9 rewrites on, 15 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nsetup:   25 s (plan 0.18 s, build 16 s, capture 8.6 s, provenance 0.0048 s)\nspeed:   2.05 ms/step, whole-run mean over steps 1\u2013300\nruntime: re-captures 1 (0.0704 s, 11.4 % of the loop); overflows redone 1\noutput:  /home/fzwin/fastmace-opt4-t05/run/warm-1-omat0-NaCl/md\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none",
+ "cache_stats": {
+  "inductor.async_compile_cache_miss": 528,
+  "inductor.async_compile_cache_hit": 350,
+  "inductor.fxgraph_cache_hit": 6,
+  "aot_autograd.autograd_cache_bypass": 2,
+  "aot_autograd.autograd_cache_hit": 2
+ },
+ "compile_times": "TorchDynamo compilation metrics:\nFunction                                               Runtimes (s)\n---------------------------------------------------  --------------\n_compile.compile_inner                                      16.2124\ncompile_attempt_0                                            4.1302\nbytecode_tracing                                             7.7299\nget_fake_value                                               1.0192\ncreate_proxy                                                 0.3557\nwrap_to_fake_tensor_and_record                               0.1654\nvariable_builder_call                                        4.1059\ncompile_attempt_1                                            9.5143\ninsert_deferred_runtime_asserts                              0.0917\nOutputGraph.call_user_compiler                               5.7073\ninductor_codecache_torch_key                                 0.0579\n_recursive_pre_grad_passes                                   0.1314\npass.pre_grad_passes.group_batch_fusion_passes               0.0011\npass.pre_grad_passes.efficient_conv_bn_eval_pass             0.0035\npass.pre_grad_passes.apply_gumbel_max_trick_pass             0.0015\ncreate_aot_dispatcher_function                               5.5335\naot_collect_metadata                                         0.604\naot_trace_joint_graph                                        2.3757\n_recursive_joint_graph_passes                                0.5619\npass.joint_graph_passes.remove_noop_ops                      0.0188\npass.joint_graph_passes.constant_fold_uniform_value          0.1098\npass.joint_graph_passes.pass_pattern_0                       0.2711\nCacheBase.get_system.triton_key                              0.0001\npass.joint_graph_passes.pass_pattern_1                       0.0023\nmin_cut_rematerialization_partition                          0.9031\ncompile_fx.<locals>.fw_compiler_base                         0.5949\ncompile_fx_inner                                             1.0227\nfx_codegen_and_compile                                       0.7128\nTritonBundler.read_and_emit                                  0.0102\nTritonBundler.load_cached_static_autotuners                  0.0051\nPyCodeCache.load_by_key_path                                 0.2903\nasync_compile.wait                                           0.2018\nStaticAutotunerFuture.warm_precompile                        0.0728\nbuild_guards                                                 2.519\ngc                                                           0.0014\nAOTAutogradCache.inductor_load                               0.0049\nbackward._backward_impl                                      0.2706\ncompile_fx.<locals>.bw_compiler                              0.4288\npgo.dynamic_whitelist                                        0"
+}

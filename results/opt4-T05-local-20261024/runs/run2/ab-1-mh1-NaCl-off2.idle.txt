@@ -1,0 +1,10 @@
+2026-10-24T11:47:04Z
+ 13:47:04 up 13:01,  1 user,  load average: 211.69, 210.67, 210.53
+NVIDIA GeForce RTX 5060 Ti, 610.88, 0 %, 2513 MiB
+Mem:              39           1          23           0          14          37
+your 131072x1 screen size is bogus. expect trouble
+%CPU COMMAND
+ 6.8 /home/fzwin/.local/share/uv/tools/google-colab-cli/bin/python /home/fzwin/.local/bin/colab upload -s fm-opt4-t02-a100-gate-114430 /home/fzwin/.fastmace-colab/caches/sm80-py310-f00d5798f8b5/002.tar.gz /content/fm_cache-in-002.tar.gz
+ 1.2 python3 tools/colab/fastmace_colab.py --gpu A100 --commit 9b9e3e0 --session fm-opt4-t02-a100-gate-114430 --models polar-1-l --timeout-min 30 --out /home/fzwin/fastmace-acceptance/colab-opt4-T02-a100-gate --command python tools/force_stress_gate.py --output $OUT/gate-polar1-l --engine fastmace --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-L.model --model polar1-l --structures NaCl NbCl5@2x2x2 --structures-root $FASTMACE_STRUCTURES --rewrites fx_e3nn_linear=on polar_graph_sums=on
+ 0.0 python3 tools/ci/local_gpu.py run --quiet --purpose OPT4-T02 TIMED A/B POLAR-1-S NaCl rerun both orders warmup 3000 (<13 min, quiet) --wait-minutes 600 -- bash /home/fzwin/fastmace-opt4/t02_ab_nacl.sh
+ 0.0 /usr/lib/systemd/systemd-udevd

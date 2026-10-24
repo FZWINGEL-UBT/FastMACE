@@ -1,0 +1,10 @@
+2026-10-24T12:06:10Z
+ 14:06:10 up 13:20,  1 user,  load average: 210.45, 210.40, 210.42
+NVIDIA GeForce RTX 5060 Ti, 610.88, 0 %, 2533 MiB
+Mem:              39           1          22           0          15          37
+your 131072x1 screen size is bogus. expect trouble
+%CPU COMMAND
+ 2.1 /home/fzwin/.local/share/uv/tools/google-colab-cli/bin/python /home/fzwin/.local/bin/colab upload -s fm-opt4-t02-l4-ab-120416 /home/fzwin/fastmace-acceptance/colab-opt4-T02-l4-ab/.colab-work/chunks/000.tar.gz.chunk000 /content/fm_cache-in-000.tar.gz.chunk000
+ 1.7 python3 tools/colab/fastmace_colab.py --gpu L4 --commit 9b9e3e0 --session fm-opt4-t02-l4-ab-120416 --models polar-1-s --timeout-min 25 --out /home/fzwin/fastmace-acceptance/colab-opt4-T02-l4-ab --command python tools/ab_rewrites.py --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-S.model --model polar1-s --structures NaCl NbCl5 --warmup 3000 --blocks 12 --b fx_e3nn_linear=on polar_graph_sums=on --output $OUT/ab-ab --order ab --pattern abab --command python tools/ab_rewrites.py --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-S.model --model polar1-s --structures NaCl NbCl5 --warmup 3000 --blocks 12 --b fx_e3nn_linear=on polar_graph_sums=on --output $OUT/ab-ba --order ba --pattern abba
+ 0.2 python3 tools/ci/local_gpu.py run --wait-minutes 600 --purpose OPT4-T08 precision screen MH-1 NaNbO3 i1 (<14 min, untimed) -- /home/fzwin/environments/mace_cueq_latest/bin/python tools/precision_screen.py --output /home/fzwin/fastmace-opt4-t08/j5-mh1-nanbo3-b --model mh1-r2scan --structures NaNbO3 --stages i1
+ 0.1 bash /mnt/c/Users/fzwin/AppData/Local/Temp/claude/D--Margraf-FastMACE--claude-worktrees-angry-bartik-12748f/04b8c8c1-04c6-4ff5-9883-ddb339dfcc85/scratchpad/t08run.sh OPT4-T08 precision screen MH-1 NaNbO3 i1 (<14 min, untimed) /home/fzwin/fastmace-opt4-t08/j5-mh1-nanbo3-b -- --model mh1-r2scan --structures NaNbO3 --stages i1

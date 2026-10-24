@@ -74,7 +74,7 @@ def main(roots):
     for root in roots:
         for path in sorted(Path(root).glob("*/setup.json")):
             name = path.parent.name
-            if name.startswith(("fill", "dyn-fill", "diag")):
+            if name.startswith(("fill", "dyn-fill", "diag", "reused")):
                 continue
             record = json.loads(path.read_text())
             kind, cell = cell_of(name)
