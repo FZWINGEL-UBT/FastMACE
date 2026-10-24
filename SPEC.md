@@ -452,6 +452,8 @@ class Rewrite:
 | `gated_rows` (residual products, gate and `linear_2` on per-segment rows; FastMACE optimisation round 1, OPT-T02 stage A) | exact (bitwise on the CPU and in the reproducible GPU mode) | with `merged_residual`, MACE's `GatedEquivariantBlock` in the folded MH-1 forward | MH-1: NaCl −4.4 % (sm_89) / −3.7 % (sm_120), NbCl5 −9.0 % / −10.6 %, on top of the rest | default on by owner decision, 20 October 2026; switched off for any model that fails the 19-label gate in the combined acceptance |
 | `segment_gemm` (`linear_2`'s products in the `gated_rows` chains write straight into the joined output, Triton gathered-row GEMM where the shared shape rule picks it; OPT-T02 stage B) | rounding (another GEMM; deterministic, no atomics) | with `gated_rows`, float32, not `reproducible=True` | MH-1 NbCl5 −4.8 to −5.2 % (sm_89) / −4.2 to −4.3 % (sm_120) on top of `gated_rows`; NaCl neutral (stock path below the rule's threshold) | default on by owner decision, 20 October 2026; float64 and the reproducible mode keep the stock path; switched off for any model that fails the 19-label gate in the combined acceptance |
 | `grouped_launch` (a block linear's small products of equal weight shape in one Triton launch, forward and input gradient; FastMACE optimisation round 1, OPT-T03 candidate 2) | rounding (another GEMM; deterministic) | with `block_linear`, float32, not `reproducible=True`; by default the generic MACE family only (every interaction MP-0's residual or the density family's, not PolarMACE) | generic NaCl −4.5 to −5.4 % (sm_120, five labels) / −4.1 to −4.3 % (sm_89 L4, OMAT-0); NbCl5 neutral (products above the shape rule's threshold); MH-1 NaCl −1.8 to −2.3 % (sm_120), +0.3 to +0.5 % (sm_89) | default on for the generic family by owner decision 57, 24 October 2026; MH-1, MACE-OFF, POLAR-1 and OMOL-0 stay off unless requested |
+| `fx_e3nn_linear` (e3nn's `o3.Linear` code as its own fx graph instead of the TorchScript a checkpoint restores, so dynamo traces it; FastMACE optimisation round 4, OPT4-T02) | rounding (eager bitwise on the CPU; compiled, Inductor fuses what ran eagerly; deterministic) | a model with TorchScript `o3.Linear`; by default the qualified POLAR-1 checkpoints (S, M), hybrid float32, not `reproducible=True` | POLAR-1-S: PolarMACE's forward compiles (31 graphs → 5, 1,226 → 642 kernels per NaCl force call); with `polar_graph_sums` NaCl −24 % (sm_120) / −19 % (sm_89 L4), NbCl5 −18 % / −16 % | default on for POLAR-1-S and -M by owner decision 58, 24 October 2026; POLAR-1-L after its NbCl5 gate; other models off unless requested |
+| `polar_graph_sums` (PolarMACE's one-graph per-graph sums as a sum over atoms and a broadcast instead of `scatter_add_` and `x[batch]`; OPT4-T02) | rounding (another summation order; deterministic, no atomics) | PolarMACE, one graph per batch; by default as `fx_e3nn_linear` | alone NaCl −8 %, NbCl5 −9 % of the force call (the float64 `index_put` backward); none on top of `fx_e3nn_linear` | default on with `fx_e3nn_linear` by owner decision 58 |
 | `streaming_conv` (OEq PR 223 kernels, NVRTC) | exact (summation order; atomic sums, not bitwise reproducible) | folded MH-1 class, `GENERIC_*` with OEq fusion | −7.7% NaNbO3; generic −16 to −28% with reassociation | OEq present; per-engine edge counter (§8.1) |
 | `generic_species_skip` | exact (absent columns multiply zeros) | MP-0/density family | −7 to −39% | fixed species superset |
 | `generic_fused_radial_backward` | rounding | MP-0/density family | −3 to −5% large cells | — |
@@ -2636,6 +2638,23 @@ Open decisions for the owner:
    RTX 5060 Ti (five labels, both orders) and 4.1–4.3 % on the L4 (OMAT-0);
    NbCl5 was neutral (`docs/validation/opt4-T04.md`).
 
+58. Decided (user, 24 October 2026, optimisation round 4, OPT4-T02: "Yes",
+   answering "both T02 records on by default for POLAR-1-S and -M; POLAR-1-L
+   only after a local NbCl5 gate passes"): `RewriteConfig.fx_e3nn_linear` and
+   `RewriteConfig.polar_graph_sums` are on by default for the qualified POLAR-1
+   checkpoints, POLAR-1-S and POLAR-1-M, in hybrid float32 plans that are not
+   reproducible. The planner identifies the checkpoint by its label-table label
+   (by label, or by SHA-256 and head, as rule 15 does); PolarMACE with any
+   other checkpoint, a model of unknown identity and every other family stay
+   off. Float64 and `reproducible=True` plans keep MACE's code, as under
+   decision 57 (`polar_graph_sums` is deterministic, but it stays with
+   `fx_e3nn_linear` on the compiled hybrid path, where its gain and its
+   gate are). An explicit `on` or `off` overrides the rule for any model.
+   Same-process A/Bs on POLAR-1-S, both records against the default: NaCl
+   −24 % and NbCl5 −18 % on the RTX 5060 Ti, −19 % and −16 % on the L4; the
+   force gate passed for S and M on NaCl and NbCl5 2×2×2
+   (`docs/validation/opt4-T02.md`).
+
 ---
 
 ## 19. Revision history
@@ -3048,3 +3067,22 @@ more FastMACE-only rewrite default, scoped to a model family.
   deterministic; the record itself is unchanged since OPT-T03b. NaCl −4.5 to
   −5.4 % on the RTX 5060 Ti (five generic labels, both orders), −4.1 to
   −4.3 % on the L4 (OMAT-0), NbCl5 neutral. §6.2's table has its row.
+
+**Draft 0.12, sixteenth amendment (24 October 2026, owner decision 58,
+"Yes"; optimisation round 4, OPT4-T02):** two FastMACE-only rewrite defaults,
+scoped to qualified checkpoints of one model family.
+- **`RewriteConfig.fx_e3nn_linear`:** a TorchScript e3nn `o3.Linear` (as a
+  checkpoint restores it) is a graph break, and in a loop it made dynamo run
+  PolarMACE's whole forward eagerly. The record gives each such Linear e3nn's
+  own fx graph back. Rounding class (eager bitwise on the CPU), deterministic.
+- **`RewriteConfig.polar_graph_sums`:** PolarMACE's one-graph per-graph sums
+  (Fukui norms, total charges, barycentre) as a sum and a broadcast, without
+  `scatter_add_` atomics and the serial float64 `index_put` backward.
+  Rounding class, deterministic.
+- **Default:** both on for POLAR-1-S and POLAR-1-M (the label table's
+  `polar1-s`, `polar1-m`, identified by label or SHA-256) in hybrid float32,
+  non-reproducible plans; stage 2 turns them off for any other model with the
+  reason "not a qualified POLAR-1 checkpoint"; float64 and reproducible plans
+  keep MACE's code; an explicit `on` or `off` overrides. POLAR-1-S A/B: NaCl
+  −24 %, NbCl5 −18 % (RTX 5060 Ti); −19 %, −16 % (L4). §6.2's table has
+  their rows.

@@ -100,8 +100,8 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
     "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.tf32x3_gemms": "never_automatic",
-    "RewriteConfig.fx_e3nn_linear": "never_automatic",
-    "RewriteConfig.polar_graph_sums": "never_automatic",
+    "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
+    "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.species_tables": "on_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
@@ -263,6 +263,27 @@ def _workload_text(atoms, pbc):
 
 def _toggle(value):
     return "on" if value else "off"
+
+
+# Owner decision 58, 24 October 2026 (OPT4-T02): the POLAR-1 checkpoints whose force gate passed with
+# fx_e3nn_linear and polar_graph_sums on (S and M on NaCl and NbCl5 2x2x2). They are label-table labels, which
+# identify a checkpoint by its SHA-256 (fastmace.model.labels), not by its file name.
+POLAR_GRAPH_LABELS = ("polar1-s", "polar1-m")
+POLAR_GRAPH_RECORDS = ("fx_e3nn_linear", "polar_graph_sums")
+
+
+def _qualified_polar(traits, model_label):
+    """PolarMACE with a checkpoint of ``POLAR_GRAPH_LABELS`` (decision 58)."""
+    return bool(traits.polar) and model_label in POLAR_GRAPH_LABELS
+
+
+def _label_of(traits):
+    """The label-table label of a ``LoadedModel`` (by label, or by SHA-256 and head); None for anything else."""
+    if not hasattr(traits, "sha256"):
+        return None
+    from . import warnings as known_issues
+
+    return known_issues.label_of(getattr(traits, "label", None), getattr(traits, "head", None), traits.sha256)
 
 
 def _generic_mace_family(traits):
@@ -469,16 +490,18 @@ class FixedPlanner:
 
     # ------------------------------------------------------------------ the plan
 
-    def plan(self, traits, atoms, integrator: IntegratorConfig, hardware: Hardware) -> Plan:
+    def plan(self, traits, atoms, integrator: IntegratorConfig, hardware: Hardware, *, model_label=None) -> Plan:
         """The fixed plan for model ``traits`` (a ``ModelTraits``, a model or a ``LoadedModel``), ``atoms``,
-        ``integrator`` and ``hardware``; raises ``PlanRefused`` with every reason."""
+        ``integrator`` and ``hardware``; raises ``PlanRefused`` with every reason. ``model_label``: the checkpoint's
+        label-table label (default: a ``LoadedModel``'s), which decision 58's POLAR-1 defaults read."""
         book = _Book()
-        parts = self._resolve(book, traits, atoms, integrator, hardware)
+        parts = self._resolve(book, traits, atoms, integrator, hardware,
+                              model_label=model_label if model_label is not None else _label_of(traits))
         book.raise_refusals()
         return Plan(**parts, reason="fixed plan of phase 1a (main.py)")
 
     def _resolve(self, book, traits, atoms, integrator, hardware, *, backend_choice=None, evaluation=False,
-                 texts=None, reproducible=False, rule_11=None, mc=None, optimizer=None):
+                 texts=None, reproducible=False, rule_11=None, mc=None, optimizer=None, model_label=None):
         """The plan's parts (``Plan`` keywords except the reason), decisions and refusals in ``book``.
 
         Shared with the minimal planner (1b-T12): ``backend_choice`` is its backend rule;
@@ -489,7 +512,8 @@ class FixedPlanner:
         ``mc`` (minimal planner, 3-T11) is ``(mc_moves, Workload.mc_energy_precision)``; its moves also
         choose the fixcm projection (3-T22b). ``optimizer`` (4-T05) plans a relaxation with that
         ``OptimizerConfig``: rule 1 from the optimiser's record, checked steps only, the stress path for a
-        cell filter (rule 10); ``integrator`` then only carries the MD-side defaults.
+        cell filter (rule 10); ``integrator`` then only carries the MD-side defaults. ``model_label`` is the
+        checkpoint's label-table label or None (decision 58: the POLAR-1 defaults need a qualified checkpoint).
         """
         from fastmace.longrange import polar as longrange
         from fastmace.model.capabilities import ModelTraits, model_traits
@@ -546,7 +570,7 @@ class FixedPlanner:
         backend, dtype, fusion = self._backend(book, backend_choice, reproducible)
         hybrid = backend == "hybrid"
         values = self._stage1(book, hybrid, npt)
-        self._stage2(book, values, traits, explicit)
+        self._stage2(book, values, traits, explicit, model_label)
         self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible, hardware.compute_capability)
         rewrite_values = {name: _toggle(values[name]) for name in REWRITE_FIELDS}
 
@@ -860,15 +884,14 @@ class FixedPlanner:
         needs("tf32x3_gemms", r.tf32x3_gemms == "on", v["block_linear"], "block_linear")
         if r.tf32x3_gemms == "auto":
             v["_why"]["tf32x3_gemms"] = "off: only an explicit 'on' enables it (OPT4-T03, accuracy screen)"
-        note("fx_e3nn_linear", r.fx_e3nn_linear == "on",
-             "on: e3nn's o3.Linear as fx graphs, traced by dynamo" if r.fx_e3nn_linear == "on"
-             else "off: only an explicit 'on' enables it (OPT4-T02, opt-in)")
-        note("polar_graph_sums", r.polar_graph_sums == "on",
-             "on: PolarMACE's one-graph sums without scatter and index" if r.polar_graph_sums == "on"
-             else "off: only an explicit 'on' enables it (OPT4-T02, opt-in)")
+        # Owner decision 58, 24 October 2026 (OPT4-T02): on for the qualified POLAR-1 checkpoints on the hybrid;
+        # stage 2 drops them for every other model, the FastMACE rules in float64 and reproducible plans.
+        for name in POLAR_GRAPH_RECORDS:
+            note(name, hybrid if getattr(r, name) == "auto" else getattr(r, name) == "on",
+                 f"stage 1: {backend_name} backend")
         return v
 
-    def _stage2(self, book, v, traits, explicit):
+    def _stage2(self, book, v, traits, explicit, model_label=None):
         """``workflow.adapt_options_to_model``: unsupported options off (auto) or refused (on)."""
         support = traits.rewrite_support
         for name, key in STAGE2_SUPPORT:
@@ -890,6 +913,17 @@ class FixedPlanner:
             v["grouped_launch"] = False
             v["_auto_off"]["grouped_launch"] = reason
             v["_why"]["grouped_launch"] += f"; stage 2: off, {reason}"
+        for name in POLAR_GRAPH_RECORDS:
+            if v[name] and name not in explicit and not _qualified_polar(traits, model_label):
+                # Gated and A/B-measured on POLAR-1-S and -M only (OPT4-T02); POLAR-1-L's NbCl5 gate is open.
+                found = f"PolarMACE, label {model_label}" if traits.polar else traits.model_class
+                reason = (f"not a qualified POLAR-1 checkpoint, decision 58 ({found}; qualified: "
+                          f"{', '.join(POLAR_GRAPH_LABELS)})")
+                v[name] = False
+                v["_auto_off"][name] = reason
+                v["_why"][name] += f"; stage 2: off, {reason}"
+            elif v[name] and name not in explicit:
+                v["_why"][name] += f"; stage 2: {model_label}, decision 58"
 
     def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False, capability=None):
         """FastMACE's hard rules on the rewrites, then one decision per rewrite field and neighbour option."""
@@ -924,6 +958,11 @@ class FixedPlanner:
             v["segment_gemm"] = False
             v["_why"]["segment_gemm"] += ("; off: reproducible=True keeps the stock products" if reproducible
                                           else f"; off: {dtype} keeps the stock products (the Triton GEMM is float32)")
+        for name in POLAR_GRAPH_RECORDS:  # decision 58, as decision 57: float64 and reproducible keep MACE's code
+            if v[name] and name not in explicit and (dtype != "float32" or reproducible):
+                v[name] = False
+                v["_why"][name] += ("; off: reproducible=True keeps MACE's code" if reproducible
+                                    else f"; off: {dtype} keeps MACE's code")
         if v["grouped_launch"] and "grouped_launch" not in explicit and (dtype != "float32" or reproducible):
             v["grouped_launch"] = False
             v["_why"]["grouped_launch"] += ("; off: reproducible=True keeps the stock products" if reproducible

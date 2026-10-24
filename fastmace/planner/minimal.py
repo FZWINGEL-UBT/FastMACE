@@ -644,7 +644,8 @@ class MinimalPlanner:
                                                                       rule_11=rule_11,
                                                                       mc=(workload.mc_moves,
                                                                           workload.mc_energy_precision),
-                                                                      optimizer=optimizer)
+                                                                      optimizer=optimizer,
+                                                                      model_label=model_label)
             if d3_cutoff_A is not None:
                 parts["neighbours"], d3_memory = self._d3_list(book, parts["neighbours"], atoms, superset,
                                                                integrator, workload, hardware, float(d3_cutoff_A))
@@ -1020,8 +1021,10 @@ class MinimalPlanner:
         book.decide("EngineConfig.dynamic_edges", "on" if dynamic_edges else "off",
                     "exact edge counts: the edge dimension is dynamic from the first call, so a new edge count "
                     "does not compile again (2-T13)" if dynamic_edges else "nothing is compiled")
+        model_label = None if loaded is None else known_issues.label_of(
+            getattr(loaded, "label", None), getattr(loaded, "head", None), getattr(loaded, "sha256", None))
         parts = self._fixed(rewrites, precision)._resolve(book, traits, atoms, None, hardware, backend_choice=backend,
-                                                          evaluation=True, texts=TEXTS)
+                                                          evaluation=True, texts=TEXTS, model_label=model_label)
         book.raise_refusals()
         parts["requested"] = parts["requested"] + requested
         parts["engine"] = dataclasses.replace(parts["engine"], dynamic_edges=dynamic_edges)

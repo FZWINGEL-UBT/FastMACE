@@ -14,7 +14,8 @@ NbCl5 timed out cold-compiling on the Colab A100. Locally the pair cuts POLAR-1-
 - `polar_graph_sums` removes the float64 `index_put` backward. It gains 8–9 % alone, nothing on top of
   `fx_e3nn_linear`, and makes those sums deterministic.
 
-Both records are `never_automatic`; the owner decides defaults.
+**Owner decision 58 (24 October 2026, "Yes"):** both records are on by default for POLAR-1-S and POLAR-1-M
+(§8). POLAR-1-L follows only after a local NbCl5 gate passes.
 
 | Same-process A/B, POLAR-1-S, default (a) against both records (b) | NaCl b/a | NbCl5 b/a |
 | --- | ---: | ---: |
@@ -207,3 +208,29 @@ L4 numbers compare only within this container (OPT-T10).
   beyond POLAR and MH-1.
 - **Reproducible mode.** Not run for these records. `polar_graph_sums` removes atomics; `fx_e3nn_linear` changes
   only what Inductor compiles.
+
+## 8. Default (owner decision 58, branch `fastmace/opt4-T02b`)
+
+The owner answered "Yes" to "both T02 records on by default for POLAR-1-S and -M; POLAR-1-L only after a local
+NbCl5 gate passes".
+
+- **Rule** (`fastmace/planner/fixed.py`, `on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints`):
+  - stage 1: on with the hybrid backend;
+  - stage 2: off unless the model is PolarMACE and its checkpoint is one of `POLAR_GRAPH_LABELS` = (`polar1-s`,
+    `polar1-m`), with the reason "not a qualified POLAR-1 checkpoint, decision 58";
+  - an explicit `on` or `off` overrides.
+- **Identity.** The checkpoint is the loaded model's label-table label, found by label or by SHA-256 and head,
+  as rule 15 finds it. The table identifies checkpoints by SHA-256, not by file name. A model of unknown identity
+  stays off. main.py's fixed planner, which plans from traits alone, therefore keeps the research engine's
+  plan; its `plan()` takes `model_label` or reads a `LoadedModel`'s.
+- **Float64 and `reproducible=True`:** off, as under decision 57. Reproducible plans run plain cuEq, where these
+  compiled-path records were neither gated nor timed. `polar_graph_sums` is deterministic and would be allowed
+  there, but it goes with `fx_e3nn_linear` on the hybrid path, where its gate is. An explicit `on` still
+  enables it.
+- **Tests:** `tests/cpu/test_polar_defaults.py`, and `tests/cpu/test_planner.py` with both records in
+  `FASTMACE_ONLY_DEFAULTS`. The latter's 19-label default plans and the research-engine comparison were run with
+  `FASTMACE_BASELINE` set.
+- **POLAR-1-L, NbCl5 2×2×2, local** (the owner's condition; untimed reservation, 14:13–14:23 UTC, source
+  `9b9e3e0`, both records on): energy 0.88, forces 0.96 (2.8e-3 eV/Å, yardstick 3.0e-3), stress 0.75, **passed**.
+  Phase 1b on leto, without the records: 1.12 / 0.98 / 0.70. POLAR-1-L joins `POLAR_GRAPH_LABELS` in the commit
+  after the S and M default (`results/opt4-T02/gates/polar1-l-NbCl5/`).

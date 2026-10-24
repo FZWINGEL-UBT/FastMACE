@@ -167,11 +167,12 @@ class RewriteConfig:
     tf32x3_gemms: Toggle = "auto"
     # e3nn's o3.Linear code as an fx graph instead of the TorchScript a checkpoint restores, so dynamo traces it
     # (a TorchScript Linear in a loop sends PolarMACE's whole forward back to eager); rounding (opt-4 OPT4-T02,
-    # fastmace.rewrites.codegen); opt-in, auto = off.
+    # fastmace.rewrites.codegen); auto = on for the qualified POLAR-1 checkpoints (S, M) in hybrid float32 plans
+    # that are not reproducible (owner decision 58, 24 October 2026), off for every other model.
     fx_e3nn_linear: Toggle = "auto"
     # PolarMACE: per-graph sums of one graph (Fukui norms, total charges, barycentre) as a sum over atoms and a
     # broadcast, not scatter_add_ and an index (float64 index_put backward); rounding (opt-4 OPT4-T02,
-    # fastmace.rewrites.polar.graph_sums); opt-in, auto = off.
+    # fastmace.rewrites.polar.graph_sums); auto as fx_e3nn_linear (owner decision 58).
     polar_graph_sums: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False

@@ -22,7 +22,9 @@ call (538 of 1,226 kernels) are eager kernels and their eager autograd nodes (``
   copy just before compiling (``fastmace.model.compile.compile_model``), after the last copy.
 - **Refused** for models without a TorchScript ``o3.Linear`` and for Linears with ``f_in``/``f_out``
   (weights with batch dimensions; the module does not keep those sizes).
-- **Opt-in** (default off, the planner's ``never_automatic``); the owner decides defaults.
+- **Default** (owner decision 58, 24 October 2026): on under ``auto`` for the qualified POLAR-1 checkpoints
+  (``fastmace.planner.fixed.POLAR_GRAPH_LABELS``: S and M) in hybrid float32 plans that are not reproducible;
+  off for every other model unless requested. The record's own ``default`` stays ``"off"``: the planner decides.
 """
 
 from __future__ import annotations

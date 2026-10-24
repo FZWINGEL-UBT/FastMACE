@@ -128,7 +128,7 @@ def plan_for(label, backend="auto", integrator=None, atoms=None, **configs):
     engine = configs.pop("engine", EngineConfig())
     engine = dataclasses.replace(engine, backend=backend)
     return planner(engine=engine, **configs).plan(traits(label), atoms if atoms is not None else nacl(),
-                                                  integrator or IntegratorConfig(), GPU)
+                                                  integrator or IntegratorConfig(), GPU, model_label=label)
 
 
 def on(value):
@@ -216,6 +216,10 @@ FASTMACE_ONLY_DEFAULTS = {
     "fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
     # Owner decision 57, 24 October 2026 (OPT4-T04): the generic MACE family only, float32, not reproducible.
     "grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
+    # Owner decision 58, 24 October 2026 (OPT4-T02): the qualified POLAR-1 checkpoints (S and M), hybrid float32,
+    # not reproducible.
+    "fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
+    "polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
 }
 # Where each FastMACE-only default applies (labels): the factored interaction, or the OPT-T08 records' own scope
 # (docs/design/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
@@ -226,7 +230,8 @@ GENERIC_FAMILY_LABELS = tuple(label for label, facts in LABEL_FACTS.items()
                               if facts[0] != "PolarMACE" and set(facts[1]) <= {RESIDUAL, DENSITY_FIRST, DENSITY})
 APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "folded_backward_tiles": FACTORED_LABELS,
            "species_tables": MH1_LABELS, "fold_product_linear": MH1_LABELS,
-           "fold_readout_tail": (*MH1_LABELS, "omol0-xl"), "grouped_launch": GENERIC_FAMILY_LABELS}
+           "fold_readout_tail": (*MH1_LABELS, "omol0-xl"), "grouped_launch": GENERIC_FAMILY_LABELS,
+           "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS}
 
 
 def fastmace_only_expected(name, label, backend):
@@ -683,7 +688,7 @@ def test_plans_equal_the_research_engine(label, capsys):
         configs = configs_from_argv(argv)
         integrator = configs.pop("integrator")
         try:
-            plan = planner(**configs).plan(traits(label), nacl(), integrator, GPU)
+            plan = planner(**configs).plan(traits(label), nacl(), integrator, GPU, model_label=label)
         except PlanRefused as error:
             if research is not None and not (_plain_cueq_reassociation(argv, research)
                                              or _refused_at_engine_construction(label, argv, research)):
@@ -702,6 +707,9 @@ def test_plans_equal_the_research_engine(label, capsys):
             if name == "grouped_launch" and name in got_off:
                 assert label not in APPLIES[name], (label, argv)
                 assert got_off[name].startswith("not the generic MACE family, decision 57"), (label, argv)
+            elif name in fixed.POLAR_GRAPH_RECORDS and name in got_off:
+                assert label not in APPLIES[name], (label, argv)
+                assert got_off[name].startswith("not a qualified POLAR-1 checkpoint, decision 58"), (label, argv)
             elif name in got_off:
                 supported, reason = capabilities.rewrite_support(model)[stage2[name]]
                 assert label not in APPLIES[name] and not supported and got_off[name] == reason, (label, argv, name)

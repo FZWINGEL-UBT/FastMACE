@@ -2,7 +2,8 @@
 
 - the one-graph helpers give MACE's ``scatter_sum(...)[batch]``, ``scatter_mean`` and ``x[batch]`` values and
   gradients (rounding: another summation order), and with several graphs they are MACE's forms, bit for bit;
-- the record is rounding-class, deterministic, opt-in (``never_automatic``) and needs one graph per batch;
+- the record is rounding-class, deterministic, default only for the qualified POLAR-1 checkpoints (decision 58)
+  and needs one graph per batch;
 - the source edit replaces exactly the five sites of MACE 0.3.16's forward (three with PR 1762's options,
   whose Fukui normalisation takes the helpers itself), composes with the float64 energy reduction, and
   refuses another source;
@@ -70,7 +71,8 @@ def test_the_record_is_rounding_opt_in_and_single_graph():
 
     assert fixed.SINGLE_GRAPH in record["workload_constraints"]
     assert RewriteConfig().polar_graph_sums == "auto"
-    assert fixed.AUTO_RULES["RewriteConfig.polar_graph_sums"] == "never_automatic"
+    assert fixed.AUTO_RULES["RewriteConfig.polar_graph_sums"] == (
+        "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints")  # decision 58
     assert "polar_graph_sums" in fixed.REWRITE_FIELDS
     assert reg.default_registry().config_field("polar_graph_sums") == "polar_graph_sums"
 
