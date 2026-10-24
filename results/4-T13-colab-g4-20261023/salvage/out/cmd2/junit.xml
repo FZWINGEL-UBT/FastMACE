@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="27" time="2891.300" timestamp="2026-10-23T20:50:57.284592+00:00" hostname="82b449450a30"><testcase classname="tests.gpu.test_ase_calculator_gpu" name="test_lbfgs_with_fm_calc_reaches_maces_minimum[pytest]" time="87.947" /><testcase classname="tests.gpu.test_ase_calculator_gpu" name="test_lbfgs_with_fm_calc_reaches_maces_minimum[hybrid]" time="57.911" /><testcase classname="tests.gpu.test_combo_kernels_cuda" name="test_combo_kernels_change_no_value" time="94.456" /><testcase classname="tests.gpu.test_compat_gpu" name="test_captured_graphs_and_their_kernel_counts_are_recorded" time="66.702" /><testcase classname="tests.gpu.test_compat_gpu" name="test_a_short_md_smoke_in_nve_nvt_and_npt" time="141.553" /><testcase classname="tests.gpu.test_compiled_gpu" name="test_mh1_hybrid_compiled_equals_graph_within_float32_noise" time="162.735" /><testcase classname="tests.gpu.test_compiled_gpu" name="test_mp0_compiled_equals_graph_within_float32_noise" time="119.476" /><testcase classname="tests.gpu.test_eager_gpu" name="test_mh1_hybrid_eager_equals_graph_within_float32_noise" time="137.751" /><testcase classname="tests.gpu.test_eager_gpu" name="test_polar1_s_plain_cueq_runs_gated_in_eager_mode" time="48.662" /><testcase classname="tests.gpu.test_forces_gpu" name="test_two_force_fields_from_one_model_step_independently[float64-none]" time="29.502" /><testcase classname="tests.gpu.test_forces_gpu" name="test_two_force_fields_from_one_model_step_independently[float64-default]" time="68.954" /><testcase classname="tests.gpu.test_forces_gpu" name="test_mh1_agrees_with_maceforces[cueq-float64-eager-plain]" time="333.802" /><testcase classname="tests.gpu.test_mc_displace_gpu" name="test_displacement_attempts_captured_and_on_the_host_path" time="342.315" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_decisions_replay_the_exact_chain" time="511.313" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_first_attempt_after_md" time="192.667" /><testcase classname="tests.gpu.test_move_energy_gate_gpu" name="test_move_energy_gate_captured_tiny_plain_cueq" time="90.255" /><testcase classname="tests.gpu.test_rewrites_generic_gpu" name="test_stacked_generic_rewrites_plain_cueq_float64[mp0-medium]" time="11.059" /><testcase classname="tests.gpu.test_rewrites_generic_gpu" name="test_stacked_generic_rewrites_plain_cueq_float64[off23-small]" time="5.595" /><testcase classname="tests.gpu.test_rewrites_generic_gpu" name="test_stacked_generic_rewrites_hybrid_in_a_fresh_process[mp0-medium-float64]" time="31.577" /><testcase classname="tests.gpu.test_rewrites_generic_gpu" name="test_stacked_generic_rewrites_hybrid_in_a_fresh_process[mp0-medium-float32]" time="33.192" /><testcase classname="tests.gpu.test_rewrites_generic_gpu" name="test_stacked_generic_rewrites_hybrid_in_a_fresh_process[off23-small-float64]" time="28.819" /><testcase classname="tests.gpu.test_rewrites_generic_gpu" name="test_stacked_generic_rewrites_hybrid_in_a_fresh_process[off23-small-float32]" time="30.207" /><testcase classname="tests.gpu.test_rewrites_mh1_gpu" name="test_streaming_attaches_on_a_tiny_hybrid_model[float64]" time="27.381" /><testcase classname="tests.gpu.test_rewrites_mh1_gpu" name="test_mh1_float64_package_agrees_with_the_unrewritten_model" time="7.417" /><testcase classname="tests.gpu.test_rewrites_mh1_gpu" name="test_mh1_hybrid_float32_with_streaming" time="33.500" /><testcase classname="tests.gpu.test_template_cache_gpu" name="test_a_second_simulation_from_a_template_copy_runs_as_from_a_reload[hybrid-float32]" time="120.665"><failure message="subprocess.TimeoutExpired: Command '['/content/fm/venv/bin/python', '-c', 'import openequivariance']' timed out after 120 seconds">backend = 'hybrid', dtype = 'float32'
+tiny_checkpoint = PosixPath('/content/fm/tmp/pytest-of-root/pytest-1/tiny0/tiny-mh1.model')
+tmp_path = PosixPath('/content/fm/tmp/pytest-of-root/pytest-1/test_a_second_simulation_from_0')
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize(("backend", "dtype"), [("hybrid", "float32"), ("cueq", "float32")])
+    def test_a_second_simulation_from_a_template_copy_runs_as_from_a_reload(backend, dtype, tiny_checkpoint, tmp_path):
+&gt;       _skip_unless_possible(backend)
+
+tests/gpu/test_template_cache_gpu.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/gpu/test_template_cache_gpu.py:44: in _skip_unless_possible
+    if backend == "hybrid" and not _has(HYBRID_PYTHON, "import openequivariance"):
+tests/gpu/test_template_cache_gpu.py:38: in _has
+    return subprocess.run([python, "-c", code], capture_output=True, timeout=120, check=False).returncode == 0
+../uv-python/cpython-3.10-linux-x86_64-gnu/lib/python3.10/subprocess.py:505: in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+../uv-python/cpython-3.10-linux-x86_64-gnu/lib/python3.10/subprocess.py:1154: in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+../uv-python/cpython-3.10-linux-x86_64-gnu/lib/python3.10/subprocess.py:2022: in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;Popen: returncode: -9 args: ['/content/fm/venv/bin/python', '-c', 'import o...&gt;
+endtime = 8457.030183759, orig_timeout = 120, stdout_seq = []
+stderr_seq = [b'/content/fm/venv/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is depre...aises an error naming the lock file to delete.\n\n  from openequivariance._torch.TensorProduct import TensorProduct\n']
+skip_check_and_raise = False
+
+    def _check_timeout(self, endtime, orig_timeout, stdout_seq, stderr_seq,
+                       skip_check_and_raise=False):
+        """Convenience for checking if a timeout has expired."""
+        if endtime is None:
+            return
+        if skip_check_and_raise or _time() &gt; endtime:
+&gt;           raise TimeoutExpired(
+                    self.args, orig_timeout,
+                    output=b''.join(stdout_seq) if stdout_seq else None,
+                    stderr=b''.join(stderr_seq) if stderr_seq else None)
+E           subprocess.TimeoutExpired: Command '['/content/fm/venv/bin/python', '-c', 'import openequivariance']' timed out after 120 seconds
+
+../uv-python/cpython-3.10-linux-x86_64-gnu/lib/python3.10/subprocess.py:1198: TimeoutExpired</failure></testcase><testcase classname="tests.gpu.test_template_cache_gpu" name="test_a_second_simulation_from_a_template_copy_runs_as_from_a_reload[cueq-float32]" time="68.480" /></testsuite></testsuites>

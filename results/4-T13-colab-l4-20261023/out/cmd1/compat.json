@@ -1,0 +1,123 @@
+{
+  "tool": "compat",
+  "tier": "-m compat (tests/_support/tiers.py)",
+  "provider": "colab",
+  "label": "Colab L4",
+  "host": "dcc0dd81c0d1",
+  "gpu": "NVIDIA L4",
+  "capability": [
+    8,
+    9
+  ],
+  "driver": "580.82.07",
+  "cuda": "13.0",
+  "versions": {
+    "torch": "2.14.1+cu130",
+    "triton": "3.8.0",
+    "cuequivariance": "0.12.0",
+    "cuequivariance_torch": "0.12.0",
+    "openequivariance": "0.7.0",
+    "mace": null,
+    "ase": "3.27.0",
+    "numpy": "2.2.6"
+  },
+  "python": "/content/fm/venv/bin/python",
+  "fastmace_commit": "269674154d504e732ea3f19f25d9d1a4901c0aa9",
+  "started_utc": "2026-10-23T19:30:05+00:00",
+  "command": [
+    "/content/fm/venv/bin/python",
+    "-m",
+    "pytest",
+    "tests/gpu",
+    "-m",
+    "compat",
+    "-p",
+    "no:cacheprovider",
+    "-rfEs",
+    "--durations=30",
+    "--junitxml=/content/fm/out/cmd1/junit.xml",
+    "-p",
+    "resultlog",
+    "--result-log=/content/fm/out/cmd1/results.jsonl"
+  ],
+  "exit_code": 1,
+  "wall_s": 5818.6227938580005,
+  "finished_utc": "2026-10-23T21:07:04+00:00",
+  "counts": {
+    "passed": 356,
+    "failed": 1,
+    "error": 0,
+    "skipped": 2
+  },
+  "failures": [
+    {
+      "test": "tests.gpu.test_combo_kernels_cuda::test_combo_kernels_change_no_value",
+      "outcome": "failed",
+      "message": "assert 3.0994415283203125e-06 <= (2 * 7.152557373046875e-07)"
+    }
+  ],
+  "slowest": [
+    {
+      "test": "tests.gpu.test_reproducible_gpu::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]",
+      "seconds": 478.21
+    },
+    {
+      "test": "tests.gpu.test_compat_gpu::test_a_short_md_smoke_in_nve_nvt_and_npt",
+      "seconds": 357.211
+    },
+    {
+      "test": "tests.gpu.test_canonical_restart_gpu::test_mh1_plain_cueq_float64_resumes_within_1e_12",
+      "seconds": 354.937
+    },
+    {
+      "test": "tests.gpu.test_eager_gpu::test_mh1_hybrid_eager_equals_graph_within_float32_noise",
+      "seconds": 311.344
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[polar1-s]",
+      "seconds": 253.061
+    },
+    {
+      "test": "tests.gpu.test_compat_gpu::test_captured_graphs_and_their_kernel_counts_are_recorded",
+      "seconds": 240.934
+    },
+    {
+      "test": "tests.gpu.test_combo_kernels_cuda::test_combo_kernels_change_no_value",
+      "seconds": 230.618
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[mh1-r2scan-nvt]",
+      "seconds": 219.414
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[mh1-r2scan-npt-full]",
+      "seconds": 194.588
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[mp0-medium]",
+      "seconds": 181.886
+    },
+    {
+      "test": "tests.gpu.test_energy_gpu::test_float64_energy_replays_and_keeps_forces[default-dtype1]",
+      "seconds": 176.597
+    },
+    {
+      "test": "tests.gpu.test_tiny_released_gpu::test_tiny_registry_plain_cueq_float64",
+      "seconds": 174.795
+    },
+    {
+      "test": "tests.gpu.test_tiny_released_gpu::test_tiny_broken_captured_graph_fails_while_eager_passes",
+      "seconds": 167.515
+    },
+    {
+      "test": "tests.gpu.test_mc_evaluator_gpu::test_energy_only_graph_and_evaluator_tiny_plain_cueq",
+      "seconds": 164.904
+    },
+    {
+      "test": "tests.gpu.test_overflow_commit_gpu::test_an_edge_overflow_is_redone_with_the_fused_integrator",
+      "seconds": 159.848
+    }
+  ],
+  "test_seconds": 5787.747000000011,
+  "junit": "/content/fm/out/cmd1/junit.xml"
+}

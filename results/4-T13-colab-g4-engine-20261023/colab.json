@@ -1,0 +1,28 @@
+{
+  "provider": "colab",
+  "date_utc": "2026-10-23T19:31:46Z",
+  "session": "fm-4t13-g4-engine",
+  "gpu": "G4",
+  "commit": "269674154d504e732ea3f19f25d9d1a4901c0aa9",
+  "requested_commit": "269674154d504e732ea3f19f25d9d1a4901c0aa9",
+  "commands_text": [
+    "export PYTHONPATH=$PYTHONPATH:$PWD/tools/acceptance; python -m pytest -p no:cacheprovider -p resultlog --result-log=$OUT/results.jsonl --junitxml=$OUT/junit.xml -rfEs --durations=40 tests/gpu/test_schemes_engine_ase_gpu.py",
+    "ckpt=$FASTMACE_MODELS/mace-mh-1.model; S=$FASTMACE_STRUCTURES; A=$S/anneal-minima\nprobe() { name=$1; opt=$2; crystal=$3; shift 3; mkdir -p $OUT/$name\n  for side in ase gpu; do python tools/validation/anneal_frame_probe.py run --side $side --optimizer $opt --checkpoint $ckpt --traj $crystal=$A/$crystal/captured.traj --frame 10 --precision float64 \"$@\" --output $OUT/$name/$side > $OUT/$name/$side.log 2>&1; echo \"$name $side $?\"; done\n  python tools/validation/anneal_frame_probe.py compare $OUT/$name/ase $OUT/$name/gpu > $OUT/$name/compare.json 2>&1; cat $OUT/$name/compare.json; }\nfor opt in lbfgs fire; do for c in NaCl NbCl5; do probe fixed-f64-$opt-$c $opt $c; done; probe fix-atoms-$opt $opt NbCl5 --fix-every 3 --ase-calculator mace; done"
+  ],
+  "commands": [],
+  "exit": "error",
+  "stack": "f00d5798f8b5",
+  "models": [
+    "mh-1",
+    "medium",
+    "polar-1-s"
+  ],
+  "out": "/home/fzwin/fastmace-acceptance/4-T13-colab-g4-engine-20261023",
+  "timings": {},
+  "cu_before": 183.97,
+  "rate_per_h": 29.94,
+  "stopped": true,
+  "cu_after": 183.97,
+  "wall_s": 8.7,
+  "cu_used": 0.0
+}

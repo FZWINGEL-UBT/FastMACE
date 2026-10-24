@@ -1,0 +1,104 @@
+{
+  "protocol_record_version": 1,
+  "source": "npt_anneal_NbCl5_short",
+  "structure": "/content/fm/src/fastmace/protocols/data/NbCl5_R2SCAN.cif",
+  "repeat": [
+    3,
+    3,
+    3
+  ],
+  "atoms": 1944,
+  "timestep_fs": 1.0,
+  "relax": {
+    "fmax": 0.01,
+    "optimizer": "gpu-LBFGS",
+    "max_steps": 5000
+  },
+  "relaxation": {
+    "optimizer": "gpu-LBFGS",
+    "fixed_cell": true,
+    "fmax_target_eV_A": 0.01,
+    "max_steps": 5000,
+    "converged": true,
+    "steps": 17,
+    "seconds": 0.11597265700038406,
+    "initial_eV_atom": -10.715682092628137,
+    "energy_eV_atom": -10.715861232635815,
+    "fmax_eV_A": 0.008652792426237432,
+    "neighbour_rebuilds": 0,
+    "recaptures": 0
+  },
+  "quench": {
+    "min_K": 500.0,
+    "bin_K": 100.0,
+    "per_bin": 2,
+    "fmax": 0.01,
+    "optimizer": "gpu-LBFGS",
+    "max_steps": 5000
+  },
+  "quench_result": {
+    "settings": {
+      "min_K": 500.0,
+      "bin_K": 100.0,
+      "per_bin": 2,
+      "fmax": 0.01,
+      "optimizer": "gpu-LBFGS",
+      "max_steps": 5000,
+      "fixed_cell": true,
+      "cell": "frame",
+      "selection": "thermostat target temperature; each ramp separately; evenly spaced within each bin; plus the final frame"
+    },
+    "frames": 21,
+    "frame_every": 100,
+    "trajectory_frames": 271,
+    "quench_wall_s": 366.4347957310001,
+    "engines": 1,
+    "quench_seconds_sum": 306.39495899999565,
+    "not_converged": 10,
+    "heating": {
+      "n": 10,
+      "mean_eV_atom": -10.71246518357228,
+      "sd_eV_atom": 0.005808168460881633
+    },
+    "cooling": {
+      "n": 10,
+      "mean_eV_atom": -10.647950816019387,
+      "sd_eV_atom": 0.015779625076000465
+    },
+    "final_quenched_eV_atom": -10.633877766815026
+  },
+  "mc": null,
+  "min_mc_temperature_K": null,
+  "dispersion": "D3(functional=r2scan, damping=bj, pair_cutoff_bohr=40.0, cn_cutoff_bohr=40.0, three_body=False, smoothing=none, precision=float64, autoang=0.52917726, autoev=27.21138505, s6=1.0, s8=0.7898, a1=0.4948, a2=5.7308)",
+  "pieces": [
+    {
+      "first_step": 0,
+      "last_step": 13500,
+      "wall_s": 150.59526242100037,
+      "counters": {
+        "neighbour_rebuilds": 1957,
+        "d3_builds": 263,
+        "d3_rebuilds": 262,
+        "d3_build_s": 0.614636893998977
+      }
+    },
+    {
+      "first_step": 13500,
+      "last_step": 27000,
+      "wall_s": 167.7759625510007,
+      "counters": {
+        "neighbour_rebuilds": 1575,
+        "d3_builds": 200,
+        "d3_rebuilds": 199,
+        "d3_build_s": 0.3438556259861798
+      }
+    }
+  ],
+  "counters": {
+    "neighbour_rebuilds": 3532,
+    "d3_builds": 463,
+    "d3_rebuilds": 461,
+    "d3_build_s": 0.9584925199851568
+  },
+  "status": "complete"
+}

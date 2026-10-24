@@ -1,0 +1,309 @@
+{
+  "schema": 4,
+  "task": "4-T05/4-T06/4-T07/4-T08",
+  "side": "ase",
+  "optimizer": "lbfgs",
+  "cell_filter": "frechet",
+  "pressure_GPa": 0.0,
+  "dispersion": "none",
+  "structure_settings": {
+    "root": "/content/fm/baseline/1a-T18",
+    "repeat": [
+      3,
+      3,
+      3
+    ],
+    "strain": 0.02,
+    "rattle_A": 0.02,
+    "seed": 0,
+    "seed_rule": "seed + crc32(name)"
+  },
+  "optimizer_settings": "ASE 3.27 defaults",
+  "cuda_allocator": "expandable_segments:True",
+  "started": "2026-10-23T21:47:23+00:00",
+  "fastmace_commit": null,
+  "machine": "82b449450a30",
+  "gpu": "NVIDIA RTX PRO 6000 Blackwell Server Edition",
+  "torch": "2.14.1+cu130",
+  "ase": "3.27.0",
+  "precision": "float32",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/content/fm/cache/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "model": "mh1",
+  "head": "matpes_r2scan",
+  "checkpoint": "/content/fm/models/mace-mh-1.model",
+  "fmax": 0.01,
+  "steps": 5000,
+  "structures": {
+    "NaCl": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NaCl.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 48,
+          "seconds": 37.80220655799894,
+          "initial_eV_atom": -6.882520629300012,
+          "energy_eV_atom": -6.88761027654012,
+          "fmax_eV_A": 0.008924147735609279,
+          "ms_per_step": 787.5459699583113,
+          "switch_flips": null,
+          "warm_up": true,
+          "cell_lengths_A": [
+            16.839046988323528,
+            16.839140928922962,
+            16.839095328492427
+          ],
+          "cell_angles_deg": [
+            89.9999589542282,
+            89.99996017402,
+            89.99985186329587
+          ],
+          "volume_A3": 4774.811112987212
+        }
+      }
+    },
+    "NaNbCl6": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NaNbCl6.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 189,
+          "seconds": 52.74405223999929,
+          "initial_eV_atom": -9.684609088356849,
+          "energy_eV_atom": -9.701952029709462,
+          "fmax_eV_A": 0.008419713890202407,
+          "ms_per_step": 279.0690594708957,
+          "switch_flips": null,
+          "warm_up": false,
+          "cell_lengths_A": [
+            19.480191110420932,
+            20.725167892286205,
+            58.20069658065679
+          ],
+          "cell_angles_deg": [
+            89.99983144760552,
+            91.4538860525749,
+            90.00001717211343
+          ],
+          "volume_A3": 23489.81616996764
+        }
+      }
+    },
+    "NaTaCl6": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NaTaCl6.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 186,
+          "seconds": 43.630699628,
+          "initial_eV_atom": -12.754449062877232,
+          "energy_eV_atom": -12.771486663983929,
+          "fmax_eV_A": 0.009670641715611767,
+          "ms_per_step": 234.57365391397852,
+          "switch_flips": null,
+          "warm_up": false,
+          "cell_lengths_A": [
+            19.512588989209377,
+            20.743490050442293,
+            58.03891242621702
+          ],
+          "cell_angles_deg": [
+            90.00050323773276,
+            91.58569338274478,
+            90.0000608992326
+          ],
+          "volume_A3": 23482.787462438115
+        }
+      }
+    },
+    "NaNbO3": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NaNbO3.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 225,
+          "seconds": 47.72402622200025,
+          "initial_eV_atom": -11.84696533812417,
+          "energy_eV_atom": -11.87887426857595,
+          "fmax_eV_A": 0.00998506102596347,
+          "ms_per_step": 212.10678320889,
+          "switch_flips": null,
+          "warm_up": false,
+          "cell_lengths_A": [
+            16.578706998101442,
+            16.854239977256594,
+            46.58459561956475
+          ],
+          "cell_angles_deg": [
+            90.0000165032785,
+            89.99982800062138,
+            89.9999256919334
+          ],
+          "volume_A3": 13016.73787639758
+        }
+      }
+    },
+    "NaTaO3": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NaTaO3.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 131,
+          "seconds": 44.929292746999636,
+          "initial_eV_atom": -16.88103293489527,
+          "energy_eV_atom": -16.9149589949184,
+          "fmax_eV_A": 0.009456651788985497,
+          "ms_per_step": 342.9717003587758,
+          "switch_flips": null,
+          "warm_up": false,
+          "cell_lengths_A": [
+            16.576164690166546,
+            23.31494374128053,
+            16.357601514114993
+          ],
+          "cell_angles_deg": [
+            89.99999622307162,
+            90.00027906212624,
+            90.00003170516794
+          ],
+          "volume_A3": 6321.7606516043525
+        }
+      }
+    },
+    "NbCl3O": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl3O.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 209,
+          "seconds": 44.29837270900134,
+          "initial_eV_atom": -11.582271540164948,
+          "energy_eV_atom": -11.608805515148022,
+          "fmax_eV_A": 0.008648302646567841,
+          "ms_per_step": 211.953936406705,
+          "switch_flips": null,
+          "warm_up": false,
+          "cell_lengths_A": [
+            33.824638455799565,
+            33.82459798884798,
+            11.865494550899621
+          ],
+          "cell_angles_deg": [
+            89.99927173111541,
+            89.99898310619159,
+            89.99978096118942
+          ],
+          "volume_A3": 13575.369241635148
+        }
+      }
+    },
+    "TaCl3O": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/TaCl3O.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 203,
+          "seconds": 44.19749717600098,
+          "initial_eV_atom": -16.53118586451919,
+          "energy_eV_atom": -16.558170180409043,
+          "fmax_eV_A": 0.009987685690689477,
+          "ms_per_step": 217.72166096552206,
+          "switch_flips": null,
+          "warm_up": false,
+          "cell_lengths_A": [
+            33.87737021474196,
+            33.877136549785405,
+            11.415959519410723
+          ],
+          "cell_angles_deg": [
+            90.00086548665367,
+            89.99938371614698,
+            89.9999474419435
+          ],
+          "volume_A3": 13101.734814722147
+        }
+      }
+    },
+    "NbCl2O": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl2O.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 218,
+          "seconds": 45.984447007998824,
+          "initial_eV_atom": -12.63185202523514,
+          "energy_eV_atom": -12.659190621640947,
+          "fmax_eV_A": 0.008124697144532109,
+          "ms_per_step": 210.9378303119212,
+          "switch_flips": null,
+          "warm_up": false,
+          "cell_lengths_A": [
+            40.557857052495216,
+            11.879453023785226,
+            20.28742370181025
+          ],
+          "cell_angles_deg": [
+            90.00020611367482,
+            105.70830207983053,
+            90.00004347209547
+          ],
+          "volume_A3": 9409.52930748493
+        }
+      }
+    },
+    "NbCl5": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/NbCl5.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 251,
+          "seconds": 46.90099696099969,
+          "initial_eV_atom": -10.60316372150747,
+          "energy_eV_atom": -10.623767346756939,
+          "fmax_eV_A": 0.009836502449010668,
+          "ms_per_step": 186.85656159760833,
+          "switch_flips": null,
+          "warm_up": false,
+          "cell_lengths_A": [
+            57.55871868179965,
+            54.983015192771795,
+            18.124972924392605
+          ],
+          "cell_angles_deg": [
+            90.00006373188539,
+            90.4197486287827,
+            90.00003890656114
+          ],
+          "volume_A3": 57359.503285221304
+        }
+      }
+    },
+    "TaCl5": {
+      "traj": "/content/fm/baseline/1a-T18/Structures/Benchmark/R2SCAN/TaCl5.cif",
+      "frames": {
+        "0": {
+          "converged": true,
+          "steps": 284,
+          "seconds": 45.23762549200001,
+          "initial_eV_atom": -14.68689359853297,
+          "energy_eV_atom": -14.709295348498065,
+          "fmax_eV_A": 0.009692175981102634,
+          "ms_per_step": 159.28741370422537,
+          "switch_flips": null,
+          "warm_up": false,
+          "cell_lengths_A": [
+            57.12158076989416,
+            54.6128095421354,
+            18.10906025935061
+          ],
+          "cell_angles_deg": [
+            89.99994045199959,
+            90.72141150409647,
+            89.99995209679766
+          ],
+          "volume_A3": 56488.00340409961
+        }
+      }
+    }
+  },
+  "finished": "2026-10-23T21:54:56+00:00"
+}
