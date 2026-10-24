@@ -35,7 +35,9 @@ def _python(backend):
 
 
 def _has(python, code):
-    return subprocess.run([python, "-c", code], capture_output=True, timeout=120, check=False).returncode == 0
+    # A first ``import openequivariance`` on a fresh machine may build its extension and wait up to 5 minutes for
+    # the build lock (120 s timed out on a Colab G4, 23 October 2026).
+    return subprocess.run([python, "-c", code], capture_output=True, timeout=900, check=False).returncode == 0
 
 
 def _skip_unless_possible(backend):
