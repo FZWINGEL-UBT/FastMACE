@@ -160,6 +160,14 @@ class RewriteConfig:
     # one launch; rounding (the energy moves by ~1e-9 relative), not adopted (opt-3 OPT3-T04,
     # fastmace.rewrites.inductor); opt-in, auto = off.
     combo_kernels: Toggle = "auto"
+    # e3nn's o3.Linear code as an fx graph instead of the TorchScript a checkpoint restores, so dynamo traces it
+    # (a TorchScript Linear in a loop sends PolarMACE's whole forward back to eager); rounding (opt-4 OPT4-T02,
+    # fastmace.rewrites.codegen); opt-in, auto = off.
+    fx_e3nn_linear: Toggle = "auto"
+    # PolarMACE: per-graph sums of one graph (Fukui norms, total charges, barycentre) as a sum over atoms and a
+    # broadcast, not scatter_add_ and an index (float64 index_put backward); rounding (opt-4 OPT4-T02,
+    # fastmace.rewrites.polar.graph_sums); opt-in, auto = off.
+    polar_graph_sums: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
     # MACE PR 1498 one-graph strain in the stress path (upstream_mace.use_single_graph_strain).

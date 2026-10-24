@@ -290,6 +290,9 @@ class PolarHolder:
     # The strain path bound by the force field (2-T08b, fastmace.rewrites.engine.bind_strain_path):
     # True one-graph, False MACE's own, None not bound (whatever mace.modules.utils holds).
     single_graph_strain: bool | None = None
+    # opt-4 OPT4-T02 (``fastmace.rewrites.polar.graph_sums``): per-graph sums of one graph without scatter and
+    # index (``GRAPH_SUM_EDITS``).
+    graph_sums: bool = False
 
 
 class _Call:
@@ -541,33 +544,38 @@ def _permute_to_e3nn_convention(x):
 # --------------------------------------------------------------------------- MACE PR 1762
 
 
-def normalise_fukui(fukui_sources, batch, num_graphs, regularisation=0.0):
+def normalise_fukui(fukui_sources, batch, num_graphs, regularisation=0.0, graph_sums=False):
     """PolarMACE._normalise_fukui of MACE PR 1762 with r = ``regularisation``.
 
     r = 0: MACE 0.3.16's normalisation (division by the signed per-graph sum, in float64, with
     sum 0 replaced by 1). r > 0: s / (s^2 + (r sum|f|)^2) with the withheld weight spread evenly;
-    the weights sum to one, are smooth through s = 0 and bounded by about 1/(2r).
+    the weights sum to one, are smooth through s = 0 and bounded by about 1/(2r). ``graph_sums``: the
+    per-graph sums by ``graph_sum`` (one graph without scatter and index).
     """
     import torch
     from mace.tools.scatter import scatter_sum
 
+    def per_graph(src):
+        if graph_sums:
+            return graph_sum(src, batch, num_graphs)
+        return scatter_sum(src=src, index=batch, dim=0, dim_size=num_graphs)[batch]
+
     r = float(regularisation)
     if r > 0.0:
         f = fukui_sources.double()
-        count = scatter_sum(src=torch.ones_like(f[:, :1]), index=batch, dim=0, dim_size=num_graphs)[batch]
-        mean_sq = scatter_sum(src=f * f, index=batch, dim=0, dim_size=num_graphs)[batch] / count
+        count = per_graph(torch.ones_like(f[:, :1]))
+        mean_sq = per_graph(f * f) / count
         empty = mean_sq == 0
         f = torch.where(empty, torch.ones_like(f), f)
         mean_sq = torch.where(empty, torch.ones_like(mean_sq), mean_sq)
-        norm = scatter_sum(src=f, index=batch, dim=0, dim_size=num_graphs)[batch]
+        norm = per_graph(f)
         smooth_abs = torch.sqrt(f * f + 1e-6 * mean_sq)
-        total_abs = scatter_sum(src=smooth_abs, index=batch, dim=0, dim_size=num_graphs)[batch]
+        total_abs = per_graph(smooth_abs)
         eps2 = (r * total_abs) ** 2
         denom = norm * norm + eps2
         weights = f * norm / denom + eps2 / denom / count
         return torch.where(empty, 1.0 / count, weights).to(fukui_sources.dtype)
-    norm = scatter_sum(src=fukui_sources.double(), index=batch, dim=0, dim_size=num_graphs)[batch]
-    norm = norm.to(fukui_sources.dtype)
+    norm = per_graph(fukui_sources.double()).to(fukui_sources.dtype)
     norm = torch.where(norm == 0, torch.ones_like(norm), norm)
     return fukui_sources / norm
 
@@ -603,7 +611,9 @@ def _instance_config(model):
 
 
 def _model_normalise_fukui(model, fukui_sources, batch, num_graphs):
-    return normalise_fukui(fukui_sources, batch, num_graphs, _instance_config(model).fukui_regularisation)
+    holder = model.__dict__.get(HOLDER_ATTRIBUTE)
+    return normalise_fukui(fukui_sources, batch, num_graphs, _instance_config(model).fukui_regularisation,
+                           graph_sums=holder is not None and holder.graph_sums)
 
 
 def _model_cap_charge_dipole(model, spin_charge_density):
@@ -703,14 +713,78 @@ FLOAT64_ENERGY_EDITS = (
 )
 
 
-def polar_forward(original_forward, stabilise=False, float64_energy=False):
-    """MACE 0.3.16's PolarMACE.forward with PR 1762 (``stabilise``) and/or the float64 energy reduction.
+# --------------------------------------------------------------------------- per-graph sums (OPT4-T02)
 
-    Neither: ``original_forward`` itself. Otherwise built from its source like ``pr1762_forward``.
-    An unqualified source raises ``PolarUnavailableError`` (PR 1762) or
+
+def graph_sum(src, batch, num_graphs):
+    """``scatter_sum(src, batch, dim=0, dim_size=num_graphs)[batch]``: each atom's graph total.
+
+    One graph: the sum over atoms, broadcast back (a reduction; its backward a broadcast). MACE's form
+    adds every atom into one row with ``scatter_add_`` (atomics on CUDA) and gathers it back with an
+    index whose backward is a serial sort-based ``index_put`` (2.3 ms of POLAR-1-S's NbCl5 force call in
+    float64). Several graphs: MACE's form. ``num_graphs`` is a Python int (static under dynamo).
+    """
+    if num_graphs == 1:
+        return src.sum(dim=0, keepdim=True).expand_as(src)
+    from mace.tools.scatter import scatter_sum
+
+    return scatter_sum(src=src, index=batch, dim=0, dim_size=num_graphs)[batch]
+
+
+def graph_mean(src, batch, num_graphs):
+    """``scatter_mean(src, batch, dim=0, dim_size=num_graphs)``: one graph, the sum divided by the atom count."""
+    if num_graphs == 1:
+        return src.sum(dim=0, keepdim=True) / src.shape[0]
+    from mace.tools.scatter import scatter_mean
+
+    return scatter_mean(src=src, index=batch, dim=0, dim_size=num_graphs)
+
+
+def graph_gather(values, batch, num_graphs):
+    """``values[batch]``: one graph, the row broadcast to every atom (its backward a sum, not an index_put)."""
+    if num_graphs == 1:
+        return values.expand(batch.shape[0], *values.shape[1:])
+    return values[batch]
+
+
+# MACE 0.3.16's PolarMACE.forward sites that ``graph_sums`` changes (every per-graph sum and every gather by
+# ``data["batch"]``): (pattern, replacement, count without PR 1762, count with it). PR 1762's edits replace the
+# two Fukui sums by ``_fastmace_normalise_fukui``, which takes the helpers itself.
+GRAPH_SUM_EDITS = (
+    (r'scatter_sum\(\s*src=(?P<src>[^\n]+?),\s*index=data\["batch"\],\s*dim=0,\s*dim_size=num_graphs,\s*\)'
+     r'\[data\["batch"\]\]',
+     r'_fastmace_graph_sum(\g<src>, data["batch"], num_graphs)', 4, 2),
+    (r'scatter_mean\(\s*src=positions\.double\(\),\s*index=data\["batch"\],\s*dim=0,\s*dim_size=num_graphs,'
+     r'\s*\)',
+     r'_fastmace_graph_mean(positions.double(), data["batch"], num_graphs)', 1, 1),
+    (r'barycenter\[data\["batch"\], :\]', r'_fastmace_graph_gather(barycenter, data["batch"], num_graphs)', 1, 1),
+    (r'(?P<total>\(data\["total_charge"\] [+-] \(data\["total_spin"\] - 1\)\))\[data\["batch"\]\]',
+     r'_fastmace_graph_gather(\g<total>, data["batch"], num_graphs)', 2, 2),
+)
+
+
+def graph_sums_source(source, stabilise=False):
+    """``source`` with ``GRAPH_SUM_EDITS`` (after PR 1762's edits when ``stabilise``); refuses another source."""
+    import re
+
+    for pattern, replacement, plain, with_pr1762 in GRAPH_SUM_EDITS:
+        expected = with_pr1762 if stabilise else plain
+        source, found = re.subn(pattern, replacement, source)
+        if found != expected:
+            raise PolarUnavailableError(f"PolarMACE.forward is not MACE 0.3.16's; the graph sums do not apply "
+                                        f"({found} sites of {pattern[:40]!r}, expected {expected})")
+    return source
+
+
+def polar_forward(original_forward, stabilise=False, float64_energy=False, graph_sums=False):
+    """MACE 0.3.16's PolarMACE.forward with PR 1762 (``stabilise``), the float64 energy reduction and/or the
+    one-graph sums (``graph_sums``, ``GRAPH_SUM_EDITS``).
+
+    None: ``original_forward`` itself. Otherwise built from its source like ``pr1762_forward``.
+    An unqualified source raises ``PolarUnavailableError`` (PR 1762, graph sums) or
     ``fastmace.model.energy.EnergyReductionError``.
     """
-    if not float64_energy:
+    if not float64_energy and not graph_sums:
         return pr1762_forward(original_forward) if stabilise else original_forward
     import mace.modules.extensions as extensions
 
@@ -722,12 +796,18 @@ def polar_forward(original_forward, stabilise=False, float64_energy=False):
             if source.count(old) != 1:
                 raise PolarUnavailableError("PolarMACE.forward is not MACE 0.3.16's; the PR 1762 port does not apply")
             source = source.replace(old, new)
-    source = energy.apply_edits(source, FLOAT64_ENERGY_EDITS, "PolarMACE.forward")
+    if float64_energy:
+        source = energy.apply_edits(source, FLOAT64_ENERGY_EDITS, "PolarMACE.forward")
+    if graph_sums:
+        source = graph_sums_source(source, stabilise)
     namespace = dict(vars(extensions))
     namespace.update(_fastmace_normalise_fukui=_model_normalise_fukui,
                      _fastmace_cap_charge_dipole=_model_cap_charge_dipole,
-                     _fastmace_coulomb_energy_float64=coulomb_energy_float64)
-    return energy.compile_forward(source, namespace, "<fastmace PolarMACE.forward, float64 energy>")
+                     _fastmace_coulomb_energy_float64=coulomb_energy_float64,
+                     _fastmace_graph_sum=graph_sum, _fastmace_graph_mean=graph_mean,
+                     _fastmace_graph_gather=graph_gather)
+    what = ", ".join(name for name, on in (("float64 energy", float64_energy), ("graph sums", graph_sums)) if on)
+    return energy.compile_forward(source, namespace, f"<fastmace PolarMACE.forward, {what}>")
 
 
 # --------------------------------------------------------------------------- process-wide install
@@ -831,14 +911,15 @@ def install():
     original_internal = gto_utils.GTOInternalFieldtoFeaturesBlock.forward
     original_radial = gto_utils.RadialIntegralDirect.forward
     original_moduli = gto_utils.GTOBasis._prepare_k_moduli
-    rewritten = {}  # (PR 1762, float64 energy, strain path) -> forward, built on first use
+    rewritten = {}  # (PR 1762, float64 energy, strain path, graph sums) -> forward, built on first use
 
     def model_forward(holder):
-        key = (stabilised(holder.config), bool(holder.float64_energy), holder.single_graph_strain)
-        if key == (False, False, None):
+        key = (stabilised(holder.config), bool(holder.float64_energy), holder.single_graph_strain,
+               bool(holder.graph_sums))
+        if key == (False, False, None, False):
             return original_forward
         if key not in rewritten:
-            function = polar_forward(original_forward, *key[:2])
+            function = polar_forward(original_forward, *key[:2], graph_sums=key[3])
             if key[2] is not None:
                 # After install(): the module functions it replaced are in the copied globals.
                 from fastmace.rewrites import engine as engine_rewrites
@@ -998,6 +1079,18 @@ def set_float64_energy(model, enabled=True):
     _holder(model, create=True).float64_energy = bool(enabled)
 
 
+def set_graph_sums(model, enabled=True):
+    """Let this PolarMACE instance take its per-graph sums of one graph without scatter and index (OPT4-T02).
+
+    ``fastmace.rewrites.polar.graph_sums`` sets it; installs the wrappers, whose dispatcher builds the
+    forward with ``GRAPH_SUM_EDITS``. Works with or without the GPU-only path.
+    """
+    if not is_polar(model):
+        raise TypeError(f"{type(model).__name__} is not PolarMACE")
+    install()
+    _holder(model, create=True).graph_sums = bool(enabled)
+
+
 def set_single_graph_strain(model, one_graph):
     """Bind this PolarMACE instance's strain path (2-T08b): one-graph (True) or MACE's own (False).
 
@@ -1070,12 +1163,15 @@ def no_sync_check():
 
 
 __all__ = [
-    "FLOAT64_ENERGY_EDITS", "HOLDER_ATTRIBUTE", "PATCH_NAME", "PR1762_EDITS", "PROCESS_CONSTRAINTS", "SOURCE_HASHES",
+    "FLOAT64_ENERGY_EDITS", "GRAPH_SUM_EDITS", "HOLDER_ATTRIBUTE", "PATCH_NAME", "PR1762_EDITS", "PROCESS_CONSTRAINTS",
+    "SOURCE_HASHES",
     "ZERO_FORCE_REASON", "PolarHolder", "PolarState", "PolarUnavailableError", "cap_charge_dipole",
     "compute_k_vectors_fixed", "configure", "coulomb_energy_float64", "coulomb_energy_pbc", "disable", "enable",
-    "frozen_kset", "get_config", "get_state", "install", "installed", "is_polar", "no_sync_check", "normalise_fukui",
+    "frozen_kset", "get_config", "get_state", "graph_gather", "graph_mean", "graph_sum",
+    "graph_sums_source", "install", "installed", "is_polar", "no_sync_check", "normalise_fukui",
     "overflowed", "polar_forward", "pr1762_forward", "require_route", "reset_overflow", "resolve_kspace_headroom",
-    "route_support", "set_float64_energy", "set_single_graph_strain", "set_state", "source_digest",
+    "route_support", "set_float64_energy", "set_graph_sums",
+    "set_single_graph_strain", "set_state", "source_digest",
     "source_problems", "stabilised",
     "validate_charge_spin",
 ]

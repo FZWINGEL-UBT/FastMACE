@@ -155,7 +155,7 @@ def test_uvu_within_the_self_check_thresholds(dtype):
 
 
 def test_record_has_the_rewrite_fields():
-    assert set(RECORDS) == {"polar_uvu"}
+    assert set(RECORDS) == {"polar_uvu", "polar_graph_sums"}  # polar_graph_sums: test_polar_graph_sums.py
     record = RECORDS["polar_uvu"]
     assert {"name", "applies_to", "requires", "conflicts", "mace_versions", "source_hashes", "exactness",
             "default", "workload_constraints", "apply", "selfcheck"} <= set(record)  # SPEC §6.1
