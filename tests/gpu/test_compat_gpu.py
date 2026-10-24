@@ -96,7 +96,7 @@ for chunk in range(21):
 times, conserved = np.array(rows).T
 slope = float(np.polyfit(times, conserved, 1)[0])
 out["nve"] = {"drift_meV_per_atom_per_ps": 1e3 * slope, "range_meV_per_atom": 1e3 * float(np.ptp(conserved)),
-              "plan": sim.plan.describe()}
+              "plan": sim.plan.describe(full=True)}
 sim.close()
 
 sim, n = simulation(fm.integrators.Langevin(timestep_fs=1.0, temperature_K=300.0, friction_per_fs=0.01), 300.0)

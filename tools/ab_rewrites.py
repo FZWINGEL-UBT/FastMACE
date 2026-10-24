@@ -130,7 +130,7 @@ def main(argv=None):
             engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
             sides[side] = ab_step_time.FastMACESide(engine, torch)
             setup[side] = time.perf_counter() - started
-            lines[side] = [line.strip() for line in plan.describe().splitlines()
+            lines[side] = [line.strip() for line in plan.describe(full=True).splitlines()
                            if any(f"RewriteConfig.{f} " in line for f in {**args.a, **args.b})]
         for side in order:  # warm up outside the compile-counter window (new edge sizes compile here)
             step_time.warm_up(sides[side], protocol.warmup)

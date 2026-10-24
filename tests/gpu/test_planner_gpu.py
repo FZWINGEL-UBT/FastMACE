@@ -120,7 +120,7 @@ def planned_run():
     return out
 
 
-result = {"planned": planned_run(), "plan": plan.describe(), "torch": torch.__version__,
+result = {"planned": planned_run(), "plan": plan.describe(full=True), "torch": torch.__version__,
           "hardware": [hardware.name, list(hardware.compute_capability), hardware.memory_bytes]}
 
 # By hand (1a-T13's helper): the planned records, receiver order and step mode; main.py's settings.

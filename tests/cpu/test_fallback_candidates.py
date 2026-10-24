@@ -432,6 +432,9 @@ def test_describe_lists_the_tried_candidates():
     _, plan = gpu_plan()
     tried = (TriedCandidate("rewrites", "rewrites fold_cutoff off", "failed", "gate failed: forces", stage="gate"),
              TriedCandidate("mode", "mode eager", "activated", "capture failed", revision=1, full_gate_runs=1))
-    text = str(plan.revise("fallback: mode eager: capture failed", 0, fallbacks=tried))
+    revision = plan.revise("fallback: mode eager: capture failed", 0, fallbacks=tried)
+    assert ("fallbacks tried (2): rewrites fold_cutoff off: failed at gate; mode eager: activated as revision 1"
+            in str(revision))
+    text = revision.describe(full=True)
     assert "  fallback tried: rewrites fold_cutoff off: failed at gate (gate failed: forces)" in text
     assert "  fallback tried: mode eager: activated as revision 1 (capture failed)" in text
