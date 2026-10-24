@@ -1,8 +1,8 @@
 # OPT4-T03 stage 1: 3×TF32 atom GEMMs, accuracy (optimisation round 4)
 
 Plan: `plans/opt-4.md`, §3 candidate 3 and the OPT4-T03 row of §5. Stage 1 only: the accuracy of 3×TF32 atom GEMMs
-through Triton's `tf32x3`. Stage 2 (a CUTLASS 3×TF32 kernel) is the owner's decision after this report and is not
-built. Speed does not count here.
+through Triton's `tf32x3`. Stage 2 (a CUTLASS 3×TF32 kernel) is not built: the owner decided so after this
+report (§8). Speed does not count here.
 
 **Verdict: PASS.**
 - MH-1 passes the force gate on NaCl and NbCl5 (local sm_120) and the NVE drift check (Colab A100).
@@ -216,3 +216,16 @@ gain needs stage 2's CUTLASS kernel (OPT-T01 §5: 0.55–0.75× of cuBLAS GEMM t
   3. whether the rule should restrict the record to devices where 3×TF32 can win. By OPT-T01 that is sm_80; on
      sm_89 and sm_120, TF32 is under 3× FP32.
 - **Default:** none. The record stays opt-in (`never_automatic`). On sm_120 and the L4 it can only be slower.
+
+## 8. Decision (owner, 24 October 2026)
+
+**Stage 2 is not built now.** The owner: "Go ahead and do it as you recommended". The conductor's recommendation:
+
+- **No production A100.** The A100 is not a production GPU for FastMACE: it is Colab-only, and the compute units
+  are limited.
+- **No gain elsewhere.** On the production GPUs (the local RTX 5060 Ti, the Ada workstations, Modal), 3×TF32 is
+  slower than FP32.
+- **Stage 1 is enough for now.** It answers the accuracy question. The record `tf32x3_gemms` stays opt-in
+  (`never_automatic`). Stage 2 can start from it if the A100 becomes a production target.
+
+No default changes, so SPEC §19 has no entry, as for OPT4-T07's close.
