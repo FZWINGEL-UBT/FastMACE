@@ -51,6 +51,20 @@ end of each ``run()`` call, moments that synchronise anyway; the first ``run()``
 the setup's captures are not counted. ``counters.segments`` and ``counters.neighbour_lists`` record it,
 and the report's ``runtime`` line appears once re-captures or overflows happened. Under the subprocess
 runner the child's monitor reports each call's segments to the parent's.
+
+Tier switch (plan task 5-T07, SPEC §9.6, §18 decisions 52 and 53): past the re-capture budget the loop also
+reads the monitor after each re-capture (which synchronised already). When the trigger fires and nothing
+blocks it (``planner.adapt.blocked``), the switch is made at the next committed step outside an MC block,
+a canonical point forced there if the restart cadence would come later: the state is taken in memory
+(``_hand_over``), the graph engine is dropped, the compiled revision (``adapt.compiled_revision``) is built
+from the pristine model (``_build_for``), validated (self-checks; the gate under ``check="gate"``; the
+move-energy part for MC plans), and given the state (``_restore``). A candidate that fails stays a record
+and a warning, and the run continues on its revision, rebuilt from the same state. ``counters.tier_switches``
+and the report's revision lines read the switch from the plan chain; a resume rebuilds the switched
+revision as it is and does not switch again. In a subprocess runner's child the switch is the parent's: the
+child returns early at the canonical point with the request, and the parent hands it to a fresh child
+(``SubprocessRunner``). ``_last_point`` keeps the last committed canonical point in memory (the setup's, then
+each restart write's) for the mid-run fallbacks of 5-T08.
 """
 
 from __future__ import annotations
@@ -121,8 +135,9 @@ class PlannerOptions:
     - ``engine``, ``neighbours``: the planner-level options; ``None`` keeps the default planner's
       (``planner.minimal.default_planner``: CUDA if available, else the CPU without compilation);
     - ``adaptation``, ``calibration``: runtime adaptation (§9.6) and the optional calibration (§9.1) of
-      phase 5 (plan task 5-T01). Their fields that an open owner decision fixes stay ``config.PENDING``, and
-      ``calibrate=True`` is refused, until 5-T07 and 5-T09 land (``phase_5_pending``).
+      phase 5 (plan task 5-T01). Adaptation options decisions 52 and 53 did not choose are refused (5-T07);
+      calibration's fields stay ``config.PENDING``, and ``calibrate=True`` is refused, until 5-T09 lands
+      (``phase_5_pending``).
     """
 
     mode: Mode | None = None
@@ -172,22 +187,24 @@ class PlannerOptions:
 
 
 # The refusals of phase 5's placeholders (plan task 5-T01): a field an open owner decision fixes, set before the
-# task implementing it lands. 5-T07 (D2, D3) and 5-T09 (D5) remove them.
-PHASE_5_PENDING_CODES = {"adaptation": "adaptation-pending", "calibration": "calibration-pending"}
+# task implementing it lands (5-T09, D5), and an adaptation option decisions 52 and 53 did not choose (5-T07).
+PHASE_5_PENDING_CODES = {"adaptation": "adaptation-unsupported", "calibration": "calibration-pending"}
 
 
 def phase_5_pending(adaptation: AdaptationConfig, calibration: CalibrationConfig) -> list[Any]:
-    """The ``Reason`` for each phase 5 option that asks for behaviour an open owner decision fixes."""
-    from fastmace.config import PENDING
+    """The ``Reason`` for each phase 5 option that asks for behaviour not implemented: an adaptation option the
+    owner did not choose (decisions 52, 53), or the calibration that waits for D5."""
+    from fastmace.config import ADAPTATION_SUPPORTED, PENDING
     from fastmace.errors import Reason
 
     reasons = []
-    decided = adaptation.decided()
-    if decided:
-        reasons.append(Reason(f"AdaptationConfig({', '.join(f'{name}=...' for name in decided)}): the trigger and the "
-                              "limits of runtime adaptation wait for owner decisions D2 and D3 (plans/phase-5.md, "
-                              "task 5-T07); leave them 'pending', or pass adapt='off'",
-                              code=PHASE_5_PENDING_CODES["adaptation"]))
+    unsupported = adaptation.unsupported()
+    if unsupported:
+        reasons.append(Reason(
+            f"AdaptationConfig({', '.join(f'{name}={getattr(adaptation, name)!r}' for name in unsupported)}): "
+            "runtime adaptation implements owner decisions 52 and 53 only (SPEC §18): "
+            + "; ".join(f"{name} one of {ADAPTATION_SUPPORTED[name]}" for name in unsupported)
+            + "; or pass adapt='off'", code=PHASE_5_PENDING_CODES["adaptation"]))
     if calibration.calibrate or calibration.choose != PENDING:
         reasons.append(Reason("CalibrationConfig(calibrate=True) or choose=...: the optional calibration waits for "
                               "owner decision D5 (plans/phase-5.md, task 5-T09)",
@@ -272,6 +289,29 @@ def move_from_record(record: Mapping[str, Any]) -> Any:
     # A TOML table gives mu and formal_charges as mappings; T09's records take them as (species, value) pairs.
     return from_record({key: list(value.items()) if isinstance(value, Mapping) else value
                         for key, value in record.items()})
+
+
+@dataclasses.dataclass(frozen=True)
+class HandOver:
+    """A committed canonical point in memory (plan task 5-T07): ``step``, the restart entries
+    (``io.restart.engine_arrays``, the plan record and, at a restart write, the output chunk indices
+    ``outputs`` included) as the restart file would hold them. ``restart()`` reads them as
+    ``io.restart.read_restart`` reads a file."""
+
+    step: int
+    arrays: Mapping[str, Any]
+    outputs: Mapping[str, int] | None = None
+
+    def __post_init__(self):  # host copies of their own: on the CPU the engine's arrays share the tensors' memory
+        import numpy as np
+
+        object.__setattr__(self, "arrays", {key: np.array(value, copy=True) if isinstance(value, np.ndarray) else value
+                                            for key, value in self.arrays.items()})
+
+    def restart(self) -> dict[str, Any]:
+        from fastmace.io import restart
+
+        return restart.in_memory(self.arrays)
 
 
 def _steps(steps: Any) -> int:
@@ -490,6 +530,13 @@ class Simulation:
         setup = {}
 
         planner = _planner(minimal.default_planner(ff), options)
+        self._planner = planner  # a tier switch re-plans through it (5-T07)
+        self._references = self._move_references = None  # the gate's references, for a switch's validation
+        self._switch_due = None  # a SwitchRequest the trigger fired, until the switch is made (5-T07)
+        self._switch_request = None  # in a subprocess runner's child: the request handed to the parent
+        self._switch_failed = None  # the warning of a switch whose candidate failed: no second attempt
+        self._last_point = None  # the last committed canonical point (HandOver; 5-T08's mid-run fallbacks)
+        self._child = False  # set by the subprocess runner's child: switches are the parent's
         started = time.perf_counter()
         stored = getattr(self, "_resume_plan", None)  # a resume of a fallback revision (2-T15)
         self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq,
@@ -518,6 +565,7 @@ class Simulation:
         started = time.perf_counter()
         moves = selfcheck.move_references(self._plan, ff, atoms, workload, seed=seed, check=check, gate=options.gate)
         move_s = time.perf_counter() - started
+        self._references, self._move_references = references, moves
 
         started = time.perf_counter()
         failure = None
@@ -593,6 +641,8 @@ class Simulation:
         self._report = self._new_report()
         if output is not None:
             self._open_output()
+        if optimizer is None and not getattr(self, "_resuming", False):  # a fresh build is canonical (§10.6)
+            self._last_point = self._hand_over(canonicalise=False)
         self._write_metadata()
 
     def _attach_engine(self):
@@ -1020,6 +1070,11 @@ class Simulation:
         self._run_started = time.perf_counter()
         if not self._monitor.started:  # counted from the first step: the setup's captures are not in it
             self._monitor.start(self._monitor_info(), step=int(engine.state.step), wall_s=self._loop_s)
+        if self._switch_due is not None and self._switch_at_committed_step():  # due since the last call
+            engine = self._engine
+            cuda = engine.device.type == "cuda"
+        # Past the budget, a reading after each re-capture (5-T07's trigger); None: nothing can switch.
+        watch = getattr(engine, "recaptures", None) if self._switch_blocked() is None else None
         resolved = position.resolved if position is not None else None
         driver = self._mc
         if driver is not None:  # the steps of this call, run with the move set attached
@@ -1049,6 +1104,19 @@ class Simulation:
                             self._queue.submit(self._snapshot(), sink)
                 if restart_every is not None and step % restart_every == 0:
                     self.save_restart(Path(output.directory) / RESTART_NAME)
+                if watch is not None and engine.recaptures != watch:
+                    watch = engine.recaptures
+                    if engine.recapture_budget_exceeded_at is not None:
+                        synchronised_clock()  # the re-capture synchronised: the loop clock is exact again
+                        self._observe("recapture", canonical=False)
+                if self._switch_due is not None:
+                    if self._child:  # the parent switches: return here, at the hand-off's canonical point
+                        self._switch_request, self._switch_due = self._switch_due, None
+                        break
+                    if self._switch_at_committed_step():
+                        engine, driver = self._engine, self._mc
+                        cuda = engine.device.type == "cuda"
+                        watch = None
                 if step == window_first:
                     self._window_clock = synchronised_clock() - self._mc_block_s  # MD only: blocks left out
                 elif step == window_last and self._window_clock is not None and self._report.measured is None:
@@ -1065,7 +1133,7 @@ class Simulation:
         except NonFiniteError:
             self._status = "non-finite"
             self._stop_clock(synchronised_clock, count_steps=engine.state.step)
-            self._observe("run-end", canonical=False)
+            self._observe("run-end", canonical=False, switch=False)
             if self._writer is not None:
                 self._writer.flush()
             self._write_metadata()
@@ -1073,7 +1141,7 @@ class Simulation:
         except CellDivergedError:
             self._status = "cell-diverged"
             self._stop_clock(synchronised_clock, count_steps=engine.state.step)
-            self._observe("run-end", canonical=False)
+            self._observe("run-end", canonical=False, switch=False)
             if output is not None and not self._mc_block_active and not engine.uncommitted():
                 self.save_restart(Path(output.directory) / RESTART_NAME)  # the state at the stop (also metadata)
             else:
@@ -1084,6 +1152,11 @@ class Simulation:
         self._stop_clock(synchronised_clock, count_steps=engine.state.step)
         self._status = "paused"
         self._observe("run-end", canonical=False)
+        if self._switch_due is not None:
+            if self._child:
+                self._switch_request, self._switch_due = self._switch_due, None
+            elif self._switch_at_committed_step():  # a canonical point forced at the call's last step
+                engine = self._engine
         if self._mc_record is not None or self._mc is not None:
             if self._mc is not None:
                 self._mc_record = self._mc.state_dict()
@@ -1119,10 +1192,12 @@ class Simulation:
             info["d3"] = d3.counters()
         return info
 
-    def _observe(self, reason, canonical=True):
+    def _observe(self, reason, canonical=True, switch=True):
         """Close the monitor's segment at the committed step (module docstring). Called right after a moment
         that synchronised: a restart write, an MC block, a host write's re-evaluation (canonical points, at a
-        committed step outside an MC block), or the end of ``run()`` (``canonical=False``)."""
+        committed step outside an MC block), the end of ``run()`` or a re-capture past the budget
+        (``canonical=False``). A trigger that fires makes the switch due (5-T07); ``switch=False`` (a stop)
+        never does."""
         from fastmace.planner import adapt
 
         if self._engine is None:  # a plan run in a child: the child's monitor observes, the runner absorbs
@@ -1130,8 +1205,168 @@ class Simulation:
         monitor = self._monitor
         monitor.observe(self._monitor_info(), step=int(self._engine.state.step), wall_s=self._loop_clock(),
                         reason=reason, canonical=canonical)
-        request = monitor.decide(monitor.window())  # noqa: F841  (5-T07 acts on it, at a canonical point)
+        request = monitor.decide(monitor.window())
+        if request is not None and switch and self._switch_due is None and self._switch_blocked() is None:
+            self._switch_due = request  # made at the next committed step outside an MC block
         self._report.runtime = adapt.report_line(monitor.totals(), getattr(self._engine, "recapture_budget", None))
+
+    # ------------------------------------------------------------------ tier switch (§9.6; 5-T07)
+
+    def _switch_blocked(self):
+        """Why this run may not switch tiers now (``planner.adapt.blocked``), or ``None``."""
+        from fastmace.planner import adapt
+
+        if self._engine is None or self._switch_failed is not None:
+            return "no engine in this process" if self._engine is None else "a switch failed in this run"
+        return adapt.blocked(self._plan, self.options.adaptation, mode=self.options.mode,
+                             in_mc_block=self._mc_block_active)
+
+    def _switch_at_committed_step(self):
+        """Make the due switch now if this is a committed step outside an MC block; whether the engine
+        changed. In a subprocess runner's child the request goes to the parent instead."""
+        request = self._switch_due
+        if request is None or self._mc_block_active or self._engine.uncommitted():
+            return False
+        self._switch_due = None
+        if self._child:
+            self._switch_request = request
+            return False
+        if self._switch_blocked() is not None:
+            return False
+        self.switch_tier(request)
+        return True
+
+    def switch_tier(self, request):
+        """The tier switch of SPEC §9.6 at the committed step, for ``request`` (a ``planner.adapt.SwitchRequest``):
+        the compiled revision, built from the pristine model, validated, then given the committed state. A
+        candidate that fails leaves the run on its revision, with a warning (``adapt.SWITCH_FAILED_CODE``);
+        returns whether the switch was made. Not inside an MC block, nor from an uncommitted step."""
+        import logging
+
+        from fastmace.planner import adapt
+
+        self._check_restart_point()
+        old = self._plan
+        step = int(self._engine.state.step)
+        point = self._hand_over()  # canonicalised: a forced canonical point when no restart write is here
+        atoms = _restart_atoms(self._structure_record(), point.restart())
+        try:
+            revision = adapt.compiled_revision(old, self._planner, self.force_field, atoms, step=step,
+                                               request=request)
+            if not self._take_over(point, revision, atoms):
+                return False
+        except Exception as error:  # the re-plan refused: nothing was dropped
+            self._switch_failure(step, error)
+            return False
+        switch = adapt.tier_switches(self._plan)[-1]
+        logging.getLogger("fastmace.planner").info(adapt.switch_line(switch))
+        self._monitor.start(self._monitor_info(), step=step, wall_s=self._loop_clock())
+        self._monitor.mark(step)
+        self._report.plan = self._plan
+        self._write_metadata()
+        return True
+
+    def _switch_failure(self, step, error):
+        import logging
+
+        from fastmace.planner import adapt
+
+        text = (f"tier switch at step {step:,} not made ({adapt.SWITCH_FAILED_CODE}): {type(error).__name__}: "
+                f"{error}; the run stays on plan revision {self._plan.revision} ({self._plan.tier}) (SPEC §9.6, "
+                "decision 53)")
+        self._switch_failed = text
+        self._report.add_warning(text)
+        logging.getLogger("fastmace.planner").warning(text)
+
+    def _take_over(self, point, plan, atoms):
+        """Drop the active engine, build ``plan`` (``_build_for``), validate it and give it ``point``'s state
+        (``_restore``); whether it took over. A failure rebuilds the previous revision from the same ``point``
+        and records it (``_switch_failure``)."""
+        old = self._plan
+        self._drop_engine()
+        try:
+            engine = self._build_for(plan, atoms)
+            self._validate(engine, plan)
+        except Exception as error:
+            engine = None
+            self._drop_engine()
+            self._restore(point, self._build_for(old, atoms), old)
+            self._switch_failure(point.step, error)
+            return False
+        self._restore(point, engine, plan)
+        return True
+
+    def _drop_engine(self):
+        """Release the active engine before another is built (memory: conductor's answer, 5-T07 Q3)."""
+        import gc
+
+        import torch
+
+        engine = self._engine
+        if self._mc is not None:
+            self._mc_record = self._mc.state_dict()
+            self._mc.detach()
+            self._mc = None
+        self._engine = self._fill = None
+        cuda = engine is not None and engine.device.type == "cuda"
+        del engine
+        gc.collect()
+        if cuda:
+            torch.cuda.empty_cache()
+
+    def _build_for(self, plan, atoms):
+        """``plan``'s engine at ``atoms`` (the committed structure), from the pristine model; not validated."""
+        engine = self._planner.build(plan, self.force_field, atoms)
+        return engine
+
+    def _validate(self, engine, plan):
+        """Validation before activation (SPEC §9.4 step 4, decision 53): the self-checks ran in the build; the
+        gate's production half when the run requested one; the move-energy part for MC plans, at the plan's MC
+        energy precision. ``GateFailed`` and the build's errors propagate."""
+        from fastmace.planner import selfcheck
+
+        if self._references is not None and self.check != "skip":
+            selfcheck.production(engine, self._references, check=self.check)
+        if self._move_references is not None:
+            selfcheck.move_gate(engine, self._move_references, plan=plan, force_field=self.force_field,
+                                requested=plan.precision.mc_energy)
+
+    def _restore(self, point, engine, plan):
+        """Give ``engine`` (built for ``plan``) the committed state of ``point`` and make it the active one:
+        state, buckets and targets (``io.restart.resume_engine``), the schedule, the MC move set, the target
+        fill. 5-T08 restores a fallback candidate's validated engine through it."""
+        from fastmace.io import restart
+
+        stored = point.restart()
+        restart.resume_engine(stored, engine)
+        self._engine, self._plan = engine, plan
+        self._attach_engine()
+        engine.state.protocol = self._schedule
+        restart.restore_targets(stored, engine.integrator)
+        self._fill.reset()
+        mc = restart.mc_record(stored)
+        if mc is not None and self._mc_moves is not None:
+            self._resume_mc(mc)
+        else:
+            engine.state.mc = None
+
+    def _hand_over(self, canonicalise=True):
+        """The committed state as a ``HandOver`` (no file): drained output, then ``engine_arrays`` (a canonical
+        point unless ``canonicalise=False``, for a fresh build). Not inside an MC block or from an uncommitted
+        step."""
+        from fastmace.io import restart
+
+        self._check_restart_point()
+        self._queue.drain()
+        engine = self._engine
+        arrays = restart.engine_arrays(engine, name=ENGINE_NAME, plan=self._plan, canonicalise=canonicalise)
+        return HandOver(step=int(engine.state.step), arrays=arrays)
+
+    def _structure_record(self):
+        """``simulation.json``'s ``structure``: the run's species, masses and PBC (a restart's composition wins)."""
+        atoms = self._atoms
+        return {"numbers": [int(z) for z in atoms.numbers], "masses": [float(m) for m in atoms.get_masses()],
+                "pbc": [bool(p) for p in atoms.pbc]}
 
     def _monitor_counters(self):
         """``counters.segments`` and ``counters.neighbour_lists`` from the monitor (``None`` before a segment)."""
@@ -1272,6 +1507,7 @@ class Simulation:
 
     def _base_metadata_record(self):
         from fastmace import provenance
+        from fastmace.planner import adapt
 
         if self._runner is not None:
             return self._runner.metadata(self)
@@ -1284,7 +1520,8 @@ class Simulation:
             checkpoint=self.force_field.model, identity=self.force_field.identity, plan=plan, seed=self.seed,
             generators={"integrator": state.rng.generator}, cursors={"integrator": int(state.rng.cursor)},
             schedule=self._schedule, gate=self._gate,
-            counters={"mc": self._mc_counters(), **self._monitor_counters()},
+            counters={"mc": self._mc_counters(), **self._monitor_counters(), "tier_switches": [
+                switch.record() for switch in adapt.tier_switches(plan)]},
             engine_info=self._engine.info(),
             restart_points=self._restart_points, setup=self._setup_s, timing=timing, report=self._report,
             device=str(self._engine.device), force_field=self._engine.force_field)
@@ -1362,7 +1599,9 @@ class Simulation:
         path.parent.mkdir(parents=True, exist_ok=True)
         self._queue.drain()
         outputs = self._writer.restart_point() if self._writer is not None else None
-        restart.write_engine_restart(path, self._engine, name=ENGINE_NAME, plan=self._plan, outputs=outputs)
+        arrays = restart.write_engine_restart(path, self._engine, name=ENGINE_NAME, plan=self._plan,
+                                              outputs=outputs)
+        self._last_point = HandOver(step=int(self._engine.state.step), arrays=arrays, outputs=outputs)
         if outputs is not None:
             point = {"step": int(self._engine.state.step), **outputs}
             if not self._restart_points or self._restart_points[-1] != point:
@@ -1476,9 +1715,11 @@ class Simulation:
             output = Output(**output)
         sim = cls.__new__(cls)
         sim._resuming = True  # a plan that runs in a child takes this restart as its first hand-off (2-T07)
-        from fastmace.planner import fallback
+        from fastmace.planner import adapt, fallback
 
         previous = fallback.stored_fallback_plan(restart.plan_record(stored))
+        if previous is None:  # a switched revision too is rebuilt as it is (5-T07)
+            previous = adapt.stored_switch_plan(restart.plan_record(stored))
         if previous is not None:  # a fallback revision is rebuilt as it is, never searched again (2-T15)
             sim._resume_plan = previous
         integrator = _kept_projection(_integrator(record["integrator"]), restart.plan_record(stored))
@@ -1534,6 +1775,7 @@ class Simulation:
             self._report.add_warning(_versions_text(versions))
         if output is not None:
             self._open_output(resume_from=restart.output_indices(stored))
+        self._last_point = self._hand_over(canonicalise=False)  # resume_engine canonicalised (§10.6)
         self._write_metadata()
 
     def _resumed_plan(self, stored, step, allow_plan_change, versions):

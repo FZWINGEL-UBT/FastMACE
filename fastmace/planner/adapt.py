@@ -15,11 +15,26 @@ previous reading as a ``Segment``:
 of an MC block, a host write's re-evaluation, the end of ``run()``), so the step path gains no
 synchronisation. A segment's wall time is the run's loop clock between two readings.
 
-The monitor keeps the last ``SEGMENT_LIMIT`` segments (the totals keep counting), the window since the
-last ``mark`` for 5-T07's trigger, and ``decide``, which returns ``None`` until 5-T07 adds the trigger.
-It starts empty in every process: a resume starts a new monitor, and the restart format does not
-change (phase 5 conductor's choice 5). Under the subprocess runner the child's monitor ``export``s the
+The monitor keeps the last ``SEGMENT_LIMIT`` segments (the totals keep counting) and the window since the
+last ``mark``. It starts empty in every process: a resume starts a new monitor, and the restart format does
+not change (phase 5 conductor's choice 5). Under the subprocess runner the child's monitor ``export``s the
 segments of each call, and the parent's ``absorb``s them.
+
+Plan task 5-T07 adds the tier switch (SPEC §9.6, §18 decisions 52 and 53):
+
+- ``Monitor.decide(window)`` is the trigger: the re-capture budget exceeded and, over the window since the
+  last switch, more than ``recapture_time_fraction`` of the wall time spent re-capturing. It returns a
+  ``SwitchRequest`` or ``None``;
+- ``blocked(plan, adaptation, ...)`` holds the limits: one way (graph -> compiled), at most
+  ``max_switches`` per run (a resume counts its chain's), never under ``reproducible=True``, with an
+  explicit ``mode=``, during an MC block or for a relaxation;
+- ``compiled_revision`` makes the switch's revision: the active plan re-planned on the compiled tier with
+  the same backend, rewrites (every rewrite off stays off), precision and physics, reason
+  ``"adapt: graph -> compiled: ..."`` and code ``SWITCH_CODE`` (no §9.3 rule: §9.6);
+- ``tier_switches(plan)`` reads the switches back from the revision chain (``counters.tier_switches``).
+
+``Simulation`` reads the monitor at canonical points and, past the budget, after each re-capture (a moment
+that synchronised anyway), and makes the switch at a canonical point: the one it is at, or one it forces.
 """
 
 from __future__ import annotations
@@ -31,9 +46,10 @@ from typing import Any
 
 from fastmace.config import AdaptationConfig
 
-# Where a segment ends: a restart write, an MC block, a host write (canonical points, §10.6), or the end
-# of a run() call (not canonical: its counters are read, nothing is canonicalised).
-SEGMENT_REASONS = ("restart", "mc-block", "host-write", "run-end")
+# Where a segment ends: a restart write, an MC block, a host write (canonical points, §10.6), the end of a
+# run() call, or a re-capture past the budget (5-T07's trigger reading). The last two are not canonical: their
+# counters are read, nothing is canonicalised.
+SEGMENT_REASONS = ("restart", "mc-block", "host-write", "run-end", "recapture")
 # Segments kept (``counters.segments``); the totals keep counting past it.
 SEGMENT_LIMIT = 1000
 # The neighbour lists a segment reports: MACE's always, D3's when the force field has the term.
@@ -182,9 +198,22 @@ class Monitor:
         self._totals = combine(self._totals, segment)
         self.closed += 1
 
-    def decide(self, window: Segment | None) -> None:
-        """What to do at this point; 5-T06 decides nothing (5-T07 adds the trigger, SPEC §9.6)."""
-        return None
+    def decide(self, window: Segment | None) -> SwitchRequest | None:
+        """The trigger (SPEC §18 decision 52): a ``SwitchRequest`` when, over ``window`` (the segments since the
+        last switch), the re-capture budget was exceeded and re-capturing took more than
+        ``recapture_time_fraction`` of the wall time; ``None`` otherwise, and always with ``adapt="off"`` or
+        ``trigger="none"``. The limits are ``blocked``'s."""
+        adaptation = self.adaptation
+        if window is None or adaptation.adapt == "off" or adaptation.trigger == "none":
+            return None
+        if window.budget_exceeded_at is None or window.wall_s <= 0:
+            return None
+        if (adaptation.trigger == "recapture-time"
+                and window.recapture_s / window.wall_s <= adaptation.recapture_time_fraction):
+            return None
+        return SwitchRequest(step=window.last_step, recaptures=window.recaptures, recapture_s=window.recapture_s,
+                             wall_s=window.wall_s, budget_exceeded_at=window.budget_exceeded_at,
+                             threshold=adaptation.recapture_time_fraction)
 
     def mark(self, step: int) -> None:
         """Start the window at ``step`` (5-T07 marks a tier switch)."""
@@ -259,4 +288,140 @@ def report_line(totals: Segment | None, budget: int | None = None) -> str | None
     return "; ".join(parts)
 
 
-__all__ = ["LISTS", "SEGMENT_LIMIT", "SEGMENT_REASONS", "Monitor", "Segment", "combine", "report_line"]
+# --------------------------------------------------------------------------- the tier switch (5-T07)
+
+# A switch revision's reason starts with this; its decisions carry SWITCH_CODE (no §9.3 rule: SPEC §9.6).
+PREFIX = "adapt: "
+SWITCH_CODE = "adapt-tier-switch"
+# A switch whose candidate failed its validation: the run stays on its revision, with this warning's code.
+SWITCH_FAILED_CODE = "adapt-switch-failed"
+# The one switch decision 52 allows.
+FROM_TIER, TO_TIER = "graph", "compiled"
+
+
+@dataclasses.dataclass(frozen=True)
+class SwitchRequest:
+    """What the trigger saw: the window's re-captures and their host time against its wall time, the step the
+    budget was exceeded at, and the threshold; ``step`` is the reading's."""
+
+    step: int
+    recaptures: int
+    recapture_s: float
+    wall_s: float
+    budget_exceeded_at: int
+    threshold: float
+
+    def text(self) -> str:
+        """The trigger in the revision's reason (measured values only, §7.7)."""
+        share = 100.0 * self.recapture_s / self.wall_s
+        return (f"{self.recaptures} re-captures took {self.recapture_s:.3g} s, {share:.1f} % of the wall time since "
+                f"the last switch (above {100.0 * self.threshold:g} %), the budget exceeded at step "
+                f"{self.budget_exceeded_at:,} (SPEC §9.6, decision 52)")
+
+    def record(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+    @classmethod
+    def from_record(cls, record: Mapping[str, Any]) -> SwitchRequest:
+        return cls(**record)
+
+
+def is_switch(plan: Any) -> bool:
+    """Whether ``plan`` (a revision or a chain summary) is a tier switch's revision."""
+    return str(getattr(plan, "reason", "")).startswith(PREFIX)
+
+
+def _revisions(plan):
+    return [] if plan is None else [*plan.chain(), plan]
+
+
+def switches(plan: Any) -> int:
+    """The tier switches in ``plan``'s revision chain, itself included (a resume counts them: decision 53)."""
+    return sum(1 for entry in _revisions(plan) if is_switch(entry))
+
+
+def tier_switches(plan: Any) -> list[Any]:
+    """``counters.tier_switches``: one ``TierSwitch`` per switch revision in ``plan``'s chain, oldest first."""
+    from fastmace.planner.plan import TierSwitch
+
+    out = []
+    for entry in _revisions(plan):
+        if is_switch(entry):
+            first, _, second = str(entry.reason)[len(PREFIX):].split(":", 1)[0].partition(" -> ")
+            out.append(TierSwitch(step=int(entry.step or 0), from_tier=first.strip(), to_tier=second.strip(),
+                                  reason=str(entry.reason), revision=int(entry.revision)))
+    return out
+
+
+def blocked(plan: Any, adaptation: AdaptationConfig, *, mode: str | None, in_mc_block: bool = False) -> str | None:
+    """Why the active ``plan`` may not switch (SPEC §18 decision 53), or ``None``: adaptation off or no trigger,
+    a tier other than graph (one way), the chain's switches at ``max_switches``, ``reproducible=True``, an
+    explicit ``mode=`` (the user's choice stays), an MC block, a relaxation."""
+    if adaptation.adapt == "off" or adaptation.trigger == "none":
+        return "adaptation is off"
+    if plan is None or plan.tier != FROM_TIER:
+        return f"the {getattr(plan, 'tier', None)} tier does not switch (one way: {FROM_TIER} -> {TO_TIER})"
+    if plan.optimizer is not None or plan.integrator is None:
+        return "a relaxation does not switch tiers"
+    limit = adaptation.max_switches
+    if limit is not None and switches(plan) >= limit:
+        return f"at most {limit} tier switch{'' if limit == 1 else 'es'} per run"
+    if plan.workload is not None and plan.workload.reproducible:
+        return "reproducible=True: a switch would break the bitwise promise"
+    if mode is not None:
+        return f"mode={mode!r} was given: the user's choice stays"
+    if in_mc_block:
+        return "inside an MC block"
+    return None
+
+
+def compiled_revision(plan: Any, planner: Any, force_field: Any, atoms: Any, *, step: int,
+                      request: SwitchRequest) -> Any:
+    """The tier switch's revision of ``plan`` at ``step``: ``plan`` re-planned on the compiled tier through
+    ``planner`` from the pristine ``force_field`` at ``atoms`` (the committed structure), with the same
+    backend, rewrite set (every rewrite off stays off), force and MC energy precision, physics and runner.
+    ``ValueError`` if the re-plan would change any of them; refusals of the re-plan propagate."""
+    from fastmace.errors import Reason
+    from fastmace.planner import fallback
+
+    planned = fallback._replanned(plan, planner, force_field, atoms, mode=TO_TIER, subprocess=False)
+    for name in (*fallback._PHYSICS, "rewrites", "runner"):
+        if getattr(planned, name) != getattr(plan, name):
+            raise ValueError(f"the compiled re-plan changes {name}; a tier switch changes only the tier (SPEC §9.6)")
+    if planned.engine.backend != plan.engine.backend or planned.precision.dtype != plan.precision.dtype:
+        raise ValueError("the compiled re-plan changes the backend or the force precision; a tier switch changes "
+                         "only the tier (SPEC §9.6, decision 52)")
+    text = request.text()
+    reason = Reason(f"{FROM_TIER} -> {TO_TIER} at step {int(step):,}: {text}", code=SWITCH_CODE)
+    decisions = [(key, choice, reason if key == "mode" else why) for key, choice, why in planned.decisions]
+    if all(key != "mode" for key, _, _ in decisions):
+        decisions.append(("mode", TO_TIER, reason))
+    decisions.append(("adaptation", f"{FROM_TIER} -> {TO_TIER}", reason))
+    fields = {f.name: getattr(planned, f.name) for f in dataclasses.fields(planned)
+              if f.name not in fallback._NOT_REPLANNED}
+    fields.update(decisions=tuple(decisions), requested=tuple(entry for entry in planned.requested
+                                                              if entry[0] != "mode"),
+                  precision=plan.precision, adaptation=plan.adaptation, calibration=plan.calibration)
+    return plan.revise(f"{PREFIX}{FROM_TIER} -> {TO_TIER}: {text}", int(step), selfchecks=(), **fields)
+
+
+def switch_line(switch: Any) -> str:
+    """The ``fastmace.planner`` log line of a switch (a ``TierSwitch``)."""
+    reason = switch.reason[len(PREFIX):] if switch.reason.startswith(PREFIX) else switch.reason
+    return f"tier switch at step {switch.step:,} as plan revision {switch.revision}: {reason}"
+
+
+def stored_switch_plan(record: Mapping[str, Any] | None) -> Any:
+    """The plan of a restart's plan record when it, or a revision before it, is a tier switch; else ``None``.
+    A resume rebuilds that revision as it is (``Simulation.resume``, as for a fallback revision)."""
+    from fastmace.planner.plan import Plan
+
+    if not record:
+        return None
+    plan = Plan.from_restart(record)
+    return plan if switches(plan) else None
+
+
+__all__ = ["FROM_TIER", "LISTS", "PREFIX", "SEGMENT_LIMIT", "SEGMENT_REASONS", "SWITCH_CODE", "SWITCH_FAILED_CODE",
+           "TO_TIER", "Monitor", "Segment", "SwitchRequest", "blocked", "combine", "compiled_revision", "is_switch",
+           "report_line", "stored_switch_plan", "switch_line", "switches", "tier_switches"]

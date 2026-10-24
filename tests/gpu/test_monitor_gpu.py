@@ -1,8 +1,10 @@
 """The runtime monitor on the GPU (plan task 5-T06; SPEC §9.6), untimed smoke.
 
-A fresh process runs MH-1 through ``Simulation`` with the production defaults (CUDA graphs, pipelined) on
+Fresh processes (one per run) run MH-1 through ``Simulation`` with the production defaults (CUDA graphs, pipelined) on
 NaCl 3x3x3 at 600 K, a restart every 20 steps. ``EngineConfig(graph_variant_cap=1)`` forces a re-capture
-storm: each stage's replay evicts the other's graph, so every step re-captures. The counters must move:
+storm: each stage's replay evicts the other's graph, so every step re-captures; runtime adaptation is off
+(``AdaptationConfig(adapt="off")``), so the storm stays on the graph tier (5-T07's switch has its own test,
+``test_adapt_switch_gpu.py``). The counters must move:
 re-captures with their host time (from ``GraphEngine._capture``'s own synchronisations, none added to
 the step), a segment per restart write and one at the end of ``run()``, ``counters.segments`` in
 ``metadata.json`` and the report's ``runtime`` line. The control run (the default cap) re-captures
@@ -36,7 +38,7 @@ from ase.build import bulk
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 
 from fastmace import integrators
-from fastmace.config import EngineConfig
+from fastmace.config import AdaptationConfig, EngineConfig
 from fastmace.io.output import Output
 from fastmace.model import loading
 from fastmace.model.forcefield import ForceField
@@ -44,23 +46,22 @@ from fastmace.planner.workload import Workload
 from fastmace.simulation import Simulation
 
 SPEC = {spec!r}
-loaded = loading.load_pristine(SPEC["path"], trusted=True)
-out = {{"gpu": torch.cuda.get_device_name(), "torch": torch.__version__, "runs": {{}}}}
-for tag, cap in SPEC["runs"]:
-    atoms = bulk("NaCl", "rocksalt", a=5.64, cubic=True).repeat((3, 3, 3))
-    MaxwellBoltzmannDistribution(atoms, temperature_K=600.0, rng=np.random.default_rng(11))
-    engine = {{}} if cap is None else {{"engine": EngineConfig(graph_variant_cap=cap)}}
-    directory = SPEC["directory"] + "/" + tag
-    sim = Simulation(atoms, ForceField(loaded, atoms, precision="float32"),
-                     integrator=integrators.Langevin(timestep_fs=2.0, temperature_K=600.0, friction_per_fs=0.02),
-                     seed=7, workload=Workload(max_temperature_K=600.0),
-                     output=Output(directory, thermo_every=20, trajectory_every=None, restart_every=20), **engine)
-    sim.run(steps=SPEC["steps"])
-    totals = sim._monitor.totals()
-    info = sim._engine.info()
-    sim.close()
-    metadata = json.load(open(directory + "/metadata.json"))
-    out["runs"][tag] = {{
+loaded = loading.load_pristine(SPEC["label"])  # the label names the head (MH-1 has six)
+atoms = bulk("NaCl", "rocksalt", a=5.64, cubic=True).repeat((3, 3, 3))
+MaxwellBoltzmannDistribution(atoms, temperature_K=600.0, rng=np.random.default_rng(11))
+engine = {{}} if SPEC["cap"] is None else {{"engine": EngineConfig(graph_variant_cap=SPEC["cap"])}}
+directory = SPEC["directory"]
+# Nothing touches CUDA before the Simulation: the allocator is configured at its build (SPEC §8.7).
+sim = Simulation(atoms, ForceField(loaded, atoms, precision="float32"),
+                 integrator=integrators.Langevin(timestep_fs=2.0, temperature_K=600.0, friction_per_fs=0.02),
+                 seed=7, workload=Workload(max_temperature_K=600.0), adaptation=AdaptationConfig(adapt="off"),
+                 output=Output(directory, thermo_every=20, trajectory_every=None, restart_every=20), **engine)
+sim.run(steps=SPEC["steps"])
+totals = sim._monitor.totals()
+info = sim._engine.info()
+sim.close()
+metadata = json.load(open(directory + "/metadata.json"))
+out = {{"gpu": torch.cuda.get_device_name(), "torch": torch.__version__,
         "plan": [sim.plan.tier, sim.plan.engine.backend], "segments": sim._monitor.records(),
         "totals": totals.record(), "engine": {{key: info[key] for key in (
             "captures", "capture_seconds", "recaptures", "recapture_seconds", "recapture_budget")}},
@@ -74,12 +75,13 @@ print(json.dumps(out))
 @pytest.mark.slow
 @pytest.mark.skipif(ENGINE._mh1_path() is None, reason="needs FASTMACE_MODELS with MH-1")
 def test_a_recapture_storm_moves_the_monitor_counters(tmp_path):
-    spec = {"path": str(ENGINE._mh1_path()), "steps": 60, "directory": str(tmp_path),
-            "runs": [["storm", 1], ["control", None]]}
-    result = ENGINE.run_fresh(CHILD.format(spec=spec), python=sys.executable)
-    print({tag: (run["plan"], run["totals"], run["engine"]) for tag, run in result["runs"].items()}, result["gpu"])
+    runs = {}
+    for tag, cap in (("storm", 1), ("control", None)):  # one fresh process each: one production engine
+        spec = {"label": "mh1-r2scan", "steps": 60, "directory": str(tmp_path / tag), "cap": cap}
+        runs[tag] = ENGINE.run_fresh(CHILD.format(spec=spec), python=sys.executable)
+        print(tag, runs[tag]["gpu"], runs[tag]["plan"], runs[tag]["totals"], runs[tag]["engine"])
 
-    storm, control = result["runs"]["storm"], result["runs"]["control"]
+    storm, control = runs["storm"], runs["control"]
     assert storm["plan"][0] == "graph"
     reasons = [(entry["last_step"], entry["reason"], entry["canonical"]) for entry in storm["segments"]]
     assert reasons == [(20, "restart", True), (40, "restart", True), (60, "restart", True)]

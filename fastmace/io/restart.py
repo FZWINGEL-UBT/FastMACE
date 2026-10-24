@@ -55,6 +55,7 @@ the resumed engine is in the state of the uninterrupted one.
 from __future__ import annotations
 
 import dataclasses
+import io
 import json
 import zipfile
 from collections.abc import Mapping
@@ -284,27 +285,52 @@ def write_restart(path: str | Path, state: SimulationState, *, engine: str,
     arguments are ``state_arrays``'s; ``variable_cell`` stores the cell again as ``cell_state``, the
     research engine's NPT key. Every record is checked before anything is written.
     """
+    write_arrays(path, state_arrays(state, engine, integrator_state, variable_cell, integrator=integrator,
+                                    plan=plan, outputs=outputs))
+
+
+def write_arrays(path: str | Path, arrays: Mapping[str, Any]) -> None:
+    """``state_arrays``' entries as a durable atomic restart file (``write_restart``'s second half)."""
     path = Path(path)
-    arrays = state_arrays(state, engine, integrator_state, variable_cell, integrator=integrator, plan=plan,
-                          outputs=outputs)
     durable.write_atomically(path, lambda handle: _write_npz(handle, arrays),
                              temporary=path.with_name(path.name + ".tmp.npz"))
 
 
+def in_memory(arrays: Mapping[str, Any]) -> dict[str, np.ndarray]:
+    """``state_arrays``' entries as ``read_restart`` would read them back from their file, without a file: the
+    in-memory hand-over of a tier switch (plan task 5-T07) reads exactly what a resume reads."""
+    buffer = io.BytesIO()
+    _write_npz(buffer, arrays)
+    buffer.seek(0)
+    with np.load(buffer, allow_pickle=False) as stored:
+        return {key: stored[key] for key in stored.files}
+
+
+def engine_arrays(engine: Any, *, name: str, plan: Any = None, outputs: Mapping[str, int] | None = None,
+                  canonicalise: bool = True) -> dict[str, Any]:
+    """A canonical restart point of ``engine`` and its restart entries (SPEC §10.6): ``engine.canonicalise()``
+    (unless ``canonicalise=False``, for a state that is canonical already, as a fresh build is), then
+    ``state_arrays`` with the engine's state and integrator. The arguments are ``write_engine_restart``'s."""
+    if canonicalise:
+        engine.canonicalise()
+    buckets = engine.restart_buckets()
+    record = buckets if plan is None else plan.to_restart(**buckets)
+    return state_arrays(engine.state, name, variable_cell=engine.variable_cell, integrator=engine.integrator,
+                        plan=record, outputs=outputs)
+
+
 def write_engine_restart(path: str | Path, engine: Any, *, name: str, plan: Any = None,
-                         outputs: Mapping[str, int] | None = None) -> None:
-    """A canonical restart point of ``engine``, then its restart file (SPEC §10.6).
+                         outputs: Mapping[str, int] | None = None) -> dict[str, Any]:
+    """A canonical restart point of ``engine``, then its restart file (SPEC §10.6); returns the entries written.
 
     ``engine.canonicalise()`` first, then ``write_restart`` with the engine's state and integrator.
     ``name`` is the restart file's ``engine`` entry. ``plan`` is the active ``Plan``; its record is
     ``plan.to_restart`` with the engine's edge bucket and neighbour capacity, or those two alone
     without a plan. ``outputs`` is ``ChunkedOutput.restart_point()`` (the output queue drained first).
     """
-    engine.canonicalise()
-    buckets = engine.restart_buckets()
-    record = buckets if plan is None else plan.to_restart(**buckets)
-    write_restart(path, engine.state, engine=name, variable_cell=engine.variable_cell, integrator=engine.integrator,
-                  plan=record, outputs=outputs)
+    arrays = engine_arrays(engine, name=name, plan=plan, outputs=outputs)
+    write_arrays(path, arrays)
+    return arrays
 
 
 def resume_engine(restart: Mapping[str, Any], engine: Any) -> None:
