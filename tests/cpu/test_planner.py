@@ -696,10 +696,13 @@ def test_plans_equal_the_research_engine(label, capsys):
         got_off = dict(plan.auto_options_off)
         assert {k: v for k, v in got_off.items() if k not in FASTMACE_ONLY_DEFAULTS} == off, (label, argv)
         # The FastMACE-only rewrites, unknown to the research engine, are switched off by stage 2 only where the
-        # model does not take them, with the model's own reason.
+        # model does not take them, with the model's own reason; grouped_launch by its family rule (decision 57).
         stage2 = dict(fixed.STAGE2_SUPPORT)
         for name in FASTMACE_ONLY_DEFAULTS:
-            if name in got_off:
+            if name == "grouped_launch" and name in got_off:
+                assert label not in APPLIES[name], (label, argv)
+                assert got_off[name].startswith("not the generic MACE family, decision 57"), (label, argv)
+            elif name in got_off:
                 supported, reason = capabilities.rewrite_support(model)[stage2[name]]
                 assert label not in APPLIES[name] and not supported and got_off[name] == reason, (label, argv, name)
         compared += 1
