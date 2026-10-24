@@ -99,6 +99,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.grouped_launch": "never_automatic",
     "RewriteConfig.combo_kernels": "never_automatic",
+    "RewriteConfig.tf32x3_gemms": "never_automatic",
     "RewriteConfig.species_tables": "on_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
@@ -124,7 +125,7 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
-                  "combo_kernels")
+                  "combo_kernels", "tf32x3_gemms")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
 SINGLE_GRAPH = "single_graph"  # one structure per evaluation: always, production is one structure
@@ -533,7 +534,7 @@ class FixedPlanner:
         hybrid = backend == "hybrid"
         values = self._stage1(book, hybrid, npt)
         self._stage2(book, values, traits, explicit)
-        self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible)
+        self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible, hardware.compute_capability)
         rewrite_values = {name: _toggle(values[name]) for name in REWRITE_FIELDS}
 
         rewrites = self.rewrites
@@ -843,6 +844,9 @@ class FixedPlanner:
         note("combo_kernels", r.combo_kernels == "on",
              "on: Inductor's pointwise combo kernels in the compiled model" if r.combo_kernels == "on"
              else "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)")
+        needs("tf32x3_gemms", r.tf32x3_gemms == "on", v["block_linear"], "block_linear")
+        if r.tf32x3_gemms == "auto":
+            v["_why"]["tf32x3_gemms"] = "off: only an explicit 'on' enables it (OPT4-T03, accuracy screen)"
         return v
 
     def _stage2(self, book, v, traits, explicit):
@@ -861,8 +865,20 @@ class FixedPlanner:
             elif v[name]:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
 
-    def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False):
+    def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False, capability=None):
         """FastMACE's hard rules on the rewrites, then one decision per rewrite field and neighbour option."""
+        if v["tf32x3_gemms"]:
+            from fastmace.kernels.triton.tf32x3_gemm import MIN_CAPABILITY
+
+            # OPT4-T03: Triton's tf32x3 is float32 only and needs TF32 tensor cores (compute capability >= 8.0).
+            if dtype != "float32":
+                book.refuse(f"RewriteConfig.tf32x3_gemms='on' needs float32, not {dtype}", "tf32x3-needs-float32")
+            elif capability not in (None, (0, 0)) and tuple(capability) < MIN_CAPABILITY:  # (0, 0): the CPU, PyTorch
+                book.refuse(f"RewriteConfig.tf32x3_gemms='on' needs compute capability >= 8.0, the GPU has "
+                            f"{capability[0]}.{capability[1]}", "tf32x3-needs-sm80")
+            if v["grouped_launch"]:
+                book.refuse("RewriteConfig.tf32x3_gemms and grouped_launch both reroute the block linears' products",
+                            "rewrite-conflict")
         # OPT-DEF-2 (owner, 21 October 2026): the rounding-class OPT-T08 records keep the stock path in float64 and
         # reproducible plans. species_tables too: its tables are not bitwise the per-atom products on the GPU
         # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).

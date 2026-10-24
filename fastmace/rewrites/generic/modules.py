@@ -143,6 +143,7 @@ class SpeciesSkip(torch.nn.Module):
             species, mul_in, mul_out = weight.shape
             self.register_buffer(f"w{index}", weight.permute(1, 0, 2).reshape(mul_in, species * mul_out).contiguous())
             self.pairs.append((i, j))
+        self.tf32x3 = False  # tf32x3_gemms: the products as 3xTF32 (OPT4-T03)
 
     def _view(self, x, segment):
         offset, mul, dim = segment
@@ -159,7 +160,13 @@ class SpeciesSkip(torch.nn.Module):
             weight = getattr(self, f"w{index}")
             xi = self._view(x1, self.segments_in[i])  # [atoms, size, mul_in]
             size, mul_out = xi.shape[1], weight.shape[1] // species
-            y = (xi.reshape(atoms * size, -1) @ weight).view(atoms, size, species, mul_out)
+            left = xi.reshape(atoms * size, -1)
+            if self.tf32x3:
+                from fastmace.kernels.triton.tf32x3_gemm import tf32x3_matmul
+
+                y = tf32x3_matmul(left, weight).view(atoms, size, species, mul_out)
+            else:
+                y = (left @ weight).view(atoms, size, species, mul_out)
             y = (y * onehot[:, None, :, None]).sum(dim=2)  # the atom's own species block
             outputs[j] = y if outputs[j] is None else outputs[j] + y
         blocks = []

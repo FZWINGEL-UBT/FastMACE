@@ -80,6 +80,8 @@ RECORD_SOURCES = (
     "fastmace.rewrites.polar",
     # OPT-T08 (opt-in): species tables and the folded readout tail, after every module they replace.
     "fastmace.rewrites.species",
+    # Optimisation round 4 (OPT4-T03, opt-in): 3xTF32 atom GEMMs, after every module family that multiplies atom rows.
+    "fastmace.rewrites.precision",
     # Process-wide stress-path patch (MACE PR 1498), as a record so the planner gets a decision and reason.
     "fastmace.rewrites.engine",
     # Optimisation round 3 (OPT3-T04): Inductor options of the compiled model, last (they change no module).

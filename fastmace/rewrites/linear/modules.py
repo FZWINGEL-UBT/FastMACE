@@ -46,10 +46,17 @@ def block_products(module, lefts):
     same weight shape run together in one Triton launch, if there are at least two of them. Equal K and N give
     every tile of the launch, forward and input gradient, the same work: a larger-K product's tiles would run
     several times longer and set the launch's length, where cuBLAS splits K (OPT-T03b diagnosis). The others,
-    and everything on the CPU or in other dtypes (``module.sms`` None), keep cuBLAS."""
+    and everything on the CPU or in other dtypes (``module.sms`` None), keep cuBLAS.
+
+    With ``module.tf32x3`` (record ``tf32x3_gemms``, OPT4-T03) every product and its input gradient run as
+    3xTF32 (``fastmace.kernels.triton.tf32x3_gemm``)."""
     count = len(lefts)
     weights = [getattr(module, f"weight_{k}") for k in range(count)]
     weights_t = [getattr(module, f"weight_t_{k}") for k in range(count)]
+    if getattr(module, "tf32x3", False):
+        from fastmace.kernels.triton.tf32x3_gemm import tf32x3_matmul
+
+        return [tf32x3_matmul(x, w, wt) for x, w, wt in zip(lefts, weights, weights_t)]
     parts = [None] * count
     sms = getattr(module, "sms", None)
     if getattr(module, "grouped_launch", False) and sms:
@@ -98,6 +105,7 @@ class BlockLinear(torch.nn.Module):
         self.grouped = bool(grouped)
         self.grouped_launch = False  # grouped_launch: small products in one Triton launch (block_products)
         self.sms = None  # grouped_launch: the device's SM count for the shape rule (None: not float32 on CUDA)
+        self.tf32x3 = False  # tf32x3_gemms: every product as 3xTF32 (block_products)
         if self.grouped:  # one product per output segment
             blocks = _group(blocks)
             self.block_ends = tuple((i, j) for i, j, _ in blocks)
@@ -173,6 +181,7 @@ class ResidualBlockLinear(torch.nn.Module):
         self.block_ends = tuple((tuple(i for i, _ in members), j) for j, members in grouped.items())
         self.grouped_launch = False  # grouped_launch (see block_products)
         self.sms = None
+        self.tf32x3 = False  # tf32x3_gemms (see block_products)
         for index, members in enumerate(grouped.values()):
             weight = torch.cat([w for _, w in members], dim=0).contiguous()
             self.register_buffer(f"weight_{index}", weight)

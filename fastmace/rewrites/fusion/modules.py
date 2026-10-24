@@ -53,6 +53,7 @@ class GatedRows(torch.nn.Module):
         self.act_gate, self.gate_cst = act_gate, gate_cst
         self.joined = None  # segment_gemm: (input index, output offset, dim) per product of ``second``
         self.sms = None  # segment_gemm: the device's SM count for the shape rule (None: not float32 on CUDA)
+        self.tf32x3 = False  # tf32x3_gemms: the joined products as 3xTF32, all in Triton (OPT4-T03)
 
     def join_in_place(self):
         """Let ``second``'s products write straight into its joined output (``segment_gemm``); returns
@@ -84,6 +85,8 @@ class GatedRows(torch.nn.Module):
         not, the joined op would only add launches, so the stock products and join run (NaCl-sized cells)."""
         from fastmace.kernels.triton import tile_rule
 
+        if self.tf32x3:  # every product runs in the Triton GEMM (segment_gemm._choices)
+            return bool(self.sms)
         return any(tile_rule.uses_triton(n * dim, self.sms) for _, _, dim, _ in self.joined)
 
     def forward(self, x, y):
@@ -113,7 +116,7 @@ class GatedRows(torch.nn.Module):
                                   [getattr(second, f"weight_{k}") for _, _, _, k in self.joined],
                                   [getattr(second, f"weight_t_{k}") for _, _, _, k in self.joined],
                                   [offset for _, offset, _, _ in self.joined], [dim for _, _, dim, _ in self.joined],
-                                  width)
+                                  width, "tf32x3" if self.tf32x3 else "ieee")
             return second.transpose_out(out)
         return second.transpose_out(join_rows(second.segments_out, second.products(rows), n, like))
 

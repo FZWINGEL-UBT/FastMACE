@@ -36,6 +36,8 @@ def parse_args(argv=None):
     p.add_argument("--ps", type=float, default=20.0)
     p.add_argument("--every", type=int, default=10, help="steps between samples")
     p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="RewriteConfig overrides on the default plan, e.g. tf32x3_gemms=on (OPT4-T03)")
     return p.parse_args(argv)
 
 
@@ -54,11 +56,15 @@ def main(argv=None):
     import torch
 
     import fastmace as fm
+    from fastmace.config import RewriteConfig
     from fastmace.integrators.base import CONSERVED_KEY
     from fastmace.quick import nve_max_temperature_K
 
     sys.path.insert(0, str(TOOLS))
     import ab_step_time
+    import force_stress_gate
+
+    rewrites = force_stress_gate.rewrite_overrides(args.rewrites)
 
     spec = importlib.util.spec_from_file_location("_ab_frontends", TOOLS / "ab_frontends.py")
     frontends = importlib.util.module_from_spec(spec)
@@ -69,7 +75,7 @@ def main(argv=None):
     frontends.thermalize(atoms, args.temperature_K, args.seed)
     n = len(atoms)
     started = time.perf_counter()
-    sim = fm.Simulation(atoms, fm.ForceField(fm.load(args.model), atoms),
+    sim = fm.Simulation(atoms, fm.ForceField(fm.load(args.model), atoms, rewrites=RewriteConfig(**rewrites)),
                         integrator=fm.integrators.NVE(timestep_fs=args.timestep_fs), seed=args.seed,
                         workload=fm.Workload(max_temperature_K=nve_max_temperature_K(atoms)))
     setup_s = time.perf_counter() - started
@@ -91,7 +97,7 @@ def main(argv=None):
     record = dict(tool="nve_drift", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                   python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), model=args.model,
                   structure=structure, natoms=n, temperature_K=args.temperature_K, timestep_fs=args.timestep_fs,
-                  ps=args.ps, every=args.every, plan=sim.plan.describe(), setup_s=setup_s, seconds=seconds,
+                  ps=args.ps, every=args.every, rewrites=rewrites, plan=sim.plan.describe(), setup_s=setup_s, seconds=seconds,
                   drift_meV_per_atom_per_ps=1e3 * slope, rms_meV_per_atom=1e3 * rms, range_meV_per_atom=1e3 * spread,
                   rows_step_conserved_kinetic_eV_per_atom=rows, gpu=torch.cuda.get_device_name(),
                   torch=torch.__version__)

@@ -153,6 +153,7 @@ class FirstInteractionReassociation(torch.nn.Module):
         self.ls = tuple(int(l) for l in ls)  # noqa: E741
         self.gammas = tuple(float(g) for g in gammas)
         self.ir_mul = bool(ir_mul)
+        self.tf32x3 = False  # tf32x3_gemms: the per-path products as 3xTF32 (OPT4-T03)
 
     def bind(self, species_feats):
         """Point the forward at ``species_feats`` (a host-side pointer swap; captured graphs keep their address)."""
@@ -180,7 +181,12 @@ class FirstInteractionReassociation(torch.nn.Module):
             # [nodes * size, slots * width] @ [slots * width, C]
             left = summed[:, :, start:start + size].transpose(1, 2).reshape(nodes * size, slots * width)
             right = (gamma * x[:, None, :] * weight[path * c:(path + 1) * c].t()[None]).reshape(slots * width, c)
-            block = (left @ right).view(nodes, size, c)
+            if self.tf32x3:
+                from fastmace.kernels.triton.tf32x3_gemm import tf32x3_matmul
+
+                block = tf32x3_matmul(left, right).view(nodes, size, c)
+            else:
+                block = (left @ right).view(nodes, size, c)
             if not self.ir_mul:
                 block = block.transpose(1, 2)
             blocks.append(block.reshape(nodes, size * c))

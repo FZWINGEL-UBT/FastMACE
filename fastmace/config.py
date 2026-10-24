@@ -160,6 +160,10 @@ class RewriteConfig:
     # one launch; rounding (the energy moves by ~1e-9 relative), not adopted (opt-3 OPT3-T04,
     # fastmace.rewrites.inductor); opt-in, auto = off.
     combo_kernels: Toggle = "auto"
+    # Every atom GEMM (block linears, segment_gemm, species skip, reassociated first interaction) and its input
+    # gradients as 3xTF32 through Triton's tf32x3 (opt-4 OPT4-T03 stage 1, fastmace.rewrites.precision); rounding,
+    # not IEEE-equivalent under cancellation; float32 on compute capability >= 8.0 only; opt-in, auto = off.
+    tf32x3_gemms: Toggle = "auto"
     # Per-l products as in-place strided-batched GEMMs (INPLACE_BLOCK_LINEAR); opt-in, slower.
     inplace_block_linear: bool = False
     # MACE PR 1498 one-graph strain in the stress path (upstream_mace.use_single_graph_strain).

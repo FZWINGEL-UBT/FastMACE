@@ -76,6 +76,7 @@ AUTO_RULES = {
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.grouped_launch": "never_automatic",
     "RewriteConfig.combo_kernels": "never_automatic",
+    "RewriteConfig.tf32x3_gemms": "never_automatic",
     "RewriteConfig.species_tables": "on_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
