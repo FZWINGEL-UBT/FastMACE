@@ -17,7 +17,7 @@ on the device:
   negative term is a stock tensor the rewrite does not materialise);
 - **neighbour list**: the MACE pair buffers at their capacity;
 - **D3 list**: its buffers and build transient (``neighbors.adaptive.rule_12_d3``), where D3 is on;
-- **workspace**: the library workspaces a capture allocates (cuBLAS, 32-64 MiB; ``engine/graph.py``).
+- **workspace**: the library workspaces beside the model (``LIBRARY_WORKSPACES`` x 32 MiB, cuBLAS).
 
 The **build** holds the weights, the rewrites' buffers and the workspace, and the largest transient of a
 rewrite's self-check (``Rewrite.selfcheck_memory``: segment_gemm's probes, sized to the device's SM count).
@@ -45,12 +45,18 @@ from typing import Any
 
 # Decision 51: the estimate must stay below this share of the free GPU memory.
 MARGIN = 0.9
-# One factor on the activations and rewrite terms, for every model and GPU (SPEC §9.3 rule 12), fitted on
-# the 19 labels (docs/validation/5-T03.md). Provisional until that fit: the tiny models' CPU peaks are
-# 0.84-0.91 of the unscaled activations (the remainder is small per-edge copies the structure leaves out).
-SAFETY = 1.25
-# cuBLAS and cuSOLVER workspaces a capture allocates outside the graph pool (engine/graph.py), bytes.
-WORKSPACE_BYTES = 64 * 2**20
+# One factor on the activations and rewrite terms, for every model and GPU (SPEC §9.3 rule 12), fitted on the
+# 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.5]).
+# Below 1 because the run term is stock-structured: it counts what stock MACE keeps per edge, while the fused
+# paths (OEq's convolution, the folded MH-1 backward) keep less, and the uniform-density edge estimate is
+# 1.2-1.3x the edges a crystal uses. Per-path structural terms are a known limitation (plans/phase-5.md).
+SAFETY = 0.90
+# Library workspaces live beside the model (cuBLAS's 32 MiB per stream and handle): five seen at the GPU peaks
+# of 5-T03 (the capture and side streams, the eager router, the self-checks, PolarMACE's long range). A path
+# that adds one adds it here, so the count stays visible.
+LIBRARY_WORKSPACES = 5
+LIBRARY_WORKSPACE_BYTES = 32 * 2**20
+WORKSPACE_BYTES = LIBRARY_WORKSPACES * LIBRARY_WORKSPACE_BYTES
 # The MACE pair list per capacity slot (neighbors/skin.py ``_allocate_now``): candidate and model edge
 # indices (2 x 2 int64), four shift tensors at the list's float width and the float64 candidate shifts.
 _INDEX_BYTES_PER_SLOT = 2 * 2 * 8
@@ -291,6 +297,7 @@ def annotate_out_of_memory(error, plan) -> Any:
     return error
 
 
-__all__ = ["DTYPE_BYTES", "MARGIN", "MemoryEstimate", "MemoryTerm", "SAFETY", "WORKSPACE_BYTES",
-           "annotate_out_of_memory", "drop_order", "estimate", "fits", "interaction_floats", "list_capacity",
-           "model_edges", "resident_memory_terms", "rewrite_memory_terms", "selfcheck_memory_terms"]
+__all__ = ["DTYPE_BYTES", "LIBRARY_WORKSPACES", "LIBRARY_WORKSPACE_BYTES", "MARGIN", "MemoryEstimate", "MemoryTerm",
+           "SAFETY", "WORKSPACE_BYTES", "annotate_out_of_memory", "drop_order", "estimate", "fits",
+           "interaction_floats", "list_capacity", "model_edges", "resident_memory_terms", "rewrite_memory_terms",
+           "selfcheck_memory_terms"]
