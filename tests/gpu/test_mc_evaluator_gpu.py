@@ -122,7 +122,9 @@ def test_energy_only_graph_and_evaluator_tiny_plain_cueq(tmp_path):
     assert any("'E'" in key for key in out["graphs"])
     # Bitwise where the GPU kernels are deterministic; within float32 reduction-order noise otherwise.
     assert out["positions_diff"] <= 1e-6 and out["forces_diff"] <= 1e-4, out
-    assert out["after_md"][0] == out["after_md"][1]
+    # Two fresh float64 evaluations: bitwise where the kernels are deterministic, within 4 ulps otherwise (Colab
+    # G4, sm_120, 23 October 2026: 1 ulp at 101.1).
+    assert abs(out["after_md"][0] - out["after_md"][1]) <= 4 * 2.0 ** -52 * abs(out["after_md"][1]), out
 
 
 # --------------------------------------------------------------------------- PolarMACE (the polar_gpu._Call failure)
