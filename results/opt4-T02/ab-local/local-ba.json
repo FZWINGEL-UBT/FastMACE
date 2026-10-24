@@ -1,0 +1,413 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-10-24T11:37:07.071070+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "9b9e3e0",
+  "model": "polar1-s",
+  "checkpoint_sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+  "sides": {
+    "a": {},
+    "b": {
+      "fx_e3nn_linear": "on",
+      "polar_graph_sums": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abba",
+  "order": [
+    "b",
+    "a"
+  ],
+  "load": [
+    209.82080078125,
+    210.31982421875,
+    210.5244140625
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 2.98475574500723,
+            "mean_ms": 5.858820610836928,
+            "min_ms": 2.9327514833372943,
+            "max_ms": 37.46560795666786,
+            "stdev_ms": 9.953629723416933,
+            "spread": 11.56974286123601,
+            "block_ms": [
+              2.9763559000033033,
+              2.9659593533385,
+              2.9464369733371614,
+              2.9327514833372943,
+              2.9569301899997904,
+              37.46560795666786,
+              3.0806896100208787,
+              2.973920380003013,
+              2.993155590011156,
+              3.0104899666669853,
+              3.0033000666541434,
+              3.0002498600030476
+            ]
+          },
+          "a": {
+            "median_ms": 3.9336684066559733,
+            "mean_ms": 3.9713513569404313,
+            "min_ms": 3.8845795700035524,
+            "max_ms": 4.422888463329097,
+            "stdev_ms": 0.14767654035729114,
+            "spread": 0.13684653551750778,
+            "block_ms": [
+              3.886836643335603,
+              3.8845795700035524,
+              3.8971192333216704,
+              3.9308917599798106,
+              3.910736846664804,
+              4.422888463329097,
+              4.035415216664357,
+              3.916140569999698,
+              3.936445053332136,
+              3.950436436668194,
+              3.93892030333518,
+              3.9458061866510734
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.3179197035590076,
+        "pair_ratios_b_over_a": [
+          1.30590452685154,
+          1.3097211078199869,
+          1.322654877259349,
+          1.3403426039722577,
+          1.3225665116784786,
+          0.11805196030568998,
+          1.3099064584559066,
+          1.3168276448597223,
+          1.3151488236926112,
+          1.3122237510865564,
+          1.3115307215117449,
+          1.3151591936569793
+        ]
+      },
+      "ratio_b_over_a": 0.758771568024612,
+      "pair_ratios": [
+        0.7657527632674205,
+        0.7635213283417921,
+        0.756055126090098,
+        0.7460779035422632,
+        0.7561056409411825,
+        8.470846205438242,
+        0.763413290731295,
+        0.7594008250840808,
+        0.7603702196928925,
+        0.7620651578452022,
+        0.7624678428022968,
+        0.7603642242117957
+      ],
+      "setup_s": {
+        "b": 19.010344920003263,
+        "a": 11.552110270997218
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.fx_e3nn_linear = on  (requested 'on': on: e3nn's o3.Linear as fx graphs, traced by dynamo)",
+          "RewriteConfig.polar_graph_sums = on  (requested 'on': on: PolarMACE's one-graph sums without scatter and index)"
+        ],
+        "a": [
+          "RewriteConfig.fx_e3nn_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T02, opt-in))",
+          "RewriteConfig.polar_graph_sums = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T02, opt-in))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            4,
+            5
+          ],
+          "aot_autograd.ok": [
+            28,
+            29
+          ],
+          "aot_autograd.total": [
+            28,
+            29
+          ],
+          "frames.ok": [
+            137,
+            138
+          ],
+          "frames.total": [
+            153,
+            154
+          ],
+          "graph_break.Attempted to call function marked as skipped\n  Explanation: Dynamo developers have intentionally marked that the function `grad` in file `/home/fzwin/environments/mace_cueq_oeq_polar/lib/python3.10/site-packages/torch/autograd/__init__.py` should not be traced.\n  Hint: Avoid calling the function `grad`.\n  Hint: Apply `@torch._dynamo.dont_skip_tracing` to the function `grad` to force tracing into the function. More graph breaks may occur as a result of attempting to trace into the function.\n  Hint: Please file an issue to PyTorch.\n\n  Developer debug context: module: torch.autograd, qualname: grad, skip reason: <function grad at 0x748d039bf5b0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0007.html": [
+            6,
+            7
+          ],
+          "inductor.async_compile_cache_hit": [
+            1075,
+            1471
+          ],
+          "inductor.async_compile_cache_miss": [
+            1721,
+            2318
+          ],
+          "inductor.decompose_mm": [
+            46,
+            65
+          ],
+          "inductor.decompose_mm_pointwise": [
+            4,
+            5
+          ],
+          "inductor.extern_calls": [
+            572,
+            777
+          ],
+          "inductor.fxgraph_cache_hit": [
+            45,
+            47
+          ],
+          "inductor.pad_rewritten_as_cat": [
+            24,
+            35
+          ],
+          "inductor.pattern_matcher_count": [
+            1670,
+            2402
+          ],
+          "inductor.pattern_matcher_nodes": [
+            1832,
+            2628
+          ],
+          "inductor.removed_pointless_view_pair": [
+            16,
+            20
+          ],
+          "inductor.triton_bundler_load_static_autotuner": [
+            435,
+            632
+          ],
+          "stats.calls_captured": [
+            5042,
+            6834
+          ],
+          "stats.unique_graphs": [
+            28,
+            29
+          ]
+        },
+        "recompiled": true
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 271.91213457963573,
+          "potential_eV_atom": -8471.388464304919,
+          "kinetic_eV_atom": 0.035147350295558766
+        },
+        "a": {
+          "temperature_K": 271.9121080991409,
+          "potential_eV_atom": -8471.388464179641,
+          "kinetic_eV_atom": 0.03514734687269119
+        }
+      },
+      "load_after": [
+        210.25439453125,
+        210.41259765625,
+        210.53955078125
+      ],
+      "other_gpu_processes": [],
+      "valid": false
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "b",
+          "a"
+        ],
+        "pattern": "abba",
+        "order": [
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "b": {
+            "median_ms": 21.25915305333668,
+            "mean_ms": 21.266196133053906,
+            "min_ms": 21.04509336000774,
+            "max_ms": 21.588965126647963,
+            "stdev_ms": 0.13707533800610625,
+            "spread": 0.0255829460974157,
+            "block_ms": [
+              21.04509336000774,
+              21.051674706662503,
+              21.588965126647963,
+              21.313141036662273,
+              21.28618236000572,
+              21.25039242998658,
+              21.256591269993805,
+              21.25961887000206,
+              21.31339964333165,
+              21.313562636666273,
+              21.258687236671296,
+              21.257044920009015
+            ]
+          },
+          "a": {
+            "median_ms": 25.829614591675636,
+            "mean_ms": 25.85942171000069,
+            "min_ms": 25.696968866662548,
+            "max_ms": 26.391116156664793,
+            "stdev_ms": 0.1769323814765698,
+            "spread": 0.026874086236886984,
+            "block_ms": [
+              25.69782172999112,
+              25.696968866662548,
+              26.391116156664793,
+              25.894662626669742,
+              25.836832586671033,
+              25.822033659981873,
+              25.83351390666697,
+              25.81937700000708,
+              25.825715276684303,
+              25.818342596661147,
+              25.835714016672377,
+              25.84096209667526
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.214987940811763,
+        "pair_ratios_b_over_a": [
+          1.221083760019094,
+          1.2206615019815923,
+          1.2224354433779403,
+          1.2149622893278125,
+          1.2137842356934543,
+          1.21513208497478,
+          1.2153178079466593,
+          1.2144797683291948,
+          1.2117126178302777,
+          1.211357436426193,
+          1.2153014778873878,
+          1.2156422585507853
+        ]
+      },
+      "ratio_b_over_a": 0.8230534365072592,
+      "pair_ratios": [
+        0.8189446397881527,
+        0.819227933687287,
+        0.8180391082548398,
+        0.8230708136243948,
+        0.8238696554076467,
+        0.8229558023897913,
+        0.822830039567634,
+        0.8233978252068681,
+        0.8252781932655158,
+        0.825520172600954,
+        0.8228410959709718,
+        0.8226104291505455
+      ],
+      "setup_s": {
+        "b": 19.086057658001664,
+        "a": 12.279029890996753
+      },
+      "plan_lines": {
+        "b": [
+          "RewriteConfig.fx_e3nn_linear = on  (requested 'on': on: e3nn's o3.Linear as fx graphs, traced by dynamo)",
+          "RewriteConfig.polar_graph_sums = on  (requested 'on': on: PolarMACE's one-graph sums without scatter and index)"
+        ],
+        "a": [
+          "RewriteConfig.fx_e3nn_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T02, opt-in))",
+          "RewriteConfig.polar_graph_sums = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T02, opt-in))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 295.71930505395557,
+          "potential_eV_atom": -10694.869895933605,
+          "kinetic_eV_atom": 0.03822466408113364
+        },
+        "a": {
+          "temperature_K": 295.5540567099405,
+          "potential_eV_atom": -10694.869883518151,
+          "kinetic_eV_atom": 0.0382033040876128
+        }
+      },
+      "load_after": [
+        210.06884765625,
+        210.1923828125,
+        210.40966796875
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

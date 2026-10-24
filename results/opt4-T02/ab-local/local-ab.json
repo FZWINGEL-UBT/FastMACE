@@ -1,0 +1,413 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-10-24T11:30:33.574410+00:00",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "9b9e3e0",
+  "model": "polar1-s",
+  "checkpoint_sha256": "e4495612037b3b3312633182882a38a694ecac9ea0be2b9889ac0b2a84a99510",
+  "sides": {
+    "a": {},
+    "b": {
+      "fx_e3nn_linear": "on",
+      "polar_graph_sums": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "load": [
+    211.3505859375,
+    211.19970703125,
+    210.7822265625
+  ],
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 3.947154409991829,
+            "mean_ms": 5.217878206389691,
+            "min_ms": 3.904333180010629,
+            "max_ms": 19.157225403323537,
+            "stdev_ms": 4.389892779486486,
+            "spread": 3.8642755359916316,
+            "block_ms": [
+              3.9371833200129913,
+              3.929093886666427,
+              3.904333180010629,
+              3.9517125600104914,
+              3.939242913329508,
+              19.157225403323537,
+              4.048817076666941,
+              3.950022016651928,
+              3.950321713321803,
+              3.96870563000751,
+              3.944286803331731,
+              3.9335939733427954
+            ]
+          },
+          "b": {
+            "median_ms": 3.0025978916576905,
+            "mean_ms": 3.02187878916205,
+            "min_ms": 2.9443036266457057,
+            "max_ms": 3.317809456687731,
+            "stdev_ms": 0.09658030257228181,
+            "spread": 0.12439422244309191,
+            "block_ms": [
+              2.9443036266457057,
+              2.9807608966560415,
+              2.969971540005645,
+              2.978732836660735,
+              2.9851940666655232,
+              3.317809456687731,
+              3.0382220833174265,
+              2.9919437599892262,
+              3.0139529099930464,
+              3.0132520233261553,
+              3.013276700003189,
+              3.0151255699941735
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.7606993747335833,
+        "pair_ratios_b_over_a": [
+          0.7478197958625891,
+          0.7586382465360271,
+          0.7606859873566322,
+          0.7537827692236874,
+          0.7578090847264841,
+          0.17318841256167156,
+          0.7503974681460654,
+          0.7574498945515303,
+          0.7629639124907198,
+          0.7592530926312248,
+          0.7639598361503227,
+          0.7665065561995202
+        ]
+      },
+      "ratio_b_over_a": 0.7606993747335833,
+      "pair_ratios": [
+        0.7478197958625891,
+        0.7586382465360271,
+        0.7606859873566322,
+        0.7537827692236874,
+        0.7578090847264841,
+        0.17318841256167156,
+        0.7503974681460654,
+        0.7574498945515303,
+        0.7629639124907198,
+        0.7592530926312248,
+        0.7639598361503227,
+        0.7665065561995202
+      ],
+      "setup_s": {
+        "a": 14.127125029997842,
+        "b": 16.274308364998433
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.fx_e3nn_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T02, opt-in))",
+          "RewriteConfig.polar_graph_sums = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T02, opt-in))"
+        ],
+        "b": [
+          "RewriteConfig.fx_e3nn_linear = on  (requested 'on': on: e3nn's o3.Linear as fx graphs, traced by dynamo)",
+          "RewriteConfig.polar_graph_sums = on  (requested 'on': on: PolarMACE's one-graph sums without scatter and index)"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {
+          "aot_autograd.autograd_cache_bypass": [
+            4,
+            5
+          ],
+          "aot_autograd.ok": [
+            45,
+            46
+          ],
+          "aot_autograd.total": [
+            45,
+            46
+          ],
+          "frames.ok": [
+            165,
+            166
+          ],
+          "frames.total": [
+            185,
+            186
+          ],
+          "graph_break.User-defined object with non-function __getattr__\n  Explanation: Found a non-function __getattr__ <instancemethod __getattr__ at 0x70534b17a8c0> from a user-defined object ScriptObject <__torch__.torch.fx.graph_module.GraphModule>  when attempting to getattr `forward`\n  Hint: Ensure the object's __getattr__ is a function type.\n\n  Developer debug context: object=ScriptObject <__torch__.torch.fx.graph_module.GraphModule>, name=forward, getattr_fn=<instancemethod __getattr__ at 0x70534b17a8c0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0256.html": [
+            2,
+            3
+          ],
+          "inductor.async_compile_cache_hit": [
+            1339,
+            1499
+          ],
+          "inductor.async_compile_cache_miss": [
+            2058,
+            2301
+          ],
+          "inductor.decompose_mm": [
+            46,
+            50
+          ],
+          "inductor.decompose_mm_pointwise": [
+            4,
+            5
+          ],
+          "inductor.extern_calls": [
+            618,
+            676
+          ],
+          "inductor.fxgraph_cache_hit": [
+            77,
+            79
+          ],
+          "inductor.pad_rewritten_as_cat": [
+            24,
+            25
+          ],
+          "inductor.pattern_matcher_count": [
+            1670,
+            1773
+          ],
+          "inductor.pattern_matcher_nodes": [
+            1832,
+            1952
+          ],
+          "inductor.removed_pointless_view_pair": [
+            16,
+            20
+          ],
+          "inductor.triton_bundler_load_static_autotuner": [
+            626,
+            705
+          ],
+          "stats.calls_captured": [
+            5450,
+            5955
+          ],
+          "stats.unique_graphs": [
+            45,
+            46
+          ]
+        },
+        "recompiled": true
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 271.91208092241254,
+          "potential_eV_atom": -8471.388464194224,
+          "kinetic_eV_atom": 0.03514734335982851
+        },
+        "b": {
+          "temperature_K": 271.91208386282165,
+          "potential_eV_atom": -8471.388464187588,
+          "kinetic_eV_atom": 0.035147343739905655
+        }
+      },
+      "load_after": [
+        210.53173828125,
+        211.02392578125,
+        210.76123046875
+      ],
+      "other_gpu_processes": [],
+      "valid": false
+    },
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 25.914364680005143,
+            "mean_ms": 25.933384316944686,
+            "min_ms": 25.670876089983118,
+            "max_ms": 26.500865766671875,
+            "stdev_ms": 0.19820402335010368,
+            "spread": 0.03202816997204475,
+            "block_ms": [
+              25.670876089983118,
+              25.741244163339918,
+              26.500865766671875,
+              25.966964503337902,
+              25.908697349999176,
+              25.916031380014225,
+              25.910934043349698,
+              25.925083273323253,
+              25.902063683339897,
+              25.91975313000148,
+              25.925400439979665,
+              25.912697979996057
+            ]
+          },
+          "b": {
+            "median_ms": 21.313275578322646,
+            "mean_ms": 21.30862289999843,
+            "min_ms": 21.095415529998718,
+            "max_ms": 21.68764485664724,
+            "stdev_ms": 0.14600087496271946,
+            "spread": 0.027786875108529407,
+            "block_ms": [
+              21.095415529998718,
+              21.098709860016243,
+              21.68764485664724,
+              21.337360003332527,
+              21.320913956684915,
+              21.315256856663233,
+              21.314797349987202,
+              21.302428733324632,
+              21.31175380665809,
+              21.301249353321815,
+              21.30065083333951,
+              21.317293660007028
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.8224502449318165,
+        "pair_ratios_b_over_a": [
+          0.8217645340990227,
+          0.8196460795032019,
+          0.818374956033404,
+          0.8217117561272799,
+          0.8229249687339295,
+          0.8224738017990288,
+          0.822617869133045,
+          0.8216918151713208,
+          0.8227820789571189,
+          0.8218152868387523,
+          0.821613185210119,
+          0.8226582070482755
+        ]
+      },
+      "ratio_b_over_a": 0.8224502449318165,
+      "pair_ratios": [
+        0.8217645340990227,
+        0.8196460795032019,
+        0.818374956033404,
+        0.8217117561272799,
+        0.8229249687339295,
+        0.8224738017990288,
+        0.822617869133045,
+        0.8216918151713208,
+        0.8227820789571189,
+        0.8218152868387523,
+        0.821613185210119,
+        0.8226582070482755
+      ],
+      "setup_s": {
+        "a": 15.100360163000005,
+        "b": 31.9286479279981
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.fx_e3nn_linear = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T02, opt-in))",
+          "RewriteConfig.polar_graph_sums = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T02, opt-in))"
+        ],
+        "b": [
+          "RewriteConfig.fx_e3nn_linear = on  (requested 'on': on: e3nn's o3.Linear as fx graphs, traced by dynamo)",
+          "RewriteConfig.polar_graph_sums = on  (requested 'on': on: PolarMACE's one-graph sums without scatter and index)"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 295.74934214335366,
+          "potential_eV_atom": -10694.869918047481,
+          "kinetic_eV_atom": 0.038228546673959314
+        },
+        "b": {
+          "temperature_K": 295.7062786253481,
+          "potential_eV_atom": -10694.869891845347,
+          "kinetic_eV_atom": 0.03822298028555726
+        }
+      },
+      "load_after": [
+        210.00390625,
+        210.39990234375,
+        210.5556640625
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}

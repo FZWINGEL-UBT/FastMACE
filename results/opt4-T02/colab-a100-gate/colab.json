@@ -1,0 +1,78 @@
+{
+  "provider": "colab",
+  "date_utc": "2026-10-24T11:44:30Z",
+  "session": "fm-opt4-t02-a100-gate-114430",
+  "gpu": "A100",
+  "commit": "9b9e3e0ef8b246e461be54be2c16b5a2c94a6ddf",
+  "requested_commit": "9b9e3e0",
+  "commands_text": [
+    "python tools/force_stress_gate.py --output $OUT/gate-polar1-l --engine fastmace --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-L.model --model polar1-l --structures NaCl NbCl5@2x2x2 --structures-root $FASTMACE_STRUCTURES --rewrites fx_e3nn_linear=on polar_graph_sums=on"
+  ],
+  "commands": [
+    {
+      "command": "python tools/force_stress_gate.py --output $OUT/gate-polar1-l --engine fastmace --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-L.model --model polar1-l --structures NaCl NbCl5@2x2x2 --structures-root $FASTMACE_STRUCTURES --rewrites fx_e3nn_linear=on polar_graph_sums=on",
+      "exit": 124,
+      "wall_s": null
+    }
+  ],
+  "exit": 124,
+  "stack": "f00d5798f8b5",
+  "models": [
+    "polar-1-l"
+  ],
+  "out": "/home/fzwin/fastmace-acceptance/colab-opt4-T02-a100-gate",
+  "timings": {
+    "allocate_s": 4.7,
+    "upload_s": 7.9,
+    "setup_step_s": 39,
+    "cache_restore_s": 200.6,
+    "pack_download_s": 45.4,
+    "unpack_s": 0.6,
+    "install_s": 31.1,
+    "models_s": 2.0
+  },
+  "cu_before": 45.56,
+  "rate_per_h": 1.54,
+  "active_before": 0,
+  "gpu_name": "NVIDIA A100-SXM4-40GB",
+  "driver": "580.82.07",
+  "gpu_memory": "40960 MiB",
+  "capability": "8.0",
+  "cuda_driver": "13.0",
+  "cpus": 12,
+  "ram_gib": 83.5,
+  "cache_key": "sm80-py310-f00d5798f8b5",
+  "cache_hit": true,
+  "cache_bytes_in": 573866738,
+  "setup_s": 273.7,
+  "cache_bytes_out": 86885069,
+  "cache_saved": true,
+  "environment": {
+    "python": "3.10.22",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance_torch": "0.12.0",
+      "openequivariance": "0.7.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "ase": "3.27.0",
+      "numpy": "2.2.6",
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0"
+    },
+    "torch_cuda": "13.0",
+    "cuda_available": true,
+    "pip_freeze_sha256": "2b05fb7fcb3cfc72dd0880fc327e6e81c097f29c86389b2a5f416286392d0b08",
+    "unpack_s": 0.6,
+    "install_s": 31.1,
+    "models_s": 2.0
+  },
+  "env_matches_manifest": true,
+  "stopped": true,
+  "cu_after": 42.22,
+  "active_after": 1,
+  "wall_s": 2138.0,
+  "cu_used": 3.34
+}
