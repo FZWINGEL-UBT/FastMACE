@@ -145,8 +145,7 @@ class PlannerOptions:
     - ``engine``, ``neighbours``: the planner-level options; ``None`` keeps the default planner's
       (``planner.minimal.default_planner``: CUDA if available, else the CPU without compilation);
     - ``adaptation``, ``calibration``: runtime adaptation (§9.6) and the optional calibration (§9.1) of
-      phase 5 (plan task 5-T01). Adaptation options decisions 52 and 53 did not choose are refused (5-T07);
-      calibration's fields stay ``config.PENDING``, and ``calibrate=True`` is refused, until 5-T09 lands
+      phase 5 (plan task 5-T01). Options decisions 52, 53 (5-T07) and 55 (5-T09) did not choose are refused
       (``phase_5_pending``).
     """
 
@@ -196,15 +195,15 @@ class PlannerOptions:
                                calibration=part("calibration", CalibrationConfig))
 
 
-# The refusals of phase 5's placeholders (plan task 5-T01): a field an open owner decision fixes, set before the
-# task implementing it lands (5-T09, D5), and an adaptation option decisions 52 and 53 did not choose (5-T07).
-PHASE_5_PENDING_CODES = {"adaptation": "adaptation-unsupported", "calibration": "calibration-pending"}
+# The refusals of phase 5's options the owner did not choose: an adaptation option outside decisions 52 and 53
+# (5-T07), and the calibration that only reports (D5 (b), not chosen by decision 55; 5-T09).
+PHASE_5_PENDING_CODES = {"adaptation": "adaptation-unsupported", "calibration": "calibration-unsupported"}
 
 
 def phase_5_pending(adaptation: AdaptationConfig, calibration: CalibrationConfig) -> list[Any]:
     """The ``Reason`` for each phase 5 option that asks for behaviour not implemented: an adaptation option the
-    owner did not choose (decisions 52, 53), or the calibration that waits for D5."""
-    from fastmace.config import ADAPTATION_SUPPORTED, PENDING
+    owner did not choose (decisions 52, 53), or a calibration that only reports (decision 55 chose D5 (a))."""
+    from fastmace.config import ADAPTATION_SUPPORTED
     from fastmace.errors import Reason
 
     reasons = []
@@ -215,9 +214,9 @@ def phase_5_pending(adaptation: AdaptationConfig, calibration: CalibrationConfig
             "runtime adaptation implements owner decisions 52 and 53 only (SPEC §18): "
             + "; ".join(f"{name} one of {ADAPTATION_SUPPORTED[name]}" for name in unsupported)
             + "; or pass adapt='off'", code=PHASE_5_PENDING_CODES["adaptation"]))
-    if calibration.calibrate or calibration.choose != PENDING:
-        reasons.append(Reason("CalibrationConfig(calibrate=True) or choose=...: the optional calibration waits for "
-                              "owner decision D5 (plans/phase-5.md, task 5-T09)",
+    if calibration.choose is not True:
+        reasons.append(Reason("CalibrationConfig(choose=False): the calibration's measurement breaks the backend's tie "
+                              "(owner decision 55, D5 (a)); a calibration that only reports, D5 (b), was not chosen",
                               code=PHASE_5_PENDING_CODES["calibration"]))
     return reasons
 
@@ -488,6 +487,12 @@ class Simulation:
                 f"the integrator's temperature_K={integrator.temperature_K:g} K is above "
                 f"Workload.max_temperature_K={workload.max_temperature_K:g} K, which sized the skin and the buckets "
                 "(rule 11, SPEC §7.6)", code="target-above-max-temperature")])
+        if options.calibration.calibrate:  # MD plans only (5-T09)
+            from fastmace.planner import calibrate
+
+            refusal = calibrate.workload_refusal(optimizer=optimizer, workload=workload)
+            if refusal is not None:
+                raise PlanRefused.from_reasons([refusal])
 
         self.force_field = ff
         self.integrator = integrator
@@ -555,6 +560,11 @@ class Simulation:
         self._child = False  # set by the subprocess runner's child: switches are the parent's
         started = time.perf_counter()
         stored = getattr(self, "_resume_plan", None)  # a resume of a fallback revision (2-T15)
+        calibrated = None
+        if options.calibration.calibrate and stored is None and not getattr(self, "_resuming", False):
+            calibrated = self._calibrate(planner, workload)  # the optional calibration (SPEC §9.1, 5-T09)
+            planner = self._planner = calibrated.planner
+            started = time.perf_counter()
         self._plan = planner.plan(ff, atoms, self._config, workload, allow_naive_cueq=self.allow_naive_cueq,
                                   allow_reference=options.allow_reference,
                                   mode=options.mode if stored is None else stored.tier,
@@ -563,6 +573,13 @@ class Simulation:
             from fastmace.planner.fallback import replay_off
 
             self._plan = replay_off(stored, self._plan)
+        if calibrated is not None:
+            from fastmace.planner import calibrate
+
+            self._plan = calibrate.apply(self._plan, calibrated)
+            if calibrated.record is not None:
+                setup["calibration"] = calibrated.record.setup_s
+        self._calibrated = calibrated
         setup["plan"] = time.perf_counter() - started
         if self._plan.runner == "subprocess":
             if optimizer is not None:
@@ -1661,7 +1678,7 @@ class Simulation:
         reads_charge = model.charge is not None or model.spin_multiplicity is not None
         heights = 1.0 / np.linalg.norm(atoms.cell.reciprocal(), axis=1)
         outputs = () if self.output is None else (str(Path(self.output.directory)),)
-        return reports.Report(
+        report = reports.Report(
             model=model.label or Path(str(model.path)).name, head=model.head, sha256=model.sha256,
             structure=atoms.get_chemical_formula(), n_atoms=len(atoms), pbc=tuple(bool(p) for p in atoms.pbc),
             species=_symbols(self._plan.superset).split(), plan=self._plan,
@@ -1673,6 +1690,41 @@ class Simulation:
             cell_heights_A=tuple(float(h) for h in heights), cutoff_A=self.force_field.traits.r_max,
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,
             start_step=int(self._engine.state.step) if start_step is None else start_step)
+        calibrated = getattr(self, "_calibrated", None)
+        if calibrated is not None:  # calibrate=True (SPEC §9.1, 5-T09): measured, or why not
+            from fastmace.planner import calibrate
+
+            report.calibration = calibrate.report_line(self._plan.calibration, calibrated.note)
+            if calibrated.warning is not None:
+                report.add_warning(calibrated.warning)
+        return report
+
+    def _calibrate(self, planner, workload):
+        """The optional calibration (SPEC §9.1, decision 55; plan task 5-T09) before this process plans: the
+        backend's tie measured in children (``planner.calibrate``); returns its ``Outcome``. A changed backend is
+        set in ``self.options`` too (``simulation.json``), so a resume plans it again."""
+        from fastmace.planner import calibrate
+
+        started = time.perf_counter()
+        config = self.options.calibration
+
+        def plan_with(candidate):
+            return candidate.plan(self.force_field, self._atoms, self._config, workload,
+                                  allow_naive_cueq=self.allow_naive_cueq, allow_reference=self.options.allow_reference,
+                                  mode=self.options.mode)
+
+        found = calibrate.tie(planner, plan_with, workload)
+        if found.alternative is None:
+            return calibrate.calibrate(planner, found, None, config)
+        self._plan = found.rules  # the children's record (_simulation_record) reads it
+        launcher = calibrate.ChildLauncher(self, planner, found, config)
+        try:
+            outcome = calibrate.calibrate(planner, found, launcher, config, setup_s=time.perf_counter() - started)
+        finally:
+            launcher.close()
+        if outcome.changed:
+            self.options = dataclasses.replace(self.options, engine=outcome.planner.engine)
+        return outcome
 
     def add_metadata_block(self, name: str, provider: Any) -> None:
         """Add ``{name: provider()}`` to every ``metadata.json`` record this Simulation builds, evaluated at each
@@ -1916,7 +1968,7 @@ class Simulation:
                      allow_naive_cueq=record["allow_naive_cueq"], mode=options.mode,
                      allow_reference=options.allow_reference, fallback=options.fallback, gate=options.gate,
                      runner=options.runner, engine=options.engine, neighbours=options.neighbours,
-                     adaptation=options.adaptation)
+                     adaptation=options.adaptation, calibration=options.calibration)  # a resume never calibrates
         del sim._resuming
         sim.__dict__.pop("_resume_plan", None)
         sim._resume(stored, record, output, allow_plan_change, versions, source=directory)

@@ -231,6 +231,7 @@ def test_rejected_switches_have_no_field():
         (config.CalibrationConfig, {"steps": 0}),
         (config.CalibrationConfig, {"margin": 0.0}),
         (config.CalibrationConfig, {"choose": "auto"}),
+        (config.CalibrationConfig, {"choose": config.PENDING}),
     ],
 )
 def test_invalid_values_are_refused(cls, kwargs):

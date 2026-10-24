@@ -2,9 +2,9 @@
 phase 5 tasks build against.
 
 - ``AdaptationConfig``: the defaults are decisions 52 and 53 (5-T07); the options not chosen are refused
-  (``test_adapt_switch.py``). ``CalibrationConfig``: the fields the open decision D5 fixes default to
-  ``config.PENDING``, and ``planner_options`` refuses any other value, and ``calibrate=True``, until 5-T09
-  lands. The defaults plan as before (conductor's choice 7).
+  (``test_adapt_switch.py``). ``CalibrationConfig``: the defaults are decision 55 (5-T09, off by default);
+  ``choose=False`` (D5 (b), not chosen) is refused (``test_calibrate.py``). The defaults plan as before
+  (conductor's choice 7).
 - ``PlannerOptions`` records both and reads records from before phase 5.
 - ``Plan.calibration`` and ``Plan.adaptation`` default to ``None`` and stay out of the restart record (its
   version stays 2); ``CalibrationRecord`` and ``TierSwitch`` are the records 5-T09 and 5-T07 fill.
@@ -39,11 +39,11 @@ def test_adaptation_defaults_are_decisions_52_and_53():
             if name in fields and fields[name] not in config.ADAPTATION_SUPPORTED[name])
 
 
-def test_calibration_defaults_wait_for_d5():
+def test_calibration_defaults_are_decision_55():
     calibration = config.CalibrationConfig()
     assert (calibration.calibrate, calibration.steps, calibration.margin, calibration.choose) == (
-        False, 50, 0.05, config.PENDING)
-    assert config.CalibrationConfig(calibrate=True, choose=False).choose is False  # D5 (b) fits
+        False, 50, 0.05, True)
+    assert config.CalibrationConfig(calibrate=True, choose=False).choose is False  # D5 (b) fits the record
 
 
 def test_planner_options_record_both_and_read_older_records():
@@ -64,8 +64,8 @@ def test_planner_options_record_both_and_read_older_records():
 @pytest.mark.parametrize(("kwargs", "code"), [
     ({"adaptation": config.AdaptationConfig(trigger="recapture-budget")}, "adaptation-unsupported"),
     ({"adaptation": config.AdaptationConfig(max_switches=2)}, "adaptation-unsupported"),
-    ({"calibration": config.CalibrationConfig(calibrate=True)}, "calibration-pending"),
-    ({"calibration": config.CalibrationConfig(choose=True)}, "calibration-pending"),
+    ({"calibration": config.CalibrationConfig(choose=False)}, "calibration-unsupported"),
+    ({"calibration": config.CalibrationConfig(calibrate=True, choose=False)}, "calibration-unsupported"),
 ])
 def test_an_option_not_implemented_is_refused(kwargs, code):
     from fastmace.simulation import PHASE_5_PENDING_CODES, planner_options
