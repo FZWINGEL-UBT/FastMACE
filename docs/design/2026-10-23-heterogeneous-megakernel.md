@@ -1,7 +1,8 @@
 # Long-term direction: a heterogeneous persistent megakernel (23 October 2026)
 
-Status: **recorded, not planned.** The owner had it recorded on 23 October 2026, after an outside proposal. It
-stays a research direction with a cheap gate. It is not a task in any round until that gate passes.
+Status: **heterogeneous part closed** (owner, 24 October 2026: "Close the part", after OPT4-T07). Recorded on
+23 October 2026 after an outside proposal. The persistent-kernel part without tensor-core co-execution stays
+a research direction under OPT-T05's stopping rules.
 
 **Gate result (OPT4-T07, 24 October 2026): fail.** The probe fails on the reference GPU (RTX 5060 Ti, sm_120)
 and on the A100 (sm_80). The L4 (sm_89) passes only at the threshold, as a no-traffic ceiling. The
@@ -85,7 +86,7 @@ The most realistic variants, a 64×64 tensor-core warp tile (128 accumulators) b
   sides are perfectly balanced. Only the GEMM share of a step would gain. OPT-T01b's real two-stream version was
   0.77–0.85×.
 
-**Decision proposed to the owner:** the heterogeneous part is closed on sm_120 and sm_80. It cannot open on
+**Decision (owner, 24 October 2026, as proposed):** the heterogeneous part is closed on sm_120 and sm_80. It cannot open on
 sm_89 alone, because each later stage needs ≥ 10 % whole-step gain on the reference GPU. For a future GPU whose
 TF32 tensor-core rate is several times its FP32 rate, re-run the probe (about 10 s of GPU time) first.
 

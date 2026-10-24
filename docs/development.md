@@ -628,6 +628,9 @@ python3 tools/colab/fastmace_colab.py --gpu G4 --commit <sha> --out ~/fastmace-a
 - **Commands:** `--command` is repeatable, and the commands run one after another on the same VM. Each runs
   from the source root, with `$OUT` as its own results directory (`out/cmd<n>/`). A failing command does not
   stop the next one; the job's exit code is the first non-zero one.
+- **Quoting from Windows:** `wsl.exe -e bash -lc '...'` expands `$OUT` and other variables on the WSL side
+  before the driver sees them, so the VM gets an empty path and the results are lost (OPT4-T07, 24 October
+  2026). Launch from a script file in WSL instead of an inline `bash -lc` string.
 - **The VM:** `--session NAME` names it. The default name is unique per call: GPU, UTC time and a random
   suffix. Two 4-T13 jobs started in the same second once got the same name, and `colab stop` then stopped
   only one of their VMs. The driver refuses a name that is already live (exit 2) and leaves that VM alone;
