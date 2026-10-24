@@ -310,7 +310,7 @@ def test_a_resume_rebuilds_the_fallback_revision(pristine, break_capture, tmp_pa
     assert fallback.is_mid_run(plan)
     sim.close()
     resumed = Simulation.resume(tmp_path / "run")
-    assert resumed.plan.tier == plan.tier and not isinstance(resumed._engine, graph.GraphEngine)
+    assert resumed.plan.tier == plan.tier and isinstance(resumed._engine, CompiledEngine)
     assert fallback.mid_run_fallbacks(resumed.plan) == fallback.mid_run_fallbacks(plan)
     resumed.run(steps=10)
     assert int(resumed._engine.state.step) == 70
