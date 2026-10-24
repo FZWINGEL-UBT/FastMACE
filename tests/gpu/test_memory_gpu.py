@@ -33,7 +33,6 @@ import json
 import fastmace
 import fastmace as fm
 import torch
-torch.cuda.reset_peak_memory_stats()
 atoms = structure()
 sim = fm.Simulation(atoms, fm.ForceField(fm.load("mh1-r2scan"), atoms),
                     integrator=fm.integrators.Langevin(timestep_fs=1.0, temperature_K=300.0,
