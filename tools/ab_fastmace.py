@@ -286,7 +286,11 @@ class Version:
                                         compile_cache=self.cache)
         options = {name: True for name in fixed.enabled_options(plan)}
         options.update({f"off:{name}": reason for name, reason in fixed.auto_options_off(plan).items()})
-        return engine, dict(describe=plan.describe(full=True), options=options)
+        try:
+            describe = plan.describe(full=True)
+        except TypeError:  # releases before phase 5 (fastmace-4) have no full= (5-T11)
+            describe = plan.describe()
+        return engine, dict(describe=describe, options=options)
 
 
 def main(argv=None):
