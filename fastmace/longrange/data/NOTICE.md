@@ -13,3 +13,8 @@ terms apply to the file.
 It ships with FastMACE so that the native D3 path needs no `[d3]` extra
 (SPEC §4.1, §14). `tests/cpu/test_d3_kernel.py` checks the hash and, when
 torch-dftd is installed, that the file equals torch-dftd's own.
+
+The reference values themselves are from S. Grimme, J. Antony, S. Ehrlich and
+H. Krieg, J. Chem. Phys. 132, 154104 (2010), distributed with the DFT-D3
+program (GPL); see `docs/licences.md` for the open question about their
+licence.
