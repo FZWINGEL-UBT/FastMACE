@@ -83,7 +83,12 @@ Plan revision 0, tier graph: minimal plan (phase 1b)
 
 1. The runner's outer `DONE` marker masked child failures (fixed in tools, a2077787).
 2. The slow tier runs out of GPU memory in one process on 16 GiB. Run POLAR stress references in a child process,
-   or split the tier.
+   or split the tier. **Fixed in 6-T11:** the POLAR-1-S stress check runs its float64 reference in a child
+   process (limits unchanged). The six slow-tier tests (7 cases) then passed in one pytest process on the
+   RTX 5060 Ti, 200 s, mace_cueq_latest (NbCl5 max_abs 8.3e-9, NaCl 6.9e-9, generic float64 errors <= 2.8e-15).
 3. From the pre-acceptance list, deferred: the integrator label in plan records (4-T13), extended-energy
    `run_fresh`, the slow POLAR cold compile, and the NAS sync (until the workstations are back).
+   **6-T11:** plan records now name the scheme that runs (NVE, CSVR, NoseHooverChain, MTK, Berendsen; Langevin and
+   LangevinBAOAB keep the baseline text); extended-energy `run_fresh` was already done in 9e9996d2. Still open:
+   the slow POLAR cold compile and the NAS sync.
 4. OMOL-0 XL on the A100: still open. The A100 is not a production GPU.

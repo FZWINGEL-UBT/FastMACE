@@ -59,6 +59,9 @@ from . import rules
 from .plan import Hardware, Plan
 
 TIER = "graph"
+# The plan record's integrator name per scheme other than Langevin/BAOAB (6-T11): the fastmace.integrators class.
+SCHEME_CLASS_NAMES = MappingProxyType({"nve": "NVE", "csvr": "CSVR", "nhc": "NoseHooverChain", "mtk": "MTK",
+                                       "berendsen": "Berendsen", "langevin": "Langevin", "baoab": "LangevinBAOAB"})
 EAGER_TIER = "eager"  # the graph engine without capture or compilation (SPEC §8.3, 2-T02)
 COMPILED_TIER = "compiled"  # the compiled model without capture, exact edge counts (SPEC §8.2, 3-T06)
 
@@ -679,12 +682,19 @@ class FixedPlanner:
                         "CUDA graphs" if self._device_type() == "cuda" else "CPU device: eager stages")
 
             # Integrator (workflow.GPUEngine.__init__, baoab_settings).
-            if npt:
+            # The record names the scheme that runs (6-T11, phase 4 open finding 2); Langevin and BAOAB keep the
+            # baseline's text, which the phase 4 plan comparison relies on.
+            if npt and integrator.scheme == "baoab":
                 book.decide("integrator", "LangevinBAOAB", f"NPT, {integrator.cell_mode} cell, externalstress="
                             f"{_stress_text(integrator)}, disable_cell_langevin="
                             f"{bool(integrator.disable_cell_langevin)} (workflow.baoab_settings)")
-            else:
+            elif not npt and integrator.scheme == "langevin":
                 book.decide("integrator", "Langevin", f"NVT, fixcm={integrator.fixcm} (workflow.GPUEngine)")
+            else:
+                name = SCHEME_CLASS_NAMES.get(integrator.scheme, integrator.scheme)
+                cell = f", {integrator.cell_mode} cell" if npt else ""
+                book.decide("integrator", name, f"{integrator.ensemble.upper()}{cell}, fixcm={integrator.fixcm} "
+                            f"(fastmace.integrators, scheme {integrator.scheme!r})")
             book.decide("compute_stress", _toggle(npt), "variable cell (NPT)" if npt else
                         "fixed cell: the graph engine computes no stress")
             integrator = _fixcm_projection(book, integrator, npt=npt, mc_moves=bool(mc and mc[0]))
