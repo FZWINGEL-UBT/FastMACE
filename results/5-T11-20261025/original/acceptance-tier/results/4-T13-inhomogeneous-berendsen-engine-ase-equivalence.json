@@ -1,0 +1,66 @@
+{
+ "scheme": "inhomogeneous-berendsen",
+ "steps": 4000,
+ "blocks_dT_K": [
+  7.389644451905042e-13,
+  1.5916157281026244e-12,
+  5.115907697472721e-13,
+  1.8189894035458565e-12,
+  9.663381206337363e-13,
+  1.4210854715202004e-12,
+  3.410605131648481e-13,
+  2.7853275241795927e-12
+ ],
+ "blocks_dPE_eV_per_atom": [
+  8.881784197001252e-16,
+  8.881784197001252e-16,
+  0.0,
+  0.0,
+  0.0,
+  8.881784197001252e-16,
+  0.0,
+  2.6645352591003757e-15
+ ],
+ "blocks_dV_A3": [
+  0.0,
+  0.0,
+  0.0,
+  -9.094947017729282e-13,
+  0.0,
+  9.094947017729282e-13,
+  0.0,
+  0.0
+ ],
+ "final_positions_max_diff_A": 1.3233858453531866e-12,
+ "final_cell_max_diff_A": 3.552713678800501e-15,
+ "blocks_dPE_meV_per_atom": [
+  8.881784197001252e-13,
+  8.881784197001252e-13,
+  0.0,
+  0.0,
+  0.0,
+  8.881784197001252e-13,
+  0.0,
+  2.6645352591003757e-12
+ ],
+ "final_T_K": [
+  299.8604148277541,
+  299.860414827762
+ ],
+ "final_volume_A3": [
+  4769.27363506884,
+  4769.27363506884
+ ],
+ "seconds": {
+  "ase": 516.8636455670021,
+  "fastmace": 422.62228260199845
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "mode": "pipelined",
+ "engine": "GraphEngine",
+ "integrator": "Berendsen",
+ "records": [
+  "single_graph_strain"
+ ],
+ "plan": "Plan revision 0, tier graph (the research engine's --engine gpu: CUDA graphs, edge buckets)\n  backend cueq (fused convolution on) | force float64 | MC energy none (no MC) | runner in-process\n  rewrites on (2): single_graph_strain, polar_uvu\n  rewrites off: factor_species, block_linear, fx_e3nn_linear, polar_graph_sums (plain cuEq backend); fold_cutoff,\n      density_first, reassociate_first, joint_radial_input, fused_folded_backward, folded_backward_tiles,\n      segmented_first_sum, grouped_linear, merged_residual, gated_rows (+13 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: not recorded\n  memory (rule 12): not estimated; GPU NVIDIA GeForce RTX 5060 Ti\n  workload: LangevinBAOAB NPT, full cell, externalstress=-0.00624151 (-1 GPa), disable_cell_langevin=False;\n      216 atoms, 3D PBC, no constraints\n  rules 8-11: skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 fixed plan of phase 1a (main.py)"
+}

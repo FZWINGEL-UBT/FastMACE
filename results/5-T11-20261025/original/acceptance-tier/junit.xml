@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="55" time="25780.075" timestamp="2026-10-25T02:34:56.401175+01:00" hostname="Fabi-PC"><testcase classname="tests.gpu.test_ase_equivalence_gpu" name="test_langevin_reproduces_ase_in_every_50_K_bin" time="943.000" /><testcase classname="tests.gpu.test_ase_equivalence_gpu" name="test_baoab_variants_reproduce_their_references" time="1022.040" /><testcase classname="tests.gpu.test_canonical_restart_gpu" name="test_mh1_hybrid_resumes_statistically" time="269.406" /><testcase classname="tests.gpu.test_engine_gpu" name="test_mh1_plain_cueq_float64_against_the_research_engine" time="374.815" /><testcase classname="tests.gpu.test_engine_gpu" name="test_mh1_plain_cueq_float64_npt_against_the_research_engine" time="264.061" /><testcase classname="tests.gpu.test_engine_gpu" name="test_mh1_hybrid_float32_against_the_research_engine" time="167.244" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_ddmin_finds_the_broken_rewrites[rewrite]" time="95.014" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_ddmin_finds_the_broken_rewrites[pair]" time="118.719" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_a_broken_capture_drops_the_graph_mode" time="61.775" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_a_capture_error_before_the_first_step_falls_back_to_compiled[skip]" time="61.784" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_a_capture_error_before_the_first_step_falls_back_to_compiled[gate]" time="61.782" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_prepare_leaves_the_default_trajectory_unchanged" time="60.817" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_prepared_graphs_keep_every_edge_after_the_edge_count_grows" time="61.373" /><testcase classname="tests.gpu.test_fallback_gpu" name="test_a_failed_candidates_memory_is_freed_before_the_next_build" time="155.695" /><testcase classname="tests.gpu.test_fix_atoms_gpu" name="test_langevin_with_fixed_atoms_reproduces_ase_in_every_50_K_bin" time="944.444" /><testcase classname="tests.gpu.test_forces_gpu" name="test_mh1_agrees_with_maceforces[cueq-float64-compiled-production]" time="104.002" /><testcase classname="tests.gpu.test_forces_gpu" name="test_mh1_agrees_with_maceforces[hybrid-float32-compiled-production]" time="109.788" /><testcase classname="tests.gpu.test_gate_resources_gpu" name="test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[polar1-l]" time="430.075" /><testcase classname="tests.gpu.test_gate_resources_gpu" name="test_out_of_memory_ends_on_the_cpu_or_a_reduced_cell[omol0-xl]" time="130.073" /><testcase classname="tests.gpu.test_isolation_gpu" name="test_a_b_a_equals_fresh_instances[mh1-plain-cueq]" time="162.575" /><testcase classname="tests.gpu.test_isolation_gpu" name="test_a_b_a_equals_fresh_instances[mh1-hybrid]" time="145.920" /><testcase classname="tests.gpu.test_isolation_gpu" name="test_a_b_a_equals_fresh_instances[polar1-s-hybrid]" time="494.346" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_populations_follow_boltzmann[swap-20261022]" time="217.341" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_populations_follow_boltzmann[transmute-20261023]" time="788.254" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_kinetic_temperature_with_mc_on_and_off[fixcm]" time="497.545" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_kinetic_temperature_with_mc_on_and_off[free]" time="448.993" /><testcase classname="tests.gpu.test_mc_statistics_gpu" name="test_mh1_kinetic_temperature_with_mc_on_and_off[negative]" time="388.761" /><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_matches_ase_on_mh1[nhc]" time="1045.641" /><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_matches_ase_on_mh1[hydrostatic]" time="1052.043" /><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_matches_ase_on_mh1[full]" time="1056.549" /><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_extended_energy_over_20_ps[nhc]" time="5.033"><failure message="fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 59 of 59 allocator segments are not expandable. Call configure_allocator before anything touches CUDA&#10;Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).&#10;Environment: run `fastmace doctor` to check this installation.">name = 'nhc'
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @cuda
+    @needs_mh1
+    @pytest.mark.parametrize("name", SCHEMES)
+    def test_extended_energy_over_20_ps(name):
+        """Recorded, not acceptance (plan 4-T03): the drift of the conserved quantity in the default plan."""
+        import fastmace as fm
+        from fastmace.integrators.base import CONSERVED_KEY
+    
+        atoms = nacl()
+        n = len(atoms)
+&gt;       sim = fm.Simulation(atoms, fm.ForceField(fm.load("mh1-r2scan"), atoms),
+                            integrator=record(name, timestep_fs=1.0, dof="auto", fixcm=True), seed=SEED,
+                            workload=fm.Workload(max_temperature_K=TEMPERATURE_K))
+
+tests/gpu/test_nose_hoover_mtk_mh1_gpu.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+fastmace/simulation.py:608: in __init__
+    failure = self._failure("build", error, stored)
+fastmace/simulation.py:705: in _failure
+    raise error
+fastmace/simulation.py:606: in __init__
+    self._engine = planner.build(self._plan, ff, atoms)
+fastmace/planner/minimal.py:1097: in build
+    engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
+fastmace/planner/fixed.py:1102: in build
+    return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
+fastmace/engine/graph.py:208: in __init__
+    self.process = process.check_engine(config, force_field, record=constraints, owner=type(self).__name__,
+fastmace/engine/constraints.py:198: in check_engine
+    facts = {"allocator": check_allocator(config, segments),
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+config = EngineConfig(backend='cueq', compile_mode='default', device='cuda:0', pipelined='on', async_output='on', speculative_g...e_cache=True, overlap_rebuild=True, step_graph=False, fused_integrator=True, recapture_budget=64, graph_variant_cap=64)
+segments = [{'device': 0, 'address': 55870226432, 'total_size': 2097152, 'allocated_size': 0, ...}, {'device': 0, 'address': 5587...ated_size': 0, ...}, {'device': 0, 'address': 55918460928, 'total_size': 2097152, 'allocated_size': 2097152, ...}, ...]
+environ = environ({'SHELL': '/bin/bash', 'WSL2_GUI_APPS_ENABLED': '1', 'WSL_DISTRO_NAME': 'Ubuntu', 'WT_SESSION': '8b20863e-6628...nts:True', 'TORCHINDUCTOR_FX_GRAPH_CACHE': '1', 'ENABLE_AOT_AUTOGRAD_CACHE': '1', 'TORCHINDUCTOR_AUTOGRAD_CACHE': '1'})
+torch_version = None
+
+    def check_allocator(config, segments: list[Mapping[str, Any]] | None, environ: Mapping[str, str] | None = None,
+                        torch_version: str | None = None) -&gt; str:
+        """Refuse an engine whose allocator setting did not take effect; returns what is in effect.
+    
+        ``segments`` is ``torch.cuda.memory_snapshot()`` (None on the CPU: nothing to check). Every
+        segment of an allocator with expandable segments is expandable; one that is not means the
+        variable was set after the first CUDA allocation (or not at all).
+        """
+        if segments is None:
+            return "cpu"
+        environ = os.environ if environ is None else environ
+        if not wants_expandable_segments(config, environ, torch_version):
+            return "default"
+        if EXPANDABLE not in (environ.get("PYTORCH_CUDA_ALLOC_CONF") or ""):
+            raise ProcessConstraintError(
+                f"EngineConfig.expandable_segments={config.expandable_segments!r} needs "
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} before the first CUDA allocation "
+                "(fastmace.model.compile.configure_allocator), and it is not set")
+        fixed = [segment for segment in segments if not segment.get("is_expandable", False)]
+        if fixed:
+&gt;           raise ProcessConstraintError(
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} was set after the first CUDA allocation: {len(fixed)} of "
+                f"{len(segments)} allocator segments are not expandable. Call configure_allocator before "
+                "anything touches CUDA")
+E           fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 59 of 59 allocator segments are not expandable. Call configure_allocator before anything touches CUDA
+E           Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).
+E           Environment: run `fastmace doctor` to check this installation.
+
+fastmace/engine/constraints.py:142: ProcessConstraintError</failure></testcase><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_extended_energy_over_20_ps[hydrostatic]" time="3.261"><failure message="fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 59 of 59 allocator segments are not expandable. Call configure_allocator before anything touches CUDA&#10;Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).&#10;Environment: run `fastmace doctor` to check this installation.">name = 'hydrostatic'
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @cuda
+    @needs_mh1
+    @pytest.mark.parametrize("name", SCHEMES)
+    def test_extended_energy_over_20_ps(name):
+        """Recorded, not acceptance (plan 4-T03): the drift of the conserved quantity in the default plan."""
+        import fastmace as fm
+        from fastmace.integrators.base import CONSERVED_KEY
+    
+        atoms = nacl()
+        n = len(atoms)
+&gt;       sim = fm.Simulation(atoms, fm.ForceField(fm.load("mh1-r2scan"), atoms),
+                            integrator=record(name, timestep_fs=1.0, dof="auto", fixcm=True), seed=SEED,
+                            workload=fm.Workload(max_temperature_K=TEMPERATURE_K))
+
+tests/gpu/test_nose_hoover_mtk_mh1_gpu.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+fastmace/simulation.py:608: in __init__
+    failure = self._failure("build", error, stored)
+fastmace/simulation.py:705: in _failure
+    raise error
+fastmace/simulation.py:606: in __init__
+    self._engine = planner.build(self._plan, ff, atoms)
+fastmace/planner/minimal.py:1097: in build
+    engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
+fastmace/planner/fixed.py:1102: in build
+    return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
+fastmace/engine/graph.py:208: in __init__
+    self.process = process.check_engine(config, force_field, record=constraints, owner=type(self).__name__,
+fastmace/engine/constraints.py:198: in check_engine
+    facts = {"allocator": check_allocator(config, segments),
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+config = EngineConfig(backend='cueq', compile_mode='default', device='cuda:0', pipelined='on', async_output='on', speculative_g...e_cache=True, overlap_rebuild=True, step_graph=False, fused_integrator=True, recapture_budget=64, graph_variant_cap=64)
+segments = [{'device': 0, 'address': 55870226432, 'total_size': 2097152, 'allocated_size': 2097152, ...}, {'device': 0, 'address'...ated_size': 0, ...}, {'device': 0, 'address': 55918460928, 'total_size': 2097152, 'allocated_size': 1146880, ...}, ...]
+environ = environ({'SHELL': '/bin/bash', 'WSL2_GUI_APPS_ENABLED': '1', 'WSL_DISTRO_NAME': 'Ubuntu', 'WT_SESSION': '8b20863e-6628...YTEST_CURRENT_TEST': 'tests/gpu/test_nose_hoover_mtk_mh1_gpu.py::test_extended_energy_over_20_ps[hydrostatic] (call)'})
+torch_version = None
+
+    def check_allocator(config, segments: list[Mapping[str, Any]] | None, environ: Mapping[str, str] | None = None,
+                        torch_version: str | None = None) -&gt; str:
+        """Refuse an engine whose allocator setting did not take effect; returns what is in effect.
+    
+        ``segments`` is ``torch.cuda.memory_snapshot()`` (None on the CPU: nothing to check). Every
+        segment of an allocator with expandable segments is expandable; one that is not means the
+        variable was set after the first CUDA allocation (or not at all).
+        """
+        if segments is None:
+            return "cpu"
+        environ = os.environ if environ is None else environ
+        if not wants_expandable_segments(config, environ, torch_version):
+            return "default"
+        if EXPANDABLE not in (environ.get("PYTORCH_CUDA_ALLOC_CONF") or ""):
+            raise ProcessConstraintError(
+                f"EngineConfig.expandable_segments={config.expandable_segments!r} needs "
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} before the first CUDA allocation "
+                "(fastmace.model.compile.configure_allocator), and it is not set")
+        fixed = [segment for segment in segments if not segment.get("is_expandable", False)]
+        if fixed:
+&gt;           raise ProcessConstraintError(
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} was set after the first CUDA allocation: {len(fixed)} of "
+                f"{len(segments)} allocator segments are not expandable. Call configure_allocator before "
+                "anything touches CUDA")
+E           fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 59 of 59 allocator segments are not expandable. Call configure_allocator before anything touches CUDA
+E           Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).
+E           Environment: run `fastmace doctor` to check this installation.
+
+fastmace/engine/constraints.py:142: ProcessConstraintError</failure></testcase><testcase classname="tests.gpu.test_nose_hoover_mtk_mh1_gpu" name="test_extended_energy_over_20_ps[full]" time="3.524"><failure message="fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 59 of 59 allocator segments are not expandable. Call configure_allocator before anything touches CUDA&#10;Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).&#10;Environment: run `fastmace doctor` to check this installation.">name = 'full'
+
+    @pytest.mark.slow
+    @pytest.mark.acceptance
+    @cuda
+    @needs_mh1
+    @pytest.mark.parametrize("name", SCHEMES)
+    def test_extended_energy_over_20_ps(name):
+        """Recorded, not acceptance (plan 4-T03): the drift of the conserved quantity in the default plan."""
+        import fastmace as fm
+        from fastmace.integrators.base import CONSERVED_KEY
+    
+        atoms = nacl()
+        n = len(atoms)
+&gt;       sim = fm.Simulation(atoms, fm.ForceField(fm.load("mh1-r2scan"), atoms),
+                            integrator=record(name, timestep_fs=1.0, dof="auto", fixcm=True), seed=SEED,
+                            workload=fm.Workload(max_temperature_K=TEMPERATURE_K))
+
+tests/gpu/test_nose_hoover_mtk_mh1_gpu.py:188: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+fastmace/simulation.py:608: in __init__
+    failure = self._failure("build", error, stored)
+fastmace/simulation.py:705: in _failure
+    raise error
+fastmace/simulation.py:606: in __init__
+    self._engine = planner.build(self._plan, ff, atoms)
+fastmace/planner/minimal.py:1097: in build
+    engine = self._fixed(RewriteConfig(), plan.precision.dtype).build(
+fastmace/planner/fixed.py:1102: in build
+    return GraphEngine(plan.engine, field, integrator, state, neighbours=plan.neighbours, constraints=constraints,
+fastmace/engine/graph.py:208: in __init__
+    self.process = process.check_engine(config, force_field, record=constraints, owner=type(self).__name__,
+fastmace/engine/constraints.py:198: in check_engine
+    facts = {"allocator": check_allocator(config, segments),
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+config = EngineConfig(backend='cueq', compile_mode='default', device='cuda:0', pipelined='on', async_output='on', speculative_g...e_cache=True, overlap_rebuild=True, step_graph=False, fused_integrator=True, recapture_budget=64, graph_variant_cap=64)
+segments = [{'device': 0, 'address': 55870226432, 'total_size': 2097152, 'allocated_size': 0, ...}, {'device': 0, 'address': 5587...'allocated_size': 0, ...}, {'device': 0, 'address': 55918460928, 'total_size': 2097152, 'allocated_size': 0, ...}, ...]
+environ = environ({'SHELL': '/bin/bash', 'WSL2_GUI_APPS_ENABLED': '1', 'WSL_DISTRO_NAME': 'Ubuntu', 'WT_SESSION': '8b20863e-6628...'1', 'PYTEST_CURRENT_TEST': 'tests/gpu/test_nose_hoover_mtk_mh1_gpu.py::test_extended_energy_over_20_ps[full] (call)'})
+torch_version = None
+
+    def check_allocator(config, segments: list[Mapping[str, Any]] | None, environ: Mapping[str, str] | None = None,
+                        torch_version: str | None = None) -&gt; str:
+        """Refuse an engine whose allocator setting did not take effect; returns what is in effect.
+    
+        ``segments`` is ``torch.cuda.memory_snapshot()`` (None on the CPU: nothing to check). Every
+        segment of an allocator with expandable segments is expandable; one that is not means the
+        variable was set after the first CUDA allocation (or not at all).
+        """
+        if segments is None:
+            return "cpu"
+        environ = os.environ if environ is None else environ
+        if not wants_expandable_segments(config, environ, torch_version):
+            return "default"
+        if EXPANDABLE not in (environ.get("PYTORCH_CUDA_ALLOC_CONF") or ""):
+            raise ProcessConstraintError(
+                f"EngineConfig.expandable_segments={config.expandable_segments!r} needs "
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} before the first CUDA allocation "
+                "(fastmace.model.compile.configure_allocator), and it is not set")
+        fixed = [segment for segment in segments if not segment.get("is_expandable", False)]
+        if fixed:
+&gt;           raise ProcessConstraintError(
+                f"PYTORCH_CUDA_ALLOC_CONF={EXPANDABLE} was set after the first CUDA allocation: {len(fixed)} of "
+                f"{len(segments)} allocator segments are not expandable. Call configure_allocator before "
+                "anything touches CUDA")
+E           fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 59 of 59 allocator segments are not expandable. Call configure_allocator before anything touches CUDA
+E           Next: Run this plan in a separate process (a fresh Python process or the subprocess runner).
+E           Environment: run `fastmace doctor` to check this installation.
+
+fastmace/engine/constraints.py:142: ProcessConstraintError</failure></testcase><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[nve]" time="1037.024" /><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[csvr]" time="1040.258" /><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[nvt-berendsen]" time="1033.326" /><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[npt-berendsen]" time="1040.605" /><testcase classname="tests.gpu.test_nve_csvr_berendsen_gpu" name="test_matches_ase_on_mh1[inhomogeneous-berendsen]" time="1044.371" /><testcase classname="tests.gpu.test_reproducible_gpu" name="test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float64]" time="256.866" /><testcase classname="tests.gpu.test_reproducible_gpu" name="test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]" time="89.194" /><testcase classname="tests.gpu.test_reproducible_gpu" name="test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float64]" time="309.719" /><testcase classname="tests.gpu.test_reproducible_gpu" name="test_repeated_and_interrupted_runs_are_bitwise_equal[NbCl5-float32]" time="118.839" /><testcase classname="tests.gpu.test_reproducible_gpu" name="test_reproducible_after_cuda_started_runs_in_a_child_bitwise" time="58.154" /><testcase classname="tests.gpu.test_schemes_engine_ase_gpu" name="test_scheme_on_the_graph_engine_reproduces_ase[nve]" time="949.512" /><testcase classname="tests.gpu.test_schemes_engine_ase_gpu" name="test_scheme_on_the_graph_engine_reproduces_ase[csvr]" time="953.261" /><testcase classname="tests.gpu.test_schemes_engine_ase_gpu" name="test_scheme_on_the_graph_engine_reproduces_ase[nvt-berendsen]" time="954.000" /><testcase classname="tests.gpu.test_schemes_engine_ase_gpu" name="test_scheme_on_the_graph_engine_reproduces_ase[npt-berendsen]" time="962.510" /><testcase classname="tests.gpu.test_schemes_engine_ase_gpu" name="test_scheme_on_the_graph_engine_reproduces_ase[inhomogeneous-berendsen]" time="964.427" /><testcase classname="tests.gpu.test_schemes_engine_ase_gpu" name="test_scheme_on_the_graph_engine_reproduces_ase[nhc]" time="951.387" /><testcase classname="tests.gpu.test_schemes_engine_ase_gpu" name="test_scheme_on_the_graph_engine_reproduces_ase[mtk-hydrostatic]" time="967.640" /><testcase classname="tests.gpu.test_schemes_engine_ase_gpu" name="test_scheme_on_the_graph_engine_reproduces_ase[mtk-full]" time="968.044" /><testcase classname="tests.gpu.test_selfcheck_gpu" name="test_gate_passes_in_graph_mode[omol0-xl]" time="90.008" /><testcase classname="tests.gpu.test_selfcheck_gpu" name="test_gate_time_on_nbcl5" time="61.635" /><testcase classname="tests.gpu.test_subprocess_runner_gpu" name="test_plain_cueq_float64_after_a_hybrid_runs_in_a_child_within_1e_12" time="128.991" /><testcase classname="tests.gpu.test_subprocess_runner_gpu" name="test_hybrid_after_a_plain_cueq_runs_in_a_child" time="48.309" /></testsuite></testsuites>

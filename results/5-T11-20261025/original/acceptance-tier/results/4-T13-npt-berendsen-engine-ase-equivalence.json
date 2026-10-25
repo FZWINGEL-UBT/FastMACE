@@ -1,0 +1,66 @@
+{
+ "scheme": "npt-berendsen",
+ "steps": 4000,
+ "blocks_dT_K": [
+  3.126388037344441e-13,
+  4.547473508864641e-13,
+  6.252776074688882e-13,
+  7.958078640513122e-13,
+  9.094947017729282e-13,
+  5.684341886080801e-13,
+  1.2505552149377763e-12,
+  5.115907697472721e-13
+ ],
+ "blocks_dPE_eV_per_atom": [
+  0.0,
+  8.881784197001252e-16,
+  0.0,
+  0.0,
+  8.881784197001252e-16,
+  8.881784197001252e-16,
+  0.0,
+  0.0
+ ],
+ "blocks_dV_A3": [
+  -1.8189894035458565e-12,
+  -9.094947017729282e-13,
+  0.0,
+  0.0,
+  0.0,
+  -9.094947017729282e-13,
+  0.0,
+  0.0
+ ],
+ "final_positions_max_diff_A": 2.2382096176443156e-13,
+ "final_cell_max_diff_A": 0.0,
+ "blocks_dPE_meV_per_atom": [
+  0.0,
+  8.881784197001252e-13,
+  0.0,
+  0.0,
+  8.881784197001252e-13,
+  8.881784197001252e-13,
+  0.0,
+  0.0
+ ],
+ "final_T_K": [
+  305.37810738459433,
+  305.37810738460905
+ ],
+ "final_volume_A3": [
+  4749.907208601715,
+  4749.907208601715
+ ],
+ "seconds": {
+  "ase": 513.9776228549999,
+  "fastmace": 423.69588456199926
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "mode": "pipelined",
+ "engine": "GraphEngine",
+ "integrator": "Berendsen",
+ "records": [
+  "single_graph_strain"
+ ],
+ "plan": "Plan revision 0, tier graph (the research engine's --engine gpu: CUDA graphs, edge buckets)\n  backend cueq (fused convolution on) | force float64 | MC energy none (no MC) | runner in-process\n  rewrites on (2): single_graph_strain, polar_uvu\n  rewrites off: factor_species, block_linear, fx_e3nn_linear, polar_graph_sums (plain cuEq backend); fold_cutoff,\n      density_first, reassociate_first, joint_radial_input, fused_folded_backward, folded_backward_tiles,\n      segmented_first_sum, grouped_linear, merged_residual, gated_rows (+13 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: not recorded\n  memory (rule 12): not estimated; GPU NVIDIA GeForce RTX 5060 Ti\n  workload: LangevinBAOAB NPT, hydrostatic cell, externalstress=-0.00624151 (-1 GPa), disable_cell_langevin=False;\n      216 atoms, 3D PBC, no constraints\n  rules 8-11: skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 fixed plan of phase 1a (main.py)"
+}

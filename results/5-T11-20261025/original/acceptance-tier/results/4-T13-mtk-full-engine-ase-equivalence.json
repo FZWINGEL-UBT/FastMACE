@@ -1,0 +1,66 @@
+{
+ "scheme": "mtk-full",
+ "steps": 4000,
+ "blocks_dT_K": [
+  3.296918293926865e-12,
+  5.343281372915953e-12,
+  5.002220859751105e-12,
+  1.3642420526593924e-12,
+  6.764366844436154e-12,
+  1.63140612130519e-11,
+  7.048583938740194e-12,
+  7.503331289626658e-12
+ ],
+ "blocks_dPE_eV_per_atom": [
+  4.440892098500626e-15,
+  8.881784197001252e-16,
+  3.552713678800501e-15,
+  8.881784197001252e-16,
+  2.6645352591003757e-15,
+  1.7763568394002505e-15,
+  1.7763568394002505e-15,
+  2.6645352591003757e-15
+ ],
+ "blocks_dV_A3": [
+  9.094947017729282e-12,
+  -5.002220859751105e-11,
+  1.2732925824820995e-11,
+  6.275513442233205e-11,
+  -7.366907084360719e-11,
+  9.094947017729282e-13,
+  7.275957614183426e-12,
+  1.000444171950221e-11
+ ],
+ "final_positions_max_diff_A": 8.93507490218326e-13,
+ "final_cell_max_diff_A": 5.151434834260726e-13,
+ "blocks_dPE_meV_per_atom": [
+  4.440892098500626e-12,
+  8.881784197001252e-13,
+  3.552713678800501e-12,
+  8.881784197001252e-13,
+  2.6645352591003757e-12,
+  1.7763568394002505e-12,
+  1.7763568394002505e-12,
+  2.6645352591003757e-12
+ ],
+ "final_T_K": [
+  314.92206492612064,
+  314.92206492622876
+ ],
+ "final_volume_A3": [
+  4804.027981765651,
+  4804.027981765446
+ ],
+ "seconds": {
+  "ase": 519.0900397349978,
+  "fastmace": 424.53096237000136
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "mode": "pipelined",
+ "engine": "GraphEngine",
+ "integrator": "MTK",
+ "records": [
+  "single_graph_strain"
+ ],
+ "plan": "Plan revision 0, tier graph (the research engine's --engine gpu: CUDA graphs, edge buckets)\n  backend cueq (fused convolution on) | force float64 | MC energy none (no MC) | runner in-process\n  rewrites on (2): single_graph_strain, polar_uvu\n  rewrites off: factor_species, block_linear, fx_e3nn_linear, polar_graph_sums (plain cuEq backend); fold_cutoff,\n      density_first, reassociate_first, joint_radial_input, fused_folded_backward, folded_backward_tiles,\n      segmented_first_sum, grouped_linear, merged_residual, gated_rows (+13 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: not recorded\n  memory (rule 12): not estimated; GPU NVIDIA GeForce RTX 5060 Ti\n  workload: LangevinBAOAB NPT, full cell, externalstress=-0.00624151 (-1 GPa), disable_cell_langevin=False;\n      216 atoms, 3D PBC, no constraints\n  rules 8-11: skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 fixed plan of phase 1a (main.py)"
+}

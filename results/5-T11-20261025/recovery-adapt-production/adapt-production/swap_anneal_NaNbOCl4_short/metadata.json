@@ -1,0 +1,4505 @@
+{
+  "schema": "fastmace.metadata/1",
+  "schema_minor": 1,
+  "created_utc": "2026-10-25T12:04:55.104100+00:00",
+  "code": {
+    "version": "0.0.1.dev0",
+    "git_commit": "a2077787e230a78f5306254e9ad467f4f193c094",
+    "git_dirty": null
+  },
+  "checkpoint": {
+    "path": "/home/fzwin/models/mace-mh-1.model",
+    "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+    "head": "matpes_r2scan",
+    "licence": "ASL",
+    "label": "mh1-r2scan",
+    "trust": "sha256"
+  },
+  "model": null,
+  "force_field_identity": {
+    "schema": "fastmace.identity/1",
+    "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+    "head": "matpes_r2scan",
+    "species": [
+      8,
+      11,
+      17,
+      41
+    ],
+    "force_precision": "float32",
+    "physics": {
+      "charge": null,
+      "spin_multiplicity": null
+    },
+    "reference_record_id": null,
+    "mace_version": "0.3.16",
+    "fastmace_version": "0.0.1.dev0",
+    "digest": "ccb346dfcfc6289c9745b5b770d3948928bb5c0ee4e68d11b57f8dfba0932c9d"
+  },
+  "reference_record": null,
+  "plan": {
+    "revision": 0,
+    "tier": "graph",
+    "reason": "minimal plan (phase 1b)",
+    "step": null,
+    "description": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy float32 (pending the move-energy gate) | runner in-process\n  rewrites on (19): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, block_linear, grouped_linear,\n      merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,\n      fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,\n      tf32x3_gemms (only an explicit 'on' enables it); grouped_launch (not the generic MACE family, decision 57);\n      species_skip (not supported by the model); fx_e3nn_linear (+2 more; describe(full=True) lists them)\n  sizes: skin 0.92 A, headroom 1.2 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 1.01, build 1.53), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 756 atoms, 3D PBC, no constraints; up to 1000 K; MC swap from 250 K;\n      species changes\n  rules 8-11: superset O Na Cl Nb (8), max_temperature_K 1000 K (11), host_callbacks_every none (9),\n      species_changes on (8), skin 0.92 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)",
+    "description_full": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = O Na Cl Nb  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1000 K  (rule 11 sizes the skin and headroom: skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = swap  (MC moves are attached through Simulation.run(mc=...) (SPEC \u00a77.6))\n  workload.species_changes = on  (graph mode stays allowed; species-dependent rewrites and tables are built for the superset (SPEC \u00a79.3 rule 8, 3-T02))\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (756 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear); stage 2: off, not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock']))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.tf32x3_gemms = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen))\n  RewriteConfig.fx_e3nn_linear = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  RewriteConfig.polar_graph_sums = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  IntegratorConfig.fixcm_projection = mass_weighted  (auto (mass_weighted_under_nvt_fixcm_else_ase): MC moves under fixcm: redraw_all draws (3N - 3) kT, the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37))\n  IntegratorConfig.dof = fastmace  (auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2))\n  NeighbourConfig.skin = 0.92 A  (auto (rule_11_skin_from_workload): skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild))\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.2 from the skin, edge_bucket_fraction as given)\n  NeighbourConfig.d3_skin = unused  (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04); rule 11 expects at most 9 padded edge buckets inside the capacity)\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): pending the move-energy gate: the force precision float32 if it passes, float64 otherwise, while MD forces keep theirs (SPEC \u00a710.4, \u00a712.3, decision 35))\n  EngineConfig.dynamic_edges = on  (the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59))\n  memory = fits  (rule 12: predicted 1.53 GiB (build; run 1.01, build 1.53) at 30580 edges, 756 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 62 MiB); needs 1.53 of 14.80 GiB free)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+    "backend": "hybrid",
+    "conv_fusion": "off",
+    "rewrites": {
+      "factor_species": "on",
+      "fold_cutoff": "on",
+      "density_first": "on",
+      "reassociate_first": "on",
+      "joint_radial_input": "on",
+      "fused_folded_backward": "on",
+      "folded_backward_tiles": "on",
+      "segmented_first_sum": "on",
+      "streaming_conv": "on",
+      "species_skip": "off",
+      "fused_radial_hidden": "off",
+      "direct_node_feats": "off",
+      "folded_constants": "off",
+      "block_linear": "on",
+      "grouped_linear": "on",
+      "merged_residual": "on",
+      "gated_rows": "on",
+      "segment_gemm": "on",
+      "grouped_launch": "off",
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "combo_kernels": "off",
+      "tf32x3_gemms": "off",
+      "fx_e3nn_linear": "off",
+      "polar_graph_sums": "off",
+      "inplace_block_linear": false,
+      "single_graph_strain": "on",
+      "polar_uvu": true,
+      "selfcheck_cache": "use"
+    },
+    "engine": {
+      "backend": "hybrid",
+      "compile_mode": "default",
+      "device": "cuda:0",
+      "pipelined": "on",
+      "async_output": "on",
+      "speculative_graph": false,
+      "pipeline_edge_margin": 0.0,
+      "pipeline_rebuild_fraction": 0.8,
+      "cueq_conv_fusion": "off",
+      "first_derivative_only": true,
+      "unfuse_full_addmm": true,
+      "dynamo_cache_size_limit": 64,
+      "expandable_segments": "on",
+      "empty_cache_before_capture": true,
+      "warmup_in_graph_pool": true,
+      "dynamic_edges": true,
+      "model_template_cache": true,
+      "overlap_rebuild": true,
+      "step_graph": false,
+      "fused_integrator": true,
+      "recapture_budget": 64,
+      "graph_variant_cap": 64
+    },
+    "neighbours": {
+      "skin": 0.92,
+      "sort_receivers": "on",
+      "gpu_neighbour_list": "on",
+      "edge_multiple": 256,
+      "edge_bucket_fraction": 0.05,
+      "capacity_headroom": 1.2,
+      "headroom": "fixed",
+      "d3_skin": 1.0
+    },
+    "polar": null,
+    "integrator": {
+      "ensemble": "nvt",
+      "scheme": "langevin",
+      "dof": "fastmace",
+      "parameters": [],
+      "timestep_fs": 1.0,
+      "friction": 0.02,
+      "seed": 284122898,
+      "fixcm": true,
+      "fixcm_projection": "mass_weighted",
+      "noise_batch": 256,
+      "pressure_GPa": 0.0,
+      "cell_mode": "hydrostatic",
+      "barostat_tau_fs": null,
+      "barostat_mass_factor": 1.0,
+      "ase_trace_drag_all_elements": false,
+      "temperature_K": 0.0,
+      "external_stress_GPa": null,
+      "disable_cell_langevin": false
+    },
+    "decisions": [
+      {
+        "key": "mode",
+        "choice": "graph",
+        "reason": "molecular dynamics on the graph tier (SPEC \u00a78.1)",
+        "code": "mode-graph",
+        "rule": null
+      },
+      {
+        "key": "allow_reference",
+        "choice": "off",
+        "reason": "not requested",
+        "code": "no-allow-reference",
+        "rule": 1
+      },
+      {
+        "key": "superset",
+        "choice": "O Na Cl Nb",
+        "reason": "declared (species=), equal to the structure's",
+        "code": "superset",
+        "rule": 8
+      },
+      {
+        "key": "force_precision",
+        "choice": "float32",
+        "reason": "the ForceField's precision (SPEC \u00a77.1, \u00a79.2)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.oeq",
+        "choice": "on",
+        "reason": "openequivariance is installed (its extension is built when the hybrid model is loaded)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.triton",
+        "choice": "on",
+        "reason": "triton 3.8.0 is importable",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.nvrtc",
+        "choice": "on",
+        "reason": "NVRTC 13.0 loads through cuda.bindings",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.fused_cueq",
+        "choice": "on",
+        "reason": "cuequivariance_ops_torch imports",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.mace_imported_first",
+        "choice": "none",
+        "reason": "modules imported before FastMACE could prepare the OEq runtime",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "allow_naive_cueq",
+        "choice": "off",
+        "reason": "not needed: no naive cuEq kernel",
+        "code": "fused-cueq",
+        "rule": 6
+      },
+      {
+        "key": "workload.max_temperature_K",
+        "choice": "1000 K",
+        "reason": "rule 11 sizes the skin and headroom: skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild)",
+        "code": "rule-11",
+        "rule": 11
+      },
+      {
+        "key": "workload.host_callbacks_every",
+        "choice": "none",
+        "reason": "no host callbacks",
+        "code": "no-host-callbacks",
+        "rule": 9
+      },
+      {
+        "key": "workload.mc_moves",
+        "choice": "swap",
+        "reason": "MC moves are attached through Simulation.run(mc=...) (SPEC \u00a77.6)",
+        "code": "mc-moves",
+        "rule": null
+      },
+      {
+        "key": "workload.species_changes",
+        "choice": "on",
+        "reason": "graph mode stays allowed; species-dependent rewrites and tables are built for the superset (SPEC \u00a79.3 rule 8, 3-T02)",
+        "code": "species-changes",
+        "rule": 8
+      },
+      {
+        "key": "workload.needs_per_atom",
+        "choice": "none",
+        "reason": "recorded",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "tier",
+        "choice": "graph",
+        "reason": "the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "workload",
+        "choice": "ok",
+        "reason": "756 atoms, 3D PBC, no constraints",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "hardware",
+        "choice": "NVIDIA GeForce RTX 5060 Ti",
+        "reason": "compute capability 12.0, 15.9 GiB (recorded only)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.backend",
+        "choice": "hybrid",
+        "reason": "requested 'hybrid'",
+        "code": "backend-hybrid",
+        "rule": null
+      },
+      {
+        "key": "PrecisionConfig.dtype",
+        "choice": "float32",
+        "reason": "requested 'float32': hybrid backend",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.cueq_conv_fusion",
+        "choice": "off",
+        "reason": "auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.factor_species",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fold_cutoff",
+        "choice": "on",
+        "reason": "auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.density_first",
+        "choice": "on",
+        "reason": "auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.reassociate_first",
+        "choice": "on",
+        "reason": "auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.joint_radial_input",
+        "choice": "on",
+        "reason": "auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fused_folded_backward",
+        "choice": "on",
+        "reason": "auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.folded_backward_tiles",
+        "choice": "on",
+        "reason": "auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.segmented_first_sum",
+        "choice": "on",
+        "reason": "auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fused_radial_hidden",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (no measured gain)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.direct_node_feats",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.folded_constants",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.streaming_conv",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.block_linear",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_graph_engine): stage 1: hybrid backend",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.grouped_linear",
+        "choice": "on",
+        "reason": "auto (on_with_block_linear): stage 1: on (with block_linear)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.merged_residual",
+        "choice": "on",
+        "reason": "auto (on_with_block_linear): stage 1: on (with block_linear)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.gated_rows",
+        "choice": "on",
+        "reason": "auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.segment_gemm",
+        "choice": "on",
+        "reason": "auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.grouped_launch",
+        "choice": "off",
+        "reason": "auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear); stage 2: off, not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock'])",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.species_skip",
+        "choice": "off",
+        "reason": "auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.single_graph_strain",
+        "choice": "on",
+        "reason": "auto (on): process-wide; acts only where stress is computed",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.species_tables",
+        "choice": "on",
+        "reason": "auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fold_readout_tail",
+        "choice": "on",
+        "reason": "auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fold_product_linear",
+        "choice": "on",
+        "reason": "auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.combo_kernels",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.tf32x3_gemms",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fx_e3nn_linear",
+        "choice": "off",
+        "reason": "auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.polar_graph_sums",
+        "choice": "off",
+        "reason": "auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "NeighbourConfig.sort_receivers",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_graph_engine): hybrid backend",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "NeighbourConfig.gpu_neighbour_list",
+        "choice": "on",
+        "reason": "auto (on_with_graph_engine): graph engine",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.inplace_block_linear",
+        "choice": "off",
+        "reason": "not carried over in 1a (SPEC \u00a76.2: opt-in, slower)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.polar_uvu",
+        "choice": "on",
+        "reason": "no effect: not a PolarMACE model",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "PolarConfig.kspace_headroom",
+        "choice": "n/a",
+        "reason": "auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.expandable_segments",
+        "choice": "on",
+        "reason": "auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.compile_mode",
+        "choice": "default",
+        "reason": "main.py's --compile-mode",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.speculative_graph",
+        "choice": "off",
+        "reason": "off unless requested (main.py default)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.pipelined",
+        "choice": "on",
+        "reason": "auto (on_with_graph_engine_unless_speculative): graph engine",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.async_output",
+        "choice": "on",
+        "reason": "auto (on_with_graph_engine): graph engine; the run loop's choice",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "capture",
+        "choice": "on",
+        "reason": "CUDA graphs",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "integrator",
+        "choice": "Langevin",
+        "reason": "NVT, fixcm=True (workflow.GPUEngine)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "compute_stress",
+        "choice": "off",
+        "reason": "fixed cell: the graph engine computes no stress",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "IntegratorConfig.fixcm_projection",
+        "choice": "mass_weighted",
+        "reason": "auto (mass_weighted_under_nvt_fixcm_else_ase): MC moves under fixcm: redraw_all draws (3N - 3) kT, the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37)",
+        "code": "fixcm-projection-mc",
+        "rule": null
+      },
+      {
+        "key": "IntegratorConfig.dof",
+        "choice": "fastmace",
+        "reason": "auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2)",
+        "code": "dof-fastmace",
+        "rule": null
+      },
+      {
+        "key": "NeighbourConfig.skin",
+        "choice": "0.92 A",
+        "reason": "auto (rule_11_skin_from_workload): skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild)",
+        "code": "rule-11",
+        "rule": 11
+      },
+      {
+        "key": "NeighbourConfig.headroom",
+        "choice": "fixed",
+        "reason": "auto (rule_11_headroom_from_workload): capacity_headroom 1.2 from the skin, edge_bucket_fraction as given",
+        "code": "rule-11",
+        "rule": 11
+      },
+      {
+        "key": "NeighbourConfig.d3_skin",
+        "choice": "unused",
+        "reason": "auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.recapture_budget",
+        "choice": "64",
+        "reason": "auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04); rule 11 expects at most 9 padded edge buckets inside the capacity",
+        "code": "rule-11",
+        "rule": 11
+      },
+      {
+        "key": "PrecisionConfig.mc_energy",
+        "choice": "float32",
+        "reason": "auto (force_precision_if_move_energy_gate_passes_else_float64): pending the move-energy gate: the force precision float32 if it passes, float64 otherwise, while MD forces keep theirs (SPEC \u00a710.4, \u00a712.3, decision 35)",
+        "code": "mc-energy-gate-pending",
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.dynamic_edges",
+        "choice": "on",
+        "reason": "the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59)",
+        "code": "dynamic-edges-graph",
+        "rule": null
+      },
+      {
+        "key": "memory",
+        "choice": "fits",
+        "reason": "rule 12: predicted 1.53 GiB (build; run 1.01, build 1.53) at 30580 edges, 756 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 62 MiB); needs 1.53 of 14.80 GiB free",
+        "code": "rule-12-memory",
+        "rule": 12
+      }
+    ],
+    "requested": [
+      [
+        "EngineConfig.backend",
+        "hybrid"
+      ],
+      [
+        "PrecisionConfig.dtype",
+        "float32"
+      ]
+    ],
+    "auto_options_off": [
+      [
+        "species_skip",
+        "no MACE-MP-0 or density-family interaction"
+      ],
+      [
+        "grouped_launch",
+        "not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock'])"
+      ],
+      [
+        "fx_e3nn_linear",
+        "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)"
+      ],
+      [
+        "polar_graph_sums",
+        "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)"
+      ]
+    ],
+    "superset": [
+      8,
+      11,
+      17,
+      41
+    ],
+    "workload": {
+      "max_temperature_K": 1000.0,
+      "species_changes": true,
+      "atom_count_changes": false,
+      "min_mc_temperature_K": 250.0,
+      "host_callbacks_every": null,
+      "needs_per_atom": [],
+      "mc_moves": [
+        "swap"
+      ],
+      "reproducible": false,
+      "mc_energy_precision": "auto",
+      "max_displacement_A": null
+    },
+    "software": {
+      "oeq": [
+        true,
+        "openequivariance is installed (its extension is built when the hybrid model is loaded)"
+      ],
+      "triton": [
+        true,
+        "triton 3.8.0 is importable"
+      ],
+      "nvrtc": [
+        true,
+        "NVRTC 13.0 loads through cuda.bindings"
+      ],
+      "fused_cueq": [
+        true,
+        "cuequivariance_ops_torch imports"
+      ],
+      "mace_imported_first": []
+    },
+    "allowances": [],
+    "fallbacks_tried": [],
+    "predicted_memory_bytes": 1642881072,
+    "runner": "in-process",
+    "calibration": null,
+    "adaptation": null
+  },
+  "plan_revisions": [
+    {
+      "revision": 0,
+      "tier": "graph",
+      "step": null,
+      "reason": "minimal plan (phase 1b)",
+      "description": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy float32 (pending the move-energy gate) | runner in-process\n  rewrites on (19): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, block_linear, grouped_linear,\n      merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,\n      fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,\n      tf32x3_gemms (only an explicit 'on' enables it); grouped_launch (not the generic MACE family, decision 57);\n      species_skip (not supported by the model); fx_e3nn_linear (+2 more; describe(full=True) lists them)\n  sizes: skin 0.92 A, headroom 1.2 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 1.01, build 1.53), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 756 atoms, 3D PBC, no constraints; up to 1000 K; MC swap from 250 K;\n      species changes\n  rules 8-11: superset O Na Cl Nb (8), max_temperature_K 1000 K (11), host_callbacks_every none (9),\n      species_changes on (8), skin 0.92 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)",
+      "description_full": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = O Na Cl Nb  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1000 K  (rule 11 sizes the skin and headroom: skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = swap  (MC moves are attached through Simulation.run(mc=...) (SPEC \u00a77.6))\n  workload.species_changes = on  (graph mode stays allowed; species-dependent rewrites and tables are built for the superset (SPEC \u00a79.3 rule 8, 3-T02))\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (756 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear); stage 2: off, not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock']))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.tf32x3_gemms = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen))\n  RewriteConfig.fx_e3nn_linear = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  RewriteConfig.polar_graph_sums = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  IntegratorConfig.fixcm_projection = mass_weighted  (auto (mass_weighted_under_nvt_fixcm_else_ase): MC moves under fixcm: redraw_all draws (3N - 3) kT, the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37))\n  IntegratorConfig.dof = fastmace  (auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2))\n  NeighbourConfig.skin = 0.92 A  (auto (rule_11_skin_from_workload): skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild))\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.2 from the skin, edge_bucket_fraction as given)\n  NeighbourConfig.d3_skin = unused  (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04); rule 11 expects at most 9 padded edge buckets inside the capacity)\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): pending the move-energy gate: the force precision float32 if it passes, float64 otherwise, while MD forces keep theirs (SPEC \u00a710.4, \u00a712.3, decision 35))\n  EngineConfig.dynamic_edges = on  (the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59))\n  memory = fits  (rule 12: predicted 1.53 GiB (build; run 1.01, build 1.53) at 30580 edges, 756 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 62 MiB); needs 1.53 of 14.80 GiB free)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+      "runner": "in-process",
+      "fallback": null
+    }
+  ],
+  "precision": {
+    "force": "float32",
+    "integration": "float64",
+    "tf32": false,
+    "float64_energy": true
+  },
+  "runtime": {
+    "file_locks": "soft",
+    "file_lock_source": "start-up hook (nfs_soft_locks)",
+    "file_lock_switch_late": false,
+    "cuda_driver_cache": "enabled"
+  },
+  "software": {
+    "versions": {
+      "python": "3.10.12",
+      "torch": "2.14.1+cu130",
+      "numpy": "2.2.6",
+      "ase": "3.27.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance-torch": "0.12.0",
+      "cuequivariance-ops-torch-cu13": "0.12.0",
+      "openequivariance": "0.7.0",
+      "cuda-bindings": "13.3.1",
+      "jinja2": "3.1.6",
+      "filelock": "3.32.3"
+    },
+    "kernels": {
+      "triton": {
+        "available": true,
+        "reason": "triton 3.8.0 is importable"
+      },
+      "nvrtc": {
+        "available": true,
+        "reason": "NVRTC 13.0 loads through cuda.bindings"
+      },
+      "streaming": {
+        "available": true,
+        "reason": "NVRTC 13.0 loads through cuda.bindings; jinja2 and openequivariance are installed"
+      }
+    },
+    "patches": [
+      {
+        "name": "oeq_runtime",
+        "value": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/cuda-runtime",
+        "targets": [
+          "env:CMAKE_CUDA_COMPILER",
+          "env:CPATH",
+          "env:CUDACXX",
+          "env:CUDA_HOME",
+          "env:CUDA_PATH",
+          "env:MAX_JOBS",
+          "env:OEQ_JIT_EXTENSION",
+          "env:OEQ_NVCC_ATTEMPTS",
+          "env:PATH",
+          "env:PYTORCH_NVCC",
+          "env:TORCH_EXTENSIONS_DIR"
+        ],
+        "detail": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13"
+      },
+      {
+        "name": "capture_safe_mask_head",
+        "value": true,
+        "targets": [
+          "mace.modules.blocks:mask_head"
+        ],
+        "detail": "multi-head readout mask without indexed assignment (CUDA graph capture)"
+      },
+      {
+        "name": "unfuse_full_addmm",
+        "value": true,
+        "targets": [
+          "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm",
+          "torch._inductor.config:post_grad_custom_pre_pass"
+        ],
+        "detail": "mm + full-matrix add unfused on the GPU; cache key fastmace-unfused-full-addmm-v1"
+      }
+    ],
+    "triton": "3.8.0",
+    "oeq_extension": {
+      "OEQ_JIT_EXTENSION": "1",
+      "TORCH_EXTENSIONS_DIR": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/torch-extensions-1y6ackz5",
+      "OEQ_NVCC_ATTEMPTS": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/nvcc-attempts.log",
+      "CUDA_HOME": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/cuda-runtime",
+      "MACE_COMPILE_CACHE": null,
+      "OEQ_EXTENSION_SEED": null
+    },
+    "treatments": [
+      {
+        "name": "float64_energy",
+        "qualified": true,
+        "decision": "patched",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "polar_forward",
+        "qualified": true,
+        "decision": "patched",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "capture_safe_mask_head",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "first_derivative_only",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "single_graph_strain",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "unfuse_full_addmm",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "cueq_conv_fusion",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      }
+    ]
+  },
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "driver": null,
+    "compute_capability": "12.0"
+  },
+  "random": {
+    "seed": 284122898,
+    "generators": {
+      "integrator": "b4ee87eaff9b37bff450696edcec97e637a3dcc1b2b09b33405325c42acf4d8b"
+    },
+    "cursors": {
+      "integrator": 120
+    }
+  },
+  "integrator": {
+    "ensemble": "nvt",
+    "scheme": "langevin",
+    "dof": "fastmace",
+    "parameters": [],
+    "timestep_fs": 1.0,
+    "friction": 0.02,
+    "seed": 284122898,
+    "fixcm": true,
+    "fixcm_projection": "mass_weighted",
+    "noise_batch": 256,
+    "pressure_GPa": 0.0,
+    "cell_mode": "hydrostatic",
+    "barostat_tau_fs": null,
+    "barostat_mass_factor": 1.0,
+    "ase_trace_drag_all_elements": false,
+    "temperature_K": 0.0,
+    "external_stress_GPa": null,
+    "disable_cell_langevin": false
+  },
+  "schedule": {
+    "segments": [
+      {
+        "kind": "ramp",
+        "start_K": 0.0,
+        "end_K": 1000.0,
+        "ps": 2.0,
+        "steps": 2000
+      },
+      {
+        "kind": "ramp",
+        "start_K": 1000.0,
+        "end_K": 250.0,
+        "rate_K_per_ps": -30.0,
+        "steps": 25000
+      }
+    ],
+    "timestep_fs": 1.0,
+    "step": 27000,
+    "target_K": 250.0
+  },
+  "gate": {
+    "status": "skipped",
+    "check": "skip",
+    "reason": "opt-in: check=\"gate\"",
+    "copies": null,
+    "energy_meV_per_atom": null,
+    "force_eV_per_A": null,
+    "stress_eV_per_A3": null,
+    "quantities": {},
+    "floors": null,
+    "nonfinite": [],
+    "mode": null,
+    "references": null,
+    "seconds": {},
+    "notes": [],
+    "device": null,
+    "reduced_cell": null,
+    "steps": [],
+    "replay": null,
+    "move_energy": {
+      "requested": "auto",
+      "threshold_eV": 0.00021543333155000003,
+      "min_mc_temperature_K": 250.0,
+      "fraction": 0.01,
+      "superset": [
+        "O",
+        "Na",
+        "Cl",
+        "Nb"
+      ],
+      "max_displacement_A": null,
+      "samples": {
+        "swap": 12
+      },
+      "configurations": 13,
+      "not_sampleable": [],
+      "references": {
+        "ran": "child process",
+        "device": "cuda:0",
+        "steps": [
+          {
+            "device": "cuda:0",
+            "cell": "production",
+            "repeat": null,
+            "atoms": 756,
+            "outcome": "ran",
+            "reason": null,
+            "process": "child"
+          }
+        ],
+        "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c"
+      },
+      "status": "passed",
+      "precision": "float32",
+      "tried": [
+        {
+          "precision": "float32",
+          "status": "passed",
+          "worst_k_B_T_min": 0.0006476337609487371
+        }
+      ],
+      "moves": {
+        "swap": {
+          "samples": 12,
+          "worst_eV": 1.3952189874544274e-05,
+          "worst_label": "swap Na-Nb (atoms 533, 229)",
+          "worst_k_B_T_min": 0.0006476337609487371,
+          "passed": true
+        }
+      },
+      "nonfinite": [],
+      "rows": [
+        {
+          "move": "swap",
+          "label": "swap O-Na (atoms 642, 450)",
+          "production": 17.978127777576447,
+          "reference": 17.97812704590342,
+          "error": 7.316730261663906e-07
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Na (atoms 109, 729)",
+          "production": 18.13707423210144,
+          "reference": 18.137068371182977,
+          "error": 5.860918463440612e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Cl (atoms 83, 686)",
+          "production": 11.350845247507095,
+          "reference": 11.350838590355124,
+          "error": 6.657151971012354e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Cl (atoms 419, 232)",
+          "production": 10.185166656970978,
+          "reference": 10.185154346932904,
+          "error": 1.2310038073337637e-05
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Nb (atoms 192, 341)",
+          "production": 30.076188266277313,
+          "reference": 30.076189581077415,
+          "error": 1.3148001016816124e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Nb (atoms 250, 481)",
+          "production": 28.224247813224792,
+          "reference": 28.224242220516317,
+          "error": 5.592708475887775e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap Na-Cl (atoms 703, 577)",
+          "production": 9.212690532207489,
+          "reference": 9.212698227556757,
+          "error": 7.69534926803317e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap Na-Cl (atoms 253, 737)",
+          "production": 8.147432386875153,
+          "reference": 8.147430382015955,
+          "error": 2.0048591977683827e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap Na-Nb (atoms 197, 649)",
+          "production": 13.994111776351929,
+          "reference": 13.994104456669447,
+          "error": 7.319682481465861e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap Na-Nb (atoms 533, 229)",
+          "production": 14.15832006931305,
+          "reference": 14.158334021502924,
+          "error": 1.3952189874544274e-05
+        },
+        {
+          "move": "swap",
+          "label": "swap Cl-Nb (atoms 350, 483)",
+          "production": 20.877540469169617,
+          "reference": 20.877541378094975,
+          "error": 9.089253580896184e-07
+        },
+        {
+          "move": "swap",
+          "label": "swap Cl-Nb (atoms 69, 622)",
+          "production": 21.077397406101227,
+          "reference": 21.07739880421468,
+          "error": 1.3981134543428198e-06
+        }
+      ],
+      "mode": "captured energy-only graph",
+      "seconds": {
+        "references_s": 19.08496434799963,
+        "production_s": 10.697109693999664
+      }
+    },
+    "mc_energy_precision": "float32",
+    "selfchecks": []
+  },
+  "counters": {
+    "recaptures": 4,
+    "neighbour_lists": {
+      "mace": {
+        "rebuilds": 552,
+        "build_time_s": null,
+        "skin_A": 0.92
+      }
+    },
+    "overflows_redone": 68,
+    "mc": {
+      "swap": {
+        "attempted": 13300,
+        "impossible": 0,
+        "accepted": 0
+      }
+    },
+    "tier_switches": [],
+    "segments": [
+      {
+        "first_step": 13500,
+        "last_step": 13600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 2.0899510389999705,
+        "recaptures": 2,
+        "recapture_s": 0.1590943299988794,
+        "captures": 5,
+        "capture_s": 0.5497297499987326,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 13600,
+        "last_step": 13700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.356268239000201,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 13700,
+        "last_step": 13800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.3211073860002216,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 13800,
+        "last_step": 13900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.3068784710003456,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 13900,
+        "last_step": 14000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.235558157000014,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14000,
+        "last_step": 14100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.205911168000057,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14100,
+        "last_step": 14200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.4035269890000563,
+        "recaptures": 2,
+        "recapture_s": 0.12503656199987745,
+        "captures": 2,
+        "capture_s": 0.12503656199987745,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14200,
+        "last_step": 14300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1324834949991782,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14300,
+        "last_step": 14400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.222988551000526,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14400,
+        "last_step": 14500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1751515349997135,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14500,
+        "last_step": 14600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1876475369999753,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14600,
+        "last_step": 14700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1623000300005515,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14700,
+        "last_step": 14800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1505750149999585,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14800,
+        "last_step": 14900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2733335289995011,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 14900,
+        "last_step": 15000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.261982044999968,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15000,
+        "last_step": 15100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.181133994999982,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15100,
+        "last_step": 15200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2057527739998477,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15200,
+        "last_step": 15300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2222621480004818,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15300,
+        "last_step": 15400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2119645840002704,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15400,
+        "last_step": 15500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2054657559992847,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15500,
+        "last_step": 15600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1486559040004067,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15600,
+        "last_step": 15700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.152033633999963,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15700,
+        "last_step": 15800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1740409920003003,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15800,
+        "last_step": 15900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1749845719996301,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 15900,
+        "last_step": 16000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1827475250001953,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16000,
+        "last_step": 16100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.18699720099994,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16100,
+        "last_step": 16200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1497732289999476,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16200,
+        "last_step": 16300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.165615310999783,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16300,
+        "last_step": 16400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1674190220001037,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16400,
+        "last_step": 16500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1439902499996606,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16500,
+        "last_step": 16600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1350783460002276,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16600,
+        "last_step": 16700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1539024710000376,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16700,
+        "last_step": 16800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1911819429997195,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 4,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16800,
+        "last_step": 16900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1610601450001923,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 16900,
+        "last_step": 17000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2473743640002795,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17000,
+        "last_step": 17100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1702797420002753,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17100,
+        "last_step": 17200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.153225088999534,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17200,
+        "last_step": 17300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1561090450004485,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17300,
+        "last_step": 17400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1776540049995674,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17400,
+        "last_step": 17500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1695120120002684,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17500,
+        "last_step": 17600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2132687289995374,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17600,
+        "last_step": 17700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2114672320003592,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17700,
+        "last_step": 17800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1595253309997133,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17800,
+        "last_step": 17900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1326984110000922,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 17900,
+        "last_step": 18000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1347209260002273,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18000,
+        "last_step": 18100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1350325269995665,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18100,
+        "last_step": 18200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.144480756000121,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18200,
+        "last_step": 18300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1513284239999848,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18300,
+        "last_step": 18400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1580203140001686,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18400,
+        "last_step": 18500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1370984360000875,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18500,
+        "last_step": 18600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1401140259995373,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18600,
+        "last_step": 18700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.136619568000242,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18700,
+        "last_step": 18800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1378878280002027,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18800,
+        "last_step": 18900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1420801829999618,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 18900,
+        "last_step": 19000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1891794379998828,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19000,
+        "last_step": 19100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.201124739000079,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19100,
+        "last_step": 19200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2737348379996547,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19200,
+        "last_step": 19300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.24042176400053,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19300,
+        "last_step": 19400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2524079730001176,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19400,
+        "last_step": 19500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.192436956000165,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19500,
+        "last_step": 19600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.164389257000039,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19600,
+        "last_step": 19700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2364755359994888,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19700,
+        "last_step": 19800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1615652450000198,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19800,
+        "last_step": 19900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2404296900003828,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 19900,
+        "last_step": 20000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2611012809993554,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20000,
+        "last_step": 20100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2416272520003986,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20100,
+        "last_step": 20200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1218548779997946,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20200,
+        "last_step": 20300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1422742459999427,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20300,
+        "last_step": 20400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1831737780003095,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20400,
+        "last_step": 20500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1478355250001187,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20500,
+        "last_step": 20600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.246113888999389,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20600,
+        "last_step": 20700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.230041622000499,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20700,
+        "last_step": 20800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2607943299999533,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20800,
+        "last_step": 20900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1268229179995615,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 20900,
+        "last_step": 21000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1195162630001505,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21000,
+        "last_step": 21100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1044578130004084,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21100,
+        "last_step": 21200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1122687689994564,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21200,
+        "last_step": 21300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0998228779999408,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21300,
+        "last_step": 21400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1131043360001058,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21400,
+        "last_step": 21500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1409346400005234,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21500,
+        "last_step": 21600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1976976759997342,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21600,
+        "last_step": 21700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2502426860000924,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21700,
+        "last_step": 21800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2340174959999786,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21800,
+        "last_step": 21900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1445075920000818,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 21900,
+        "last_step": 22000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.138391010000305,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22000,
+        "last_step": 22100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1426048169996648,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22100,
+        "last_step": 22200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1352195959998426,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22200,
+        "last_step": 22300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1414184570003272,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22300,
+        "last_step": 22400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.139156999000079,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22400,
+        "last_step": 22500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.145127524999225,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22500,
+        "last_step": 22600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1431736960003036,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22600,
+        "last_step": 22700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1314881630005402,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22700,
+        "last_step": 22800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1364164759997948,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22800,
+        "last_step": 22900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.197089464999408,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 22900,
+        "last_step": 23000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2179512030006663,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23000,
+        "last_step": 23100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1759548559994073,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23100,
+        "last_step": 23200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0961644220005837,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23200,
+        "last_step": 23300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.106845850999889,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23300,
+        "last_step": 23400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0937918859999627,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23400,
+        "last_step": 23500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.089020088000325,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23500,
+        "last_step": 23600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0947676349996982,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23600,
+        "last_step": 23700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.106427794999945,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23700,
+        "last_step": 23800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1554915110000366,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23800,
+        "last_step": 23900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1218204169999808,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 23900,
+        "last_step": 24000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0870234859994525,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24000,
+        "last_step": 24100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0954692510003952,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24100,
+        "last_step": 24200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.094246096000461,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24200,
+        "last_step": 24300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0886432119996243,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24300,
+        "last_step": 24400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0910175540002456,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24400,
+        "last_step": 24500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0953680719994736,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24500,
+        "last_step": 24600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1031098410003324,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24600,
+        "last_step": 24700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1014136320000034,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24700,
+        "last_step": 24800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2621102450002581,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24800,
+        "last_step": 24900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.107929953999701,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 24900,
+        "last_step": 25000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.106400931999815,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25000,
+        "last_step": 25100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.098139073999846,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25100,
+        "last_step": 25200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1460067779999008,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25200,
+        "last_step": 25300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1666688310006066,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25300,
+        "last_step": 25400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1976779779997742,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25400,
+        "last_step": 25500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0936688550000326,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25500,
+        "last_step": 25600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.093020796000019,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25600,
+        "last_step": 25700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0991031599996859,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25700,
+        "last_step": 25800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0941194329998325,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25800,
+        "last_step": 25900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.0973444090004705,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 25900,
+        "last_step": 26000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1075188869999693,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26000,
+        "last_step": 26100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1046451459997115,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26100,
+        "last_step": 26200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1064388869999675,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26200,
+        "last_step": 26300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.106365762000678,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26300,
+        "last_step": 26400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1061485959999118,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26400,
+        "last_step": 26500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.104047652999725,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26500,
+        "last_step": 26600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1032976099995722,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26600,
+        "last_step": 26700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1420018000007985,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26700,
+        "last_step": 26800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.103508096999576,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26800,
+        "last_step": 26900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1203994819998115,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 2,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 26900,
+        "last_step": 27000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.090825283000413,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      }
+    ],
+    "fallbacks": [],
+    "engine": {
+      "rebuilds_beside": 552,
+      "fused_integrator": true,
+      "engine": "graph",
+      "mode": "pipelined",
+      "capture": true,
+      "pad_edges": true,
+      "variable_cell": false,
+      "initial_edges": 27590,
+      "edge_bucket": 1536,
+      "edge_sizes_used": [
+        27648,
+        29184
+      ],
+      "neighbour_rebuilds": 552,
+      "graphs": [
+        "('E', 'float32', 29184)",
+        "('mc.swap', 1, 0, 'float32', 29184)",
+        "('B', 29184)",
+        "ACP",
+        "('B', 27648)",
+        "('E', 'float32', 27648)",
+        "('mc.swap', 1, 0, 'float32', 27648)"
+      ],
+      "pool_resets": 0,
+      "capture_memory": [
+        {
+          "key": "('E', 'float32', 27590)",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1792.0,
+          "max_reserved_after_capture_MiB": 1792.0
+        },
+        {
+          "key": "ACP",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1792.0,
+          "max_reserved_after_capture_MiB": 1792.0
+        },
+        {
+          "key": "('B', 27648)",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1792.0,
+          "max_reserved_after_capture_MiB": 1792.0
+        },
+        {
+          "key": "('B', 29184)",
+          "warmup_in_pool": true,
+          "max_reserved_after_warmup_MiB": 1792.0,
+          "max_reserved_after_capture_MiB": 1792.0
+        },
+        {
+          "key": "('E', 'float32', 29184)",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1792.0,
+          "max_reserved_after_capture_MiB": 1792.0
+        },
+        {
+          "key": "('mc.swap', 1, 0, 'float32', 29184)",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1792.0,
+          "max_reserved_after_capture_MiB": 1792.0
+        },
+        {
+          "key": "('E', 'float32', 27648)",
+          "warmup_in_pool": true,
+          "max_reserved_after_warmup_MiB": 1792.0,
+          "max_reserved_after_capture_MiB": 1792.0
+        },
+        {
+          "key": "('mc.swap', 1, 0, 'float32', 27648)",
+          "warmup_in_pool": true,
+          "max_reserved_after_warmup_MiB": 1792.0,
+          "max_reserved_after_capture_MiB": 1792.0
+        }
+      ],
+      "speculative_launches": 0,
+      "speculative_rollbacks": 0,
+      "speculative_rebuild_rollbacks": 0,
+      "speculative_bucket_rollbacks": 0,
+      "pipelined_redos": 68,
+      "pipelined_rebuild_redos": 0,
+      "pipelined_early_rebuilds": 552,
+      "canonical_points": 3,
+      "polar_overflow_steps": [],
+      "process": {
+        "allocator": "expandable_segments:True",
+        "dynamo_cache_size_limit": 64,
+        "compile_family": "oeq"
+      },
+      "energy_graphs": {
+        "float32": {
+          "copy": false,
+          "backend": "hybrid",
+          "compile_mode": "default"
+        }
+      },
+      "overflow_check": "edges",
+      "overflows_redone": 68,
+      "overflow_log": [
+        {
+          "step": 13528,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13557,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13571,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13858,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13879,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13948,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13952,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 14164,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 14539,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 14561,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 14569,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 14803,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 14830,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 14842,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 14933,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 14942,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15112,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15171,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15176,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15205,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15258,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15282,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15320,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15349,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15454,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15467,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15653,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15752,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15769,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15800,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15841,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15860,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15929,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15960,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 15975,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16077,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16092,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16202,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16206,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16730,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16736,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16769,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16781,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16932,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16965,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 16967,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17051,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17183,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17296,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17388,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17498,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17554,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17559,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17605,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17620,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17662,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17701,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 17716,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 18299,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 18330,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 19384,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 19473,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 19539,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 19545,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 19625,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 19631,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 19655,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 19762,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        }
+      ],
+      "recaptures": 4,
+      "recapture_budget": 64,
+      "recapture_budget_exceeded_at": null,
+      "graph_variant_cap": 64,
+      "graph_evictions": 0,
+      "recapture_log": [
+        {
+          "step": 0,
+          "key": "('E', 'float32', 27590)",
+          "reason": "first capture",
+          "counted": false,
+          "s": 10.073422749999736
+        },
+        {
+          "step": 13500,
+          "key": "ACP",
+          "reason": "first capture",
+          "counted": false,
+          "s": 0.05897149599968543
+        },
+        {
+          "step": 13500,
+          "key": "('B', 27648)",
+          "reason": "first capture",
+          "counted": false,
+          "s": 0.17518497299988667
+        },
+        {
+          "step": 13528,
+          "key": "('B', 29184)",
+          "reason": "new variant of B",
+          "counted": true,
+          "s": 0.07676283699947817
+        },
+        {
+          "step": 13600,
+          "key": "('E', 'float32', 29184)",
+          "reason": "new variant of E",
+          "counted": true,
+          "s": 0.08233149299940123
+        },
+        {
+          "step": 13600,
+          "key": "('mc.swap', 1, 0, 'float32', 29184)",
+          "reason": "first capture",
+          "counted": false,
+          "s": 0.15647895100028109
+        },
+        {
+          "step": 14200,
+          "key": "('E', 'float32', 27648)",
+          "reason": "new variant of E",
+          "counted": true,
+          "s": 0.052208799999789335
+        },
+        {
+          "step": 14200,
+          "key": "('mc.swap', 1, 0, 'float32', 27648)",
+          "reason": "new variant of mc.swap",
+          "counted": true,
+          "s": 0.07282776200008811
+        }
+      ],
+      "invalidations": [
+        {
+          "step": 13500,
+          "reason": "the restart's neighbour capacity",
+          "graphs": 1
+        }
+      ],
+      "captures": 8,
+      "capture_seconds": 10.748189061998346,
+      "recapture_seconds": 0.28413089199875685
+    }
+  },
+  "restart_points": [
+    {
+      "step": 10000,
+      "output_chunk": 0,
+      "output_rows": 1001,
+      "output_frames": 1001
+    },
+    {
+      "step": 13500,
+      "output_chunk": 1,
+      "output_rows": 1351,
+      "output_frames": 1351
+    },
+    {
+      "step": 20000,
+      "output_chunk": 2,
+      "output_rows": 2001,
+      "output_frames": 2001
+    },
+    {
+      "step": 27000,
+      "output_chunk": 3,
+      "output_rows": 2701,
+      "output_frames": 2701
+    }
+  ],
+  "timing": {
+    "setup_s": {
+      "plan": 0.1749456329998793,
+      "build": 26.835714530999212,
+      "move_energy_gate": 29.788870009000675,
+      "provenance": 0.005670477999956347
+    },
+    "setup_total_s": 56.80520065099972,
+    "status": "complete",
+    "steps": 13500,
+    "loop_s": 157.86209570100073
+  },
+  "report": {
+    "text": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl432Na108Nb108O108, 756 atoms (3\u00d73\u00d73), 3D PBC, NVT Langevin 1 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 9 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nmc \u0394E:   float32; move-energy gate passed (worst \u0394E error in k_B T_min: swap 0.00065; limit 0.01 k_B T_min at T_min 250 K; 13 configurations)\nmc:      swap O-Cl every 100, 50 attempts (exchange); accepted 0/13300; 4.59 ms/attempt over 266 blocks (device time; each attach's first block, with its captures, left out); attached over steps 499\u201327,000\nsetup:   57 s (plan 0.17 s, build 27 s, move_energy_gate 30 s, provenance 0.0057 s)\nspeed:   9.29 ms/step, whole-run mean over steps 13,501\u201327,000; MD only; MC blocks: see mc\nruntime: re-captures 4 (0.284 s, 0.2 % of the loop); overflows redone 68\noutput:  /home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-adapt-production/adapt-production/swap_anneal_NaNbOCl4_short\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    MC: experimental: not yet qualified (\u00a710.4)",
+    "speed": {
+      "status": "whole-run mean",
+      "seconds_per_step": 0.009285440630740832,
+      "first_step": 13501,
+      "last_step": 27000
+    },
+    "measured_window": {
+      "seconds_per_step": 0.009627719730000536,
+      "first_step": 14500,
+      "last_step": 15500
+    },
+    "speed_window": {
+      "warmup_steps": 1000,
+      "window_steps": 1000,
+      "start_step": 13500
+    },
+    "setup_s": {
+      "plan": 0.1749456329998793,
+      "build": 26.835714530999212,
+      "move_energy_gate": 29.788870009000675,
+      "provenance": 0.005670477999956347
+    },
+    "setup_total_s": 56.80520065099972,
+    "licence": {
+      "licence": "ASL",
+      "source": "label table"
+    },
+    "gate_status": "skipped",
+    "move_energy_status": "passed",
+    "mc_energy_precision": "float32",
+    "reasons": [],
+    "warnings": [
+      "MC: experimental: not yet qualified (\u00a710.4)"
+    ],
+    "mc": {
+      "moves": [
+        "swap O-Cl every 100, 50 attempts (exchange)"
+      ],
+      "ranges": [
+        [
+          499,
+          27000
+        ]
+      ],
+      "blocks": 266,
+      "device_ms": 60545.756286621094,
+      "timed_attempts": 13200
+    }
+  },
+  "force_field": {
+    "backend": "hybrid",
+    "dtype": "float32",
+    "device": "cuda:0",
+    "compile_mode": "default",
+    "training": false,
+    "compute_stress": false,
+    "padding_exact": true,
+    "rewrites": [
+      "factor_species",
+      "fold_cutoff",
+      "density_first",
+      "joint_radial_input",
+      "fused_folded_backward",
+      "folded_backward_tiles",
+      "streaming_conv",
+      "reassociate_first",
+      "segmented_first_sum",
+      "block_linear",
+      "grouped_linear",
+      "merged_residual",
+      "gated_rows",
+      "segment_gemm",
+      "species_tables",
+      "fold_readout_tail",
+      "fold_product_linear",
+      "single_graph_strain"
+    ],
+    "decisions": {
+      "factor_species": "on",
+      "fold_cutoff": "on",
+      "density_first": "on",
+      "joint_radial_input": "on",
+      "fused_folded_backward": "on",
+      "folded_backward_tiles": "on",
+      "fused_radial_hidden": "off",
+      "direct_node_feats": "off",
+      "folded_constants": "off",
+      "streaming_conv": "on",
+      "reassociate_first": "on",
+      "segmented_first_sum": "on",
+      "generic_species_skip": "off",
+      "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+      "generic_segmented_first_sum": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field segmented_first_sum honoured by segmented_first_sum)",
+      "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+      "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+      "block_linear": "on",
+      "grouped_linear": "on",
+      "merged_residual": "on",
+      "gated_rows": "on",
+      "segment_gemm": "on",
+      "grouped_launch": "off",
+      "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+      "polar_graph_sums": "off",
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "tf32x3_gemms": "off",
+      "fx_e3nn_linear": "off",
+      "single_graph_strain": "on",
+      "combo_kernels": "off"
+    },
+    "selfchecks": {
+      "factor_species": 8.588763149396382e-07,
+      "fold_cutoff": 9.845065348367955e-07,
+      "density_first": 9.527486226113163e-07,
+      "joint_radial_input": 1.0020223674295779e-06,
+      "fused_folded_backward": 9.527485015806732e-07,
+      "folded_backward_tiles": 9.5430738088049e-07,
+      "streaming_conv": 1.587913967583435e-06,
+      "reassociate_first": 1.6837957435238778e-06,
+      "segmented_first_sum": 1.595174914917358e-06,
+      "block_linear": 6.039514733043886e-07,
+      "grouped_linear": 6.039514733043886e-07,
+      "merged_residual": 3.8196586371076017e-07,
+      "gated_rows": 6.729809585806178e-07,
+      "segment_gemm": 6.729809585806178e-07,
+      "species_tables": 2.2110571207813168e-07,
+      "fold_readout_tail": 3.2029163450137925e-07,
+      "fold_product_linear": 1.068059986521083e-06,
+      "single_graph_strain": 0.0
+    },
+    "streaming_interactions": 2,
+    "sort_receivers": true,
+    "gpu_neighbour_list": true,
+    "neighbour_rebuilds": 556,
+    "edge_capacity": 58112,
+    "candidates": 45242,
+    "species_columns": [
+      7,
+      10,
+      16,
+      40
+    ],
+    "superset": [
+      8,
+      11,
+      17,
+      41
+    ],
+    "charge": null,
+    "spin_multiplicity": null,
+    "dynamo_reset": false,
+    "polar": null,
+    "float64_energy": true,
+    "energy_treatment": "patched",
+    "strain_path": "one_graph",
+    "follows": null
+  },
+  "subprocess": null
+}

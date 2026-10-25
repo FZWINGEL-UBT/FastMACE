@@ -1,0 +1,159 @@
+{
+ "gpu": "NVIDIA L4",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "eager": {
+  "tier": "eager",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "compile_mode": "none",
+  "capture": false,
+  "gate": "passed"
+ },
+ "graph": {
+  "tier": "graph",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "compile_mode": "default",
+  "capture": true
+ },
+ "gate_record": {
+  "status": "passed",
+  "check": "gate",
+  "reason": null,
+  "copies": "2 rattled (0.05 \u00c5)",
+  "energy_meV_per_atom": 0.00020839284944587338,
+  "force_eV_per_A": 3.0221465970869943e-06,
+  "stress_eV_per_A3": null,
+  "quantities": {
+   "energy_meV_per_atom": {
+    "production": 0.00020839284944587338,
+    "yardstick": 0.00041083318238735147,
+    "ratio": 0.5072444446548904,
+    "floor": 0.01,
+    "floor_source": "SPEC \u00a712.3",
+    "limit": 0.01,
+    "passed": true
+   },
+   "force_eV_per_A": {
+    "production": 3.0221465970869943e-06,
+    "yardstick": 2.992344274699299e-06,
+    "ratio": 1.009959523253951,
+    "floor": 1e-05,
+    "floor_source": "SPEC \u00a712.3",
+    "limit": 1e-05,
+    "passed": true
+   },
+   "stress_eV_per_A3": {
+    "passed": true,
+    "note": "stress: not in plan"
+   }
+  },
+  "floors": {
+   "energy_meV_per_atom": 0.01,
+   "force_eV_per_A": 1e-05,
+   "stress_eV_per_A3": 1e-07
+  },
+  "nonfinite": [],
+  "mode": "eager stages C, B",
+  "references": {
+   "ran": "child process",
+   "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+   "oeq_runtime": "prepared",
+   "reference": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "reference",
+    "dtype": "float64",
+    "float64_energy": false,
+    "energy_bound": "float64 accumulation",
+    "e0_table": null,
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/content/fm/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "gate_floors": {},
+    "stock": true,
+    "polar": null,
+    "dispersion": null
+   },
+   "yardstick": {
+    "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c",
+    "role": "yardstick",
+    "dtype": "float32",
+    "float64_energy": true,
+    "energy_bound": "float64 accumulation",
+    "e0_table": "checkpoint",
+    "backend": "cueq",
+    "cueq_conv_fusion": false,
+    "model": {
+     "path": "/content/fm/models/mace-mh-1.model",
+     "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+     "label": "mh1-r2scan",
+     "head": "matpes_r2scan"
+    },
+    "patches": [
+     "oeq_runtime",
+     "single_graph_strain"
+    ],
+    "corrections_active": [],
+    "optional_physics": [],
+    "gate_floors": {},
+    "stock": true,
+    "polar": null,
+    "dispersion": null
+   },
+   "process": "child"
+  },
+  "seconds": {
+   "references_s": 82.59332546999985,
+   "production_s": 1.179811268999856,
+   "step_1_s": 82.58545455300009
+  },
+  "notes": [
+   "the neighbour capacity grew on a gate copy: the list was rebuilt at the committed positions with the larger capacity, and the graphs are captured again"
+  ],
+  "device": "cuda:0",
+  "reduced_cell": null,
+  "steps": [
+   {
+    "device": "cuda:0",
+    "cell": "production",
+    "repeat": null,
+    "atoms": 216,
+    "outcome": "ran",
+    "reason": null,
+    "process": "child"
+   }
+  ],
+  "replay": null,
+  "move_energy": null,
+  "mc_energy_precision": null
+ },
+ "eager_vs_graph_A": 4.999546145967315e-07,
+ "repeat_vs_graph_A": 3.1762647800803734e-07,
+ "eager_vs_graph_energy_meV_per_atom": 0.00010927518179215667,
+ "repeat_vs_graph_energy_meV_per_atom": 1.54530566121025e-05,
+ "speed_eager": {
+  "status": "whole-run mean",
+  "seconds_per_step": 0.07193003573000624,
+  "first_step": 1,
+  "last_step": 100
+ },
+ "speed_graph": {
+  "status": "whole-run mean",
+  "seconds_per_step": 0.007255521619990759,
+  "first_step": 1,
+  "last_step": 100
+ },
+ "report_eager": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (1\u00d71\u00d71), 3D PBC, NVT Langevin 2 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    eager, hybrid cuEq/OEq, float32, 18 rewrites on, 9 off (reasons in run.plan)\nwhy:     eager tier: no CUDA graphs, no compilation (mode='eager', SPEC \u00a78.3); correct but slower\ngate:    passed (2 rattled (0.05 \u00c5); 0.00021 meV/atom, 3e-06 eV/\u00c5; floors \u00a712.3)\nsetup:   113 s (plan 0.2 s, build 29 s, gate 84 s, provenance 0.015 s)\nspeed:   71.9 ms/step, whole-run mean over steps 1\u2013100\nruntime: overflows redone 32\noutput:  none\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none"
+}

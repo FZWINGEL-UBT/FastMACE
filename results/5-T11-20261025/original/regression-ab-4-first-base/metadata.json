@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "status": "failed",
+  "tool": "ab_fastmace",
+  "created_utc": "2026-10-25T00:40:20.187541+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "fastmace_commit": "+tools",
+  "release": {
+    "tag": "fastmace-4",
+    "commit": "dae3848",
+    "renamed": "fastmace_4",
+    "planner": "minimal",
+    "current": "5"
+  },
+  "release_source": {
+    "name": "fastmace_4",
+    "ref": "fastmace-4",
+    "commit": "dae38486d281f01b19964f593869a4452b43e7ae",
+    "renamed": "fastmace -> fastmace_4 (standalone words, .py files)",
+    "tree_sha256": "fb6d3219a561323b273f996f2e2467eccce51e86169310e68a63a273a2b9b4e6"
+  },
+  "current_side": "5",
+  "release_side": "4",
+  "model": "mh1-r2scan",
+  "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "backend": "hybrid",
+  "dtype": "float32",
+  "tf32": false,
+  "ensemble": "nvt",
+  "temperature_K": 300.0,
+  "protocol": {
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12
+  },
+  "pattern": "abab",
+  "sides": [
+    "4",
+    "5"
+  ],
+  "build_order": [
+    "4",
+    "5"
+  ],
+  "planner_1b": "minimal",
+  "oeq_runtime": "PatchRecord(name='oeq_runtime', value='/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/cuda-runtime', targets=('env:CMAKE_CUDA_COMPILER', 'env:CPATH', 'env:CUDACXX', 'env:CUDA_HOME', 'env:CUDA_PATH', 'env:MAX_JOBS', 'env:OEQ_JIT_EXTENSION', 'env:OEQ_NVCC_ATTEMPTS', 'env:PATH', 'env:PYTORCH_NVCC', 'env:TORCH_EXTENSIONS_DIR'), detail='OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13')",
+  "oeq_runtime_shared": {
+    "name": "oeq_runtime",
+    "value": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/cuda-runtime",
+    "targets": [
+      "env:CMAKE_CUDA_COMPILER",
+      "env:CPATH",
+      "env:CUDACXX",
+      "env:CUDA_HOME",
+      "env:CUDA_PATH",
+      "env:MAX_JOBS",
+      "env:OEQ_JIT_EXTENSION",
+      "env:OEQ_NVCC_ATTEMPTS",
+      "env:PATH",
+      "env:PYTORCH_NVCC",
+      "env:TORCH_EXTENSIONS_DIR"
+    ],
+    "detail": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13 (shared from fastmace._patches)"
+  },
+  "args": {
+    "output": "/home/fzwin/fastmace-acceptance/5-T11-local-20261025/regression-ab-4-first-base",
+    "release": "4",
+    "sides": [
+      "4",
+      "5"
+    ],
+    "renamed": "/home/fzwin/fastmace-5-T11/versions",
+    "expected_commit": "dae3848",
+    "planner_1b": "minimal",
+    "engine_option": [],
+    "integrator_option": [],
+    "model": "mh1-r2scan",
+    "checkpoint": "/home/fzwin/models/mace-mh-1.model",
+    "structures": [
+      "NaCl",
+      "NbCl5"
+    ],
+    "temperature_K": 300.0,
+    "warmup": 300,
+    "block": 300,
+    "blocks": 12,
+    "pattern": "abab",
+    "seed": 1,
+    "backend": "hybrid",
+    "ensemble": "nvt",
+    "cell_mode": "hydrostatic",
+    "dump_forces": false,
+    "allow_option_changes": [],
+    "dump_final": false,
+    "engine_options": {},
+    "integrator_options": {},
+    "current": "5"
+  },
+  "versions": {
+    "4": {
+      "load_s": 0.15450844000000075,
+      "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+      "package": "fastmace_4",
+      "planner": "MinimalPlanner"
+    },
+    "5": {
+      "load_s": 0.13390089799999316,
+      "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+      "package": "fastmace",
+      "planner": "MinimalPlanner"
+    }
+  },
+  "structures": {
+    "NaCl": {
+      "natoms": 216,
+      "structure": "NaCl",
+      "sides": {},
+      "plans": {}
+    }
+  },
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "error": "TypeError: Plan.describe() got an unexpected keyword argument 'full'",
+  "finished_utc": "2026-10-25T00:41:05.034857+00:00"
+}

@@ -94,6 +94,7 @@ RELEASES = {
     "p3b": Release("phase-3-baseline", "156ab76", "fastmace_p3b", "minimal", "3"),
     "3": Release("fastmace-3", None, "fastmace_3", "minimal", "3b"),  # commit: --expected-commit (tag not set yet)
     "3b": Release("fastmace-3b", None, "fastmace_3b", "minimal", "4"),  # commit: --expected-commit (tag not set yet)
+    "4": Release("fastmace-4", "dae3848", "fastmace_4", "minimal", "5"),  # 5-T11, phase 5 items 4 and 5
 }
 # IntegratorConfig fields this checkout's side pins against a release unless --integrator-option sets them.
 RELEASE_INTEGRATOR_PINS = {"p3b": {"fixcm_projection": "ase"}}
@@ -116,7 +117,7 @@ def parse_args(argv=None):
     p.add_argument("--output", required=True, type=Path, help="Fresh directory")
     p.add_argument("--release", choices=sorted(RELEASES), default="1a",
                    help="The earlier release timed against this checkout (1a: sides 1a and 1b; 1b: sides 1b and 2)")
-    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b", "3b", "4"),
+    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b", "3b", "4", "5"),
                    help="Build order; two sides for an A/B process, one for a control (default: release, checkout)")
     p.add_argument("--renamed", type=Path, help="Directory holding the release's exported renamed package")
     p.add_argument("--expected-commit", help="Commit (prefix) the release's copy must be (default: the release's)")
@@ -285,7 +286,11 @@ class Version:
                                         compile_cache=self.cache)
         options = {name: True for name in fixed.enabled_options(plan)}
         options.update({f"off:{name}": reason for name, reason in fixed.auto_options_off(plan).items()})
-        return engine, dict(describe=plan.describe(full=True), options=options)
+        try:
+            describe = plan.describe(full=True)
+        except TypeError:  # releases before phase 5 (fastmace-4) have no full= (5-T11)
+            describe = plan.describe()
+        return engine, dict(describe=describe, options=options)
 
 
 def main(argv=None):

@@ -1,0 +1,79 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/5-T11/inductor, triton /home/fzwin/fastmace-cache/5-T11/triton
+rootdir: /home/fzwin/fastmace-5T11-freeze
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 1 item
+
+tests/gpu/test_rewrites_generic_gpu.py .                                 [100%]
+
+=============================== warnings summary ===============================
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/_fontconfig_pattern.py:64: PyparsingDeprecationWarning: 'oneOf' deprecated - use 'one_of'
+    prop = Group((name + Suppress("=") + comma_separated(value)) | oneOf(_CONSTANTS))
+
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/_fontconfig_pattern.py:85: PyparsingDeprecationWarning: 'parseString' deprecated - use 'parse_string'
+    parse = parser.parseString(pattern)
+
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/_fontconfig_pattern.py:89: PyparsingDeprecationWarning: 'resetCache' deprecated - use 'reset_cache'
+    parser.resetCache()
+
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/_mathtext.py:45: PyparsingDeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+    ParserElement.enablePackrat()
+
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  /home/fzwin/fastmace-5T11-freeze/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+    "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+
+tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+  <string>:11: ModelLicenceWarning: off23-small (MACE-OFF23_small.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+==================================== PASSES ====================================
+________ test_stacked_generic_rewrites_plain_cueq_float64[off23-small] _________
+----------------------------- Captured stdout call -----------------------------
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+GENERIC_GPU {"label": "off23-small", "backend": "cueq", "dtype": "float64", "atoms": 9, "edges": 72, "interactions": ["RealAgnosticInteractionBlock", "RealAgnosticResidualInteractionBlock"], "applied": {"generic_species_skip": {"detail": ["interactions.1"], "passed": true, "error": 4.1213703975482506e-16, "modules": 1}, "generic_fused_radial_backward": {"detail": ["interactions.1"], "passed": true, "error": 3.1005215333586044e-16, "modules": 1}}, "reasons": {"generic_species_skip": "default auto", "generic_reassociate": "the first interaction RealAgnosticInteractionBlock is not a generic class (MACE-OFF: the generic rewrites act on its later blocks only)", "generic_segmented_first_sum": "the first interaction RealAgnosticInteractionBlock is not a generic class (MACE-OFF: the generic rewrites act on its later blocks only)", "generic_fused_radial_backward": "default auto", "generic_streaming": "no generic interaction has an OpenEquivariance-fused convolution (hybrid backend only)"}, "relative": {"energy": 0.0, "forces": 3.447420533106851e-16}, "repeat_equal": false, "energy": -4221.357003743383}
+------------------------------ Captured log call -------------------------------
+WARNING  cuequivariance_ops.triton.cache_manager:cache_manager.py:147 Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+WARNING  matplotlib.style.core:core.py:205 In /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/mpl-data/stylelib/classic.mplstyle: 'parseString' deprecated - use 'parse_string'
+WARNING  matplotlib.style.core:core.py:205 In /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/matplotlib/mpl-data/stylelib/classic.mplstyle: 'resetCache' deprecated - use 'reset_cache'
+- generated xml file: /home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-slow-3/targeted/junit.xml -
+============================= slowest 60 durations =============================
+8.83s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+
+(2 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+PASSED tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]
+======================== 1 passed, 19 warnings in 9.25s ========================

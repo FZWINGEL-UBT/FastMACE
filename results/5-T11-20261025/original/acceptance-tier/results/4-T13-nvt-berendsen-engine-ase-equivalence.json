@@ -1,0 +1,66 @@
+{
+ "scheme": "nvt-berendsen",
+ "steps": 4000,
+ "blocks_dT_K": [
+  8.526512829121202e-14,
+  0.0,
+  2.8421709430404007e-13,
+  1.1368683772161603e-13,
+  2.2737367544323206e-13,
+  3.410605131648481e-13,
+  1.7053025658242404e-13,
+  2.2737367544323206e-13
+ ],
+ "blocks_dPE_eV_per_atom": [
+  0.0,
+  8.881784197001252e-16,
+  1.7763568394002505e-15,
+  8.881784197001252e-16,
+  8.881784197001252e-16,
+  8.881784197001252e-16,
+  0.0,
+  0.0
+ ],
+ "blocks_dV_A3": [
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  0.0,
+  0.0
+ ],
+ "final_positions_max_diff_A": 8.171241461241152e-14,
+ "final_cell_max_diff_A": 0.0,
+ "blocks_dPE_meV_per_atom": [
+  0.0,
+  8.881784197001252e-13,
+  1.7763568394002505e-12,
+  8.881784197001252e-13,
+  8.881784197001252e-13,
+  8.881784197001252e-13,
+  0.0,
+  0.0
+ ],
+ "final_T_K": [
+  307.8689235022562,
+  307.8689235022544
+ ],
+ "final_volume_A3": [
+  4843.965887999999,
+  4843.965887999999
+ ],
+ "seconds": {
+  "ase": 517.2852904060019,
+  "fastmace": 411.92823097899964
+ },
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "mode": "pipelined",
+ "engine": "GraphEngine",
+ "integrator": "Berendsen",
+ "records": [
+  "single_graph_strain"
+ ],
+ "plan": "Plan revision 0, tier graph (the research engine's --engine gpu: CUDA graphs, edge buckets)\n  backend cueq (fused convolution on) | force float64 | MC energy none (no MC) | runner in-process\n  rewrites on (2): single_graph_strain, polar_uvu\n  rewrites off: factor_species, block_linear, fx_e3nn_linear, polar_graph_sums (plain cuEq backend); fold_cutoff,\n      density_first, reassociate_first, joint_radial_input, fused_folded_backward, folded_backward_tiles,\n      segmented_first_sum, grouped_linear, merged_residual, gated_rows (+13 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: not recorded\n  memory (rule 12): not estimated; GPU NVIDIA GeForce RTX 5060 Ti\n  workload: Langevin NVT, fixcm=True; 216 atoms, 3D PBC, no constraints\n  rules 8-11: skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 fixed plan of phase 1a (main.py)"
+}

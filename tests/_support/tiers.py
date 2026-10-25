@@ -44,6 +44,9 @@ COMPAT_TESTS = (
     # reproducible mode bitwise, and a restart round trip
     "test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]",
     "test_canonical_restart_gpu.py::test_mh1_plain_cueq_float64_resumes_within_1e_12",
+    # phase 5 (5-T11): runtime adaptation, the forced re-capture storm switches once (correctness, untimed);
+    # rule 6 is asserted in test_compat_gpu.py's graph-kernel test
+    "test_adapt_switch_gpu.py::test_a_forced_recapture_storm_switches_once_to_the_compiled_tier",
 )
 
 

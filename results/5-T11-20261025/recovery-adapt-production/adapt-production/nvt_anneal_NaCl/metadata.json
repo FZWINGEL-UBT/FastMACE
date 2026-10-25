@@ -1,0 +1,3604 @@
+{
+  "schema": "fastmace.metadata/1",
+  "schema_minor": 1,
+  "created_utc": "2026-10-25T12:20:53.061158+00:00",
+  "code": {
+    "version": "0.0.1.dev0",
+    "git_commit": "a2077787e230a78f5306254e9ad467f4f193c094",
+    "git_dirty": null
+  },
+  "checkpoint": {
+    "path": "/home/fzwin/models/mace-mh-1.model",
+    "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+    "head": "matpes_r2scan",
+    "licence": "ASL",
+    "label": "mh1-r2scan",
+    "trust": "sha256"
+  },
+  "model": null,
+  "force_field_identity": {
+    "schema": "fastmace.identity/1",
+    "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+    "head": "matpes_r2scan",
+    "species": [
+      11,
+      17
+    ],
+    "force_precision": "float32",
+    "physics": {
+      "charge": null,
+      "spin_multiplicity": null
+    },
+    "reference_record_id": null,
+    "mace_version": "0.3.16",
+    "fastmace_version": "0.0.1.dev0",
+    "digest": "c330ff5d0f046e9b2f783a9bb9634933bec60be469096f0b02591c8242a0fd01"
+  },
+  "reference_record": null,
+  "plan": {
+    "revision": 0,
+    "tier": "graph",
+    "reason": "minimal plan (phase 1b)",
+    "step": null,
+    "description": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (19): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, block_linear, grouped_linear,\n      merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,\n      fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,\n      tf32x3_gemms (only an explicit 'on' enables it); grouped_launch (not the generic MACE family, decision 57);\n      species_skip (not supported by the model); fx_e3nn_linear (+2 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 0.48, build 1.53), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 216 atoms, 3D PBC, no constraints; up to 1000 K\n  rules 8-11: superset Na Cl (8), max_temperature_K 1000 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  self-checks: 18 records, none failed\n  revisions: 0 minimal plan (phase 1b)",
+    "description_full": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = Na Cl  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1000 K  (MD only: phase 1a's skin and headroom; rule 11 would give skin 0.7 A, headroom 1.16 (fastest of 216 atoms at 1000 K, lightest mass 22.9898 u, 1 fs: 0.0217 A per step, 16 steps per rebuild) (it applies to MC and species-change workloads))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (no species changes: species-dependent rewrites are built for the superset (SPEC \u00a79.3 rule 8))\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear); stage 2: off, not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock']))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.tf32x3_gemms = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen))\n  RewriteConfig.fx_e3nn_linear = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  RewriteConfig.polar_graph_sums = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  IntegratorConfig.fixcm_projection = mass_weighted  (auto (mass_weighted_under_nvt_fixcm_else_ase): MD under fixcm: the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37))\n  IntegratorConfig.dof = fastmace  (auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2))\n  NeighbourConfig.skin = 0.3 A  (auto (rule_11_skin_from_workload): phase 1a's skin: rule 11 sizes only MC and species-change workloads; rule 11 would give 0.7 A)\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.15 and edge_bucket_fraction as given; rule 11 would give 1.16)\n  NeighbourConfig.d3_skin = unused  (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04))\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): the force precision: no MC moves, no MC energies)\n  EngineConfig.dynamic_edges = on  (the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59))\n  memory = fits  (rule 12: predicted 1.53 GiB (build; run 0.48, build 1.53) at 9151 edges, 216 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 62 MiB); needs 1.53 of 14.80 GiB free)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32\n  self-checks: 18 records",
+    "backend": "hybrid",
+    "conv_fusion": "off",
+    "rewrites": {
+      "factor_species": "on",
+      "fold_cutoff": "on",
+      "density_first": "on",
+      "reassociate_first": "on",
+      "joint_radial_input": "on",
+      "fused_folded_backward": "on",
+      "folded_backward_tiles": "on",
+      "segmented_first_sum": "on",
+      "streaming_conv": "on",
+      "species_skip": "off",
+      "fused_radial_hidden": "off",
+      "direct_node_feats": "off",
+      "folded_constants": "off",
+      "block_linear": "on",
+      "grouped_linear": "on",
+      "merged_residual": "on",
+      "gated_rows": "on",
+      "segment_gemm": "on",
+      "grouped_launch": "off",
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "combo_kernels": "off",
+      "tf32x3_gemms": "off",
+      "fx_e3nn_linear": "off",
+      "polar_graph_sums": "off",
+      "inplace_block_linear": false,
+      "single_graph_strain": "on",
+      "polar_uvu": true,
+      "selfcheck_cache": "use"
+    },
+    "engine": {
+      "backend": "hybrid",
+      "compile_mode": "default",
+      "device": "cuda:0",
+      "pipelined": "on",
+      "async_output": "on",
+      "speculative_graph": false,
+      "pipeline_edge_margin": 0.0,
+      "pipeline_rebuild_fraction": 0.8,
+      "cueq_conv_fusion": "off",
+      "first_derivative_only": true,
+      "unfuse_full_addmm": true,
+      "dynamo_cache_size_limit": 64,
+      "expandable_segments": "on",
+      "empty_cache_before_capture": true,
+      "warmup_in_graph_pool": true,
+      "dynamic_edges": true,
+      "model_template_cache": true,
+      "overlap_rebuild": true,
+      "step_graph": false,
+      "fused_integrator": true,
+      "recapture_budget": 64,
+      "graph_variant_cap": 64
+    },
+    "neighbours": {
+      "skin": 0.3,
+      "sort_receivers": "on",
+      "gpu_neighbour_list": "on",
+      "edge_multiple": 256,
+      "edge_bucket_fraction": 0.05,
+      "capacity_headroom": 1.15,
+      "headroom": "fixed",
+      "d3_skin": 1.0
+    },
+    "polar": null,
+    "integrator": {
+      "ensemble": "nvt",
+      "scheme": "langevin",
+      "dof": "fastmace",
+      "parameters": [],
+      "timestep_fs": 1.0,
+      "friction": 0.02,
+      "seed": 1773298550,
+      "fixcm": true,
+      "fixcm_projection": "mass_weighted",
+      "noise_batch": 256,
+      "pressure_GPa": 0.0,
+      "cell_mode": "hydrostatic",
+      "barostat_tau_fs": null,
+      "barostat_mass_factor": 1.0,
+      "ase_trace_drag_all_elements": false,
+      "temperature_K": 0.0,
+      "external_stress_GPa": null,
+      "disable_cell_langevin": false
+    },
+    "decisions": [
+      {
+        "key": "mode",
+        "choice": "graph",
+        "reason": "molecular dynamics on the graph tier (SPEC \u00a78.1)",
+        "code": "mode-graph",
+        "rule": null
+      },
+      {
+        "key": "allow_reference",
+        "choice": "off",
+        "reason": "not requested",
+        "code": "no-allow-reference",
+        "rule": 1
+      },
+      {
+        "key": "superset",
+        "choice": "Na Cl",
+        "reason": "declared (species=), equal to the structure's",
+        "code": "superset",
+        "rule": 8
+      },
+      {
+        "key": "force_precision",
+        "choice": "float32",
+        "reason": "the ForceField's precision (SPEC \u00a77.1, \u00a79.2)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.oeq",
+        "choice": "on",
+        "reason": "openequivariance is installed (its extension is built when the hybrid model is loaded)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.triton",
+        "choice": "on",
+        "reason": "triton 3.8.0 is importable",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.nvrtc",
+        "choice": "on",
+        "reason": "NVRTC 13.0 loads through cuda.bindings",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.fused_cueq",
+        "choice": "on",
+        "reason": "cuequivariance_ops_torch imports",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.mace_imported_first",
+        "choice": "none",
+        "reason": "modules imported before FastMACE could prepare the OEq runtime",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "allow_naive_cueq",
+        "choice": "off",
+        "reason": "not needed: no naive cuEq kernel",
+        "code": "fused-cueq",
+        "rule": 6
+      },
+      {
+        "key": "workload.max_temperature_K",
+        "choice": "1000 K",
+        "reason": "MD only: phase 1a's skin and headroom; rule 11 would give skin 0.7 A, headroom 1.16 (fastest of 216 atoms at 1000 K, lightest mass 22.9898 u, 1 fs: 0.0217 A per step, 16 steps per rebuild) (it applies to MC and species-change workloads)",
+        "code": "rule-11-md-only",
+        "rule": 11
+      },
+      {
+        "key": "workload.host_callbacks_every",
+        "choice": "none",
+        "reason": "no host callbacks",
+        "code": "no-host-callbacks",
+        "rule": 9
+      },
+      {
+        "key": "workload.mc_moves",
+        "choice": "none",
+        "reason": "no MC",
+        "code": "no-mc",
+        "rule": null
+      },
+      {
+        "key": "workload.species_changes",
+        "choice": "off",
+        "reason": "no species changes: species-dependent rewrites are built for the superset (SPEC \u00a79.3 rule 8)",
+        "code": "species-changes",
+        "rule": 8
+      },
+      {
+        "key": "workload.needs_per_atom",
+        "choice": "none",
+        "reason": "recorded",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "tier",
+        "choice": "graph",
+        "reason": "the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "workload",
+        "choice": "ok",
+        "reason": "216 atoms, 3D PBC, no constraints",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "hardware",
+        "choice": "NVIDIA GeForce RTX 5060 Ti",
+        "reason": "compute capability 12.0, 15.9 GiB (recorded only)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.backend",
+        "choice": "hybrid",
+        "reason": "requested 'hybrid'",
+        "code": "backend-hybrid",
+        "rule": null
+      },
+      {
+        "key": "PrecisionConfig.dtype",
+        "choice": "float32",
+        "reason": "requested 'float32': hybrid backend",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.cueq_conv_fusion",
+        "choice": "off",
+        "reason": "auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.factor_species",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fold_cutoff",
+        "choice": "on",
+        "reason": "auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.density_first",
+        "choice": "on",
+        "reason": "auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.reassociate_first",
+        "choice": "on",
+        "reason": "auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.joint_radial_input",
+        "choice": "on",
+        "reason": "auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fused_folded_backward",
+        "choice": "on",
+        "reason": "auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.folded_backward_tiles",
+        "choice": "on",
+        "reason": "auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.segmented_first_sum",
+        "choice": "on",
+        "reason": "auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fused_radial_hidden",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (no measured gain)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.direct_node_feats",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.folded_constants",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.streaming_conv",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.block_linear",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_graph_engine): stage 1: hybrid backend",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.grouped_linear",
+        "choice": "on",
+        "reason": "auto (on_with_block_linear): stage 1: on (with block_linear)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.merged_residual",
+        "choice": "on",
+        "reason": "auto (on_with_block_linear): stage 1: on (with block_linear)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.gated_rows",
+        "choice": "on",
+        "reason": "auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.segment_gemm",
+        "choice": "on",
+        "reason": "auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.grouped_launch",
+        "choice": "off",
+        "reason": "auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear); stage 2: off, not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock'])",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.species_skip",
+        "choice": "off",
+        "reason": "auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.single_graph_strain",
+        "choice": "on",
+        "reason": "auto (on): process-wide; acts only where stress is computed",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.species_tables",
+        "choice": "on",
+        "reason": "auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fold_readout_tail",
+        "choice": "on",
+        "reason": "auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fold_product_linear",
+        "choice": "on",
+        "reason": "auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.combo_kernels",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.tf32x3_gemms",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fx_e3nn_linear",
+        "choice": "off",
+        "reason": "auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.polar_graph_sums",
+        "choice": "off",
+        "reason": "auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "NeighbourConfig.sort_receivers",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_graph_engine): hybrid backend",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "NeighbourConfig.gpu_neighbour_list",
+        "choice": "on",
+        "reason": "auto (on_with_graph_engine): graph engine",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.inplace_block_linear",
+        "choice": "off",
+        "reason": "not carried over in 1a (SPEC \u00a76.2: opt-in, slower)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.polar_uvu",
+        "choice": "on",
+        "reason": "no effect: not a PolarMACE model",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "PolarConfig.kspace_headroom",
+        "choice": "n/a",
+        "reason": "auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.expandable_segments",
+        "choice": "on",
+        "reason": "auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.compile_mode",
+        "choice": "default",
+        "reason": "main.py's --compile-mode",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.speculative_graph",
+        "choice": "off",
+        "reason": "off unless requested (main.py default)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.pipelined",
+        "choice": "on",
+        "reason": "auto (on_with_graph_engine_unless_speculative): graph engine",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.async_output",
+        "choice": "on",
+        "reason": "auto (on_with_graph_engine): graph engine; the run loop's choice",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "capture",
+        "choice": "on",
+        "reason": "CUDA graphs",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "integrator",
+        "choice": "Langevin",
+        "reason": "NVT, fixcm=True (workflow.GPUEngine)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "compute_stress",
+        "choice": "off",
+        "reason": "fixed cell: the graph engine computes no stress",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "IntegratorConfig.fixcm_projection",
+        "choice": "mass_weighted",
+        "reason": "auto (mass_weighted_under_nvt_fixcm_else_ase): MD under fixcm: the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37)",
+        "code": "fixcm-projection-md",
+        "rule": null
+      },
+      {
+        "key": "IntegratorConfig.dof",
+        "choice": "fastmace",
+        "reason": "auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2)",
+        "code": "dof-fastmace",
+        "rule": null
+      },
+      {
+        "key": "NeighbourConfig.skin",
+        "choice": "0.3 A",
+        "reason": "auto (rule_11_skin_from_workload): phase 1a's skin: rule 11 sizes only MC and species-change workloads; rule 11 would give 0.7 A",
+        "code": "rule-11-fixed",
+        "rule": 11
+      },
+      {
+        "key": "NeighbourConfig.headroom",
+        "choice": "fixed",
+        "reason": "auto (rule_11_headroom_from_workload): capacity_headroom 1.15 and edge_bucket_fraction as given; rule 11 would give 1.16",
+        "code": "rule-11-fixed",
+        "rule": 11
+      },
+      {
+        "key": "NeighbourConfig.d3_skin",
+        "choice": "unused",
+        "reason": "auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.recapture_budget",
+        "choice": "64",
+        "reason": "auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04)",
+        "code": "rule-11",
+        "rule": 11
+      },
+      {
+        "key": "PrecisionConfig.mc_energy",
+        "choice": "float32",
+        "reason": "auto (force_precision_if_move_energy_gate_passes_else_float64): the force precision: no MC moves, no MC energies",
+        "code": "mc-energy-no-mc",
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.dynamic_edges",
+        "choice": "on",
+        "reason": "the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59)",
+        "code": "dynamic-edges-graph",
+        "rule": null
+      },
+      {
+        "key": "memory",
+        "choice": "fits",
+        "reason": "rule 12: predicted 1.53 GiB (build; run 0.48, build 1.53) at 9151 edges, 216 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 62 MiB); needs 1.53 of 14.80 GiB free",
+        "code": "rule-12-memory",
+        "rule": 12
+      }
+    ],
+    "requested": [
+      [
+        "EngineConfig.backend",
+        "hybrid"
+      ],
+      [
+        "PrecisionConfig.dtype",
+        "float32"
+      ]
+    ],
+    "auto_options_off": [
+      [
+        "species_skip",
+        "no MACE-MP-0 or density-family interaction"
+      ],
+      [
+        "grouped_launch",
+        "not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock'])"
+      ],
+      [
+        "fx_e3nn_linear",
+        "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)"
+      ],
+      [
+        "polar_graph_sums",
+        "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)"
+      ]
+    ],
+    "superset": [
+      11,
+      17
+    ],
+    "workload": {
+      "max_temperature_K": 1000.0,
+      "species_changes": false,
+      "atom_count_changes": false,
+      "min_mc_temperature_K": null,
+      "host_callbacks_every": null,
+      "needs_per_atom": [],
+      "mc_moves": [],
+      "reproducible": false,
+      "mc_energy_precision": "auto",
+      "max_displacement_A": null
+    },
+    "software": {
+      "oeq": [
+        true,
+        "openequivariance is installed (its extension is built when the hybrid model is loaded)"
+      ],
+      "triton": [
+        true,
+        "triton 3.8.0 is importable"
+      ],
+      "nvrtc": [
+        true,
+        "NVRTC 13.0 loads through cuda.bindings"
+      ],
+      "fused_cueq": [
+        true,
+        "cuequivariance_ops_torch imports"
+      ],
+      "mace_imported_first": []
+    },
+    "allowances": [],
+    "fallbacks_tried": [],
+    "predicted_memory_bytes": 1642881072,
+    "runner": "in-process",
+    "calibration": null,
+    "adaptation": null
+  },
+  "plan_revisions": [
+    {
+      "revision": 0,
+      "tier": "graph",
+      "step": null,
+      "reason": "minimal plan (phase 1b)",
+      "description": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (19): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, block_linear, grouped_linear,\n      merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,\n      fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,\n      tf32x3_gemms (only an explicit 'on' enables it); grouped_launch (not the generic MACE family, decision 57);\n      species_skip (not supported by the model); fx_e3nn_linear (+2 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 0.48, build 1.53), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 216 atoms, 3D PBC, no constraints; up to 1000 K\n  rules 8-11: superset Na Cl (8), max_temperature_K 1000 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  self-checks: 18 records, none failed\n  revisions: 0 minimal plan (phase 1b)",
+      "description_full": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = Na Cl  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1000 K  (MD only: phase 1a's skin and headroom; rule 11 would give skin 0.7 A, headroom 1.16 (fastest of 216 atoms at 1000 K, lightest mass 22.9898 u, 1 fs: 0.0217 A per step, 16 steps per rebuild) (it applies to MC and species-change workloads))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = none  (no MC)\n  workload.species_changes = off  (no species changes: species-dependent rewrites are built for the superset (SPEC \u00a79.3 rule 8))\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (216 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear); stage 2: off, not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock']))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.tf32x3_gemms = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen))\n  RewriteConfig.fx_e3nn_linear = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  RewriteConfig.polar_graph_sums = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  IntegratorConfig.fixcm_projection = mass_weighted  (auto (mass_weighted_under_nvt_fixcm_else_ase): MD under fixcm: the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37))\n  IntegratorConfig.dof = fastmace  (auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2))\n  NeighbourConfig.skin = 0.3 A  (auto (rule_11_skin_from_workload): phase 1a's skin: rule 11 sizes only MC and species-change workloads; rule 11 would give 0.7 A)\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.15 and edge_bucket_fraction as given; rule 11 would give 1.16)\n  NeighbourConfig.d3_skin = unused  (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04))\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): the force precision: no MC moves, no MC energies)\n  EngineConfig.dynamic_edges = on  (the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59))\n  memory = fits  (rule 12: predicted 1.53 GiB (build; run 0.48, build 1.53) at 9151 edges, 216 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 62 MiB); needs 1.53 of 14.80 GiB free)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32\n  self-checks: 18 records",
+      "runner": "in-process",
+      "fallback": null
+    }
+  ],
+  "precision": {
+    "force": "float32",
+    "integration": "float64",
+    "tf32": false,
+    "float64_energy": true
+  },
+  "runtime": {
+    "file_locks": "soft",
+    "file_lock_source": "start-up hook (nfs_soft_locks)",
+    "file_lock_switch_late": false,
+    "cuda_driver_cache": "enabled"
+  },
+  "software": {
+    "versions": {
+      "python": "3.10.12",
+      "torch": "2.14.1+cu130",
+      "numpy": "2.2.6",
+      "ase": "3.27.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance-torch": "0.12.0",
+      "cuequivariance-ops-torch-cu13": "0.12.0",
+      "openequivariance": "0.7.0",
+      "cuda-bindings": "13.3.1",
+      "jinja2": "3.1.6",
+      "filelock": "3.32.3"
+    },
+    "kernels": {
+      "triton": {
+        "available": true,
+        "reason": "triton 3.8.0 is importable"
+      },
+      "nvrtc": {
+        "available": true,
+        "reason": "NVRTC 13.0 loads through cuda.bindings"
+      },
+      "streaming": {
+        "available": true,
+        "reason": "NVRTC 13.0 loads through cuda.bindings; jinja2 and openequivariance are installed"
+      }
+    },
+    "patches": [
+      {
+        "name": "oeq_runtime",
+        "value": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/cuda-runtime",
+        "targets": [
+          "env:CMAKE_CUDA_COMPILER",
+          "env:CPATH",
+          "env:CUDACXX",
+          "env:CUDA_HOME",
+          "env:CUDA_PATH",
+          "env:MAX_JOBS",
+          "env:OEQ_JIT_EXTENSION",
+          "env:OEQ_NVCC_ATTEMPTS",
+          "env:PATH",
+          "env:PYTORCH_NVCC",
+          "env:TORCH_EXTENSIONS_DIR"
+        ],
+        "detail": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13"
+      },
+      {
+        "name": "capture_safe_mask_head",
+        "value": true,
+        "targets": [
+          "mace.modules.blocks:mask_head"
+        ],
+        "detail": "multi-head readout mask without indexed assignment (CUDA graph capture)"
+      },
+      {
+        "name": "unfuse_full_addmm",
+        "value": true,
+        "targets": [
+          "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm",
+          "torch._inductor.config:post_grad_custom_pre_pass"
+        ],
+        "detail": "mm + full-matrix add unfused on the GPU; cache key fastmace-unfused-full-addmm-v1"
+      }
+    ],
+    "triton": "3.8.0",
+    "oeq_extension": {
+      "OEQ_JIT_EXTENSION": "1",
+      "TORCH_EXTENSIONS_DIR": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/torch-extensions-mqphe9yc",
+      "OEQ_NVCC_ATTEMPTS": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/nvcc-attempts.log",
+      "CUDA_HOME": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/cuda-runtime",
+      "MACE_COMPILE_CACHE": null,
+      "OEQ_EXTENSION_SEED": null
+    },
+    "treatments": [
+      {
+        "name": "float64_energy",
+        "qualified": true,
+        "decision": "patched",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "polar_forward",
+        "qualified": true,
+        "decision": "patched",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "capture_safe_mask_head",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "first_derivative_only",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "single_graph_strain",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "unfuse_full_addmm",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "cueq_conv_fusion",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      }
+    ]
+  },
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "driver": null,
+    "compute_capability": "12.0"
+  },
+  "random": {
+    "seed": 1773298550,
+    "generators": {
+      "integrator": "e2e0273ec34ff195a015b555d00ce6b20961088d2b17be5ca98cd21600ce6660"
+    },
+    "cursors": {
+      "integrator": 176
+    }
+  },
+  "integrator": {
+    "ensemble": "nvt",
+    "scheme": "langevin",
+    "dof": "fastmace",
+    "parameters": [],
+    "timestep_fs": 1.0,
+    "friction": 0.02,
+    "seed": 1773298550,
+    "fixcm": true,
+    "fixcm_projection": "mass_weighted",
+    "noise_batch": 256,
+    "pressure_GPa": 0.0,
+    "cell_mode": "hydrostatic",
+    "barostat_tau_fs": null,
+    "barostat_mass_factor": 1.0,
+    "ase_trace_drag_all_elements": false,
+    "temperature_K": 0.0,
+    "external_stress_GPa": null,
+    "disable_cell_langevin": false
+  },
+  "schedule": {
+    "segments": [
+      {
+        "kind": "ramp",
+        "start_K": 0.0,
+        "end_K": 1000.0,
+        "ps": 20.0,
+        "steps": 20000
+      },
+      {
+        "kind": "ramp",
+        "start_K": 1000.0,
+        "end_K": 250.0,
+        "rate_K_per_ps": -3.0,
+        "steps": 250000
+      }
+    ],
+    "timestep_fs": 1.0,
+    "step": 270000,
+    "target_K": 250.0
+  },
+  "gate": {
+    "status": "skipped",
+    "check": "skip",
+    "reason": "opt-in: check=\"gate\"",
+    "copies": null,
+    "energy_meV_per_atom": null,
+    "force_eV_per_A": null,
+    "stress_eV_per_A3": null,
+    "quantities": {},
+    "floors": null,
+    "nonfinite": [],
+    "mode": null,
+    "references": null,
+    "seconds": {},
+    "notes": [],
+    "device": null,
+    "reduced_cell": null,
+    "steps": [],
+    "replay": null,
+    "move_energy": null,
+    "mc_energy_precision": null,
+    "selfchecks": [
+      {
+        "name": "factor_species",
+        "passed": true,
+        "max_relative_error": 1.054631060759639e-06,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "fold_cutoff",
+        "passed": true,
+        "max_relative_error": 1.7577184345993983e-06,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "density_first",
+        "passed": true,
+        "max_relative_error": 1.406174582902253e-06,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "joint_radial_input",
+        "passed": true,
+        "max_relative_error": 1.4061747476795188e-06,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "fused_folded_backward",
+        "passed": true,
+        "max_relative_error": 1.4061747476795188e-06,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "folded_backward_tiles",
+        "passed": true,
+        "max_relative_error": 1.4061744181250258e-06,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "streaming_conv",
+        "passed": true,
+        "max_relative_error": 1.406174582902253e-06,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "reassociate_first",
+        "passed": true,
+        "max_relative_error": 1.0143772763260066e-06,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "segmented_first_sum",
+        "passed": true,
+        "max_relative_error": 9.78150154308621e-07,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "block_linear",
+        "passed": true,
+        "max_relative_error": 6.039514733043886e-07,
+        "threshold": 0.0001,
+        "modules": 20,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "grouped_linear",
+        "passed": true,
+        "max_relative_error": 6.039514733043886e-07,
+        "threshold": 0.0001,
+        "modules": 20,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "merged_residual",
+        "passed": true,
+        "max_relative_error": 3.8196586371076017e-07,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "gated_rows",
+        "passed": true,
+        "max_relative_error": 6.729809585806178e-07,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "segment_gemm",
+        "passed": true,
+        "max_relative_error": 6.729809585806178e-07,
+        "threshold": 0.0001,
+        "modules": 6,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "species_tables",
+        "passed": true,
+        "max_relative_error": 2.0037698511406288e-07,
+        "threshold": 0.0001,
+        "modules": 6,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "fold_readout_tail",
+        "passed": true,
+        "max_relative_error": 3.2029163450137925e-07,
+        "threshold": 0.0001,
+        "modules": 2,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "fold_product_linear",
+        "passed": true,
+        "max_relative_error": 3.9488380642716834e-07,
+        "threshold": 0.0001,
+        "modules": 3,
+        "dtype": "float32",
+        "detail": "ok"
+      },
+      {
+        "name": "single_graph_strain",
+        "passed": true,
+        "max_relative_error": 0.0,
+        "threshold": 1e-10,
+        "modules": 2,
+        "dtype": "float64",
+        "detail": "ok"
+      }
+    ]
+  },
+  "counters": {
+    "recaptures": 1,
+    "neighbour_lists": {
+      "mace": {
+        "rebuilds": 15063,
+        "build_time_s": null,
+        "skin_A": 0.3
+      }
+    },
+    "overflows_redone": 567,
+    "mc": null,
+    "tier_switches": [],
+    "segments": [
+      {
+        "first_step": 135000,
+        "last_step": 140000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 14.807068282000728,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 2,
+        "capture_s": 0.2727336930001911,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 683,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 140000,
+        "last_step": 150000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 28.875827945999845,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1324,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 150000,
+        "last_step": 160000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 29.031428259999302,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1291,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 160000,
+        "last_step": 170000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 28.942430397000862,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1264,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 170000,
+        "last_step": 180000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 29.09660531499958,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1210,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 180000,
+        "last_step": 190000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 28.95673418699971,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1197,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 190000,
+        "last_step": 200000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 28.942847215000256,
+        "recaptures": 1,
+        "recapture_s": 0.058850215000347816,
+        "captures": 1,
+        "capture_s": 0.058850215000347816,
+        "overflows_redone": 9,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1136,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 200000,
+        "last_step": 210000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 29.102241628999764,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 1,
+        "capture_s": 0.029171379000217712,
+        "overflows_redone": 41,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1122,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 210000,
+        "last_step": 220000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 29.164559243999975,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 103,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1073,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 220000,
+        "last_step": 230000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 29.23917762200017,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 195,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1036,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 230000,
+        "last_step": 240000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 29.06310181200024,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 161,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1004,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 240000,
+        "last_step": 250000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 28.65607037999962,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 42,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 962,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 250000,
+        "last_step": 260000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 28.351662064000266,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 16,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 909,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 260000,
+        "last_step": 270000,
+        "reason": "restart",
+        "canonical": true,
+        "wall_s": 28.454000488999554,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 852,
+            "build_time_s": null
+          }
+        }
+      }
+    ],
+    "fallbacks": [],
+    "engine": {
+      "rebuilds_beside": 15061,
+      "fused_integrator": true,
+      "engine": "graph",
+      "mode": "pipelined",
+      "capture": true,
+      "pad_edges": true,
+      "variable_cell": false,
+      "initial_edges": 7456,
+      "edge_bucket": 512,
+      "edge_sizes_used": [
+        7168,
+        7680
+      ],
+      "neighbour_rebuilds": 15063,
+      "graphs": [
+        "C",
+        "('B', 7680)",
+        "ACP",
+        "('B', 7168)"
+      ],
+      "pool_resets": 0,
+      "capture_memory": [
+        {
+          "key": "ACP",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1548.0,
+          "max_reserved_after_capture_MiB": 1548.0
+        },
+        {
+          "key": "('B', 7680)",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1548.0,
+          "max_reserved_after_capture_MiB": 1548.0
+        },
+        {
+          "key": "('B', 7168)",
+          "warmup_in_pool": true,
+          "max_reserved_after_warmup_MiB": 1548.0,
+          "max_reserved_after_capture_MiB": 1548.0
+        },
+        {
+          "key": "C",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1548.0,
+          "max_reserved_after_capture_MiB": 1548.0
+        }
+      ],
+      "speculative_launches": 0,
+      "speculative_rollbacks": 0,
+      "speculative_rebuild_rollbacks": 0,
+      "speculative_bucket_rollbacks": 0,
+      "pipelined_redos": 569,
+      "pipelined_rebuild_redos": 2,
+      "pipelined_early_rebuilds": 15061,
+      "canonical_points": 16,
+      "polar_overflow_steps": [],
+      "process": {
+        "allocator": "expandable_segments:True",
+        "dynamo_cache_size_limit": 64,
+        "compile_family": "oeq"
+      },
+      "energy_graphs": {
+        "float32": {
+          "copy": false,
+          "backend": "hybrid",
+          "compile_mode": "default"
+        }
+      },
+      "overflow_check": "edges",
+      "overflows_redone": 567,
+      "overflow_log": [
+        {
+          "step": 227441,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 227474,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 227615,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 227627,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 227721,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 227766,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 227786,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 227828,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 227938,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 227974,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228018,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228086,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228244,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228363,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228527,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228592,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228652,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228657,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228705,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 228744,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229027,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229187,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229231,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229374,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229454,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229470,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229549,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229551,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229796,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229804,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229816,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229825,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229839,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229903,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229917,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229945,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 229973,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230016,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230025,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230116,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230186,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230202,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230308,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230432,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230532,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230543,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230567,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230602,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230638,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230645,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230679,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230690,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230703,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230713,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230766,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230773,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230783,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230786,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230816,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230821,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230881,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230887,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 230892,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231047,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231107,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231112,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231120,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231205,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231212,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231230,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231254,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231263,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231267,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231328,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231354,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231357,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231367,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231453,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231565,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231656,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231700,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231738,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231816,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231872,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231891,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231919,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231925,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231972,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231983,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 231986,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232078,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232164,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232166,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232293,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232298,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232308,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232313,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232391,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232417,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232426,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232459,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232510,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232517,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232636,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232697,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232703,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232732,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232736,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232743,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232760,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232765,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232788,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232803,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232953,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 232989,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 233140,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 233187,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 233598,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 233602,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 233621,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 233634,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234256,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234265,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234272,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234471,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234510,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234535,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234624,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234702,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234712,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234878,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 234936,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235087,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235100,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235112,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235190,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235192,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235222,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235268,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235280,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235555,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235691,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235703,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235766,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235776,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235779,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235786,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 235978,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236008,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236038,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236054,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236056,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236103,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236240,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236399,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236405,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236426,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236444,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236512,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236517,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236575,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236581,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236592,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 236876,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237015,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237021,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237192,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237214,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237254,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237268,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237286,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237343,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237345,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237402,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237410,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237420,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237540,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237561,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237568,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237575,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237593,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237597,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237707,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237883,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 237898,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 238052,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 238058,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 238257,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 238322,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 238428,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 238447,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 238728,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 238743,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 239088,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 239101,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 239382,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 239395,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 239932,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 240470,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 240559,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 240612,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 240621,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 240963,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241237,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241313,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241323,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241458,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241463,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241501,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241513,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241526,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241581,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 241623,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243043,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243093,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243163,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243285,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243289,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243313,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243344,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243352,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243393,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243407,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243418,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 243424,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 244700,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 244722,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 245131,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 245284,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 246128,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 246543,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 246652,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 246840,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 248125,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 248651,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 248656,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 249233,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 249620,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 249955,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 249958,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250015,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250022,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250039,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250127,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250227,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250233,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250287,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250302,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250314,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250328,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250346,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250358,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250432,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250677,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 250777,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 252608,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        }
+      ],
+      "recaptures": 1,
+      "recapture_budget": 64,
+      "recapture_budget_exceeded_at": null,
+      "graph_variant_cap": 64,
+      "graph_evictions": 0,
+      "recapture_log": [
+        {
+          "step": 135000,
+          "key": "ACP",
+          "reason": "first capture",
+          "counted": false,
+          "s": 0.1423045629999251
+        },
+        {
+          "step": 135000,
+          "key": "('B', 7680)",
+          "reason": "first capture",
+          "counted": false,
+          "s": 0.130429130000266
+        },
+        {
+          "step": 197032,
+          "key": "('B', 7168)",
+          "reason": "new variant of B",
+          "counted": true,
+          "s": 0.058850215000347816
+        },
+        {
+          "step": 202359,
+          "key": "C",
+          "reason": "first capture",
+          "counted": false,
+          "s": 0.029171379000217712
+        }
+      ],
+      "invalidations": [
+        {
+          "step": 135000,
+          "reason": "the restart's neighbour capacity",
+          "graphs": 0
+        }
+      ],
+      "captures": 4,
+      "capture_seconds": 0.36075528700075665,
+      "recapture_seconds": 0.058850215000347816
+    }
+  },
+  "restart_points": [
+    {
+      "step": 10000,
+      "output_chunk": 0,
+      "output_rows": 1001,
+      "output_frames": 1001
+    },
+    {
+      "step": 20000,
+      "output_chunk": 1,
+      "output_rows": 2001,
+      "output_frames": 2001
+    },
+    {
+      "step": 30000,
+      "output_chunk": 2,
+      "output_rows": 3001,
+      "output_frames": 3001
+    },
+    {
+      "step": 40000,
+      "output_chunk": 3,
+      "output_rows": 4001,
+      "output_frames": 4001
+    },
+    {
+      "step": 50000,
+      "output_chunk": 4,
+      "output_rows": 5001,
+      "output_frames": 5001
+    },
+    {
+      "step": 60000,
+      "output_chunk": 5,
+      "output_rows": 6001,
+      "output_frames": 6001
+    },
+    {
+      "step": 70000,
+      "output_chunk": 6,
+      "output_rows": 7001,
+      "output_frames": 7001
+    },
+    {
+      "step": 80000,
+      "output_chunk": 7,
+      "output_rows": 8001,
+      "output_frames": 8001
+    },
+    {
+      "step": 90000,
+      "output_chunk": 8,
+      "output_rows": 9001,
+      "output_frames": 9001
+    },
+    {
+      "step": 100000,
+      "output_chunk": 9,
+      "output_rows": 10001,
+      "output_frames": 10001
+    },
+    {
+      "step": 110000,
+      "output_chunk": 10,
+      "output_rows": 11001,
+      "output_frames": 11001
+    },
+    {
+      "step": 120000,
+      "output_chunk": 11,
+      "output_rows": 12001,
+      "output_frames": 12001
+    },
+    {
+      "step": 130000,
+      "output_chunk": 12,
+      "output_rows": 13001,
+      "output_frames": 13001
+    },
+    {
+      "step": 135000,
+      "output_chunk": 13,
+      "output_rows": 13501,
+      "output_frames": 13501
+    },
+    {
+      "step": 140000,
+      "output_chunk": 14,
+      "output_rows": 14001,
+      "output_frames": 14001
+    },
+    {
+      "step": 150000,
+      "output_chunk": 15,
+      "output_rows": 15001,
+      "output_frames": 15001
+    },
+    {
+      "step": 160000,
+      "output_chunk": 16,
+      "output_rows": 16001,
+      "output_frames": 16001
+    },
+    {
+      "step": 170000,
+      "output_chunk": 17,
+      "output_rows": 17001,
+      "output_frames": 17001
+    },
+    {
+      "step": 180000,
+      "output_chunk": 18,
+      "output_rows": 18001,
+      "output_frames": 18001
+    },
+    {
+      "step": 190000,
+      "output_chunk": 19,
+      "output_rows": 19001,
+      "output_frames": 19001
+    },
+    {
+      "step": 200000,
+      "output_chunk": 20,
+      "output_rows": 20001,
+      "output_frames": 20001
+    },
+    {
+      "step": 210000,
+      "output_chunk": 21,
+      "output_rows": 21001,
+      "output_frames": 21001
+    },
+    {
+      "step": 220000,
+      "output_chunk": 22,
+      "output_rows": 22001,
+      "output_frames": 22001
+    },
+    {
+      "step": 230000,
+      "output_chunk": 23,
+      "output_rows": 23001,
+      "output_frames": 23001
+    },
+    {
+      "step": 240000,
+      "output_chunk": 24,
+      "output_rows": 24001,
+      "output_frames": 24001
+    },
+    {
+      "step": 250000,
+      "output_chunk": 25,
+      "output_rows": 25001,
+      "output_frames": 25001
+    },
+    {
+      "step": 260000,
+      "output_chunk": 26,
+      "output_rows": 26001,
+      "output_frames": 26001
+    },
+    {
+      "step": 270000,
+      "output_chunk": 27,
+      "output_rows": 27001,
+      "output_frames": 27001
+    },
+    {
+      "step": 270000,
+      "output_chunk": 28,
+      "output_rows": 27001,
+      "output_frames": 27001
+    }
+  ],
+  "timing": {
+    "setup_s": {
+      "plan": 0.3337855600002513,
+      "build": 24.949885707999783,
+      "provenance": 0.005156350000106613
+    },
+    "setup_total_s": 25.28882761800014,
+    "status": "complete",
+    "steps": 135000,
+    "loop_s": 390.7202652730002
+  },
+  "report": {
+    "text": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl108Na108, 216 atoms (3\u00d73\u00d73), 3D PBC, NVT Langevin 1 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 9 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nsetup:   25 s (plan 0.33 s, build 25 s, provenance 0.0052 s)\nspeed:   2.89 ms/step, whole-run mean over steps 135,001\u2013270,000\nruntime: re-captures 1 (0.0589 s, 0.0 % of the loop); overflows redone 567\noutput:  /home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-adapt-production/adapt-production/nvt_anneal_NaCl\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    none",
+    "speed": {
+      "status": "whole-run mean",
+      "seconds_per_step": 0.0028942241872074092,
+      "first_step": 135001,
+      "last_step": 270000
+    },
+    "measured_window": {
+      "seconds_per_step": 0.00289721430300051,
+      "first_step": 136000,
+      "last_step": 137000
+    },
+    "speed_window": {
+      "warmup_steps": 1000,
+      "window_steps": 1000,
+      "start_step": 135000
+    },
+    "setup_s": {
+      "plan": 0.3337855600002513,
+      "build": 24.949885707999783,
+      "provenance": 0.005156350000106613
+    },
+    "setup_total_s": 25.28882761800014,
+    "licence": {
+      "licence": "ASL",
+      "source": "label table"
+    },
+    "gate_status": "skipped",
+    "move_energy_status": null,
+    "mc_energy_precision": null,
+    "reasons": [],
+    "warnings": [],
+    "mc": null
+  },
+  "force_field": {
+    "backend": "hybrid",
+    "dtype": "float32",
+    "device": "cuda:0",
+    "compile_mode": "default",
+    "training": false,
+    "compute_stress": false,
+    "padding_exact": true,
+    "rewrites": [
+      "factor_species",
+      "fold_cutoff",
+      "density_first",
+      "joint_radial_input",
+      "fused_folded_backward",
+      "folded_backward_tiles",
+      "streaming_conv",
+      "reassociate_first",
+      "segmented_first_sum",
+      "block_linear",
+      "grouped_linear",
+      "merged_residual",
+      "gated_rows",
+      "segment_gemm",
+      "species_tables",
+      "fold_readout_tail",
+      "fold_product_linear",
+      "single_graph_strain"
+    ],
+    "decisions": {
+      "factor_species": "on",
+      "fold_cutoff": "on",
+      "density_first": "on",
+      "joint_radial_input": "on",
+      "fused_folded_backward": "on",
+      "folded_backward_tiles": "on",
+      "fused_radial_hidden": "off",
+      "direct_node_feats": "off",
+      "folded_constants": "off",
+      "streaming_conv": "on",
+      "reassociate_first": "on",
+      "segmented_first_sum": "on",
+      "generic_species_skip": "off",
+      "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+      "generic_segmented_first_sum": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field segmented_first_sum honoured by segmented_first_sum)",
+      "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+      "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+      "block_linear": "on",
+      "grouped_linear": "on",
+      "merged_residual": "on",
+      "gated_rows": "on",
+      "segment_gemm": "on",
+      "grouped_launch": "off",
+      "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+      "polar_graph_sums": "off",
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "tf32x3_gemms": "off",
+      "fx_e3nn_linear": "off",
+      "single_graph_strain": "on",
+      "combo_kernels": "off"
+    },
+    "selfchecks": {
+      "factor_species": 1.054631060759639e-06,
+      "fold_cutoff": 1.7577184345993983e-06,
+      "density_first": 1.406174582902253e-06,
+      "joint_radial_input": 1.4061747476795188e-06,
+      "fused_folded_backward": 1.4061747476795188e-06,
+      "folded_backward_tiles": 1.4061744181250258e-06,
+      "streaming_conv": 1.406174582902253e-06,
+      "reassociate_first": 1.0143772763260066e-06,
+      "segmented_first_sum": 9.78150154308621e-07,
+      "block_linear": 6.039514733043886e-07,
+      "grouped_linear": 6.039514733043886e-07,
+      "merged_residual": 3.8196586371076017e-07,
+      "gated_rows": 6.729809585806178e-07,
+      "segment_gemm": 6.729809585806178e-07,
+      "species_tables": 2.0037698511406288e-07,
+      "fold_readout_tail": 3.2029163450137925e-07,
+      "fold_product_linear": 3.9488380642716834e-07,
+      "single_graph_strain": 0.0
+    },
+    "streaming_interactions": 2,
+    "sort_receivers": true,
+    "gpu_neighbour_list": true,
+    "neighbour_rebuilds": 15080,
+    "edge_capacity": 10752,
+    "candidates": 9400,
+    "species_columns": [
+      10,
+      16
+    ],
+    "superset": [
+      11,
+      17
+    ],
+    "charge": null,
+    "spin_multiplicity": null,
+    "dynamo_reset": false,
+    "polar": null,
+    "float64_energy": true,
+    "energy_treatment": "patched",
+    "strain_path": "one_graph",
+    "follows": null
+  },
+  "subprocess": null
+}
