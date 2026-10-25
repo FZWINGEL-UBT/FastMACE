@@ -1,0 +1,255 @@
+diff --git a/openequivariance/openequivariance/_torch/extlib/__init__.py b/openequivariance/openequivariance/_torch/extlib/__init__.py
+index c8599df..9dab66e 100644
+--- a/openequivariance/openequivariance/_torch/extlib/__init__.py
++++ b/openequivariance/openequivariance/_torch/extlib/__init__.py
+@@ -134,17 +134,41 @@ def load_jit_extension():
+                     f"-l{python_lib_name}",
+                 ],
+             )
++        wheel_include_dirs = None
+         if BACKEND == "cuda":
+-            extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc", "-lcublas"])
++            from torch.utils.cpp_extension import CUDA_HOME
+ 
+-            try:
+-                torch_libs, cuda_libs = library_paths("cuda")
+-                extra_link_args.append("-Wl,-rpath," + torch_libs)
+-                extra_link_args.append("-L" + cuda_libs)
+-                if os.path.exists(cuda_libs + "/stubs"):
+-                    extra_link_args.append("-L" + cuda_libs + "/stubs")
+-            except Exception as e:
+-                getLogger().info(str(e))
++            from openequivariance._torch.extlib.wheel_cuda import wheel_build_flags
++
++            # OEQ_CUDA_FROM_WHEELS: "auto" (default) uses the NVIDIA runtime wheels only when
++            # no CUDA toolkit is found; "1" always; "0" never.
++            from_wheels = os.getenv("OEQ_CUDA_FROM_WHEELS", "auto")
++            wheel_flags = None
++            if from_wheels == "1" or (from_wheels == "auto" and CUDA_HOME is None):
++                wheel_flags = wheel_build_flags()
++                if wheel_flags is None and from_wheels == "1":
++                    BUILT_EXTENSION_ERROR = (
++                        "OEQ_CUDA_FROM_WHEELS=1, but no NVIDIA CUDA runtime wheel "
++                        "(nvidia/cu13 or nvidia/cuda_runtime) or no libcuda.so.1 was found."
++                    )
++                    return
++
++            if wheel_flags is not None:
++                wheel_include_dirs, wheel_ldflags = wheel_flags
++                extra_link_args.extend(wheel_ldflags)
++                extra_link_args.append("-Wl,-rpath," + library_paths("cpu")[0])
++                getLogger().info("Building the OEq host extension against the CUDA wheels")
++            else:
++                extra_link_args.extend(["-lcuda", "-lcudart", "-lnvrtc", "-lcublas"])
++
++                try:
++                    torch_libs, cuda_libs = library_paths("cuda")
++                    extra_link_args.append("-Wl,-rpath," + torch_libs)
++                    extra_link_args.append("-L" + cuda_libs)
++                    if os.path.exists(cuda_libs + "/stubs"):
++                        extra_link_args.append("-L" + cuda_libs + "/stubs")
++                except Exception as e:
++                    getLogger().info(str(e))
+ 
+             extra_cflags.append("-DCUDA_BACKEND")
+         elif BACKEND == "hip":
+@@ -172,10 +196,15 @@ def load_jit_extension():
+                 extra_link_args.append("-L" + lib_dir)
+ 
+         torch_sources = [oeq_root + "/extension/" + src for src in torch_sources]
++        if wheel_include_dirs is not None:
++            # include_paths("cuda") needs CUDA_HOME; the torch headers plus the wheels' instead
++            device_include_dirs = include_paths("cpu") + wheel_include_dirs
++        else:
++            device_include_dirs = include_paths("xpu" if BACKEND == "sycl" else "cuda")
+         include_dirs = (
+             [oeq_root + "/extension/" + d for d in include_dirs]
+             + extra_include_dirs
+-            + include_paths("xpu" if BACKEND == "sycl" else "cuda")
++            + device_include_dirs
+         )
+ 
+         with warnings.catch_warnings():
+diff --git a/openequivariance/openequivariance/_torch/extlib/wheel_cuda.py b/openequivariance/openequivariance/_torch/extlib/wheel_cuda.py
+new file mode 100644
+index 0000000..41d6f9b
+--- /dev/null
++++ b/openequivariance/openequivariance/_torch/extlib/wheel_cuda.py
+@@ -0,0 +1,103 @@
++"""CUDA headers and libraries for the JIT host-extension build from pip wheels, without a toolkit.
++
++The host extension (``libtorch_tp_jit``) has only C++ sources: its device kernels are compiled
++at run time with NVRTC. Building it needs the CUDA *runtime* headers (``cuda.h``, ``nvrtc.h``,
++``cuda_runtime.h`` and CCCL) and link libraries (``cudart``, ``nvrtc``, ``cublas``, the driver),
++but not ``nvcc``. A PyTorch install from PyPI already ships all of them in the NVIDIA wheels
++(``nvidia/cu13`` for CUDA 13, ``nvidia/cuda_runtime`` etc. for CUDA 12), under a layout that
++``torch.utils.cpp_extension`` does not recognise as a CUDA home. On a machine without a CUDA
++toolkit, ``include_paths("cuda")`` then fails (``CUDA_HOME`` is None) and the extension is not
++built.
++
++``wheel_build_flags()`` finds the wheel directories and returns explicit include paths and
++linker arguments, so the build needs neither ``CUDA_HOME`` nor unversioned ``lib*.so`` links:
++libraries are linked by soname (``-l:libcudart.so.13``), which GNU ld and lld accept.
++"""
++
++import ctypes.util
++import glob
++import os
++import site
++import sys
++from pathlib import Path
++from typing import List, Optional, Tuple
++
++# (wheel directory, include subdir, lib subdir) for each layout; CUDA 13 first.
++_LAYOUTS = (
++    ("nvidia/cu13", "include", "lib"),
++    ("nvidia/cuda_runtime", "include", "lib"),
++)
++_CUDA12_EXTRA = ("nvidia/cuda_nvrtc", "nvidia/cublas", "nvidia/cuda_cccl")
++_LIBRARIES = ("cudart", "nvrtc", "cublas")
++_DRIVER_DIRS = (
++    "/usr/lib/wsl/lib",
++    "/usr/lib/x86_64-linux-gnu",
++    "/usr/lib/aarch64-linux-gnu",
++    "/usr/lib64",
++    "/usr/lib64-nvidia",
++)
++
++
++def _site_dirs() -> List[Path]:
++    dirs = list(site.getsitepackages()) if hasattr(site, "getsitepackages") else []
++    dirs += [p for p in sys.path if p.endswith("site-packages")]
++    seen, out = set(), []
++    for d in dirs:
++        if d not in seen and os.path.isdir(d):
++            seen.add(d)
++            out.append(Path(d))
++    return out
++
++
++def _soname(lib_dir: Path, name: str) -> Optional[str]:
++    """The versioned file name of lib<name>.so.<major> in ``lib_dir`` (shortest match)."""
++    matches = sorted(glob.glob(str(lib_dir / f"lib{name}.so.*")), key=len)
++    return os.path.basename(matches[0]) if matches else None
++
++
++def find_driver_dir() -> Optional[str]:
++    configured = os.environ.get("OEQ_CUDA_DRIVER_DIR")
++    if configured:
++        return configured
++    for d in _DRIVER_DIRS:
++        if os.path.exists(os.path.join(d, "libcuda.so.1")):
++            return d
++    found = ctypes.util.find_library("cuda")
++    return os.path.dirname(found) if found and os.path.isabs(found) else None
++
++
++def wheel_build_flags() -> Optional[Tuple[List[str], List[str]]]:
++    """(include dirs, linker args) from the NVIDIA runtime wheels, or None if they are not installed."""
++    for site_dir in _site_dirs():
++        for root, inc, lib in _LAYOUTS:
++            base = site_dir / root
++            if not (base / inc / "cuda.h").is_file() and not (base / inc / "cuda_runtime.h").is_file():
++                continue
++            include_dirs = [base / inc]
++            lib_dirs = [base / lib]
++            if root != "nvidia/cu13":  # CUDA 12: one wheel per component
++                for extra in _CUDA12_EXTRA:
++                    if (site_dir / extra / "include").is_dir():
++                        include_dirs.append(site_dir / extra / "include")
++                    if (site_dir / extra / "lib").is_dir():
++                        lib_dirs.append(site_dir / extra / "lib")
++            cccl = base / inc / "cccl"
++            if cccl.is_dir():
++                include_dirs.append(cccl)
++            ldflags = []
++            for name in _LIBRARIES:
++                for d in lib_dirs:
++                    so = _soname(d, name)
++                    if so:
++                        if f"-L{d}" not in ldflags:
++                            ldflags += [f"-L{d}", f"-Wl,-rpath,{d}"]
++                        ldflags.append(f"-l:{so}")
++                        break
++                else:
++                    return None
++            driver = find_driver_dir()
++            if driver is None:
++                return None
++            ldflags += [f"-L{driver}", "-l:libcuda.so.1"]
++            return [str(d) for d in include_dirs], ldflags
++    return None
+diff --git a/tests/wheel_cuda_test.py b/tests/wheel_cuda_test.py
+new file mode 100644
+index 0000000..12621ec
+--- /dev/null
++++ b/tests/wheel_cuda_test.py
+@@ -0,0 +1,68 @@
++import importlib.util
++import os
++
++import pytest
++
++HERE = os.path.dirname(__file__)
++PATH = os.path.join(HERE, "..", "openequivariance", "openequivariance", "_torch", "extlib", "wheel_cuda.py")
++
++
++def _module():
++    spec = importlib.util.spec_from_file_location("wheel_cuda", PATH)
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)
++    return module
++
++
++def _touch(path):
++    os.makedirs(os.path.dirname(path), exist_ok=True)
++    open(path, "w").close()
++
++
++def test_cu13_layout(tmp_path, monkeypatch):
++    wc = _module()
++    site = tmp_path / "site-packages"
++    base = site / "nvidia" / "cu13"
++    _touch(base / "include" / "cuda.h")
++    os.makedirs(base / "include" / "cccl")
++    for name in ("cudart", "nvrtc", "cublas"):
++        _touch(base / "lib" / f"lib{name}.so.13")
++    driver = tmp_path / "driver"
++    _touch(driver / "libcuda.so.1")
++    monkeypatch.setattr(wc, "_site_dirs", lambda: [site])
++    monkeypatch.setenv("OEQ_CUDA_DRIVER_DIR", str(driver))
++    include, ldflags = wc.wheel_build_flags()
++    assert include == [str(base / "include"), str(base / "include" / "cccl")]
++    assert "-l:libcudart.so.13" in ldflags and "-l:libnvrtc.so.13" in ldflags
++    assert ldflags.count(f"-L{base / 'lib'}") == 1
++    assert ldflags[-1] == "-l:libcuda.so.1"
++
++
++def test_missing_wheel(tmp_path, monkeypatch):
++    wc = _module()
++    monkeypatch.setattr(wc, "_site_dirs", lambda: [tmp_path])
++    assert wc.wheel_build_flags() is None
++
++
++def test_missing_library(tmp_path, monkeypatch):
++    wc = _module()
++    base = tmp_path / "nvidia" / "cu13"
++    _touch(base / "include" / "cuda.h")
++    _touch(base / "lib" / "libcudart.so.13")
++    monkeypatch.setattr(wc, "_site_dirs", lambda: [tmp_path])
++    monkeypatch.setenv("OEQ_CUDA_DRIVER_DIR", str(tmp_path))
++    assert wc.wheel_build_flags() is None
++
++
++@pytest.mark.skipif(not os.environ.get("OEQ_TEST_WHEEL_BUILD"), reason="set OEQ_TEST_WHEEL_BUILD=1 on a GPU host")
++def test_jit_build_without_toolkit(tmp_path, monkeypatch):
++    """End to end: build in a subprocess with CUDA_HOME unset and no nvcc on PATH."""
++    import subprocess
++    import sys
++
++    env = dict(os.environ, OEQ_JIT_EXTENSION="1", OEQ_CUDA_FROM_WHEELS="1",
++               TORCH_EXTENSIONS_DIR=str(tmp_path), PATH=os.path.dirname(sys.executable) + ":/usr/bin:/bin")
++    env.pop("CUDA_HOME", None)
++    env.pop("CUDA_PATH", None)
++    code = "import openequivariance._torch.extlib as e; assert e.BUILT_EXTENSION, e.BUILT_EXTENSION_ERROR"
++    subprocess.run([sys.executable, "-c", code], env=env, check=True)
