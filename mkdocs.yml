@@ -1,0 +1,98 @@
+site_name: FastMACE
+site_description: Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs
+repo_url: https://github.com/FZWINGEL-UBT/FastMACE
+repo_name: FZWINGEL-UBT/FastMACE
+edit_uri: edit/main/docs/
+# Plan task 6-T06 (owner decision D6: MkDocs Material on GitHub Pages). Build with
+# `mkdocs build --strict`; deployment is a separate, owner-approved step.
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    - scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+
+# The design notes and validation records are kept in the repository and linked from the
+# pages (GitHub URLs); they are not part of the site.
+exclude_docs: |
+  design/
+  validation/
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: null
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            filters: ["!^_"]
+            show_signature_annotations: true
+            separate_signature: true
+            heading_level: 2
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Install: install.md
+      - FastMACE in five minutes: quickstart.md
+  - User guide:
+      - Port your ASE script: guide/ase.md
+      - Models and licences: guide/models.md
+      - The planner: guide/planner.md
+      - Output, restart and resume: guide/restart.md
+      - Monte Carlo and swaps: guide/mc.md
+      - NPT and D3 dispersion: guide/npt-d3.md
+      - Relaxations and quenches: guide/relax.md
+      - FAQ and troubleshooting: faq.md
+  - API reference:
+      - Overview: api/index.md
+      - Quick runs (fm.md): api/quick.md
+      - Models and force fields: api/model.md
+      - Simulation: api/simulation.md
+      - Integrators: api/integrators.md
+      - Optimisers: api/optimize.md
+      - Monte Carlo: api/mc.md
+      - Protocols and schedules: api/protocols.md
+      - Output: api/output.md
+      - Dispersion (D3): api/d3.md
+      - ASE front end: api/ase.md
+      - Errors: api/errors.md
+  - Project:
+      - Rewrite screens: rewrites.md
+      - Licences: licences.md
+      - Development: development.md
