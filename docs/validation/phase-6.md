@@ -1,5 +1,11 @@
 # Phase 6 acceptance (1.0)
 
+**Release follow-up:** `v1.0.0` is published on PyPI and GitHub, the documentation site is live, and the
+Python 3.13 finding was resolved by 6-T15 and verified on a fresh Colab L4 plus a public-PyPI installation.
+The final CPU suite passes in 13 min 51 s with all prior cases retained (6-T16).
+See [release-1.0.0.md](release-1.0.0.md) for publication hashes, live URLs and qualification limits.
+The original acceptance run and its findings are preserved below.
+
 Plan task 6-T13, 25 October 2026. Runbook (items and pass rules fixed before the runs):
 [phase-6-runbook.md](phase-6-runbook.md). SPEC §16 row 6: **1.0 tagged; docs build; `pip install fastmace[oeq]` on
 a clean machine without a compiler.** Records: `results/6-T13-20261025/`.
@@ -88,12 +94,12 @@ boundary. The original Colab Python 3.13 failure below remains the acceptance-ru
 - **Carried over:** phase 5's open findings that 6-T11 did not close (slow tier in one process on 16 GiB, slow
   POLAR cold compile, OMOL-0 XL on the A100, NAS sync); workstation clean install (workstations off).
 
-## Steps left for the owner
+## Release follow-up (completed)
 
 1. F1 option (b) was selected and implemented in 6-T15; the 3.13 wheel is merged. The complete CPU suite
    passed after 6-T15: 4,655 passed, 553 skipped, now 13 min 51 s with 6-T16's scheduling.
    A fresh Colab L4 Python 3.13 clean install also passed with the prebuilt hybrid and no C++ build calls.
-2. `fastmace/6-T13`, 6-T15 and 6-T16 are merged. The owner has authorized tagging `v1.0.0`
-   (`docs/development.md`, "Releasing"), publication and docs deployment.
-3. `tools/release/make_release.sh v1.0.0`, upload `fastmace-oeq-ext` 0.7.0.post1 (6-T04's wheels) before
-   `fastmace` 1.0.0, since `[oeq]` depends on it, then upload `fastmace`. Optionally deploy the docs.
+2. `fastmace/6-T13`, 6-T15 and 6-T16 are merged. `v1.0.0` tags `f45985c5`; the tag's wheel and sdist
+   were built and checked with `tools/release/make_release.sh v1.0.0`.
+3. All four `fastmace-oeq-ext` 0.7.0.post1 wheels were published before `fastmace` 1.0.0. The public-index
+   hybrid installation passed; GitHub release assets and the GitHub Pages documentation are live.
