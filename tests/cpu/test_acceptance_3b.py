@@ -168,7 +168,7 @@ def test_fails():
     assert 1 == 2
 
 def test_slow():
-    time.sleep(120)
+    time.sleep(900)  # far beyond every timeout below: only the signal can end it
 
 def test_never_reached():
     pass
@@ -187,7 +187,7 @@ def _records(path):
     return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
 
 
-def _wait_for(path, nodeid_part, timeout_s=60):
+def _wait_for(path, nodeid_part, timeout_s=300):
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         if any(nodeid_part in r.get("nodeid", "") for r in _records(path)):
@@ -213,6 +213,12 @@ def _check_stopped(out):
     assert _junit(out / "junit.xml") == {"test_fast": "passed", "test_fails": "failed"}
 
 
+# 6-T13: 60 s timed out under the full -n 8 suite (plans/phase-6.md, Known flakes). A slow start or a slow
+# interrupt under load is not what these tests check; returncode 2 and the interrupted record still prove the
+# signal, not the dummy test, ended the run (test_slow sleeps 900 s).
+STOP_TIMEOUT_S = 300
+
+
 def _environment():
     env = dict(os.environ)
     env.pop("PYTEST_ADDOPTS", None)
@@ -231,7 +237,7 @@ def test_a_stopped_job_keeps_its_results_and_junit(tmp_path, name):
         _wait_for(out / "results.jsonl", "test_fails")
         time.sleep(0.5)  # test_slow is running
         job.send_signal(getattr(signal, name))
-        output, _ = job.communicate(timeout=60)
+        output, _ = job.communicate(timeout=STOP_TIMEOUT_S)
     finally:
         if job.poll() is None:
             job.kill()
@@ -255,7 +261,7 @@ def test_the_plugin_rearms_an_ignored_sigint(tmp_path):
         _wait_for(out / "results.jsonl", "test_fails")
         time.sleep(0.5)
         job.send_signal(signal.SIGINT)
-        output, _ = job.communicate(timeout=60)
+        output, _ = job.communicate(timeout=STOP_TIMEOUT_S)
     finally:
         if job.poll() is None:
             job.kill()
