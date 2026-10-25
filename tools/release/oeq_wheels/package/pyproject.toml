@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fastmace-oeq-ext"
+version = "@EXT_VERSION@"
+description = "Prebuilt OpenEquivariance 0.7.0 host extension for FastMACE (torch @TORCH_VERSION@), no compiler needed"
+readme = "README.md"
+# The wrapper is MIT (FastMACE); the shipped libtorch_tp_jit.so is built from OpenEquivariance's BSD-3 sources.
+license = "MIT AND BSD-3-Clause"
+license-files = ["LICENSE", "fastmace_oeq_ext/LICENSE.openequivariance"]
+authors = [{ name = "Fabian Zwingel" }]
+requires-python = ">=3.10,<3.13"
+# Exact pins: the library is linked against this torch's C++ ABI and calls this OEq's Python side.
+dependencies = ["torch==2.14.1", "openequivariance==0.7.0"]
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: POSIX :: Linux",
+    "Environment :: GPU :: NVIDIA CUDA :: 13",
+]
+
+[project.urls]
+Source = "https://github.com/FZWINGEL-UBT/FastMACE"
+OpenEquivariance = "https://github.com/PASSIONLab/OpenEquivariance"
+
+[tool.setuptools]
+packages = ["fastmace_oeq_ext"]
+include-package-data = false
+
+[tool.setuptools.package-data]
+fastmace_oeq_ext = ["libtorch_tp_jit.so", "manifest.json", "LICENSE.openequivariance", "BUILD_COMPILER.txt"]

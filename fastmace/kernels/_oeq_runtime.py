@@ -18,6 +18,14 @@ libraries. As a guard against a torch build that loads them lazily, they are
 also loaded by absolute path with ``RTLD_GLOBAL`` (``preload_libraries``), so the
 loader finds them by soname when the extension is loaded.
 
+Prebuilt extension (plan task 6-T04, owner decision D4). When the separate wheel ``fastmace-oeq-ext``
+is installed and its ``manifest.json`` names the installed torch, OpenEquivariance and CPython
+(``prebuilt_extension``), no compiler is needed: ``prepare_in_process`` still sets up the stand-in CUDA
+home (links only), then wraps ``torch.utils.cpp_extension.load`` so that OEq's ``load_jit_extension``
+gets the wheel's ``libtorch_tp_jit.so`` instead of building it (``install_prebuilt_loader``). Any
+mismatch, or ``FASTMACE_OEQ_PREBUILT=0``, falls back to the toolchain build below; the plan's
+``extension`` records which (``source`` "prebuilt", or the build's, with ``prebuilt_skipped`` saying why).
+
 The entry point is ``prepare_in_process(cache)``; model loading calls it once per
 process through ``fastmace._patches.prepare_oeq_runtime``, before its first MACE
 import.
@@ -85,6 +93,11 @@ STALE_LOCK_AGE = 3600.0  # seconds; a host build takes minutes (CHILD_BUILD_TIME
 LOCK_WAIT = 30.0  # seconds the preparation waits for a lock in its own extension directory
 LOCK_POLL = 1.0
 PROC = Path("/proc")
+PREBUILT_PACKAGE = "fastmace_oeq_ext"  # the wheel fastmace-oeq-ext (tools/release/oeq_wheels)
+PREBUILT_DISTRIBUTION = "fastmace-oeq-ext"
+PREBUILT_MANIFEST = "manifest.json"
+PREBUILT_SWITCH = "FASTMACE_OEQ_PREBUILT"  # "0": never use the wheel; "1": refuse to build instead
+EXTENSION_NAME = "libtorch_tp_jit"  # OEq 0.7's torch.utils.cpp_extension.load name and pybind11 module
 
 
 @dataclass(frozen=True)
@@ -426,6 +439,104 @@ def _check_not_too_late():
                               f"({extension.CUDA_HOME}); prepare the OEq runtime before it")
 
 
+@dataclass(frozen=True)
+class Prebuilt:
+    """The outcome of looking for the prebuilt extension: ``library`` when usable, else ``reason``."""
+
+    library: Path | None
+    manifest: dict
+    reason: str | None = None
+
+    @property
+    def usable(self):
+        return self.library is not None
+
+
+def _package_directory(name=PREBUILT_PACKAGE):
+    """The package directory of ``name`` without importing it (None: not installed)."""
+    import importlib.util
+    try:
+        spec = importlib.util.find_spec(name)
+    except (ImportError, ValueError):
+        return None
+    if spec is None or not spec.submodule_search_locations:
+        return None
+    return Path(list(spec.submodule_search_locations)[0])
+
+
+def _platform():
+    import platform
+    return sys.platform, platform.machine()
+
+
+def prebuilt_extension(environ=None, versions=None, package_directory=_package_directory, platform=_platform):
+    """Whether the prebuilt ``fastmace-oeq-ext`` library can stand in for OEq's host build here. Reads only.
+
+    Usable when the package is installed, ``FASTMACE_OEQ_PREBUILT`` is not "0", the platform is Linux
+    x86_64 and its manifest names exactly the installed torch (with its local CUDA tag) and
+    OpenEquivariance and this CPython (``cp310``...), and the library exists.
+    """
+    environ = os.environ if environ is None else environ
+    if environ.get(PREBUILT_SWITCH) == "0":
+        return Prebuilt(None, {}, f"{PREBUILT_SWITCH}=0")
+    directory = package_directory()
+    if directory is None:
+        return Prebuilt(None, {}, f"{PREBUILT_DISTRIBUTION} is not installed")
+    try:
+        manifest = json.loads((directory / PREBUILT_MANIFEST).read_text())
+    except (OSError, ValueError) as error:
+        return Prebuilt(None, {}, f"{PREBUILT_DISTRIBUTION} has no readable {PREBUILT_MANIFEST} ({error})")
+    system, machine = platform()
+    if not system.startswith("linux") or machine not in ("x86_64", "AMD64"):
+        return Prebuilt(None, manifest, f"{PREBUILT_DISTRIBUTION} is for Linux x86_64, not {system} {machine}")
+    versions = versions or {name: _distribution_version(name) for name in ("torch", "openequivariance")}
+    python = f"cp{sys.version_info.major}{sys.version_info.minor}"
+    wanted = {"torch": versions.get("torch"), "openequivariance": versions.get("openequivariance"),
+              "python": python}
+    for key, value in wanted.items():
+        if manifest.get(key) != value:
+            return Prebuilt(None, manifest, f"{PREBUILT_DISTRIBUTION} was built for {key} {manifest.get(key)}, "
+                                            f"installed is {value}")
+    library = directory / manifest.get("library", f"{EXTENSION_NAME}{LIBRARY_SUFFIX}")
+    if not library.is_file():
+        return Prebuilt(None, manifest, f"{library} is missing")
+    return Prebuilt(library, manifest)
+
+
+def load_prebuilt_module(library, name=EXTENSION_NAME):
+    """Import the pybind11 module ``name`` from the prebuilt ``library`` file."""
+    import importlib.machinery
+    import importlib.util
+    loader = importlib.machinery.ExtensionFileLoader(name, str(library))
+    spec = importlib.util.spec_from_file_location(name, str(library), loader=loader)
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    return module
+
+
+def install_prebuilt_loader(library, cpp_extension=None, load_module=load_prebuilt_module):
+    """Wrap ``torch.utils.cpp_extension.load``: OEq's ``libtorch_tp_jit`` comes from ``library``, unbuilt.
+
+    Other extensions still build as before. Returns the wrapper; its ``original`` is torch's function.
+    Idempotent. Imports ``torch.utils.cpp_extension``, so call it after the CUDA home variables are set.
+    """
+    if cpp_extension is None:
+        import torch.utils.cpp_extension as cpp_extension
+    current = cpp_extension.load
+    if getattr(current, "fastmace_prebuilt", None) is not None:
+        return current
+
+    def load(name, *args, **kwargs):
+        if name == EXTENSION_NAME:
+            return load_module(library, name)
+        return current(name, *args, **kwargs)
+
+    load.original = current
+    load.fastmace_prebuilt = str(library)
+    cpp_extension.load = load
+    return load
+
+
 def _plan_for(cache, environ):
     cache = Path(os.path.realpath(os.path.expanduser(cache)))
     cache.mkdir(parents=True, exist_ok=True)
@@ -444,13 +555,29 @@ def prepare_in_process(cache, preload=True, environ=None, build=None, *, lock_wa
     """
     environ = os.environ if environ is None else environ
     _check_not_too_late()
+    prebuilt = prebuilt_extension(environ)
+    if not prebuilt.usable and environ.get(PREBUILT_SWITCH) == "1":
+        raise OEqRuntimeError(f"OEq unavailable: prebuilt extension not usable: {prebuilt.reason}",
+                              why=f"{PREBUILT_SWITCH}=1 forbids the host-toolchain build",
+                              next_step="pip install 'fastmace[oeq]' with torch 2.14.1+cu130 on CPython 3.10-3.12, "
+                                        f"or unset {PREBUILT_SWITCH}.")
     runtime_plan = _plan_for(cache, environ)
     materialize(runtime_plan)
     environ.update(runtime_plan.environment)
+    if prebuilt.usable:
+        start = time.perf_counter()
+        install_prebuilt_loader(prebuilt.library)
+        extension = {"key": None, "path": str(prebuilt.library), "source": "prebuilt",
+                     "seconds": round(time.perf_counter() - start, 3), "error": None,
+                     "version": prebuilt.manifest.get("extension_version")}
+        runtime_plan = dataclasses.replace(runtime_plan, extension=extension)
+        handles = preload_libraries(runtime_plan) if preload else []
+        return runtime_plan, handles
     extensions = Path(runtime_plan.environment["TORCH_EXTENSIONS_DIR"])
     extension = reuse_extension(extensions.parent, extensions, build_identity(runtime_plan, environ),
                                 build or child_build(dict(environ)))
     _check_build_locks(extensions, lock_wait)
+    extension = dict(extension, prebuilt_skipped=prebuilt.reason)
     runtime_plan = dataclasses.replace(runtime_plan, extension=extension)
     handles = preload_libraries(runtime_plan) if preload else []
     return runtime_plan, handles
