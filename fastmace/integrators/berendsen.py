@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/md/nvtberendsen.py and nptberendsen.py, LGPL-2.1-or-later; see NOTICE.md.
 """ASE 3.27's Berendsen classes as graph-capturable half steps on a SimulationState (SPEC §10.2; 4-T02).
 
 Berendsen et al., J. Chem. Phys. 81, 3684 (1984). Non-canonical: for equilibration only (the scheme record

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/md/bussi.py (Bussi), LGPL-2.1-or-later; see NOTICE.md.
 """ASE 3.27's ``Bussi`` (CSVR, NVT) as graph-capturable half steps on a SimulationState (SPEC §10.2; 4-T02).
 
 Bussi, Donadio and Parrinello, J. Chem. Phys. 126, 014101 (2007), Eq. (A7), as ASE writes it: at the start

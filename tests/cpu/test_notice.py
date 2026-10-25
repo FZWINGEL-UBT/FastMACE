@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _listed() -> list[str]:
-    text = (ROOT / "NOTICE.md").read_text(encoding="utf-8")
+    # The vendored-file table only; the ASE ports' table is test_lgpl_headers.py's.
+    text = (ROOT / "NOTICE.md").read_text(encoding="utf-8").split("\n## ", 1)[0]
     return re.findall(r"^\| `(fastmace/[^`]+)` \|", text, flags=re.MULTILINE)
 
 
