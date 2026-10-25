@@ -28,10 +28,7 @@ def load_mh1(checkpoint: str | None, head: str = "matpes_r2scan"):
 
     if checkpoint is None:
         return fm.load("mh1", head=head)
-    from fastmace.model.loading import MODELS_VARIABLE, load_pristine
+    from fastmace.model.loading import load_pristine
 
-    # Child processes (the gate's and MC's reference calculators) find the label's file through
-    # $FASTMACE_MODELS, not through the explicit path: point it at the checkpoint's directory.
-    path = Path(os.path.expanduser(checkpoint)).resolve()
-    os.environ.setdefault(MODELS_VARIABLE, str(path.parent))
-    return load_pristine("mh1", head, checkpoint=str(path))
+    # The gates' and MC's reference children load this same file (its path and SHA-256 go in their job).
+    return load_pristine("mh1", head, checkpoint=os.path.expanduser(checkpoint))
