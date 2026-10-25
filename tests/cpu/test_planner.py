@@ -845,3 +845,16 @@ def test_phase_3_auto_fields_resolve_to_todays_values():  # 3-T01: until 3-T04, 
     for item in ("NeighbourConfig.skin", "NeighbourConfig.headroom", "EngineConfig.recapture_budget",
                  "PrecisionConfig.mc_energy"):
         assert f"auto ({fixed.AUTO_RULES[item]})" in decided[item]
+
+
+CSVR = IntegratorConfig(ensemble="nvt", scheme="csvr", parameters={"tau_fs": 100.0})
+
+
+@pytest.mark.parametrize("integrator, name", [(IntegratorConfig(), "Langevin"),
+                                              (IntegratorConfig(ensemble="nve"), "NVE"), (CSVR, "CSVR")])
+def test_plan_record_names_the_scheme_that_runs(integrator, name):
+    """6-T11 (phase 4 open finding 2): the record named Langevin for every fixed-cell scheme."""
+    item, choice, reason = decision(plan_for("mh1-r2scan", integrator=integrator), "integrator")
+    assert choice == name, (choice, reason)
+    if name == "Langevin":
+        assert str(reason) == f"NVT, fixcm={integrator.fixcm} (workflow.GPUEngine)"

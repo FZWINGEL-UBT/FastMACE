@@ -89,7 +89,35 @@ def test_polar1s_stress_check_passes_on_the_gate_configuration(structure):
     """4-T11: the self-test holds the unstrained cell's k-set. On 3b-T08's NbCl5 3x3x3 gate configuration a
     Bragg pair sits 2.8e-5 outside the k-space cutoff and enters at e_xx = +1e-4; the live finite differences
     were 4.36e-4 eV/A^3 off, the frozen ones 8.3e-9 (docs/validation/3b-T08.md). NaCl 3x3x3, where nothing
-    crosses, stays as 1a-T19 measured it (<= 8.1e-9)."""
+    crosses, stays as 1a-T19 measured it (<= 8.1e-9).
+
+    Runs in a fresh interpreter (6-T11): in one slow-tier process on the 16 GiB RTX 5060 Ti the float64
+    reference ran out of GPU memory (Triton) and left later tests without a usable CUDA context (5-T11)."""
+    import subprocess
+    import sys
+    import textwrap
+
+    child = textwrap.dedent(f"""
+        import importlib.util, json
+        spec = importlib.util.spec_from_file_location('_polar1s_stress_child', {str(Path(__file__))!r})
+        module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+        print(json.dumps(module._polar1s_stress_check({structure!r})))
+        """)
+    root = Path(__file__).resolve().parents[2]
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join(filter(None, [str(root), str(root / "tests"),
+                                                                    os.environ.get("PYTHONPATH")])),
+               PYTHONDONTWRITEBYTECODE="1")
+    result = subprocess.run([sys.executable, "-c", child], cwd=root, env=env, capture_output=True, text=True,
+                            timeout=3600, check=False)
+    assert result.returncode == 0, result.stdout[-3000:] + result.stderr[-6000:]
+    check = json.loads(result.stdout.strip().splitlines()[-1])
+    print(json.dumps(check))
+    assert check["passed"] and check["kset"] == "frozen"
+    assert check["max_abs"] <= 1e-7, check["max_abs"]
+
+
+def _polar1s_stress_check(structure):
+    """The float64 self-test in this process: what the test above asserts on (JSON-serialisable)."""
     import importlib.util
 
     from fastmace.reference import calculators
@@ -101,7 +129,6 @@ def test_polar1s_stress_check_passes_on_the_gate_configuration(structure):
     atoms = tool.configurations(structure, (3, 3, 3), ("gate",))["gate"]
     reference = calculators.load("polar1-s", atoms, dtype="float64", device="cuda:0")
     check = reference.check_stress_fix(atoms, h=1e-4)
-    print(json.dumps({"structure": structure, "natoms": len(atoms),
-                      **{key: check[key] for key in ("max_abs", "strain", "kset", "k_vectors_included")}}))
-    assert check["passed"] and check["kset"] == "frozen"
-    assert check["max_abs"] <= 1e-7, check["max_abs"]
+    return json.loads(json.dumps({"structure": structure, "natoms": len(atoms), "passed": bool(check["passed"]),
+                                  **{key: check[key] for key in ("max_abs", "strain", "kset", "k_vectors_included")}},
+                                 default=lambda value: value.tolist() if hasattr(value, "tolist") else str(value)))
