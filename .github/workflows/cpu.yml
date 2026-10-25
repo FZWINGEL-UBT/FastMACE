@@ -66,4 +66,4 @@ jobs:
       - name: Tests
         env:
           CUDA_VISIBLE_DEVICES: ""
-        run: python -m pytest -n auto -rs tests/cpu tests/gpu
+        run: python -m pytest -n auto --dist=load --maxschedchunk=1 -rs tests/cpu tests/gpu

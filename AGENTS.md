@@ -113,12 +113,14 @@ took longer than the app's five-minute start limit (SPEC §18 decision 1).
 - **CPU suite:** from the repository root,
 
   ```bash
-  CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 tests/cpu
+  CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 --dist=load --maxschedchunk=1 tests/cpu
   ```
 
   At most 8 workers locally (WSL has 15 GB RAM); check free memory first, and
   never run two suites at once. While sibling workers are running, use at
   most `-n 2`.
+  Keep `--dist=load --maxschedchunk=1`: the CPU suite mixes very short tests
+  with long MC statistics cases, and large consecutive batches leave workers idle.
 - **GPU tests and benchmarks** are scheduled by the conductor, one job per
   idle GPU. Timing comparisons count only from alternating A/B blocks in one
   process on an otherwise idle GPU (cross-process noise is about 3%).

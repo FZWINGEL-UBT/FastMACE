@@ -42,7 +42,7 @@ Run the CPU suite from the repository root (at most 8 workers locally, at
 most 2 while other sessions run tests):
 
 ```bash
-CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 tests/cpu
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 --dist=load --maxschedchunk=1 tests/cpu
 ```
 
 Never install FastMACE into the GPU environments; GPU runs use
@@ -201,6 +201,15 @@ Review the diff of the golden files and commit it with the change. Tasks that fi
 of the plan text (5-T03's memory line, 5-T07's tier switches, 5-T09's calibration line) update
 the files this way.
 
+## CPU test scheduling
+
+Use `--dist=load --maxschedchunk=1` with xdist, keeping the local limit of eight workers and
+`OMP_NUM_THREADS=2`. The suite mixes thousands of short tests with long MC statistical cases. The default
+scheduler queues large consecutive batches (162 cases per worker in a 5,199-case, eight-worker run), so
+the MC cases can occupy one worker while the others finish. Small scheduling chunks spread that work
+without dropping cases, shortening trajectories or changing tolerances. They do not increase the worker
+limit. Timing evidence and the coverage comparison are recorded in `docs/validation/6-T16.md`.
+
 ## Bitwise equality in CPU float64 tests
 
 Found in task 0-T04 (17 October 2026, `fastmace_cpu`, torch 2.14.1+cpu,
@@ -246,12 +255,12 @@ together with SPEC §4.1.
 
 Each cell installs torch first, then `pip install -e ".[dev]"`, runs
 `ruff check fastmace tests` and then
-`CUDA_VISIBLE_DEVICES='' pytest -n auto tests/cpu tests/gpu`; the GPU tests
+`CUDA_VISIBLE_DEVICES='' pytest -n auto --dist=load --maxschedchunk=1 tests/cpu tests/gpu`; the GPU tests
 skip. The same checks locally, from the repository root:
 
 ```bash
 ~/environments/fastmace_cpu/bin/ruff check fastmace tests
-CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 tests/cpu tests/gpu
+CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 --dist=load --maxschedchunk=1 tests/cpu tests/gpu
 ```
 
 Ruff's rules are in `pyproject.toml` (`E`, `W`, `F`, `I`, line length 120).
@@ -471,7 +480,7 @@ tags (`fastmace-5`, ...) stay as they are; `v0.1.0` is `fastmace-5`'s library wi
    ```bash
    ~/environments/fastmace_cpu/bin/ruff check fastmace tests
    CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 \
-     ~/environments/fastmace_cpu/bin/python -m pytest -n 8 tests/cpu tests/gpu
+     ~/environments/fastmace_cpu/bin/python -m pytest -n 8 --dist=load --maxschedchunk=1 tests/cpu tests/gpu
    ```
 
 2. Tag: `git tag -a v0.1.0 -m "FastMACE 0.1.0"` and `git push origin v0.1.0`.

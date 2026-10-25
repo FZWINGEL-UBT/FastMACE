@@ -147,7 +147,7 @@ phase 1a checkpoint 3 (after T19: `main.py` default and shims).
    `git worktree add --detach D:/Margraf/fastmace-trial main`, then
    `git merge --no-ff origin/fastmace/<a> origin/fastmace/<b> ...`.
 3. In WSL, from the trial worktree:
-   `CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=<trial> FASTMACE_BASELINE=$HOME/fastmace-baseline/20261017 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 -q tests/cpu tests/gpu`,
+   `CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=<trial> FASTMACE_BASELINE=$HOME/fastmace-baseline/20261017 ~/environments/fastmace_cpu/bin/python -m pytest -n 8 --dist=load --maxschedchunk=1 -q tests/cpu tests/gpu`,
    then the same with `~/environments/mace_cueq_latest/bin/python` on
    `tests/cpu`, then `~/environments/fastmace_cpu/bin/ruff check fastmace tests`.
    Run once more, alone, any test that passes only in the full run:
