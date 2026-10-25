@@ -25,9 +25,12 @@ SUBPACKAGES = (
 
 
 def test_version():
+    import re
+
     import fastmace
 
-    assert fastmace.__version__ == "0.0.1.dev0"
+    # PEP 440 release or pre/dev release; the number itself is set per release (6-T12, CHANGELOG.md).
+    assert re.fullmatch(r"\d+\.\d+\.\d+((a|b|rc)\d+)?(\.post\d+)?(\.dev\d+)?", fastmace.__version__)
 
 
 @pytest.mark.parametrize("name", SUBPACKAGES)

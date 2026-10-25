@@ -84,6 +84,13 @@ notice; D8.2 (b) mark the ASE ports LGPL-2.1+ and say so in NOTICE.md.
 **Ready now (no decision needed):** T01, T02, T08, T09, T11. T05 and T07 may begin on content; only the docs
 builder waits for D6.
 
+## Known flakes (25 October 2026)
+
+- `tests/cpu/test_acceptance_3b.py::test_a_stopped_job_keeps_its_results_and_junit[SIGINT|SIGHUP]`: timed out
+  (60 s `communicate`) in the full `-n 8` suite after the 6-T04/T12/T14 merges, while the file is unchanged since
+  3b-T10; passes alone (3 of 3, and 33 of 33 with its neighbours). A load-sensitive timeout, not a regression.
+  To fix in 6-T13 (raise the timeout or mark it to run outside xdist).
+
 ## Rules carried over (phase 5)
 
 Tests and merges, GPU reservations (`tools/ci/local_gpu.py run`), timing (alternating blocks, RTX 5060 Ti only),
