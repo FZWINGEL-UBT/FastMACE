@@ -16,16 +16,16 @@ PYTHONS=${PYTHONS:-"cp310-cp310 cp311-cp311 cp312-cp312"}
 TORCH_INDEX=https://download.pytorch.org/whl/cu130
 # CUDA 13 header/library wheels pinned to the ones torch 2.14.1+cu130 requires (mace_cueq_oeq).
 NVIDIA_PINS="nvidia-cuda-runtime==13.0.96 nvidia-cuda-nvrtc==13.0.88 nvidia-cuda-cccl==13.0.85 \
-nvidia-cublas==13.1.1.3 nvidia-cusparse==12.6.3.3 nvidia-cusolver==12.0.4.66 nvidia-cufft==12.0.0.61 \
-nvidia-curand==10.4.0.35"
+nvidia-cuda-crt==13.0.88 nvidia-cublas==13.1.1.3 nvidia-cusparse==12.6.3.3 nvidia-cusolver==12.0.4.66 \
+nvidia-cufft==12.0.0.61 nvidia-curand==10.4.0.35"  # ATen/cuda/CUDAContextLight.h includes their headers
 
 export PIP_CACHE_DIR=/work/pip-cache PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONDONTWRITEBYTECODE=1
 mkdir -p /work /out
 cd /work
 
 # CUDA headers and link libraries, shared by every Python (they are pure C).
-if [ ! -f /work/cuda/nvidia/cu13/include/cuda.h ]; then
-  /opt/python/cp312-cp312/bin/python -m pip install --no-deps --target /work/cuda $NVIDIA_PINS
+if [ ! -f /work/cuda/nvidia/cu13/include/cusparse.h ] || [ ! -f /work/cuda/nvidia/cu13/include/crt/host_defines.h ]; then
+  /opt/python/cp312-cp312/bin/python -m pip install --upgrade --no-deps --target /work/cuda $NVIDIA_PINS
 fi
 CU13=/work/cuda/nvidia/cu13
 ls "$CU13/include/cuda.h" "$CU13/include/nvrtc.h" "$CU13/lib/libcudart.so.13" >/dev/null
