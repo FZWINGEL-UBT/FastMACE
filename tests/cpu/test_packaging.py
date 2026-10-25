@@ -51,6 +51,9 @@ def test_wheel_contents(dist):
         names = set(zf.namelist())
     _check(names)
     assert any(n.endswith(".dist-info/entry_points.txt") for n in names)
+    # Every licence and notice (6-T13): the MIT licence, the LGPL text and NOTICE.md naming the LGPL files.
+    for name in ("LICENSE", "NOTICE.md", "LICENSES/LGPL-2.1-or-later.txt"):
+        assert any(n.endswith(".dist-info/licenses/" + name) for n in names), name
 
 
 def test_sdist_contents(dist):
@@ -58,4 +61,4 @@ def test_sdist_contents(dist):
     with tarfile.open(sdist) as tf:
         names = {n.split("/", 1)[1] for n in tf.getnames() if "/" in n}
     _check(names)
-    assert {"pyproject.toml", "README.md", "LICENSE"} <= names
+    assert {"pyproject.toml", "README.md", "LICENSE", "NOTICE.md", "LICENSES/LGPL-2.1-or-later.txt"} <= names
