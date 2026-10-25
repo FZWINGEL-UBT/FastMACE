@@ -1,0 +1,82 @@
+{
+  "provider": "colab",
+  "date_utc": "2026-10-25T13:02:09Z",
+  "session": "fm-l4-20261025-130209-9ac911",
+  "gpu": "L4",
+  "commit": "c1f4de9c50fee98220497aa84e8c44ad1a04d99c",
+  "requested_commit": "c1f4de9c",
+  "commands_text": [
+    "python tools/ab_step_time.py --sides fastmace --model mh1-r2scan --checkpoint $FASTMACE_MODELS/mace-mh-1.model --structures NaCl NaNbO3 NbCl5 --output $OUT/mh1-r2scan > $OUT/mh1-r2scan.log 2>&1; echo \"mh1-r2scan exit $?\"; python tools/ab_step_time.py --sides fastmace --model mp0-medium --checkpoint $FASTMACE_MODELS/2023-12-03-mace-128-L1_epoch-199.model --structures NaCl NaNbO3 NbCl5 --output $OUT/mp0-medium > $OUT/mp0-medium.log 2>&1; echo \"mp0-medium exit $?\"; python tools/ab_step_time.py --sides fastmace --model mpa0-medium --checkpoint $FASTMACE_MODELS/mace-mpa-0-medium.model --structures NaCl NaNbO3 NbCl5 --output $OUT/mpa0-medium > $OUT/mpa0-medium.log 2>&1; echo \"mpa0-medium exit $?\"; python tools/ab_step_time.py --sides fastmace --model omat0-medium --checkpoint $FASTMACE_MODELS/mace-omat-0-medium.model --structures NaCl NaNbO3 NbCl5 --output $OUT/omat0-medium > $OUT/omat0-medium.log 2>&1; echo \"omat0-medium exit $?\"; python tools/ab_step_time.py --sides fastmace --model polar1-s --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-S.model --structures NaCl NaNbO3 NbCl5 --output $OUT/polar1-s > $OUT/polar1-s.log 2>&1; echo \"polar1-s exit $?\"; "
+  ],
+  "commands": [
+    {
+      "command": "python tools/ab_step_time.py --sides fastmace --model mh1-r2scan --checkpoint $FASTMACE_MODELS/mace-mh-1.model --structures NaCl NaNbO3 NbCl5 --output $OUT/mh1-r2scan > $OUT/mh1-r2scan.log 2>&1; echo \"mh1-r2scan exit $?\"; python tools/ab_step_time.py --sides fastmace --model mp0-medium --checkpoint $FASTMACE_MODELS/2023-12-03-mace-128-L1_epoch-199.model --structures NaCl NaNbO3 NbCl5 --output $OUT/mp0-medium > $OUT/mp0-medium.log 2>&1; echo \"mp0-medium exit $?\"; python tools/ab_step_time.py --sides fastmace --model mpa0-medium --checkpoint $FASTMACE_MODELS/mace-mpa-0-medium.model --structures NaCl NaNbO3 NbCl5 --output $OUT/mpa0-medium > $OUT/mpa0-medium.log 2>&1; echo \"mpa0-medium exit $?\"; python tools/ab_step_time.py --sides fastmace --model omat0-medium --checkpoint $FASTMACE_MODELS/mace-omat-0-medium.model --structures NaCl NaNbO3 NbCl5 --output $OUT/omat0-medium > $OUT/omat0-medium.log 2>&1; echo \"omat0-medium exit $?\"; python tools/ab_step_time.py --sides fastmace --model polar1-s --checkpoint $FASTMACE_MODELS/MACE-POLAR-1-S.model --structures NaCl NaNbO3 NbCl5 --output $OUT/polar1-s > $OUT/polar1-s.log 2>&1; echo \"polar1-s exit $?\"; ",
+      "exit": 0,
+      "wall_s": 1556
+    }
+  ],
+  "exit": 0,
+  "stack": "f00d5798f8b5",
+  "models": [
+    "mh-1",
+    "medium",
+    "medium-mpa-0",
+    "medium-omat-0",
+    "polar-1-s"
+  ],
+  "out": "/home/fzwin/fastmace-colab-runs/6-T08-l4-steptime-20261025",
+  "timings": {
+    "allocate_s": 4.9,
+    "upload_s": 50.3,
+    "setup_step_s": 46,
+    "cache_restore_s": 510.8,
+    "pack_download_s": 53.7,
+    "unpack_s": 0.7,
+    "install_s": 35.7,
+    "models_s": 4.8
+  },
+  "cu_before": 32.11,
+  "rate_per_h": 0.0,
+  "active_before": 0,
+  "gpu_name": "NVIDIA L4",
+  "driver": "580.82.07",
+  "gpu_memory": "23034 MiB",
+  "capability": "8.9",
+  "cuda_driver": "13.0",
+  "cpus": 12,
+  "ram_gib": 53.0,
+  "cache_key": "sm89-py310-f00d5798f8b5",
+  "cache_hit": true,
+  "cache_bytes_in": 681389922,
+  "setup_s": 637.1,
+  "cache_bytes_out": 77332973,
+  "cache_saved": true,
+  "environment": {
+    "python": "3.10.22",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance_torch": "0.12.0",
+      "openequivariance": "0.7.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "ase": "3.27.0",
+      "numpy": "2.2.6",
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0"
+    },
+    "torch_cuda": "13.0",
+    "cuda_available": true,
+    "pip_freeze_sha256": "2b05fb7fcb3cfc72dd0880fc327e6e81c097f29c86389b2a5f416286392d0b08",
+    "unpack_s": 0.7,
+    "install_s": 35.7,
+    "models_s": 4.8
+  },
+  "env_matches_manifest": true,
+  "stopped": true,
+  "cu_after": 31.19,
+  "active_after": 0,
+  "wall_s": 2262.5,
+  "cu_used": 0.92
+}
