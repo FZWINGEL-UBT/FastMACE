@@ -462,16 +462,16 @@ with the owner. (GitHub's notes: "Secure use reference", self-hosted runner hard
 
 ## Releasing
 
-Plan task 6-T12; owner decisions D2 (reserve `fastmace` on PyPI with `0.1.0` from `fastmace-5`) and D7 (hosted
-CI stays off; the suite runs locally before each tag).
+Plan task 6-T12; D7 keeps hosted CI off and requires the local suite before each tag. The planned 0.1.0
+name reservation was not published; the owner authorized tagging and publishing 1.0.0 after acceptance.
 
 **Version.** `fastmace/__init__.py`'s `__version__` is the only place the version is written;
 `pyproject.toml` reads it (`[tool.setuptools.dynamic] version = { attr = "fastmace.__version__" }`), and
 `fastmace --version`, `fastmace doctor` and the provenance records report it. Semantic versioning, 0.x while the
 API may change. A release commit sets the version, moves `CHANGELOG.md`'s "Unreleased" entries under the new
 version and date, and is tagged `v<version>` (annotated). Development after it may set `<next>.dev0`. The phase
-tags (`fastmace-5`, ...) stay as they are; `v0.1.0` is `fastmace-5`'s library with the phase 6 release metadata
-(version, licence expression, LGPL headers).
+tags (`fastmace-5`, ...) stay as they are. The 1.0.0 tag includes the phase-6 packaging, licence metadata
+and Python 3.10–3.13 prebuilt OEq extension support.
 
 **Steps** (in WSL, from the repository root, on the commit to tag):
 
@@ -483,17 +483,18 @@ tags (`fastmace-5`, ...) stay as they are; `v0.1.0` is `fastmace-5`'s library wi
      ~/environments/fastmace_cpu/bin/python -m pytest -n 8 --dist=load --maxschedchunk=1 tests/cpu tests/gpu
    ```
 
-2. Tag: `git tag -a v0.1.0 -m "FastMACE 0.1.0"` and `git push origin v0.1.0`.
-3. Build and check: `tools/release/make_release.sh v0.1.0`. It extracts the tag with `git archive` into a new
+2. Tag: `git tag -a v1.0.0 -m "FastMACE 1.0.0"` and `git push origin v1.0.0`.
+3. Build and check: `tools/release/make_release.sh v1.0.0`. It extracts the tag with `git archive` into a new
    directory under `~/tmp`, runs `python -m build` (sdist and wheel) and `twine check --strict`, checks the file
    names carry the version, prints the SHA-256 sums and the upload command. **It never uploads.** Optionally,
    `.github/workflows/release.yml` (manual `workflow_dispatch` only, no secrets) builds and checks the same
    artifacts on GitHub and keeps them for 14 days; it has no publish step either.
-4. Upload (the owner only, with their own PyPI API token, scoped to the project once it exists):
+4. Upload with an authorized maintainer's PyPI token: publish the four `fastmace-oeq-ext` wheels first,
+   then FastMACE's wheel and sdist. Twine prompts for the token without putting it in shell history:
 
    ```bash
-   TWINE_USERNAME=__token__ TWINE_PASSWORD=<pypi-token> \
-     ~/environments/fastmace_cpu/bin/python -m twine upload ~/tmp/fastmace-release-v0.1.0-*/dist/*
+   TWINE_USERNAME=__token__ \
+     ~/environments/fastmace_cpu/bin/python -m twine upload ~/tmp/fastmace-release-v1.0.0-*/dist/*
    ```
 
    Never commit or log the token. Try TestPyPI first if in doubt (`--repository testpypi`, a TestPyPI token).

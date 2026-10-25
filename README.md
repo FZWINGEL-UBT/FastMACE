@@ -17,16 +17,18 @@ run = fm.md("NaCl.cif", model="mh1", head="matpes_r2scan", ensemble="NVT",
 print(run.summary)
 ```
 
-Documentation: build it with `mkdocs build --strict` (see [docs/install.md](docs/install.md));
-start with [docs/quickstart.md](docs/quickstart.md).
+Documentation: [user guide and API reference](https://fzwingel-ubt.github.io/FastMACE/).
+Start with [docs/quickstart.md](docs/quickstart.md), or build the site locally with `mkdocs build --strict`.
 
 ## Status (25 October 2026)
 
-Pre-1.0. Phases 0 to 5 are accepted: extraction of the research engine,
+Version **1.0.0**. Phases 0 to 5 are accepted: extraction of the research engine,
 contracts, safety (gates, fallback, durable restarts, provenance), MC and
 the remaining integrators, D3, relaxations and the planner with runtime
-adaptation. Phase 6 (release: packaging, documentation, examples) is in
-progress. The design is in [SPEC.md](SPEC.md), progress in
+adaptation. Phase 6's packaging, documentation, examples and clean-install acceptance checks passed,
+including the prebuilt hybrid backend on Python 3.13. See the
+[acceptance report](docs/validation/phase-6.md) for qualification limits and known findings.
+The design is in [SPEC.md](SPEC.md), progress in
 [plans/README.md](plans/README.md).
 
 ## Why FastMACE

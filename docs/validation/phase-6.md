@@ -90,7 +90,10 @@ boundary. The original Colab Python 3.13 failure below remains the acceptance-ru
 
 ## Steps left for the owner
 
-1. Decide F1 (a, b or c).
-2. Merge `fastmace/6-T13`, then tag `v1.0.0` on the merge (`docs/development.md`, "Releasing").
+1. F1 option (b) was selected and implemented in 6-T15; the 3.13 wheel is merged. The complete CPU suite
+   passed after 6-T15: 4,655 passed, 553 skipped, now 13 min 51 s with 6-T16's scheduling.
+   A fresh Colab L4 Python 3.13 clean install also passed with the prebuilt hybrid and no C++ build calls.
+2. `fastmace/6-T13`, 6-T15 and 6-T16 are merged. The owner has authorized tagging `v1.0.0`
+   (`docs/development.md`, "Releasing"), publication and docs deployment.
 3. `tools/release/make_release.sh v1.0.0`, upload `fastmace-oeq-ext` 0.7.0.post1 (6-T04's wheels) before
    `fastmace` 1.0.0, since `[oeq]` depends on it, then upload `fastmace`. Optionally deploy the docs.

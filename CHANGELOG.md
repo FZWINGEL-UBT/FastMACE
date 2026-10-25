@@ -28,10 +28,11 @@ in 0.1.0 (torch 2.14.1+cu130 only, owner decision D3); Linux x86_64, NVIDIA GPUs
 - The accuracy gate's reference child loads an explicit checkpoint path outside `$FASTMACE_MODELS` (6-T14).
 - Development status "Production/Stable".
 
-## [0.1.0] - 2026-10-25
+## [0.1.0] - Planned, not published
 
-Name reservation on PyPI (owner decision D2): the library of the tag `fastmace-5` plus the release metadata below,
-tagged `v0.1.0` (the `fastmace-5` tree still says `0.0.1.dev0` and `license = "MIT"`). Alpha: the library is
+The planned name reservation on PyPI (owner decision D2) was superseded by the 1.0.0 release; no `v0.1.0`
+tag or PyPI upload was made. The proposal was the library of `fastmace-5` plus the release metadata below
+(the `fastmace-5` tree still says `0.0.1.dev0` and `license = "MIT"`). Alpha: the library was
 validated on the qualified stack (torch 2.14.1+cu130, mace-torch 0.3.16, cuEquivariance 0.12.0,
 OpenEquivariance 0.7.0, ASE 3.27.0) on NVIDIA GPUs. Phase acceptance reports are in `docs/validation/phase-*.md`.
 

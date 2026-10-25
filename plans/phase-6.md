@@ -1,5 +1,10 @@
 # Phase 6: Release
 
+**Current status:** acceptance passed; 6-T15 adds the validated Python 3.13 wheel, and 6-T16 reduces the
+complete local CPU suite from 33 minutes to 14 minutes with all prior tests preserved. The owner authorized
+the 1.0.0 tag, PyPI publication and docs deployment. The inventory and decision history below describe the
+start of this phase; current evidence is in `docs/validation/phase-6.md`, `6-T15.md` and `6-T16.md`.
+
 Status: **decided**, 25 October 2026 (owner, 14:35 UTC: D1–D8 below). Written by the conductor after the phase 5 acceptance (tag `fastmace-5`,
 `d304834c`).
 Spec: [SPEC.md](../SPEC.md) §16 row "6. Release", and the sections it cites:
@@ -12,7 +17,7 @@ Spec: [SPEC.md](../SPEC.md) §16 row "6. Release", and the sections it cites:
 Acceptance (§16): **1.0 tagged; docs build; `pip install fastmace[oeq]` on a clean machine without a compiler.**
 Estimate: 2–3 weeks (§16).
 
-## Inventory (25 October 2026)
+## Inventory at the start of phase 6 (25 October 2026)
 
 - **Name:** `fastmace` is free on PyPI (`/pypi/fastmace/json` 404). On GitHub the only repository of that name is
   ours (`FZWINGEL-UBT/FastMACE`). **The API reports it as public** (ResearchModule's AGENTS.md says private). D1.
@@ -81,7 +86,7 @@ notice; D8.2 (b) mark the ASE ports LGPL-2.1+ and say so in NOTICE.md.
 | 6-T12 Release engineering | S–M | no | T01; D2, D7 | `.github/workflows/release.yml` (new), `CHANGELOG.md` (new), `docs/development.md` (release steps) |
 | 6-T13 Acceptance and 1.0 | M | yes | all | `docs/validation/phase-6-runbook.md`, `docs/validation/phase-6.md`; tag `v1.0.0` |
 
-**Ready now (no decision needed):** T01, T02, T08, T09, T11. T05 and T07 may begin on content; only the docs
+**Initial ready list (historical):** T01, T02, T08, T09, T11. T05 and T07 may begin on content; only the docs
 builder waits for D6.
 
 ## Known flakes (25 October 2026)
