@@ -34,6 +34,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Operating System :: POSIX :: Linux",
     "Environment :: GPU :: NVIDIA CUDA",
     "Topic :: Scientific/Engineering :: Chemistry",
@@ -49,11 +50,11 @@ Issues = "https://github.com/FZWINGEL-UBT/FastMACE/issues"
 fastmace = "fastmace.cli:main"
 
 [project.optional-dependencies]
-# fastmace-oeq-ext (6-T04, D4): OEq 0.7.0's host extension prebuilt for torch 2.14.1+cu130, CPython 3.10-3.12,
+# fastmace-oeq-ext (6-T04, D4): OEq 0.7.0's host extension prebuilt for torch 2.14.1+cu130, CPython 3.10-3.13,
 # so no g++/ninja is needed; elsewhere FastMACE builds it with the host toolchain (docs/design/oeq-runtime.md).
 oeq = [
     "openequivariance>=0.7",
-    "fastmace-oeq-ext; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version < '3.13'",
+    "fastmace-oeq-ext; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version < '3.14'",
 ]
 # graph-longrange is pinned per MACE version; MACE 0.3.16 calls the 0.4.0 interface.
 polar = ["graph-longrange==0.4.0"]
@@ -63,7 +64,7 @@ d3-reference = ["torch-dftd==0.5.1", "dftd3==1.6.0"]
 # Union of [oeq], [polar] and [d3]; no packages of its own (SPEC §14).
 full = [
     "openequivariance>=0.7",
-    "fastmace-oeq-ext; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version < '3.13'",
+    "fastmace-oeq-ext; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version < '3.14'",
     "graph-longrange==0.4.0",
     "torch-dftd==0.5.1",
 ]

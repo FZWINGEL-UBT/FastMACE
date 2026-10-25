@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build OpenEquivariance 0.7.0's host extension (libtorch_tp_jit) for torch 2.14.1+cu130 and wrap it in a
-# `fastmace-oeq-ext` wheel, one per CPython 3.10/3.11/3.12. Runs INSIDE quay.io/pypa/manylinux_2_28_x86_64
+# `fastmace-oeq-ext` wheel, one per CPython 3.10/3.11/3.12/3.13. Runs INSIDE quay.io/pypa/manylinux_2_28_x86_64
 # (build.sh starts it). Layout inside the container:
 #   /src   this directory (read-only): package skeleton, this script
 #   /work  scratch (pip cache, sysroots, build trees), a docker volume
@@ -12,7 +12,7 @@ TORCH_VERSION=${TORCH_VERSION:-2.14.1+cu130}
 OEQ_VERSION=${OEQ_VERSION:-0.7.0}
 PYBIND11_VERSION=${PYBIND11_VERSION:-3.1.0}
 EXT_VERSION=${EXT_VERSION:-0.7.0.post1}  # <OEq version>.post<N>: rebuilds of the same OEq
-PYTHONS=${PYTHONS:-"cp310-cp310 cp311-cp311 cp312-cp312"}
+PYTHONS=${PYTHONS:-"cp310-cp310 cp311-cp311 cp312-cp312 cp313-cp313"}
 TORCH_INDEX=https://download.pytorch.org/whl/cu130
 # CUDA 13 header/library wheels pinned to the ones torch 2.14.1+cu130 requires (mace_cueq_oeq).
 NVIDIA_PINS="nvidia-cuda-runtime==13.0.96 nvidia-cuda-nvrtc==13.0.88 nvidia-cuda-cccl==13.0.85 \

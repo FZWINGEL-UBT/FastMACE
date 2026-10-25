@@ -86,6 +86,10 @@ builder waits for D6.
 
 ## Known flakes (25 October 2026)
 
+**6-T15, owner follow-up:** add the CPython 3.13 `fastmace-oeq-ext` wheel (F1 option b), update both extras'
+dependency markers and validate an installed wheel on the local GPU. This extends D4's Python range to
+3.10–3.13; torch/CUDA, OEq, architecture and platform stay as decided. Publishing remains a separate step.
+
 - `tests/cpu/test_acceptance_3b.py::test_a_stopped_job_keeps_its_results_and_junit[SIGINT|SIGHUP]`: timed out
   (60 s `communicate`) in the full `-n 8` suite after the 6-T04/T12/T14 merges, while the file is unchanged since
   3b-T10; passes alone (3 of 3, and 33 of 33 with its neighbours). A load-sensitive timeout, not a regression.

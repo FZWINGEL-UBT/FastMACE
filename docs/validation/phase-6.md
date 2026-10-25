@@ -67,6 +67,11 @@ no tag was made, and the docs were not deployed.
 
 ## Open findings
 
+**F1 follow-up (6-T15):** the owner selected option (b), adding a CPython 3.13 wheel. The wheel, extras'
+markers and documentation have been updated and a fresh Python 3.13 installation passed the local hybrid
+GPU smoke with no g++/Ninja/nvcc calls. See [6-T15.md](6-T15.md) for the artefact, evidence and qualification
+boundary. The original Colab Python 3.13 failure below remains the acceptance-run history.
+
 - **F1 (owner decision, before or with the tag): Python 3.13.** Colab's system Python, and the current default of
   several distributions, is 3.13. `fastmace` declares `requires-python >=3.10` and the cp313 classifier is absent,
   but its `[oeq]` marker skips `fastmace-oeq-ext` on 3.13. With no prebuilt extension and no compiler the planner

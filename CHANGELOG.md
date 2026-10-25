@@ -16,7 +16,7 @@ in 0.1.0 (torch 2.14.1+cu130 only, owner decision D3); Linux x86_64, NVIDIA GPUs
 ### Added
 
 - `fastmace-oeq-ext` (6-T04): OpenEquivariance 0.7.0's host extension prebuilt for torch 2.14.1+cu130 and
-  CPython 3.10-3.12, pulled in by `pip install "fastmace[oeq]"`; no C++ compiler, ninja or nvcc is needed.
+  CPython 3.10-3.13, pulled in by `pip install "fastmace[oeq]"`; no C++ compiler, ninja or nvcc is needed.
   `fastmace doctor` and the `oeq_runtime` patch record say whether the extension is prebuilt or built.
 - User documentation and API reference as a MkDocs Material site (6-T05, 6-T06), examples (6-T07),
   benchmark tables (6-T08), licences and notices (6-T02), upstream PR drafts (6-T10).

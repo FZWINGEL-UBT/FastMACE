@@ -1,7 +1,7 @@
 # Prebuilt OEq host-extension wheels: `fastmace-oeq-ext` (plan task 6-T04)
 
 Owner decisions (plans/phase-6.md): **D3 (a)** torch 2.14.1+cu130 only; **D4 (a)** prebuilt wheels on PyPI as a
-separate package `fastmace-oeq-ext`, Linux x86_64, CPython 3.10 to 3.12.
+separate package `fastmace-oeq-ext`, Linux x86_64, CPython 3.10 to 3.13.
 
 ## What it is
 
@@ -15,6 +15,7 @@ unmodified sources against torch 2.14.1+cu130, one wheel per CPython:
 | --- | --- | --- |
 | `fastmace_oeq_ext-0.7.0.post1-cp310-cp310-manylinux_2_28_x86_64.whl` | cp310 | `fastmace_oeq_ext/{__init__.py, libtorch_tp_jit.so, manifest.json, LICENSE.openequivariance, BUILD_COMPILER.txt}` |
 | `...-cp311-cp311-...` / `...-cp312-cp312-...` | cp311 / cp312 | the same |
+| `...-cp313-cp313-...` | cp313 | the same; Python 3.13 support added by 6-T15 |
 
 `dependencies = ["torch==2.14.1", "openequivariance==0.7.0"]`. Licence `MIT AND BSD-3-Clause`: the packaging
 is FastMACE's MIT, the library OEq's BSD-3 (its licence ships in the wheel, as BSD-3 clause 2 requires for
@@ -42,7 +43,7 @@ the wheel was not used (`extension["prebuilt_skipped"]`).
   (<path>)` or `host extension: built|reused|raced|in-process`.
 
 `pip install "fastmace[oeq]"` pulls `fastmace-oeq-ext` with the marker
-`sys_platform == 'linux' and platform_machine == 'x86_64' and python_version < '3.13'`. On another torch
+`sys_platform == 'linux' and platform_machine == 'x86_64' and python_version < '3.14'`. On another torch
 pip refuses to resolve (`torch==2.14.1` pin); install `openequivariance` alone to use the toolchain build.
 
 ## Building

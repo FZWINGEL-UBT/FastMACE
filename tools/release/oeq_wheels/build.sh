@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build the fastmace-oeq-ext wheels (CPython 3.10-3.12, torch 2.14.1+cu130) in a manylinux_2_28 container.
+# Build the fastmace-oeq-ext wheels (CPython 3.10-3.13, torch 2.14.1+cu130) in a manylinux_2_28 container.
 #
 #   tools/release/oeq_wheels/build.sh [OUTPUT_DIR]      (default ~/tmp/6-T04/wheels)
 #

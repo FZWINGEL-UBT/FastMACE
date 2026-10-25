@@ -78,7 +78,7 @@ pip install "fastmace[full]"
 fastmace doctor
 ```
 
-FastMACE 1.0 supports torch 2.14.1+cu130 and Python 3.10 to 3.12 on Linux.
+FastMACE 1.0 supports torch 2.14.1+cu130 and Python 3.10 to 3.13 on Linux.
 Extras: `[oeq]` (OpenEquivariance hybrid backend), `[polar]` (PolarMACE),
 `[d3]` (torch-dftd reference), `[full]` (all three), `[dev]` and `[docs]`.
 For development: `pip install -e ".[dev]"`.
