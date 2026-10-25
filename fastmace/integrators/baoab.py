@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/md/langevinbaoab.py (LangevinBAOAB), LGPL-2.1-or-later; see NOTICE.md.
 """ASE's ``LangevinBAOAB`` (NPT) as graph-capturable half steps on a SimulationState (SPEC §10.2).
 
 ASE's LangevinBAOAB (ASE 3.27) integrates atoms with BAOAB Langevin dynamics (Leimkuhler and

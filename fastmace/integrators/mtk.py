@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/md/nose_hoover_chain.py (IsotropicMTKNPT, MTKNPT), LGPL-2.1-or-later; see NOTICE.md.
 """ASE 3.27's ``IsotropicMTKNPT`` and ``MTKNPT`` as graph-capturable half steps on a SimulationState (SPEC §10.2).
 
 Martyna-Tobias-Klein NPT (Martyna, Tobias and Klein 1994) with Nose-Hoover chains on the atoms and on the

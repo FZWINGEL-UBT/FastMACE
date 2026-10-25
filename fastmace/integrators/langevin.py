@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/md/langevin.py (Langevin), LGPL-2.1-or-later; see NOTICE.md.
 """ASE's ``Langevin`` (NVT, fixed cell) as graph-capturable half steps on a SimulationState (SPEC §10.2).
 
 The maths of the research engine's ``GPULangevin``, which reproduces ``ase.md.langevin.Langevin``

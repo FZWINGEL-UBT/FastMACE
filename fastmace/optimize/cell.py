@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/filters.py (FrechetCellFilter), LGPL-2.1-or-later; see NOTICE.md.
 """ASE 3.27's ``FrechetCellFilter`` as a device ``DOFView`` (SPEC §10.3; plan task 4-T07).
 
 The degrees of freedom are ASE's (N + 3) x 3 rows: the positions in the original cell, ``u = r F^-T``, and the

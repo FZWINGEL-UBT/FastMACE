@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/optimize/lbfgs.py (LBFGS), LGPL-2.1-or-later; see NOTICE.md.
 """ASE 3.27's ``LBFGS`` on the device (SPEC §10.3; plan task 4-T05).
 
 ASE's step, at iteration ``k`` with positions ``x``, gradient ``g`` (minus the constraint-adjusted forces) and

@@ -107,8 +107,17 @@ torch-dftd derived its file was not traced (**uncertain**). Public sources show:
 3. Ported ASE code: the FastMACE integrators and optimisers port ASE 3.27's
    algorithms to the GPU for agreement to rounding. If any port is a close
    enough translation to be a derived work of LGPL-2.1-or-later code, that
-   file would be LGPL, not MIT. Not assessed here in detail; the owner may
-   want a review of `fastmace/integrators/` and `fastmace/optimize/` before
-   release.
+   file would be LGPL, not MIT. **Decided (owner D8.2, 25 October 2026; task
+   6-T02b):** the ports are marked LGPL-2.1-or-later. The 13 files are:
+   `fastmace/integrators/{langevin,baoab,berendsen,csvr,nose_hoover,mtk,nve}.py`,
+   `fastmace/optimize/{fire,lbfgs,cell}.py`, `fastmace/reference/integrators.py`
+   and `fastmace/kernels/triton/{fused_integrator,nose_hoover_chain}.py`.
+   Each carries `# SPDX-License-Identifier: LGPL-2.1-or-later` and a line
+   naming the ASE source it ports; NOTICE.md lists them, the licence text is
+   `LICENSES/LGPL-2.1-or-later.txt`, and `pyproject.toml` declares
+   `license = "MIT AND LGPL-2.1-or-later"`. `tests/cpu/test_lgpl_headers.py`
+   keeps the headers, NOTICE.md and the licence expression in step. Found by
+   searching `fastmace/` for ASE provenance in docstrings ("ASE 3.27's ...",
+   "port"); the `fastmace/ase/` shims mirror ASE's signatures and stay MIT.
 
 No change to what ships was made by this task.

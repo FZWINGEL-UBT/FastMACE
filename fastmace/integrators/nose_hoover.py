@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/md/nose_hoover_chain.py (NoseHooverChainNVT), LGPL-2.1-or-later; see NOTICE.md.
 """ASE 3.27's ``NoseHooverChainNVT`` as graph-capturable half steps on a SimulationState (SPEC §10.2).
 
 ASE's step (``ase/md/nose_hoover_chain.py``) is a Trotter splitting of the Nose-Hoover chain equations

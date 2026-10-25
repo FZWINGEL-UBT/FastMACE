@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/optimize/fire.py (FIRE), LGPL-2.1-or-later; see NOTICE.md.
 """ASE 3.27's ``FIRE`` on a ``DOFView``, graph-capturable (SPEC §10.3; plan task 4-T06).
 
 ASE's ``FIRE.step`` branches on host floats: whether ``v.f > 0``, whether ``Nsteps > Nmin``, whether the step

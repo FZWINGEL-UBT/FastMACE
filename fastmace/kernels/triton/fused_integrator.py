@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: ASE 3.27's Langevin step (ase/md/langevin.py) as Triton kernels, via fastmace/integrators/langevin.py;
+# LGPL-2.1-or-later; see NOTICE.md.
 """The integrator stage of a fixed-cell Langevin step in a few kernels (opt-3 OPT3-T03; exact).
 
 ``GraphEngine``'s AC stage (and the pipelined ACP) is about 45 small PyTorch kernels on NaCl: the first half

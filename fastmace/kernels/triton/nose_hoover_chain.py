@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: ASE 3.27's Nose-Hoover chain and MTK cell step (ase/md/nose_hoover_chain.py) as Triton kernels, via
+# fastmace/integrators/nose_hoover.py and mtk.py; LGPL-2.1-or-later; see NOTICE.md.
 """Nose-Hoover chain halves and the MTK cell's 3 x 3 exp and exprel in one Triton program each (4-T03b; exact).
 
 The PyTorch stages of ``fastmace.integrators.nose_hoover.NoseHooverChain.integrate`` and

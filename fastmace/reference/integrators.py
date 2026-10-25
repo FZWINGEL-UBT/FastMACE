@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: patches and re-derives ASE 3.27's ase/md/langevinbaoab.py (LangevinBAOAB), LGPL-2.1-or-later; see NOTICE.md.
 """Independent references for the integrator correction (SPEC §12.1 "Integrator corrections", owner decision D8).
 
 FastMACE's full-cell BAOAB drags the atom velocities with (p_eps + Tr(p_eps)/N_dof · I)/W

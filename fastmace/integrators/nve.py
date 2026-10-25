@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# Provenance: port of ASE 3.27's ase/md/verlet.py (VelocityVerlet), LGPL-2.1-or-later; see NOTICE.md.
 """ASE's ``VelocityVerlet`` (NVE) as graph-capturable half steps on a SimulationState (SPEC §10.2; plan task 4-T02).
 
 ``first_half`` is ``VelocityVerlet.step`` up to the force call (half kick, drift), ``second_half`` the kick
