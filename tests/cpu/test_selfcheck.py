@@ -474,3 +474,46 @@ def test_a_grown_neighbour_capacity_is_rebuilt_at_the_committed_state(pristine, 
     np.testing.assert_array_equal(engine.state.positions.numpy(), plain.state.positions.numpy())
     np.testing.assert_array_equal(engine.state.cell.numpy(), plain.state.cell.numpy())
     assert engine.potential_energy() == plain.potential_energy()
+
+
+def _explicit_label_model(path, sha256):
+    """A loaded model as ``fm.load("mh1", checkpoint=path)`` records it: a label and its explicit file."""
+    import types
+
+    return types.SimpleNamespace(label="mh1-r2scan", head="matpes_r2scan", path=path, sha256=sha256, charge=None,
+                                 spin_multiplicity=None, family="mh1")
+
+
+def test_the_reference_job_carries_an_explicit_checkpoint_outside_fastmace_models(tmp_path, monkeypatch):
+    """6-T14: the gates' and MC's reference child reloads the parent's file, not the label's under $FASTMACE_MODELS."""
+    import json
+    import types
+
+    from fastmace.reference import calculators
+
+    path = tmp_path / "elsewhere" / "mace-mh-1.model"
+    path.parent.mkdir()
+    path.write_bytes(b"x")
+    monkeypatch.setenv("FASTMACE_MODELS", str(tmp_path / "empty"))
+    plan = types.SimpleNamespace(polar=None, dispersion=None, engine=EngineConfig(device="cpu"))
+    force_field = types.SimpleNamespace(model=_explicit_label_model(path, "ab" * 32))
+    job = json.loads(json.dumps(selfcheck._job(plan, force_field, [])))  # as the child reads it
+    assert job["source"] == "mh1-r2scan" and job["checkpoint"] == str(path) and job["sha256"] == "ab" * 32
+    seen = {}
+    monkeypatch.setattr(calculators, "load", lambda source, atoms, **kwargs: seen.update(source=source, **kwargs))
+    selfcheck._load_reference(job, "float64", nacl())
+    assert seen["source"] == "mh1-r2scan" and seen["checkpoint"] == str(path) and seen["sha256"] == "ab" * 32
+    path.unlink()  # a run moved to another machine: the label resolves as usual, still checked by its hash
+    selfcheck._load_reference(job, "float64", nacl())
+    assert seen["checkpoint"] is None and seen["sha256"] == "ab" * 32
+
+
+def test_the_child_refuses_an_explicit_checkpoint_with_another_sha256(tmp_path, monkeypatch):
+    from fastmace.errors import CheckpointTrustError
+    from fastmace.model import loading
+
+    path = tmp_path / "mace-mh-1.model"
+    path.write_bytes(b"not the parent's file")
+    monkeypatch.setenv("FASTMACE_MODELS", str(tmp_path / "empty"))
+    with pytest.raises(CheckpointTrustError, match="not the expected"):
+        loading.load("mh1-r2scan", checkpoint=str(path), sha256="ab" * 32, device="cpu")

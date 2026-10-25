@@ -673,6 +673,7 @@ def _job(plan, force_field, copies, *, device=None, cell="production", repeat=No
     polar = None if plan.polar is None else dataclasses.asdict(plan.polar)
     return {
         "source": model.label or str(model.path), "head": None if model.label else model.head,
+        "checkpoint": None if model.path is None else str(model.path),
         "sha256": model.sha256, "charge": model.charge, "spin_multiplicity": model.spin_multiplicity,
         "family": model.family, "device": device or plan.engine.device, "backend": plan.engine.backend,
         "polar": polar, "cell": cell, "repeat": None if repeat is None else list(repeat),
@@ -719,7 +720,13 @@ def _load_reference(job, dtype, atoms):
     """One corrected reference calculator (``fastmace.reference.calculators.load``) for ``job``'s model."""
     from fastmace.reference import calculators
 
-    return calculators.load(job["source"], atoms, dtype=dtype, device=job["device"], head=job["head"],
+    # The loaded file itself (an explicit checkpoint= outside $FASTMACE_MODELS too, 6-T14), checked by its
+    # SHA-256; a label whose recorded file is gone resolves as usual.
+    checkpoint = job.get("checkpoint")
+    if checkpoint == job["source"] or (checkpoint is not None and not os.path.isfile(checkpoint)):
+        checkpoint = None
+    return calculators.load(job["source"], atoms, checkpoint=checkpoint, dtype=dtype, device=job["device"],
+                            head=job["head"],
                             family=job["family"], polar=_polar_config(job), d3=_d3_record(job), sha256=job["sha256"],
                             charge=job["charge"], spin_multiplicity=job["spin_multiplicity"])
 

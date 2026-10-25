@@ -355,13 +355,14 @@ def finite_difference_stress(reference, atoms, h=FD_STRAIN):
 
 
 def load(source, atoms, *, dtype="float64", device="cuda:0", head=None, family=None, polar=None, d3=None,
-         sha256=None, trusted=False, charge=None, spin_multiplicity=None, environ=None):
+         sha256=None, trusted=False, charge=None, spin_multiplicity=None, environ=None, checkpoint=None):
     """A reference calculator from a checkpoint, as its record states (``fastmace.model.loading.load``).
 
     ``family``: the record family (default: the label's, else "polar" or "unlabelled");
     ``polar``: a ``PolarConfig`` (PR 1762 options); ``d3``: an ``fm.D3`` record, whose torch-dftd term is
     added to MACE's results (SPEC §12.1, the record's ``d3`` entry). On the CPU the cuEquivariance model
-    takes MACE's naive kernels (the CPU float64 references of 1a-T15).
+    takes MACE's naive kernels (the CPU float64 references of 1a-T15). ``checkpoint``: the label's file
+    as an explicit path (``loading.resolve_checkpoint``), still checked against ``sha256``.
     """
     from fastmace.model import loading
 
@@ -369,7 +370,7 @@ def load(source, atoms, *, dtype="float64", device="cuda:0", head=None, family=N
     if d3 is not None:
         records.record_for(version, family or "unlabelled", d3=d3)  # refusals before any model is loaded
     stock = records.STOCK
-    loaded = loading.load(source, head, backend=stock["backend"], dtype=dtype, device=device,
+    loaded = loading.load(source, head, checkpoint=checkpoint, backend=stock["backend"], dtype=dtype, device=device,
                           cueq_conv_fusion=stock["cueq_conv_fusion"], sha256=sha256, trusted=trusted,
                           allow_naive_cueq=str(device).startswith("cpu"), charge=charge,
                           spin_multiplicity=spin_multiplicity, environ=environ)
