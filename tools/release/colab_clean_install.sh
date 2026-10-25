@@ -4,8 +4,9 @@
 # root by tools/colab/fastmace_colab.py with $OUT set.
 set -u
 dist=$FASTMACE_BASELINE/dist
-py=$(python3 -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')
-echo "VM python3: $(python3 --version) -> clean venv on $py; g++: $(command -v g++); nvcc: $(command -v nvcc)"
+# The VM's system Python, not the driver's 3.10 venv that remote.sh puts first on PATH.
+py=$(/usr/bin/python3 -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')
+echo "VM python3: $(/usr/bin/python3 --version) -> clean venv on $py; g++: $(command -v g++); nvcc: $(command -v nvcc)"
 command -v uv >/dev/null || python3 -m pip install -q uv
 whl=$(ls "$dist"/fastmace-1.0.0-*.whl)
 mkdir -p "$dist/oeq" && cp "$dist"/fastmace_oeq_ext-*.whl "$dist/oeq/"
