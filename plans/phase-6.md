@@ -1,8 +1,9 @@
 # Phase 6: Release
 
-**Current status:** acceptance passed; 6-T15 adds the validated Python 3.13 wheel, and 6-T16 reduces the
-complete local CPU suite from 33 minutes to 14 minutes with all prior tests preserved. The owner authorized
-the 1.0.0 tag, PyPI publication and docs deployment. The inventory and decision history below describe the
+**Current status:** released as `v1.0.0`; FastMACE and all four OEq extension wheels are on PyPI, the public-index
+hybrid installation passed, and the documentation site is live. 6-T15 adds the validated Python 3.13 wheel,
+and 6-T16 reduces the complete local CPU suite from 33 minutes to 14 minutes with all prior tests preserved.
+Publication evidence: `docs/validation/release-1.0.0.md`. The inventory and decision history below describe the
 start of this phase; current evidence is in `docs/validation/phase-6.md`, `6-T15.md` and `6-T16.md`.
 
 Status: **decided**, 25 October 2026 (owner, 14:35 UTC: D1–D8 below). Written by the conductor after the phase 5 acceptance (tag `fastmace-5`,

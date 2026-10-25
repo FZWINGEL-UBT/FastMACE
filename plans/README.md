@@ -17,7 +17,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | 3b. NPT for the chlorides | [phase-3b.md](phase-3b.md) | **complete**, tag `fastmace-3b`; [report](../docs/validation/phase-3b.md) records the cost target and timing limitations |
 | 4. Physics | [phase-4.md](phase-4.md) | **complete**, tag `fastmace-4`; [acceptance report](../docs/validation/phase-4.md) |
 | 5. Planner completion | [phase-5.md](phase-5.md) | **complete**, tag `fastmace-5`; [acceptance report](../docs/validation/phase-5.md) |
-| 6. Release | [phase-6.md](phase-6.md) | **acceptance passed**, preparing 1.0.0 publication; Python 3.13 wheel and faster CPU scheduling merged; [acceptance report](../docs/validation/phase-6.md) |
+| 6. Release | [phase-6.md](phase-6.md) | **released `v1.0.0`**, PyPI packages and docs live; Python 3.13 public-index hybrid install verified; [release evidence](../docs/validation/release-1.0.0.md) |
 
 ## Workstation availability (owner, 20 October 2026)
 

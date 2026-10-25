@@ -40,6 +40,23 @@ remains deferred until the owner says those machines are available.
 
 ## Publication
 
-Validation is complete. The publication order is the four `fastmace-oeq-ext` 0.7.0.post1 wheels, then the
-FastMACE 1.0.0 wheel and sdist, followed by an installation from PyPI and documentation deployment.
-The final tag, published hashes and live URLs are recorded after those steps complete.
+**Complete, 25 October 2026.** Annotated tag `v1.0.0` points to
+`f45985c5a5aba75747421fc58058ee8c3dd07364`. The four extension wheels were uploaded before FastMACE.
+Anonymous PyPI metadata confirms every published file's SHA-256 matches the checked local artefact.
+
+- [FastMACE 1.0.0](https://pypi.org/project/fastmace/1.0.0/): wheel and sdist.
+  Wheel SHA-256 `919a84cfddefd2df458beb8789fc5b17b7b35d336d3a0e36ce2771c8f9d1d9c9`;
+  sdist SHA-256 `c1125ae1d2ddd66fae00049342950aac4901548ae47075a70b055c2366f12bbc`.
+- [fastmace-oeq-ext 0.7.0.post1](https://pypi.org/project/fastmace-oeq-ext/0.7.0.post1/):
+  CPython 3.10, 3.11, 3.12 and 3.13 manylinux_2_28_x86_64 wheels. Hashes: `pypi-publication.json`.
+- [GitHub release](https://github.com/FZWINGEL-UBT/FastMACE/releases/tag/v1.0.0): published stable,
+  six uploaded artefacts, not a draft or prerelease.
+- [Documentation](https://fzwingel-ubt.github.io/FastMACE/): GitHub Pages reports `built`; the root,
+  installation guide, API reference and generated stylesheet each returned HTTP 200.
+
+A second fresh Python 3.13.15 environment installed `fastmace[oeq]==1.0.0` from the public PyPI index,
+without `--find-links` or a local FastMACE source. Neither distribution had direct-URL metadata.
+`uv pip check` passed; the GPU smoke selected hybrid, loaded the prebuilt extension, reached step 20
+with finite output, and left the blocked-compiler log empty. See `pypi-installation.json`, `pypi-gpu.log`
+and `pypi-install.log`. The publishing credential was entered at Twine's hidden prompt, never placed in a
+repository file or shell command, and cleared from session storage after both uploads.
