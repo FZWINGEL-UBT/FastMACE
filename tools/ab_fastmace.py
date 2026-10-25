@@ -95,6 +95,7 @@ RELEASES = {
     "3": Release("fastmace-3", None, "fastmace_3", "minimal", "3b"),  # commit: --expected-commit (tag not set yet)
     "3b": Release("fastmace-3b", None, "fastmace_3b", "minimal", "4"),  # commit: --expected-commit (tag not set yet)
     "4": Release("fastmace-4", "dae3848", "fastmace_4", "minimal", "5"),  # 5-T11, phase 5 items 4 and 5
+    "5": Release("fastmace-5", "6722f29", "fastmace_5", "minimal", "6"),  # 6-T13, phase 6 item 6
 }
 # IntegratorConfig fields this checkout's side pins against a release unless --integrator-option sets them.
 RELEASE_INTEGRATOR_PINS = {"p3b": {"fixcm_projection": "ase"}}
@@ -117,7 +118,7 @@ def parse_args(argv=None):
     p.add_argument("--output", required=True, type=Path, help="Fresh directory")
     p.add_argument("--release", choices=sorted(RELEASES), default="1a",
                    help="The earlier release timed against this checkout (1a: sides 1a and 1b; 1b: sides 1b and 2)")
-    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b", "3b", "4", "5"),
+    p.add_argument("--sides", nargs="+", choices=("1a", "1b", "2", "3", "p3b", "3b", "4", "5", "6"),
                    help="Build order; two sides for an A/B process, one for a control (default: release, checkout)")
     p.add_argument("--renamed", type=Path, help="Directory holding the release's exported renamed package")
     p.add_argument("--expected-commit", help="Commit (prefix) the release's copy must be (default: the release's)")
