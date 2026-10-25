@@ -1,7 +1,7 @@
 # Phase 6: Release
 
-Status: **draft**, 25 October 2026, written by the conductor after the phase 5 acceptance (tag `fastmace-5`,
-`d304834c`). D1–D7 below are open; tasks that need none of them may start.
+Status: **decided**, 25 October 2026 (owner, 14:35 UTC: D1–D8 below). Written by the conductor after the phase 5 acceptance (tag `fastmace-5`,
+`d304834c`).
 Spec: [SPEC.md](../SPEC.md) §16 row "6. Release", and the sections it cites:
 - §14: name, licence, extras, prebuilt OEq host-extension wheels, caches;
 - §15: documentation;
@@ -32,6 +32,12 @@ Estimate: 2–3 weeks (§16).
   in plan records; extended-energy `run_fresh`; slow POLAR cold compile; OMOL-0 XL on the A100; NAS sync.
 
 ## Owner decisions
+
+**Decided by the owner, 25 October 2026:** D1 (a) keep public; D2 (a) reserve `fastmace` on PyPI with `0.1.0`
+from `fastmace-5`; D3 (a) torch 2.14.1+cu130 only; D4 (a) prebuilt OEq wheels on PyPI as `fastmace-oeq-ext`;
+D5 (b) the conductor drafts the upstream PRs, the owner opens them; D6 (a) MkDocs Material on GitHub Pages;
+D7 (b) hosted CI stays off, the suite runs locally before each tag; D8.1 (a) ship `dftd3_params.npz` with its
+notice; D8.2 (b) mark the ASE ports LGPL-2.1+ and say so in NOTICE.md.
 
 - **D1 Repository visibility.** (a) keep it public, as GitHub reports now; (b) make it private until 1.0 is
   tagged. The ResearchModule's AGENTS.md is corrected either way.
