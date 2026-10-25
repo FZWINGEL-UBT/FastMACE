@@ -7,7 +7,7 @@ separate package `fastmace-oeq-ext`, Linux x86_64, CPython 3.10 to 3.12.
 
 OpenEquivariance 0.7.0 builds a small C++ host extension (`libtorch_tp_jit.so`, pybind11 plus `TORCH_LIBRARY`
 ops) with `torch.utils.cpp_extension.load` at its first import, which needs g++ and ninja
-([oeq-runtime.md](../design/oeq-runtime.md)). Its device kernels are compiled with NVRTC at run time, so
+([oeq-runtime.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/design/oeq-runtime.md)). Its device kernels are compiled with NVRTC at run time, so
 the host library is the only compiled part. `fastmace-oeq-ext` ships that library, built from OEq's
 unmodified sources against torch 2.14.1+cu130, one wheel per CPython:
 
@@ -73,4 +73,4 @@ Run it under the local reservation: `python3 tools/ci/local_gpu.py run --purpose
 
 ## Results
 
-See the "6-T04" section of [docs/validation/6-T04.md](../validation/6-T04.md).
+See the "6-T04" section of [docs/validation/6-T04.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/6-T04.md).
