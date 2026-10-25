@@ -49,3 +49,33 @@ production profiles; the FastMACE against TorchSim comparison of 25 October 2026
 - `tools/plan_corpus.py` (new): item 3.
 - `tools/ab_fastmace.py` and `tools/trajectory_versions.py`: release `4` (`fastmace-4`, `dae3848`), sides `4`
   and `5`.
+
+## Recovery and completion (25 October 2026)
+
+The first local sequence finished, but its outer `sequence.log` masked child failures. Use the pytest
+JUnit records and `jobs.log`, not the outer `DONE` marker. The runner now stops on a required child failure.
+The original records remain under `~/fastmace-acceptance/5-T11-local-20261025`; recovery jobs use separate
+directories, so they cannot overwrite the failed evidence.
+
+- Rerun the three extended-energy cases with `9e9996d2`'s fresh-child test correction.
+- Rerun each of the six slow-tier failures in a separate process. The first failure was a Triton CUDA OOM
+  in the POLAR stress reference; later failures saw the same unusable CUDA context. Classify the failure
+  from these reruns, without weakening numerical limits.
+- Repeat all three local alternating timing jobs. The tool must receive
+  `--allow-option-changes grouped_launch fx_e3nn_linear polar_graph_sums` for decisions 57–58; all other
+  validity checks remain enabled. A zero process exit alone is insufficient: every timing record must be valid.
+- Complete `adapt-storm` (2,000 steps per side) and judge the switched side against the unswitched side,
+  including the recorded switch and the 3% cross-process noise floor used by the worker's runbook.
+- Complete the worker's `adapt-production` jobs: the shipped short NbCl5 NPT and NaNbOCl4 swap profiles,
+  plus the NaCl NVT anneal. Each runs in two pieces with a resume. Preserve each piece's root MD metadata
+  before continuing; check all six records for zero tier switches. These are the named acceptance profiles,
+  not a claim about every material or longer annealing protocol.
+- The compatibility tier includes the rule-6 fused-cuEq assertion, rule-12 MH-1 memory peak check, and
+  forced re-capture switch. If a tier started before the test-only additions, run the added tests separately
+  on the same GPU type and record both source commits.
+- Run the calibration check during the quiet local window, collect real plan records for items 6–9,
+  and write `phase-5.md` before the release decision.
+
+Production source remains frozen: the `fastmace/` tree at `533b0a6e` and `9e9996d2` is
+`95d8558071b236d6fcc563c4cfa2d4e1547d7f62`. Recovery changes are acceptance tools, tests and documentation.
+Any production defect requiring a code change must be listed with its affected reruns.

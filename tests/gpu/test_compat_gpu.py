@@ -9,7 +9,8 @@ OpenEquivariance runtime is there), NaCl 3x3x3, each in a fresh process:
   its kernel count and its cuEquivariance kernels are recorded (``FASTMACE_RESULTS``), so that a new
   architecture's graphs can be compared with the reference GPU's (phase-3.md open finding 8: cuEq picks its
   kernel variants at run time, so the counts are recorded, not judged). Replay against eager is
-  ``test_eager_gpu.py``'s, also in the tier;
+  ``test_eager_gpu.py``'s, also in the tier. The same run checks rule 6 on that GPU (plan task 5-T11): the
+  planner's software check finds cuEquivariance's fused kernels, and the plan needs no ``allow_naive_cueq``;
 - **a short MD smoke:** NVE, NVT (Langevin) and NPT (hydrostatic BAOAB at 0 GPa), 2 ps each at 1 fs from
   300 K. Limits loose enough for any GPU and tight enough for a broken kernel or integrator: NVE's conserved
   energy drifts by less than 0.05 meV/atom/ps and stays within a 0.1 meV/atom range (4-T03's NHC drifted
@@ -57,7 +58,10 @@ graphs = {str(key): {"nodes": getattr(graph, "node_count", None),
                      "cueq_kernels": sorted({kind for kind in (getattr(graph, "node_kinds", None) or [])
                                              if "segmented_polynomial" in kind})}
           for key, graph in sim._engine._graphs.items()}
-out = {"graphs": graphs, "tier": sim.plan.tier, "engine_mode": sim._engine.mode, "backend": sim.plan.engine.backend,
+_, naive_choice, naive_reason = sim.plan.decision("allow_naive_cueq")
+out = {"rule_6": [naive_choice, getattr(naive_reason, "code", None), getattr(naive_reason, "rule", None)],
+       "fused_cueq": list(sim.plan.software.fused_cueq),
+       "graphs": graphs, "tier": sim.plan.tier, "engine_mode": sim._engine.mode, "backend": sim.plan.engine.backend,
        "dtype": sim.plan.precision.dtype, "gpu": torch.cuda.get_device_name(),
        "capability": list(torch.cuda.get_device_capability()), "energy": sim.committed().energy}
 sim.close()
@@ -127,6 +131,8 @@ def test_captured_graphs_and_their_kernel_counts_are_recorded():
     out = _child(GRAPHS_CHILD)
     ENGINE.report("compat-graph-kernels", out)
     print(out)
+    # Rule 6 on this GPU (5-T11): the planner found cuEquivariance's fused kernels, so no allow_naive_cueq.
+    assert out["fused_cueq"][0] and out["rule_6"][:2] == ["off", "fused-cueq"], out["rule_6"]
     assert out["graphs"], "no graph was captured"
     assert all(graph["nodes"] and graph["kernels"] for graph in out["graphs"].values()), out["graphs"]
     assert np.isfinite(out["energy"])

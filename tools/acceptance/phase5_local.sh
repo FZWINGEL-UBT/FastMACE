@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 5-T11: phase 5 acceptance jobs on the local RTX 5060 Ti (WSL), one job per call, from the pinned copy.
 #
-#   FASTMACE_4_COMMIT=<sha of the baseline> bash tools/acceptance/phase4_local.sh SRC JOB [ARGS...]
+#   FASTMACE_4_COMMIT=<sha of the baseline> bash tools/acceptance/phase5_local.sh SRC JOB [ARGS...]
 #
 # SRC is the pinned copy (git archive of the 5-T11 head, with .source_commit); its fastmace/ equals the freeze's.
 # Run every call under the GPU reservation:
@@ -10,16 +10,18 @@
 # table: docs/validation/phase-5-runbook.md.
 # Jobs:
 #   timed (quiet PC, first, alone): regression (item 5, NVT A/B), regression-npt (item 5, NPT, one side per process),
-#     ase-speed (recorded: stock ASE against fastmace.ase, and each new integrator's step time)
+#     adapt-storm (item 6), calibration (item 9), ase-speed (recorded: stock ASE against fastmace.ase, and each new
+#     integrator's step time)
 #   untimed: preflight [TEST...], optimisers [PART...] (item 1), minima (item 2, only if the runbook requires it),
-#     protocol-start / protocol-resume (item 2's production path), nve-drift, trajectories-cpu,
-#     trajectories-reproducible, restart-across (item 5), compat (the compatibility tier, needs fastmace/5-T11-compat),
+#     protocol-start / protocol-resume (item 2's production path), nve-drift, trajectories-cpu, adapt-production,
+#     adapt-tests, trajectories-reproducible, restart-across (item 5), compat (the compatibility tier, needs
+#     fastmace/5-T11-compat),
 #     cpu-acceptance, acceptance-tier, slow-tier, targeted TEST...
 # pytest jobs run through 3b-T10's stoppable_pytest.sh: results.jsonl per finished test, junit.xml also when stopped.
 # Stop one with kill -INT "$(cat <root>/<job>/pytest.pid)", never by killing this script's shell or the reservation.
 # regression, regression-npt, trajectories-* and restart-across need the release-4 tooling (tools/ab_fastmace.py
 # --release 4, tools/trajectory_versions.py --against 4) and tools/restart_versions.py (5-T11).
-set -uo pipefail
+set -euo pipefail
 src=$(cd "${1:?SRC}" && pwd); job=${2:?JOB}; shift 2
 run_id=5-T11-local-${RUN_DATE:-$(date -u +%Y%m%d)}
 root=$HOME/fastmace-acceptance/$run_id
@@ -45,8 +47,11 @@ note() { echo "$(date -u +%FT%TZ) $*" | tee -a "$log"; }
 run() {  # name command...
   local name=$1; shift
   note "start $name gpu=$(nvidia-smi --query-gpu=name,driver_version,utilization.gpu,memory.used --format=csv,noheader) load=$(cut -d' ' -f1-3 /proc/loadavg) source=$FASTMACE_SOURCE_COMMIT"
-  (cd "$src" && "$@") > "$root/$name.log" 2>&1 < /dev/null
-  local status=$?
+  local status=0
+  # Preserve the end marker when a required child fails.  The conditional
+  # keeps errexit from firing before the status is recorded; the caller's
+  # errexit then stops the acceptance job on the first failure.
+  (cd "$src" && "$@") > "$root/$name.log" 2>&1 < /dev/null || status=$?
   note "end $name exit=$status"
   return $status
 }
@@ -85,7 +90,8 @@ ab() {  # name blocks pattern sides...
   local name=$1 blocks=$2 pattern=$3; shift 3
   run "$name" "$hybrid" tools/ab_fastmace.py --release 4 --expected-commit "$base" --renamed "$versions" \
     --output "$root/$name" --model mh1-r2scan --checkpoint "$checkpoint" --structures NaCl NbCl5 --sides "$@" \
-    --warmup 300 --block 300 --blocks "$blocks" --pattern "$pattern"
+    --warmup 300 --block 300 --blocks "$blocks" --pattern "$pattern" \
+    --allow-option-changes grouped_launch fx_e3nn_linear polar_graph_sums
 }
 frames() {  # NAME=PATH arguments of the given crystals' captured.traj
   for c in "$@"; do printf '%s=%s ' "$c" "$anneal/$c/captured.traj"; done
@@ -265,6 +271,41 @@ torch.save(tiny_mace_model([11, 17], **FAMILIES['mh1']), sys.argv[1])" "$tiny")
     done
     run restart-across-resume env CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=4 "$hybrid" tools/restart_versions.py run       --stage resume --source "$root/restart-across/write" "${common[@]}" --output "$root/restart-across/resume"
     run restart-across-compare "$hybrid" tools/restart_versions.py compare "$root/restart-across/uninterrupted"       "$root/restart-across/resume"
+    ;;
+  adapt-storm)  # item 6, timed: 5-T07's forced re-capture storm, unswitched then switched, one process per side
+    for side in ${STORM_SIDES:-unswitched switched}; do
+      run adapt-storm-$side "$hybrid" tools/validation/adapt_runs.py storm --side "$side" \
+        --steps "${STORM_STEPS:-2000}" --output "$root/adapt-storm"
+    done
+    ;;
+  adapt-production)  # item 6: the default adaptation profiles, each started and resumed in two pieces
+    export FASTMACE_COMMIT=$FASTMACE_SOURCE_COMMIT
+    nacl=$(cd "$src" && "$hybrid" tools/validation/adapt_runs.py nacl-config "$root/adapt-production/nacl-config")
+    for entry in "npt_anneal_NbCl5_short:13500" "swap_anneal_NaNbOCl4_short:13500" "$nacl:135000"; do
+      profile=${entry%:*}; half=${entry##*:}; name=$(basename "$profile" .toml)
+      run adapt-production-$name-start bash results/3-T14-protocol/run.sh start "$root/adapt-production/$name" \
+        "$profile" "$half"
+      mkdir -p "$root/adapt-production/evidence/$name-start"
+      cp "$root/adapt-production/$name/metadata.json" \
+        "$root/adapt-production/evidence/$name-start/metadata.json"
+      run adapt-production-$name-resume bash results/3-T14-protocol/run.sh resume "$root/adapt-production/$name" "$half"
+      mkdir -p "$root/adapt-production/evidence/$name-resume"
+      cp "$root/adapt-production/$name/metadata.json" \
+        "$root/adapt-production/evidence/$name-resume/metadata.json"
+    done
+    p=$root/adapt-production
+    evidence=$p/evidence
+    run adapt-production-check "$hybrid" tools/validation/adapt_runs.py check \
+      "$evidence/npt_anneal_NbCl5_short-start" "$evidence/npt_anneal_NbCl5_short-resume" \
+      "$evidence/swap_anneal_NaNbOCl4_short-start" "$evidence/swap_anneal_NaNbOCl4_short-resume" \
+      "$evidence/nvt_anneal_NaCl-start" "$evidence/nvt_anneal_NaCl-resume" --out "$p/check.json"
+    ;;
+  calibration)  # item 9, timed: 5-T09's NaCl smoke (hybrid against plain cuEq)
+    pytest_job calibration -rA tests/gpu/test_calibrate_gpu.py
+    ;;
+  adapt-tests)  # items 6 and 7: monitor, switch and fallback tests, untimed
+    pytest_job adapt-tests -rA tests/gpu/test_monitor_gpu.py tests/gpu/test_adapt_switch_gpu.py \
+      tests/gpu/test_fallback_gpu.py tests/gpu/test_fallback_mid_run_gpu.py "$@"
     ;;
   compat)  # the GPU compatibility check on this Blackwell GPU (SPEC decision 39, amended; tests/_support/tiers.py)
     PYTEST_PYTHON=${PYTEST_PYTHON:-$latest}  # pytest lives here; hybrid children use FASTMACE_HYBRID_PYTHON
