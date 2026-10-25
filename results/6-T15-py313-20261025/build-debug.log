@@ -1,0 +1,103 @@
++ set -euo pipefail
++++ dirname /mnt/d/Margraf/fm-6-T15/tools/release/oeq_wheels/build.sh
+++ cd /mnt/d/Margraf/fm-6-T15/tools/release/oeq_wheels
+++ pwd
++ here=/mnt/d/Margraf/fm-6-T15/tools/release/oeq_wheels
++ out=/home/fzwin/tmp/6-T15/wheels
++ image=quay.io/pypa/manylinux_2_28_x86_64
++ docker=docker.exe
++ mkdir -p /home/fzwin/tmp/6-T15/wheels
++ docker.exe volume create fastmace-oeq-ext-work
++ docker.exe volume rm -f fastmace-oeq-ext-out
++ true
++ docker.exe volume create fastmace-oeq-ext-out
++ tar -C /mnt/d/Margraf/fm-6-T15/tools/release/oeq_wheels -cf - build_in_container.sh package
++ docker.exe run --rm -i -v fastmace-oeq-ext-work:/work -v fastmace-oeq-ext-out:/out -e TORCH_VERSION -e OEQ_VERSION -e EXT_VERSION -e PYTHONS quay.io/pypa/manylinux_2_28_x86_64 bash -c 'mkdir -p /src && tar -C /src -xf - && bash /src/build_in_container.sh'
+Processing ./build-cp310-cp310/pkg
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+Processing ./build-cp310-cp310/pkg
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: fastmace-oeq-ext
+  Building wheel for fastmace-oeq-ext (pyproject.toml): started
+  Building wheel for fastmace-oeq-ext (pyproject.toml): finished with status 'done'
+  Created wheel for fastmace-oeq-ext: filename=fastmace_oeq_ext-0.7.0.post1-py3-none-any.whl size=209330 sha256=8ca0a661c417125e1598a6e67452fe63bf2f8763dff5353bca9e0e8cb2de0545
+  Stored in directory: /tmp/pip-ephem-wheel-cache-t34923v3/wheels/23/d9/3d/146833c7e6b37c1495ee27978cac10e3318d897d18b365039a
+Successfully built fastmace-oeq-ext
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+fastmace_oeq_ext-0.7.0.post1-cp310-cp310-manylinux_2_28_x86_64.whl
+Processing ./build-cp311-cp311/pkg
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+Processing ./build-cp311-cp311/pkg
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: fastmace-oeq-ext
+  Building wheel for fastmace-oeq-ext (pyproject.toml): started
+  Building wheel for fastmace-oeq-ext (pyproject.toml): finished with status 'done'
+  Created wheel for fastmace-oeq-ext: filename=fastmace_oeq_ext-0.7.0.post1-py3-none-any.whl size=211770 sha256=b530d221a96417b54aff770bc998bd5d8484a916dd01826652e663eaf7d5b942
+  Stored in directory: /tmp/pip-ephem-wheel-cache-rvv8yyux/wheels/31/e7/6d/eea07188a34d40986ee1412923440accd5a3edbf6bb5e66dbf
+Successfully built fastmace-oeq-ext
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+fastmace_oeq_ext-0.7.0.post1-cp311-cp311-manylinux_2_28_x86_64.whl
+Processing ./build-cp312-cp312/pkg
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+Processing ./build-cp312-cp312/pkg
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: fastmace-oeq-ext
+  Building wheel for fastmace-oeq-ext (pyproject.toml): started
+  Building wheel for fastmace-oeq-ext (pyproject.toml): finished with status 'done'
+  Created wheel for fastmace-oeq-ext: filename=fastmace_oeq_ext-0.7.0.post1-py3-none-any.whl size=211389 sha256=5d88f698d46f39bb307f1bd9432cb7dff548404ef3f9c06eb82e6c2b920b914a
+  Stored in directory: /tmp/pip-ephem-wheel-cache-h98d99yv/wheels/c6/82/08/12793cdf96c6d6b6d8b42c86f1f58e2f504fb411cdc94d0053
+Successfully built fastmace-oeq-ext
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+fastmace_oeq_ext-0.7.0.post1-cp312-cp312-manylinux_2_28_x86_64.whl
+Looking in indexes: https://download.pytorch.org/whl/cu130
+Collecting torch==2.14.1+cu130
+  Downloading torch-2.14.1%2Bcu130-cp313-cp313-manylinux_2_28_x86_64.whl.metadata (37 kB)
+Downloading torch-2.14.1%2Bcu130-cp313-cp313-manylinux_2_28_x86_64.whl (554.6 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 554.6/554.6 MB 12.7 MB/s  0:00:44
+Installing collected packages: torch
+Successfully installed torch-2.14.1+cu130
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+Collecting pybind11==3.1.0
+  Using cached pybind11-3.1.0-py3-none-any.whl.metadata (10 kB)
+Using cached pybind11-3.1.0-py3-none-any.whl (319 kB)
+Installing collected packages: pybind11
+Successfully installed pybind11-3.1.0
+WARNING: Target directory /work/sys-cp313-cp313/bin already exists. Specify --upgrade to force replacement.
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+Processing ./build-cp313-cp313/pkg
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+Processing ./build-cp313-cp313/pkg
+  Preparing metadata (pyproject.toml): started
+  Preparing metadata (pyproject.toml): finished with status 'done'
+Building wheels for collected packages: fastmace-oeq-ext
+  Building wheel for fastmace-oeq-ext (pyproject.toml): started
+  Building wheel for fastmace-oeq-ext (pyproject.toml): finished with status 'done'
+  Created wheel for fastmace-oeq-ext: filename=fastmace_oeq_ext-0.7.0.post1-py3-none-any.whl size=211512 sha256=edce660bf899d422ebe3bca497f3ec63312abc1a62f9fdf32b30441fdbdbd8dd
+  Stored in directory: /tmp/pip-ephem-wheel-cache-ydshvorj/wheels/75/30/36/1bf53ad5c7bd40863e632db78729df49eb58c49359324d93fd
+Successfully built fastmace-oeq-ext
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+fastmace_oeq_ext-0.7.0.post1-cp313-cp313-manylinux_2_28_x86_64.whl
+total 832
+-rw-r--r-- 1 root root 209347 Oct 25 22:16 fastmace_oeq_ext-0.7.0.post1-cp310-cp310-manylinux_2_28_x86_64.whl
+-rw-r--r-- 1 root root 211788 Oct 25 22:16 fastmace_oeq_ext-0.7.0.post1-cp311-cp311-manylinux_2_28_x86_64.whl
+-rw-r--r-- 1 root root 211405 Oct 25 22:17 fastmace_oeq_ext-0.7.0.post1-cp312-cp312-manylinux_2_28_x86_64.whl
+-rw-r--r-- 1 root root 211527 Oct 25 22:18 fastmace_oeq_ext-0.7.0.post1-cp313-cp313-manylinux_2_28_x86_64.whl
++ docker.exe run --rm -v fastmace-oeq-ext-out:/out quay.io/pypa/manylinux_2_28_x86_64 tar -C /out -cf - .
++ tar -C /home/fzwin/tmp/6-T15/wheels -xf -
++ ls -l /home/fzwin/tmp/6-T15/wheels
+total 832
+-rw-r--r-- 1 fzwin fzwin 209347 Oct 25 23:16 fastmace_oeq_ext-0.7.0.post1-cp310-cp310-manylinux_2_28_x86_64.whl
+-rw-r--r-- 1 fzwin fzwin 211788 Oct 25 23:16 fastmace_oeq_ext-0.7.0.post1-cp311-cp311-manylinux_2_28_x86_64.whl
+-rw-r--r-- 1 fzwin fzwin 211405 Oct 25 23:17 fastmace_oeq_ext-0.7.0.post1-cp312-cp312-manylinux_2_28_x86_64.whl
+-rw-r--r-- 1 fzwin fzwin 211527 Oct 25 23:18 fastmace_oeq_ext-0.7.0.post1-cp313-cp313-manylinux_2_28_x86_64.whl
