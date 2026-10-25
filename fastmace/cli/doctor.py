@@ -159,6 +159,12 @@ def _oeq_runtime_problems(environ):
     return problems
 
 
+def _prebuilt(environ):
+    """The prebuilt fastmace-oeq-ext extension, if usable here (6-T04); reads its manifest only."""
+    from fastmace.kernels import _oeq_runtime
+    return _oeq_runtime.prebuilt_extension(environ)
+
+
 def _on_nfs(path):
     return _file_locks.on_nfs(path)
 
@@ -303,17 +309,27 @@ def check_oeq(context):
     if not _find_spec("openequivariance"):
         return _fail("openequivariance is not installed; the hybrid backend is unavailable (plain cuEq runs)",
                      "pip install 'fastmace[oeq]'")
-    lines = [f"openequivariance {_version('openequivariance')}; looked up, not imported",
-             "build path: host toolchain (OEQ_JIT_EXTENSION=1, no nvcc; prebuilt wheels come in phase 6)"]
-    problems = [f"{tool} not found" for tool in ("g++", "ninja") if _which(tool) is None]
+    lines = [f"openequivariance {_version('openequivariance')}; looked up, not imported"]
+    prebuilt = _prebuilt(context.environ)
+    if prebuilt.usable:
+        lines.append(f"host extension: prebuilt (fastmace-oeq-ext {prebuilt.manifest.get('extension_version')}, "
+                     f"{prebuilt.library}); no compiler needed")
+        problems = []
+    else:
+        lines.append("host extension: built with the host toolchain (OEQ_JIT_EXTENSION=1, no nvcc); "
+                     f"prebuilt not used: {prebuilt.reason}")
+        problems = [f"{tool} not found" for tool in ("g++", "ninja") if _which(tool) is None]
     problems += _oeq_runtime_problems(context.environ)
     if problems:
         lines += [f"missing: {problem}" for problem in problems]
         return _fail("\n".join(lines),
-                     "See docs/design/oeq-runtime.md (SPEC §14): g++, ninja (pip install ninja), the CUDA 13 runtime "
-                     "wheels (nvidia/cu13) and libcuda.so.1 (OEQ_CUDA_DRIVER_LIBRARY).")
+                     "pip install 'fastmace[oeq]' (prebuilt fastmace-oeq-ext for torch 2.14.1+cu130, CPython "
+                     "3.10-3.12), or see docs/design/oeq-runtime.md (SPEC §14): g++, ninja (pip install ninja), "
+                     "the CUDA 13 runtime wheels (nvidia/cu13) and libcuda.so.1 (OEQ_CUDA_DRIVER_LIBRARY).")
     built = _built_extensions(context.environ)
-    if built:
+    if prebuilt.usable:
+        pass
+    elif built:
         lines.append(f"extension built before: {built[0]}")
     else:
         lines.append("extension not built yet: the first hybrid load builds it")

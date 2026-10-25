@@ -451,7 +451,10 @@ def prepare_oeq_runtime(cache):
     record = PatchRecord("oeq_runtime", str(runtime_plan.root),
                          tuple(f"env:{name}" for name in sorted(runtime_plan.environment)),
                          "OEq host-extension build environment; preloaded "
-                         + ", ".join(p.name for p in runtime_plan.preload))
+                         + ", ".join(p.name for p in runtime_plan.preload)
+                         + f"; host extension: {runtime_plan.extension.get('source')}"
+                         + (f" ({runtime_plan.extension['path']})"
+                            if runtime_plan.extension.get("source") == "prebuilt" else ""))
     _RECORDS["oeq_runtime"] = record
     return record
 
