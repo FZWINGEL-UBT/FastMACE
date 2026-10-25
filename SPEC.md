@@ -190,7 +190,7 @@ rewrites it cannot verify.
 
 | Component | Qualified | 1.0 support policy |
 | --- | --- | --- |
-| Python | 3.10.12 | 3.10–3.12 |
+| Python | 3.10.12; 3.13 clean-install GPU smoke (6-T15) | 3.10–3.13 (owner: add the 3.13 wheel) |
 | torch | 2.14.1+cu130 (2.5.1+cu124 reference stack) | each release pins and CI-tests exact builds of the two newest torch minor releases at release time (CUDA 12.x/13.x wheels); other versions run only the rewrites whose self-checks pass |
 | MACE (`mace-torch`) | 0.3.16 | per-release rewrite registry (§6.3); unknown versions run the reference path |
 | cuEquivariance (+ ops) | 0.12.0 (0.6.1 older stack) | ≥ 0.12 |
@@ -3123,3 +3123,11 @@ optimisation round 4, OPT4-T05):** one engine default for setup time.
   `TRITON_CACHE_DIR` under the cache root when the environment names none.
   Before, nothing called the 1a-T04 helper, so Inductor wrote to
   `$TMPDIR/torchinductor_$USER`, which the workstation rule forbids.
+
+**Release follow-up 6-T15 (25 October 2026, owner: "Go ahead and add the wheel then"):**
+extend the prebuilt OEq host-extension wheel matrix to CPython 3.13 and update
+the `[oeq]` and `[full]` dependency markers to include it. The torch 2.14.1+cu130,
+OpenEquivariance 0.7.0, Linux x86_64 and manylinux_2_28 constraints stay unchanged.
+Acceptance is a fresh Python 3.13 installation with the prebuilt extension,
+hybrid NaCl MD and no g++/Ninja/nvcc invocation. A C compiler for Triton's
+launcher remains a requirement. Results: `docs/validation/6-T15.md`.

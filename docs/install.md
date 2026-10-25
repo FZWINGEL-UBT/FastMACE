@@ -1,7 +1,7 @@
 # Install
 
 FastMACE is a Python library for Linux with an NVIDIA GPU. It needs Python
-3.10, 3.11 or 3.12.
+3.10, 3.11, 3.12 or 3.13.
 
 ## Supported stack
 
@@ -45,6 +45,10 @@ report says so.
 
 No CUDA compiler (`nvcc`) is needed. Kernels are compiled at run time with
 Triton and NVRTC, and the results are cached (see [Caches](faq.md#caches)).
+On Linux x86_64, the `[oeq]` and `[full]` extras install the prebuilt OEq
+host extension for Python 3.10–3.13, so no C++ compiler or Ninja is needed.
+A C compiler such as gcc is still required by Triton's launcher stub;
+runtime compilation and the initial warm-up still occur.
 
 ## Extras
 
