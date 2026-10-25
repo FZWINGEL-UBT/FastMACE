@@ -27,6 +27,10 @@ log=$root/compiler-attempts-py$python_version.log
 models=${FASTMACE_MODELS:-$HOME/models}
 export UV_CACHE_DIR=${UV_CACHE_DIR:-$HOME/.cache/uv} PYTHONDONTWRITEBYTECODE=1 TMPDIR=$root/tmp
 stage=${CLEAN_INSTALL_STAGE:-all}
+# 6-T13: a built sdist or wheel instead of the checkout, and never the checkout through PYTHONPATH (Colab sets it).
+fastmace_source=${CLEAN_INSTALL_FASTMACE:-$repo}
+case $fastmace_source in /*) ;; *) fastmace_source=$(cd "$(dirname "$fastmace_source")" && pwd)/$(basename "$fastmace_source") ;; esac
+unset PYTHONPATH
 command -v uv >/dev/null || export PATH="$HOME/.local/bin:$PATH"
 mkdir -p "$root" "$TMPDIR"
 py=$venv/bin/python
@@ -37,7 +41,7 @@ uv venv -q --python "$python_version" "$venv"
 uv pip install -q --python "$py" --index-url https://download.pytorch.org/whl/cu130 \
   --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match "torch==2.14.1+cu130"
 uv pip install -q --python "$py" --find-links "$wheels" \
-  "cuequivariance-ops-torch-cu13" "fastmace[oeq] @ file://$repo" "torch==2.14.1+cu130" \
+  "cuequivariance-ops-torch-cu13" "fastmace[oeq] @ file://$fastmace_source" "torch==2.14.1+cu130" \
   --extra-index-url https://download.pytorch.org/whl/cu130 --index-strategy unsafe-best-match
 uv pip check --python "$py"
 "$py" -m pip --version >/dev/null 2>&1 || true
@@ -79,10 +83,11 @@ import numpy as np
 committed = result.simulation.committed()
 summary = {"backend": result.plan.engine.backend, "oeq_runtime": None if record is None else record.detail,
            "step": int(committed.step), "finite": bool(np.isfinite(committed.positions).all()),
-           "python": sys.version.split()[0]}
+           "python": sys.version.split()[0], "fastmace": fm.__version__, "fastmace_file": fm.__file__}
 print(json.dumps(summary, indent=1))
 assert summary["backend"] == "hybrid" and summary["step"] == 20 and summary["finite"], summary
 assert record is not None and "host extension: prebuilt" in record.detail, summary
+assert fm.__file__.startswith(sys.prefix), summary  # the installed copy, not a checkout
 EOF
 if [ -s "$log" ]; then echo "FAIL: a blocked compiler was called:"; cat "$log"; exit 1; fi
 echo "CLEAN INSTALL OK (python $python_version): hybrid backend, prebuilt OEq host extension, no g++/ninja/nvcc call"
