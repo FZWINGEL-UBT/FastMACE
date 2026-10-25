@@ -8,6 +8,8 @@
 # script are forwarded to pytest as SIGINT; pytest then ends the session and writes junit.xml. After GRACE_S
 # (default 120) seconds a pytest still running is killed; results.jsonl still holds every finished test.
 # To stop a run: kill -INT "$(cat OUTDIR/pytest.pid)" (or signal this script); never kill the reservation first.
+# Bash cannot trap a signal that was ignored when it started: under `nohup` (HUP) or as a background job of a
+# non-interactive shell (INT) only TERM reaches this script; signal pytest's pid instead (its plugin re-arms INT).
 set -uo pipefail
 out=${1:?OUTDIR}; python=${2:?PYTHON}; shift 2
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

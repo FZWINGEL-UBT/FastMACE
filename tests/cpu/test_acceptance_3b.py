@@ -213,10 +213,17 @@ def _check_stopped(out):
     assert _junit(out / "junit.xml") == {"test_fast": "passed", "test_fails": "failed"}
 
 
-# 6-T13: 60 s timed out under the full -n 8 suite (plans/phase-6.md, Known flakes). A slow start or a slow
-# interrupt under load is not what these tests check; returncode 2 and the interrupted record still prove the
-# signal, not the dummy test, ended the run (test_slow sleeps 900 s).
+# 6-T13: the "load-sensitive" timeout of plans/phase-6.md (Known flakes) was the suite's launch: under
+# `setsid nohup ... &` SIGHUP (nohup) and SIGINT (a background job of a non-interactive bash) arrive ignored, and
+# bash cannot trap a signal ignored on entry, so the script never forwarded them. The script is therefore started
+# with default dispositions, as from an ordinary shell. The longer waits keep slow starts under -n 8 harmless;
+# returncode 2 and the interrupted record still prove the signal ended the run (test_slow sleeps 900 s).
 STOP_TIMEOUT_S = 300
+
+
+def _default_signals():
+    for number in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(number, signal.SIG_DFL)
 
 
 def _environment():
@@ -232,7 +239,8 @@ def test_a_stopped_job_keeps_its_results_and_junit(tmp_path, name):
     suite, out = _suite(tmp_path), tmp_path / "out"
     job = subprocess.Popen(["bash", str(ACCEPTANCE / "stoppable_pytest.sh"), str(out), sys.executable, "-q",
                             "-p", "no:cacheprovider", "-p", "no:xdist", "test_dummy.py"],
-                           cwd=suite, env=_environment(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                           cwd=suite, env=_environment(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                           preexec_fn=_default_signals)
     try:
         _wait_for(out / "results.jsonl", "test_fails")
         time.sleep(0.5)  # test_slow is running
