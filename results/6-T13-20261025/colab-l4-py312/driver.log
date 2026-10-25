@@ -1,0 +1,58 @@
+[fastmace-colab 19:18:30] allocating L4 as fm-l4-20261025-191815-75c17f
+[fastmace-colab 19:19:15] NVIDIA L4 (sm 8.9, driver 580.82.07); cache sm89-py310-f00d5798f8b5
+[fastmace-colab 19:29:57] ready after 702.0 s; running 2 command(s)
+[fastmace-colab 19:33:11] command 1 exit 0 after 189 s
+site-packages/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/content/fm/tmp/clean/clean-py3.12/lib/python3.12/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.12/lib/python3.12/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.12/lib/python3.12/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/content/fm/tmp/clean/clean-py3.12/lib/python3.12/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+W1025 19:32:06.736000 7008 torch/_inductor/utils.py:1806] [0/0_1] Not enough SMs to use max_autotune_gemm mode
+{
+ "backend": "hybrid",
+ "oeq_runtime": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13; host extension: prebuilt (/content/fm/tmp/clean/clean-py3.12/lib/python3.12/site-packages/fastmace_oeq_ext/libtorch_tp_jit.so)",
+ "step": 20,
+ "finite": true,
+ "python": "3.12.3",
+ "fastmace": "1.0.0",
+ "fastmace_file": "/content/fm/tmp/clean/clean-py3.12/lib/python3.12/site-packages/fastmace/__init__.py"
+}
+CLEAN INSTALL OK (python 3.12): hybrid backend, prebuilt OEq host extension, no g++/ninja/nvcc call
+clean install exit 0
+
+
+[fastmace-colab 19:36:00] command 2 exit 0 after 154 s
+ite-packages/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+W1025 19:34:42.194000 8144 torch/_inductor/utils.py:1806] [0/0_1] Not enough SMs to use max_autotune_gemm mode
+{
+ "backend": "hybrid",
+ "oeq_runtime": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13; host extension: prebuilt (/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/fastmace_oeq_ext/libtorch_tp_jit.so)",
+ "step": 20,
+ "finite": true,
+ "python": "3.10.22",
+ "fastmace": "1.0.0",
+ "fastmace_file": "/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/fastmace/__init__.py"
+}
+CLEAN INSTALL OK (python 3.10): hybrid backend, prebuilt OEq host extension, no g++/ninja/nvcc call
+clean install exit 0
+
+
+[fastmace-colab 20:01:00] poll of pack failed (TimeoutExpired); reattaching (1/5)
+[fastmace-colab 20:02:27] stopped fm-l4-20261025-191815-75c17f
+[fastmace-colab 20:02:27] exit 0, wall 2652.5 s, CU 30.83 -> 29.8; /home/fzwin/tmp/6-T13/colab-l4-py312/colab.json; ledger /home/fzwin/.fastmace-colab/colab-ledger.csv

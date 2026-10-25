@@ -8,6 +8,26 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 Nothing yet.
 
+## [1.0.0] - 2026-10-25
+
+First stable release (SPEC section 16, phase 6). Acceptance: `docs/validation/phase-6.md`. Qualified stack as
+in 0.1.0 (torch 2.14.1+cu130 only, owner decision D3); Linux x86_64, NVIDIA GPUs.
+
+### Added
+
+- `fastmace-oeq-ext` (6-T04): OpenEquivariance 0.7.0's host extension prebuilt for torch 2.14.1+cu130 and
+  CPython 3.10-3.12, pulled in by `pip install "fastmace[oeq]"`; no C++ compiler, ninja or nvcc is needed.
+  `fastmace doctor` and the `oeq_runtime` patch record say whether the extension is prebuilt or built.
+- User documentation and API reference as a MkDocs Material site (6-T05, 6-T06), examples (6-T07),
+  benchmark tables (6-T08), licences and notices (6-T02), upstream PR drafts (6-T10).
+
+### Changed
+
+- Plan records name the integrator that runs for the phase 4 schemes (NVE, CSVR, NoseHooverChain, MTK,
+  Berendsen) instead of "Langevin"/"LangevinBAOAB" (6-T11); Langevin and BAOAB keep their text.
+- The accuracy gate's reference child loads an explicit checkpoint path outside `$FASTMACE_MODELS` (6-T14).
+- Development status "Production/Stable".
+
 ## [0.1.0] - 2026-10-25
 
 Name reservation on PyPI (owner decision D2): the library of the tag `fastmace-5` plus the release metadata below,
@@ -69,5 +89,6 @@ OpenEquivariance 0.7.0, ASE 3.27.0) on NVIDIA GPUs. Phase acceptance reports are
 - Run-time tier adaptation and calibration, optimisation round 4. Acceptance: CPU suite 4,651 passed, bitwise
   trajectories equal to `fastmace-4`, timed regression within noise.
 
-[Unreleased]: https://github.com/FZWINGEL-UBT/FastMACE/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/FZWINGEL-UBT/FastMACE/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/FZWINGEL-UBT/FastMACE/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/FZWINGEL-UBT/FastMACE/releases/tag/v0.1.0

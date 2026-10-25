@@ -1,0 +1,76 @@
+Using Python 3.10.22 environment at: /content/fm/tmp/clean/clean-py3.10
+Checked 77 packages in 1ms
+All installed packages are compatible
+== installed
+Using Python 3.10.22 environment at: /content/fm/tmp/clean/clean-py3.10
+cuequivariance                0.13.0
+fastmace                      1.0.0
+fastmace-oeq-ext              0.7.0.post1
+mace-torch                    0.3.16
+ninja                         1.13.2
+openequivariance              0.7.0
+torch                         2.14.1+cu130
+== which: g++=/content/fm/tmp/clean/no-compiler-bin/g++ ninja=/content/fm/tmp/clean/no-compiler-bin/ninja nvcc=/content/fm/tmp/clean/no-compiler-bin/nvcc
+== fastmace doctor
+fastmace doctor: FastMACE 1.0.0, Python 3.10.22, Linux x86_64
+[ ok ] GPU and driver: NVIDIA L4; driver 580.82.07; torch CUDA 13.0
+[ ok ] torch: torch 2.14.1+cu130
+[ ok ] MACE: mace-torch 0.3.16; looked up, not imported
+[ ok ] cuEquivariance: cuequivariance 0.13.0, cuequivariance-torch 0.13.0; fused-kernel libraries present (cuequivariance-ops-torch-cu13 0.13.0, cuequivariance-ops-cu13 0.13.0); not imported, so a load failure shows at the first model load
+[ ok ] OpenEquivariance: openequivariance 0.7.0; looked up, not imported
+       host extension: prebuilt (fastmace-oeq-ext 0.7.0.post1, /content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/fastmace_oeq_ext/libtorch_tp_jit.so); no compiler needed
+[ ok ] Triton: triton 3.8.0 is importable
+[ ok ] NVRTC: NVRTC 13.0 loads through cuda.bindings
+[warn] graph-longrange: graph-longrange is not installed; needed for MACE-POLAR-1
+       fix: pip install 'fastmace[polar]' (graph-longrange 0.4.0)
+[warn] torch-dftd: torch-dftd is not installed; needed for the D3 reference
+       fix: pip install 'fastmace[d3]'
+[ ok ] cache root: /content/fm/tmp/clean/cache-py3.10 (FASTMACE_CACHE; not created yet)
+[ ok ] file locks: PyTorch file locks: soft (switched at import); cache root on NFS: no; CUDA driver cache /content/fm/cache/nv on NFS: no (enabled)
+[ ok ] model files: /content/fm/models/mace-mh-1.model: mh1-omat, mh1-mp, mh1-r2scan (not hashed: --no-hash)
+all required checks passed (2 warnings).
+== NaCl smoke
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/fastmace/model/loading.py:753: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+W1025 19:34:42.194000 8144 torch/_inductor/utils.py:1806] [0/0_1] Not enough SMs to use max_autotune_gemm mode
+{
+ "backend": "hybrid",
+ "oeq_runtime": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13; host extension: prebuilt (/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/fastmace_oeq_ext/libtorch_tp_jit.so)",
+ "step": 20,
+ "finite": true,
+ "python": "3.10.22",
+ "fastmace": "1.0.0",
+ "fastmace_file": "/content/fm/tmp/clean/clean-py3.10/lib/python3.10/site-packages/fastmace/__init__.py"
+}
+CLEAN INSTALL OK (python 3.10): hybrid backend, prebuilt OEq host extension, no g++/ninja/nvcc call
