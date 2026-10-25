@@ -179,7 +179,21 @@ def test_matches_ase_on_mh1(name):
 @needs_mh1
 @pytest.mark.parametrize("name", SCHEMES)
 def test_extended_energy_over_20_ps(name):
-    """Recorded, not acceptance (plan 4-T03): the drift of the conserved quantity in the default plan."""
+    """Recorded, not acceptance (plan 4-T03): the drift of the conserved quantity in the default plan.
+
+    Runs in a fresh interpreter (``run_fresh``): after other CUDA tests in one process the allocator constraint
+    refused it (phase 4 report, follow-up 3; 5-T11)."""
+    child = (f"import importlib.util, json\n"
+             f"spec = importlib.util.spec_from_file_location('_extended_energy_child', {str(Path(__file__))!r})\n"
+             f"module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)\n"
+             f"print(json.dumps(module._extended_energy({name!r})))\n")
+    summary = ENGINE.run_fresh(child)
+    ENGINE.report(f"4-T03-{name}-extended-energy-20ps", summary)
+    assert summary["finite"], summary
+
+
+def _extended_energy(name):
+    """One scheme's 20 ps run in this process: the summary ``test_extended_energy_over_20_ps`` records."""
     import fastmace as fm
     from fastmace.integrators.base import CONSERVED_KEY
 
@@ -206,5 +220,5 @@ def test_extended_energy_over_20_ps(name):
                "conserved_eV_per_atom_every_ps": rows, "drift_meV_per_atom_per_ps": 1e3 * slope,
                "range_meV_per_atom": 1e3 * float(np.ptp(values)), "seconds": seconds,
                "gpu": torch.cuda.get_device_name()}
-    ENGINE.report(f"4-T03-{name}-extended-energy-20ps", summary)
-    assert np.all(np.isfinite(values)), summary
+    summary["finite"] = bool(np.all(np.isfinite(values)))
+    return summary
