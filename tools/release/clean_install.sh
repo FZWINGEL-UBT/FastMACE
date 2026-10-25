@@ -2,6 +2,7 @@
 # Clean-install check for `pip install fastmace[oeq]` without a C++ compiler (plan task 6-T04, 6-T03).
 #
 #   tools/release/clean_install.sh WHEEL_DIR [PYTHON_VERSION]      (default 3.10)
+#   CLEAN_INSTALL_STAGE=install|check|all (default all): install needs no GPU; check is the GPU part.
 #
 # 1. A fresh venv under ~/tmp/6-T04/clean-<python> (removed first), made with uv.
 # 2. Installs torch 2.14.1+cu130, cuEquivariance's CUDA 13 ops, then FastMACE from this checkout with
@@ -25,13 +26,16 @@ shims=$root/no-compiler-bin
 log=$root/compiler-attempts-py$python_version.log
 models=${FASTMACE_MODELS:-$HOME/models}
 export UV_CACHE_DIR=${UV_CACHE_DIR:-$HOME/.cache/uv} PYTHONDONTWRITEBYTECODE=1 TMPDIR=$root/tmp
+stage=${CLEAN_INSTALL_STAGE:-all}
+command -v uv >/dev/null || export PATH="$HOME/.local/bin:$PATH"
 mkdir -p "$root" "$TMPDIR"
+py=$venv/bin/python
 
+if [ "$stage" != check ]; then
 rm -rf "$venv" "$shims" "$log"
 uv venv -q --python "$python_version" "$venv"
-py=$venv/bin/python
 uv pip install -q --python "$py" --index-url https://download.pytorch.org/whl/cu130 \
-  --extra-index-url https://pypi.org/simple "torch==2.14.1+cu130"
+  --extra-index-url https://pypi.org/simple --index-strategy unsafe-best-match "torch==2.14.1+cu130"
 uv pip install -q --python "$py" --find-links "$wheels" \
   "cuequivariance-ops-torch-cu13" "fastmace[oeq] @ file://$repo" "torch==2.14.1+cu130" \
   --extra-index-url https://download.pytorch.org/whl/cu130 --index-strategy unsafe-best-match
@@ -39,6 +43,8 @@ uv pip check --python "$py"
 "$py" -m pip --version >/dev/null 2>&1 || true
 echo "== installed"
 uv pip list --python "$py" | grep -Ei "^(torch|openequivariance|fastmace|fastmace-oeq-ext|cuequivariance|mace-torch|ninja) "
+fi
+[ "$stage" = install ] && exit 0
 
 mkdir -p "$shims"
 for tool in g++ c++ x86_64-linux-gnu-g++ ninja nvcc; do
@@ -50,7 +56,7 @@ done
 export PATH="$shims:$venv/bin:/usr/local/bin:/usr/bin:/bin"
 export CXX="$shims/g++"
 export FASTMACE_CACHE=$root/cache-py$python_version FASTMACE_MODELS=$models FASTMACE_OEQ_PREBUILT=1
-rm -rf "$FASTMACE_CACHE"
+rm -rf "$FASTMACE_CACHE" "$TMPDIR/nacl-smoke"
 echo "== which: g++=$(command -v g++) ninja=$(command -v ninja) nvcc=$(command -v nvcc)"
 
 echo "== fastmace doctor"
@@ -69,10 +75,13 @@ atoms.rattle(0.05, seed=17)
 result = fm.md(atoms, model="mh1-r2scan", temperature_K=300, steps=20, seed=1,
                output=os.path.join(os.environ["TMPDIR"], "nacl-smoke"))
 record = _patches.record_of("oeq_runtime")
+import numpy as np
+committed = result.simulation.committed()
 summary = {"backend": result.plan.engine.backend, "oeq_runtime": None if record is None else record.detail,
-           "step": result.simulation.step, "python": sys.version.split()[0]}
+           "step": int(committed.step), "finite": bool(np.isfinite(committed.positions).all()),
+           "python": sys.version.split()[0]}
 print(json.dumps(summary, indent=1))
-assert summary["backend"] == "hybrid", summary
+assert summary["backend"] == "hybrid" and summary["step"] == 20 and summary["finite"], summary
 assert record is not None and "host extension: prebuilt" in record.detail, summary
 EOF
 if [ -s "$log" ]; then echo "FAIL: a blocked compiler was called:"; cat "$log"; exit 1; fi
