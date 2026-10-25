@@ -1,0 +1,33 @@
+[fastmace-colab 18:39:35] allocating L4 as fm-l4-20261025-183925-e0e40e
+[fastmace-colab 18:40:22] NVIDIA L4 (sm 8.9, driver 580.82.07); cache sm89-py310-f00d5798f8b5
+[fastmace-colab 18:49:52] ready after 627.3 s; running 1 command(s)
+[fastmace-colab 18:53:11] command 1 exit 1 after 196 s
+tmp/clean/clean-py3.13/lib/python3.13/site-packages/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/content/fm/tmp/clean/clean-py3.13/lib/python3.13/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.13/lib/python3.13/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/content/fm/tmp/clean/clean-py3.13/lib/python3.13/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/content/fm/tmp/clean/clean-py3.13/lib/python3.13/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+W1025 18:51:51.853000 5902 torch/_inductor/utils.py:1806] [0/0] Not enough SMs to use max_autotune_gemm mode
+{
+ "backend": "cueq",
+ "oeq_runtime": null,
+ "step": 20,
+ "finite": true,
+ "python": "3.13.16",
+ "fastmace": "1.0.0",
+ "fastmace_file": "/content/fm/tmp/clean/clean-py3.13/lib/python3.13/site-packages/fastmace/__init__.py"
+}
+Traceback (most recent call last):
+  File "<stdin>", line 17, in <module>
+AssertionError: {'backend': 'cueq', 'oeq_runtime': None, 'step': 20, 'finite': True, 'python': '3.13.16', 'fastmace': '1.0.0', 'fastmace_file': '/content/fm/tmp/clean/clean-py3.13/lib/python3.13/site-packages/fastmace/__init__.py'}
+clean install exit 1
+
+
+[fastmace-colab 18:53:36] stopped fm-l4-20261025-183925-e0e40e
+[fastmace-colab 18:53:37] exit 1, wall 852.7 s, CU 31.19 -> 30.96; /home/fzwin/tmp/6-T13/colab-l4/colab.json; ledger /home/fzwin/.fastmace-colab/colab-ledger.csv

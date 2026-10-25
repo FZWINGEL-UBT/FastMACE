@@ -1,0 +1,22 @@
+ok  fastmace/kernels/oeq_streaming/LICENSE wheel=True sdist=True
+ok  fastmace/kernels/oeq_streaming/NOTICE.md wheel=True sdist=True
+ok  fastmace/longrange/data/dftd3_params.npz wheel=True sdist=True
+ok  fastmace/longrange/data/LICENSE wheel=True sdist=True
+ok  fastmace/longrange/data/NOTICE.md wheel=True sdist=True
+fastmace/kernels/oeq_streaming/ wheel: ['LICENSE', 'NOTICE.md', 'factorized_projected.cuh']
+fastmace/protocols/data/ wheel: ['NaNbOCl4_I4m_Ma2026.cif', 'NbCl5_R2SCAN.cif', 'SOURCES.md', 'npt_anneal_NbCl5.toml', 'npt_anneal_NbCl5_short.toml', 'swap_anneal_NaNbOCl4.toml', 'swap_anneal_NaNbOCl4_short.toml']
+dist-info licences: ['fastmace-1.0.0.dist-info/licenses/LICENSE', 'fastmace-1.0.0.dist-info/licenses/NOTICE.md', 'fastmace-1.0.0.dist-info/licenses/LICENSES/LGPL-2.1-or-later.txt']
+sdist NOTICE.md: True LICENSES: ['LICENSES/LGPL-2.1-or-later.txt']
+  Name: fastmace
+  Version: 1.0.0
+  License-Expression: MIT AND LGPL-2.1-or-later
+  Requires-Python: >=3.10
+  License-File: LICENSE
+  License-File: NOTICE.md
+  License-File: LICENSES/LGPL-2.1-or-later.txt
+  Provides-Extra: oeq
+  Requires-Dist: openequivariance>=0.7; extra == "oeq"
+  Requires-Dist: fastmace-oeq-ext; (sys_platform == "linux" and platform_machine == "x86_64" and python_version < "3.13") and extra == "oeq"
+  Requires-Dist: fastmace-oeq-ext; (sys_platform == "linux" and platform_machine == "x86_64" and python_version < "3.13") and extra == "full"
+  Extras: `[oeq]` (OpenEquivariance hybrid backend), `[polar]` (PolarMACE),
+ITEM2 PASS

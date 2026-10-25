@@ -1,0 +1,87 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for '6-T13 clean install sdist-py3.10' (pid 85026)
+== which: g++=/home/fzwin/tmp/6-T13/clean-sdist-py3.10/no-compiler-bin/g++ ninja=/home/fzwin/tmp/6-T13/clean-sdist-py3.10/no-compiler-bin/ninja nvcc=/home/fzwin/tmp/6-T13/clean-sdist-py3.10/no-compiler-bin/nvcc
+== fastmace doctor
+fastmace doctor: FastMACE 1.0.0, Python 3.10.12, Linux x86_64
+[ ok ] GPU and driver: NVIDIA GeForce RTX 5060 Ti; driver unknown (nvidia-smi not found); torch CUDA 13.0
+[ ok ] torch: torch 2.14.1+cu130
+[ ok ] MACE: mace-torch 0.3.16; looked up, not imported
+[ ok ] cuEquivariance: cuequivariance 0.13.0, cuequivariance-torch 0.13.0; fused-kernel libraries present (cuequivariance-ops-torch-cu13 0.13.0, cuequivariance-ops-cu13 0.13.0); not imported, so a load failure shows at the first model load
+[ ok ] OpenEquivariance: openequivariance 0.7.0; looked up, not imported
+       host extension: prebuilt (fastmace-oeq-ext 0.7.0.post1, /home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/fastmace_oeq_ext/libtorch_tp_jit.so); no compiler needed
+[ ok ] Triton: triton 3.8.0 is importable
+[ ok ] NVRTC: NVRTC 13.0 loads through cuda.bindings
+[warn] graph-longrange: graph-longrange is not installed; needed for MACE-POLAR-1
+       fix: pip install 'fastmace[polar]' (graph-longrange 0.4.0)
+[warn] torch-dftd: torch-dftd is not installed; needed for the D3 reference
+       fix: pip install 'fastmace[d3]'
+[ ok ] cache root: /home/fzwin/tmp/6-T13/clean-sdist-py3.10/cache-py3.10 (FASTMACE_CACHE; not created yet)
+[ ok ] file locks: PyTorch file locks: soft (switched at import); cache root on NFS: no; CUDA driver cache /home/fzwin/.nv/ComputeCache on NFS: no (enabled)
+[ ok ] model files: /home/fzwin/models/2023-12-03-mace-128-L1_epoch-199.model: mp0-medium (not hashed: --no-hash)
+       /home/fzwin/models/MACE-OFF23_large.model: off23-large (not hashed: --no-hash)
+       /home/fzwin/models/MACE-OFF23_medium.model: off23-medium (not hashed: --no-hash)
+       /home/fzwin/models/MACE-OFF23_small.model: off23-small (not hashed: --no-hash)
+       /home/fzwin/models/MACE-OFF23b_medium.model: off23b-medium (not hashed: --no-hash)
+       /home/fzwin/models/MACE-OFF24_medium.model: off24-medium (not hashed: --no-hash)
+       /home/fzwin/models/MACE-POLAR-1-L.model: polar1-l (not hashed: --no-hash)
+       /home/fzwin/models/MACE-POLAR-1-M.model: polar1-m (not hashed: --no-hash)
+       /home/fzwin/models/MACE-POLAR-1-S.model: polar1-s (not hashed: --no-hash)
+       /home/fzwin/models/MACE-matpes-pbe-omat-ft.model: matpes-pbe (not hashed: --no-hash)
+       /home/fzwin/models/MACE-matpes-r2scan-omat-ft.model: matpes-r2scan (not hashed: --no-hash)
+       /home/fzwin/models/MACE-omol-0-extra-large-1024.model: omol0-xl (not hashed: --no-hash)
+       /home/fzwin/models/MACE_MPtrj_2022.9.model: mp0-large (not hashed: --no-hash)
+       /home/fzwin/models/mace-mh-1.matpes_r2scan.model: not in the label table (fm.load needs sha256= or trusted=True)
+       /home/fzwin/models/mace-mh-1.matpes_r2scan.model.json: not in the label table (fm.load needs sha256= or trusted=True)
+       /home/fzwin/models/mace-mh-1.model: mh1-omat, mh1-mp, mh1-r2scan (not hashed: --no-hash)
+       /home/fzwin/models/mace-mp-0b3-medium.model: mp0b3-medium (not hashed: --no-hash)
+       /home/fzwin/models/mace-mpa-0-medium.model: mpa0-medium (not hashed: --no-hash)
+       /home/fzwin/models/mace-omat-0-medium.model: omat0-medium (not hashed: --no-hash)
+all required checks passed (2 warnings).
+== NaCl smoke
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA RTX A6000.
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/fastmace/model/loading.py:753: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+W1025 19:42:04.879000 85076 torch/_inductor/utils.py:1806] [0/0_1] Not enough SMs to use max_autotune_gemm mode
+Error getting GPU memory: [Errno 2] No such file or directory: 'nvidia-smi'
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+{
+ "backend": "hybrid",
+ "oeq_runtime": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13; host extension: prebuilt (/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/fastmace_oeq_ext/libtorch_tp_jit.so)",
+ "step": 20,
+ "finite": true,
+ "python": "3.10.12",
+ "fastmace": "1.0.0",
+ "fastmace_file": "/home/fzwin/tmp/6-T13/clean-sdist-py3.10/clean-py3.10/lib/python3.10/site-packages/fastmace/__init__.py"
+}
+CLEAN INSTALL OK (python 3.10): hybrid backend, prebuilt OEq host extension, no g++/ninja/nvcc call
