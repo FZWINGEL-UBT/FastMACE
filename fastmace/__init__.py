@@ -9,7 +9,7 @@ _FILE_LOCK_SOURCE, _FILE_LOCK_SWITCH_LATE, _CUDA_DRIVER_CACHE = _file_locks.conf
 from dataclasses import dataclass  # noqa: E402  (after the lock switch above)
 
 # The single source of the version (pyproject.toml reads it; docs/development.md, "Releasing").
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 
 @dataclass(frozen=True)
