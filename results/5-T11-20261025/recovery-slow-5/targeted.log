@@ -1,0 +1,90 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/5-T11/inductor, triton /home/fzwin/fastmace-cache/5-T11/triton
+rootdir: /home/fzwin/fastmace-5T11-freeze
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 1 item
+
+tests/gpu/test_rewrites_mh1_gpu.py .                                     [100%]
+
+=============================== warnings summary ===============================
+../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+  /home/fzwin/fastmace-5T11-freeze/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+  /home/fzwin/fastmace-5T11-freeze/tests/gpu/test_rewrites_mh1_gpu.py:250: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    original = loading.load("mh1-r2scan", backend="cueq", dtype="float64", device="cuda:0")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+==================================== PASSES ====================================
+__________ test_mh1_float64_package_agrees_with_the_unrewritten_model __________
+----------------------------- Captured stdout call -----------------------------
+{
+ "enabled": [
+  "factor_species",
+  "fold_cutoff",
+  "density_first",
+  "joint_radial_input",
+  "fused_folded_backward",
+  "reassociate_first",
+  "segmented_first_sum",
+  "block_linear",
+  "grouped_linear",
+  "merged_residual"
+ ],
+ "reasons": {
+  "factor_species": "default auto",
+  "fold_cutoff": "default auto",
+  "density_first": "default auto",
+  "joint_radial_input": "default auto",
+  "fused_folded_backward": "default auto",
+  "folded_backward_tiles": "default off; only an explicit 'on' enables it",
+  "fused_radial_hidden": "default off; only an explicit 'on' enables it",
+  "direct_node_feats": "default off; only an explicit 'on' enables it",
+  "folded_constants": "default off; only an explicit 'on' enables it",
+  "streaming_conv": "no factored interaction with an OEq-fused convolution (hybrid backend)",
+  "reassociate_first": "default auto",
+  "segmented_first_sum": "default auto",
+  "block_linear": "default auto",
+  "grouped_linear": "default auto",
+  "merged_residual": "default auto"
+ },
+ "checks": {
+  "factor_species": 3.928807003186746e-15,
+  "fold_cutoff": 3.383139363855254e-15,
+  "density_first": 3.928807003186746e-15,
+  "joint_radial_input": 4.256207586785642e-15,
+  "fused_folded_backward": 3.3831393638552517e-15,
+  "reassociate_first": 9.177209734366426e-15,
+  "segmented_first_sum": 6.073153500683673e-15,
+  "block_linear": 2.57745411649926e-15,
+  "grouped_linear": 2.57745411649926e-15,
+  "merged_residual": 9.04367440167639e-16
+ },
+ "energy_eV": -438.03803240946763,
+ "energy_error_eV": 0.0,
+ "energy_relative": 0.0,
+ "force_error_eV_per_A": 1.6653345369377348e-15,
+ "force_relative": 1.582382898911797e-15
+}
+- generated xml file: /home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-slow-5/targeted/junit.xml -
+============================= slowest 60 durations =============================
+14.50s call     tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+
+(2 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+PASSED tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+======================== 1 passed, 5 warnings in 16.75s ========================

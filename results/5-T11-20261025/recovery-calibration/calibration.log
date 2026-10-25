@@ -1,0 +1,25 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/5-T11/inductor, triton /home/fzwin/fastmace-cache/5-T11/triton
+rootdir: /home/fzwin/fastmace-5T11-recovery-a2077787
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 2 items
+
+tests/gpu/test_calibrate_gpu.py ..                                       [100%]
+
+==================================== PASSES ====================================
+___________ test_the_calibration_measures_both_backends_in_children ____________
+---------------------------- Captured stdout setup -----------------------------
+{'gpu': 'NVIDIA GeForce RTX 5060 Ti', 'backend': 'hybrid', 'candidates': [['', [3.953946960000394, 4.00523475999762]], ['backend cueq', [7.249746679999589, 7.241700200002015]]], 'chosen': '', 'record_setup_s': 99.63720313999966}
+- generated xml file: /home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-calibration/calibration/junit.xml -
+============================= slowest 60 durations =============================
+127.28s setup    tests/gpu/test_calibrate_gpu.py::test_the_calibration_measures_both_backends_in_children
+
+(5 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+PASSED tests/gpu/test_calibrate_gpu.py::test_the_calibration_measures_both_backends_in_children
+PASSED tests/gpu/test_calibrate_gpu.py::test_the_calibration_keeps_hybrid_on_nacl
+======================== 2 passed in 127.84s (0:02:07) =========================

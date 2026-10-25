@@ -1,0 +1,66 @@
+{
+ "restart-False": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "fused": null,
+  "rebuilds": 82,
+  "graphs": [
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "restart-True": {
+  "step": 600,
+  "energy": -1461.4094561957781,
+  "fused": true,
+  "rebuilds": 82,
+  "graphs": [
+   "C",
+   "ACP",
+   "('B', 7680)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "npt-False": {
+  "step": 600,
+  "energy": -1456.9443879830474,
+  "fused": null,
+  "rebuilds": 134,
+  "graphs": [
+   "('B', 7680)",
+   "('B', 7168)",
+   "AC",
+   "C",
+   "('B', 6656)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ },
+ "npt-True": {
+  "step": 600,
+  "energy": -1456.9443879830474,
+  "fused": "variable cell (LangevinBAOAB keeps the PyTorch stage)",
+  "rebuilds": 134,
+  "graphs": [
+   "('B', 7680)",
+   "('B', 7168)",
+   "AC",
+   "C",
+   "('B', 6656)"
+  ],
+  "backend": "cueq",
+  "dtype": "float64",
+  "tier": "graph",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti"
+ }
+}

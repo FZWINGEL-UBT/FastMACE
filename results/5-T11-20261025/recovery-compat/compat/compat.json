@@ -1,0 +1,117 @@
+{
+  "tool": "compat",
+  "tier": "-m compat (tests/_support/tiers.py)",
+  "provider": "local",
+  "label": "RTX 5060 Ti (local)",
+  "host": "Fabi-PC",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "capability": [
+    12,
+    0
+  ],
+  "driver": "610.88",
+  "cuda": "13.0",
+  "versions": {
+    "torch": "2.14.1+cu130",
+    "triton": "3.8.0",
+    "cuequivariance": "0.12.0",
+    "cuequivariance_torch": "0.12.0",
+    "openequivariance": null,
+    "mace": null,
+    "ase": "3.27.0",
+    "numpy": "2.2.6"
+  },
+  "python": "/home/fzwin/environments/mace_cueq_latest/bin/python",
+  "fastmace_commit": "a2077787e230a78f5306254e9ad467f4f193c094",
+  "started_utc": "2026-10-25T10:55:51+00:00",
+  "command": [
+    "/home/fzwin/environments/mace_cueq_latest/bin/python",
+    "-m",
+    "pytest",
+    "tests/gpu",
+    "-m",
+    "compat",
+    "-p",
+    "no:cacheprovider",
+    "-rfEs",
+    "--durations=30",
+    "--junitxml=/home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-compat/compat/junit.xml",
+    "-p",
+    "resultlog",
+    "--result-log=/home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-compat/compat/results.jsonl"
+  ],
+  "exit_code": 0,
+  "wall_s": 1675.3746734810002,
+  "finished_utc": "2026-10-25T11:23:46+00:00",
+  "counts": {
+    "passed": 365,
+    "failed": 0,
+    "error": 0,
+    "skipped": 3
+  },
+  "failures": [],
+  "slowest": [
+    {
+      "test": "tests.gpu.test_canonical_restart_gpu::test_mh1_plain_cueq_float64_resumes_within_1e_12",
+      "seconds": 184.104
+    },
+    {
+      "test": "tests.gpu.test_reproducible_gpu::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]",
+      "seconds": 85.002
+    },
+    {
+      "test": "tests.gpu.test_energy_gpu::test_float64_energy_replays_and_keeps_forces[default-dtype1]",
+      "seconds": 75.902
+    },
+    {
+      "test": "tests.gpu.test_eager_gpu::test_mh1_hybrid_eager_equals_graph_within_float32_noise",
+      "seconds": 75.874
+    },
+    {
+      "test": "tests.gpu.test_compat_gpu::test_a_short_md_smoke_in_nve_nvt_and_npt",
+      "seconds": 74.161
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[mh1-r2scan-nvt]",
+      "seconds": 66.452
+    },
+    {
+      "test": "tests.gpu.test_adapt_switch_gpu::test_a_forced_recapture_storm_switches_once_to_the_compiled_tier",
+      "seconds": 63.665
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[polar1-s]",
+      "seconds": 58.701
+    },
+    {
+      "test": "tests.gpu.test_energy_gpu::test_float64_energy_replays_and_keeps_forces[default-dtype0]",
+      "seconds": 50.916
+    },
+    {
+      "test": "tests.gpu.test_mc_driver_gpu::test_captured_attempts_tiny_plain_cueq",
+      "seconds": 49.647
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[mh1-r2scan-npt-full]",
+      "seconds": 45.791
+    },
+    {
+      "test": "tests.gpu.test_tiny_released_gpu::test_tiny_registry_plain_cueq_float64",
+      "seconds": 44.291
+    },
+    {
+      "test": "tests.gpu.test_selfcheck_gpu::test_gate_passes_in_graph_mode[mp0-medium]",
+      "seconds": 42.78
+    },
+    {
+      "test": "tests.gpu.test_tiny_released_gpu::test_tiny_broken_captured_graph_fails_while_eager_passes",
+      "seconds": 42.008
+    },
+    {
+      "test": "tests.gpu.test_mc_evaluator_gpu::test_energy_only_graph_and_evaluator_tiny_plain_cueq",
+      "seconds": 41.153
+    }
+  ],
+  "test_seconds": 1660.3799999999987,
+  "junit": "/home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-compat/compat/junit.xml"
+}

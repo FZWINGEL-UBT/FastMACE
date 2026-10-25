@@ -1,0 +1,86 @@
+{
+  "5-T11-local-20261025": {
+    "source_directory": "/home/fzwin/fastmace-acceptance/5-T11-local-20261025",
+    "suites": {
+      "slow-tier": {
+        "counts": {
+          "passed": 69,
+          "failed": 6,
+          "errors": 0,
+          "skipped": 0
+        },
+        "failures": [
+          {
+            "test": "tests.gpu.test_reference_gpu::test_polar1s_stress_check_passes_on_the_gate_configuration[NbCl5]",
+            "message": "RuntimeError: Triton Error [CUDA]: out of memory"
+          },
+          {
+            "test": "tests.gpu.test_reference_gpu::test_polar1s_stress_check_passes_on_the_gate_configuration[NaCl]",
+            "message": "fastmace.errors.BackendError: cueq initialization failed: CUDA error: out of memory\nSearch for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\nThe CUDA driver logged these messages, which may provide useful details:\nSticky error detected\nReturning 2 (CUDA_ERROR_OUT_OF_MEMORY) from cuStreamIsCapturing\n\n\nNext: Install the backend's packages, or choose another backend.\nEnvironment: run `fastmace doctor` to check this installation."
+          },
+          {
+            "test": "tests.gpu.test_rewrites_generic_gpu::test_stacked_generic_rewrites_plain_cueq_float64[mp0-medium]",
+            "message": "fastmace.errors.BackendError: cueq initialization failed: CUDA error: out of memory\nSearch for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\nThe CUDA driver logged these messages, which may provide useful details:\nSticky error detected\nReturning 2 (CUDA_ERROR_OUT_OF_MEMORY) from cuStreamIsCapturing\n\n\nNext: Install the backend's packages, or choose another backend.\nEnvironment: run `fastmace doctor` to check this installation."
+          },
+          {
+            "test": "tests.gpu.test_rewrites_generic_gpu::test_stacked_generic_rewrites_plain_cueq_float64[off23-small]",
+            "message": "fastmace.errors.BackendError: cueq initialization failed: CUDA error: out of memory\nSearch for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\nThe CUDA driver logged these messages, which may provide useful details:\nSticky error detected\nReturning 2 (CUDA_ERROR_OUT_OF_MEMORY) from cuStreamIsCapturing\n\n\nNext: Install the backend's packages, or choose another backend.\nEnvironment: run `fastmace doctor` to check this installation."
+          },
+          {
+            "test": "tests.gpu.test_rewrites_mh1_gpu::test_streaming_attaches_on_a_tiny_hybrid_model[float64]",
+            "message": "torch.AcceleratorError: CUDA error: out of memory\nSearch for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\nThe CUDA driver logged these messages, which may provide useful details:\nSticky error detected\nReturning 2 (CUDA_ERROR_OUT_OF_MEMORY) from cuStreamGetCaptureInfo_v3"
+          },
+          {
+            "test": "tests.gpu.test_rewrites_mh1_gpu::test_mh1_float64_package_agrees_with_the_unrewritten_model",
+            "message": "fastmace.errors.BackendError: cueq initialization failed: CUDA error: out of memory\nSearch for `cudaErrorMemoryAllocation' in https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__TYPES.html for more information.\nThe CUDA driver logged these messages, which may provide useful details:\nSticky error detected\nReturning 2 (CUDA_ERROR_OUT_OF_MEMORY) from cuStreamIsCapturing\n\n\nNext: Install the backend's packages, or choose another backend.\nEnvironment: run `fastmace doctor` to check this installation."
+          }
+        ]
+      },
+      "acceptance-tier": {
+        "counts": {
+          "passed": 52,
+          "failed": 3,
+          "errors": 0,
+          "skipped": 0
+        },
+        "failures": [
+          {
+            "test": "tests.gpu.test_nose_hoover_mtk_mh1_gpu::test_extended_energy_over_20_ps[nhc]",
+            "message": "fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 59 of 59 allocator segments are not expandable. Call configure_allocator before anything touches CUDA\nNext: Run this plan in a separate process (a fresh Python process or the subprocess runner).\nEnvironment: run `fastmace doctor` to check this installation."
+          },
+          {
+            "test": "tests.gpu.test_nose_hoover_mtk_mh1_gpu::test_extended_energy_over_20_ps[hydrostatic]",
+            "message": "fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 59 of 59 allocator segments are not expandable. Call configure_allocator before anything touches CUDA\nNext: Run this plan in a separate process (a fresh Python process or the subprocess runner).\nEnvironment: run `fastmace doctor` to check this installation."
+          },
+          {
+            "test": "tests.gpu.test_nose_hoover_mtk_mh1_gpu::test_extended_energy_over_20_ps[full]",
+            "message": "fastmace.errors.ProcessConstraintError: PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True was set after the first CUDA allocation: 59 of 59 allocator segments are not expandable. Call configure_allocator before anything touches CUDA\nNext: Run this plan in a separate process (a fresh Python process or the subprocess runner).\nEnvironment: run `fastmace doctor` to check this installation."
+          }
+        ]
+      },
+      "preflight": {
+        "counts": {
+          "passed": 37,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "failures": []
+      }
+    }
+  },
+  "5-T11-local-20261025-recovery-energy": {
+    "source_directory": "/home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-energy",
+    "suites": {
+      "targeted": {
+        "counts": {
+          "passed": 3,
+          "failed": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "failures": []
+      }
+    }
+  }
+}

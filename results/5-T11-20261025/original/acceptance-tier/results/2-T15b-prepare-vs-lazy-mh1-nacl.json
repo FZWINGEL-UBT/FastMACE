@@ -1,0 +1,41 @@
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "backend": "hybrid",
+ "dtype": "float32",
+ "prepare_vs_lazy_A": 3.7299463251372345e-07,
+ "lazy_again_vs_lazy_A": 4.284086756456418e-07,
+ "prepare_vs_lazy_momenta": 3.194010068929831e-06,
+ "graphs_after_setup": {
+  "lazy": [],
+  "prepare": [
+   "ACP",
+   "('B', 7168)"
+  ]
+ },
+ "setup_s": {
+  "lazy": {
+   "plan": 0.17671607399915956,
+   "build": 19.50429082000028,
+   "capture": 1.3729995771427639e-06,
+   "provenance": 0.0046675300000060815
+  },
+  "prepare": {
+   "plan": 0.005766528000094695,
+   "build": 15.34284183499949,
+   "capture": 0.26661278099982155,
+   "provenance": 9.924299956765026e-05
+  },
+  "lazy_again": {
+   "plan": 0.006715204000101949,
+   "build": 15.349928442999953,
+   "capture": 1.6639996829326265e-06,
+   "provenance": 6.990100064285798e-05
+  }
+ },
+ "loop_s": {
+  "lazy": 0.9377364009997109,
+  "prepare": 0.7761964260007517,
+  "lazy_again": 1.0303014139999505
+ }
+}

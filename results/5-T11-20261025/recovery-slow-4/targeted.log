@@ -1,0 +1,130 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/5-T11/inductor, triton /home/fzwin/fastmace-cache/5-T11/triton
+rootdir: /home/fzwin/fastmace-5T11-freeze
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 1 item
+
+tests/gpu/test_rewrites_mh1_gpu.py .                                     [100%]
+
+=============================== warnings summary ===============================
+../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+==================================== PASSES ====================================
+___________ test_streaming_attaches_on_a_tiny_hybrid_model[float64] ____________
+----------------------------- Captured stdout call -----------------------------
+{
+ "enabled": [
+  "factor_species",
+  "fold_cutoff",
+  "density_first",
+  "joint_radial_input",
+  "fused_folded_backward",
+  "streaming_conv",
+  "reassociate_first",
+  "segmented_first_sum",
+  "block_linear",
+  "grouped_linear",
+  "merged_residual"
+ ],
+ "reasons": {
+  "factor_species": "default auto",
+  "fold_cutoff": "default auto",
+  "density_first": "default auto",
+  "joint_radial_input": "default auto",
+  "fused_folded_backward": "default auto",
+  "folded_backward_tiles": "default off; only an explicit 'on' enables it",
+  "fused_radial_hidden": "default off; only an explicit 'on' enables it",
+  "direct_node_feats": "default off; only an explicit 'on' enables it",
+  "folded_constants": "default off; only an explicit 'on' enables it",
+  "streaming_conv": "default auto",
+  "reassociate_first": "default auto",
+  "segmented_first_sum": "default auto",
+  "block_linear": "default auto",
+  "grouped_linear": "default auto",
+  "merged_residual": "default auto"
+ },
+ "checks": {
+  "factor_species": [
+   true,
+   9.509816262891476e-16,
+   1e-10
+  ],
+  "fold_cutoff": [
+   true,
+   9.891676541997196e-16,
+   1e-10
+  ],
+  "density_first": [
+   true,
+   1.0261909380051146e-15,
+   1e-10
+  ],
+  "joint_radial_input": [
+   true,
+   1.0261909380051146e-15,
+   1e-10
+  ],
+  "fused_folded_backward": [
+   true,
+   1.0261909380051146e-15,
+   1e-10
+  ],
+  "streaming_conv": [
+   true,
+   1.0261909380051146e-15,
+   1e-10
+  ],
+  "reassociate_first": [
+   true,
+   1.19569660910027e-15,
+   1e-10
+  ],
+  "segmented_first_sum": [
+   true,
+   1.19569660910027e-15,
+   1e-10
+  ],
+  "block_linear": [
+   true,
+   4.702077005678919e-16,
+   1e-10
+  ],
+  "grouped_linear": [
+   true,
+   4.702077005678919e-16,
+   1e-10
+  ],
+  "merged_residual": [
+   true,
+   2.921378419517686e-16,
+   1e-10
+  ]
+ },
+ "streaming": [
+  0,
+  1
+ ],
+ "bound": 2,
+ "energy": 22.697508797643014,
+ "atoms": 64,
+ "energy_error": 1.4210854715202004e-14,
+ "energy_relative": 6.260975529031497e-16,
+ "force_error": 6.96491475604688e-16,
+ "force_relative": 3.754987243180901e-14,
+ "bound_relative": 1.7395457714362463e-14
+}
+- generated xml file: /home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-slow-4/targeted/junit.xml -
+============================= slowest 60 durations =============================
+11.06s call     tests/gpu/test_rewrites_mh1_gpu.py::test_streaming_attaches_on_a_tiny_hybrid_model[float64]
+
+(2 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+PASSED tests/gpu/test_rewrites_mh1_gpu.py::test_streaming_attaches_on_a_tiny_hybrid_model[float64]
+======================== 1 passed, 1 warning in 13.24s =========================

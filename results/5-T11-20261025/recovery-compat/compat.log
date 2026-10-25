@@ -1,0 +1,136 @@
+Cannot read termcap database;
+using dumb terminal settings.
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-9.1.1, pluggy-1.7.0
+compile caches (caller's): inductor /home/fzwin/fastmace-cache/5-T11/inductor, triton /home/fzwin/fastmace-cache/5-T11/triton
+rootdir: /home/fzwin/fastmace-5T11-recovery-a2077787
+configfile: pyproject.toml
+plugins: platformdirs-4.12.3, xdist-3.8.0
+collected 518 items / 150 deselected / 368 selected
+
+tests/gpu/test_adapt_switch_gpu.py .                                     [  0%]
+tests/gpu/test_canonical_restart_gpu.py .                                [  0%]
+tests/gpu/test_cell_filter_gpu.py ....                                   [  1%]
+tests/gpu/test_combo_kernels_cuda.py .                                   [  1%]
+tests/gpu/test_compat_gpu.py ..                                          [  2%]
+tests/gpu/test_d3_integration_gpu.py .                                   [  2%]
+tests/gpu/test_d3_kernel_gpu.py ........................................ [ 13%]
+.                                                                        [ 13%]
+tests/gpu/test_d3_list_gpu.py ...........                                [ 16%]
+tests/gpu/test_eager_gpu.py .                                            [ 17%]
+tests/gpu/test_energy_gpu.py ....                                        [ 18%]
+tests/gpu/test_engine_gpu.py .............                               [ 21%]
+tests/gpu/test_events_gpu.py ............                                [ 25%]
+tests/gpu/test_fire_gpu.py ..........                                    [ 27%]
+tests/gpu/test_folded_tiles_cuda.py ......                               [ 29%]
+tests/gpu/test_forces_gpu.py ........                                    [ 31%]
+tests/gpu/test_fused_projection_gpu.py .....                             [ 32%]
+tests/gpu/test_grouped_gemm_cuda.py ..                                   [ 33%]
+tests/gpu/test_integrators_gpu.py .....                                  [ 34%]
+tests/gpu/test_io_gpu.py ....                                            [ 35%]
+tests/gpu/test_kernels_oeq_streaming_cuda.py ss                          [ 36%]
+tests/gpu/test_kernels_triton_cuda.py .................                  [ 41%]
+tests/gpu/test_lbfgs_gpu.py ....                                         [ 42%]
+tests/gpu/test_load_hybrid_gpu.py ...                                    [ 42%]
+tests/gpu/test_loading_gpu.py ...                                        [ 43%]
+tests/gpu/test_mc_displace_gpu.py .                                      [ 44%]
+tests/gpu/test_mc_driver_gpu.py .                                        [ 44%]
+tests/gpu/test_mc_evaluator_gpu.py ..                                    [ 44%]
+tests/gpu/test_memory_gpu.py .                                           [ 45%]
+tests/gpu/test_neighbors_gpu.py ........................................ [ 55%]
+.......................................................                  [ 70%]
+tests/gpu/test_nose_hoover_mtk_gpu.py .................................. [ 80%]
+...                                                                      [ 80%]
+tests/gpu/test_npt_d3_gpu.py .                                           [ 81%]
+tests/gpu/test_nve_csvr_berendsen_gpu.py .....                           [ 82%]
+tests/gpu/test_overflow_commit_gpu.py ...                                [ 83%]
+tests/gpu/test_planner_gpu.py .                                          [ 83%]
+tests/gpu/test_polar_gpu.py ....                                         [ 84%]
+tests/gpu/test_reference_gpu.py s                                        [ 85%]
+tests/gpu/test_reproducible_gpu.py .                                     [ 85%]
+tests/gpu/test_rewrites_generic_gpu.py .............                     [ 88%]
+tests/gpu/test_rewrites_linear_gpu.py .....                              [ 90%]
+tests/gpu/test_rewrites_mh1_gpu.py ...........                           [ 93%]
+tests/gpu/test_segment_gemm_cuda.py ..                                   [ 93%]
+tests/gpu/test_selfcheck_gpu.py ....                                     [ 94%]
+tests/gpu/test_smoke.py ..                                               [ 95%]
+tests/gpu/test_superset_gpu.py ..                                        [ 95%]
+tests/gpu/test_template_cache_gpu.py ....                                [ 97%]
+tests/gpu/test_tf32x3_gemm_cuda.py .......                               [ 98%]
+tests/gpu/test_tiny_engine_gpu.py ..                                     [ 99%]
+tests/gpu/test_tiny_released_gpu.py ..                                   [100%]
+
+=============================== warnings summary ===============================
+../environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+tests/gpu/test_cell_filter_gpu.py::test_captured_relaxation_equals_eager_bitwise[fire]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/e3nn/o3/_wigner.py:10: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    _Jd, _W3j_flat, _W3j_indices = torch.load(os.path.join(os.path.dirname(__file__), 'constants.pt'))
+
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+tests/gpu/test_loading_gpu.py::test_mh1_plain_cueq_float64
+tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_float64_package_agrees_with_the_unrewritten_model
+  /home/fzwin/fastmace-5T11-recovery-a2077787/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+    value = original(*args, **kwargs)
+
+tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+  /home/fzwin/fastmace-5T11-recovery-a2077787/fastmace/model/loading.py:753: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+    loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+
+tests/gpu/test_d3_kernel_gpu.py::test_float64_against_both_references[NaCl-rattled-torch-dftd]
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch_dftd/torch_dftd3_calculator.py:98: UserWarning: Creating a tensor from a list of numpy.ndarrays is extremely slow. Please consider converting the list to a single numpy.ndarray with numpy.array() before converting to a tensor. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/utils/tensor_new.cpp:252.)
+    cell: Optional[Tensor] = torch.tensor(
+
+tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[none-dtype0]
+  /home/fzwin/fastmace-5T11-recovery-a2077787/tests/gpu/test_forces_gpu.py:78: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+  Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:820.)
+    return float((got - expected).abs().max()) / float(expected.abs().max())
+
+tests/gpu/test_polar_gpu.py::test_tiny_polar_runs_without_host_synchronisation
+  /home/fzwin/environments/mace_cueq_latest/lib/python3.10/site-packages/torch/cuda/__init__.py:1395: UserWarning: Synchronization debug mode is a prototype feature and does not yet detect all synchronizing operations (Triggered internally at /__w/pytorch/pytorch/torch/csrc/cuda/Module.cpp:1080.)
+    torch._C._cuda_set_sync_debug_mode(debug_mode)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+- generated xml file: /home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-compat/compat/junit.xml -
+============================= slowest 30 durations =============================
+184.10s call     tests/gpu/test_canonical_restart_gpu.py::test_mh1_plain_cueq_float64_resumes_within_1e_12
+85.00s call     tests/gpu/test_reproducible_gpu.py::test_repeated_and_interrupted_runs_are_bitwise_equal[NaCl-float32]
+75.88s call     tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[default-dtype1]
+75.87s call     tests/gpu/test_eager_gpu.py::test_mh1_hybrid_eager_equals_graph_within_float32_noise
+74.16s call     tests/gpu/test_compat_gpu.py::test_a_short_md_smoke_in_nve_nvt_and_npt
+66.45s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[mh1-r2scan-nvt]
+63.66s call     tests/gpu/test_adapt_switch_gpu.py::test_a_forced_recapture_storm_switches_once_to_the_compiled_tier
+58.70s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[polar1-s]
+50.91s call     tests/gpu/test_energy_gpu.py::test_float64_energy_replays_and_keeps_forces[default-dtype0]
+49.65s call     tests/gpu/test_mc_driver_gpu.py::test_captured_attempts_tiny_plain_cueq
+45.79s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[mh1-r2scan-npt-full]
+44.29s call     tests/gpu/test_tiny_released_gpu.py::test_tiny_registry_plain_cueq_float64
+42.78s call     tests/gpu/test_selfcheck_gpu.py::test_gate_passes_in_graph_mode[mp0-medium]
+42.01s call     tests/gpu/test_tiny_released_gpu.py::test_tiny_broken_captured_graph_fails_while_eager_passes
+41.15s call     tests/gpu/test_mc_evaluator_gpu.py::test_energy_only_graph_and_evaluator_tiny_plain_cueq
+38.64s call     tests/gpu/test_overflow_commit_gpu.py::test_an_edge_overflow_is_redone_with_the_fused_integrator
+38.06s call     tests/gpu/test_engine_gpu.py::test_process_constraints_refuse_a_mixed_process
+30.71s call     tests/gpu/test_forces_gpu.py::test_two_force_fields_from_one_model_step_independently[float32-default]
+30.31s call     tests/gpu/test_tiny_engine_gpu.py::test_no_compile_at_a_later_edge_bucket_tiny_plain_cueq
+26.49s call     tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[default-dtype0]
+26.36s call     tests/gpu/test_forces_gpu.py::test_rewritten_force_field_agrees_and_replays_in_a_graph[default-dtype1]
+25.84s call     tests/gpu/test_d3_integration_gpu.py::test_d3_in_the_captured_force_graph
+21.86s call     tests/gpu/test_combo_kernels_cuda.py::test_combo_kernels_change_no_value
+21.28s call     tests/gpu/test_compat_gpu.py::test_captured_graphs_and_their_kernel_counts_are_recorded
+19.96s call     tests/gpu/test_memory_gpu.py::test_the_prediction_covers_the_measured_peak
+19.18s call     tests/gpu/test_npt_d3_gpu.py::test_npt_with_d3_follows_ase
+17.14s call     tests/gpu/test_rewrites_mh1_gpu.py::test_mh1_hybrid_float32_with_streaming
+14.91s call     tests/gpu/test_mc_displace_gpu.py::test_displacement_attempts_captured_with_trial_builds
+14.87s call     tests/gpu/test_rewrites_generic_gpu.py::test_stacked_generic_rewrites_hybrid_in_a_fresh_process[mp0-medium-float32]
+13.28s call     tests/gpu/test_template_cache_gpu.py::test_a_template_copy_is_the_reload[hybrid-float64]
+=========================== short test summary info ============================
+SKIPPED [1] tests/gpu/test_kernels_oeq_streaming_cuda.py:155: openequivariance is not installed (the streaming kernels need it)
+SKIPPED [1] tests/gpu/test_kernels_oeq_streaming_cuda.py:159: openequivariance is not installed (the streaming kernels need it)
+SKIPPED [1] tests/gpu/test_reference_gpu.py:45: FASTMACE_1A_T19_POLAR1S is not set (1a-T19's gate-polar1-s run)
+=== 365 passed, 3 skipped, 150 deselected, 12 warnings in 1669.76s (0:27:49) ===
+compat on RTX 5060 Ti (local) (local): 365 passed, 0 failed, 0 errors, 3 skipped in 27.9 min (/home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-compat/compat/compat.json)

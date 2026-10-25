@@ -1,0 +1,802 @@
+{
+ "side": "switched",
+ "steps": 2000,
+ "wall_s": 54.193479333999676,
+ "ms_per_step": 27.096739666999838,
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "source_commit": "a2077787e230a78f5306254e9ad467f4f193c094",
+ "switches": [
+  {
+   "step": 1,
+   "from": "graph",
+   "to": "compiled",
+   "reason": "adapt: graph -> compiled: 2 re-captures took 0.107 s, 70.9 % of the wall time since the last switch (above 20 %), the budget exceeded at step 0 (SPEC \u00a79.6, decision 52)",
+   "revision": 1
+  }
+ ],
+ "tier": "compiled",
+ "segments": [
+  {
+   "first_step": 0,
+   "last_step": 1,
+   "reason": "recapture",
+   "canonical": false,
+   "wall_s": 0.15159230099970955,
+   "recaptures": 2,
+   "recapture_s": 0.1074328400000013,
+   "captures": 2,
+   "capture_s": 0.1074328400000013,
+   "overflows_redone": 0,
+   "budget_exceeded_at": 0,
+   "lists": {
+    "mace": {
+     "rebuilds": 0,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1,
+   "last_step": 50,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 1.038223998000376,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 28,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 8,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 50,
+   "last_step": 100,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9406342799998129,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 17,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 100,
+   "last_step": 150,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8896675099999811,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 19,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 150,
+   "last_step": 200,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.936644921000152,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 18,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 200,
+   "last_step": 250,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9365511649998552,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 250,
+   "last_step": 300,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8892560690001119,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 19,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 300,
+   "last_step": 350,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9389349079997373,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 21,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 350,
+   "last_step": 400,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8879288500002076,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 19,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 400,
+   "last_step": 450,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.840219808999791,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 14,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 450,
+   "last_step": 500,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9569940139999744,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 21,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 500,
+   "last_step": 550,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8593846500002655,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 18,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 550,
+   "last_step": 600,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9077982720000364,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 21,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 600,
+   "last_step": 650,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9405926479998925,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 650,
+   "last_step": 700,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8870289790002062,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 700,
+   "last_step": 750,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8532075529997201,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 21,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 750,
+   "last_step": 800,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8654741640002612,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 800,
+   "last_step": 850,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.857679098999597,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 850,
+   "last_step": 900,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8672596559999874,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 21,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 900,
+   "last_step": 950,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.7992629700001999,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 16,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 950,
+   "last_step": 1000,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9149031249999098,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 25,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1000,
+   "last_step": 1050,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8402731539999877,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 19,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1050,
+   "last_step": 1100,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.7900660340001195,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 18,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1100,
+   "last_step": 1150,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9940327049998814,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 24,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1150,
+   "last_step": 1200,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.858340765000321,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 19,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1200,
+   "last_step": 1250,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9365242049998415,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1250,
+   "last_step": 1300,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8874020220000602,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 16,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1300,
+   "last_step": 1350,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8971407240001099,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 18,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1350,
+   "last_step": 1400,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8976934489996893,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 18,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1400,
+   "last_step": 1450,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.9577026980000483,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 19,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1450,
+   "last_step": 1500,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.831814642000154,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 14,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1500,
+   "last_step": 1550,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.956741847000103,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 19,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1550,
+   "last_step": 1600,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8604696219999823,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 14,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1600,
+   "last_step": 1650,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8520079059999262,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1650,
+   "last_step": 1700,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8514852969997264,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 22,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1700,
+   "last_step": 1750,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8411024030001499,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1750,
+   "last_step": 1800,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8625201830000151,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 18,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1800,
+   "last_step": 1850,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.8895426569997653,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1850,
+   "last_step": 1900,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.797328392000054,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 16,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1900,
+   "last_step": 1950,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.774810355000227,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 17,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 10,
+     "build_time_s": null
+    }
+   }
+  },
+  {
+   "first_step": 1950,
+   "last_step": 2000,
+   "reason": "restart",
+   "canonical": true,
+   "wall_s": 0.83995360300014,
+   "recaptures": 0,
+   "recapture_s": 0,
+   "captures": 0,
+   "capture_s": 0,
+   "overflows_redone": 20,
+   "budget_exceeded_at": null,
+   "lists": {
+    "mace": {
+     "rebuilds": 11,
+     "build_time_s": null
+    }
+   }
+  }
+ ],
+ "plan_first": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (19): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, block_linear, grouped_linear,\n      merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,\n      fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,\n      tf32x3_gemms (only an explicit 'on' enables it); grouped_launch (not the generic MACE family, decision 57);\n      species_skip (not supported by the model); fx_e3nn_linear (+2 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 1, variant cap 1\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 0.48, build 1.53), fits (14.80 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 216 atoms, 3D PBC, no constraints; up to 600 K\n  rules 8-11: superset Na Cl (8), max_temperature_K 600 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 1 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)",
+ "plan_final": "Plan revision 1, tier compiled (graph -> compiled at step 1: 2 re-captures took 0.107 s, 70.9 % of the wal\u2026, from step 1\n  backend hybrid | force float32 | MC energy none (no MC) | runner in-process\n  rewrites on (19): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, block_linear, grouped_linear,\n      merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,\n      fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,\n      tf32x3_gemms (only an explicit 'on' enables it); grouped_launch (not the generic MACE family, decision 57);\n      species_skip (not supported by the model); fx_e3nn_linear (+2 more; describe(full=True) lists them)\n  sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, no CUDA graphs\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 0.48, build 1.53), fits (14.21 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 216 atoms, 3D PBC, no constraints; up to 600 K\n  rules 8-11: superset Na Cl (8), max_temperature_K 600 K (11), host_callbacks_every none (9), species_changes off (8),\n      skin 0.3 A (11), headroom fixed (11), recapture_budget 1 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b);\n      1 at step 1: adapt: graph -> compiled: 2 re-captures took 0.107 s, 70.9 % of the wall time since the last switch\u2026"
+}

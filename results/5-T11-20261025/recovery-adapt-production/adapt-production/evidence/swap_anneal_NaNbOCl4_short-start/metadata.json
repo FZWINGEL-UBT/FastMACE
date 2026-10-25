@@ -1,0 +1,4917 @@
+{
+  "schema": "fastmace.metadata/1",
+  "schema_minor": 1,
+  "created_utc": "2026-10-25T12:01:12.502111+00:00",
+  "code": {
+    "version": "0.0.1.dev0",
+    "git_commit": "a2077787e230a78f5306254e9ad467f4f193c094",
+    "git_dirty": null
+  },
+  "checkpoint": {
+    "path": "/home/fzwin/models/mace-mh-1.model",
+    "sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+    "head": "matpes_r2scan",
+    "licence": "ASL",
+    "label": "mh1-r2scan",
+    "trust": "label"
+  },
+  "model": null,
+  "force_field_identity": {
+    "schema": "fastmace.identity/1",
+    "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+    "head": "matpes_r2scan",
+    "species": [
+      8,
+      11,
+      17,
+      41
+    ],
+    "force_precision": "float32",
+    "physics": {
+      "charge": null,
+      "spin_multiplicity": null
+    },
+    "reference_record_id": null,
+    "mace_version": "0.3.16",
+    "fastmace_version": "0.0.1.dev0",
+    "digest": "ccb346dfcfc6289c9745b5b770d3948928bb5c0ee4e68d11b57f8dfba0932c9d"
+  },
+  "reference_record": null,
+  "plan": {
+    "revision": 0,
+    "tier": "graph",
+    "reason": "minimal plan (phase 1b)",
+    "step": null,
+    "description": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy float32 (pending the move-energy gate) | runner in-process\n  rewrites on (19): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, block_linear, grouped_linear,\n      merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,\n      fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,\n      tf32x3_gemms (only an explicit 'on' enables it); grouped_launch (not the generic MACE family, decision 57);\n      species_skip (not supported by the model); fx_e3nn_linear (+2 more; describe(full=True) lists them)\n  sizes: skin 0.92 A, headroom 1.2 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 1.01, build 1.53), fits (14.67 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 756 atoms, 3D PBC, no constraints; up to 1000 K; MC swap from 250 K;\n      species changes\n  rules 8-11: superset O Na Cl Nb (8), max_temperature_K 1000 K (11), host_callbacks_every none (9),\n      species_changes on (8), skin 0.92 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)",
+    "description_full": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = O Na Cl Nb  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1000 K  (rule 11 sizes the skin and headroom: skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = swap  (MC moves are attached through Simulation.run(mc=...) (SPEC \u00a77.6))\n  workload.species_changes = on  (graph mode stays allowed; species-dependent rewrites and tables are built for the superset (SPEC \u00a79.3 rule 8, 3-T02))\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (756 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear); stage 2: off, not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock']))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.tf32x3_gemms = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen))\n  RewriteConfig.fx_e3nn_linear = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  RewriteConfig.polar_graph_sums = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  IntegratorConfig.fixcm_projection = mass_weighted  (auto (mass_weighted_under_nvt_fixcm_else_ase): MC moves under fixcm: redraw_all draws (3N - 3) kT, the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37))\n  IntegratorConfig.dof = fastmace  (auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2))\n  NeighbourConfig.skin = 0.92 A  (auto (rule_11_skin_from_workload): skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild))\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.2 from the skin, edge_bucket_fraction as given)\n  NeighbourConfig.d3_skin = unused  (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04); rule 11 expects at most 9 padded edge buckets inside the capacity)\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): pending the move-energy gate: the force precision float32 if it passes, float64 otherwise, while MD forces keep theirs (SPEC \u00a710.4, \u00a712.3, decision 35))\n  EngineConfig.dynamic_edges = on  (the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59))\n  memory = fits  (rule 12: predicted 1.53 GiB (build; run 1.01, build 1.53) at 30580 edges, 756 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 62 MiB); needs 1.53 of 14.67 GiB free)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+    "backend": "hybrid",
+    "conv_fusion": "off",
+    "rewrites": {
+      "factor_species": "on",
+      "fold_cutoff": "on",
+      "density_first": "on",
+      "reassociate_first": "on",
+      "joint_radial_input": "on",
+      "fused_folded_backward": "on",
+      "folded_backward_tiles": "on",
+      "segmented_first_sum": "on",
+      "streaming_conv": "on",
+      "species_skip": "off",
+      "fused_radial_hidden": "off",
+      "direct_node_feats": "off",
+      "folded_constants": "off",
+      "block_linear": "on",
+      "grouped_linear": "on",
+      "merged_residual": "on",
+      "gated_rows": "on",
+      "segment_gemm": "on",
+      "grouped_launch": "off",
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "combo_kernels": "off",
+      "tf32x3_gemms": "off",
+      "fx_e3nn_linear": "off",
+      "polar_graph_sums": "off",
+      "inplace_block_linear": false,
+      "single_graph_strain": "on",
+      "polar_uvu": true,
+      "selfcheck_cache": "use"
+    },
+    "engine": {
+      "backend": "hybrid",
+      "compile_mode": "default",
+      "device": "cuda:0",
+      "pipelined": "on",
+      "async_output": "on",
+      "speculative_graph": false,
+      "pipeline_edge_margin": 0.0,
+      "pipeline_rebuild_fraction": 0.8,
+      "cueq_conv_fusion": "off",
+      "first_derivative_only": true,
+      "unfuse_full_addmm": true,
+      "dynamo_cache_size_limit": 64,
+      "expandable_segments": "on",
+      "empty_cache_before_capture": true,
+      "warmup_in_graph_pool": true,
+      "dynamic_edges": true,
+      "model_template_cache": true,
+      "overlap_rebuild": true,
+      "step_graph": false,
+      "fused_integrator": true,
+      "recapture_budget": 64,
+      "graph_variant_cap": 64
+    },
+    "neighbours": {
+      "skin": 0.92,
+      "sort_receivers": "on",
+      "gpu_neighbour_list": "on",
+      "edge_multiple": 256,
+      "edge_bucket_fraction": 0.05,
+      "capacity_headroom": 1.2,
+      "headroom": "fixed",
+      "d3_skin": 1.0
+    },
+    "polar": null,
+    "integrator": {
+      "ensemble": "nvt",
+      "scheme": "langevin",
+      "dof": "fastmace",
+      "parameters": [],
+      "timestep_fs": 1.0,
+      "friction": 0.02,
+      "seed": 284122898,
+      "fixcm": true,
+      "fixcm_projection": "mass_weighted",
+      "noise_batch": 256,
+      "pressure_GPa": 0.0,
+      "cell_mode": "hydrostatic",
+      "barostat_tau_fs": null,
+      "barostat_mass_factor": 1.0,
+      "ase_trace_drag_all_elements": false,
+      "temperature_K": 0.0,
+      "external_stress_GPa": null,
+      "disable_cell_langevin": false
+    },
+    "decisions": [
+      {
+        "key": "mode",
+        "choice": "graph",
+        "reason": "molecular dynamics on the graph tier (SPEC \u00a78.1)",
+        "code": "mode-graph",
+        "rule": null
+      },
+      {
+        "key": "allow_reference",
+        "choice": "off",
+        "reason": "not requested",
+        "code": "no-allow-reference",
+        "rule": 1
+      },
+      {
+        "key": "superset",
+        "choice": "O Na Cl Nb",
+        "reason": "declared (species=), equal to the structure's",
+        "code": "superset",
+        "rule": 8
+      },
+      {
+        "key": "force_precision",
+        "choice": "float32",
+        "reason": "the ForceField's precision (SPEC \u00a77.1, \u00a79.2)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.oeq",
+        "choice": "on",
+        "reason": "openequivariance is installed (its extension is built when the hybrid model is loaded)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.triton",
+        "choice": "on",
+        "reason": "triton 3.8.0 is importable",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.nvrtc",
+        "choice": "on",
+        "reason": "NVRTC 13.0 loads through cuda.bindings",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.fused_cueq",
+        "choice": "on",
+        "reason": "cuequivariance_ops_torch imports",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "software.mace_imported_first",
+        "choice": "none",
+        "reason": "modules imported before FastMACE could prepare the OEq runtime",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "allow_naive_cueq",
+        "choice": "off",
+        "reason": "not needed: no naive cuEq kernel",
+        "code": "fused-cueq",
+        "rule": 6
+      },
+      {
+        "key": "workload.max_temperature_K",
+        "choice": "1000 K",
+        "reason": "rule 11 sizes the skin and headroom: skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild)",
+        "code": "rule-11",
+        "rule": 11
+      },
+      {
+        "key": "workload.host_callbacks_every",
+        "choice": "none",
+        "reason": "no host callbacks",
+        "code": "no-host-callbacks",
+        "rule": 9
+      },
+      {
+        "key": "workload.mc_moves",
+        "choice": "swap",
+        "reason": "MC moves are attached through Simulation.run(mc=...) (SPEC \u00a77.6)",
+        "code": "mc-moves",
+        "rule": null
+      },
+      {
+        "key": "workload.species_changes",
+        "choice": "on",
+        "reason": "graph mode stays allowed; species-dependent rewrites and tables are built for the superset (SPEC \u00a79.3 rule 8, 3-T02)",
+        "code": "species-changes",
+        "rule": 8
+      },
+      {
+        "key": "workload.needs_per_atom",
+        "choice": "none",
+        "reason": "recorded",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "tier",
+        "choice": "graph",
+        "reason": "the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "workload",
+        "choice": "ok",
+        "reason": "756 atoms, 3D PBC, no constraints",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "hardware",
+        "choice": "NVIDIA GeForce RTX 5060 Ti",
+        "reason": "compute capability 12.0, 15.9 GiB (recorded only)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.backend",
+        "choice": "hybrid",
+        "reason": "requested 'hybrid'",
+        "code": "backend-hybrid",
+        "rule": null
+      },
+      {
+        "key": "PrecisionConfig.dtype",
+        "choice": "float32",
+        "reason": "requested 'float32': hybrid backend",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.cueq_conv_fusion",
+        "choice": "off",
+        "reason": "auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.factor_species",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fold_cutoff",
+        "choice": "on",
+        "reason": "auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.density_first",
+        "choice": "on",
+        "reason": "auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.reassociate_first",
+        "choice": "on",
+        "reason": "auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.joint_radial_input",
+        "choice": "on",
+        "reason": "auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fused_folded_backward",
+        "choice": "on",
+        "reason": "auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.folded_backward_tiles",
+        "choice": "on",
+        "reason": "auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.segmented_first_sum",
+        "choice": "on",
+        "reason": "auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fused_radial_hidden",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (no measured gain)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.direct_node_feats",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.folded_constants",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.streaming_conv",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.block_linear",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_graph_engine): stage 1: hybrid backend",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.grouped_linear",
+        "choice": "on",
+        "reason": "auto (on_with_block_linear): stage 1: on (with block_linear)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.merged_residual",
+        "choice": "on",
+        "reason": "auto (on_with_block_linear): stage 1: on (with block_linear)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.gated_rows",
+        "choice": "on",
+        "reason": "auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.segment_gemm",
+        "choice": "on",
+        "reason": "auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.grouped_launch",
+        "choice": "off",
+        "reason": "auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear); stage 2: off, not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock'])",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.species_skip",
+        "choice": "off",
+        "reason": "auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.single_graph_strain",
+        "choice": "on",
+        "reason": "auto (on): process-wide; acts only where stress is computed",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.species_tables",
+        "choice": "on",
+        "reason": "auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fold_readout_tail",
+        "choice": "on",
+        "reason": "auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fold_product_linear",
+        "choice": "on",
+        "reason": "auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.combo_kernels",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.tf32x3_gemms",
+        "choice": "off",
+        "reason": "auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.fx_e3nn_linear",
+        "choice": "off",
+        "reason": "auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.polar_graph_sums",
+        "choice": "off",
+        "reason": "auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "NeighbourConfig.sort_receivers",
+        "choice": "on",
+        "reason": "auto (on_for_hybrid_graph_engine): hybrid backend",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "NeighbourConfig.gpu_neighbour_list",
+        "choice": "on",
+        "reason": "auto (on_with_graph_engine): graph engine",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.inplace_block_linear",
+        "choice": "off",
+        "reason": "not carried over in 1a (SPEC \u00a76.2: opt-in, slower)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "RewriteConfig.polar_uvu",
+        "choice": "on",
+        "reason": "no effect: not a PolarMACE model",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "PolarConfig.kspace_headroom",
+        "choice": "n/a",
+        "reason": "auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.expandable_segments",
+        "choice": "on",
+        "reason": "auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.compile_mode",
+        "choice": "default",
+        "reason": "main.py's --compile-mode",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.speculative_graph",
+        "choice": "off",
+        "reason": "off unless requested (main.py default)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.pipelined",
+        "choice": "on",
+        "reason": "auto (on_with_graph_engine_unless_speculative): graph engine",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.async_output",
+        "choice": "on",
+        "reason": "auto (on_with_graph_engine): graph engine; the run loop's choice",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "capture",
+        "choice": "on",
+        "reason": "CUDA graphs",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "integrator",
+        "choice": "Langevin",
+        "reason": "NVT, fixcm=True (workflow.GPUEngine)",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "compute_stress",
+        "choice": "off",
+        "reason": "fixed cell: the graph engine computes no stress",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "IntegratorConfig.fixcm_projection",
+        "choice": "mass_weighted",
+        "reason": "auto (mass_weighted_under_nvt_fixcm_else_ase): MC moves under fixcm: redraw_all draws (3N - 3) kT, the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37)",
+        "code": "fixcm-projection-mc",
+        "rule": null
+      },
+      {
+        "key": "IntegratorConfig.dof",
+        "choice": "fastmace",
+        "reason": "auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2)",
+        "code": "dof-fastmace",
+        "rule": null
+      },
+      {
+        "key": "NeighbourConfig.skin",
+        "choice": "0.92 A",
+        "reason": "auto (rule_11_skin_from_workload): skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild)",
+        "code": "rule-11",
+        "rule": 11
+      },
+      {
+        "key": "NeighbourConfig.headroom",
+        "choice": "fixed",
+        "reason": "auto (rule_11_headroom_from_workload): capacity_headroom 1.2 from the skin, edge_bucket_fraction as given",
+        "code": "rule-11",
+        "rule": 11
+      },
+      {
+        "key": "NeighbourConfig.d3_skin",
+        "choice": "unused",
+        "reason": "auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor",
+        "code": null,
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.recapture_budget",
+        "choice": "64",
+        "reason": "auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04); rule 11 expects at most 9 padded edge buckets inside the capacity",
+        "code": "rule-11",
+        "rule": 11
+      },
+      {
+        "key": "PrecisionConfig.mc_energy",
+        "choice": "float32",
+        "reason": "auto (force_precision_if_move_energy_gate_passes_else_float64): pending the move-energy gate: the force precision float32 if it passes, float64 otherwise, while MD forces keep theirs (SPEC \u00a710.4, \u00a712.3, decision 35)",
+        "code": "mc-energy-gate-pending",
+        "rule": null
+      },
+      {
+        "key": "EngineConfig.dynamic_edges",
+        "choice": "on",
+        "reason": "the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59)",
+        "code": "dynamic-edges-graph",
+        "rule": null
+      },
+      {
+        "key": "memory",
+        "choice": "fits",
+        "reason": "rule 12: predicted 1.53 GiB (build; run 1.01, build 1.53) at 30580 edges, 756 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 62 MiB); needs 1.53 of 14.67 GiB free",
+        "code": "rule-12-memory",
+        "rule": 12
+      }
+    ],
+    "requested": [
+      [
+        "EngineConfig.backend",
+        "hybrid"
+      ],
+      [
+        "PrecisionConfig.dtype",
+        "float32"
+      ]
+    ],
+    "auto_options_off": [
+      [
+        "species_skip",
+        "no MACE-MP-0 or density-family interaction"
+      ],
+      [
+        "grouped_launch",
+        "not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock'])"
+      ],
+      [
+        "fx_e3nn_linear",
+        "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)"
+      ],
+      [
+        "polar_graph_sums",
+        "not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l)"
+      ]
+    ],
+    "superset": [
+      8,
+      11,
+      17,
+      41
+    ],
+    "workload": {
+      "max_temperature_K": 1000.0,
+      "species_changes": true,
+      "atom_count_changes": false,
+      "min_mc_temperature_K": 250.0,
+      "host_callbacks_every": null,
+      "needs_per_atom": [],
+      "mc_moves": [
+        "swap"
+      ],
+      "reproducible": false,
+      "mc_energy_precision": "auto",
+      "max_displacement_A": null
+    },
+    "software": {
+      "oeq": [
+        true,
+        "openequivariance is installed (its extension is built when the hybrid model is loaded)"
+      ],
+      "triton": [
+        true,
+        "triton 3.8.0 is importable"
+      ],
+      "nvrtc": [
+        true,
+        "NVRTC 13.0 loads through cuda.bindings"
+      ],
+      "fused_cueq": [
+        true,
+        "cuequivariance_ops_torch imports"
+      ],
+      "mace_imported_first": []
+    },
+    "allowances": [],
+    "fallbacks_tried": [],
+    "predicted_memory_bytes": 1642881072,
+    "runner": "in-process",
+    "calibration": null,
+    "adaptation": null
+  },
+  "plan_revisions": [
+    {
+      "revision": 0,
+      "tier": "graph",
+      "step": null,
+      "reason": "minimal plan (phase 1b)",
+      "description": "Plan revision 0, tier graph (molecular dynamics on the graph tier)\n  backend hybrid | force float32 | MC energy float32 (pending the move-energy gate) | runner in-process\n  rewrites on (19): factor_species, fold_cutoff, density_first, reassociate_first, joint_radial_input,\n      fused_folded_backward, folded_backward_tiles, segmented_first_sum, streaming_conv, block_linear, grouped_linear,\n      merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,\n      fold_product_linear, polar_uvu\n  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,\n      tf32x3_gemms (only an explicit 'on' enables it); grouped_launch (not the generic MACE family, decision 57);\n      species_skip (not supported by the model); fx_e3nn_linear (+2 more; describe(full=True) lists them)\n  sizes: skin 0.92 A, headroom 1.2 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64\n  sizes: D3: no list; k-space headroom n/a\n  kernels: OEq yes, Triton yes, NVRTC yes, fused cuEq yes\n  memory (rule 12): 1.53 GiB predicted (build; run 1.01, build 1.53), fits (14.67 GiB free); GPU NVIDIA GeForce RTX 506\u2026\n  workload: Langevin NVT, fixcm=True; 756 atoms, 3D PBC, no constraints; up to 1000 K; MC swap from 250 K;\n      species changes\n  rules 8-11: superset O Na Cl Nb (8), max_temperature_K 1000 K (11), host_callbacks_every none (9),\n      species_changes on (8), skin 0.92 A (11), headroom fixed (11), recapture_budget 64 (11)\n  fallbacks: none\n  calibration: none\n  revisions: 0 minimal plan (phase 1b)",
+      "description_full": "Plan revision 0, tier graph: minimal plan (phase 1b)\n  mode = graph  (molecular dynamics on the graph tier (SPEC \u00a78.1))\n  allow_reference = off  (not requested)\n  superset = O Na Cl Nb  (declared (species=), equal to the structure's)\n  force_precision = float32  (the ForceField's precision (SPEC \u00a77.1, \u00a79.2))\n  software.oeq = on  (openequivariance is installed (its extension is built when the hybrid model is loaded))\n  software.triton = on  (triton 3.8.0 is importable)\n  software.nvrtc = on  (NVRTC 13.0 loads through cuda.bindings)\n  software.fused_cueq = on  (cuequivariance_ops_torch imports)\n  software.mace_imported_first = none  (modules imported before FastMACE could prepare the OEq runtime)\n  allow_naive_cueq = off  (not needed: no naive cuEq kernel)\n  workload.max_temperature_K = 1000 K  (rule 11 sizes the skin and headroom: skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild))\n  workload.host_callbacks_every = none  (no host callbacks)\n  workload.mc_moves = swap  (MC moves are attached through Simulation.run(mc=...) (SPEC \u00a77.6))\n  workload.species_changes = on  (graph mode stays allowed; species-dependent rewrites and tables are built for the superset (SPEC \u00a79.3 rule 8, 3-T02))\n  workload.needs_per_atom = none  (recorded)\n  tier = graph  (the research engine's --engine gpu: CUDA graphs, edge buckets (SPEC \u00a78.1))\n  workload = ok  (756 atoms, 3D PBC, no constraints)\n  hardware = NVIDIA GeForce RTX 5060 Ti  (compute capability 12.0, 15.9 GiB (recorded only))\n  EngineConfig.backend = hybrid  (requested 'hybrid')\n  PrecisionConfig.dtype = float32  (requested 'float32': hybrid backend)\n  EngineConfig.cueq_conv_fusion = off  (auto (on_for_plain_cueq_unless_reproducible): not applicable: the hybrid fuses its OEq convolution anyway (the research engine records None))\n  RewriteConfig.factor_species = on  (auto (on_for_hybrid_graph_engine_if_model_supports): stage 1: hybrid backend; stage 2: supported (ok))\n  RewriteConfig.fold_cutoff = on  (auto (on_with_factor_species_if_model_supports): stage 1: on (with factor_species); stage 2: supported (ok))\n  RewriteConfig.density_first = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.reassociate_first = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.joint_radial_input = on  (auto (on_with_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.fused_folded_backward = on  (auto (on_with_stage1_fold_cutoff_if_model_supports): stage 1: on (with fold_cutoff); stage 2: supported (ok))\n  RewriteConfig.folded_backward_tiles = on  (auto (on_with_fused_folded_backward): stage 1: on (with fused_folded_backward); stage 2: supported (ok))\n  RewriteConfig.segmented_first_sum = on  (auto (on_with_reassociate_first_and_sort_receivers): stage 1: on (with reassociate_first and sort_receivers); stage 2: supported (ok))\n  RewriteConfig.fused_radial_hidden = off  (auto (never_automatic): off: only an explicit 'on' enables it (no measured gain))\n  RewriteConfig.direct_node_feats = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.folded_constants = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT3-T05, opt-in))\n  RewriteConfig.streaming_conv = on  (auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok))\n  RewriteConfig.block_linear = on  (auto (on_for_hybrid_graph_engine): stage 1: hybrid backend)\n  RewriteConfig.grouped_linear = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.merged_residual = on  (auto (on_with_block_linear): stage 1: on (with block_linear))\n  RewriteConfig.gated_rows = on  (auto (on_with_merged_residual): stage 1: on (with merged_residual); stage 2: supported (ok))\n  RewriteConfig.segment_gemm = on  (auto (on_with_gated_rows_float32_unless_reproducible): stage 1: on (with gated_rows); stage 2: supported (ok))\n  RewriteConfig.grouped_launch = off  (auto (on_with_block_linear_float32_unless_reproducible_for_generic_mace_family): stage 1: on (with block_linear); stage 2: off, not the generic MACE family, decision 57 (interactions ['RealAgnosticResidualNonLinearInteractionBlock']))\n  RewriteConfig.species_skip = off  (auto (on_with_graph_engine_if_model_supports): stage 1: graph engine, any backend; stage 2: off, not supported by the model (no MACE-MP-0 or density-family interaction))\n  RewriteConfig.single_graph_strain = on  (auto (on): process-wide; acts only where stress is computed)\n  RewriteConfig.species_tables = on  (auto (on_float32_unless_reproducible_if_model_supports): stage 1: graph engine, any backend; stage 2: supported (ok))\n  RewriteConfig.fold_readout_tail = on  (auto (on_with_block_linear_float32_unless_reproducible_if_model_supports): stage 1: on (with block_linear); stage 2: supported (ok))\n  RewriteConfig.fold_product_linear = on  (auto (on_with_species_tables_and_block_linear_if_model_supports): stage 1: on (with block_linear and species_tables); stage 2: supported (ok))\n  RewriteConfig.combo_kernels = off  (auto (never_automatic): off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs))\n  RewriteConfig.tf32x3_gemms = off  (auto (never_automatic): off: only an explicit 'on' enables it (OPT4-T03, accuracy screen))\n  RewriteConfig.fx_e3nn_linear = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  RewriteConfig.polar_graph_sums = off  (auto (on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints): stage 1: hybrid backend; stage 2: off, not a qualified POLAR-1 checkpoint, decision 58 (ScaleShiftMACE; qualified: polar1-s, polar1-m, polar1-l))\n  NeighbourConfig.sort_receivers = on  (auto (on_for_hybrid_graph_engine): hybrid backend)\n  NeighbourConfig.gpu_neighbour_list = on  (auto (on_with_graph_engine): graph engine)\n  RewriteConfig.inplace_block_linear = off  (not carried over in 1a (SPEC \u00a76.2: opt-in, slower))\n  RewriteConfig.polar_uvu = on  (no effect: not a PolarMACE model)\n  PolarConfig.kspace_headroom = n/a  (auto (variable_cell_0_1_else_0): not a PolarMACE model, no long range)\n  EngineConfig.expandable_segments = on  (auto (on_for_torch_2_14_unless_alloc_conf_set): PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation)\n  EngineConfig.compile_mode = default  (main.py's --compile-mode)\n  EngineConfig.speculative_graph = off  (off unless requested (main.py default))\n  EngineConfig.pipelined = on  (auto (on_with_graph_engine_unless_speculative): graph engine)\n  EngineConfig.async_output = on  (auto (on_with_graph_engine): graph engine; the run loop's choice)\n  capture = on  (CUDA graphs)\n  integrator = Langevin  (NVT, fixcm=True (workflow.GPUEngine))\n  compute_stress = off  (fixed cell: the graph engine computes no stress)\n  IntegratorConfig.fixcm_projection = mass_weighted  (auto (mass_weighted_under_nvt_fixcm_else_ase): MC moves under fixcm: redraw_all draws (3N - 3) kT, the mass-weighted projection holds every species at the target, temperatures over 3N - 3 degrees of freedom (decision 37))\n  IntegratorConfig.dof = fastmace  (auto (owner_decision_d2_default): FastMACE's count: 3N - 3 under fixcm, 3(N - n_fixed) with FixAtoms (owner decision D2))\n  NeighbourConfig.skin = 0.92 A  (auto (rule_11_skin_from_workload): skin 0.92 A, headroom 1.2 (fastest of 756 atoms at 1000 K, lightest mass 15.999 u, 1 fs: 0.0285 A per step, 16 steps per rebuild))\n  NeighbourConfig.headroom = fixed  (auto (rule_11_headroom_from_workload): capacity_headroom 1.2 from the skin, edge_bucket_fraction as given)\n  NeighbourConfig.d3_skin = unused  (auto (rule_11_d3_skin_from_workload): no D3 list; 1 A, the floor)\n  EngineConfig.recapture_budget = 64  (auto (recapture_budget_from_workload): the graph variant cap (64): past it the run warns, records and the report recommends the compiled tier (3-T04); rule 11 expects at most 9 padded edge buckets inside the capacity)\n  PrecisionConfig.mc_energy = float32  (auto (force_precision_if_move_energy_gate_passes_else_float64): pending the move-energy gate: the force precision float32 if it passes, float64 otherwise, while MD forces keep theirs (SPEC \u00a710.4, \u00a712.3, decision 35))\n  EngineConfig.dynamic_edges = on  (the edge dimension is dynamic from the first compiled call, so the model compiles once and the padded first capture reuses that graph instead of compiling again; the edges stay padded to buckets (decision 59))\n  memory = fits  (rule 12: predicted 1.53 GiB (build; run 1.01, build 1.53) at 30580 edges, 756 atoms, float32 (self-check segment_gemm 1296 MiB, workspace 160 MiB, rewrites' buffers 62 MiB); needs 1.53 of 14.67 GiB free)\n  requested: EngineConfig.backend=hybrid, PrecisionConfig.dtype=float32",
+      "runner": "in-process",
+      "fallback": null
+    }
+  ],
+  "precision": {
+    "force": "float32",
+    "integration": "float64",
+    "tf32": false,
+    "float64_energy": true
+  },
+  "runtime": {
+    "file_locks": "soft",
+    "file_lock_source": "start-up hook (nfs_soft_locks)",
+    "file_lock_switch_late": false,
+    "cuda_driver_cache": "enabled"
+  },
+  "software": {
+    "versions": {
+      "python": "3.10.12",
+      "torch": "2.14.1+cu130",
+      "numpy": "2.2.6",
+      "ase": "3.27.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance-torch": "0.12.0",
+      "cuequivariance-ops-torch-cu13": "0.12.0",
+      "openequivariance": "0.7.0",
+      "cuda-bindings": "13.3.1",
+      "jinja2": "3.1.6",
+      "filelock": "3.32.3"
+    },
+    "kernels": {
+      "triton": {
+        "available": true,
+        "reason": "triton 3.8.0 is importable"
+      },
+      "nvrtc": {
+        "available": true,
+        "reason": "NVRTC 13.0 loads through cuda.bindings"
+      },
+      "streaming": {
+        "available": true,
+        "reason": "NVRTC 13.0 loads through cuda.bindings; jinja2 and openequivariance are installed"
+      }
+    },
+    "patches": [
+      {
+        "name": "oeq_runtime",
+        "value": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/cuda-runtime",
+        "targets": [
+          "env:CMAKE_CUDA_COMPILER",
+          "env:CPATH",
+          "env:CUDACXX",
+          "env:CUDA_HOME",
+          "env:CUDA_PATH",
+          "env:MAX_JOBS",
+          "env:OEQ_JIT_EXTENSION",
+          "env:OEQ_NVCC_ATTEMPTS",
+          "env:PATH",
+          "env:PYTORCH_NVCC",
+          "env:TORCH_EXTENSIONS_DIR"
+        ],
+        "detail": "OEq host-extension build environment; preloaded libcudart.so.13, libnvrtc.so.13, libcublasLt.so.13, libcublas.so.13"
+      },
+      {
+        "name": "capture_safe_mask_head",
+        "value": true,
+        "targets": [
+          "mace.modules.blocks:mask_head"
+        ],
+        "detail": "multi-head readout mask without indexed assignment (CUDA graph capture)"
+      },
+      {
+        "name": "unfuse_full_addmm",
+        "value": true,
+        "targets": [
+          "torch._inductor.fx_passes.post_grad:should_prefer_unfused_addmm",
+          "torch._inductor.config:post_grad_custom_pre_pass"
+        ],
+        "detail": "mm + full-matrix add unfused on the GPU; cache key fastmace-unfused-full-addmm-v1"
+      }
+    ],
+    "triton": "3.8.0",
+    "oeq_extension": {
+      "OEQ_JIT_EXTENSION": "1",
+      "TORCH_EXTENSIONS_DIR": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/torch-extensions-if8ibbx8",
+      "OEQ_NVCC_ATTEMPTS": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/nvcc-attempts.log",
+      "CUDA_HOME": "/home/fzwin/fastmace-cache/5-T11/fastmace/oeq/cuda-runtime",
+      "MACE_COMPILE_CACHE": null,
+      "OEQ_EXTENSION_SEED": null
+    },
+    "treatments": [
+      {
+        "name": "float64_energy",
+        "qualified": true,
+        "decision": "patched",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "polar_forward",
+        "qualified": true,
+        "decision": "patched",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "capture_safe_mask_head",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "first_derivative_only",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "single_graph_strain",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "unfuse_full_addmm",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      },
+      {
+        "name": "cueq_conv_fusion",
+        "qualified": true,
+        "decision": "installed",
+        "reason": "every pinned source hashes"
+      }
+    ]
+  },
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "driver": null,
+    "compute_capability": "12.0"
+  },
+  "random": {
+    "seed": 284122898,
+    "generators": {
+      "integrator": "48c3049df88ba9b38725f6f006d1d24ffa6571949c278c2c7be6931c0a4d29a9"
+    },
+    "cursors": {
+      "integrator": 188
+    }
+  },
+  "integrator": {
+    "ensemble": "nvt",
+    "scheme": "langevin",
+    "dof": "fastmace",
+    "parameters": [],
+    "timestep_fs": 1.0,
+    "friction": 0.02,
+    "seed": 284122898,
+    "fixcm": true,
+    "fixcm_projection": "mass_weighted",
+    "noise_batch": 256,
+    "pressure_GPa": 0.0,
+    "cell_mode": "hydrostatic",
+    "barostat_tau_fs": null,
+    "barostat_mass_factor": 1.0,
+    "ase_trace_drag_all_elements": false,
+    "temperature_K": 0.0,
+    "external_stress_GPa": null,
+    "disable_cell_langevin": false
+  },
+  "schedule": {
+    "segments": [
+      {
+        "kind": "ramp",
+        "start_K": 0.0,
+        "end_K": 1000.0,
+        "ps": 2.0,
+        "steps": 2000
+      },
+      {
+        "kind": "ramp",
+        "start_K": 1000.0,
+        "end_K": 250.0,
+        "rate_K_per_ps": -30.0,
+        "steps": 25000
+      }
+    ],
+    "timestep_fs": 1.0,
+    "step": 13500,
+    "target_K": 655.0
+  },
+  "gate": {
+    "status": "skipped",
+    "check": "skip",
+    "reason": "opt-in: check=\"gate\"",
+    "copies": null,
+    "energy_meV_per_atom": null,
+    "force_eV_per_A": null,
+    "stress_eV_per_A3": null,
+    "quantities": {},
+    "floors": null,
+    "nonfinite": [],
+    "mode": null,
+    "references": null,
+    "seconds": {},
+    "notes": [],
+    "device": null,
+    "reduced_cell": null,
+    "steps": [],
+    "replay": null,
+    "move_energy": {
+      "requested": "auto",
+      "threshold_eV": 0.00021543333155000003,
+      "min_mc_temperature_K": 250.0,
+      "fraction": 0.01,
+      "superset": [
+        "O",
+        "Na",
+        "Cl",
+        "Nb"
+      ],
+      "max_displacement_A": null,
+      "samples": {
+        "swap": 12
+      },
+      "configurations": 13,
+      "not_sampleable": [],
+      "references": {
+        "ran": "child process",
+        "device": "cuda:0",
+        "steps": [
+          {
+            "device": "cuda:0",
+            "cell": "production",
+            "repeat": null,
+            "atoms": 756,
+            "outcome": "ran",
+            "reason": null,
+            "process": "child",
+            "gpu_free_bytes": 15747514368
+          }
+        ],
+        "record_id": "fastmace.reference/0.3.16/mh1/763155208cd1ef8c"
+      },
+      "status": "passed",
+      "precision": "float32",
+      "tried": [
+        {
+          "precision": "float32",
+          "status": "passed",
+          "worst_k_B_T_min": 0.0016075138861077981
+        }
+      ],
+      "moves": {
+        "swap": {
+          "samples": 12,
+          "worst_eV": 3.4631207199709024e-05,
+          "worst_label": "swap O-Cl (atoms 419, 232)",
+          "worst_k_B_T_min": 0.0016075138861077981,
+          "passed": true
+        }
+      },
+      "nonfinite": [],
+      "rows": [
+        {
+          "move": "swap",
+          "label": "swap O-Na (atoms 642, 450)",
+          "production": 18.423448622226715,
+          "reference": 18.42344266523014,
+          "error": 5.956996574241202e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Na (atoms 109, 729)",
+          "production": 18.438807010650635,
+          "reference": 18.438789880086006,
+          "error": 1.7130564629042055e-05
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Cl (atoms 83, 686)",
+          "production": 10.668658554553986,
+          "reference": 10.668653311955495,
+          "error": 5.242598490440287e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Cl (atoms 419, 232)",
+          "production": 10.507431596517563,
+          "reference": 10.507396965310363,
+          "error": 3.4631207199709024e-05
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Nb (atoms 192, 341)",
+          "production": 31.133128851652145,
+          "reference": 31.133107495623335,
+          "error": 2.1356028810259886e-05
+        },
+        {
+          "move": "swap",
+          "label": "swap O-Nb (atoms 250, 481)",
+          "production": 31.040356874465942,
+          "reference": 31.040350881460654,
+          "error": 5.993005288473796e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap Na-Cl (atoms 703, 577)",
+          "production": 8.849526286125183,
+          "reference": 8.849506835376815,
+          "error": 1.9450748368399218e-05
+        },
+        {
+          "move": "swap",
+          "label": "swap Na-Cl (atoms 253, 737)",
+          "production": 8.847243428230286,
+          "reference": 8.847237978267003,
+          "error": 5.449963282444514e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap Na-Nb (atoms 197, 649)",
+          "production": 13.9078449010849,
+          "reference": 13.907835585222529,
+          "error": 9.315862371295225e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap Na-Nb (atoms 533, 229)",
+          "production": 13.90783941745758,
+          "reference": 13.907840343034877,
+          "error": 9.255772965843789e-07
+        },
+        {
+          "move": "swap",
+          "label": "swap Cl-Nb (atoms 350, 483)",
+          "production": 21.363894999027252,
+          "reference": 21.363896092307186,
+          "error": 1.093279934138991e-06
+        },
+        {
+          "move": "swap",
+          "label": "swap Cl-Nb (atoms 69, 622)",
+          "production": 21.50157554447651,
+          "reference": 21.501568691052853,
+          "error": 6.853423656139057e-06
+        }
+      ],
+      "mode": "captured energy-only graph",
+      "seconds": {
+        "references_s": 20.394483361999846,
+        "production_s": 14.347701947000132
+      }
+    },
+    "mc_energy_precision": "float32",
+    "selfchecks": []
+  },
+  "counters": {
+    "recaptures": 3,
+    "neighbour_lists": {
+      "mace": {
+        "rebuilds": 710,
+        "build_time_s": null,
+        "skin_A": 0.92
+      }
+    },
+    "overflows_redone": 139,
+    "mc": {
+      "swap": {
+        "attempted": 6550,
+        "impossible": 0,
+        "accepted": 0
+      }
+    },
+    "tier_switches": [],
+    "segments": [
+      {
+        "first_step": 0,
+        "last_step": 499,
+        "reason": "run-end",
+        "canonical": false,
+        "wall_s": 4.8423128409995115,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 1,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 499,
+        "last_step": 500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 0.43602530699990893,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 1,
+        "capture_s": 0.1206988599997203,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 0,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 500,
+        "last_step": 600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1848313580003378,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 2,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 600,
+        "last_step": 700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.17503148600008,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 2,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 700,
+        "last_step": 800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1376898479993542,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 2,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 800,
+        "last_step": 900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1418890869999814,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 2,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 900,
+        "last_step": 1000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1451536280001164,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1000,
+        "last_step": 1100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1389299330003269,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 3,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1100,
+        "last_step": 1200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1494335689994841,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1200,
+        "last_step": 1300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1455302700005632,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1300,
+        "last_step": 1400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.145374379999339,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1400,
+        "last_step": 1500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1435635260004346,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1500,
+        "last_step": 1600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1429621429997496,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1600,
+        "last_step": 1700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1421497080000336,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1700,
+        "last_step": 1800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1477336879997893,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1800,
+        "last_step": 1900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1491035860008196,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 1900,
+        "last_step": 2000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.152758255999288,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2000,
+        "last_step": 2100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.150848211000266,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2100,
+        "last_step": 2200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1554119100001117,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2200,
+        "last_step": 2300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1450939810001728,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2300,
+        "last_step": 2400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1492036909994567,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2400,
+        "last_step": 2500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1477877870001976,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2500,
+        "last_step": 2600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1508533859996533,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2600,
+        "last_step": 2700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1511525960004292,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2700,
+        "last_step": 2800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1490501819998826,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2800,
+        "last_step": 2900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.156525340999906,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 2900,
+        "last_step": 3000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1585309820002294,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3000,
+        "last_step": 3100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1562459220003802,
+        "recaptures": 0,
+        "recapture_s": 0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3100,
+        "last_step": 3200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2471324949992777,
+        "recaptures": 1,
+        "recapture_s": 0.07304470900089655,
+        "captures": 1,
+        "capture_s": 0.07304470900089655,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3200,
+        "last_step": 3300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.146621225000672,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3300,
+        "last_step": 3400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1745108029999756,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3400,
+        "last_step": 3500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1561630400001377,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3500,
+        "last_step": 3600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1769338709991644,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3600,
+        "last_step": 3700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1695895390002988,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3700,
+        "last_step": 3800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1674891620004928,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3800,
+        "last_step": 3900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.4471956339993994,
+        "recaptures": 2,
+        "recapture_s": 0.1287454710009115,
+        "captures": 2,
+        "capture_s": 0.1287454710009115,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 3900,
+        "last_step": 4000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2213596620003955,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4000,
+        "last_step": 4100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.233040061999418,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4100,
+        "last_step": 4200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2746105860005628,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4200,
+        "last_step": 4300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.3072266019999006,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4300,
+        "last_step": 4400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.3097093910000694,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4400,
+        "last_step": 4500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2285935079999035,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4500,
+        "last_step": 4600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1751007259999824,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4600,
+        "last_step": 4700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1381408589995772,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4700,
+        "last_step": 4800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1263734520007347,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4800,
+        "last_step": 4900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.151673920999201,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 4900,
+        "last_step": 5000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1056771140001729,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5000,
+        "last_step": 5100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1704193160003342,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5100,
+        "last_step": 5200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1441366979997838,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5200,
+        "last_step": 5300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1335317040002337,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5300,
+        "last_step": 5400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.147862984999847,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5400,
+        "last_step": 5500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1579845610003758,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5500,
+        "last_step": 5600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1335108869998294,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5600,
+        "last_step": 5700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1069766159998835,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5700,
+        "last_step": 5800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1510998530002325,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 4,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5800,
+        "last_step": 5900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1467802269999083,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 5900,
+        "last_step": 6000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1344559110002592,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6000,
+        "last_step": 6100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1265752679992147,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6100,
+        "last_step": 6200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.129896297000414,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6200,
+        "last_step": 6300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1472034250000434,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6300,
+        "last_step": 6400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1426820010001393,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6400,
+        "last_step": 6500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1680637680001382,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6500,
+        "last_step": 6600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.181023522999567,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6600,
+        "last_step": 6700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.194601627999873,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6700,
+        "last_step": 6800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.134061458999895,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6800,
+        "last_step": 6900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1298041560003185,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 7,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 6900,
+        "last_step": 7000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.098071157999584,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7000,
+        "last_step": 7100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1626996470004087,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7100,
+        "last_step": 7200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1478580989996772,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7200,
+        "last_step": 7300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1385697840005378,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7300,
+        "last_step": 7400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1439669470000808,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7400,
+        "last_step": 7500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1684038240000518,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7500,
+        "last_step": 7600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1424971349997577,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7600,
+        "last_step": 7700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1856431699998211,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7700,
+        "last_step": 7800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1414491490004366,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7800,
+        "last_step": 7900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.152516485999513,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 7900,
+        "last_step": 8000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.196936069000003,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8000,
+        "last_step": 8100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1576672239998516,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8100,
+        "last_step": 8200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1470503000000463,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8200,
+        "last_step": 8300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1727635030001693,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8300,
+        "last_step": 8400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1614981310003714,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8400,
+        "last_step": 8500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1583821479998733,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8500,
+        "last_step": 8600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1414759199997206,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8600,
+        "last_step": 8700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1954399980004382,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8700,
+        "last_step": 8800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1788363239993487,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8800,
+        "last_step": 8900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1614487289998578,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 8900,
+        "last_step": 9000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1681359890008025,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9000,
+        "last_step": 9100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2166529289997925,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9100,
+        "last_step": 9200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2419022269996276,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 5,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9200,
+        "last_step": 9300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1609307140006422,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9300,
+        "last_step": 9400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1552127489994746,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9400,
+        "last_step": 9500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1286459720004132,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9500,
+        "last_step": 9600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1507536849994722,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9600,
+        "last_step": 9700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1494292160004989,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9700,
+        "last_step": 9800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1521489910001037,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9800,
+        "last_step": 9900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.154064142999232,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 9900,
+        "last_step": 10000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.166376644000593,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10000,
+        "last_step": 10100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.2653977629997826,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10100,
+        "last_step": 10200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.173310727000171,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 4,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10200,
+        "last_step": 10300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1745113709994257,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10300,
+        "last_step": 10400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1389489260000119,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10400,
+        "last_step": 10500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1730732450005235,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 4,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10500,
+        "last_step": 10600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1308398589999342,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10600,
+        "last_step": 10700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1523130989999117,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10700,
+        "last_step": 10800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1577291479998166,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10800,
+        "last_step": 10900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1460782750000362,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 10900,
+        "last_step": 11000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1490334910004094,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11000,
+        "last_step": 11100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1320524819993807,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11100,
+        "last_step": 11200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.129862427000262,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11200,
+        "last_step": 11300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1372258310002508,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11300,
+        "last_step": 11400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1144984060001661,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11400,
+        "last_step": 11500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1410562239998399,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11500,
+        "last_step": 11600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1581715279999116,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 4,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11600,
+        "last_step": 11700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1281722359999549,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11700,
+        "last_step": 11800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1150552310000421,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11800,
+        "last_step": 11900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.104963337999834,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 11900,
+        "last_step": 12000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.123625971000365,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 2,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12000,
+        "last_step": 12100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.157299824999427,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 4,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12100,
+        "last_step": 12200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1991960770001242,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12200,
+        "last_step": 12300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1577518479998616,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12300,
+        "last_step": 12400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1326399660001698,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12400,
+        "last_step": 12500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1421013210001547,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12500,
+        "last_step": 12600,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1583552649999547,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12600,
+        "last_step": 12700,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1536967490001189,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 4,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12700,
+        "last_step": 12800,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1419329569998808,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12800,
+        "last_step": 12900,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.135501927000405,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 1,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 12900,
+        "last_step": 13000,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1183413949993337,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 4,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 13000,
+        "last_step": 13100,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1230659259999811,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 6,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 13100,
+        "last_step": 13200,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1512507400002505,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 13200,
+        "last_step": 13300,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.139356386000145,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 13300,
+        "last_step": 13400,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1283404719997634,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 0,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      },
+      {
+        "first_step": 13400,
+        "last_step": 13500,
+        "reason": "mc-block",
+        "canonical": true,
+        "wall_s": 1.1719347850003032,
+        "recaptures": 0,
+        "recapture_s": 0.0,
+        "captures": 0,
+        "capture_s": 0.0,
+        "overflows_redone": 3,
+        "budget_exceeded_at": null,
+        "lists": {
+          "mace": {
+            "rebuilds": 5,
+            "build_time_s": null
+          }
+        }
+      }
+    ],
+    "fallbacks": [],
+    "engine": {
+      "rebuilds_beside": 710,
+      "fused_integrator": true,
+      "engine": "graph",
+      "mode": "pipelined",
+      "capture": true,
+      "pad_edges": true,
+      "variable_cell": false,
+      "initial_edges": 26784,
+      "edge_bucket": 1536,
+      "edge_sizes_used": [
+        27648,
+        29184
+      ],
+      "neighbour_rebuilds": 710,
+      "graphs": [
+        "('E', 'float32', 29184)",
+        "('mc.swap', 1, 0, 'float32', 29184)",
+        "('B', 29184)",
+        "ACP",
+        "('B', 27648)",
+        "('E', 'float32', 27648)",
+        "('mc.swap', 1, 0, 'float32', 27648)"
+      ],
+      "pool_resets": 0,
+      "capture_memory": [
+        {
+          "key": "ACP",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1592.0,
+          "max_reserved_after_capture_MiB": 1592.0
+        },
+        {
+          "key": "('B', 27648)",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1592.0,
+          "max_reserved_after_capture_MiB": 1592.0
+        },
+        {
+          "key": "('E', 'float32', 27648)",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1592.0,
+          "max_reserved_after_capture_MiB": 1592.0
+        },
+        {
+          "key": "('mc.swap', 1, 0, 'float32', 27648)",
+          "warmup_in_pool": false,
+          "max_reserved_after_warmup_MiB": 1592.0,
+          "max_reserved_after_capture_MiB": 1592.0
+        },
+        {
+          "key": "('B', 29184)",
+          "warmup_in_pool": true,
+          "max_reserved_after_warmup_MiB": 1592.0,
+          "max_reserved_after_capture_MiB": 1592.0
+        },
+        {
+          "key": "('E', 'float32', 29184)",
+          "warmup_in_pool": true,
+          "max_reserved_after_warmup_MiB": 1592.0,
+          "max_reserved_after_capture_MiB": 1592.0
+        },
+        {
+          "key": "('mc.swap', 1, 0, 'float32', 29184)",
+          "warmup_in_pool": true,
+          "max_reserved_after_warmup_MiB": 1592.0,
+          "max_reserved_after_capture_MiB": 1592.0
+        }
+      ],
+      "speculative_launches": 0,
+      "speculative_rollbacks": 0,
+      "speculative_rebuild_rollbacks": 0,
+      "speculative_bucket_rollbacks": 0,
+      "pipelined_redos": 139,
+      "pipelined_rebuild_redos": 0,
+      "pipelined_early_rebuilds": 710,
+      "canonical_points": 2,
+      "polar_overflow_steps": [],
+      "process": {
+        "allocator": "expandable_segments:True",
+        "dynamo_cache_size_limit": 64,
+        "compile_family": "oeq"
+      },
+      "energy_graphs": {
+        "float32": {
+          "copy": false,
+          "backend": "hybrid",
+          "compile_mode": "default"
+        }
+      },
+      "overflow_check": "edges",
+      "overflows_redone": 139,
+      "overflow_log": [
+        {
+          "step": 3163,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 3324,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 3354,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 3803,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 3815,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 3943,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 3955,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 3974,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 4074,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 4300,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 4325,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 4334,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 4414,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 4430,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 4568,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 4683,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 4944,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5290,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5393,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5446,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5466,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5470,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5536,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5552,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5710,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5732,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5763,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5792,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5828,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 5915,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6246,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6280,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6288,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6311,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6325,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6339,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6407,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6430,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6459,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6539,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 6558,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7017,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7022,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7047,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7184,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7439,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7452,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7469,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7536,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7599,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7671,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7698,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7889,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7925,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7937,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 7985,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 8002,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 8063,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 8414,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 8664,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 8702,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9115,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9140,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9153,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9158,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9189,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9209,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9219,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9332,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9351,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9542,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9856,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9966,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 9982,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10018,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10031,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10106,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10123,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10138,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10170,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10235,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10274,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10288,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10366,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10402,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10426,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10439,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10468,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10553,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10621,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10647,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10845,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 10912,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11297,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11313,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11407,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11482,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11484,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11507,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11526,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11543,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11566,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11632,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11840,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11959,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 11982,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12003,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12030,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12045,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12080,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12124,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12162,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12181,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12212,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12218,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12246,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12332,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12341,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12369,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12405,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12442,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12494,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12510,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12532,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12563,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12618,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12633,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12667,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12678,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12740,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12755,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12769,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 12860,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13136,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13192,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13199,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13413,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13415,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        },
+        {
+          "step": 13435,
+          "kinds": [
+            "edges"
+          ],
+          "mode": "pipelined"
+        }
+      ],
+      "recaptures": 3,
+      "recapture_budget": 64,
+      "recapture_budget_exceeded_at": null,
+      "graph_variant_cap": 64,
+      "graph_evictions": 0,
+      "recapture_log": [
+        {
+          "step": 0,
+          "key": "ACP",
+          "reason": "first capture",
+          "counted": false,
+          "s": 0.09813553799995134
+        },
+        {
+          "step": 0,
+          "key": "('B', 27648)",
+          "reason": "first capture",
+          "counted": false,
+          "s": 0.15490234800017788
+        },
+        {
+          "step": 0,
+          "key": "('E', 'float32', 27648)",
+          "reason": "first capture",
+          "counted": false,
+          "s": 13.677664223999273
+        },
+        {
+          "step": 500,
+          "key": "('mc.swap', 1, 0, 'float32', 27648)",
+          "reason": "first capture",
+          "counted": false,
+          "s": 0.1206988599997203
+        },
+        {
+          "step": 3163,
+          "key": "('B', 29184)",
+          "reason": "new variant of B",
+          "counted": true,
+          "s": 0.07304470900089655
+        },
+        {
+          "step": 3900,
+          "key": "('E', 'float32', 29184)",
+          "reason": "new variant of E",
+          "counted": true,
+          "s": 0.054341035000106785
+        },
+        {
+          "step": 3900,
+          "key": "('mc.swap', 1, 0, 'float32', 29184)",
+          "reason": "new variant of mc.swap",
+          "counted": true,
+          "s": 0.07440443600080471
+        }
+      ],
+      "invalidations": [],
+      "captures": 7,
+      "capture_seconds": 14.25319115000093,
+      "recapture_seconds": 0.20179018000180804
+    }
+  },
+  "restart_points": [
+    {
+      "step": 10000,
+      "output_chunk": 0,
+      "output_rows": 1001,
+      "output_frames": 1001
+    },
+    {
+      "step": 13500,
+      "output_chunk": 1,
+      "output_rows": 1351,
+      "output_frames": 1351
+    }
+  ],
+  "timing": {
+    "setup_s": {
+      "plan": 0.006025793999469897,
+      "build": 25.65453990700007,
+      "capture": 0.29611961400041764,
+      "move_energy_gate": 34.74409968100008,
+      "provenance": 0.00010098799975821748
+    },
+    "setup_total_s": 60.7008859839998,
+    "status": "paused",
+    "steps": 13500,
+    "loop_s": 156.08463826699972
+  },
+  "report": {
+    "text": "FastMACE 0.0.1.dev0  |  mh1-r2scan (head matpes_r2scan)  |  Cl432Na108Nb108O108, 756 atoms (3\u00d73\u00d73), 3D PBC, NVT Langevin 1 fs\nphysics: no dispersion; charge/spin not used by this model\nplan:    graph, hybrid cuEq/OEq, float32, 18 rewrites on, 9 off (reasons in run.plan)\ngate:    not run (opt-in: check=\"gate\")\nmc \u0394E:   float32; move-energy gate passed (worst \u0394E error in k_B T_min: swap 0.0016; limit 0.01 k_B T_min at T_min 250 K; 13 configurations)\nmc:      swap O-Cl every 100, 50 attempts (exchange); accepted 0/6550; 4.54 ms/attempt over 131 blocks (device time; each attach's first block, with its captures, left out); attached over steps 499\u201313,500\nsetup:   61 s (plan 0.006 s, build 26 s, capture 0.3 s, move_energy_gate 35 s, provenance 0.0001 s)\nspeed:   9.28 ms/step, whole-run mean over steps 1\u201313,500; MD only; MC blocks: see mc\nruntime: re-captures 3 (0.202 s, 0.1 % of the loop); overflows redone 139\noutput:  /home/fzwin/fastmace-acceptance/5-T11-local-20261025-recovery-adapt-production/adapt-production/swap_anneal_NaNbOCl4_short\nlicence: ASL (non-commercial), from the label table (\u00a74.3)\nwarn:    MC: experimental: not yet qualified (\u00a710.4)",
+    "speed": {
+      "status": "whole-run mean",
+      "seconds_per_step": 0.009278259619111311,
+      "first_step": 1,
+      "last_step": 13500
+    },
+    "measured_window": {
+      "seconds_per_step": 0.009124562598999545,
+      "first_step": 1000,
+      "last_step": 2000
+    },
+    "speed_window": {
+      "warmup_steps": 1000,
+      "window_steps": 1000,
+      "start_step": 0
+    },
+    "setup_s": {
+      "plan": 0.006025793999469897,
+      "build": 25.65453990700007,
+      "capture": 0.29611961400041764,
+      "move_energy_gate": 34.74409968100008,
+      "provenance": 0.00010098799975821748
+    },
+    "setup_total_s": 60.7008859839998,
+    "licence": {
+      "licence": "ASL",
+      "source": "label table"
+    },
+    "gate_status": "skipped",
+    "move_energy_status": "passed",
+    "mc_energy_precision": "float32",
+    "reasons": [],
+    "warnings": [
+      "MC: experimental: not yet qualified (\u00a710.4)"
+    ],
+    "mc": {
+      "moves": [
+        "swap O-Cl every 100, 50 attempts (exchange)"
+      ],
+      "ranges": [
+        [
+          499,
+          13500
+        ]
+      ],
+      "blocks": 131,
+      "device_ms": 29540.39436340332,
+      "timed_attempts": 6500
+    }
+  },
+  "force_field": {
+    "backend": "hybrid",
+    "dtype": "float32",
+    "device": "cuda:0",
+    "compile_mode": "default",
+    "training": false,
+    "compute_stress": false,
+    "padding_exact": true,
+    "rewrites": [
+      "factor_species",
+      "fold_cutoff",
+      "density_first",
+      "joint_radial_input",
+      "fused_folded_backward",
+      "folded_backward_tiles",
+      "streaming_conv",
+      "reassociate_first",
+      "segmented_first_sum",
+      "block_linear",
+      "grouped_linear",
+      "merged_residual",
+      "gated_rows",
+      "segment_gemm",
+      "species_tables",
+      "fold_readout_tail",
+      "fold_product_linear",
+      "single_graph_strain"
+    ],
+    "decisions": {
+      "factor_species": "on",
+      "fold_cutoff": "on",
+      "density_first": "on",
+      "joint_radial_input": "on",
+      "fused_folded_backward": "on",
+      "folded_backward_tiles": "on",
+      "fused_radial_hidden": "off",
+      "direct_node_feats": "off",
+      "folded_constants": "off",
+      "streaming_conv": "on",
+      "reassociate_first": "on",
+      "segmented_first_sum": "on",
+      "generic_species_skip": "off",
+      "generic_reassociate": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field reassociate_first honoured by reassociate_first)",
+      "generic_segmented_first_sum": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field segmented_first_sum honoured by segmented_first_sum)",
+      "generic_fused_radial_backward": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field fused_folded_backward honoured by fused_folded_backward)",
+      "generic_streaming": "no MACE-MP-0, density-family or MACE-OFF residual interaction (field streaming_conv honoured by streaming_conv)",
+      "block_linear": "on",
+      "grouped_linear": "on",
+      "merged_residual": "on",
+      "gated_rows": "on",
+      "segment_gemm": "on",
+      "grouped_launch": "off",
+      "polar_uvu": "ScaleShiftMACE is not PolarMACE",
+      "polar_graph_sums": "off",
+      "species_tables": "on",
+      "fold_readout_tail": "on",
+      "fold_product_linear": "on",
+      "tf32x3_gemms": "off",
+      "fx_e3nn_linear": "off",
+      "single_graph_strain": "on",
+      "combo_kernels": "off"
+    },
+    "selfchecks": {
+      "factor_species": 1.0497378184367743e-06,
+      "fold_cutoff": 9.065915792529475e-07,
+      "density_first": 9.527483200347664e-07,
+      "joint_radial_input": 9.527482595194795e-07,
+      "fused_folded_backward": 1.0020224630532847e-06,
+      "folded_backward_tiles": 1.7654679807092562e-06,
+      "streaming_conv": 1.587913765865799e-06,
+      "reassociate_first": 1.7724165721303977e-06,
+      "segmented_first_sum": 1.8610369059570195e-06,
+      "block_linear": 6.039514733043886e-07,
+      "grouped_linear": 6.039514733043886e-07,
+      "merged_residual": 3.8196586371076017e-07,
+      "gated_rows": 6.729809585806178e-07,
+      "segment_gemm": 6.729809585806178e-07,
+      "species_tables": 2.2110571207813168e-07,
+      "fold_readout_tail": 3.2029163450137925e-07,
+      "fold_product_linear": 1.068059986521083e-06,
+      "single_graph_strain": 0.0
+    },
+    "streaming_interactions": 2,
+    "sort_receivers": true,
+    "gpu_neighbour_list": true,
+    "neighbour_rebuilds": 713,
+    "edge_capacity": 58112,
+    "candidates": 44732,
+    "species_columns": [
+      7,
+      10,
+      16,
+      40
+    ],
+    "superset": [
+      8,
+      11,
+      17,
+      41
+    ],
+    "charge": null,
+    "spin_multiplicity": null,
+    "dynamo_reset": false,
+    "polar": null,
+    "float64_energy": true,
+    "energy_treatment": "patched",
+    "strain_path": "one_graph",
+    "follows": null
+  },
+  "subprocess": null
+}

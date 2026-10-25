@@ -1,0 +1,62 @@
+{
+ "gpu": "NVIDIA GeForce RTX 5060 Ti",
+ "torch": "2.14.1+cu130",
+ "fastmace": "0.0.1.dev0",
+ "initial": {
+  "tier": "graph",
+  "backend": "hybrid",
+  "dtype": "float32"
+ },
+ "second_run_s": 47.324060591999796,
+ "broken": {
+  "hits": [
+   51
+  ],
+  "tier": "compiled",
+  "backend": "hybrid",
+  "revision": 1,
+  "plan_step": 50,
+  "reason": "fallback: mode compiled: mid-run on the graph tier from step 50 (the last restart point; capture error at step 51: AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing): eager passes the reduced gate: the fault is in capture or compilation; compiled first (AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing)",
+  "chain": [
+   [
+    0,
+    null,
+    "minimal plan (phase 1b)"
+   ]
+  ],
+  "decision": [
+   "graph -> compiled",
+   14,
+   "fallback-mid-run"
+  ],
+  "step": 200,
+  "finite": true,
+  "restart_points": [
+   50,
+   100,
+   150,
+   200
+  ],
+  "fallbacks": [
+   {
+    "step": 50,
+    "from": "graph",
+    "to": "compiled",
+    "reason": "fallback: mode compiled: mid-run on the graph tier from step 50 (the last restart point; capture error at step 51: AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing): eager passes the reduced gate: the fault is in capture or compilation; compiled first (AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing)",
+    "revision": 1
+   }
+  ],
+  "metadata_fallbacks": [
+   {
+    "step": 50,
+    "from": "graph",
+    "to": "compiled",
+    "reason": "fallback: mode compiled: mid-run on the graph tier from step 50 (the last restart point; capture error at step 51: AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing): eager passes the reduced gate: the fault is in capture or compilation; compiled first (AcceleratorError: CUDA error: operation failed due to a previous error during capture; innermost AcceleratorError: CUDA error: operation not permitted when stream is capturing)",
+    "revision": 1
+   }
+  ],
+  "report_line": [
+   "         mid-run fallback (fallback-mid-run): capture error at step 51 on plan revision 0 (graph); from step 50 (the last restart point) on plan revision 1 (compiled), searched in 44.7 s (SPEC \u00a79.4 step 5, decision 54)"
+  ]
+ }
+}
