@@ -75,8 +75,8 @@ and in addition the acceptance tier on merges that touch `model/`, `rewrites/` o
 
 The first run after a change of environment, or with emptied caches, is slower,
 because it compiles everything and builds the OEq extension once. Measurements:
-[validation/1b-T24-test-suite-speed.md](validation/1b-T24-test-suite-speed.md),
-[validation/1b-T27-gpu-tiers.md](validation/1b-T27-gpu-tiers.md).
+[validation/1b-T24-test-suite-speed.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/1b-T24-test-suite-speed.md),
+[validation/1b-T27-gpu-tiers.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/1b-T27-gpu-tiers.md).
 
 The CPU suite (`tests/cpu`) has no tiers: everyone runs all of it.
 
@@ -144,7 +144,7 @@ POLAR-1-S (30 s to 5 min each). Two of them have tiny-model versions in the fast
 failing a broken captured graph while the eager stages pass. Tiny versions of the others were
 tried. They cost almost as much as the MH-1 tests, because fresh processes, compiles and the
 tests' own child processes dominate, so they were left out
-([validation/1b-T26-gpu-retiering.md](validation/1b-T26-gpu-retiering.md)). These behaviours
+([validation/1b-T26-gpu-retiering.md](https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/1b-T26-gpu-retiering.md)). These behaviours
 are tested **only in the full tier**:
 
 - an engine resumed from canonical restart points follows the uninterrupted run within 1e-12 Å

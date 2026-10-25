@@ -61,6 +61,9 @@ full = [
     "torch-dftd==0.5.1",
 ]
 dev = ["pytest", "pytest-xdist", "ruff"]
+# The documentation site (6-T06, owner decision D6): `mkdocs build --strict`. pymdown-extensions 12
+# breaks mkdocstrings 1.0.6's highlighter (Highlight.__init__ needs `md`), hence the pin.
+docs = ["mkdocs-material", "mkdocstrings[python]", "pymdown-extensions<12"]
 
 [tool.setuptools.dynamic]
 version = { attr = "fastmace.__version__" }
