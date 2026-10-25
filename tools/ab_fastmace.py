@@ -95,7 +95,7 @@ RELEASES = {
     "3": Release("fastmace-3", None, "fastmace_3", "minimal", "3b"),  # commit: --expected-commit (tag not set yet)
     "3b": Release("fastmace-3b", None, "fastmace_3b", "minimal", "4"),  # commit: --expected-commit (tag not set yet)
     "4": Release("fastmace-4", "dae3848", "fastmace_4", "minimal", "5"),  # 5-T11, phase 5 items 4 and 5
-    "5": Release("fastmace-5", "6722f29", "fastmace_5", "minimal", "6"),  # 6-T13, phase 6 item 6
+    "5": Release("fastmace-5", "d304834", "fastmace_5", "minimal", "6"),  # 6-T13, phase 6 item 6
 }
 # IntegratorConfig fields this checkout's side pins against a release unless --integrator-option sets them.
 RELEASE_INTEGRATOR_PINS = {"p3b": {"fixcm_projection": "ase"}}

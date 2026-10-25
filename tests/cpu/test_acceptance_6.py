@@ -21,16 +21,16 @@ def test_release_5_is_the_fastmace_5_tag_with_side_6(tmp_path):
     ab = _tool("ab_fastmace")
     release = ab.RELEASES["5"]
     assert (release.tag, release.commit, release.renamed, release.planner, release.current) == (
-        "fastmace-5", "6722f29", "fastmace_5", "minimal", "6")
+        "fastmace-5", "d304834", "fastmace_5", "minimal", "6")
     common = ["--output", str(tmp_path / "out"), "--checkpoint", "m", "--renamed", str(tmp_path / "v")]
     args = ab.parse_args([*common, "--release", "5"])
-    assert args.sides == ["5", "6"] and args.current == "6" and args.expected_commit == "6722f29"
+    assert args.sides == ["5", "6"] and args.current == "6" and args.expected_commit == "d304834"
 
 
 def test_trajectory_runs_against_5(tmp_path):
     tv = _tool("trajectory_versions")
     common = ["run", "--output", str(tmp_path / "out"), "--checkpoint", "m"]
     assert tv.parse_args([*common, "--against", "5", "--side", "6", "--device", "cpu"]).side == "6"
-    assert tv.parse_args([*common, "--against", "5", "--side", "5", "--renamed", "v"]).expected_commit == "6722f29"
+    assert tv.parse_args([*common, "--against", "5", "--side", "5", "--renamed", "v"]).expected_commit == "d304834"
     with pytest.raises(SystemExit):
         tv.parse_args([*common, "--against", "5", "--side", "4"])

@@ -8,7 +8,7 @@ pass rules were fixed before any run. The tag itself is the owner's step (item 7
 
 - **Freeze:** the release-candidate commit of `fastmace/6-T13` named in `phase-6.md` (version `1.0.0`). Fixes
   needed during the acceptance are listed there with the items they rerun.
-- **Baseline:** the tag `fastmace-5` (`6722f29`), exported with `python -m fastmace.bench.versions export`.
+- **Baseline:** the tag `fastmace-5` (`d304834`), exported with `python -m fastmace.bench.versions export`.
 - **Hardware:** local RTX 5060 Ti (sm_120) in WSL2 Ubuntu 24.04; one fresh Colab L4 VM (sm_89) as the other
   machine. Workstations are off. Colab budget: at most 6 compute units.
 - **Environments:** `~/environments/fastmace_cpu` (CPU suite, build, docs), `~/environments/mace_cueq_oeq`

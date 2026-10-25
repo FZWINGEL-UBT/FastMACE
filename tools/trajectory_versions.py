@@ -25,7 +25,7 @@ Phase 3b (3b-T10, item 5) runs it against the ``fastmace-3`` tag with ``run --ag
 add the cell and the stress, and ``compare --bitwise`` compares them too.
 
 Phase 5 (5-T11, item 4) runs it against the ``fastmace-4`` tag (dae3848) with ``run --against 4 --side 4|5``.
-Phase 6 (6-T13, item 6) runs it against the ``fastmace-5`` tag (6722f29) with ``run --against 5 --side 5|6``.
+Phase 6 (6-T13, item 6) runs it against the ``fastmace-5`` tag (d304834) with ``run --against 5 --side 5|6``.
 Phase 4 (4-T13, item 5) runs it against the 3b release with ``run --against 3b --side 3b|4 --expected-commit SHA``,
 in NVT and NPT, with ``--dispersion none`` and ``d3bj`` (D3(BJ) on both sides; ``compare`` checks it matches).
 """

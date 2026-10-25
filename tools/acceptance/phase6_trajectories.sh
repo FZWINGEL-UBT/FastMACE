@@ -14,7 +14,7 @@ hybrid=$HOME/environments/mace_cueq_oeq/bin/python
 latest=$HOME/environments/mace_cueq_latest/bin/python
 checkpoint=$HOME/models/mace-mh-1.model
 versions=$HOME/tmp/6-T13/versions
-base=6722f2988e4185e66283eaad7682432ce671b4d8
+base=d304834cf018a55c7b2e0f7f2945d0988cb38569
 mkdir -p "$root" "$cache"/{tmp,fastmace,inductor,triton}
 export PYTHONPATH=$src PYTHONDONTWRITEBYTECODE=1 TORCHINDUCTOR_COMPILE_THREADS=4
 export TMPDIR=$cache/tmp FASTMACE_CACHE=$cache/fastmace TORCHINDUCTOR_CACHE_DIR=$cache/inductor TRITON_CACHE_DIR=$cache/triton
