@@ -51,6 +51,11 @@ Estimate: 2–3 weeks (§16).
   only (the acceptance's "docs build" is then a link check).
 - **D7 Hosted CPU CI.** (a) turn `cpu.yml` back on for the release branch and tags; (b) keep it off and run the
   suite locally before each tag.
+- **D8 Licence questions from 6-T02** (`docs/licences.md`). (1) `dftd3_params.npz`: the numbers come from Grimme's
+  DFT-D3 (GPL-1+; simple-dftd3 LGPL-3+); no separate data licence was found, so torch-dftd's MIT relabelling may
+  not hold. (a) ship as now with the notice; (b) do not ship it, fetch it from an installed torch-dftd at first
+  use; (c) ask the Grimme group or PFN first. (2) The ASE 3.27 ports in `integrators/` and `optimize/` may be
+  LGPL derived works: (a) owner reviews; (b) mark those files LGPL-2.1+ and say so in NOTICE.md.
 
 ## Tasks
 
