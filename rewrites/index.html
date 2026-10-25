@@ -1,0 +1,2033 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs">
+      
+      
+      
+        <link rel="canonical" href="https://fzwingel-ubt.github.io/FastMACE/rewrites/">
+      
+      
+        <link rel="prev" href="../benchmarks/">
+      
+      
+        <link rel="next" href="../licences/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Rewrite screens - FastMACE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#rewrite-screens-adopted-and-rejected" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="FastMACE" class="md-header__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FastMACE
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Rewrite screens
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="FastMACE" class="md-nav__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    FastMACE
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release/oeq-wheels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prebuilt OEq extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastMACE in five minutes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Port your ASE script
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/restart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output, restart and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo and swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/npt-d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NPT and D3 dispersion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/relax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relaxations and quenches
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ and troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/quick/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick runs (fm.md)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and force fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispersion (D3)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ASE front end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite screens
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace-screens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastMACE screens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-research-engines-rejected-screens-1016-october-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The research engine's rejected screens (10–16 October 2026)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../licences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upstream PR drafts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upstream PR drafts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upstream/mace-block-linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE block linear
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upstream/mace-reassociate-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE first-interaction reassociation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upstream/oeq-no-nvcc-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OEq build without nvcc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace-screens" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastMACE screens
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-research-engines-rejected-screens-1016-october-2026" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The research engine's rejected screens (10–16 October 2026)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="rewrite-screens-adopted-and-rejected">Rewrite screens: adopted and rejected<a class="headerlink" href="#rewrite-screens-adopted-and-rejected" title="Permanent link">&para;</a></h1>
+<p>SPEC §6.2 asks for this record of every screen, adopted or not, so that work is not repeated. The adopted
+rewrites are the registry records (<code>fastmace/rewrites/</code>, SPEC §6.2 catalogue). This file lists FastMACE's
+own screens and summarises the research engine's rejected ones.</p>
+<h2 id="fastmace-screens">FastMACE screens<a class="headerlink" href="#fastmace-screens" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Date</th>
+<th>Screen</th>
+<th>Exactness</th>
+<th>Result</th>
+<th>Decision</th>
+<th>Report</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-10-24</td>
+<td>OPT4-T04: <code>grouped_launch</code> (unchanged since <code>f2531cb</code>) on generic MACE, where every block linear's per-l products are <code>[n(2l+1), 128] @ [128, 128]</code> and all small in NaCl</td>
+<td>rounding, deterministic</td>
+<td>Force gate passed on <code>omat0-medium</code> (NaCl 1.57 / 1.14 / 0.64, NbCl5 1.38 / 1.13 / 1.03). Same-process A/B, 12 blocks, both orders, main <code>13a1983</code>, NaCl b/a on the local RTX 5060 Ti (sm_120): <code>omat0-medium</code> <strong>0.9529 / 0.9509</strong>, <code>mp0-medium</code> 0.9467 / 0.9546, <code>mpa0-medium</code> 0.9508 / 0.9466, <code>mp0b3-medium</code> 0.9493 / 0.9456, <code>matpes-pbe</code> 0.9507 / 0.9500; <code>omat0-medium</code> NbCl5 1.0008 / 0.9984 (neutral: not grouped by the shape rule). Colab L4 (sm_89) <code>omat0-medium</code> NaCl <strong>0.9593 / 0.9568</strong> (0.87 CU)</td>
+<td><strong>Adopted: default on for the generic MACE family</strong> (owner decision 57, 24 October 2026: every interaction MP-0's residual or the density family's, not PolarMACE; float32, not reproducible). MH-1, MACE-OFF, POLAR-1 and OMOL-0 stay off unless requested (MH-1 sm_89 1.005). No applicability change to the record</td>
+<td><code>docs/validation/opt4-T04.md</code>, <code>results/opt4-T04-grouped-launch/</code></td>
+</tr>
+<tr>
+<td>2026-10-24</td>
+<td>OPT4-T08: one stage of the force call at reduced precision (bf16/fp16 output, gradient or saved-tensor storage; TF32 forward or backward; autocast; whole stage cast), every other stage FP32</td>
+<td>rounding (screen only; MACE's e3nn float32 path as the base)</td>
+<td>MH-1 NaCl/NbCl5/NaNbO3 and omat0-medium NaCl/NbCl5, gate ratios against the float32 calculator: fp16 storage 2–1,100×, bf16 7–8,000×, TF32 forward GEMMs 2–600×; most sensitive the radial basis, radial MLP and neighbour sums. Passes only ZBL (fp16) and MH-1's interaction-0 symmetric-contraction backward in TF32 (fails on omat0-medium)</td>
+<td><strong>Not built</strong>: no stage with a real share of the step passes alone</td>
+<td><code>docs/validation/opt4-T08-precision-sensitivity.md</code>, <code>tools/precision_screen.py</code></td>
+</tr>
+<tr>
+<td>2026-10-24</td>
+<td>OPT4-T07: the megakernel gate. A single-SM probe with FP32 FFMA warps beside <code>mma.sync</code> TF32/BF16 warps in one kernel, from register-only up to a 64×64 tensor-core warp tile and an in-kernel 3×TF32 split</td>
+<td>speed only</td>
+<td>Gain against the better of all warps on CUDA cores or all on tensor cores, with an FP32-accurate decomposition: RTX 5060 Ti (sm_120) <strong>1.04</strong> with the split measured (keep 0.91); L4 (sm_89) <strong>1.10</strong> (keep 0.92), a no-traffic ceiling; A100 <strong>0.92</strong> (keep 0.58: tensor cores alone are 2.2× the CUDA cores)</td>
+<td><strong>Fail</strong> on sm_120 and sm_80. sm_89 passes only at the threshold, and the stage rule needs the reference GPU. Heterogeneous megakernel work does not start</td>
+<td><code>docs/validation/opt4-T07-megakernel-probe.md</code>, <code>tools/megakernel_probe.py</code></td>
+</tr>
+<tr>
+<td>2026-10-24</td>
+<td>OPT4-T06: the OEq streaming forward's launch shape (block size 32–512, register caps 64/72) on NbCl5</td>
+<td>exact (every variant bitwise equal)</td>
+<td>local sm_120, main <code>13a1983</code>, ncu: 93.85 % of DRAM peak (414 GB/s), long-scoreboard stalls 92 %, occupancy 50 % (register limit); 802 µs against a 746 µs traffic floor (ceiling 0.26 % of the step). Block sizes 32–256 within 0.2 %, 512 +3.6 %; register caps raise occupancy to 58–67 % and are 0.5–2.1 % slower. OPT-T10's "47 % of DRAM" was ncu's clocks (its 1,681 µs duration against 0.87 ms)</td>
+<td><strong>Not built</strong> (no shape-rule lever; DRAM-bound)</td>
+<td><code>docs/validation/opt4-T06.md</code></td>
+</tr>
+<tr>
+<td>2026-10-24</td>
+<td>OPT4-T01: a write-bound Triton kernel for the folded radial last layer's forward <code>[E, 65] @ [65, 1280]</code> (Inductor pads it to K = 68 for cuBLAS): all of K in one tile, IEEE <code>tl.dot</code> on 64 columns, the cutoff column as a rank-1 update, the output streamed; 36 tiles, K steps 16/32/64, a persistent TMA-store variant</td>
+<td>rounding (3.4–3.7e-7 against float64, as cuBLAS)</td>
+<td>local sm_120 microbenchmark (CUDA-graph replays): best Triton NaCl 190 µs, NbCl5 1,306 µs, NaNbO3 1,913 µs, against cuBLAS 183–186 / 1,270–1,286 / 1,897–1,913 µs and the plan's limits of 150 / 1,000 / 1,450 µs. The store alone runs at the <code>fill_</code> rate (794 µs NbCl5): the IEEE FP32 dot (about 7.3 TFLOPS) is the limit, not the write. cuBLAS at K = 64 without the cutoff column (1,104 µs) also misses the limit; cuBLAS K = 64 plus <code>addr_</code> takes 2,650 µs</td>
+<td><strong>Cut</strong> at the falsifying first measurement; no record, gate or A/B</td>
+<td><code>docs/validation/opt4-T01.md</code>, <code>results/opt4-T01/local-microbench/</code></td>
+</tr>
+<tr>
+<td>2026-10-24</td>
+<td>OPT4-T03 stage 1, <code>tf32x3_gemms</code>: every position-dependent atom GEMM (block linears, <code>segment_gemm</code>, species skip, reassociated first interaction), forward and input gradients, as 3×TF32 through Triton's <code>tf32x3</code> (one fixed tile, no TF32 flag)</td>
+<td>rounding, not IEEE-equivalent under cancellation; deterministic</td>
+<td>Real operands of a force call: worst cancellation-scaled error 4.7–5.7e-7 against cuBLAS IEEE's 6.4e-7–1.0e-6 (MH-1 NaCl, NbCl5; OMOL-0 NaCl). Force gate, local sm_120: MH-1 NaCl ratios 0.45 / 1.09 / 0.38, NbCl5 0.45 / 1.00 / 0.79; OMOL-0 NaCl 1.62 / 1.26 / 0.71; energy offset of one sign, 2–3e-4 meV/atom (MH-1). NVE drift, Colab A100, 20 ps: NaCl 1.4e-7, NbCl5 −5.2e-6 meV/atom/ps (default 1.1e-6, −3.0e-6). Untimed: slower on the A100 (Triton kernel)</td>
+<td><strong>Stage 1 passed</strong>; opt-in record kept (<code>never_automatic</code>). Stage 2 (CUTLASS 3×TF32, A100) not built (owner, 24 October 2026: the A100 is Colab-only)</td>
+<td><code>docs/validation/opt4-T03.md</code></td>
+</tr>
+<tr>
+<td>2026-10-24</td>
+<td>OPT4-T05, setup and capture time: <code>EngineConfig.dynamic_edges</code> on graph-tier MD plans, so the padded first capture of B reuses the first compiled call's graph instead of compiling the model again (dynamo specialised the first call on the exact edge count)</td>
+<td>exact: the steps replay the same compiled code (the first warm start with the option hit all 4 FX-graph and 2 AOT-autograd cache entries the default wrote); <code>reproducible=True</code> trajectories bitwise equal to the default through 76 rebuilds</td>
+<td>local sm_120, untimed starts of <code>fm.md</code> (300 steps): warm MH-1 NaCl 35.2 → 26.7 s, NbCl5 39.7 → 31.3 s, <code>omat0-medium</code> NaCl 28.7 → 21.6 s; cold about 23 s (MH-1) and 18 s (<code>omat0</code>) shorter</td>
+<td><strong>Adopted</strong> (owner decision 59, 24 October 2026): on by default; <code>False</code> restores the second compile</td>
+<td><code>docs/validation/opt4-T05.md</code></td>
+</tr>
+<tr>
+<td>2026-10-24</td>
+<td>OPT4-T02, <code>fx_e3nn_linear</code>: e3nn's <code>o3.Linear</code> code as an fx graph instead of the TorchScript a checkpoint restores, so dynamo traces PolarMACE's forward (a TorchScript Linear in a loop had sent the whole forward body back to eager, 31 graphs, 538 eager kernels on NaCl)</td>
+<td>rounding (eager bitwise on the CPU), deterministic</td>
+<td>POLAR-1-S kernels per force call 1,226 → 642 (NaCl), graphs 31 → 5; POLAR-1 gate passed (S, M and L on NaCl and NbCl5 2×2×2; L's NbCl5 locally after the Colab A100 timed out cold-compiling); with <code>polar_graph_sums</code>, local sm_120 same-process A/B both orders: NaCl <strong>0.7634 / 0.7589</strong>, NbCl5 <strong>0.8225 / 0.8231</strong>; Colab L4 (sm_89) both orders: NaCl <strong>0.8184 / 0.8108</strong>, NbCl5 <strong>0.8395 / 0.8366</strong>. MH-1 hybrid: refused (no TorchScript Linear)</td>
+<td><strong>Adopted for POLAR-1-S, -M and -L</strong> (owner decision 58, 24 October 2026; L after its NbCl5 gate): on under <code>auto</code> for those checkpoints in hybrid float32, non-reproducible plans; off for every other model unless requested</td>
+<td><code>docs/validation/opt4-T02.md</code></td>
+</tr>
+<tr>
+<td>2026-10-24</td>
+<td>OPT4-T02, <code>polar_graph_sums</code>: PolarMACE's one-graph per-graph sums (Fukui norms, total charges, barycentre) as a sum and a broadcast instead of <code>scatter_add_</code> and <code>x[batch]</code> (a serial float64 <code>index_put</code> backward, 2.3 ms of NbCl5's 25 ms force call)</td>
+<td>rounding, deterministic (no atomics)</td>
+<td>alone: NaCl −8 %, NbCl5 −9 % of the force call's kernel time (untimed profile); on top of <code>fx_e3nn_linear</code>: no further gain (Inductor compiles that backward)</td>
+<td><strong>Adopted for POLAR-1-S, -M and -L with <code>fx_e3nn_linear</code></strong> (decision 58): deterministic sums, no atomics</td>
+<td><code>docs/validation/opt4-T02.md</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT3-T03, <code>EngineConfig.fused_integrator</code>: fixed-cell CUDA Langevin's AC/ACP stage (half kick, drift, neighbour checks, compaction, saved velocities, flags) in four Triton kernels around PyTorch's centre-of-mass sums and cumsum, instead of about 45 PyTorch kernels</td>
+<td>exact (every written buffer byte-identical at stage level; reproducible-mode trajectories bitwise: pipelined, checked, resume)</td>
+<td>local sm_120 same-process A/B, 300 K: NaCl <strong>0.9758 / 0.9758</strong> (all 24 pairs faster), NbCl5 0.9972 / 0.9929; Modal L4: NaCl <strong>0.9807 / 0.9797</strong>, NbCl5 0.9990 / 0.9975</td>
+<td><strong>Adopted</strong> (owner decision, 21 October 2026): on by default, also in reproducible plans; NPT, CPU and no Triton keep the PyTorch stage</td>
+<td><code>docs/validation/opt3-T03.md</code>, <code>results/modal-opt3-T03-L4-20261021/</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT3-T04, <code>combo_kernels</code>: Inductor's pointwise combo kernels to cut NaCl's launches inside B</td>
+<td>rounding (positions, momenta and forces bitwise in the reproducible mode, potential energy 2.1e-6 eV apart)</td>
+<td>NaCl 264 → 211 kernels per replay, gaps 157 → 128 µs; local sm_120: NaCl 0.991 / 0.982, NbCl5 <strong>1.024 / 1.027</strong>; Modal L4: NaCl 0.991 / 0.990, NbCl5 <strong>1.019 / 1.020</strong></td>
+<td><strong>Rejected</strong> (NbCl5 slower on both GPUs); opt-in record kept</td>
+<td><code>docs/validation/opt3-T04.md</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT3-T01: fused gate and residual VJP</td>
+<td>rounding</td>
+<td>trace analysis (NbCl5, sm_120): the gate's kernels are already fused and run at DRAM bandwidth; a fused backward removes 55–110 MB per force call, 0.6–1.1 % of NbCl5, before losing Inductor's neighbouring fusions</td>
+<td><strong>Not built</strong> (ceiling about 1 %)</td>
+<td><code>docs/design/opt3-T01-gate-vjp-analysis.md</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT3-T02: the cuEquivariance symmetric contraction (other cuEq methods, OEq 0.7.0's contraction, fusing its input or output, exact zero paths, reassociation)</td>
+<td>–</td>
+<td>Share of the step (local): NaCl 2.5 %, NbCl5 5.4 %, NaNbO3 3.1 %. Its kernels run at 72–96 % of memory speed-of-light and move about the bytes of their <code>[atoms, 16, 512]</code> input and gradient (NbCl5 forward 68–71 MB at up to 422 GB/s). Every option's ceiling is below 3 % (best: removing the input materialisation, about 2.7 % on NbCl5, not buildable as a GEMM epilogue across four per-l products)</td>
+<td><strong>Screened, not built</strong> (build rule: ≥ 3 % ceiling)</td>
+<td><code>docs/design/opt3-T02-symmetric-contraction.md</code></td>
+</tr>
+<tr>
+<td>2026-10-20</td>
+<td>OPT-T02 stage A, <code>gated_rows</code>: MH-1's residual products, gate and <code>linear_2</code> on per-segment rows, without the joins and copies between them</td>
+<td>exact (bitwise on the CPU and in the reproducible GPU mode)</td>
+<td>same-process A/B, 12 blocks, both orders: murphy (sm_89) NaCl −4.4 %, NbCl5 −9.0 %; local RTX 5060 Ti (sm_120) NaCl −3.7 %, NbCl5 −10.6 %. Force gate passed (NaCl, NbCl5)</td>
+<td><strong>Adopted</strong>, default on wherever <code>merged_residual</code> is (owner decision, 20 October 2026; planner rule <code>on_with_merged_residual</code>). The check of all models (the 19 labels through the gate) runs in the combined acceptance after the round; a model that fails there gets <code>gated_rows</code> switched off</td>
+<td><code>docs/validation/opt-T02a-gated-rows.md</code></td>
+</tr>
+<tr>
+<td>2026-10-20</td>
+<td>OPT-T02 stage B, <code>segment_gemm</code>: in the <code>gated_rows</code> chains, <code>linear_2</code>'s products write straight into its joined output (Triton gathered-row GEMM where the shared shape rule picks it, cuBLAS otherwise), and the interaction's <code>reshape_irreps</code> becomes a view</td>
+<td>rounding (another GEMM), deterministic</td>
+<td>same-process A/B on top of <code>gated_rows</code>, 12 blocks, both orders: murphy (sm_89) NbCl5 0.952/0.948, NaCl 0.997/0.996; local (sm_120) NbCl5 0.958/0.957, NaCl 0.997/0.992 (NaCl takes the stock path). Force gate passed</td>
+<td><strong>Adopted</strong>, default on with <code>gated_rows</code> in float32 plans that are not reproducible (owner decision, 20 October 2026; planner rule <code>on_with_gated_rows_float32_unless_reproducible</code>); float64 and <code>reproducible=True</code> keep the stock path. The 19-label gate in the combined acceptance after the round checks all models; a model that fails gets it switched off</td>
+<td><code>docs/design/opt-T02-BC-go-no-go.md</code></td>
+</tr>
+<tr>
+<td>2026-10-20</td>
+<td>OPT-T02 stage C, <code>gate_prologue</code>: the gate applied inside <code>segment_gemm</code>'s Triton GEMM as it loads its rows (A-load prologue), so the gated rows are never stored</td>
+<td>rounding (values equal <code>segment_gemm</code>'s bitwise), deterministic</td>
+<td>local RTX 5060 Ti (sm_120), pinned <code>3dc0ca5</code>, same-process A/B on top of <code>gated_rows</code> + <code>segment_gemm</code>, 12 blocks: NbCl5 b/a <strong>1.0196</strong> (a-b, ABAB) and <strong>1.0157</strong> (b-a, ABBA), 23.58 → 24.04 and 23.38 → 23.75 ms; NaCl 0.998 / 0.997 (no product on Triton). The gate tile, gathered by atom and multiplied in registers inside the K loop, costs the GEMM more than the elementwise kernel it removes</td>
+<td><strong>Rejected</strong> (rule: NbCl5 ≤ 0.985 in both orders on both GPUs; it is slower on sm_120, so murphy was not measured). Code kept unmerged on <code>fastmace/opt-T02c</code> (3dc0ca5)</td>
+<td><code>docs/design/opt-T02-C-gate-prologue.md</code> §5, <code>results/opt-T02c-gate-prologue/local/stageC-3dc0ca5/</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT-T04: checkpoint scan for exact skips (zero weight blocks, unused paths, heads, species) in the 10 benchmark and 5 MACE-OFF checkpoints</td>
+<td>exact</td>
+<td>The zeros (4.9–36 % of parameters and buffers) are the symmetric contractions' fixed coupling tensors (<code>U_matrix_*</code>, 94–99.6 % zero), which cuEquivariance already runs sparse; learned weights: no zero linear path, no zero per-species block. Only exact skips: MH-1 product 0's 24 of 512 zero l = 1 channels (&lt; 0.1 ms on NbCl5) and the five unused heads' readout columns (about 0.05 ms)</td>
+<td><strong>Screened, not built</strong> (conductor, 21 October 2026): under 0.5 % together, below the noise floor</td>
+<td><code>docs/validation/opt-T04-checkpoint-scan.md</code> (branch <code>fastmace/opt-T04-scan</code>)</td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT-T03 candidate 2, <code>grouped_launch</code>: in every block linear, the products the shared shape rule calls small run together in one Triton launch (IEEE <code>tl.dot</code>, operands addressed by offset), forward and input gradient; the others keep cuBLAS</td>
+<td>rounding, deterministic</td>
+<td>Full-step same-process A/B on top of the defaults (<code>gated_rows</code>, <code>segment_gemm</code>), 12 blocks, pinned <code>cd71b5c</code>. Local RTX 5060 Ti (sm_120): NaCl b/a <strong>1.0179</strong> (a-b) and <strong>1.0103</strong> (b-a), NbCl5 1.0041 and 0.9971. murphy (sm_89): NaCl <strong>1.0697</strong>, NbCl5 1.0146 (a-b; b-a cancelled). Force gate passed on murphy (NaCl ratios 1.83, 1.12, 0.79; NbCl5 0.23, 1.02, 0.84). The isolated block-linear bench's gain (1.30–1.34× on sm_120) does not survive in the step. Not profiled; the extra custom-op boundaries (no Inductor fusion across them) and the IEEE Triton GEMM at small M are the likely causes</td>
+<td><strong>Rejected</strong> (it was to speed up NaCl; it slows it on both GPUs). Diagnosed and fixed afterwards (<code>f2531cb</code>: separate outputs, one launch per weight shape): sm_120 NaCl 0.977 / 0.982, sm_89 NaCl 1.005 / 1.003, NbCl5 neutral on both; stays opt-in, no gain on both GPUs (owner request, 21 October 2026)</td>
+<td><code>results/opt-T03b-grouped-launch/</code>, <code>docs/design/opt-T03b-diagnosis.md</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT2-T04, <code>EngineConfig.overlap_rebuild</code>: a pipelined fixed-cell step's early neighbour rebuild runs on a side stream beside the force graph in flight</td>
+<td>exact (bitwise in the reproducible GPU mode, 600 steps, 122 rebuilds beside)</td>
+<td>local sm_120 same-process A/B: NaCl 1000 K <strong>0.964 / 0.967</strong>, NaCl 300 K (with <code>step_graph</code>) 0.984 / 0.981, NbCl5 0.993–0.999; Modal L4: NaCl 300 K 0.996 / 0.990, 1000 K 0.988 / 0.987, NbCl5 0.996 / 1.003</td>
+<td><strong>Adopted</strong> (owner decision, 21 October 2026; OPT-DEF-2): on by default, acts only on pipelined fixed-cell CUDA steps; <code>step_graph</code> stays off</td>
+<td><code>docs/validation/opt2-T04.md</code>, <code>results/modal-round2-L4-1176db8/</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT2-T03, <code>folded_backward_tiles</code>: the folded last radial layer's Triton input gradient tiled by the waves rule (128-row tiles where the 64-row grid is 2-8 waves)</td>
+<td>exact (BLOCK_K unchanged: bitwise the same products)</td>
+<td>local sm_120: NaCl <strong>0.983 / 0.981</strong>; Modal L4: NaCl 1.005 / 1.000, NbCl5 1.000 / 1.001 (neutral)</td>
+<td><strong>Adopted</strong> (owner decision, 21 October 2026; OPT-DEF-2): auto = on wherever <code>fused_folded_backward</code> is (MH-1 class)</td>
+<td><code>docs/validation/opt2-T03.md</code>, <code>results/modal-round2-L4-1176db8/</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT-T08 C1, <code>species_tables</code>: species-only atom-level products (embeddings, projected source/target embeddings, the first interaction's <code>skip_tp</code> and <code>linear_up</code>) as per-species tables gathered each step</td>
+<td>rounding (bitwise on the CPU), deterministic</td>
+<td>local RTX 5060 Ti (sm_120), main <code>f993713</code>, same-process A/B on top of the defaults, 12 blocks, off first: NaCl <strong>0.956</strong>, NbCl5 <strong>0.979</strong></td>
+<td><strong>Adopted</strong> with C2 and C3 (see the combined row)</td>
+<td><code>docs/validation/opt-T08-linear.md</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT-T08 C3, <code>fold_product_linear</code>: <code>products.0.linear</code> folded into the linear consumers of layer 0's output, which carries the species (needs C1)</td>
+<td>rounding, deterministic</td>
+<td>local sm_120: C1 + C3 NaCl <strong>0.921</strong>, NbCl5 <strong>0.935</strong> (off first)</td>
+<td><strong>Adopted</strong> (see the combined row)</td>
+<td><code>docs/validation/opt-T08-linear.md</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT-T08 C2, <code>fold_readout_tail</code>: the last readout's first linear folded into the last product's linear and the last <code>skip_tp</code> (MH-1 class)</td>
+<td>rounding, deterministic</td>
+<td>local sm_120: NaCl <strong>0.977</strong>, NbCl5 <strong>0.991</strong> (off first)</td>
+<td><strong>Adopted</strong> (see the combined row)</td>
+<td><code>docs/validation/opt-T08-linear.md</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT-T08 C1 + C2 + C3 together</td>
+<td>rounding, deterministic</td>
+<td>local sm_120, both orders: NaCl <strong>0.908 / 0.904</strong>, NbCl5 <strong>0.924 / 0.928</strong>; Modal L4 (sm_89): NaCl 0.918 / 0.920, NbCl5 0.922 / 0.920; Modal A100 (sm_80): NaCl 0.907 / 0.896, NbCl5 0.907 / 0.906. First force within the engine's scatter (plain cuEq float64 and hybrid float32); force gate passed on sm_120 (NaCl 0.05, 1.13, 0.33; NbCl5 0.19, 1.02, 0.65) and on the L4</td>
+<td><strong>Adopted</strong> (owner decision, 21 October 2026, "Make all 3 defaults"; OPT-DEF-2): auto = on where the model takes them (C1, C3: the MH-1 labels; C2: also OMOL-0), in float32 plans that are not reproducible. species_tables is not bitwise on the GPU (reproducible mode: forces differ by 8e-16 eV/Å), so float64 and reproducible plans keep all three off</td>
+<td><code>docs/validation/opt-T08-linear.md</code>, <code>results/opt-T08-linear-audit/local-20261021/</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT3-T05, layout audit: <code>direct_node_feats</code> (no LAMMPS-only join of node features and attributes, so no strided input copies into the streaming convolution) and <code>folded_constants</code> (the folded radial <code>[W, b]</code> and its halves built once)</td>
+<td>exact (bitwise on the CPU)</td>
+<td>NaCl pure data movement 59.4 → 47.8 µs per force call; force gate passed; local sm_120 A/B: NaCl <strong>0.9921 / 0.9948</strong>, NbCl5 1.0020 / 1.0020; Modal L4: NaCl 1.0034 / 1.0005, NbCl5 1.0008 / 0.9950</td>
+<td><strong>Opt-in</strong>; no gain resolved above noise; default is the owner's call</td>
+<td><code>docs/validation/opt3-T05-layout-audit.md</code></td>
+</tr>
+<tr>
+<td>2026-10-21</td>
+<td>OPT3-T05, <code>lm_major_outer_sum</code>: the reassociated first interaction's outer sums stored (l, m)-major so its per-l GEMM operands are views</td>
+<td>exact</td>
+<td>the transpose moves to the join and the gradient slices (input <code>[., 130]</code>, output <code>[., 128]</code>): NbCl5 layout kernels 93.2 → 85.9 µs</td>
+<td><strong>Rejected</strong>, reverted</td>
+<td><code>docs/design/opt3-T05-layout-audit.md</code></td>
+</tr>
+<tr>
+<td>2026-10-20</td>
+<td>OPT-T01: FP32-accurate tensor-core GEMMs (Triton <code>tf32x3</code> 3×TF32; cuBLAS BF16×9; CUTLASS 3×TF32)</td>
+<td>rounding (3×TF32 error 5.3e-7 against float64, below cuBLAS IEEE's 1.3e-6)</td>
+<td>sm_89: tf32x3 slower than cuBLAS SIMT FP32 on 89 of 92 production shapes; per force call NbCl5 atom GEMMs 15.6 ms against 10.4 ms, NaCl 3.3 against 1.9 ms. Peak 4096³: cuBLAS FP32 16.3, TF32 38.6, tf32x3 8.4 TFLOPS, so three TF32 products cannot beat FP32 (ceiling 12.9). BF16×9 exists only on compute capability 10.0/10.3. sm_120 (RTX 5060 Ti, 21:47 UTC, pinned <code>3d301ec</code>): tf32x3 faster on 13 of 92 shapes; per force call NbCl5 24.9 ms against 12.5 ms, NaCl 4.3 against 2.6 ms; peak cuBLAS FP32 16.7, TF32 25.0, tf32x3 7.1 TFLOPS.</td>
+<td><strong>Rejected</strong> (sm_89 and sm_120)</td>
+<td><code>docs/validation/opt-T01-tensor-cores.md</code></td>
+</tr>
+<tr>
+<td>2026-10-20</td>
+<td>OPT-T01b: tensor-core work beside cuBLAS's SIMT FP32 GEMM (column split or duplicate on two streams, one captured graph)</td>
+<td>speed only</td>
+<td>murphy (sm_89, 48 SMs). With the FP32-accurate partner, Triton tf32x3, the combined rate is 0.77–0.85× of cuBLAS FP32 alone on 9720/13608 × 512 × 512 (best split 75/25), 0.98× on 1944 × 512 × 384 and 0.82× on 216 × 512 × 512. Duplicate (both whole products at once): 0.75–0.79× on the large shapes. Only 13–29 % of the shorter part overlaps. Even 1×TF32 (not FP32-accurate) only reaches 1.10–1.36×, mostly because it is 2.3× faster alone.</td>
+<td><strong>Rejected</strong> (rule: &lt; 1.10×). Both GEMMs fill every SM (hundreds of tiles on 48 SMs), so the second stream only gets the first one's tail. Co-resident warps share the schedulers' issue slots and the register file, and tf32x3 spends its own slots on its three products and the operand splits.</td>
+<td><code>results/opt-T01b-tensor-core-overlap/murphy/</code>, <code>tools/gemm_overlap_bench.py</code></td>
+</tr>
+<tr>
+<td>2026-10-20</td>
+<td>OPT-T03 candidates 1–2: a block linear's independent per-l products on 2 or 4 CUDA-graph branches (cuBLAS), or in one grouped Triton launch</td>
+<td>exact (streams); rounding (grouped)</td>
+<td>murphy (sm_89), one MH-1 block linear (4 × 512 → 512), graph replays: streams 0.85–1.11×, grouped 1.00/1.16× on NaCl forward/input gradient (7 % together) and 0.97/1.03× on NbCl5. The four products together already run at 9.6–11.1 TFLOPS on NaCl sm_120 (RTX 5060 Ti, pinned <code>3d301ec</code>, <code>~/fastmace-acceptance/opt1-local-t03t01-20261020</code>): streams 0.68–0.98×; grouped <strong>1.34/1.30×</strong> on NaCl, 0.97/0.98× on NbCl5</td>
+<td><strong>Not built</strong> on sm_89 (rule: ≥ 10 % of NaCl's atom GEMM time, no NbCl5 loss). On sm_120 the grouped launch passes for NaCl; behind the shape rule (NaCl-sized products only) it would leave NbCl5 on cuBLAS. Candidate 2 then built behind the shape rule and <strong>rejected</strong> in the model: see the <code>grouped_launch</code> row</td>
+<td><code>docs/design/opt-T03-small-m.md</code> §6</td>
+</tr>
+<tr>
+<td>2026-10-20</td>
+<td>OPT-T02 stage D: gate backward fused into <code>linear_2</code>'s input-gradient epilogue</td>
+<td>rounding</td>
+<td>not built: its per-atom reduction needs atomics or whole-atom tiles</td>
+<td><strong>Rejected</strong> (conductor): non-deterministic gradients would break the reproducible mode and the float64 bitwise promise</td>
+<td><code>docs/design/opt-T02-fusion.md</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-research-engines-rejected-screens-1016-october-2026">The research engine's rejected screens (10–16 October 2026)<a class="headerlink" href="#the-research-engines-rejected-screens-1016-october-2026" title="Permanent link">&para;</a></h2>
+<p>ResearchModule <code>Experiments/Langevin_Thermostat/studies/further_optimizations/</code> and
+<code>studies/symmetrix_xl/STREAMED_EDGES_RESULTS.md</code>; local RTX 5060 Ti unless noted. Each failed for the
+reason given, so it should not be repeated without new evidence.</p>
+<table>
+<thead>
+<tr>
+<th>Idea</th>
+<th>Result</th>
+<th>Why it failed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>GEMM-only autotuning (Inductor <code>max_autotune_gemm</code>)</td>
+<td>−0.1 to −1.0 % (slower); setup 141–756 s</td>
+<td>per-shape tuning cost, no gain after species factoring; excluded by SPEC §9.1 anyway</td>
+</tr>
+<tr>
+<td>TF32</td>
+<td>changes the accuracy</td>
+<td>production decision: FP32 with TF32 off (SPEC §1)</td>
+</tr>
+<tr>
+<td>Grouped node GEMMs</td>
+<td>ceiling 0.1 ms</td>
+<td>Triton IEEE-FP32 GEMMs slower than cuBLAS for these shapes</td>
+</tr>
+<tr>
+<td>In-place / strided-batched block linear</td>
+<td>exact; +0.1 to +0.3 ms per step</td>
+<td>cuBLAS's batched tiles make the l = 3 product 415 against 305 µs; tile choice per GPU would be tuning</td>
+</tr>
+<tr>
+<td>Contiguous folded radial weight</td>
+<td>within noise, twice</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Inductor <code>decompose_mm_pass</code> for the joint radial layer</td>
+<td>no gain</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Fused radial hidden block (Triton)</td>
+<td>no gain after the 15 October fix</td>
+<td>kept as opt-in record <code>fused_radial_hidden</code></td>
+</tr>
+<tr>
+<td>Fused gate/residual VJP (stand-alone kernel)</td>
+<td>ceiling 2–2.5 %</td>
+<td>the gate already runs at memory bandwidth; a gain needs fusion into the GEMMs (OPT-T02 now)</td>
+</tr>
+<tr>
+<td>Joint-layer Triton input gradient</td>
+<td>&lt; 0.1 ms; slower on small cells</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Segmented force accumulation</td>
+<td>21 µs</td>
+<td>below the 0.1 ms bar</td>
+</tr>
+<tr>
+<td>Activation memory budget &lt; 1 (recompute in the backward)</td>
+<td>+0.4 to +5.9 ms</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Programmatic dependent launch (<code>triton.enable_pdl</code>)</td>
+<td>wrong forces in CUDA-graph replays</td>
+<td><strong>never enable</strong> (SPEC §6.2)</td>
+</tr>
+<tr>
+<td>Radial sharing between mirror edges</td>
+<td>ceiling already slower (+1.1 ms NaNbO3)</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Tabulated radial networks</td>
+<td>ceiling 2.9–5.1 %, approximate</td>
+<td>would spend force-error budget; not built</td>
+</tr>
+<tr>
+<td>Species + Morton atom order</td>
+<td>no gain</td>
+<td>features and weights already L2-resident</td>
+</tr>
+<tr>
+<td>Skin 0.2 Å, 2 % edge buckets</td>
+<td>no gain</td>
+<td>–</td>
+</tr>
+<tr>
+<td>Speculative AC+B graph</td>
+<td>−4 to −15 % (slower)</td>
+<td>kept as opt-in <code>speculative_graph</code></td>
+</tr>
+<tr>
+<td>L2-resident edge chunks with unpatched OEq</td>
+<td>much slower</td>
+<td>OEq 0.7 always returns full-size outputs</td>
+</tr>
+<tr>
+<td>Receiver-owned streaming backward; register caps</td>
+<td>slower</td>
+<td>–</td>
+</tr>
+<tr>
+<td>OpenEquivariance 0.7 symmetric contraction</td>
+<td>exact, 27–79× slower compiled</td>
+<td>the hybrid keeps cuEq's contraction</td>
+</tr>
+<tr>
+<td>Reduced Clebsch–Gordan basis</td>
+<td>≈ 1 % of a 0.7 ms kernel</td>
+<td>no measurable gain</td>
+</tr>
+<tr>
+<td>MACE develop since 0.3.16</td>
+<td>PRs 1498, 1641, 1711, 1718 already taken</td>
+<td>nothing else left</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

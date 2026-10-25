@@ -1,0 +1,4021 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs">
+      
+      
+      
+        <link rel="canonical" href="https://fzwingel-ubt.github.io/FastMACE/api/errors/">
+      
+      
+        <link rel="prev" href="../ase/">
+      
+      
+        <link rel="next" href="../../benchmarks/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Errors - FastMACE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#errors" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="FastMACE" class="md-header__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FastMACE
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Errors
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="FastMACE" class="md-nav__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    FastMACE
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release/oeq-wheels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prebuilt OEq extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastMACE in five minutes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Port your ASE script
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/restart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output, restart and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo and swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/npt-d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NPT and D3 dispersion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/relax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relaxations and quenches
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ and troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick runs (fm.md)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and force fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispersion (D3)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ASE front end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace.errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        errors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.FastMACEError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastMACEError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.Reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reason
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PlanRefused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PlanRefused
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PlanRefused">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PlanRefused.codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PlanRefused.rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PlanRefused.from_reasons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_reasons
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.SpeciesNotInSuperset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpeciesNotInSuperset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ChargeParityRefused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ChargeParityRefused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ProcessConstraintError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProcessConstraintError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.FallbackExhausted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FallbackExhausted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.SubprocessRunnerError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SubprocessRunnerError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.TemplateChangedError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TemplateChangedError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.IsolationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IsolationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ReproducibilityError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReproducibilityError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.GateFailed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GateFailed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.GateUnavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GateUnavailable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ModelElementError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelElementError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.RestartMismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RestartMismatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.CheckpointTrustError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CheckpointTrustError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.NonFiniteError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NonFiniteError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.CellDivergedError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CellDivergedError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.CellListTooLargeError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CellListTooLargeError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.HybridUnavailableError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HybridUnavailableError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.BackendError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BackendError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.NaiveCueqError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NaiveCueqError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PolarUnavailableError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PolarUnavailableError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.OEqRuntimeError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OEqRuntimeError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.CacheLocationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CacheLocationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.RewriteError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RewriteError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.RewriteRefusedError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RewriteRefusedError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.SelfCheckError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SelfCheckError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.RegistryError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RegistryError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.BaselineExportError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BaselineExportError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ModelLicenceWarning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelLicenceWarning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../licences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upstream PR drafts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upstream PR drafts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-block-linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE block linear
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-reassociate-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE first-interaction reassociation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/oeq-no-nvcc-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OEq build without nvcc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace.errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        errors
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="errors">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.FastMACEError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastMACEError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.Reason" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reason
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PlanRefused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PlanRefused
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PlanRefused">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PlanRefused.codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        codes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PlanRefused.rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        rules
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PlanRefused.from_reasons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        from_reasons
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.SpeciesNotInSuperset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SpeciesNotInSuperset
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ChargeParityRefused" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ChargeParityRefused
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ProcessConstraintError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProcessConstraintError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.FallbackExhausted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FallbackExhausted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.SubprocessRunnerError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SubprocessRunnerError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.TemplateChangedError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TemplateChangedError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.IsolationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IsolationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ReproducibilityError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ReproducibilityError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.GateFailed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GateFailed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.GateUnavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GateUnavailable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ModelElementError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelElementError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.RestartMismatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RestartMismatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.CheckpointTrustError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CheckpointTrustError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.NonFiniteError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NonFiniteError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.CellDivergedError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CellDivergedError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.CellListTooLargeError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CellListTooLargeError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.HybridUnavailableError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HybridUnavailableError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.BackendError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BackendError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.NaiveCueqError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NaiveCueqError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.PolarUnavailableError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PolarUnavailableError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.OEqRuntimeError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OEqRuntimeError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.CacheLocationError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CacheLocationError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.RewriteError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RewriteError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.RewriteRefusedError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RewriteRefusedError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.SelfCheckError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SelfCheckError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.RegistryError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        RegistryError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.BaselineExportError" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BaselineExportError
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.errors.ModelLicenceWarning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelLicenceWarning
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="errors">Errors<a class="headerlink" href="#errors" title="Permanent link">&para;</a></h1>
+<p>Every FastMACE error derives from <code>FastMACEError</code>.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="fastmace.errors" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">errors</span>
+
+
+<a href="#fastmace.errors" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>FastMACE exceptions (SPEC §7.6 "Exceptions") and their message shape (§7.7 "Errors").</p>
+<p>Every exception FastMACE raises derives from <code>FastMACEError</code>. Its message has
+one shape, so that no traceback needs reading: what happened; why, in one or
+two sentences; what to do next; where the record is (<code>run.plan</code>,
+<code>run.gate</code>, <code>metadata.json</code>); and <code>fastmace doctor</code> for environment
+problems. The CLI prints this message alone (§7.5).</p>
+<p>This module imports nothing heavy: <code>import fastmace</code> imports neither torch
+nor MACE, and the 1a modules that defined these classes re-export them.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.FastMACEError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">FastMACEError</span>
+
+
+<a href="#fastmace.errors.FastMACEError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="Exception">Exception</span></code></p>
+
+
+
+        <p>Base class of every error FastMACE raises.</p>
+<p><code>FastMACEError(what, why=None, next_step=None, record=None, environment=None)</code>;
+a plain one-argument construction gives just <code>what</code>. Each class may set a
+default next step, record location and environment flag; <code>None</code> takes the
+class default.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.Reason" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">Reason</span>
+
+
+<a href="#fastmace.errors.Reason" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="str">str</span></code></p>
+
+
+
+        <p>One refusal reason: the text, the §9.3 hard rule (<code>None</code> for a <code>run</code> request) and a stable code.</p>
+<p>Reports and tests match <code>code</code>, never the text. Decisions use the same record. Plan task 5-T01's contract
+(<code>fastmace.planner.rules</code>): <code>rule</code> is <code>None</code> or one of 1-15; with a rule, <code>code</code> is one of that
+rule's codes (or <code>rules.OVERRIDE_CODE</code> for an overridden preference), and a rule's code never comes
+without its number. <code>rules.check_reason</code> says what is wrong; the conformance suite calls it
+(<code>tests/cpu/test_rules_meta.py</code>), the planner does not, so a reason costs nothing at run time.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.PlanRefused" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">PlanRefused</span>
+
+
+<a href="#fastmace.errors.PlanRefused" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code>, <code><span title="ValueError">ValueError</span></code></p>
+
+
+
+        <p>The planner cannot plan this workload, or a <code>run</code> request the plan does not cover.</p>
+<p><code>reasons</code> lists every hard-constraint reason of the refusal at once (SPEC
+§9.3): plain strings (1a) or <code>Reason</code> records. Raise through
+<code>PlanRefused.from_reasons</code>, which picks <code>SpeciesNotInSuperset</code> when rule
+2 is among them.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="fastmace.errors.PlanRefused.codes" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">codes</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#fastmace.errors.PlanRefused.codes" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">codes</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The stable code of each reason (<code>None</code> for a plain-string reason).</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h4 id="fastmace.errors.PlanRefused.rules" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">rules</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#fastmace.errors.PlanRefused.rules" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">rules</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The §9.3 rule of each reason (<code>None</code> where none applies).</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="fastmace.errors.PlanRefused.from_reasons" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">from_reasons</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#fastmace.errors.PlanRefused.from_reasons" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_reasons</span><span class="p">(</span><span class="n">reasons</span><span class="p">,</span> <span class="o">**</span><span class="n">parts</span><span class="p">)</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>One exception carrying every reason: <code>SpeciesNotInSuperset</code> if a reason has <code>rule == 2</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.SpeciesNotInSuperset" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">SpeciesNotInSuperset</span>
+
+
+<a href="#fastmace.errors.SpeciesNotInSuperset" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="PlanRefused (fastmace.errors.PlanRefused)" href="#fastmace.errors.PlanRefused">PlanRefused</a></code></p>
+
+
+
+        <p>Rule 2: a species outside the <code>ForceField</code>'s declared superset (SPEC §8.5), with every reason.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.ChargeParityRefused" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ChargeParityRefused</span>
+
+
+<a href="#fastmace.errors.ChargeParityRefused" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="PlanRefused (fastmace.errors.PlanRefused)" href="#fastmace.errors.PlanRefused">PlanRefused</a></code></p>
+
+
+
+        <p>A transmutable set violates the charge and spin rule of SPEC §10.4: a move needs ΔZ − Δq even.</p>
+<p>Raised by the planner through <code>ChargeParityRefused.from_reasons</code> with a reason coded
+<code>CHARGE_PARITY_CODE</code> (3-T09); every other reason of the refusal comes with it.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.ProcessConstraintError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ProcessConstraintError</span>
+
+
+<a href="#fastmace.errors.ProcessConstraintError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code>, <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+        <p>An engine would break a process-wide constraint (SPEC §8.7).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.FallbackExhausted" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">FallbackExhausted</span>
+
+
+<a href="#fastmace.errors.FallbackExhausted" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="PlanRefused (fastmace.errors.PlanRefused)" href="#fastmace.errors.PlanRefused">PlanRefused</a></code></p>
+
+
+
+        <p>No fallback candidate passed validation (SPEC §9.4 step 5); <code>revisions</code> holds every tried plan.</p>
+<p><code>revisions</code> is the revision chain of the fallback, oldest first: the failed plan, then each
+candidate tried, each with its reason. <code>reasons</code> are the refusal's, as for <code>PlanRefused</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.SubprocessRunnerError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">SubprocessRunnerError</span>
+
+
+<a href="#fastmace.errors.SubprocessRunnerError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code>, <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+        <p>The subprocess runner's child failed, was killed or stalled (SPEC §8.7); never a hang.</p>
+<p><code>exit_code</code> is the child's (negative: killed by that signal; <code>None</code>: still running when it
+was stopped), <code>child_message</code> its error message, and <code>directory</code> the hand-off directory,
+kept after an error.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.TemplateChangedError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">TemplateChangedError</span>
+
+
+<a href="#fastmace.errors.TemplateChangedError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code>, <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+        <p>A cached converted model (opt-1 OPT-T06) changed after it was stored; it is never copied for a plan.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.IsolationError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">IsolationError</span>
+
+
+<a href="#fastmace.errors.IsolationError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code>, <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+        <p>An instance whose lease on a shared component was taken by another instance (SPEC §8.7).</p>
+<p><code>component</code> names the shared component, <code>holder</code> the instance that holds its lease now.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.ReproducibilityError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ReproducibilityError</span>
+
+
+<a href="#fastmace.errors.ReproducibilityError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>A (backend, model family) failed qualification for <code>reproducible=True</code> (SPEC §9.3 rule 5).</p>
+<p><code>blocking</code> names the kernels or operators without a deterministic implementation. A plan that
+asks for <code>reproducible=True</code> without a qualified family is refused by <code>PlanRefused</code> (rule 5),
+not by this error.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.GateFailed" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">GateFailed</span>
+
+
+<a href="#fastmace.errors.GateFailed" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.errors._GateError">_GateError</span></code></p>
+
+
+
+        <p>The gate on the user's structure failed (SPEC §12.3); <code>gate_record</code> holds the comparison.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.GateUnavailable" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">GateUnavailable</span>
+
+
+<a href="#fastmace.errors.GateUnavailable" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.errors._GateError">_GateError</span></code></p>
+
+
+
+        <p>The gate's reference could not run on any allowed device (SPEC §12.3).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.ModelElementError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ModelElementError</span>
+
+
+<a href="#fastmace.errors.ModelElementError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>A declared superset species has no embedding in the model (SPEC §8.5).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.RestartMismatch" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">RestartMismatch</span>
+
+
+<a href="#fastmace.errors.RestartMismatch" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>A restart's force-field identity differs, or its plan changed without <code>allow_plan_change</code> (§10.6).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.CheckpointTrustError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">CheckpointTrustError</span>
+
+
+<a href="#fastmace.errors.CheckpointTrustError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>A checkpoint would be unpickled without a matching SHA-256 or <code>trusted=True</code> (SPEC §7.6).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.NonFiniteError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">NonFiniteError</span>
+
+
+<a href="#fastmace.errors.NonFiniteError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>A non-finite energy or observable stopped the run (SPEC §9.6); it is never "fixed".</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.CellDivergedError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">CellDivergedError</span>
+
+
+<a href="#fastmace.errors.CellDivergedError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>An NPT run's cell left the range its integrator record allows (3b-T07): V/V0 outside
+[1 / max_volume_ratio, max_volume_ratio] or a cell vector longer than max_cell_length_A. The run
+stops with a restart at the stop; <code>step</code> is the step whose cell was checked.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.CellListTooLargeError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">CellListTooLargeError</span>
+
+
+<a href="#fastmace.errors.CellListTooLargeError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code>, <code><span title="ValueError">ValueError</span></code></p>
+
+
+
+        <p>A CPU neighbour search whose matscipy cell list would need more bins than memory allows (3b-T07).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.HybridUnavailableError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">HybridUnavailableError</span>
+
+
+<a href="#fastmace.errors.HybridUnavailableError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>The cuEq/OEq hybrid cannot be built in this process; <code>reason</code> says why (SPEC §9.4 falls back).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.BackendError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">BackendError</span>
+
+
+<a href="#fastmace.errors.BackendError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>The requested backend was not built as asked (missing package, failed conversion).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.NaiveCueqError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">NaiveCueqError</span>
+
+
+<a href="#fastmace.errors.NaiveCueqError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>cuEquivariance fell back to its naive kernels (MACE PR 1614; SPEC §9.2, §9.3 rule 6).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.PolarUnavailableError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">PolarUnavailableError</span>
+
+
+<a href="#fastmace.errors.PolarUnavailableError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>The GPU-only PolarMACE path cannot be used here; <code>reason</code> says why.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.OEqRuntimeError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">OEqRuntimeError</span>
+
+
+<a href="#fastmace.errors.OEqRuntimeError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code>, <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+        <p>The OEq host-extension runtime cannot be prepared.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.CacheLocationError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">CacheLocationError</span>
+
+
+<a href="#fastmace.errors.CacheLocationError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>The cache root is not usable (inside sys.prefix).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.RewriteError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">RewriteError</span>
+
+
+<a href="#fastmace.errors.RewriteError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>A rewrite could not be resolved or applied.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.RewriteRefusedError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">RewriteRefusedError</span>
+
+
+<a href="#fastmace.errors.RewriteRefusedError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="RewriteError (fastmace.errors.RewriteError)" href="#fastmace.errors.RewriteError">RewriteError</a></code></p>
+
+
+
+        <p>An explicitly requested rewrite (<code>"on"</code>) cannot be enabled; the message gives the reasons.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.SelfCheckError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">SelfCheckError</span>
+
+
+<a href="#fastmace.errors.SelfCheckError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="RewriteError (fastmace.errors.RewriteError)" href="#fastmace.errors.RewriteError">RewriteError</a></code></p>
+
+
+
+        <p>A rewrite's self-check failed at setup (SPEC §6.4).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.RegistryError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">RegistryError</span>
+
+
+<a href="#fastmace.errors.RegistryError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code>, <code><span title="RuntimeError">RuntimeError</span></code></p>
+
+
+
+        <p>A persistent buffer without a policy, a restore whose buffer moved (SPEC §8.1), or two scheme records that
+give one buffer different restart policies (4-T01b). <code>fastmace.engine.registry</code> re-exports it.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.BaselineExportError" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">BaselineExportError</span>
+
+
+<a href="#fastmace.errors.BaselineExportError" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="FastMACEError (fastmace.errors.FastMACEError)" href="#fastmace.errors.FastMACEError">FastMACEError</a></code></p>
+
+
+
+        <p>A baseline directory is not a usable export of the research engine.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.errors.ModelLicenceWarning" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ModelLicenceWarning</span>
+
+
+<a href="#fastmace.errors.ModelLicenceWarning" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="UserWarning">UserWarning</span></code></p>
+
+
+
+        <p>The licence of a loaded model (SPEC §4.3: shown at load time).</p>
+
+
+
+
+
+
+
+
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

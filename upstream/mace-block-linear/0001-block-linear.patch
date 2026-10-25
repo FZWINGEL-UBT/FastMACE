@@ -1,0 +1,237 @@
+diff --git a/mace/modules/block_linear.py b/mace/modules/block_linear.py
+new file mode 100644
+index 0000000..66619be
+--- /dev/null
++++ b/mace/modules/block_linear.py
+@@ -0,0 +1,171 @@
++"""Per-l matrix products for cuEquivariance ``Linear`` layers ("block linear").
++
++A cuEquivariance ``Linear`` with internal shared weights is a block-diagonal map: every input
++irrep segment ``mul_in x ir`` feeds every output segment of the same irrep ``mul_out x ir``
++through one ``[mul_in, mul_out]`` weight, applied to each of the ``2l + 1`` components alike.
++For inference (MD, relaxations) the weights are constant, so the layer can run as one plain
++matrix product per (input segment, output segment) pair on ``[n * (2l + 1), mul]`` rows of the
++``ir_mul`` layout, with the effective weights extracted once from the module itself.
++
++Two details make this faster than ``method="naive"`` on GPUs:
++
++- the input gradient (forces need it) multiplies by a precomputed *contiguous* transpose of the
++  weight. The autograd/Inductor backward otherwise multiplies by a transposed view, which cuBLAS
++  runs with slower kernels (15-25 % on 512 x 512 blocks);
++- ``grouped=True`` concatenates the input segments of one irrep that feed the same output segment
++  (``linear`` after the convolution: several ``128x1o`` paths into one ``nx1o`` block) and
++  multiplies them by their stacked weights in one product, instead of one product per segment plus
++  additions of the wide outputs. Same terms, summed in a different order.
++
++The result is exact up to floating-point rounding. Weights are frozen at conversion time: convert
++*after* loading a model, and do not train the converted model.
++"""
++
++from typing import List, Optional, Tuple
++
++import torch
++
++
++class _ConstantMatmul(torch.autograd.Function):
++    """``x @ weight`` for a constant weight; input gradient ``grad @ weight_t`` (contiguous)."""
++
++    @staticmethod
++    def forward(ctx, x, weight, weight_t):  # pylint: disable=arguments-differ
++        ctx.save_for_backward(weight_t)
++        return x @ weight
++
++    @staticmethod
++    def backward(ctx, grad):  # pylint: disable=arguments-differ
++        (weight_t,) = ctx.saved_tensors
++        return grad @ weight_t, None, None
++
++
++Segment = Tuple[int, int, int]  # (offset, mul, dim) in the ir_mul core layout
++
++
++class BlockLinear(torch.nn.Module):
++    """A cuEquivariance ``Linear`` as per-l products with extracted, frozen weights.
++
++    ``blocks`` are ``(input segments, output segment, weight [sum mul_in, mul_out])``; with
++    ``grouped=False`` every entry has one input segment.
++    """
++
++    def __init__(
++        self,
++        transpose_in: Optional[torch.nn.Module],
++        transpose_out: Optional[torch.nn.Module],
++        segments_in: List[Segment],
++        segments_out: List[Segment],
++        blocks: List[Tuple[Tuple[int, ...], int, torch.Tensor]],
++    ):
++        super().__init__()
++        self.transpose_in = transpose_in
++        self.transpose_out = transpose_out
++        self.segments_in = [tuple(s) for s in segments_in]
++        self.segments_out = [tuple(s) for s in segments_out]
++        self.block_ends = [(tuple(i), int(j)) for i, j, _ in blocks]
++        for index, (_, _, weight) in enumerate(blocks):
++            self.register_buffer(f"weight_{index}", weight.detach().contiguous())
++            self.register_buffer(f"weight_t_{index}", weight.detach().t().contiguous())
++
++    def forward(self, x: torch.Tensor) -> torch.Tensor:
++        if self.transpose_in is not None:
++            x = self.transpose_in(x)
++        n = x.shape[0]
++        rows = [
++            x[:, offset : offset + dim * mul].reshape(n * dim, mul)
++            for offset, mul, dim in self.segments_in
++        ]
++        outputs: List[Optional[torch.Tensor]] = [None] * len(self.segments_out)
++        for index, (inputs, j) in enumerate(self.block_ends):
++            left = rows[inputs[0]] if len(inputs) == 1 else torch.cat([rows[k] for k in inputs], dim=1)
++            part = _ConstantMatmul.apply(
++                left, getattr(self, f"weight_{index}"), getattr(self, f"weight_t_{index}")
++            )
++            outputs[j] = part if outputs[j] is None else outputs[j] + part
++        pieces = [
++            value.reshape(n, dim * mul) if value is not None else x.new_zeros((n, dim * mul))
++            for (_, mul, dim), value in zip(self.segments_out, outputs)
++        ]
++        out = torch.cat(pieces, dim=1) if len(pieces) > 1 else pieces[0]
++        if self.transpose_out is not None:
++            out = self.transpose_out(out)
++        return out
++
++
++def _segments(irreps) -> List[Tuple[int, int, int, object]]:
++    out, offset = [], 0
++    for mul, ir in irreps:
++        out.append((offset, int(mul), int(ir.dim), ir))
++        offset += int(mul) * int(ir.dim)
++    return out
++
++
++def is_convertible(module: torch.nn.Module) -> bool:
++    """A cuEquivariance ``Linear`` with internal shared weights of one weight class."""
++    return (
++        type(module).__name__ == "Linear"
++        and type(module).__module__.startswith("cuequivariance_torch")
++        and bool(getattr(module, "internal_weights", False))
++        and getattr(module, "weight_classes", 1) in (None, 1)
++        and getattr(module, "weight", None) is not None
++    )
++
++
++def block_linear(linear: torch.nn.Module, grouped: bool = True) -> Optional[BlockLinear]:
++    """The ``BlockLinear`` equivalent of one cuEquivariance ``Linear``, or None if not convertible.
++
++    The weights are measured from the module's own polynomial (``linear.f``) on unit inputs, so its
++    path normalisation and layout are used as they are.
++    """
++    if not is_convertible(linear):
++        return None
++    segments_in = _segments(linear.irreps_in)
++    segments_out = _segments(linear.irreps_out)
++    dim_in = sum(mul * dim for _, mul, dim, _ in segments_in)
++    weight = linear.weight
++    device, dtype = weight.device, weight.dtype
++    raw = []
++    with torch.no_grad():
++        for i, (offset, mul, _, ir) in enumerate(segments_in):
++            # ir_mul core layout: component m of channel u sits at offset + m * mul + u; m = 0 suffices.
++            basis = torch.zeros((mul, dim_in), device=device, dtype=dtype)
++            basis[torch.arange(mul), offset + torch.arange(mul)] = 1
++            response = linear.f([weight, basis])[0]
++            for j, (offset_out, mul_out, _, ir_out) in enumerate(segments_out):
++                if ir_out == ir:
++                    raw.append((i, j, response[:, offset_out : offset_out + mul_out].clone()))
++    if grouped:
++        by_output = {}
++        for i, j, w in raw:
++            by_output.setdefault(j, []).append((i, w))
++        blocks = [
++            (tuple(i for i, _ in members), j, torch.cat([w for _, w in members], dim=0))
++            for j, members in by_output.items()
++        ]
++    else:
++        blocks = [((i,), j, w) for i, j, w in raw]
++    return BlockLinear(
++        getattr(linear, "transpose_in", None),
++        getattr(linear, "transpose_out", None),
++        [(o, m, d) for o, m, d, _ in segments_in],
++        [(o, m, d) for o, m, d, _ in segments_out],
++        blocks,
++    )
++
++
++def convert_block_linears(model: torch.nn.Module, grouped: bool = True) -> List[str]:
++    """Replace every convertible cuEquivariance ``Linear`` of ``model`` in place.
++
++    Returns the names of the replaced modules. For inference only: the weights are frozen.
++    The converted model is not TorchScript-exportable (custom autograd function); convert after
++    any LAMMPS export, not before.
++    """
++    replaced = []
++    for name, module in list(model.named_modules()):
++        for child_name, child in list(module.named_children()):
++            replacement = block_linear(child, grouped=grouped)
++            if replacement is not None:
++                setattr(module, child_name, replacement)
++                replaced.append(f"{name}.{child_name}" if name else child_name)
++    return replaced
+diff --git a/tests/unit/test_block_linear.py b/tests/unit/test_block_linear.py
+new file mode 100644
+index 0000000..ee39b3c
+--- /dev/null
++++ b/tests/unit/test_block_linear.py
+@@ -0,0 +1,54 @@
++import pytest
++import torch
++
++cue = pytest.importorskip("cuequivariance")
++cuet = pytest.importorskip("cuequivariance_torch")
++
++from mace.modules.block_linear import (  # noqa: E402
++    BlockLinear,
++    block_linear,
++    convert_block_linears,
++)
++
++IRREPS = [
++    ("128x0e+128x1o+128x2e+128x3o", "512x0e+512x1o+512x2e+512x3o"),
++    ("64x0e+64x1o+64x1o+64x2e", "32x0e+48x1o+16x2e"),  # repeated irrep: grouped path
++    ("16x0e+8x1o", "16x0e+8x1o+4x2e"),  # output irrep without input: zero block
++]
++
++
++@pytest.mark.parametrize("layout", ["mul_ir", "ir_mul"])
++@pytest.mark.parametrize("grouped", [False, True])
++@pytest.mark.parametrize("irreps_in,irreps_out", IRREPS)
++def test_block_linear_matches_cuet(layout, grouped, irreps_in, irreps_out):
++    torch.manual_seed(0)
++    linear = cuet.Linear(
++        cue.Irreps("O3", irreps_in),
++        cue.Irreps("O3", irreps_out),
++        layout=getattr(cue, layout),
++        shared_weights=True,
++        method="naive",
++        dtype=torch.float64,
++    )
++    with torch.no_grad():
++        linear.weight.normal_()
++    converted = block_linear(linear, grouped=grouped)
++    assert isinstance(converted, BlockLinear)
++    x = torch.randn(7, cue.Irreps("O3", irreps_in).dim, dtype=torch.float64, requires_grad=True)
++    grad = torch.randn(7, cue.Irreps("O3", irreps_out).dim, dtype=torch.float64)
++    expected = linear(x)
++    (expected_grad,) = torch.autograd.grad(expected, x, grad)
++    got = converted(x)
++    (got_grad,) = torch.autograd.grad(got, x, grad)
++    torch.testing.assert_close(got, expected, rtol=1e-12, atol=1e-12)
++    torch.testing.assert_close(got_grad, expected_grad, rtol=1e-12, atol=1e-12)
++
++
++def test_convert_skips_non_cuet_modules():
++    model = torch.nn.Sequential(
++        torch.nn.Linear(4, 4),
++        cuet.Linear(cue.Irreps("O3", "4x0e"), cue.Irreps("O3", "4x0e"), layout=cue.mul_ir,
++                    method="naive", dtype=torch.float64),
++    )
++    assert convert_block_linears(model) == ["1"]
++    assert isinstance(model[0], torch.nn.Linear)

@@ -1,0 +1,2769 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs">
+      
+      
+      
+        <link rel="canonical" href="https://fzwingel-ubt.github.io/FastMACE/development/">
+      
+      
+        <link rel="prev" href="../upstream/oeq-no-nvcc-build/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Development - FastMACE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#development" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="FastMACE" class="md-header__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FastMACE
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Development
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="FastMACE" class="md-nav__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    FastMACE
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../release/oeq-wheels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prebuilt OEq extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastMACE in five minutes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Port your ASE script
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/restart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output, restart and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo and swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/npt-d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NPT and D3 dispersion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../guide/relax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relaxations and quenches
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ and troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/quick/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick runs (fm.md)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and force fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispersion (D3)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ASE front end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../licences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upstream PR drafts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upstream PR drafts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upstream/mace-block-linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE block linear
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upstream/mace-reassociate-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE first-interaction reassociation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../upstream/oeq-no-nvcc-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OEq build without nvcc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-development-venv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU development venv
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test tiers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Test tiers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#caches-the-suite-shares" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caches the suite shares
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#golden-texts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Golden texts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-test-scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU test scheduling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bitwise-equality-in-cpu-float64-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bitwise equality in CPU float64 tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU CI
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="GPU CI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-local-gpu-reservation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The local GPU reservation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keeping-the-runners-up-without-root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping the runners up without root
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registering-the-runners-the-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering the runners (the owner)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pausing-removing-cleaning-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pausing, removing, cleaning up
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#releasing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Releasing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nas-checkout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NAS checkout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#modal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#google-colab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google Colab
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-development-venv" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU development venv
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#test-tiers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Test tiers
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Test tiers">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#caches-the-suite-shares" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Caches the suite shares
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#golden-texts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Golden texts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cpu-test-scheduling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CPU test scheduling
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bitwise-equality-in-cpu-float64-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bitwise equality in CPU float64 tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-ci" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU CI
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="GPU CI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-local-gpu-reservation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The local GPU reservation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keeping-the-runners-up-without-root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keeping the runners up without root
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#registering-the-runners-the-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Registering the runners (the owner)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pausing-removing-cleaning-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pausing, removing, cleaning up
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#releasing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Releasing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nas-checkout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NAS checkout
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#modal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Modal
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#google-colab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Google Colab
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="development">Development<a class="headerlink" href="#development" title="Permanent link">&para;</a></h1>
+<h2 id="cpu-development-venv">CPU development venv<a class="headerlink" href="#cpu-development-venv" title="Permanent link">&para;</a></h2>
+<p>CPU development and the install check use <code>~/environments/fastmace_cpu</code> in
+WSL2 Ubuntu on the PC. It is FastMACE's own environment and may be rebuilt at
+any time; the CPU CI follows the same recipe. It installs the main checkout
+in editable mode, so it outlives any worktree and always sees the code that
+is checked out there.</p>
+<p>Keep pip caches in <code>~/pip-cache</code> and temporary files in <code>~/tmp</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">PIP_CACHE_DIR</span><span class="o">=</span>~/pip-cache<span class="w"> </span><span class="nv">TMPDIR</span><span class="o">=</span>~/tmp
+python3.10<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>~/environments/fastmace_cpu
+~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>pip
+~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.14.1<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/cpu
+~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">"/mnt/d/Margraf/FastMACE[dev]"</span>
+~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>check
+~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>freeze<span class="w"> </span>&gt;<span class="w"> </span>~/environments/fastmace_cpu.requirements.txt
+</code></pre></div>
+<p>The D3 cross-check tests (<code>tests/cpu/test_d3_references.py</code>) need the
+<code>d3-reference</code> extra and are skipped without it; <code>fastmace_cpu</code> has it since
+22 October 2026 (3b-T01):</p>
+<div class="highlight"><pre><span></span><code>~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">"/mnt/d/Margraf/FastMACE[dev,d3-reference]"</span>
+</code></pre></div>
+<p>Torch comes from the PyTorch CPU index first, so the editable install keeps
+it and does not pull a CUDA build from PyPI. The installed versions are
+listed in <code>~/environments/fastmace_cpu.requirements.txt</code>.</p>
+<p>Check that it works:</p>
+<div class="highlight"><pre><span></span><code>~/environments/fastmace_cpu/bin/python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"import fastmace, torch; print(fastmace.__version__, torch.__version__)"</span>
+</code></pre></div>
+<p>Run the CPU suite from the repository root (at most 8 workers locally, at
+most 2 while other sessions run tests):</p>
+<div class="highlight"><pre><span></span><code><span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="s1">''</span><span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">PYTHONDONTWRITEBYTECODE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-n<span class="w"> </span><span class="m">8</span><span class="w"> </span>--dist<span class="o">=</span>load<span class="w"> </span>--maxschedchunk<span class="o">=</span><span class="m">1</span><span class="w"> </span>tests/cpu
+</code></pre></div>
+<p>Never install FastMACE into the GPU environments; GPU runs use
+<code>PYTHONPATH=&lt;checkout&gt;</code> with the environment's Python (AGENTS.md).</p>
+<h2 id="test-tiers">Test tiers<a class="headerlink" href="#test-tiers" title="Permanent link">&para;</a></h2>
+<p>Plan tasks 1b-T24 and 1b-T27 (19 October 2026), and 4-T13. The GPU suite has three tiers and a
+compatibility check (<code>tests/_support/tiers.py</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Tier</th>
+<th>Command</th>
+<th>Who runs it, when</th>
+<th style="text-align: right;">Local RTX 5060 Ti, warm caches</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fast (worker)</td>
+<td><code>pytest tests/gpu -m "not slow and not acceptance"</code></td>
+<td>every worker, for every change, as often as needed</td>
+<td style="text-align: right;">7.9 min (190 tests, 1b-T27)</td>
+</tr>
+<tr>
+<td>full (merge)</td>
+<td><code>pytest tests/gpu -m "not acceptance"</code></td>
+<td>the conductor, at merges that touch <code>model/</code>, <code>rewrites/</code>, <code>kernels/</code> or <code>engine/</code></td>
+<td style="text-align: right;">38.7 min (244 tests; 142 min before 1b-T27)</td>
+</tr>
+<tr>
+<td>acceptance</td>
+<td><code>pytest tests/gpu -m acceptance</code></td>
+<td>phase acceptance, and merges that touch <code>model/</code>, <code>rewrites/</code> or <code>kernels/</code></td>
+<td style="text-align: right;">murphy: 103 min (10 tests)</td>
+</tr>
+<tr>
+<td>compat</td>
+<td><code>python tools/acceptance/compat.py --provider P --output DIR</code> (<code>pytest tests/gpu -m compat</code>)</td>
+<td>every production GPU type each phase, and once when a type is added (SPEC decision 39, amended 23 October 2026)</td>
+<td style="text-align: right;">about 30 min (estimate: the fast tier and about 20 min of listed slow tests)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The compatibility tier</strong> (plan task 4-T13) checks what differs between GPU architectures: the fast
+tier, plus the slow tests listed in <code>tiers.COMPAT_TESTS</code> (kernels compile and attach, the accuracy gate
+on MH-1, MP-0 and POLAR-1-S, replay against eager, reproducible mode, a restart round trip), plus
+<code>tests/gpu/test_compat_gpu.py</code> (the captured graphs' kernel counts, recorded, and a short NVE, NVT and
+NPT smoke). The root conftest marks them <code>compat</code>; it needs <code>FASTMACE_MODELS</code> but no research engine.
+The driver records the provider, the GPU, its compute capability and driver, and the package versions in
+<code>compat.json</code>. To add a test to the tier, list it in <code>COMPAT_TESTS</code>; <code>tests/cpu/test_tiers.py</code> checks
+that every entry is still collected.</p>
+<p><strong>Merge rule:</strong> the full tier on merges that touch <code>model/</code>, <code>rewrites/</code>, <code>kernels/</code> or <code>engine/</code>,
+and in addition the acceptance tier on merges that touch <code>model/</code>, <code>rewrites/</code> or <code>kernels/</code>
+(they change numerics).</p>
+<p>The first run after a change of environment, or with emptied caches, is slower,
+because it compiles everything and builds the OEq extension once. Measurements:
+<a href="https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/1b-T24-test-suite-speed.md">validation/1b-T24-test-suite-speed.md</a>,
+<a href="https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/1b-T27-gpu-tiers.md">validation/1b-T27-gpu-tiers.md</a>.</p>
+<p>The CPU suite (<code>tests/cpu</code>) has no tiers: everyone runs all of it.</p>
+<p>A test is marked <code>@pytest.mark.slow</code> when it needs one of these:</p>
+<ul>
+<li>a real checkpoint (MH-1, MP-0, OFF, POLAR-1-S), whose load and compile take tens of seconds;</li>
+<li>a long trajectory (hundreds of steps);</li>
+<li>a cold compiler cache (the edge-bucket regression tests).</li>
+</ul>
+<p>A test is also marked <code>@pytest.mark.acceptance</code> (and keeps <code>slow</code>, so that the older
+<code>-m "not slow"</code> leaves it out too) when it is:</p>
+<ul>
+<li>a comparison with the research engine (<code>FASTMACE_BASELINE</code>) in its own process;</li>
+<li>a statistical check over tens of thousands of steps (ASE equivalence, the hybrid restart);</li>
+<li>a timing record (the gate's time on NbCl5).</li>
+</ul>
+<p>Fast- and full-tier tests make no step-time assertions: trials and workers share the GPU, so their
+step times are not comparable. A step-time comparison is an acceptance test of its own, which reuses
+the numerical test's measurement when both run in one process (2-T14d).</p>
+<p><code>tests/cpu/test_tiers.py</code> fails for an <code>acceptance</code> mark without <code>slow</code>. When a <code>-m</code> expression
+selects acceptance tests (<code>-m acceptance</code>, or <code>-m slow</code>), <code>tests/conftest.py</code> stops the run with a
+usage error if <code>FASTMACE_BASELINE</code>, <code>FASTMACE_HYBRID_PYTHON</code> or <code>FASTMACE_MODELS</code> is unset or names
+nothing, so the acceptance tier never skips silently. The check runs in the controller before
+collection, so xdist workers never see it. A run without <code>-m</code> keeps the tests' own skips.
+Run CPU suites under xdist (<code>-n 2</code> or more) whenever you change <code>conftest.py</code> or a pytest plugin.</p>
+<p>Every behaviour tested on the GPU keeps at least one test in the fast tier, usually on a
+tiny model or the Lennard-Jones force field in the pytest process, except those listed
+below. When you add a GPU test that is slow for one of these reasons, mark it <code>slow</code> and
+check that a fast test still covers the behaviour. If none can, add the behaviour to that list.</p>
+<p><strong>Budgets.</strong> <code>tools/test_budget.py</code> reads junit files (<code>pytest --junitxml</code>) and the tiers (by
+collecting <code>tests/gpu</code>). It prints each tier's total against its budget first (fast 10 min, full
+40 min, local RTX 5060 Ti with warm caches; over budget is a warning). It exits 1 if a fast-tier
+test takes over 60 s, or a full-tier test over 120 s. The exception is a test that
+<code>FULL_TIER_ALLOWED</code> in the tool lists with its measured time and a reason; such a test fails only
+when it takes more than 1.5 times its recorded time. Run the tool on the junit of a tier run before
+you merge new GPU tests:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>tools/test_budget.py<span class="w"> </span>results/&lt;run&gt;/junit.xml
+</code></pre></div>
+<p>GPU command for workers on the local PC (one process; <code>FASTMACE_HYBRID_PYTHON</code> runs the
+hybrid tests in the OEq environment). <code>TORCHINDUCTOR_COMPILE_THREADS=4</code> keeps Inductor from
+starting 24 compile workers per process. Without it, WSL's 15 GB ran out on
+19 October 2026 while other sessions ran CPU suites, and the WSL VM restarted:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">TORCHINDUCTOR_COMPILE_THREADS</span><span class="o">=</span><span class="m">4</span><span class="w"> </span><span class="nv">FASTMACE_HYBRID_PYTHON</span><span class="o">=</span>~/environments/mace_cueq_oeq/bin/python<span class="w"> </span><span class="nv">FASTMACE_MODELS</span><span class="o">=</span>~/models<span class="w"> </span><span class="nv">FASTMACE_BASELINE</span><span class="o">=</span>~/fastmace-baseline/1a-T18<span class="w"> </span><span class="nv">PYTHONPATH</span><span class="o">=</span><span class="nv">$PWD</span><span class="w"> </span><span class="nv">PYTHONDONTWRITEBYTECODE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>~/environments/mace_cueq_latest/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-m<span class="w"> </span><span class="s2">"not slow and not acceptance"</span><span class="w"> </span>tests/gpu
+</code></pre></div>
+<p>Two MH-1 behaviours have tiny-model versions in the fast tier
+(<code>tests/gpu/test_tiny_engine_gpu.py</code>, plan task 1b-T25): no compile at a later
+edge bucket, from a fresh Inductor cache (<code>test_no_compile_at_a_later_edge_bucket_tiny_plain_cueq</code>),
+and a planned engine equal to a hand-built one
+(<code>test_tiny_plain_cueq_float64_planned_equals_hand_built</code>). The MH-1 versions stay
+in the full tier, and the hybrid edge-bucket case is tested only there.</p>
+<p>Plan task 1b-T26 marked <code>slow</code> the GPU tests merged after 1b-T24 that run MH-1 or
+POLAR-1-S (30 s to 5 min each). Two of them have tiny-model versions in the fast tier
+(<code>tests/gpu/test_tiny_released_gpu.py</code>): the runtime-state registry in plain cuEq float64
+(capture warm-ups leave no trace, the registry covers what the stages mutate), and the gate
+failing a broken captured graph while the eager stages pass. Tiny versions of the others were
+tried. They cost almost as much as the MH-1 tests, because fresh processes, compiles and the
+tests' own child processes dominate, so they were left out
+(<a href="https://github.com/FZWINGEL-UBT/FastMACE/blob/main/docs/validation/1b-T26-gpu-retiering.md">validation/1b-T26-gpu-retiering.md</a>). These behaviours
+are tested <strong>only in the full tier</strong>:</p>
+<ul>
+<li>an engine resumed from canonical restart points follows the uninterrupted run within 1e-12 Å
+  (<code>test_canonical_restart_gpu.py</code>; the CPU suite has tiny-model restart tests);</li>
+<li>the gate passes in graph mode, NVT with fresh references and full-cell NPT
+  (<code>test_selfcheck_gpu.py::test_gate_passes_in_graph_mode</code>);</li>
+<li><code>fm.Simulation</code> reaches <code>FixedPlanner</code>'s trajectory, plain cuEq and hybrid (<code>test_simulation_gpu.py</code>);</li>
+<li>LBFGS with <code>fm.calc</code> reaches MACE's minimum (<code>test_ase_calculator_gpu.py</code>; a tiny random model
+  does not converge);</li>
+<li>the registry checks in hybrid pipelined NVT, hybrid full-cell NPT and POLAR-1-S
+  (<code>test_registry_gpu.py</code>).</li>
+</ul>
+<p>Behaviours tested <strong>only in the acceptance tier</strong> (1b-T27):</p>
+<ul>
+<li>Langevin and BAOAB reproduce ASE's integrators statistically (<code>test_ase_equivalence_gpu.py</code>,
+  88 min; the CPU suite checks both integrators step by step against ASE);</li>
+<li>a hybrid engine resumed from a restart file is statistically the same as the uninterrupted run
+  (<code>test_canonical_restart_gpu.py::test_mh1_hybrid_resumes_statistically</code>; plain cuEq within
+  1e-12 Å stays in the full tier);</li>
+<li>the gate's time on NbCl5 (<code>test_selfcheck_gpu.py::test_gate_time_on_nbcl5</code>);</li>
+<li>the planned MH-1 engine less than 25 % slower than the hand-built one, plain cuEq and hybrid
+  (<code>test_planner_gpu.py::*planned_is_as_fast_as_hand_built</code>, 2-T14d; their numerical comparison stays
+  in the full tier);</li>
+<li>FastMACE against the research engine: the MH-1 engine in plain cuEq NVT and NPT and the hybrid
+  (<code>test_engine_gpu.py::*against_the_research_engine</code>), and the compiled production force fields
+  (<code>test_forces_gpu.py::test_mh1_agrees_with_maceforces[*compiled-production]</code>; the eager case stays
+  in the full tier).</li>
+</ul>
+<h3 id="caches-the-suite-shares">Caches the suite shares<a class="headerlink" href="#caches-the-suite-shares" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Compiler caches.</strong> <code>tests/conftest.py</code> gives the whole run one Inductor/Triton cache,
+  inherited by every child process: the FastMACE cache root's (<code>FASTMACE_CACHE</code>, else
+  <code>~/.cache/fastmace</code>, as production runs), unless <code>TORCHINDUCTOR_CACHE_DIR</code> is already
+  set. <code>pytest --fresh-compile-cache</code> compiles everything from scratch in a new directory
+  under <code>&lt;cache root&gt;/test-runs/</code>. The pytest header names the caches. Tests that need a
+  cold cache set their own, explicitly.</li>
+<li><strong>OEq host extension.</strong> <code>fastmace.kernels._oeq_runtime</code> builds OpenEquivariance's host
+  extension once per build identity (Python and environment, torch, OpenEquivariance, the
+  CUDA runtime wheel, the compiler) in <code>&lt;cache root&gt;/oeq/extensions/&lt;key&gt;/</code> and copies it
+  into each process's own extension directory. Only the first process after a change of
+  environment builds it. Delete that directory to force a rebuild.</li>
+</ul>
+<h3 id="golden-texts">Golden texts<a class="headerlink" href="#golden-texts" title="Permanent link">&para;</a></h3>
+<p><code>tests/cpu/test_plan_text.py</code> compares <code>str(plan)</code> for seven plans with the files in
+<code>tests/cpu/golden/plan_text/</code> (plan task 5-T05). A change that alters the text on purpose
+rewrites them:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">FASTMACE_UPDATE_GOLDEN</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="s1">''</span><span class="w"> </span>~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/cpu/test_plan_text.py
+</code></pre></div>
+<p>Review the diff of the golden files and commit it with the change. Tasks that fill a section
+of the plan text (5-T03's memory line, 5-T07's tier switches, 5-T09's calibration line) update
+the files this way.</p>
+<h2 id="cpu-test-scheduling">CPU test scheduling<a class="headerlink" href="#cpu-test-scheduling" title="Permanent link">&para;</a></h2>
+<p>Use <code>--dist=load --maxschedchunk=1</code> with xdist, keeping the local limit of eight workers and
+<code>OMP_NUM_THREADS=2</code>. The suite mixes thousands of short tests with long MC statistical cases. The default
+scheduler queues large consecutive batches (162 cases per worker in a 5,199-case, eight-worker run), so
+the MC cases can occupy one worker while the others finish. Small scheduling chunks spread that work
+without dropping cases, shortening trajectories or changing tolerances. They do not increase the worker
+limit. Timing evidence and the coverage comparison are recorded in <code>docs/validation/6-T16.md</code>.</p>
+<h2 id="bitwise-equality-in-cpu-float64-tests">Bitwise equality in CPU float64 tests<a class="headerlink" href="#bitwise-equality-in-cpu-float64-tests" title="Permanent link">&para;</a></h2>
+<p>Found in task 0-T04 (17 October 2026, <code>fastmace_cpu</code>, torch 2.14.1+cpu,
+MACE 0.3.16). On CPU with more than one OpenMP thread, the <strong>first model
+evaluated in a process</strong> gives results that differ from every later model by
+about 2e-17 relative (1 force component in 192 on a tiny NaCl model). It does
+so even when the weights are bitwise equal. Repeated evaluations of one
+model are bitwise equal, and all later models agree bitwise with each other.
+The difference disappears with <code>OMP_NUM_THREADS=1</code>, with TorchScript's
+profiling executor disabled (<code>torch._C._jit_set_profiling_executor(False)</code>),
+or after one throwaway evaluation in the process.</p>
+<p>For equivalence tests (FastMACE against the research engine, phase 1a), use
+either of these:</p>
+<ul>
+<li>compare at <code>rtol=1e-12</code> (forces also <code>atol=1e-14</code>) in float64; or</li>
+<li>run one throwaway evaluation in the process before comparing bitwise.</li>
+</ul>
+<p>Do not compare the first evaluation of a process bitwise against anything.</p>
+<h2 id="ci">CI<a class="headerlink" href="#ci" title="Permanent link">&para;</a></h2>
+<p>The CPU CI is <code>.github/workflows/cpu.yml</code> (SPEC §12.4). It runs on every
+branch push and by hand (<code>workflow_dispatch</code>); there is no separate
+<code>pull_request</code> trigger, because pull requests come from branches of this
+repository and would run the same commit twice. A newer push to the same
+branch cancels the running workflow (<code>concurrency</code>), and pip downloads are
+cached, since Actions minutes count on a private repository.</p>
+<p>Matrix, all on <code>ubuntu-latest</code> with CPU torch from the PyTorch CPU index:</p>
+<table>
+<thead>
+<tr>
+<th>Cell</th>
+<th>Python</th>
+<th>torch</th>
+<th>Other packages</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>latest</td>
+<td>3.10, 3.11, 3.12</td>
+<td>2.14.1</td>
+<td>newest the <code>pyproject.toml</code> floors allow</td>
+</tr>
+<tr>
+<td>previous minor</td>
+<td>3.10, 3.11, 3.12</td>
+<td>2.13.0 (newest 2.13.x)</td>
+<td>newest the floors allow</td>
+</tr>
+<tr>
+<td>qualified</td>
+<td>3.10</td>
+<td>2.14.1</td>
+<td><code>-c constraints/qualified.txt</code> (SPEC §4.1 pins)</td>
+</tr>
+</tbody>
+</table>
+<p><code>pyproject.toml</code> keeps the §4.1 floors, so the six plain cells test what a
+user gets from a fresh install today. <code>constraints/qualified.txt</code> pins the
+qualified stack (torch 2.14.1, mace-torch 0.3.16, cuequivariance and
+cuequivariance-torch 0.12.0, e3nn 0.4.4, ASE 3.27.0, NumPy 2.2.6); update it
+together with SPEC §4.1.</p>
+<p>Each cell installs torch first, then <code>pip install -e ".[dev]"</code>, runs
+<code>ruff check fastmace tests</code> and then
+<code>CUDA_VISIBLE_DEVICES='' pytest -n auto --dist=load --maxschedchunk=1 tests/cpu tests/gpu</code>; the GPU tests
+skip. The same checks locally, from the repository root:</p>
+<div class="highlight"><pre><span></span><code>~/environments/fastmace_cpu/bin/ruff<span class="w"> </span>check<span class="w"> </span>fastmace<span class="w"> </span>tests
+<span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="s1">''</span><span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">PYTHONDONTWRITEBYTECODE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-n<span class="w"> </span><span class="m">8</span><span class="w"> </span>--dist<span class="o">=</span>load<span class="w"> </span>--maxschedchunk<span class="o">=</span><span class="m">1</span><span class="w"> </span>tests/cpu<span class="w"> </span>tests/gpu
+</code></pre></div>
+<p>Ruff's rules are in <code>pyproject.toml</code> (<code>E</code>, <code>W</code>, <code>F</code>, <code>I</code>, line length 120).
+<code>fastmace</code> and <code>_support</code> are first-party for isort; a module that must
+import <code>fastmace</code> before <code>torch</code> marks that with <code># isort: split</code>
+(<code>tests/conftest.py</code>).</p>
+<p>Install check, 17 October 2026 (<code>pip install --dry-run</code> in throwaway venvs):
+MACE 0.3.16, e3nn 0.4.4 and cuEquivariance 0.12.0 (pinned) or 0.13.0
+(newest) resolve on Python 3.10, 3.11 and 3.12 with torch 2.14.1 and
+2.13.0, so no cell is dropped. The newest resolution then was ASE 3.29.0,
+NumPy 2.5.4 and filelock 4.2.0.</p>
+<h2 id="gpu-ci">GPU CI<a class="headerlink" href="#gpu-ci" title="Permanent link">&para;</a></h2>
+<p>Plan task 2-T18, owner decision D2 (SPEC §18 decision 5). <code>.github/workflows/gpu.yml</code> runs the GPU
+tiers (see "Test tiers") on two self-hosted GitHub Actions runners. They cost no Actions minutes:</p>
+<table>
+<thead>
+<tr>
+<th>Runner</th>
+<th>Machine</th>
+<th>GPU</th>
+<th>Labels</th>
+<th>Directory</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>murphy-sm89</code></td>
+<td>murphy (shared workstation)</td>
+<td>RTX 4000 Ada, sm_89</td>
+<td><code>self-hosted, linux, x64, fastmace-gpu, sm_89, murphy</code></td>
+<td><code>/mnt/homes/zwingel/actions-runner/murphy</code></td>
+</tr>
+<tr>
+<td><code>local-5060ti-sm120</code></td>
+<td>the PC, WSL Ubuntu</td>
+<td>RTX 5060 Ti, sm_120</td>
+<td><code>self-hosted, linux, x64, fastmace-gpu, sm_120, local-5060ti</code></td>
+<td><code>~/actions-runner/local</code></td>
+</tr>
+</tbody>
+</table>
+<p>What runs when:</p>
+<table>
+<thead>
+<tr>
+<th>Event</th>
+<th>murphy</th>
+<th>local</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>push to <code>main</code></td>
+<td>fast tier</td>
+<td>fast tier</td>
+</tr>
+<tr>
+<td>nightly, 00:30 UTC</td>
+<td>full tier</td>
+<td>— (the PC is not always on or idle)</td>
+</tr>
+<tr>
+<td>by hand (<code>gh workflow run gpu.yml -f tier=full -f runner=local</code>)</td>
+<td>any tier</td>
+<td>any tier</td>
+</tr>
+</tbody>
+</table>
+<p>A push that changes only <code>plans/</code>, <code>docs/</code>, <code>results/</code> or Markdown files starts no GPU run. Each runner
+has at most one run in progress and one waiting per ref (<code>concurrency</code>, never cancelling a running one).
+A burst of merges therefore runs once more, not once per merge.</p>
+<p><code>gpu.yml</code> calls <code>gpu-tier.yml</code> once per runner. It has two jobs:</p>
+<ul>
+<li><strong>idle</strong> waits until the GPU is free (<code>tools/ci/gpu_idle.py check</code>), for at most 30 minutes, or 150
+  minutes at night. The GPU is busy while any compute process is on it: another user's, one of our own
+  from another task, or one whose owner <code>ps</code> cannot name. It is also busy if <code>nvidia-smi</code> fails. WSL's
+  <code>nvidia-smi</code> lists no processes, so the local runner counts the processes that hold <code>/dev/dxg</code>. It
+  also needs three consecutive samples under its memory, utilization and RAM limits. The desktop uses
+  about 4.3 GB, and WSL needs 10 GB available. Someone else's live local GPU reservation (see the
+  next section) also counts as busy. A GPU that stays busy is not a failure: the tests job shows as
+  <strong>skipped</strong>, and the idle job's summary names the processes.</li>
+<li><strong>tests</strong> checks once more, then runs <code>pytest tests/gpu -m &lt;tier&gt;</code> with the runner's
+  <code>FASTMACE_CI_PYTHON</code> and <code>PYTHONPATH</code> set to the checkout. Nothing is installed. On the PC the run holds
+  the local GPU reservation, and skips if it does not get it within 30 minutes. Then it runs
+  <code>tools/test_budget.py</code> on the junit file. Over budget fails the job on the local runner, where the
+  budgets were measured. On murphy it is informational. While the tests run, a watcher records any
+  other user's process that appears on the GPU. It does not stop the run, and the job summary lists
+  what it saw. The artefact <code>gpu-&lt;tier&gt;-&lt;runner&gt;-&lt;attempt&gt;</code> holds <code>junit.xml</code>, <code>pytest.log</code>,
+  <code>budget.txt</code> and the watcher's record for 30 days.</li>
+</ul>
+<p>Each runner's <code>.env</code> file holds its paths and limits (<code>tools/ci/runner/env.murphy</code>,
+<code>tools/ci/runner/env.local</code>), so the workflow names no machine path. On murphy everything stays under
+<code>/mnt/homes/zwingel</code>: the runner, its <code>_work</code> checkout, <code>HOME</code>, <code>TMPDIR</code> and a cache of its own
+(<code>fastmace-cache/ci-murphy</code>).</p>
+<h3 id="the-local-gpu-reservation">The local GPU reservation<a class="headerlink" href="#the-local-gpu-reservation" title="Permanent link">&para;</a></h3>
+<p>A GPU suite started while sibling CPU suites ran crashed WSL on 19 October 2026, when WSL had 15 GB of
+RAM (40 GB since 21 October). WSL's <code>nvidia-smi</code> does not show who is on the GPU. So every local GPU
+run holds one reservation, <code>tools/ci/local_gpu.py</code>: the GPU CI runner, a worker's GPU suite and a
+timing run alike. Every local CPU suite checks it first.</p>
+<ul>
+<li><strong>Reserve</strong> creates the marker <code>~/.fastmace-local-gpu</code> atomically (<code>mkdir</code>), with <code>holder.json</code>:
+  owner, purpose, pid, the pid's start time and the time of the reservation. While another live holder
+  has it, reserve waits.</li>
+<li><strong>First come, first served:</strong> every waiting <code>run</code> or <code>reserve</code> first puts a ticket into the queue
+  next to the marker, <code>~/.fastmace-local-gpu-queue/</code> (one JSON file per waiter: owner, purpose, pid,
+  the waiting process and its start time, and the arrival time; written to a temp file and renamed). It
+  takes the marker only when the marker is free and its ticket is the oldest live one. Before the
+  queue, waiters raced for the marker at each release, and on 22 October 2026 one worker's
+  back-to-back jobs kept four short test runs waiting 37 minutes. A ticket whose waiting process is
+  gone (or whose pid now belongs to another process) is stale: the next waiter reports and drops it. A
+  waiter that gives up after <code>--wait-minutes</code> removes its own ticket.</li>
+<li><strong>Then wait:</strong> holding the marker, it waits until no other <code>pytest</code> process that can use the GPU
+  runs and at least 10 GiB of RAM are available. Then the run starts. A pytest process whose
+  environment sets <code>CUDA_VISIBLE_DEVICES</code> empty (or <code>-1</code>) cannot use the GPU, so it does not count
+  (22 October 2026: with five phase 3 workers, CPU suites kept GPU reservations waiting). If either
+  wait takes longer than <code>--wait-minutes</code> (default 60), it releases the marker and exits with status 75.</li>
+<li><strong>Timing runs</strong> pass <code>--quiet</code>. They wait until no other pytest runs at all, and their reservation
+  blocks CPU-only suites too.</li>
+<li><strong>Release</strong> removes the marker, only for the pid that holds it.</li>
+<li><strong>A stale marker</strong> is reported and removed by the next reserve or check. It is stale when its holder
+  process is gone, or when its pid now belongs to another process.</li>
+<li><strong>Check</strong> exits 1 while a live marker exists. <code>check --cpu-only</code>, for a CPU suite run with
+  <code>CUDA_VISIBLE_DEVICES=</code>, exits 1 only while a quiet reservation is live.</li>
+</ul>
+<p>Worker commands on the PC (<code>python3</code> is WSL's system Python). The conductor's main checkout,
+<code>/mnt/d/Margraf/FastMACE</code>, always has the current tool:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># A local GPU suite: reserve, run, release (on any exit; the command's status is returned)</span>
+python3<span class="w"> </span>tools/ci/local_gpu.py<span class="w"> </span>run<span class="w"> </span>--purpose<span class="w"> </span><span class="s2">"3-Tnn fast tier"</span><span class="w"> </span>--<span class="w"> </span>&lt;the<span class="w"> </span>GPU<span class="w"> </span>command&gt;
+<span class="c1"># A timing run: the machine quiet, and CPU-only suites wait meanwhile</span>
+python3<span class="w"> </span>tools/ci/local_gpu.py<span class="w"> </span>run<span class="w"> </span>--quiet<span class="w"> </span>--purpose<span class="w"> </span><span class="s2">"3-Tnn timing"</span><span class="w"> </span>--<span class="w"> </span>&lt;the<span class="w"> </span>timing<span class="w"> </span>command&gt;
+<span class="c1"># The same in a shell script that runs several commands</span>
+python3<span class="w"> </span>tools/ci/local_gpu.py<span class="w"> </span>reserve<span class="w"> </span>--quiet<span class="w"> </span>--purpose<span class="w"> </span><span class="s2">"3-Tnn timing"</span><span class="w"> </span>--pid<span class="w"> </span><span class="nv">$$</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">trap</span><span class="w"> </span><span class="s1">'python3 tools/ci/local_gpu.py release --pid $$'</span><span class="w"> </span>EXIT
+<span class="c1"># Before every local CPU suite: CPU only, no quiet reservation, and 6 GB available</span>
+python3<span class="w"> </span>tools/ci/local_gpu.py<span class="w"> </span>check<span class="w"> </span>--cpu-only<span class="w"> </span>--min-available-gib<span class="w"> </span><span class="m">6</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="w"> </span>&lt;the<span class="w"> </span>CPU<span class="w"> </span>suite<span class="w"> </span>command&gt;
+<span class="c1"># Who holds it, and who waits in which order (with purposes and waiting times)</span>
+python3<span class="w"> </span>tools/ci/local_gpu.py<span class="w"> </span>status
+</code></pre></div>
+<p>The local runner sets <code>FASTMACE_LOCAL_GPU_MARKER</code> to the same marker by its absolute path, because
+<code>keepalive.sh</code> moves its <code>HOME</code>. The queue follows the marker: it is the marker's path with <code>-queue</code>
+appended.</p>
+<h3 id="keeping-the-runners-up-without-root">Keeping the runners up without root<a class="headerlink" href="#keeping-the-runners-up-without-root" title="Permanent link">&para;</a></h3>
+<p>GitHub's <code>svc.sh install</code> needs <code>sudo</code>, and murphy has no linger for systemd user services. So
+<code>tools/ci/runner/keepalive.sh</code> keeps each runner up. It starts <code>run.sh</code> once per runner directory
+(<code>flock</code>), in a process group of its own, with <code>HOME</code> and <code>TMPDIR</code> inside the runner directory.</p>
+<ul>
+<li><strong>murphy:</strong> cron, open to every user there, runs it at <code>@reboot</code> and every 10 minutes
+  (<code>tools/ci/runner/crontab.murphy</code>). A run while the runner is up exits at once.</li>
+<li><strong>The PC:</strong> a shortcut in the Windows Startup folder runs it at log-on with <code>--loop</code>, through
+  <code>wsl.exe</code>, minimized. The open <code>wsl.exe</code> keeps the WSL VM running. Closing that window stops the
+  runner.</li>
+</ul>
+<p>The runner updates itself (conductor answer to 2-T18, Q8, 20 October 2026). It was installed at v2.338.0.</p>
+<h3 id="registering-the-runners-the-owner">Registering the runners (the owner)<a class="headerlink" href="#registering-the-runners-the-owner" title="Permanent link">&para;</a></h3>
+<p>The owner runs these from Git Bash in <code>D:\Margraf\FastMACE</code>, on <code>main</code> after the merge. Both runners can
+be registered at once. The local runner starts a job only when the reservation and its idle rule allow
+it, so it never runs beside a worker's suite.</p>
+<p><code>gh</code> passes the registration token, valid for one hour, straight into a pipe, so it is never shown or
+written down. Registering needs admin rights on the repository, which the <code>FZWINGEL-UBT</code> account has
+(<code>GH_TOKEN=$(gh auth token --user FZWINGEL-UBT)</code>, for that one command). The <code>git show</code> copies keep LF
+line endings.</p>
+<p>murphy:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">R</span><span class="o">=</span>/mnt/homes/zwingel/actions-runner/murphy
+ssh<span class="w"> </span>murphy<span class="w"> </span><span class="s2">"mkdir -p </span><span class="nv">$R</span><span class="s2">"</span>
+<span class="k">for</span><span class="w"> </span>f<span class="w"> </span><span class="k">in</span><span class="w"> </span>keepalive.sh<span class="w"> </span>env.murphy<span class="w"> </span>crontab.murphy<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>git<span class="w"> </span>-c<span class="w"> </span>core.autocrlf<span class="o">=</span><span class="nb">false</span><span class="w"> </span>show<span class="w"> </span>main:tools/ci/runner/<span class="nv">$f</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>ssh<span class="w"> </span>murphy<span class="w"> </span><span class="s2">"cat &gt; </span><span class="nv">$R</span><span class="s2">/</span><span class="nv">$f</span><span class="s2">"</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
+ssh<span class="w"> </span>murphy<span class="w"> </span><span class="s2">"chmod +x </span><span class="nv">$R</span><span class="s2">/keepalive.sh &amp;&amp; cd </span><span class="nv">$R</span><span class="s2"> &amp;&amp; curl -fsSLo runner.tar.gz https://github.com/actions/runner/releases/download/v2.338.0/actions-runner-linux-x64-2.338.0.tar.gz &amp;&amp; echo 'af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32  runner.tar.gz' | sha256sum -c - &amp;&amp; tar xzf runner.tar.gz &amp;&amp; rm runner.tar.gz"</span>
+<span class="nv">GH_TOKEN</span><span class="o">=</span><span class="k">$(</span>gh<span class="w"> </span>auth<span class="w"> </span>token<span class="w"> </span>--user<span class="w"> </span>FZWINGEL-UBT<span class="k">)</span><span class="w"> </span>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>repos/FZWINGEL-UBT/FastMACE/actions/runners/registration-token<span class="w"> </span>--jq<span class="w"> </span>.token<span class="w"> </span><span class="p">|</span><span class="w"> </span>ssh<span class="w"> </span>murphy<span class="w"> </span><span class="s2">"read -r T &amp;&amp; cd </span><span class="nv">$R</span><span class="s2"> &amp;&amp; ./config.sh --unattended --url https://github.com/FZWINGEL-UBT/FastMACE --token \"\$T\" --name murphy-sm89 --labels fastmace-gpu,sm_89,murphy --work _work --replace"</span>
+ssh<span class="w"> </span>murphy<span class="w"> </span><span class="s2">"cd </span><span class="nv">$R</span><span class="s2"> &amp;&amp; cat env.murphy &gt;&gt; .env &amp;&amp; (crontab -l 2&gt;/dev/null; cat crontab.murphy) | crontab - &amp;&amp; setsid -f </span><span class="nv">$R</span><span class="s2">/keepalive.sh </span><span class="nv">$R</span><span class="s2"> &lt; /dev/null &gt; /dev/null 2&gt;&amp;1"</span>
+</code></pre></div>
+<p>The local PC (WSL). <code>MSYS_NO_PATHCONV=1</code> stops Git Bash from rewriting <code>/home/...</code> arguments for
+<code>wsl.exe</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nb">export</span><span class="w"> </span><span class="nv">MSYS_NO_PATHCONV</span><span class="o">=</span><span class="m">1</span>
+<span class="nv">R</span><span class="o">=</span>/home/fzwin/actions-runner/local
+wsl<span class="w"> </span>-e<span class="w"> </span>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$R</span>
+<span class="k">for</span><span class="w"> </span>f<span class="w"> </span><span class="k">in</span><span class="w"> </span>keepalive.sh<span class="w"> </span>env.local<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span>git<span class="w"> </span>-c<span class="w"> </span>core.autocrlf<span class="o">=</span><span class="nb">false</span><span class="w"> </span>show<span class="w"> </span>main:tools/ci/runner/<span class="nv">$f</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>wsl<span class="w"> </span>-e<span class="w"> </span>sh<span class="w"> </span>-c<span class="w"> </span><span class="s2">"cat &gt; </span><span class="nv">$R</span><span class="s2">/</span><span class="nv">$f</span><span class="s2">"</span><span class="p">;</span><span class="w"> </span><span class="k">done</span>
+wsl<span class="w"> </span>-e<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"chmod +x </span><span class="nv">$R</span><span class="s2">/keepalive.sh &amp;&amp; cd </span><span class="nv">$R</span><span class="s2"> &amp;&amp; curl -fsSLo runner.tar.gz https://github.com/actions/runner/releases/download/v2.338.0/actions-runner-linux-x64-2.338.0.tar.gz &amp;&amp; echo 'af4b794c1bc41d73d40535e3fe092a39f9679cd8d965954c2aca25a05ca41d32  runner.tar.gz' | sha256sum -c - &amp;&amp; tar xzf runner.tar.gz &amp;&amp; rm runner.tar.gz"</span>
+<span class="nv">GH_TOKEN</span><span class="o">=</span><span class="k">$(</span>gh<span class="w"> </span>auth<span class="w"> </span>token<span class="w"> </span>--user<span class="w"> </span>FZWINGEL-UBT<span class="k">)</span><span class="w"> </span>gh<span class="w"> </span>api<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>repos/FZWINGEL-UBT/FastMACE/actions/runners/registration-token<span class="w"> </span>--jq<span class="w"> </span>.token<span class="w"> </span><span class="p">|</span><span class="w"> </span>wsl<span class="w"> </span>-e<span class="w"> </span>bash<span class="w"> </span>-c<span class="w"> </span><span class="s2">"read -r T &amp;&amp; cd </span><span class="nv">$R</span><span class="s2"> &amp;&amp; ./config.sh --unattended --url https://github.com/FZWINGEL-UBT/FastMACE --token \"\$T\" --name local-5060ti-sm120 --labels fastmace-gpu,sm_120,local-5060ti --work _work --replace &amp;&amp; cat env.local &gt;&gt; .env"</span>
+</code></pre></div>
+<p>Then, in PowerShell, the Startup shortcut. The second line starts the runner now:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">$l</span> <span class="p">=</span> <span class="s2">"$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\FastMACE GPU runner.lnk"</span><span class="p">;</span> <span class="nv">$s</span> <span class="p">=</span> <span class="p">(</span><span class="nb">New-Object</span> <span class="n">-ComObject</span> <span class="n">WScript</span><span class="p">.</span><span class="n">Shell</span><span class="p">).</span><span class="n">CreateShortcut</span><span class="p">(</span><span class="nv">$l</span><span class="p">);</span> <span class="nv">$s</span><span class="p">.</span><span class="n">TargetPath</span> <span class="p">=</span> <span class="s2">"$env:WINDIR\System32\wsl.exe"</span><span class="p">;</span> <span class="nv">$s</span><span class="p">.</span><span class="n">Arguments</span> <span class="p">=</span> <span class="s2">"-d Ubuntu --exec /home/fzwin/actions-runner/local/keepalive.sh --loop /home/fzwin/actions-runner/local"</span><span class="p">;</span> <span class="nv">$s</span><span class="p">.</span><span class="n">WindowStyle</span> <span class="p">=</span> <span class="n">7</span><span class="p">;</span> <span class="nv">$s</span><span class="p">.</span><span class="n">Save</span><span class="p">()</span>
+<span class="nb">Start-Process</span> <span class="nv">$l</span>
+</code></pre></div>
+<p>Check that both are online and idle:</p>
+<div class="highlight"><pre><span></span><code>gh<span class="w"> </span>api<span class="w"> </span>repos/FZWINGEL-UBT/FastMACE/actions/runners<span class="w"> </span>--jq<span class="w"> </span><span class="s1">'.runners[] | [.name, .status, .busy, ([.labels[].name] | join(","))] | @tsv'</span>
+</code></pre></div>
+<h3 id="pausing-removing-cleaning-up">Pausing, removing, cleaning up<a class="headerlink" href="#pausing-removing-cleaning-up" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Pause all GPU CI:</strong> <code>gh workflow disable gpu.yml</code> (and <code>enable</code> to resume). New jobs are not queued.</li>
+<li><strong>Pause one runner:</strong> create <code>PAUSED</code> in its directory, then stop its process group, for example
+  <code>ssh murphy 'R=/mnt/homes/zwingel/actions-runner/murphy; touch $R/PAUSED; kill -- -$(cat $R/.keepalive.pid)'</code>.
+  Never use a broad <code>pkill</code>. While <code>PAUSED</code> exists, cron and the shortcut start nothing. Remove it to
+  resume. The runner shows as offline. Jobs for it wait in the queue, and fail after 24 hours.</li>
+<li><strong>Remove a runner:</strong> pause it, then
+  <code>GH_TOKEN=$(gh auth token --user FZWINGEL-UBT) gh api -X POST repos/FZWINGEL-UBT/FastMACE/actions/runners/remove-token --jq .token | ssh murphy 'read -r T &amp;&amp; cd /mnt/homes/zwingel/actions-runner/murphy &amp;&amp; ./config.sh remove --token "$T"'</code>
+  (through <code>wsl -e bash -c</code> for the local one). Then delete the cron lines (<code>crontab -e</code>) or the Startup
+  shortcut, and the runner directory. GitHub also drops a runner that has been offline for 14 days.</li>
+<li><strong>Clean up:</strong> each job deletes its own pytest temporary directory. <code>_work</code> holds one checkout, and
+  the CI cache (<code>fastmace-cache/ci-murphy</code>, <code>~/fastmace-cache/ci-local</code>) holds compiled kernels. Delete
+  either between runs if they grow, and <code>_diag/*.log</code> too.</li>
+</ul>
+<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">&para;</a></h3>
+<p>Self-hosted runners run the workflow's code as the runner's user: on murphy as <code>zwingel</code>, with
+access to the NAS home. So:</p>
+<ul>
+<li>the repository stays private, with no collaborators beyond the owner;</li>
+<li><code>gpu.yml</code> has no <code>pull_request</code> trigger, and only <code>contents: read</code>;</li>
+<li>the workflows use no secrets;</li>
+<li>jobs reach these runners only through the <code>fastmace-gpu</code> label.</li>
+</ul>
+<p>Anyone who can push a branch with a changed workflow can run code on murphy, so push access must stay
+with the owner. (GitHub's notes: "Secure use reference", self-hosted runner hardening.)</p>
+<h2 id="releasing">Releasing<a class="headerlink" href="#releasing" title="Permanent link">&para;</a></h2>
+<p>Plan task 6-T12; D7 keeps hosted CI off and requires the local suite before each tag. The planned 0.1.0
+name reservation was not published; the owner authorized tagging and publishing 1.0.0 after acceptance.</p>
+<p><strong>Version.</strong> <code>fastmace/__init__.py</code>'s <code>__version__</code> is the only place the version is written;
+<code>pyproject.toml</code> reads it (<code>[tool.setuptools.dynamic] version = { attr = "fastmace.__version__" }</code>), and
+<code>fastmace --version</code>, <code>fastmace doctor</code> and the provenance records report it. Semantic versioning, 0.x while the
+API may change. A release commit sets the version, moves <code>CHANGELOG.md</code>'s "Unreleased" entries under the new
+version and date, and is tagged <code>v&lt;version&gt;</code> (annotated). Development after it may set <code>&lt;next&gt;.dev0</code>. The phase
+tags (<code>fastmace-5</code>, ...) stay as they are. The 1.0.0 tag includes the phase-6 packaging, licence metadata
+and Python 3.10–3.13 prebuilt OEq extension support.</p>
+<p><strong>Steps</strong> (in WSL, from the repository root, on the commit to tag):</p>
+<ol>
+<li>CPU suite and lint, locally (D7):</li>
+</ol>
+<div class="highlight"><pre><span></span><code>~/environments/fastmace_cpu/bin/ruff<span class="w"> </span>check<span class="w"> </span>fastmace<span class="w"> </span>tests
+<span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="s1">''</span><span class="w"> </span><span class="nv">OMP_NUM_THREADS</span><span class="o">=</span><span class="m">2</span><span class="w"> </span><span class="nv">PYTHONDONTWRITEBYTECODE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>-n<span class="w"> </span><span class="m">8</span><span class="w"> </span>--dist<span class="o">=</span>load<span class="w"> </span>--maxschedchunk<span class="o">=</span><span class="m">1</span><span class="w"> </span>tests/cpu<span class="w"> </span>tests/gpu
+</code></pre></div>
+<ol>
+<li>Tag: <code>git tag -a v1.0.0 -m "FastMACE 1.0.0"</code> and <code>git push origin v1.0.0</code>.</li>
+<li>Build and check: <code>tools/release/make_release.sh v1.0.0</code>. It extracts the tag with <code>git archive</code> into a new
+   directory under <code>~/tmp</code>, runs <code>python -m build</code> (sdist and wheel) and <code>twine check --strict</code>, checks the file
+   names carry the version, prints the SHA-256 sums and the upload command. <strong>It never uploads.</strong> Optionally,
+   <code>.github/workflows/release.yml</code> (manual <code>workflow_dispatch</code> only, no secrets) builds and checks the same
+   artifacts on GitHub and keeps them for 14 days; it has no publish step either.</li>
+<li>Upload with an authorized maintainer's PyPI token: publish the four <code>fastmace-oeq-ext</code> wheels first,
+   then FastMACE's wheel and sdist. Twine prompts for the token without putting it in shell history:</li>
+</ol>
+<div class="highlight"><pre><span></span><code><span class="nv">TWINE_USERNAME</span><span class="o">=</span>__token__<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>~/environments/fastmace_cpu/bin/python<span class="w"> </span>-m<span class="w"> </span>twine<span class="w"> </span>upload<span class="w"> </span>~/tmp/fastmace-release-v1.0.0-*/dist/*
+</code></pre></div>
+<p>Never commit or log the token. Try TestPyPI first if in doubt (<code>--repository testpypi</code>, a TestPyPI token).</p>
+<p><strong>Later option: trusted publishing.</strong> PyPI's trusted publishing (OIDC from a GitHub Actions workflow, no stored
+token) can replace step 4: register the repository and a workflow in the project's PyPI settings and add a
+publish job with <code>id-token: write</code> and <code>pypa/gh-action-pypi-publish</code>, gated on a protected environment. Not set
+up: it needs hosted Actions for releases (D7) and an owner decision.</p>
+<h2 id="nas-checkout">NAS checkout<a class="headerlink" href="#nas-checkout" title="Permanent link">&para;</a></h2>
+<p>The workstations (murphy, leto, coraline, ...) see FastMACE at
+<code>/mnt/homes/zwingel/FastMACE</code>. It is a plain directory, not a git
+repository, like ResearchModule's NAS copy. <code>.source_commit</code> holds the
+commit it was copied from. Caches and temporary files of runs there go to
+<code>/mnt/homes/zwingel/fastmace-cache/</code>. Results and other NAS-only files
+must never be deleted, so every sync only adds and overwrites tracked
+files. Nobody edits tracked files on the NAS; check first that the NAS
+copy matches its <code>.source_commit</code>, so an edit made there is not lost:</p>
+<div class="highlight"><pre><span></span><code><span class="nv">C</span><span class="o">=</span><span class="k">$(</span>ssh<span class="w"> </span>murphy<span class="w"> </span>cat<span class="w"> </span>/mnt/homes/zwingel/FastMACE/.source_commit<span class="k">)</span>
+git<span class="w"> </span>-c<span class="w"> </span>core.quotepath<span class="o">=</span><span class="nb">false</span><span class="w"> </span>ls-tree<span class="w"> </span>-r<span class="w"> </span><span class="nv">$C</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span>-F<span class="s1">'\t'</span><span class="w"> </span><span class="s1">'{split($1,a," "); print a[3]"  "$2}'</span><span class="w"> </span>&gt;<span class="w"> </span>local.txt
+cut<span class="w"> </span>-c43-<span class="w"> </span>local.txt<span class="w"> </span><span class="p">|</span><span class="w"> </span>ssh<span class="w"> </span>murphy<span class="w"> </span><span class="s1">'cd /mnt/homes/zwingel/FastMACE &amp;&amp; git hash-object --stdin-paths'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>paste<span class="w"> </span>-d<span class="s1">' '</span><span class="w"> </span>-<span class="w"> </span>&lt;<span class="o">(</span>cut<span class="w"> </span>-c43-<span class="w"> </span>local.txt<span class="o">)</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>diff<span class="w"> </span>&lt;<span class="o">(</span>sed<span class="w"> </span><span class="s1">'s/  / /'</span><span class="w"> </span>local.txt<span class="o">)</span><span class="w"> </span>-
+rm<span class="w"> </span>local.txt
+</code></pre></div>
+<p>No output means no NAS-side edits. Then copy <code>main</code> with LF line endings
+(a plain <code>git archive</code> on Windows writes CRLF) and record the commit:</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>-c<span class="w"> </span>core.autocrlf<span class="o">=</span><span class="nb">false</span><span class="w"> </span>archive<span class="w"> </span>--format<span class="o">=</span>tar<span class="w"> </span>main<span class="w"> </span><span class="p">|</span><span class="w"> </span>ssh<span class="w"> </span>murphy<span class="w"> </span><span class="s1">'tar -x -C /mnt/homes/zwingel/FastMACE'</span>
+ssh<span class="w"> </span>murphy<span class="w"> </span><span class="s2">"echo </span><span class="k">$(</span>git<span class="w"> </span>rev-parse<span class="w"> </span>main<span class="k">)</span><span class="s2"> &gt; /mnt/homes/zwingel/FastMACE/.source_commit"</span>
+</code></pre></div>
+<p><code>tar -x</code> never deletes, so a file removed from git stays on the NAS; remove
+it by hand after checking that it is not a result. Run tests there with the
+NAS environment's Python and <code>PYTHONPATH=/mnt/homes/zwingel/FastMACE</code>; the
+full command is in <code>docs/validation/phase-0.md</code>. pytest needs
+<code>--basetemp=/mnt/homes/zwingel/fastmace-cache/&lt;name&gt;</code>: under a <code>TMPDIR</code> on
+the NAS it refuses its <code>pytest-of-zwingel</code> directory, because NFS reports
+another owner uid (1024) than the workstation login (1012).</p>
+<h2 id="modal">Modal<a class="headerlink" href="#modal" title="Permanent link">&para;</a></h2>
+<p>Plan task MODAL-T01 (owner, 21 October 2026): GPU jobs on <a href="https://modal.com">Modal</a> while the
+workstations are unreachable.
+- <strong>L4 (sm_89):</strong> a stand-in for murphy's RTX 4000 Ada.
+- <strong>A100 (sm_80):</strong> a third architecture.
+- <strong>H100:</strong> also available.</p>
+<p>The code is in <code>tools/modal/</code>.</p>
+<p><strong>Client:</strong>
+- <strong>Venv:</strong> <code>~/environments/modal_client</code> in WSL, Modal 1.6.2; the package list is
+  <code>~/environments/modal_client.requirements.txt</code>.
+- <strong>Authentication:</strong> the owner authenticates once with <code>modal token new</code>, and the token lives in
+  <code>~/.modal.toml</code>. Never print, copy or commit it.
+- <strong>Profile:</strong> <code>fzwingel</code>.</p>
+<p><strong>Image</strong> (<code>tools/modal/fastmace_modal.py</code>):
+- <strong>Base:</strong> <code>debian_slim</code>, Python 3.10, with <code>g++</code>, <code>git</code> and <code>procps</code>.
+- <strong>Packages:</strong> <code>tools/modal/requirements-hybrid.txt</code>, which pins every package of
+  <code>~/environments/mace_cueq_oeq.requirements.txt</code> (recipe C/hybrid: torch 2.14.1+cu130 from the PyTorch
+  cu130 index, cuEquivariance 0.12.0, OpenEquivariance 0.7.0, MACE 0.3.16, e3nn 0.4.4, ASE 3.27.0,
+  NumPy 2.2.6). It drops the local <code>nfs-soft-locks</code> hook and adds pytest 9.1.1 and pytest-xdist 3.8.0.
+- <strong>OpenEquivariance:</strong> FastMACE builds its host extension in-process (<code>fastmace/kernels/_oeq_runtime.py</code>),
+  with <code>g++</code>; no <code>nvcc</code> and no <code>oeq_no_nvcc.sh</code> launcher.
+- <strong>Records:</strong> every job records the image's <code>pip freeze</code> (<code>pip-freeze.txt</code> and its sha256 in <code>modal.json</code>).</p>
+<p><strong>Volume</strong> <code>fastmace-data</code>, mounted at <code>/data</code>:
+- <code>models/</code>: checkpoints from <code>~/models</code>;
+- <code>baseline/1a-T18/</code>: the research-engine export with the benchmark structures (<code>FASTMACE_STRUCTURES</code>);
+- <code>cache/&lt;GPU&gt;/</code>: FastMACE, Inductor, Triton and OEq caches, one set per GPU type. These are committed after
+  every job, so later runs skip compilation.</p>
+<p><strong>Entry points</strong>, run from WSL in the worktree with the client's <code>modal</code>:</p>
+<div class="highlight"><pre><span></span><code>modal<span class="w"> </span>run<span class="w"> </span>tools/modal/fastmace_modal.py::upload<span class="w"> </span>--models<span class="w"> </span>mace-mh-1.model
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>modal<span class="w"> </span>run<span class="w"> </span>tools/modal/fastmace_modal.py::smoke<span class="w"> </span>--commit<span class="w"> </span>&lt;sha&gt;<span class="w"> </span>--gpu<span class="w"> </span>L4
+</code></pre></div>
+<div class="highlight"><pre><span></span><code>modal<span class="w"> </span>run<span class="w"> </span>tools/modal/fastmace_modal.py::job<span class="w"> </span>--gpu<span class="w"> </span>L4<span class="w"> </span>--timeout-min<span class="w"> </span><span class="m">80</span><span class="w"> </span>--commit<span class="w"> </span>&lt;sha&gt;<span class="w"> </span>--command<span class="w"> </span><span class="s2">"bash tools/modal/opt_t08.sh"</span><span class="w"> </span>--out<span class="w"> </span>~/fastmace-acceptance/modal-&lt;run&gt;
+</code></pre></div>
+<ul>
+<li><strong>What a job runs:</strong> <code>--commit</code> is <code>git archive</code>d from <code>--repo</code> (default: the main checkout, which sees
+  every pushed branch) with <code>.source_commit</code>, like the pinned copies. <code>--tarball</code> takes a ready archive
+  instead.</li>
+<li><strong>Where the command runs:</strong> from the source root, with <code>$OUT</code> as its results directory. The results come
+  back as <code>&lt;out&gt;/out/</code>, with <code>modal.json</code> holding:</li>
+<li>the GPU, driver and CUDA;</li>
+<li>the source commit and the command;</li>
+<li>the exit code and the wall time;</li>
+<li>an estimated GPU cost at the list prices in <code>PRICE_PER_HOUR</code>. CPU, memory and container start are billed
+    on top; the dashboard has the exact figure.</li>
+<li><strong>Cost control:</strong> every function has a timeout, and the container stops when the call returns. Smoke on the
+  L4 first.</li>
+</ul>
+<p><strong>Monthly cap</strong> (MODAL-T02; owner: "on modal make sure to in total not use more than the 30$ credit i get for
+free per month"). The guard is in <code>tools/modal/budget.py</code>, called by every entry point before it launches
+anything:
+- <strong>Cap:</strong> $30 per calendar month (Modal's free credit), less a $3 reserve. A launch is refused when
+  this month's metered cost + the worst case of jobs still running from this checkout + this job's worst case
+  exceeds <strong>$27</strong>. The refusal names the numbers.
+- <strong>Metered cost:</strong> read from <code>modal.Workspace.from_context().billing.summary().metered_cost</code> (as
+  <code>modal billing summary</code>). It counts GPU, CPU, memory and container start, so it runs above the GPU-list
+  estimates in <code>modal.json</code>: $3.65 metered on 22 October 2026 against about $2.15 estimated.
+- <strong>Worst case:</strong> (function timeout + 300 s start allowance) × (GPU rate + CPU limit × CPU rate + memory
+  limit × memory rate). The rates come from <code>billing.rates()</code> (as <code>modal billing rates</code>).
+  - <strong>The limits are hard:</strong> <code>run_job</code> has <code>cpu=(4, 8)</code> cores and <code>memory=(16, 32)</code> GiB, so the bound holds.
+  - <strong>Example:</strong> a 60-minute L4 job has a function timeout of 70 min, and its worst case is about $1.79.
+- <strong>Unreadable billing refuses:</strong> this covers a network or permission error, a missing rate and an
+  unparsable value.
+- <strong>Lower limits:</strong> <code>--limit-usd 10</code> or <code>FASTMACE_MODAL_LIMIT_USD=10</code>.
+- <strong>Higher limits:</strong> need <code>--owner-override "&lt;who&gt;: &lt;why&gt;"</code>, and the ledger records it. Use it only on the
+  owner's word.
+- <strong>Jobs still running:</strong> <code>~/.fastmace-modal/modal-in-flight.json</code> holds the worst case of each job until it
+  returns, or until its worst case has expired. Parallel launches therefore cannot each fit alone and overrun
+  together. The directory (<code>FASTMACE_MODAL_STATE</code>) is shared by every checkout and worktree on the machine;
+  until 22 October 2026 each checkout had its own <code>results/</code> files, so jobs from different worktrees did not
+  see each other.
+- <strong>Ledger:</strong> after every launch (also a failed one), <code>~/.fastmace-modal/modal-ledger.csv</code> gets a row (the
+  conductor commits copies to <code>results/modal-ledger.csv</code>):
+  - the date, commit and GPU;
+  - the timeout and wall time;
+  - the estimated cost at the container limits, and the worst case;
+  - the metered cost before and after, and the delta;
+  - the limit, the override and the exit code.</p>
+<p>Modal's metering lags by minutes, so the "after" value may not yet contain the job. The next launch reads
+  it fresh.
+- <strong>No cost multipliers:</strong> <code>retries=0</code> on every function and every <code>with_options</code>, and <code>scaledown_window=2</code>
+  (the container stops 2 s after the call). <code>tests/cpu/test_modal_budget.py</code> checks both, along with the
+  timeouts and that every <code>.remote</code> call is behind the guard.
+- <strong>Not covered:</strong> image builds (one per change of <code>requirements-hybrid.txt</code>, a few minutes of CPU) and jobs
+  started outside <code>fastmace_modal.py</code>.</p>
+<p><strong>Measured so far:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Run</th>
+<th>GPU, driver</th>
+<th>Result</th>
+<th>Wall time, GPU cost (est.)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Smoke, <code>724c118</code></td>
+<td>NVIDIA L4 (sm_89, 23 GB), driver 610.57.04, CUDA UMD 13.3; torch 2.14.1+cu130 sees capability (8, 9)</td>
+<td><code>tests/gpu/test_smoke.py</code>: 2 passed</td>
+<td>31 s, ≈ $0.007</td>
+</tr>
+<tr>
+<td>Smoke, <code>340b23c</code></td>
+<td>NVIDIA A100-SXM4-40GB (sm_80), driver 610.57.04, CUDA UMD 13.3</td>
+<td><code>tests/gpu/test_smoke.py</code>: 2 passed</td>
+<td>30 s, ≈ $0.017</td>
+</tr>
+<tr>
+<td>OPT-T08 (<code>tools/modal/opt_t08.sh</code>), <code>3e5decd</code>, "Modal L4, not murphy"</td>
+<td>L4 as above</td>
+<td>force gate passed (NaCl ratios: energy 0.33, forces 1.15, stress 0.39; NbCl5: 0.61, 1.00, 0.85). Same-process A/B, all three records on/off, 12 blocks: NaCl 0.918 (off first) / 0.920 (on first), NbCl5 0.922 / 0.920; medians NaCl 4.69 → 4.31 ms, NbCl5 37.29 → 34.37 ms. Results: <code>results/modal-opt-T08-L4-3e5decd/</code></td>
+<td>38 min, ≈ $0.51</td>
+</tr>
+<tr>
+<td>Noise floor, <code>1176db8</code>, "Modal L4, not murphy" (<code>round2.sh</code> noise-ab/ba: a = <code>gated_rows=auto</code>, b = <code>gated_rows=on</code>, the same plan)</td>
+<td>L4</td>
+<td>b/a NaCl 1.0008 / 1.0019, NbCl5 1.0056 / 0.9979: <strong>floor ≈ 0.2 % NaCl, 0.6 % NbCl5</strong>. NbCl5's block-to-block spread is 8–13 % within a run, and absolute times differ by 4 % between containers (36.0 against 37.4 ms)</td>
+<td>21 min, ≈ $0.28</td>
+</tr>
+<tr>
+<td>Round 2 on L4, <code>1176db8</code> (main <code>32a0dd9</code> + this branch), "Modal L4, not murphy", OPT-T08's records on both sides</td>
+<td>L4</td>
+<td><code>overlap_rebuild</code> (OPT2-T04): NaCl 300 K 0.996 / 0.990, NbCl5 0.996 / 1.003, NaCl 1000 K 0.988 / 0.987. <code>folded_backward_tiles</code> (OPT2-T03): NaCl 1.005 / 1.000, NbCl5 1.000 / 1.001</td>
+<td>54 min, ≈ $0.72</td>
+</tr>
+<tr>
+<td>OPT-T08 on A100, <code>1176db8</code>, "Modal A100, not murphy" (records off against on)</td>
+<td>A100-SXM4-40GB</td>
+<td>NaCl 0.907 / 0.896 (3.11 → 2.82 ms), NbCl5 0.907 / 0.906 (15.07 → 13.66 ms); runs valid with the PID-1 fix</td>
+<td>18 min, ≈ $0.62</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Timing on Modal:</strong>
+- <strong>Labelling:</strong> label every result "Modal <GPU>, not murphy".
+- <strong>Same-process A/Bs only:</strong> a Modal container's GPU is not shared, but its host is, and nothing guarantees
+  the same physical GPU or clocks between calls. Compare only within one container, in the same-process A/B
+  (both orders).
+- <strong>Noise floor (L4, same-process, 12 blocks):</strong> about 0.2 % on NaCl and 0.6 % on NbCl5 (run <code>modal-noise-L4-1176db8</code>).
+- <strong>The validity flag:</strong> inside Modal's sandbox <code>nvidia-smi --query-compute-apps</code> lists every GPU process as PID 1, the
+  container's <code>dumb-init</code> (<code>results/modal-opt-T08-L4-3e5decd/pid-check.txt</code>). <code>tools/ab_step_time.gpu_processes()</code>
+  therefore drops PID 1 inside a container (<code>MODAL_IS_REMOTE</code>, <code>MODAL_TASK_ID</code> or <code>/.dockerenv</code>). Runs before that
+  fix, such as <code>modal-opt-T08-L4-3e5decd</code>, show <code>INVALID</code> for this reason only.</p>
+<h2 id="google-colab">Google Colab<a class="headerlink" href="#google-colab" title="Permanent link">&para;</a></h2>
+<p>Plan task ops-colab (23 October 2026): FastMACE jobs on Colab GPUs through the <code>colab</code> CLI (0.7.5, in WSL,
+signed in as the owner). The GPUs are G4 (RTX PRO 6000 Blackwell, sm_120, 96 GB), A100 and L4. The owner
+does not cap Colab compute units ("Dont cap anything for colab"), but every VM is stopped when its job ends,
+and every job records the units it used. Timed A/B comparisons stay on the local GPU (SPEC decision 39,
+amended). Label every Colab result "Colab <GPU>".</p>
+<p>The code is in <code>tools/colab/</code>:
+- <code>fastmace_colab.py</code>: the driver, run from WSL with the system <code>python3</code> (standard library only);
+- <code>remote.sh</code>: the VM side, in stages (probe, setup, restore, run, pack);
+- <code>remote_step.py</code>: runs one stage detached on the VM, so that <code>colab exec</code> can reattach to a long command.</p>
+<p><strong>One job:</strong></p>
+<div class="highlight"><pre><span></span><code>python3<span class="w"> </span>tools/colab/fastmace_colab.py<span class="w"> </span>--gpu<span class="w"> </span>G4<span class="w"> </span>--commit<span class="w"> </span>&lt;sha&gt;<span class="w"> </span>--out<span class="w"> </span>~/fastmace-acceptance/colab-&lt;run&gt;<span class="w"> </span>--command<span class="w"> </span><span class="s1">'python tools/acceptance/compat.py --provider colab --label "Colab G4" --output $OUT'</span>
+</code></pre></div>
+<ul>
+<li><strong>Commands:</strong> <code>--command</code> is repeatable, and the commands run one after another on the same VM. Each runs
+  from the source root, with <code>$OUT</code> as its own results directory (<code>out/cmd&lt;n&gt;/</code>). A failing command does not
+  stop the next one; the job's exit code is the first non-zero one.</li>
+<li><strong>Quoting from Windows:</strong> <code>wsl.exe -e bash -lc '...'</code> expands <code>$OUT</code> and other variables on the WSL side
+  before the driver sees them, so the VM gets an empty path and the results are lost (OPT4-T07, 24 October
+  2026). Launch from a script file in WSL instead of an inline <code>bash -lc</code> string.</li>
+<li><strong>The VM:</strong> <code>--session NAME</code> names it. The default name is unique per call: GPU, UTC time and a random
+  suffix. Two 4-T13 jobs started in the same second once got the same name, and <code>colab stop</code> then stopped
+  only one of their VMs. The driver refuses a name that is already live (exit 2) and leaves that VM alone;
+  <code>--reuse</code> runs on it instead. <code>--keep</code> leaves the VM running for such a call, and its venv is kept too.
+  Without <code>--keep</code> the driver always runs <code>colab stop</code> on a VM it allocated or reused, also after an error,
+  Ctrl-C, SIGTERM or SIGHUP. If all three stop attempts fail, it prints the command to run.</li>
+<li><strong>Orphaned VMs:</strong> a VM without a local name shows as <code>[?] &lt;endpoint&gt;</code> in <code>colab sessions</code>, and <code>colab stop</code>
+  cannot reach it. Release it with
+  <code>python3 tools/colab/fastmace_colab.py stop-endpoint &lt;endpoint&gt;</code>, which runs what <code>colab stop</code> runs after
+  its name lookup (<code>state.client.unassign(endpoint)</code> in the CLI's own interpreter). The command is refused for
+  an endpoint that a named session owns (it prints the <code>colab stop -s</code> to use instead) and for one that is
+  not live.</li>
+<li><strong>Source:</strong> a <code>git -c core.autocrlf=false archive</code> of <code>--commit</code> from <code>--repo</code> (default: the main checkout,
+  which sees every pushed branch) with <code>.source_commit</code>. The repository is private, so the VM does not clone
+  it.</li>
+<li><strong>Environment:</strong> a uv-managed Python 3.10 venv with <code>tools/modal/requirements-hybrid.txt</code> (the
+  <code>mace_cueq_oeq</code> pins). certifi is raised to 2026.10.19 as in the local environment (<code>OVERRIDES</code>). OEq builds
+  its host extension with <code>g++</code>, without <code>nvcc</code>, and <code>OEQ_CUDA_DRIVER_LIBRARY</code> points at Colab's
+  <code>/usr/lib64-nvidia/libcuda.so.1</code>. The commands run in a clean environment, without the Colab kernel's
+  variables (<code>MPLBACKEND</code>, <code>TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD</code>).</li>
+<li><strong>Models:</strong> <code>--models</code> takes checkpoint names from <code>fastmace.model.labels</code> (default <code>mh-1,medium,polar-1-s</code>,
+  the compatibility tier's). The VM downloads them from their official URLs and accepts each one only if its
+  SHA-256 matches the label table. Nothing large is uploaded from the PC.</li>
+<li><strong>Structures:</strong> <code>--baseline</code> (default <code>~/fastmace-baseline/1a-T18</code>, under 1 MB) goes up with the source as
+  <code>FASTMACE_STRUCTURES</code> and <code>FASTMACE_BASELINE</code>.</li>
+<li><strong>Results:</strong> <code>&lt;out&gt;/out/</code> holds <code>probe.json</code> (GPU, capability, driver, CPUs, RAM), <code>setup.json</code> (Python,
+  package versions, the <code>pip freeze</code> sha256, setup times), <code>pip-freeze.txt</code> and <code>cmd&lt;n&gt;/</code>. <code>&lt;out&gt;/colab.json</code>
+  records the provider, GPU, capability, driver, versions, commit, commands and exit codes, the setup and
+  wall times, the cache key, and the compute units before and after (<code>colab usage</code>).</li>
+<li><strong>Ledger:</strong> every call, a failed one too, appends a row to <code>~/.fastmace-colab/colab-ledger.csv</code>
+  (<code>--ledger</code> to change it). Like the Modal ledger, the conductor commits copies to
+  <code>results/colab-ledger.csv</code>.</li>
+</ul>
+<p><strong>No Google Drive.</strong> <code>colab drivemount</code> needs the owner's browser consent on every new VM: on 23 October
+2026 a second VM got HTTP 400 without a fresh consent. A Drive-backed environment therefore cannot run
+unattended. The driver keeps everything else in a local store, <code>~/.fastmace-colab</code>
+(<code>FASTMACE_COLAB_STATE</code>):
+- <strong>Environment:</strong> installed on every new VM. It takes about a minute, because uv fetches the wheels at
+  datacenter speed. <code>--build-env</code> sets up the environment without a command and writes
+  <code>manifests/&lt;stack&gt;.json</code>, the <code>pip freeze</code> and its sha256. Every later job compares its own freeze against
+  it (<code>env_matches_manifest</code> in <code>colab.json</code>).
+- <strong>Compile caches:</strong> Triton, Inductor, FastMACE's cache root with the OEq extension builds, MACE's compile
+  cache and the CUDA cache, under one root on the VM. The store keeps them per key
+  <code>sm&lt;capability&gt;-py310-&lt;stack&gt;</code>, where <code>&lt;stack&gt;</code> is the sha256 of the requirements and the capability comes
+  from the VM's <code>nvidia-smi</code>, not from a table. Each key is a directory of parts, <code>000.tar.gz</code> (the first
+  run's caches) and then one part per later run with only the files that run added or changed. The driver
+  uploads every part before the commands. Most of the volume is Inductor's FX graph cache: about 1.5 GB, or
+  513 MB gzipped, after the compatibility tier on a G4.
+- <strong>Large uploads:</strong> <code>colab upload</code> sends a file as one base64 JSON request, which fails above the Jupyter
+  server's request limit (a 513 MB file did). The driver uploads files over 48 MiB in chunks (64 MiB went up, 80 MiB failed with HTTP 400), and
+  <code>remote_step.py</code> joins them on the VM.
+- <strong>Colab-only packages:</strong> <code>EXTRAS</code> adds <code>dftd3==1.6.0</code> (simple-dftd3, the <code>[d3-reference]</code> extra), so that the
+  16 simple-dftd3 cross-check tests run instead of skipping.
+- <strong>Driver library:</strong> Colab keeps <code>libcuda.so.1</code> in <code>/usr/lib64-nvidia</code>. It is among OEq's driver candidates
+  (<code>fastmace/kernels/_oeq_runtime.py</code>), and <code>remote.sh</code> also sets <code>OEQ_CUDA_DRIVER_LIBRARY</code>. Without it, OEq
+  failed on the A100 pilot and the planner fell back to plain cuEq.
+- <strong>Batch the tiers:</strong> a cold tier is several times slower than a warm local one (A100 pilot: 43.5 min for
+  the fast tier, against 7.9 min locally warm). Give one call several <code>--command</code>s rather than one VM per
+  tier.</p>
+<p><strong>Measured on a G4</strong> (23 October 2026, <code>docs/validation/ops-colab-g4-20261023.md</code>):
+- <strong>Setup:</strong> a VM is ready to run commands about a minute after the call starts (56 s cold, 81 s for the
+  environment build). With the compile caches it takes 204 s, because uploading the 513 MB cache takes 154 s.
+- <strong>The compatibility tier:</strong> 40.8 min of tests cold and 36.6 min warm. The caches save about 10 %, about
+  100 s net of the upload: most of the tier is runtime, not compilation.
+- <strong>Compute units:</strong> 9.4 CU for the cold job (about 13 CU/h). <code>cu_used</code> is the change in the account's
+  balance, so it includes every other VM that was active (<code>active_before</code>, <code>active_after</code> in <code>colab.json</code>).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.suggest"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

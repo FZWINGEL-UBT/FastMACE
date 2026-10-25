@@ -1,0 +1,2930 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast molecular dynamics with pretrained MACE models on NVIDIA GPUs">
+      
+      
+      
+        <link rel="canonical" href="https://fzwingel-ubt.github.io/FastMACE/api/ase/">
+      
+      
+        <link rel="prev" href="../d3/">
+      
+      
+        <link rel="next" href="../errors/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>ASE front end - FastMACE</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ase-front-end" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="FastMACE" class="md-header__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            FastMACE
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ASE front end
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="FastMACE" class="md-nav__button md-logo" aria-label="FastMACE" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    FastMACE
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/FZWINGEL-UBT/FastMACE" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    FZWINGEL-UBT/FastMACE
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../release/oeq-wheels/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Prebuilt OEq extension
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FastMACE in five minutes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/ase/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Port your ASE script
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/planner/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The planner
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/restart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output, restart and resume
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo and swaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/npt-d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NPT and D3 dispersion
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../guide/relax/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relaxations and quenches
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ and troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../quick/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick runs (fm.md)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../model/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models and force fields
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../simulation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Simulation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../integrators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../optimize/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Optimisers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../mc/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Monte Carlo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../protocols/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Protocols and schedules
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../output/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Output
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../d3/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispersion (D3)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ASE front end
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ASE front end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace.ase.calculator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calculator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="calculator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.calculator.FastMACECalculator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastMACECalculator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.calculator.calc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calc
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace.ase.md" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        md
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="md">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.Langevin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Langevin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.LangevinBAOAB" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LangevinBAOAB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.VelocityVerlet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VelocityVerlet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.Bussi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bussi
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.NoseHooverChainNVT" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NoseHooverChainNVT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.IsotropicMTKNPT" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IsotropicMTKNPT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.MTKNPT" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MTKNPT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.NVTBerendsen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NVTBerendsen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.NPTBerendsen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NPTBerendsen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.Inhomogeneous_NPTBerendsen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inhomogeneous_NPTBerendsen
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace.ase.optimize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        optimize
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="optimize">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.optimize.LBFGS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LBFGS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.optimize.FIRE" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FIRE
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../errors/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Errors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../benchmarks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Benchmarks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rewrites/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rewrite screens
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../licences/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Licences
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_4" id="__nav_5_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Upstream PR drafts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Upstream PR drafts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-block-linear/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE block linear
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/mace-reassociate-first/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MACE first-interaction reassociation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../upstream/oeq-no-nvcc-build/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    OEq build without nvcc
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace.ase.calculator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calculator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="calculator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.calculator.FastMACECalculator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastMACECalculator
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.calculator.calc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        calc
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace.ase.md" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        md
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="md">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.Langevin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Langevin
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.LangevinBAOAB" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LangevinBAOAB
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.VelocityVerlet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        VelocityVerlet
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.Bussi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bussi
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.NoseHooverChainNVT" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NoseHooverChainNVT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.IsotropicMTKNPT" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        IsotropicMTKNPT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.MTKNPT" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MTKNPT
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.NVTBerendsen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NVTBerendsen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.NPTBerendsen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NPTBerendsen
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.md.Inhomogeneous_NPTBerendsen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Inhomogeneous_NPTBerendsen
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fastmace.ase.optimize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        optimize
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="optimize">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.optimize.LBFGS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LBFGS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastmace.ase.optimize.FIRE" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FIRE
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="ase-front-end">ASE front end<a class="headerlink" href="#ase-front-end" title="Permanent link">&para;</a></h1>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="fastmace.ase.calculator" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">calculator</span>
+
+
+<a href="#fastmace.ase.calculator" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p><code>FastMACECalculator</code> and <code>fm.calc</code>: the ASE calculator, compiled tier (SPEC §7.4, §7.7 level 0).</p>
+<p>ASE calls a calculator once per step, so this front end gets the compiled tier at most (§8.2): a
+compiled model, exact edge counts, no CUDA graphs. Full speed needs FastMACE to own the MD loop
+(<code>fm.md</code>, the <code>fastmace.ase</code> integrators). The calculator builds nothing itself: at the first
+calculation, and again whenever the species or the atom count change, it makes a one-off
+evaluation plan through the minimal planner (<code>MinimalPlanner.plan_evaluation</code>: compiled, with
+stress, no workload) and gets that plan's <code>MACEForceField</code> from <code>build_evaluation</code>. Each plan's
+superset is its structure's species (owner decision D3), so new species get a fresh plan; the
+plans share one compiled-model cache. Evaluation plans compile with a dynamic edge dimension
+(<code>EngineConfig.dynamic_edges</code>, 2-T13), so relaxations, phonopy and NEB, whose edge counts change
+between calls, pay one compile.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.calculator.FastMACECalculator" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">FastMACECalculator</span>
+
+
+<a href="#fastmace.ase.calculator.FastMACECalculator" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="ase.calculators.calculator.Calculator">Calculator</span></code></p>
+
+
+
+        <p><code>FastMACECalculator(model, *, head=None, rewrites="auto", precision="float32", dispersion=None)</code>:
+energy, free_energy, forces and Voigt stress in ASE units; full 3D PBC only (§7.6).</p>
+<ul>
+<li><code>model</code>: an <code>fm.load</code> result or a label of the model table (a checkpoint path or URL
+  needs <code>fm.load</code> or <code>fm.calc</code> with <code>sha256=</code>/<code>trusted=</code>, since the trust decision
+  needs one); <code>head</code> selects a head of a label's checkpoint, and must match a loaded
+  model's head;</li>
+<li><code>rewrites</code>: <code>"auto"</code> or a <code>RewriteConfig</code>; <code>precision</code>: the force precision,
+  <code>"float32"</code> or <code>"float64"</code>. Energies are accumulated in float64 (§7.3);</li>
+<li><code>dispersion</code>: <code>None</code>, <code>"d3bj"</code> or an <code>fm.D3</code>, as <code>fm.ForceField</code> takes it (MACE plus D3,
+  SPEC §11.2; 3b-T04). <code>dispersion</code> is then the complete record. With D3 there are no per-atom
+  <code>energies</code> (D3's energy is not split by atom here).</li>
+</ul>
+<p><code>energies</code> (per atom) is listed only for models whose energy terms are all atom-resolved;
+PolarMACE's k-space electrostatics are not (§7.3). Non-periodic or mixed-PBC atoms raise
+<code>PlanRefused</code> (rule 1); gas-phase molecules need MACE's <code>MACECalculator</code> (§4.3).</p>
+<p><code>plan</code> is the current evaluation plan (<code>None</code> before the first calculation) and <code>notes</code>
+what the calculator recorded, the compatibility-tier note first; the note is printed once.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="fastmace.ase.calculator.calc" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">calc</span>
+
+
+<a href="#fastmace.ase.calculator.calc" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">calc</span><span class="p">(</span>
+    <span class="n">model</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">head</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">options</span><span class="p">:</span> <span class="n">Any</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FastMACECalculator</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p><code>atoms.calc = fm.calc("mh1", head="matpes_r2scan")</code>: a <code>FastMACECalculator</code> for <code>model</code>
+(label, path or URL, loaded as <code>fm.load</code> does); prints the compatibility-tier note once.</p>
+<p><code>options</code>: <code>fm.load</code>'s <code>sha256</code>, <code>trusted</code>, <code>download</code>, <code>charge</code> and
+<code>spin_multiplicity</code>, and the calculator's <code>rewrites</code>, <code>precision</code> and <code>dispersion</code>.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="fastmace.ase.md" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">md</span>
+
+
+<a href="#fastmace.ase.md" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>ASE MD scripts on the graph engine: <code>fastmace.ase.Langevin</code>, <code>LangevinBAOAB</code> and the phase 4 classes
+(SPEC §7.7 level 1).</p>
+<p>An ASE script is ported by changing the import and adding <code>model=</code>. Each class takes the argument
+names and units of its ASE 3.27 class (<code>SUPPORTED</code>) and refuses the rest with the reason
+(<code>REFUSED</code>); any other argument is a <code>TypeError</code> naming it. The FastMACE additions are
+keyword-only (<code>ADDITIONS</code>). The shim never reinterprets an ASE argument: <code>friction</code>, the
+pressures and the time constants are in ASE units, and the conversion to the public integrator
+record is the only arithmetic (the record's <code>to_config</code> converts back, so a value may differ by
+one ulp).</p>
+<p>The centre of mass (owner decision D2, conductor's answer to 4-T10): a class whose ASE original
+takes <code>fixcm</code> (<code>Langevin</code>, <code>NVTBerendsen</code>, <code>NPTBerendsen</code>) passes it through and follows
+decision 37, as <code>fastmace.ase.Langevin</code> does (<code>LangevinBAOAB</code> keeps its phase 1b mapping). A class whose ASE
+original has no <code>fixcm</code> (<code>VelocityVerlet</code>, <code>Bussi</code>, <code>NoseHooverChainNVT</code>, <code>IsotropicMTKNPT</code>,
+<code>MTKNPT</code>) removes no centre of mass, as ASE, and counts ASE's degrees of freedom: its keyword-only
+<code>dof</code> defaults to <code>"ase"</code>; <code>dof="auto"</code> (or <code>"fastmace"</code>) is FastMACE's convention instead,
+the total momentum removed and 3N - 3 counted (<code>fixcm="auto"</code>: with <code>FixAtoms</code> no momentum is removed and
+3(N - n_fixed) counted, 4-T04). <code>FixAtoms</code> runs where owner decision 44 allows it (NVE, CSVR, NVT
+Berendsen, Langevin; with <code>fixcm=False</code> for the classes that take ASE's <code>fixcm</code>, whose default <code>True</code>
+is refused with it); rule 1 refuses it elsewhere at the first <code>run</code>, with the reason.</p>
+<p>Nothing here builds an engine: the classes build a <code>fm.Simulation</code> at the first <code>run</code> or
+<code>step</code>, which plans, runs the optional gate (owner decision D1: <code>check="gate"</code>) and builds
+through the minimal planner (SPEC §5). The setup report is printed then.</p>
+<p><code>run(n)</code> advances the <code>Simulation</code> in chunks that end where an observer is due (ASE's
+<code>attach</code> rule: every <code>interval</code> steps from step 0, or once at step <code>|interval|</code> for
+<code>interval &lt;= 0</code>). Before the observers of a step the committed state is written into <code>atoms</code>
+with a single-point results cache as <code>atoms.calc</code>; after them, changed positions or momenta
+changed species, masses, initial charges, positions or momenta become one event through
+<code>Simulation.update</code> (SPEC §8.5; species in the superset), and any other change raises
+<code>PlanRefused</code> with its reason. The shortest observer interval is the workload's
+<code>host_callbacks_every</code> (rule 9). <code>trajectory=</code> and <code>logfile=</code> keep
+their ASE meaning (one ASE <code>Trajectory</code>, ASE's <code>MDLogger</code> format) and are written from the
+<code>Simulation</code>'s asynchronous snapshots; every other file goes to <code>output</code>.</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.Langevin" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">Langevin</span>
+
+
+<a href="#fastmace.ase.md.Langevin" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.md._Dynamics">_Dynamics</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.langevin.Langevin</code> on FastMACE's graph engine (Langevin, SPEC §10.2).</p>
+<p><code>Langevin(atoms, timestep, temperature=None, friction=None, fixcm=True, *, temperature_K=None,
+trajectory=None, logfile=None, loginterval=1, append_trajectory=False, model=None,
+force_field=None, head=None, seed=None, output=None, check="skip", dispersion=None,
+fixcm_projection="auto")</code>: ASE's arguments and units (<code>timestep</code> and <code>1/friction</code> in ASE time
+units, <code>temperature</code> in eV, deprecated as in ASE); <code>rng</code>, a non-default
+<code>comm</code>/<code>communicator</code> and <code>master</code> are refused. The additions are those of <code>fm.md</code>, and
+<code>fixcm_projection</code> (<code>fm.integrators.Langevin</code>'s; decision 37). With <code>fixcm</code>, <code>"auto"</code> resolves
+to the mass-weighted projection: the log then reads its frames with ASE's <code>FixCom</code>, so its
+temperature counts 3N - 3 (the trajectory frames stay unconstrained). <code>fixcm_projection="ase"</code> is
+ASE's <code>Langevin</code> exactly (its noise stream, 3N). <code>FixAtoms</code> runs with <code>fixcm=False</code> (ASE's default
+<code>fixcm=True</code> is refused with it, owner decision 44); the log and the trajectory frames carry the
+constraint, so temperatures count 3(N - n_fixed).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.LangevinBAOAB" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">LangevinBAOAB</span>
+
+
+<a href="#fastmace.ase.md.LangevinBAOAB" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.md._Dynamics">_Dynamics</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.langevinbaoab.LangevinBAOAB</code> on FastMACE's graph engine (BAOAB NPT, §10.2).</p>
+<p><code>LangevinBAOAB(atoms, timestep, *, temperature_K, externalstress, hydrostatic=False, T_tau=None,
+P_tau=None, P_mass=None, P_mass_factor=1.0, disable_cell_langevin=False, trajectory=None,
+logfile=None, loginterval=1, append_trajectory=False, model=None, ...)</code>, ASE units throughout:
+<code>externalstress</code> in eV/Å³ (a scalar, 3 diagonal, 6 Voigt components or a symmetric 3×3),
+<code>T_tau</code> and <code>P_tau</code> in ASE time. Mapped to <code>fm.integrators.LangevinBAOAB</code> with
+<code>friction_per_fs = fs / T_tau</code> and <code>cell_mode = "hydrostatic" if hydrostatic else "full"</code>.</p>
+<p>Refused: no <code>externalstress</code> (fixed-cell BAOAB: use <code>Langevin</code>), no <code>temperature_K</code>
+(NVE/NPH, phase 4), an explicit <code>P_mass</code> (<code>P_mass_factor</code> scales ASE's heuristic), <code>rng</code>,
+a non-default <code>comm</code>/<code>communicator</code> and <code>master</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.VelocityVerlet" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">VelocityVerlet</span>
+
+
+<a href="#fastmace.ase.md.VelocityVerlet" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.md._Dynamics">_Dynamics</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.verlet.VelocityVerlet</code> on FastMACE's graph engine (NVE, SPEC §10.2).</p>
+<p><code>VelocityVerlet(atoms, timestep, trajectory=None, logfile=None, loginterval=1, *,
+append_trajectory=False, model=None, ..., dof="ase")</code>: <code>timestep</code> in ASE time units, the
+momenta the structure's. Mapped to <code>fm.integrators.NVE</code>; <code>dof</code> as the module docstring says.
+The workload's <code>max_temperature_K</code> is <code>fm.md</code>'s for NVE (<code>quick.nve_max_temperature_K</code>).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.Bussi" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">Bussi</span>
+
+
+<a href="#fastmace.ase.md.Bussi" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.md._Dynamics">_Dynamics</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.bussi.Bussi</code> on FastMACE's graph engine (CSVR, SPEC §10.2).</p>
+<p><code>Bussi(atoms, timestep, temperature_K, taut, *, trajectory=None, ..., seed=None, dof="ase")</code>:
+<code>timestep</code> and <code>taut</code> in ASE time units. Mapped to <code>fm.integrators.CSVR</code> with <code>tau_fs =
+taut / fs</code>; the noise is ASE's stream from <code>seed</code> (conductor's choice 3), so <code>rng</code> is refused.
+A zero initial kinetic energy raises <code>ValueError</code>, as ASE's <code>Bussi</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.NoseHooverChainNVT" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">NoseHooverChainNVT</span>
+
+
+<a href="#fastmace.ase.md.NoseHooverChainNVT" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.md._Dynamics">_Dynamics</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.nose_hoover_chain.NoseHooverChainNVT</code> on FastMACE's graph engine (NHC, §10.2).</p>
+<p><code>NoseHooverChainNVT(atoms, timestep, temperature_K, tdamp, tchain=3, tloop=1, *, trajectory=None,
+logfile=None, loginterval=1, append_trajectory=False, model=None, ..., dof="ase")</code>: <code>timestep</code>
+and <code>tdamp</code> in ASE time units. Mapped to <code>fm.integrators.NoseHooverChain</code> with <code>tdamp_fs =
+tdamp / fs</code>; <code>dof</code> as the module docstring says. <code>comm</code> other than ASE's default and <code>master</code>
+are refused.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.IsotropicMTKNPT" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">IsotropicMTKNPT</span>
+
+
+<a href="#fastmace.ase.md.IsotropicMTKNPT" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.md._MTKDynamics">_MTKDynamics</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.nose_hoover_chain.IsotropicMTKNPT</code> on FastMACE's graph engine (MTK, hydrostatic).</p>
+<p><code>IsotropicMTKNPT(atoms, timestep, temperature_K, pressure_au, tdamp, pdamp, tchain=3, pchain=3,
+tloop=1, ploop=1, *, trajectory=None, ..., dof="ase")</code>: <code>pressure_au</code> in eV/Å³, <code>timestep</code>,
+<code>tdamp</code> and <code>pdamp</code> in ASE time units. Mapped to <code>fm.integrators.MTK(cell_mode="hydrostatic")</code>
+with <code>pressure_GPa = pressure_au / GPa</code>. Experimental: not yet qualified, as BAOAB (§10.2).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.MTKNPT" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">MTKNPT</span>
+
+
+<a href="#fastmace.ase.md.MTKNPT" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.md._MTKDynamics">_MTKDynamics</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.nose_hoover_chain.MTKNPT</code> on FastMACE's graph engine (MTK, full cell).</p>
+<p>Arguments as <code>IsotropicMTKNPT</code>; mapped to <code>fm.integrators.MTK(cell_mode="full")</code>.
+Experimental: not yet qualified, as BAOAB (§10.2).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.NVTBerendsen" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">NVTBerendsen</span>
+
+
+<a href="#fastmace.ase.md.NVTBerendsen" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.md._Dynamics">_Dynamics</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.nvtberendsen.NVTBerendsen</code> on FastMACE's graph engine (Berendsen, SPEC §10.2).</p>
+<p><code>NVTBerendsen(atoms, timestep, temperature=None, taut=None, fixcm=True, *, temperature_K=None,
+trajectory=None, ...)</code>: <code>temperature</code> in K (an alias of <code>temperature_K</code>, as ASE's),
+<code>timestep</code> and <code>taut</code> in ASE time units. Mapped to <code>fm.integrators.Berendsen</code> without a
+pressure; <code>fixcm</code> follows decision 37 (module docstring). Non-canonical: equilibration only.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.NPTBerendsen" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">NPTBerendsen</span>
+
+
+<a href="#fastmace.ase.md.NPTBerendsen" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.md._Dynamics">_Dynamics</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.nptberendsen.NPTBerendsen</code> on FastMACE's graph engine (Berendsen NPT, §10.2).</p>
+<p><code>NPTBerendsen(atoms, timestep, temperature=None, *, temperature_K=None, pressure=None,
+pressure_au=None, taut=0.5 ps, taup=1 ps, compressibility=None, compressibility_au=None,
+fixcm=True, trajectory=None, ...)</code>: ASE's arguments, units and defaults (<code>taut</code> and <code>taup</code>
+default to ASE's 500 fs and 1000 fs, so a ported script keeps them). Exactly one of <code>pressure</code>
+(bar, deprecated as in ASE) and <code>pressure_au</code> (eV/Å³); <code>compressibility</code> (1/bar, deprecated) or
+<code>compressibility_au</code> (Å³/eV). Mapped to <code>fm.integrators.Berendsen</code> with <code>pressure_GPa =
+pressure_au / GPa</code> and <code>compressibility_per_GPa = compressibility_au * GPa</code>; <code>fixcm</code> follows
+decision 37. Non-canonical: equilibration only; the barostat is experimental: not yet qualified.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.md.Inhomogeneous_NPTBerendsen" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">Inhomogeneous_NPTBerendsen</span>
+
+
+<a href="#fastmace.ase.md.Inhomogeneous_NPTBerendsen" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="NPTBerendsen (fastmace.ase.md.NPTBerendsen)" href="#fastmace.ase.md.NPTBerendsen">NPTBerendsen</a></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.md.nptberendsen.Inhomogeneous_NPTBerendsen</code> on FastMACE's graph engine.</p>
+<p><code>Inhomogeneous_NPTBerendsen(*args, mask=(1, 1, 1), **kwargs)</code>: <code>NPTBerendsen</code>'s arguments and
+<code>mask</code>, the three 0/1 flags of the scaled cell directions. Mapped to <code>fm.integrators.Berendsen</code>
+with <code>mask</code> (<code>cell_mode="full"</code>: each cell vector scaled on its own, the angles kept).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="fastmace.ase.optimize" class="doc doc-heading">
+            <span class="doc doc-object-name doc-module-name">optimize</span>
+
+
+<a href="#fastmace.ase.optimize" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+        <p>ASE relaxation scripts on the graph engine: <code>fastmace.ase.LBFGS</code> and <code>FIRE</code> (SPEC §7.7; decision 48).</p>
+<p>An ASE script is ported by changing the import and adding <code>model=</code>. Each class takes the argument names,
+units and defaults of its ASE 3.27 class (<code>SUPPORTED</code>) and refuses the rest with the reason
+(<code>REFUSED</code>): <code>restart</code> other than <code>None</code> (a relaxation writes no restart files, conductor's choice 5),
+LBFGS's <code>use_line_search=True</code>, FIRE's deprecated <code>maxmove</code> and <code>position_reset_callback</code>, and a
+non-default <code>comm</code>/<code>master</code>. The FastMACE additions are keyword-only (<code>ADDITIONS</code>).</p>
+<p><code>atoms</code> is an <code>Atoms</code> (fixed cell) or <code>ase.filters.FrechetCellFilter(atoms, ...)</code> (variable cell, read
+into <code>fm.optimize.FrechetCell</code>); every other filter (<code>UnitCellFilter</code>, <code>ExpCellFilter</code>,
+<code>StrainFilter</code>, ...) is refused with the reason (decision 48).</p>
+<p>Nothing here builds an engine: the classes build a <code>fm.Simulation(optimizer=...)</code> at the first <code>run</code>,
+<code>irun</code> or <code>step</code>, and <code>run(fmax, steps)</code> is <code>Simulation.relax</code> in chunks that end where an observer
+or a trajectory frame is due (ASE's <code>attach</code> rule). <code>logfile</code> is ASE's optimiser log (ASE's <code>Log</code>,
+<code>"-"</code> by default as ASE's), one line per step from the relaxation's per-step energies and max forces;
+<code>trajectory=</code> is one ASE <code>Trajectory</code> with a frame every <code>loginterval</code> steps. Before the observers of
+a step the relaxed state is written into <code>atoms</code> (positions and cell) with a single-point results cache
+as <code>atoms.calc</code>. An observer that changes <code>atoms</code> raises: the optimiser's history would no longer
+describe the structure (conductor's answer to 4-T10).</p>
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.optimize.LBFGS" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">LBFGS</span>
+
+
+<a href="#fastmace.ase.optimize.LBFGS" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.optimize._Optimizer">_Optimizer</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.optimize.LBFGS</code> on FastMACE's graph engine (<code>fm.optimize.LBFGS</code>, SPEC §10.3).</p>
+<p><code>LBFGS(atoms, restart=None, logfile="-", trajectory=None, maxstep=None, memory=100, damping=1.0,
+alpha=70.0, use_line_search=False, *, append_trajectory=False, loginterval=1, model=None, force_field=None,
+head=None, check="skip", dispersion=None)</code>: <code>maxstep</code> in Å (<code>None</code> is ASE's 0.2), <code>alpha</code> in eV/Å²
+as ASE's. <code>atoms</code> an <code>Atoms</code> or a <code>FrechetCellFilter</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h3 id="fastmace.ase.optimize.FIRE" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">FIRE</span>
+
+
+<a href="#fastmace.ase.optimize.FIRE" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="fastmace.ase.optimize._Optimizer">_Optimizer</span></code></p>
+
+
+
+        <p>ASE 3.27's <code>ase.optimize.FIRE</code> on FastMACE's graph engine (<code>fm.optimize.FIRE</code>, SPEC §10.3).</p>
+<p><code>FIRE(atoms, restart=None, logfile="-", trajectory=None, dt=0.1, maxstep=None, maxmove=None, dtmax=1.0,
+Nmin=5, finc=1.1, fdec=0.5, astart=0.1, fa=0.99, a=0.1, downhill_check=False, position_reset_callback=None,
+*, append_trajectory=False, loginterval=1, model=None, ...)</code>: ASE's arguments and defaults (<code>dt</code> and
+<code>dtmax</code> in ASE time units, <code>maxstep</code> in Å, <code>None</code> is ASE's 0.2). Refused: the deprecated <code>maxmove</code>
+(use <code>maxstep</code>) and <code>position_reset_callback</code> (decision 48).</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.sections", "navigation.top", "content.code.copy", "search.suggest"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

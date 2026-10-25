@@ -1,0 +1,300 @@
+diff --git a/mace/modules/reassociate.py b/mace/modules/reassociate.py
+new file mode 100644
+index 0000000..d00a75b
+--- /dev/null
++++ b/mace/modules/reassociate.py
+@@ -0,0 +1,219 @@
++"""Reassociated first interaction: sum per (receiver, sender species) before projecting.
++
++In the first interaction of a MACE model the sender features are species-only scalars
++(``linear_up(node_embedding(one_hot))``), and the convolution is channelwise with one radial
++weight per (path, channel). With the last radial layer written as a linear map ``W`` (bias
++folded in as an extra column) acting on the per-edge hidden vector ``a[e] = [h_e c_e, c_e]``
++(``c_e``: the cutoff, 1 without one), the message of receiver ``i`` is
++
++    m[i, l, m, u] = gamma_l sum_z x[z, u] sum_k W[path(l) C + u, k] S[i, z, k, (l, m)],
++    S[i, z, k, (l, m)] = sum over edges j -> i with species(j) = z of a[e, k] Y[e, (l, m)].
++
++``S`` is a small edge sum (K ~ 65 radial features instead of P x C ~ 512 per-edge weights),
++and the projection is one dense GEMM per path. The per-edge ``[E, P*C]`` tensor-product weights
++are never formed. ``gamma_l`` and the output layout are measured from the model's own ``conv_tp``
++(e3nn, cuEquivariance or OpenEquivariance), so path normalisation conventions are not assumed.
++
++The conversion needs no change to the interaction forwards: ``conv_tp_weights`` is replaced by
++the hidden part of the radial net followed by a constant 1 column (the forward's ``* cutoff``
++then yields ``a``), and ``conv_tp`` by the reassociated convolution, marked ``conv_fusion`` so
++the forward calls it with ``edge_index``. The receiver's species come from a forward pre-hook
++that records ``node_attrs``.
++
++Exact up to floating-point rounding (the summation order changes). Inference only.
++"""
++
++from typing import List, Optional, Sequence
++
++import torch
++from e3nn import o3
++
++
++def _radial_layers(net: torch.nn.Module) -> List[torch.nn.Module]:
++    seq = getattr(net, "net", net)  # RadialMLP wraps a Sequential; e3nn FullyConnectedNet is one
++    layers = list(seq.children())
++    if len(layers) < 2:
++        raise ValueError("radial net has fewer than two layers")
++    return layers
++
++
++def _last_layer_affine(last: torch.nn.Module, width: int, like: torch.Tensor):
++    """(W [out, width], b [out]) with last(h) = h @ W.T + b, measured on a unit basis."""
++    with torch.no_grad():
++        eye = torch.eye(width, dtype=like.dtype, device=like.device)
++        zero = torch.zeros((1, width), dtype=like.dtype, device=like.device)
++        bias = last(zero)[0]
++        weight = (last(eye) - bias).t()
++        # check affinity on a random point
++        probe = torch.randn((3, width), dtype=like.dtype, device=like.device)
++        if not torch.allclose(last(probe), probe @ weight.t() + bias, rtol=1e-4, atol=1e-6):
++            raise ValueError("last radial layer is not affine")
++    return weight.contiguous(), bias.contiguous()
++
++
++class _AugmentedHidden(torch.nn.Module):
++    """[h, 1] from the radial net without its last (affine) layer."""
++
++    def __init__(self, hidden: Sequence[torch.nn.Module]):
++        super().__init__()
++        self.hidden = torch.nn.Sequential(*hidden)
++
++    def forward(self, edge_feats: torch.Tensor) -> torch.Tensor:
++        h = self.hidden(edge_feats)
++        return torch.cat([h, torch.ones_like(h[:, :1])], dim=1)
++
++
++def _probe_conv(interaction):
++    """(channels, ls, gammas, ir_mul) of a scalar-input channelwise first convolution."""
++    edge_irreps = o3.Irreps(str(interaction.edge_irreps))
++    attr_irreps = o3.Irreps(str(interaction.edge_attrs_irreps))
++    if len(edge_irreps) != 1 or edge_irreps[0].ir != o3.Irrep("0e"):
++        raise ValueError(f"sender features {edge_irreps} are not one scalar block")
++    if any(mul != 1 for mul, _ in attr_irreps):
++        raise ValueError(f"unexpected edge attributes {attr_irreps}")
++    channels = edge_irreps[0].mul
++    ls = [ir.l for _, ir in attr_irreps]
++    if interaction.conv_tp.weight_numel != channels * len(ls):
++        raise ValueError("first convolution is not channelwise with one weight per path")
++    p = next(interaction.parameters())
++    device, dtype = p.device, p.dtype
++    edge_index = torch.tensor([[1], [0]], device=device)
++    width = sum(channels * (2 * l + 1) for l in ls)
++
++    def convolve(x, y, w):
++        with torch.no_grad():
++            if hasattr(interaction, "conv_fusion"):
++                out = interaction.conv_tp(x, y, w, edge_index)
++            else:
++                out = torch.zeros((2, width), dtype=dtype, device=device)
++                out = out.index_add(0, edge_index[1], interaction.conv_tp(x[edge_index[0]], y, w))
++        return out[0].double().cpu()
++
++    tol = 1e-5 if dtype == torch.float32 else 1e-12
++    ones = convolve(
++        torch.ones((2, channels), dtype=dtype, device=device),
++        torch.ones((1, attr_irreps.dim), dtype=dtype, device=device),
++        torch.ones((1, channels * len(ls)), dtype=dtype, device=device),
++    )
++    gammas, start = [], 0
++    for l in ls:
++        block = ones[start : start + channels * (2 * l + 1)]
++        if not torch.allclose(block, block[0].expand_as(block), rtol=tol, atol=0):
++            raise ValueError("first convolution coefficients differ within a path")
++        gammas.append(float(block[0]))
++        start += block.numel()
++    g = torch.Generator().manual_seed(11)
++    x = torch.rand((2, channels), generator=g, dtype=torch.float64) + 0.5
++    y = torch.rand((1, attr_irreps.dim), generator=g, dtype=torch.float64) + 0.5
++    w = torch.rand((1, channels * len(ls)), generator=g, dtype=torch.float64) + 0.5
++    ref = convolve(x.to(device, dtype), y.to(device, dtype), w.to(device, dtype))
++    for ir_mul in (False, True):
++        blocks, start = [], 0
++        for path, (l, gamma) in enumerate(zip(ls, gammas)):
++            size = 2 * l + 1
++            b = gamma * (x[1] * w[0, path * channels : (path + 1) * channels])[:, None]
++            b = b * y[0, start : start + size]
++            blocks.append((b.t() if ir_mul else b).reshape(-1))
++            start += size
++        if torch.allclose(torch.cat(blocks), ref, rtol=tol, atol=0):
++            return channels, ls, gammas, ir_mul
++    raise ValueError("first convolution does not match the reassociated form in either layout")
++
++
++class ReassociatedFirstConvolution(torch.nn.Module):
++    """Drop-in ``conv_tp`` (fused calling convention) for a reassociated first interaction."""
++
++    def __init__(self, weight, columns, channels, ls, gammas, ir_mul):
++        super().__init__()
++        self.register_buffer("weight", weight)  # [P*C, K+1]: last radial layer with bias column
++        self.register_buffer("columns", columns)  # node_attrs columns of the species summed over
++        self.channels = int(channels)
++        self.ls = [int(l) for l in ls]
++        self.gammas = [float(g) for g in gammas]
++        self.ir_mul = bool(ir_mul)
++        self.weight_numel = weight.shape[1]
++        self.conv_fusion = True
++        self.node_attrs: Optional[torch.Tensor] = None  # set by the interaction's pre-hook
++
++    def forward(self, node_feats, edge_attrs, augmented, edge_index):
++        if self.node_attrs is None:
++            raise RuntimeError("ReassociatedFirstConvolution called without node_attrs")
++        onehot = self.node_attrs[:, self.columns]
++        species = onehot.argmax(dim=1)
++        nodes, slots = onehot.shape
++        c = self.channels
++        # species table x[z, u]: every atom of a species has the same features here
++        x = node_feats.new_zeros((slots, c)).index_reduce_(
++            0, species, node_feats, "amax", include_self=False
++        )
++        width, dim = augmented.shape[1], edge_attrs.shape[1]
++        key = edge_index[1] * slots + species[edge_index[0]]
++        outer = edge_attrs[:, :, None] * augmented[:, None, :]  # [E, D, K]
++        summed = outer.new_zeros((nodes * slots, dim, width)).index_add_(0, key, outer)
++        summed = summed.view(nodes, slots, dim, width)
++        blocks, start = [], 0
++        for path, (l, gamma) in enumerate(zip(self.ls, self.gammas)):
++            size = 2 * l + 1
++            left = summed[:, :, start : start + size].transpose(1, 2).reshape(nodes * size, slots * width)
++            w = self.weight[path * c : (path + 1) * c].t()  # [K+1, C]
++            right = (gamma * x[:, None, :] * w[None]).reshape(slots * width, c)
++            block = (left @ right).view(nodes, size, c)
++            if not self.ir_mul:
++                block = block.transpose(1, 2)
++            blocks.append(block.reshape(nodes, size * c))
++            start += size
++        return torch.cat(blocks, dim=1)
++
++
++def _record_node_attrs(module, args, kwargs):
++    node_attrs = kwargs["node_attrs"] if "node_attrs" in kwargs else args[0]
++    module.conv_tp.node_attrs = node_attrs
++
++
++def reassociate_first_interaction(
++    model: torch.nn.Module, species_columns: Optional[Sequence[int]] = None
++) -> bool:
++    """Convert ``model.interactions[0]`` in place; returns False (unchanged) where it does not apply.
++
++    ``species_columns`` restricts the per-receiver sums to those ``node_attrs`` columns (the
++    elements a simulation can contain). The intermediate is ``[atoms, len(columns), D, K + 1]``,
++    so pass it for foundation models with ~90 elements; the default is every column.
++    """
++    if hasattr(model, "joint_embedding"):
++        return False  # first-layer features also depend on per-structure embeddings
++    interaction = model.interactions[0]
++    if isinstance(interaction.conv_tp, ReassociatedFirstConvolution):
++        return True
++    try:
++        channels, ls, gammas, ir_mul = _probe_conv(interaction)
++        layers = _radial_layers(interaction.conv_tp_weights)
++    except (ValueError, AttributeError):
++        return False
++    hidden, last = layers[:-1], layers[-1]
++    p = next(interaction.parameters())
++    try:
++        in_features = _in_features(layers[0])
++        with torch.no_grad():  # width of the hidden vector: run the hidden layers once
++            h = torch.nn.Sequential(*hidden)(torch.zeros((1, in_features), dtype=p.dtype, device=p.device))
++        weight, bias = _last_layer_affine(last, h.shape[1], p)
++    except ValueError:
++        return False
++    num_species = int(model.atomic_numbers.numel()) if hasattr(model, "atomic_numbers") else None
++    columns = list(range(num_species)) if species_columns is None else [int(c) for c in species_columns]
++    conv = ReassociatedFirstConvolution(
++        torch.cat([weight, bias[:, None]], dim=1).contiguous(),
++        torch.tensor(columns, dtype=torch.long, device=p.device),
++        channels, ls, gammas, ir_mul,
++    )
++    interaction.conv_tp_weights = _AugmentedHidden(hidden)
++    interaction.conv_tp = conv
++    interaction.conv_fusion = True
++    interaction.register_forward_pre_hook(_record_node_attrs, with_kwargs=True)
++    return True
++
++
++def _in_features(layer: torch.nn.Module) -> int:
++    for name in ("in_features", "h_in"):
++        if hasattr(layer, name):
++            return int(getattr(layer, name))
++    raise ValueError(f"cannot read the input width of {type(layer).__name__}")
+diff --git a/tests/unit/test_reassociate.py b/tests/unit/test_reassociate.py
+new file mode 100644
+index 0000000..edfce71
+--- /dev/null
++++ b/tests/unit/test_reassociate.py
+@@ -0,0 +1,69 @@
++import numpy as np
++import pytest
++import torch
++from e3nn import o3
++
++from mace import data, modules, tools
++from mace.modules.reassociate import (
++    ReassociatedFirstConvolution,
++    reassociate_first_interaction,
++)
++from mace.tools import torch_geometric
++
++torch.set_default_dtype(torch.float64)
++
++
++def _model(interaction_cls):
++    torch.manual_seed(3)
++    return modules.MACE(
++        r_max=4.0,
++        num_bessel=8,
++        num_polynomial_cutoff=6,
++        max_ell=3,
++        interaction_cls=interaction_cls,
++        interaction_cls_first=interaction_cls,
++        num_interactions=2,
++        num_elements=3,
++        hidden_irreps=o3.Irreps("16x0e+16x1o"),
++        MLP_irreps=o3.Irreps("8x0e"),
++        gate=torch.nn.functional.silu,
++        atomic_energies=np.zeros(3),
++        avg_num_neighbors=8.0,
++        atomic_numbers=[11, 17, 41],
++        correlation=3,
++        radial_type="bessel",
++    )
++
++
++def _batch(model):
++    from ase.build import bulk
++
++    atoms = bulk("NaCl", "rocksalt", a=5.64).repeat((2, 2, 1))
++    atoms.numbers[3] = 41
++    atoms.rattle(0.05, seed=1)
++    table = tools.AtomicNumberTable([11, 17, 41])
++    config = data.config_from_atoms(atoms)
++    graph = data.AtomicData.from_config(config, z_table=table, cutoff=4.0)
++    batch = next(iter(torch_geometric.dataloader.DataLoader([graph], batch_size=1)))
++    batch.positions.requires_grad_(True)
++    return batch.to_dict()
++
++
++@pytest.mark.parametrize(
++    "interaction_cls",
++    [
++        modules.interaction_classes["RealAgnosticResidualInteractionBlock"],
++        modules.interaction_classes["RealAgnosticDensityResidualInteractionBlock"],
++        modules.interaction_classes["RealAgnosticResidualNonLinearInteractionBlock"],
++    ],
++)
++@pytest.mark.parametrize("columns", [None, [0, 1, 2]])
++def test_reassociated_first_interaction_matches(interaction_cls, columns):
++    model = _model(interaction_cls)
++    batch = _batch(model)
++    expected = model(dict(batch), training=False, compute_force=True)
++    assert reassociate_first_interaction(model, species_columns=columns)
++    assert isinstance(model.interactions[0].conv_tp, ReassociatedFirstConvolution)
++    got = model(dict(batch), training=False, compute_force=True)
++    torch.testing.assert_close(got["energy"], expected["energy"], rtol=1e-10, atol=1e-10)
++    torch.testing.assert_close(got["forces"], expected["forces"], rtol=1e-9, atol=1e-10)
