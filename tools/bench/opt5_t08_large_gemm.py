@@ -215,23 +215,34 @@ extern "C" __global__ void __launch_bounds__(256,2) row128_async(
  row_hybrid<128,true,false,true>(A,B,P,C,M,N,K,NP);
 }
 
-template<int BM,int SW,bool PACKED,bool CROSS,bool ALIGNED=false,bool STAGED=false>
+template<int BM,int SW,bool PACKED,bool CROSS,bool ALIGNED=false,bool STAGED=false,bool SWIZZLE=false,int BKC=16>
 __device__ void column_hybrid(const float* __restrict__ A,const float* __restrict__ B,
                              const uint4* __restrict__ P,float* __restrict__ C,
                              int M,int N,int K,int NP) {
-  constexpr int SN=SW*16, BN=SN+32, BK=16, AM=BM/64, RM=BM/8;
+  constexpr int SN=SW*16, BN=SN+32, BK=BKC, AM=BM/64, RM=BM/8;
+  constexpr int A_PER=AM*(BK/16), B_PER=(BK*BN/4+255)/256;
   constexpr int MT=BM/((8-SW)*16), MC=MT*16, SA=RM*4;
   constexpr int AC=SA>(CROSS ? 2*MC : MC) ? SA : (CROSS ? 2*MC : MC);
   __shared__ __align__(16) float sa[2][BK][BM+4];
   __shared__ __align__(16) float sb[2][BK][SN+4];
   __shared__ __align__(16) float sm[2][PACKED ? 1 : 32][PACKED ? 1 : 20];
   __shared__ __align__(16) uint4 sp[2][STAGED ? 128 : 1];
-  const int t=threadIdx.x,w=t/32,l=t%32,row=blockIdx.x*BM,col=blockIdx.y*BN;
+  const int t=threadIdx.x,w=t/32,l=t%32;
+  int tile_m=blockIdx.x, tile_n=blockIdx.y;
+  if(SWIZZLE) {
+    // Rasterize in groups of 8 M-tiles across all N-tiles so concurrent CTAs share A tiles.
+    const int tiles_m=gridDim.x, tiles_n=gridDim.y, linear=blockIdx.y*gridDim.x+blockIdx.x;
+    const int group_tiles=8*tiles_n, group_id=linear/group_tiles, first_m=group_id*8;
+    const int group_m=(tiles_m-first_m<8 ? tiles_m-first_m : 8), in_group=linear%group_tiles;
+    tile_m=first_m + in_group%group_m;
+    tile_n=in_group/group_m;
+  }
+  const int row=tile_m*BM, col=tile_n*BN;
   const int ar=t/4,ak=(t%4)*4,sr=t/(SN/4),sc=(t%(SN/4))*4;
   float acc[AC];
   #pragma unroll
   for(int i=0;i<AC;++i) acc[i]=0;
-  auto load=[&](int kk,float4 (&a)[AM],float4 (&b)[2],uint4& p) {
+  auto load=[&](int kk,float4 (&a)[A_PER],float4 (&b)[B_PER],uint4& p) {
     if(STAGED && t<128) {
       const int c=col+SN+t/4;
       p=make_uint4(0,0,0,0);
@@ -239,17 +250,20 @@ __device__ void column_hybrid(const float* __restrict__ A,const float* __restric
     }
     #pragma unroll
     for(int i=0;i<AM;++i) {
-      const int r=row+ar+i*64,k=kk+ak;
-      float4 v=make_float4(0,0,0,0);
-      if(r<M && (ALIGNED || (k+3<K && K%4==0))) v=*reinterpret_cast<const float4*>(A+r*K+k);
-      else if(r<M) {
-        if(k<K) v.x=A[r*K+k]; if(k+1<K) v.y=A[r*K+k+1];
-        if(k+2<K) v.z=A[r*K+k+2]; if(k+3<K) v.w=A[r*K+k+3];
+      #pragma unroll
+      for(int j=0;j<BK/16;++j) {
+        const int r=row+ar+i*64,k=kk+ak+j*16;
+        float4 v=make_float4(0,0,0,0);
+        if(r<M && k+3<K && (ALIGNED || K%4==0)) v=*reinterpret_cast<const float4*>(A+r*K+k);
+        else if(r<M) {
+          if(k<K) v.x=A[r*K+k]; if(k+1<K) v.y=A[r*K+k+1];
+          if(k+2<K) v.z=A[r*K+k+2]; if(k+3<K) v.w=A[r*K+k+3];
+        }
+        a[i*(BK/16)+j]=v;
       }
-      a[i]=v;
     }
     #pragma unroll
-    for(int i=0;i<2;++i) {
+    for(int i=0;i<B_PER;++i) {
       const int idx=t+i*256,k=kk+idx/(BN/4),c=(idx%(BN/4))*4,n=col+c;
       float4 v=make_float4(0,0,0,0);
       if((ALIGNED || idx<BK*BN/4) && (!PACKED || c<SN)) {
@@ -262,15 +276,19 @@ __device__ void column_hybrid(const float* __restrict__ A,const float* __restric
       b[i]=v;
     }
   };
-  auto store=[&](int s,const float4 (&a)[AM],const float4 (&b)[2],const uint4& p) {
+  auto store=[&](int s,const float4 (&a)[A_PER],const float4 (&b)[B_PER],const uint4& p) {
     if(STAGED && t<128) sp[s][t]=p;
     #pragma unroll
     for(int i=0;i<AM;++i) {
-      sa[s][ak][ar+i*64]=a[i].x; sa[s][ak+1][ar+i*64]=a[i].y;
-      sa[s][ak+2][ar+i*64]=a[i].z; sa[s][ak+3][ar+i*64]=a[i].w;
+      #pragma unroll
+      for(int j=0;j<BK/16;++j) {
+        const int kk16=ak+j*16;
+        sa[s][kk16][ar+i*64]=a[i*(BK/16)+j].x; sa[s][kk16+1][ar+i*64]=a[i*(BK/16)+j].y;
+        sa[s][kk16+2][ar+i*64]=a[i*(BK/16)+j].z; sa[s][kk16+3][ar+i*64]=a[i*(BK/16)+j].w;
+      }
     }
     #pragma unroll
-    for(int i=0;i<2;++i) {
+    for(int i=0;i<B_PER;++i) {
       const int idx=t+i*256,k=idx/(BN/4),c=(idx%(BN/4))*4;
       if(ALIGNED || idx<BK*BN/4) {
         if(c<SN) *reinterpret_cast<float4*>(&sb[s][k][c])=b[i];
@@ -281,7 +299,7 @@ __device__ void column_hybrid(const float* __restrict__ A,const float* __restric
       }
     }
   };
-  float4 pa[AM],pb[2];
+  float4 pa[A_PER],pb[B_PER];
   uint4 pp=make_uint4(0,0,0,0);
   load(0,pa,pb,pp); store(0,pa,pb,pp); __syncthreads();
   int s=0;
@@ -304,41 +322,43 @@ __device__ void column_hybrid(const float* __restrict__ A,const float* __restric
         }
       }
     } else {
-      const int k=(l%4)*2;
-      unsigned ah[MT][4],al[MT][4];
-      #pragma unroll
-      for(int m=0;m<MT;++m) {
-        const int r=(w-SW)*MT*16+m*16+l/4;
-        split_f16x2(sa[s][k][r],sa[s][k+1][r],ah[m][0],al[m][0]);
-        split_f16x2(sa[s][k][r+8],sa[s][k+1][r+8],ah[m][1],al[m][1]);
-        split_f16x2(sa[s][k+8][r],sa[s][k+9][r],ah[m][2],al[m][2]);
-        split_f16x2(sa[s][k+8][r+8],sa[s][k+9][r+8],ah[m][3],al[m][3]);
-      }
-      #pragma unroll
-      for(int n=0;n<4;++n) {
-        unsigned bh[2],bl[2];
-        if(PACKED) {
-          const int c=col+SN+n*8+l/4;
-          uint4 v=make_uint4(0,0,0,0);
-          if(STAGED) v=sp[s][n*32+l];
-          else if(c<NP) v=P[(kk/16*NP+c)*4+l%4];
-          bh[0]=v.x; bh[1]=v.y; bl[0]=v.z; bl[1]=v.w;
-        } else {
-          const float2 lo=*reinterpret_cast<const float2*>(&sm[s][n*8+l/4][k]);
-          const float2 hi=*reinterpret_cast<const float2*>(&sm[s][n*8+l/4][k+8]);
-          split_f16x2(lo.x,lo.y,bh[0],bl[0]); split_f16x2(hi.x,hi.y,bh[1],bl[1]);
-        }
+      for(int sub=0;sub<BK;sub+=16) {
+        const int k=(l%4)*2+sub, k16=(l%4)*2;
+        unsigned ah[MT][4],al[MT][4];
         #pragma unroll
         for(int m=0;m<MT;++m) {
-          float* out=&acc[(m*4+n)*4];
-          mma_fp16(out,ah[m],bh);
-          if(CROSS) {
-            mma_fp16(out+MC,ah[m],bl); mma_fp16(out+MC,al[m],bh);
+          const int r=(w-SW)*MT*16+m*16+l/4;
+          split_f16x2(sa[s][k][r],sa[s][k+1][r],ah[m][0],al[m][0]);
+          split_f16x2(sa[s][k][r+8],sa[s][k+1][r+8],ah[m][1],al[m][1]);
+          split_f16x2(sa[s][k+8][r],sa[s][k+9][r],ah[m][2],al[m][2]);
+          split_f16x2(sa[s][k+8][r+8],sa[s][k+9][r+8],ah[m][3],al[m][3]);
+        }
+        #pragma unroll
+        for(int n=0;n<4;++n) {
+          unsigned bh[2],bl[2];
+          if(PACKED) {
+            const int c=col+SN+n*8+l/4;
+            uint4 v=make_uint4(0,0,0,0);
+            if(STAGED) v=sp[s][n*32+l];
+            else if(c<NP) v=P[((kk+sub)/16*NP+c)*4+l%4];
+            bh[0]=v.x; bh[1]=v.y; bl[0]=v.z; bl[1]=v.w;
           } else {
-            float tmp[4]={0,0,0,0};
-            mma_fp16(tmp,ah[m],bl); mma_fp16(tmp,al[m],bh);
-            #pragma unroll
-            for(int q=0;q<4;++q) out[q]=fmaf(tmp[q],1.0f/2048,out[q]);
+            const float2 lo=*reinterpret_cast<const float2*>(&sm[s][n*8+l/4][k16]);
+            const float2 hi=*reinterpret_cast<const float2*>(&sm[s][n*8+l/4][k16+8]);
+            split_f16x2(lo.x,lo.y,bh[0],bl[0]); split_f16x2(hi.x,hi.y,bh[1],bl[1]);
+          }
+          #pragma unroll
+          for(int m=0;m<MT;++m) {
+            float* out=&acc[(m*4+n)*4];
+            mma_fp16(out,ah[m],bh);
+            if(CROSS) {
+              mma_fp16(out+MC,ah[m],bl); mma_fp16(out+MC,al[m],bh);
+            } else {
+              float tmp[4]={0,0,0,0};
+              mma_fp16(tmp,ah[m],bl); mma_fp16(tmp,al[m],bh);
+              #pragma unroll
+              for(int q=0;q<4;++q) out[q]=fmaf(tmp[q],1.0f/2048,out[q]);
+            }
           }
         }
       }
@@ -380,10 +400,11 @@ __device__ __forceinline__ void sync_mma_64() {
 // Design-1 falsification variant: SIMT and MMA roles have disjoint A staging
 // (A is loaded twice) and synchronize only within their own warp group.
 // SIMT still uses FP32 B staging; MMA reads pre-packed B directly from global.
+template<int BKC>
 __device__ void column_hybrid_decoupled(const float* __restrict__ A,const float* __restrict__ B,
                                         const uint4* __restrict__ P,float* __restrict__ C,
                                         int M,int N,int K,int NP) {
-  constexpr int BM=64, BK=16, SN=96, BN=128;
+  constexpr int BM=64, BK=BKC, SN=96, BN=128;
   __shared__ __align__(16) float sa_s[2][BK][BM+4];
   __shared__ __align__(16) float sb_s[2][BK][SN+4];
   __shared__ __align__(16) float sa_m[2][BK][BM+4];
@@ -393,36 +414,37 @@ __device__ void column_hybrid_decoupled(const float* __restrict__ A,const float*
   for(int i=0;i<32;++i) acc[i]=0;
   if(w<6) {
     const int ts=t, sr=ts/(SN/4), sc=(ts%(SN/4))*4;
-    auto load_s=[&](int kk,float4 (&a)[2],float4 (&b)[2]) {
+    constexpr int SA_ITERS=(BM*BK/4+191)/192, SB_ITERS=(BK*SN/4+191)/192;
+    auto load_s=[&](int kk,float4 (&a)[SA_ITERS],float4 (&b)[SB_ITERS]) {
       #pragma unroll
-      for(int i=0;i<2;++i) {
-        const int q=ts+i*192, r=q/4, k=(q%4)*4;
+      for(int i=0;i<SA_ITERS;++i) {
+        const int q=ts+i*192, r=q/(BK/4), k=(q%(BK/4))*4;
         a[i]=make_float4(0,0,0,0);
-        if(q<256 && row+r<M) a[i]=*reinterpret_cast<const float4*>(&A[(row+r)*K+kk+k]);
+        if(q<BM*BK/4 && row+r<M) a[i]=*reinterpret_cast<const float4*>(&A[(row+r)*K+kk+k]);
       }
       #pragma unroll
-      for(int i=0;i<2;++i) {
+      for(int i=0;i<SB_ITERS;++i) {
         const int q=ts+i*192, k=q/(SN/4), c=(q%(SN/4))*4;
         b[i]=make_float4(0,0,0,0);
-        if(kk+k<K && col+c+3<N) b[i]=*reinterpret_cast<const float4*>(&B[(kk+k)*N+col+c]);
+        if(q<BK*SN/4 && kk+k<K && col+c+3<N) b[i]=*reinterpret_cast<const float4*>(&B[(kk+k)*N+col+c]);
       }
     };
-    auto store_s=[&](int s,const float4 (&a)[2],const float4 (&b)[2]) {
+    auto store_s=[&](int s,const float4 (&a)[SA_ITERS],const float4 (&b)[SB_ITERS]) {
       #pragma unroll
-      for(int i=0;i<2;++i) {
-        const int q=ts+i*192, r=q/4, k=(q%4)*4;
-        if(q<256) {
+      for(int i=0;i<SA_ITERS;++i) {
+        const int q=ts+i*192, r=q/(BK/4), k=(q%(BK/4))*4;
+        if(q<BM*BK/4) {
           sa_s[s][k][r]=a[i].x; sa_s[s][k+1][r]=a[i].y;
           sa_s[s][k+2][r]=a[i].z; sa_s[s][k+3][r]=a[i].w;
         }
       }
       #pragma unroll
-      for(int i=0;i<2;++i) {
+      for(int i=0;i<SB_ITERS;++i) {
         const int q=ts+i*192, k=q/(SN/4), c=(q%(SN/4))*4;
-        *reinterpret_cast<float4*>(&sb_s[s][k][c])=b[i];
+        if(q<BK*SN/4) *reinterpret_cast<float4*>(&sb_s[s][k][c])=b[i];
       }
     };
-    float4 pa[2],pb[2];
+    float4 pa[SA_ITERS],pb[SB_ITERS];
     load_s(0,pa,pb); store_s(0,pa,pb); sync_simt_192();
     int s=0;
     for(int kk=0;kk<K;kk+=BK) {
@@ -454,52 +476,55 @@ __device__ void column_hybrid_decoupled(const float* __restrict__ A,const float*
     }
   } else {
     const int tm=t-192;
-    auto load_m=[&](int kk,float4 (&a)[4]) {
+    constexpr int MA_ITERS=(BM*BK/4)/64;
+    auto load_m=[&](int kk,float4 (&a)[MA_ITERS]) {
       #pragma unroll
-      for(int i=0;i<4;++i) {
-        const int q=tm+i*64, r=q/4, k=(q%4)*4;
+      for(int i=0;i<MA_ITERS;++i) {
+        const int q=tm+i*64, r=q/(BK/4), k=(q%(BK/4))*4;
         a[i]=make_float4(0,0,0,0);
         if(row+r<M) a[i]=*reinterpret_cast<const float4*>(&A[(row+r)*K+kk+k]);
       }
     };
-    auto store_m=[&](int s,const float4 (&a)[4]) {
+    auto store_m=[&](int s,const float4 (&a)[MA_ITERS]) {
       #pragma unroll
-      for(int i=0;i<4;++i) {
-        const int q=tm+i*64, r=q/4, k=(q%4)*4;
+      for(int i=0;i<MA_ITERS;++i) {
+        const int q=tm+i*64, r=q/(BK/4), k=(q%(BK/4))*4;
         sa_m[s][k][r]=a[i].x; sa_m[s][k+1][r]=a[i].y;
         sa_m[s][k+2][r]=a[i].z; sa_m[s][k+3][r]=a[i].w;
       }
     };
-    float4 pa[4];
+    float4 pa[MA_ITERS];
     load_m(0,pa); store_m(0,pa); sync_mma_64();
     int s=0;
     for(int kk=0;kk<K;kk+=BK) {
       if(kk+BK<K) load_m(kk+BK,pa);
-      const int k=(l%4)*2;
-      unsigned ah[2][4],al[2][4];
-      #pragma unroll
-      for(int m=0;m<2;++m) {
-        const int r=(w-6)*32+m*16+l/4;
-        split_f16x2(sa_m[s][k][r],sa_m[s][k+1][r],ah[m][0],al[m][0]);
-        split_f16x2(sa_m[s][k][r+8],sa_m[s][k+1][r+8],ah[m][1],al[m][1]);
-        split_f16x2(sa_m[s][k+8][r],sa_m[s][k+9][r],ah[m][2],al[m][2]);
-        split_f16x2(sa_m[s][k+8][r+8],sa_m[s][k+9][r+8],ah[m][3],al[m][3]);
-      }
-      #pragma unroll
-      for(int n=0;n<4;++n) {
-        unsigned bh[2],bl[2];
-        const int c=col+SN+n*8+l/4;
-        uint4 v=make_uint4(0,0,0,0);
-        if(c<NP) v=P[(kk/16*NP+c)*4+l%4];
-        bh[0]=v.x; bh[1]=v.y; bl[0]=v.z; bl[1]=v.w;
+      for(int sub=0;sub<BK;sub+=16) {
+        const int k=(l%4)*2+sub;
+        unsigned ah[2][4],al[2][4];
         #pragma unroll
         for(int m=0;m<2;++m) {
-          float* out=&acc[(m*4+n)*4];
-          float tmp[4]={0,0,0,0};
-          mma_fp16(out,ah[m],bh);
-          mma_fp16(tmp,ah[m],bl); mma_fp16(tmp,al[m],bh);
+          const int r=(w-6)*32+m*16+l/4;
+          split_f16x2(sa_m[s][k][r],sa_m[s][k+1][r],ah[m][0],al[m][0]);
+          split_f16x2(sa_m[s][k][r+8],sa_m[s][k+1][r+8],ah[m][1],al[m][1]);
+          split_f16x2(sa_m[s][k+8][r],sa_m[s][k+9][r],ah[m][2],al[m][2]);
+          split_f16x2(sa_m[s][k+8][r+8],sa_m[s][k+9][r+8],ah[m][3],al[m][3]);
+        }
+        #pragma unroll
+        for(int n=0;n<4;++n) {
+          unsigned bh[2],bl[2];
+          const int c=col+SN+n*8+l/4;
+          uint4 v=make_uint4(0,0,0,0);
+          if(c<NP) v=P[((kk+sub)/16*NP+c)*4+l%4];
+          bh[0]=v.x; bh[1]=v.y; bl[0]=v.z; bl[1]=v.w;
           #pragma unroll
-          for(int q=0;q<4;++q) out[q]=fmaf(tmp[q],1.0f/2048,out[q]);
+          for(int m=0;m<2;++m) {
+            float* out=&acc[(m*4+n)*4];
+            float tmp[4]={0,0,0,0};
+            mma_fp16(out,ah[m],bh);
+            mma_fp16(tmp,ah[m],bl); mma_fp16(tmp,al[m],bh);
+            #pragma unroll
+            for(int q=0;q<4;++q) out[q]=fmaf(tmp[q],1.0f/2048,out[q]);
+          }
         }
       }
       if(kk+BK<K) { store_m(s^1,pa); s^=1; sync_mma_64(); }
@@ -519,7 +544,7 @@ __device__ void column_hybrid_decoupled(const float* __restrict__ A,const float*
 }
 extern "C" __global__ void __launch_bounds__(256,2) col64_aligned_decoupled(
  const float* A,const float* B,const uint4* P,float* C,int M,int N,int K,int NP) {
- column_hybrid_decoupled(A,B,P,C,M,N,K,NP); }
+ column_hybrid_decoupled<16>(A,B,P,C,M,N,K,NP); }
 #define COL(NAME,BM,SW,PACK,CROSS,RES) \
 extern "C" __global__ void __launch_bounds__(256,RES) NAME( \
  const float* A,const float* B,const uint4* P,float* C,int M,int N,int K,int NP) { \
@@ -539,6 +564,12 @@ ALIGNED_COL(col128_aligned_inline,128,false,2)
 ALIGNED_COL(col128_aligned_packed,128,true,2)
 ALIGNED_COL(col64_aligned_inline,64,false,2)
 ALIGNED_COL(col64_aligned_packed,64,true,2)
+extern "C" __global__ void __launch_bounds__(256,2) col64_aligned_bk32(
+ const float* A,const float* B,const uint4* P,float* C,int M,int N,int K,int NP) {
+ column_hybrid<64,6,true,false,true,false,false,32>(A,B,P,C,M,N,K,NP); }
+extern "C" __global__ void __launch_bounds__(256,2) col64_aligned_swizzled(
+ const float* A,const float* B,const uint4* P,float* C,int M,int N,int K,int NP) {
+ column_hybrid<64,6,true,false,true,false,true>(A,B,P,C,M,N,K,NP); }
 #define STAGED_COL(NAME,BM) \
 extern "C" __global__ void __launch_bounds__(256,2) NAME( \
  const float* A,const float* B,const uint4* P,float* C,int M,int N,int K,int NP) { \
@@ -583,6 +614,8 @@ def compile_kernels():
     specs += [(f"col{bm}_aligned_{kind}", bm, 128) for bm in (64, 128) for kind in ("inline", "packed")]
     specs += [(f"col{bm}_aligned_staged", bm, 128) for bm in (64, 128)]
     specs.append(("col64_aligned_decoupled", 64, 128))
+    specs.append(("col64_aligned_swizzled", 64, 128))
+    specs.append(("col64_aligned_bk32", 64, 128))
     for name, bm, bn in specs:
         fn = checked(driver.cuModuleGetFunction(module, name.encode()))
         props = {key: int(checked(driver.cuFuncGetAttribute(getattr(attr, code), fn))) for key, code in (

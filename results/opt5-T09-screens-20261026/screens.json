@@ -1,0 +1,215 @@
+{
+  "metadata": {
+    "utc": "2026-10-26T15:55:28.549374+00:00",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "capability": [
+      12,
+      0
+    ],
+    "torch": "2.14.1+cu130",
+    "triton": "3.8.0",
+    "shape_mkn": [
+      13608,
+      512,
+      512
+    ],
+    "commit": "2b14f69c9ae3905b2fc80ef0b0e77ffb01b46172",
+    "precision": "FP32 IEEE for cuBLAS; normalized FP16x3 for Triton tensor paths"
+  },
+  "two_kernel_split": {
+    "full_cublas_us": 500.98,
+    "splits": [
+      {
+        "simt_cols": 256,
+        "mma_cols": 256,
+        "simt_alone_us": 287.46,
+        "mma_alone_us": 436.86,
+        "sequential_us": 1030.37,
+        "concurrent_us": 938.74,
+        "errors": {
+          "max_rel": 8.588374142612711e-07,
+          "frob_rel": 2.9994532180925094e-07,
+          "cancel_scaled": 3.3408232184451624e-07
+        }
+      },
+      {
+        "simt_cols": 384,
+        "mma_cols": 128,
+        "simt_alone_us": 411.09,
+        "mma_alone_us": 216.4,
+        "sequential_us": 731.23,
+        "concurrent_us": 734.05,
+        "errors": {
+          "max_rel": 9.371920963762643e-07,
+          "frob_rel": 3.563809986549513e-07,
+          "cancel_scaled": 3.795572877700504e-07
+        }
+      },
+      {
+        "simt_cols": 448,
+        "mma_cols": 64,
+        "simt_alone_us": 504.0,
+        "mma_alone_us": 107.81,
+        "sequential_us": 745.33,
+        "concurrent_us": 741.21,
+        "errors": {
+          "max_rel": 9.371920963762643e-07,
+          "frob_rel": 3.8136181646150526e-07,
+          "cancel_scaled": 3.795572877700504e-07
+        }
+      }
+    ]
+  },
+  "fp32_baseline": {
+    "torch_mm_us": 500.98,
+    "torch_mm_bt_view_us": 697.74,
+    "torch_mm_cublaslt_us": 501.9
+  },
+  "tensor_only": [
+    {
+      "kind": "rowcol_on_the_fly",
+      "cfg_bm_bn_bk_warps_stages": [
+        64,
+        64,
+        32,
+        4,
+        3
+      ],
+      "us": 853.74,
+      "errors": {
+        "max_rel": 2.362453668519032e-07,
+        "frob_rel": 1.2768672699144726e-07,
+        "cancel_scaled": 8.540983972084888e-08
+      }
+    },
+    {
+      "kind": "rowcol_on_the_fly",
+      "cfg_bm_bn_bk_warps_stages": [
+        128,
+        64,
+        32,
+        4,
+        3
+      ],
+      "us": 960.58,
+      "errors": {
+        "max_rel": 2.362453668519032e-07,
+        "frob_rel": 1.2768672699144726e-07,
+        "cancel_scaled": 8.540983972084888e-08
+      }
+    },
+    {
+      "kind": "rowcol_on_the_fly",
+      "cfg_bm_bn_bk_warps_stages": [
+        64,
+        128,
+        32,
+        4,
+        3
+      ],
+      "us": 795.86,
+      "errors": {
+        "max_rel": 2.362453668519032e-07,
+        "frob_rel": 1.2768672699144726e-07,
+        "cancel_scaled": 8.540983972084888e-08
+      }
+    },
+    {
+      "kind": "rowcol_on_the_fly",
+      "cfg_bm_bn_bk_warps_stages": [
+        128,
+        128,
+        32,
+        8,
+        3
+      ],
+      "us": 972.02,
+      "errors": {
+        "max_rel": 2.362453668519032e-07,
+        "frob_rel": 1.2768672699144726e-07,
+        "cancel_scaled": 8.540983972084888e-08
+      }
+    },
+    {
+      "kind": "rowcol_on_the_fly",
+      "cfg_bm_bn_bk_warps_stages": [
+        128,
+        64,
+        64,
+        4,
+        2
+      ],
+      "us": 1328.54,
+      "errors": {
+        "max_rel": 2.101596756112366e-07,
+        "frob_rel": 1.4391213756672247e-07,
+        "cancel_scaled": 7.68216524553689e-08
+      }
+    },
+    {
+      "kind": "rowcol_on_the_fly",
+      "cfg_bm_bn_bk_warps_stages": [
+        256,
+        128,
+        32,
+        8,
+        3
+      ],
+      "error": "OutOfResources: out of resource: shared memory, Required: 147456, Hardware limit: 101376. Reducing block sizes or `num_stages` may help."
+    }
+  ],
+  "producer_and_epilogue": {
+    "a_presplit_recurring_us": 1231.23,
+    "presplit_configs": [
+      {
+        "cfg_bm_bn_bk_warps_stages": [
+          64,
+          64,
+          32,
+          4,
+          3
+        ],
+        "kernel_us": 505.92,
+        "errors": {
+          "max_rel": 1.0915252079330476e-06,
+          "frob_rel": 6.529317268856982e-07,
+          "cancel_scaled": 4.2910805834619534e-07
+        }
+      },
+      {
+        "cfg_bm_bn_bk_warps_stages": [
+          128,
+          128,
+          32,
+          8,
+          3
+        ],
+        "kernel_us": 548.96,
+        "errors": {
+          "max_rel": 1.0915252079330476e-06,
+          "frob_rel": 6.529317268856982e-07,
+          "cancel_scaled": 4.2910805834619534e-07
+        }
+      },
+      {
+        "cfg_bm_bn_bk_warps_stages": [
+          128,
+          128,
+          64,
+          8,
+          2
+        ],
+        "kernel_us": 739.49,
+        "errors": {
+          "max_rel": 1.040277705445082e-06,
+          "frob_rel": 6.508782349451035e-07,
+          "cancel_scaled": 3.8985533860317936e-07
+        }
+      }
+    ],
+    "best_presplit_kernel_plus_a_prep_us": 1737.15,
+    "representative_epilogue": "bias + sigmoid(gate) + residual",
+    "gemm_plus_separate_epilogue_us": 1669.03,
+    "gemm_with_fused_epilogue_us": 865.96
+  }
+}

@@ -343,6 +343,52 @@ gap is principally lost SIMT efficiency, instruction/LSU work and the power ceil
 CUTLASS SM120 warp specialization, `setmaxnreg`, TMA pipelines and green contexts were not tested here and
 remain hypotheses, not evidence for this kernel.
 
+### 3.6 Five further improvement screens: all negative or neutral (26 October 2026)
+
+Tools: `tools/bench/opt5_t09_screens.py`, plus `col64_aligned_bk32` and `col64_aligned_swizzled` in
+`tools/bench/opt5_t08_large_gemm.py`. Records: `results/opt5-T09-screens-20261026/{screens,bk32-swizzle}.json`.
+Primary shape `[13608, 512, 512]`; Gaussian operands; medians in µs.
+
+**1. Two-kernel concurrent column split — rejected.** cuBLAS FP32 computes the first columns while the
+Triton row/column-normalized `FP16×3` kernel computes the rest, launched on separate streams.
+Full cuBLAS: 501.0. Best split (384 FP32 + 128 MMA columns): FP32 part alone 411.1, MMA part alone 216.4,
+sequential 731.2, concurrent 734.1. Concurrency recovers nothing: the MMA slice is slower per column than
+FP32 (216 µs for 128 columns), so co-scheduling two slower-per-FLOP parts cannot beat one cuBLAS call.
+
+**2. BK=32 staging and block swizzling — no general gain.** `col64_aligned_bk32` (coupled kernel, one
+`A` copy, 43,008 shared bytes, 128 registers, 8 local bytes, two blocks/SM) versus the BK=16 packed kernel
+in the same run: 619.7 vs 610.4 µs at 13,608 rows; 269.9 vs 266.9 at 5,832; 71.6 vs 68.1 at 1,512.
+Halving the staging/barrier frequency does not pay. The A-sharing swizzled rasterization is faster at
+5,832 rows (252.8 vs 266.9) but slower at 1,512 (78.0 vs 68.1) and unchanged at 13,608 (608.0 vs 610.4):
+within noise, no general rule. Both remain far behind cuBLAS (521.8 in that run).
+
+**3. FP32 baseline options — cuBLAS stands.** `torch.mm` 501.0; cuBLASLt via
+`torch.backends.cuda.preferred_blas_library("cublaslt")` 501.9 (493.9 in a first run: noise, no gain);
+transposed-B view 697.7 (much slower). CUTLASS was checked, not benchmarked: no CUTLASS Python package is
+installed in the GPU environment; `nvidia-cutlass-dsl` 4.8.1 installs into a temporary target but ships
+only SM100 GEMM helpers, and adapting NVIDIA's repo SM120 examples to a normalized three-product kernel
+is a separate project, not a screen. No FP32 alternative beat the default.
+
+**4. Tensor-only `FP16×3` configuration sweep — still slow.** Six Triton row/column-normalized
+configurations: best `(BLOCK_M, BLOCK_N, BLOCK_K, warps, stages) = (64, 128, 32, 4, 3)` at 795.9 µs,
+with good Gaussian accuracy (`cancel_scaled 8.5e-8`). Larger tiles are slower or exceed shared memory.
+On-the-fly normalization costs more than the Tensor cores return in Triton on `sm_120`.
+
+**5. Producer-side A splitting and epilogue fusion — conditional, not demonstrated.** A Triton kernel
+consuming pre-split FP16 high/low operands with global row/column power-of-two scales runs in 505.9 µs,
+essentially tying cuBLAS (501.0), with Gaussian `max_rel 1.09e-6`, `cancel_scaled 4.29e-7`. But producing
+the A split with unfused PyTorch operations costs 1,231 µs per call, for 1,737 µs total. Producer-side
+splitting therefore only helps if the producing layer emits high/low operands at near-zero marginal
+cost, which no current MACE producer does; that is an end-to-end rewrite, not a GEMM screen result.
+Fusing a representative bias + sigmoid-gate + residual epilogue into that kernel (866 µs) beats a naive
+separate PyTorch chain (1,669 µs, inflated by intermediate allocations), but remains 360 µs above the
+plain GEMM in this implementation: directional evidence only.
+
+**Overall verdict:** none of the five directions produces a faster FP32-accurate GEMM on `sm_120`.
+The pre-split tensor kernel tying cuBLAS *before* its recurring A-preparation cost is the closest result;
+it confirms the recurring operand preparation, not arithmetic throughput, is the remaining barrier.
+Production remains cuBLAS IEEE FP32 on this GPU.
+
 The separate **row/column-normalized standalone `3×FP16` path** remains a candidate for `sm_80`/`sm_89`,
 not an adopted backend. Its previously recorded local evidence does not qualify another GPU, a complete
 force/stress gate or MD. Workstation validation and NAS synchronization wait for the owner's explicit permission.

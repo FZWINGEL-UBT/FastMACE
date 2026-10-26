@@ -174,6 +174,16 @@ activity falls. Boundary/replay checks pass; real-operand accuracy is unchanged 
 Design 1 is therefore rejected. Separate concurrent kernels and `mbarrier` rings remain untested, with
 lower expected value after this result.
 
+### 3.7 Five further improvement screens (`OPT5-T09`)
+
+Recorded in [the design report, §3.6](../design/2026-10-26-fp16x3-and-hybrid-gemm.md#36-five-further-improvement-screens-all-negative-or-neutral-26-october-2026)
+and `results/opt5-T09-screens-20261026/`. At `[13608, 512, 512]`: the two-kernel concurrent FP32/MMA
+split is far slower than cuBLAS (734 vs 501 µs) because the MMA slice is slower per column than FP32;
+BK=32 staging and block swizzling give no general gain; cuBLASLt and transposed layouts do not beat
+`torch.mm`; the best tuned tensor-only Triton `FP16×3` takes 796 µs; and a pre-split-operand tensor
+kernel ties cuBLAS (506 vs 501 µs) only before its 1,231 µs recurring A-preparation cost. CUTLASS was
+availability-checked (DSL wheel ships SM100 helpers only) but not benchmarked. No direction is adopted.
+
 ## 4. Records and files
 
 - Probe and Wave-1 microbenchmarks:
@@ -193,3 +203,5 @@ lower expected value after this result.
     sustained clock/power runs and tensor-core energy controls).
   - `results/opt5-T08-large-20261026/{screen7-decoupled,validation-decoupled}.json`,
     `results/opt5-T08-profile-20261026/ncu_decoupled_raw.csv` (subgroup-barrier decoupling experiment).
+  - `tools/bench/opt5_t09_screens.py`, `results/opt5-T09-screens-20261026/` (concurrent split, FP32
+    baseline options, tensor-only sweep, producer-side split and epilogue screens).

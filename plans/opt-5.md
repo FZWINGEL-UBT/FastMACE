@@ -102,6 +102,8 @@ three one-pass cuBLAS FP16 GEMMs already equal the FP32 time before overhead. Se
 Subgroup-barrier follow-up: independent SIMT/MMA pipelines with named PTX barriers and disjoint A staging
 were implemented and rejected; barrier stalls fell 35 % but every shape was slower (duplicate staging and
 LSU/instruction work dominate). Separate kernels and `mbarrier` rings remain untested hypotheses.
+OPT5-T09 follow-up: all five further screens (concurrent two-kernel split, BK=32, swizzling, cuBLASLt/layout,
+tensor-only sweep, pre-split operands/epilogue) were negative or neutral on `sm_120`; see design report §3.6.
 
 ```text
 Wave 1 (falsifiers first, no library edits):
