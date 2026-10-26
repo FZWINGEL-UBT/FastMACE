@@ -101,6 +101,15 @@ TF32 tensor-core rate is several times its FP32 rate, re-run the probe (about 10
   at `4×4` (`45.2 → 61.3` FLOP/cycle/SM, `mma_share` `0.56 → 0.76`) and **+21.3 %** at `2×6` (`60.1 → 72.9`,
   `mma_share` `0.73 → 0.89`). On `sm_120`, where TF32 MMA rate equals FP32 FFMA rate, the SIMT producer cost still
   makes net `gain = 0.85 < 1.0`. Dense single-SM GEMM co-execution on `sm_120` remains closed.
+- **Exponent-shifted `3×FP16` (`OPT5-T06`, [2026-10-26-fp16x3-and-hybrid-gemm.md](2026-10-26-fp16x3-and-hybrid-gemm.md)):**
+  using the `512` FLOP/cycle/SM FP16 Tensor Core pipeline with a $2^{11}$ remainder shift (`big = fp16(x)`,
+  `small = fp16((x - fp32(big)) * 2048.0)`, requiring only `c = 3` MMAs instead of `BF16×6`'s `c = 6`) **passes
+  the single-SM co-execution gate on `sm_120` for the first time**: `x3 inter fp16 4×4` (with in-kernel split)
+  reaches **`keep = 0.92`, `gain = 1.22×`** (`157.7` SIMT + `82.8` useful `3×FP16` = `240.5` vs `196.8`
+  FLOP/cycle/SM; `gemm` upper bound `1.28×`). Standalone `3×FP16` (`triton_fp16x3_kernel`) is also **1.78–1.88×
+  faster than `3×TF32`**, making it a direct standalone candidate for `sm_89` (RTX 4000 Ada workstations / L4,
+  where `3×FP16` ceiling is `1.33–1.58×` FP32 SIMT) and `sm_80` (A100, `5.33×` FP32 SIMT) even if the fused
+  single-kernel `SIMT + 3×FP16` GEMM (`OPT5-T08`) does not beat `cuBLAS IEEE` on `sm_120`.
 
 ## What would come after a pass (stages 2–4 of the proposal)
 

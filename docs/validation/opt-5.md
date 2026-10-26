@@ -108,8 +108,17 @@ With tile-level IEEE exponent bit-masking (`tl.max(tl.abs(a).to(tl.int32, bitcas
   - Max force component difference vs default FP32: **`4.14×10⁻⁷ eV/Å`** (vs `tf32x3`'s `3.73×10⁻⁷ eV/Å`, 9×
     below the float32 calculator's `3.8×10⁻⁶ eV/Å` error);
   - Median cancellation-scaled error ratio vs cuBLAS IEEE: **`0.594×`** (more accurate than IEEE on 45 of 52
-    products; 1 product with mixed active/inactive species rows $1.0$ vs $10^{-25}$ inside one `64×32` tile
-    underflows tile-wide FP16 scaling on the $10^{-25}$ row without affecting energy or forces).
+    products).
+  - With **per-row ($A$) and per-column ($B$) exponent normalization (`triton_fp16x3_rowcol_kernel`, `OPT5-T08`)**,
+    the 1 sparse species-row subnormal outlier is eliminated completely: worst cancellation-scaled error across
+    all 52 real `MH-1 NaCl` products is **`5.02×10⁻⁷`** (below `cuBLAS IEEE`'s `6.44×10⁻⁷` and `tf32x3`'s
+    `5.59×10⁻⁷`), with median ratio **`0.568×`**, max ratio **`1.519×`** (vs `tf32x3`'s `1.727×`), and only **3
+    of 52 products** above IEEE (`results/opt5-T08-hybrid-gemm-20261026/summary.json`).
+  - **Fused `64 SIMT + 32 MMA` NVRTC kernel (`hybrid_gemm_64_32`, `OPT5-T08`):** 4 SIMT warps (`64×64` FP32) + 4
+    MMA warps (`64×32` `3×FP16`) sharing one `64×16` $A$ tile (`127` regs, `0` spill, 2 blocks/SM) runs in
+    `80.08 µs` on `NaCl [1512, 512, 512]` (vs `cuBLAS IEEE` `73.07 µs` and `triton_tf32x3` `142.03 µs`) and
+    `295.32 µs` on `NbCl5 [5832, 512, 512]` (vs `cuBLAS IEEE` `241.95 µs`), with `max_rel = 9.11×10⁻⁷` matching
+    `cuBLAS IEEE`. See [docs/design/2026-10-26-fp16x3-and-hybrid-gemm.md](../design/2026-10-26-fp16x3-and-hybrid-gemm.md).
 
 ### 3.3 Why Time-Step Delta GEMM and Channel-Magnitude Split fail (`OPT5-T07`)
 
@@ -123,7 +132,7 @@ Tested on the 52 real `MH-1 NaCl` products across two consecutive `1 fs` 300 K s
   `1×TF32` or `2×FP16` on Tensor Cores):** MACE's equivariant linear weights have nearly uniform row norms, so
   the bottom 50 % of channels still carry ~40 % of the product norm. `1×TF32` on the tail is **1,343× worse than
   IEEE** (median), and `2×FP16` is **411× worse**.
-## 3. Records and files
+## 4. Records and files
 
 - Probe and Wave-1 microbenchmarks:
   - `tools/megakernel_probe.py`, `docs/validation/opt5-T01-scheduler-probe.md`,
@@ -133,3 +142,7 @@ Tested on the 52 real `MH-1 NaCl` products across two consecutive `1 fs` 300 K s
   - `fastmace/kernels/triton/tf32x3_gemm.py` (`uses_tf32x3_tile`),
     `fastmace/kernels/triton/segment_gemm.py`, `tests/gpu/test_tf32x3_gemm_cuda.py`;
   - `results/opt5-T05-20261026/{accuracy,omol-accuracy,gate-NaCl,gate-NbCl5}`.
+- `OPT5-T06`, `OPT5-T07` & `OPT5-T08` (`3×FP16` and fused `SIMT + 3×FP16`):
+  - `docs/design/2026-10-26-fp16x3-and-hybrid-gemm.md`;
+  - `tools/bench/opt5_t06_t07_bench.py`, `results/opt5-T06-fp16x3-20261026/`;
+  - `tools/bench/opt5_t08_hybrid_gemm.py`, `results/opt5-T08-hybrid-gemm-20261026/summary.json`.
