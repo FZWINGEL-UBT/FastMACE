@@ -1,0 +1,42 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for 'opt6-T01 L2-chunk falsifier' (pid 38340)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:753: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+NbCl5 {"edges": 52414, "timing_ms": {"base_fwd": 1.8995, "base_bwd": 2.6853, "base": 4.5674, "mixed1280_fwd": 1.8953, "mixed1280_bwd": 2.1406, "mixed1280": 4.0119, "combo1280_fwd": 1.3861, "combo1280_bwd": 2.1673, "combo1280": 3.531, "mixed1536_fwd": 1.8707, "mixed1536_bwd": 2.1078, "mixed1536": 3.9599, "combo1536_fwd": 1.3907, "combo1536_bwd": 2.1229, "combo1536": 3.5107, "mixed1792_fwd": 1.8807, "mixed1792_bwd": 2.3788, "mixed1792": 4.2121, "combo1792_fwd": 1.3938, "combo1792_bwd": 2.3598, "combo1792": 3.7608, "mixed2048_fwd": 1.8839, "mixed2048_bwd": 2.4339, "mixed2048": 4.2981, "combo2048_fwd": 1.3887, "combo2048_bwd": 2.4416, "combo2048": 3.8056}, "gain_ms": {"mixed1280": 0.5555, "combo1280": 1.0364, "mixed1536": 0.6075, "combo1536": 1.0567, "mixed1792": 0.3553, "combo1792": 0.8066, "mixed2048": 0.2693, "combo2048": 0.7618}}

@@ -1,0 +1,124 @@
+{
+  "natoms": 216,
+  "edges": 6912,
+  "real_edges": 6912,
+  "weight_dim": 1280,
+  "w_MB": 35.38944,
+  "l2_MB": 33.554432,
+  "streaming_decision": [
+    "RewriteConfig.streaming_conv",
+    "on",
+    "auto (on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports): stage 1: on (with the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming kernels on unsorted edges give wrong results)); stage 2: supported (ok)"
+  ],
+  "chunks": {
+    "4096": {
+      "count": 2,
+      "max_edges": 4096,
+      "chunk_MB": 20.97152,
+      "max_rel_diff": {
+        "store": {
+          "out": 0.0,
+          "dx": 1.51447516431109e-07,
+          "dsh": 0.0,
+          "da": 0.0
+        },
+        "recompute": {
+          "out": 0.0,
+          "dx": 1.51447516431109e-07,
+          "dsh": 0.0,
+          "da": 0.0
+        }
+      }
+    }
+  },
+  "flush_ms": 0.2902851963881403,
+  "timing_ms": {
+    "base_fwd": 0.1059,
+    "base_bwd": 0.3272,
+    "base": 0.4496,
+    "store4096_fwd": 0.1295,
+    "store4096_bwd": 0.3406,
+    "store4096": 0.5187,
+    "recompute4096_fwd": 0.1229,
+    "recompute4096_bwd": 0.4501,
+    "recompute4096": 0.5787
+  },
+  "timing_raw": {
+    "base_fwd": {
+      "median_ms": 0.39620739989914,
+      "blocks_ms": [
+        0.4471,
+        0.3962,
+        0.3456
+      ]
+    },
+    "base_bwd": {
+      "median_ms": 0.6174570007715374,
+      "blocks_ms": [
+        0.6175,
+        0.628,
+        0.6071
+      ]
+    },
+    "base": {
+      "median_ms": 0.7398693996947259,
+      "blocks_ms": [
+        0.7399,
+        0.7426,
+        0.7386
+      ]
+    },
+    "store4096_fwd": {
+      "median_ms": 0.41975919739343226,
+      "blocks_ms": [
+        0.3782,
+        0.4292,
+        0.4198
+      ]
+    },
+    "store4096_bwd": {
+      "median_ms": 0.6308957992587239,
+      "blocks_ms": [
+        0.6486,
+        0.6124,
+        0.6309
+      ]
+    },
+    "store4096": {
+      "median_ms": 0.8089392038527876,
+      "blocks_ms": [
+        0.7959,
+        0.8099,
+        0.8089
+      ]
+    },
+    "recompute4096_fwd": {
+      "median_ms": 0.4131358000449836,
+      "blocks_ms": [
+        0.4131,
+        0.3993,
+        0.4701
+      ]
+    },
+    "recompute4096_bwd": {
+      "median_ms": 0.7403996016364545,
+      "blocks_ms": [
+        0.656,
+        0.8015,
+        0.7404
+      ]
+    },
+    "recompute4096": {
+      "median_ms": 0.869000400416553,
+      "blocks_ms": [
+        0.9061,
+        0.8531,
+        0.869
+      ]
+    }
+  },
+  "gain_ms": {
+    "store4096": -0.0691,
+    "recompute4096": -0.1291
+  }
+}

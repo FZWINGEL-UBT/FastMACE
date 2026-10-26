@@ -1,0 +1,67 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for 'opt6-T01 L2-chunk falsifier' (pid 36911)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+Failed to get GPU information from pynvml: Not Supported. Using default values for NVIDIA GeForce RTX 5060 Ti.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Environment variable OEQ_JIT_EXTENSION=1 is set.
+Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+GPU information: NVIDIA RTX A6000, 8, 6, 45, 84, 300, 2100
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_script.py:1491: FutureWarning: `torch.jit.script` is deprecated. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:753: ModelLicenceWarning: mh1-r2scan (mace-mh-1.model) is distributed under the Academic Software License (non-commercial use only), https://github.com/gabor1/ASL
+  loaded = load(source, head, checkpoint=checkpoint, backend="e3nn", dtype="float64", device="cpu",
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+NaCl {"edges": 6912, "timing_ms": {"base_fwd": 0.1705, "base_bwd": 0.3289, "base": 0.4905, "store2048_fwd": 0.2489, "store2048_bwd": 0.341, "store2048": 0.5869, "recompute2048_fwd": 0.241, "recompute2048_bwd": 0.4663, "recompute2048": 0.7322, "store4096_fwd": 0.1754, "store4096_bwd": 0.3618, "store4096": 0.5738, "recompute4096_fwd": 0.1922, "recompute4096_bwd": 0.4675, "recompute4096": 0.6723, "store6144_fwd": 0.2244, "store6144_bwd": 0.3842, "store6144": 0.5907, "recompute6144_fwd": 0.218, "recompute6144_bwd": 0.5242, "recompute6144": 0.7285, "store8192_fwd": 0.174, "store8192_bwd": 0.3389, "store8192": 0.4875, "recompute8192_fwd": 0.1734, "recompute8192_bwd": 0.4579, "recompute8192": 0.6494, "store12288_fwd": 0.1763, "store12288_bwd": 0.3257, "store12288": 0.5004, "recompute12288_fwd": 0.176, "recompute12288_bwd": 0.4553, "recompute12288": 0.6432}, "gain_ms": {"store2048": -0.0964, "recompute2048": -0.2417, "store4096": -0.0833, "recompute4096": -0.1818, "store6144": -0.1002, "recompute6144": -0.238, "store8192": 0.003, "recompute8192": -0.1589, "store12288": -0.0099, "recompute12288": -0.1527}}
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+W1026 23:41:59.950000 36912 torch/_inductor/utils.py:1806] [0/1_1] Not enough SMs to use max_autotune_gemm mode
+NbCl5 {"edges": 52414, "timing_ms": {"base_fwd": 1.8816, "base_bwd": 2.6617, "base": 4.5301, "store2048_fwd": 1.8101, "store2048_bwd": 2.3342, "store2048": 4.1497, "recompute2048_fwd": 1.7408, "recompute2048_bwd": 3.4232, "recompute2048": 5.188, "store4096_fwd": 1.4479, "store4096_bwd": 2.7138, "store4096": 4.1197, "recompute4096_fwd": 1.4182, "recompute4096_bwd": 3.562, "recompute4096": 4.9641, "store6144_fwd": 1.6454, "store6144_bwd": 2.8053, "store6144": 4.4749, "recompute6144_fwd": 1.6691, "recompute6144_bwd": 3.9266, "recompute6144": 5.5537, "store8192_fwd": 1.7327, "store8192_bwd": 2.6446, "store8192": 4.3438, "recompute8192_fwd": 1.7433, "recompute8192_bwd": 3.7518, "recompute8192": 5.4817, "store12288_fwd": 1.8735, "store12288_bwd": 2.8892, "store12288": 4.757, "recompute12288_fwd": 1.8783, "recompute12288_bwd": 3.948, "recompute12288": 5.859}, "gain_ms": {"store2048": 0.3804, "recompute2048": -0.6579, "store4096": 0.4104, "recompute4096": -0.434, "store6144": 0.0552, "recompute6144": -1.0236, "store8192": 0.1863, "recompute8192": -0.9516, "store12288": -0.2269, "recompute12288": -1.3289}}
+/mnt/d/Margraf/fm-opt6-T01/fastmace/model/loading.py:569: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  value = original(*args, **kwargs)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/jit/_serialization.py:176: FutureWarning: `torch.jit.load` is deprecated. Please switch to `torch.export`.
+  warnings.warn(
+WARNING:root:Default dtype float32 does not match model dtype float64, converting models to float32.
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/mace/modules/models.py:86: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  "atomic_numbers", torch.tensor(atomic_numbers, dtype=torch.int64)
+NaNbO3 {"edges": 84048, "timing_ms": {"base_fwd": 2.9068, "base_bwd": 4.2012, "base": 7.0262, "store2048_fwd": 4.9427, "store2048_bwd": 3.7362, "store2048": 8.6446, "recompute2048_fwd": 4.8144, "recompute2048_bwd": 5.6089, "recompute2048": 10.422, "store4096_fwd": 3.2587, "store4096_bwd": 4.3231, "store4096": 7.5403, "recompute4096_fwd": 3.2276, "recompute4096_bwd": 5.6261, "recompute4096": 8.7828, "store6144_fwd": 3.2106, "store6144_bwd": 4.4961, "store6144": 7.6528, "recompute6144_fwd": 3.1786, "recompute6144_bwd": 6.2613, "recompute6144": 9.4136, "store8192_fwd": 3.1499, "store8192_bwd": 4.0477, "store8192": 7.2137, "recompute8192_fwd": 3.1706, "recompute8192_bwd": 5.7572, "recompute8192": 8.9538, "store12288_fwd": 2.9512, "store12288_bwd": 4.4829, "store12288": 7.4052, "recompute12288_fwd": 2.989, "recompute12288_bwd": 6.2982, "recompute12288": 9.2748}, "gain_ms": {"store2048": -1.6184, "recompute2048": -3.3958, "store4096": -0.5141, "recompute4096": -1.7566, "store6144": -0.6266, "recompute6144": -2.3874, "store8192": -0.1875, "recompute8192": -1.9276, "store12288": -0.379, "recompute12288": -2.2486}}
