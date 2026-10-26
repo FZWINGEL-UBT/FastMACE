@@ -136,6 +136,20 @@ class StreamingKernels:
                           dweights.data_ptr()),
                          (ctypes.c_longlong, ctypes.c_longlong, p, p, p, p, p, p, p, p, p))
 
+    def backward_edges(self, x, sh, weights, senders, receivers, dout, dx, dsh, dweights, start, stop):
+        """``backward`` for the edges ``start:stop`` only: the edge tensors are addressed at ``start``, and
+        ``dweights`` is a buffer whose row 0 is edge ``start`` (``chunked_conv_backward``, opt-6 OPT6-T02)."""
+        count = stop - start
+        blocks = (count * self.cohort + self.num_threads - 1) // self.num_threads
+        if blocks:
+            p, item = ctypes.c_void_p, x.element_size()
+            self._launch(self._backward, blocks,
+                         (x.shape[0], count, x.data_ptr(), sh.data_ptr() + start * self.edge_dim * item,
+                          weights.data_ptr() + start * self.weight_dim * item, senders.data_ptr() + start * 4,
+                          receivers.data_ptr() + start * 4, dout.data_ptr(), dx.data_ptr(),
+                          dsh.data_ptr() + start * self.edge_dim * item, dweights.data_ptr()),
+                         (ctypes.c_longlong, ctypes.c_longlong, p, p, p, p, p, p, p, p, p))
+
 
 @torch.library.custom_op("fastmace::streaming_conv_forward", mutates_args=())
 def streaming_conv_forward(x: torch.Tensor, sh: torch.Tensor, weights: torch.Tensor, senders: torch.Tensor,
@@ -175,6 +189,109 @@ def streaming_conv_backward(x: torch.Tensor, sh: torch.Tensor, weights: torch.Te
 @streaming_conv_backward.register_fake
 def _(x, sh, weights, senders, receivers, row_ptr, dout, kernel_id):
     return torch.empty_like(x), torch.empty_like(sh), torch.empty_like(weights)
+
+
+def l2_chunk_edges(device, weight_dim, itemsize):
+    """Edges per chunk of ``chunked_conv_backward``: a chunk's weight gradient fills a quarter of the L2, rounded
+    down to a multiple of 128 edges (at least 128). The quarter leaves room for the weights and sender features
+    that stream through the L2 beside it; on the RTX 5060 Ti (32 MiB, Q = 1280) that is 1,536 edges, the best of
+    the OPT6-T01 screen (docs/validation/opt6-T01.md)."""
+    l2 = int(torch.cuda.get_device_properties(device).L2_cache_size)
+    rows = l2 // (4 * int(weight_dim) * int(itemsize))
+    return max(128, rows // 128 * 128)
+
+
+_SIDE_STREAMS = {}  # device index -> the side stream of the chunked backward's input gradients
+
+
+def _side_stream(device):
+    index = torch.device(device).index
+    index = torch.cuda.current_device() if index is None else index
+    if index not in _SIDE_STREAMS:
+        _SIDE_STREAMS[index] = torch.cuda.Stream(device=index)
+    return _SIDE_STREAMS[index]
+
+
+@torch.library.custom_op("fastmace::streaming_conv_folded_backward", mutates_args=())
+def streaming_conv_folded_backward(x: torch.Tensor, sh: torch.Tensor, weights: torch.Tensor, senders: torch.Tensor,
+                                   receivers: torch.Tensor, dout: torch.Tensor, weight: torch.Tensor,
+                                   main: torch.Tensor, last: torch.Tensor, kernel_id: int, chunk_edges: int,
+                                   tile_rule: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """The edge-owned backward of ``weights = a @ weight.T`` and the streaming convolution, returning (dx, dsh, da).
+
+    The edges run in chunks of ``chunk_edges``. Each chunk's weight gradient goes into one of two chunk-sized
+    slots, and the folded layer's input gradient reads it at once, from the L2, on a side stream while the
+    next chunk's backward runs (one stream left the small input-gradient grids exposed: NbCl5 2.83 against
+    2.10 ms at 1,536 edges, docs/validation/opt6-T01.md). Every edge's values are those of
+    ``streaming_conv_backward`` followed by ``folded_linear_input_grad`` (the same kernels, the same reduction
+    order); only the order of the atomic sender-gradient additions differs, as between any two runs.
+    """
+    from fastmace.kernels.triton.skinny_linear import input_grad_into
+
+    kernels = _REGISTRY[kernel_id]
+    x, sh, weights, dout = x.contiguous(), sh.contiguous(), weights.contiguous(), dout.contiguous()
+    senders, receivers = senders.contiguous(), receivers.contiguous()
+    edges = sh.shape[0]
+    dx = torch.zeros_like(x)  # sender gradients are added atomically (all on the current stream)
+    dsh = torch.empty_like(sh)
+    da = weights.new_empty((edges, weight.shape[1]))
+    rows = max(1, min(int(chunk_edges), edges))
+    slots = weights.new_empty((2, rows, weights.shape[1]))
+    current, side = torch.cuda.current_stream(x.device), _side_stream(x.device)
+    side.wait_stream(current)
+    freed = [None, None]  # per slot: the side stream's event after its input gradient read the slot
+    for chunk, start in enumerate(range(0, edges, rows)):
+        stop, slot = min(edges, start + rows), chunk % 2
+        if freed[slot] is not None:
+            current.wait_event(freed[slot])
+        kernels.backward_edges(x, sh, weights, senders, receivers, dout, dx, dsh, slots[slot], start, stop)
+        written = torch.cuda.Event()
+        written.record(current)
+        with torch.cuda.stream(side):
+            side.wait_event(written)
+            input_grad_into(slots[slot, :stop - start], weight, main, last, da[start:stop], tile_rule)
+            freed[slot] = torch.cuda.Event()
+            freed[slot].record(side)
+    current.wait_stream(side)
+    return dx, dsh, da
+
+
+@streaming_conv_folded_backward.register_fake
+def _(x, sh, weights, senders, receivers, dout, weight, main, last, kernel_id, chunk_edges, tile_rule):
+    return torch.empty_like(x), torch.empty_like(sh), sh.new_empty((sh.shape[0], weight.shape[1]))
+
+
+class _FoldedStreamingConvolution(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, a, weight, main, last, x, sh, senders, receivers, row_ptr, kernel_id, chunk_edges, tile_rule):
+        weights = a @ weight.t()  # folded_linear's forward
+        ctx.save_for_backward(x, sh, weights, senders, receivers, weight, main, last)
+        ctx.kernel_id, ctx.chunk_edges, ctx.tile_rule = kernel_id, chunk_edges, tile_rule
+        return streaming_conv_forward(x, sh, weights, senders, row_ptr, kernel_id)
+
+    @staticmethod
+    def backward(ctx, dout):
+        x, sh, weights, senders, receivers, weight, main, last = ctx.saved_tensors
+        dx, dsh, da = streaming_conv_folded_backward(x, sh, weights, senders, receivers, dout, weight, main, last,
+                                                     ctx.kernel_id, ctx.chunk_edges, ctx.tile_rule)
+        return da, None, None, None, dx, dsh, None, None, None, None, None, None
+
+
+def folded_streaming_convolution(a, weight, x, sh, senders, receivers, row_ptr, kernels, chunk_edges,
+                                 tile_rule="fixed", parts=None):
+    """``streaming_convolution(x, sh, a @ weight.T, ...)`` with the chunked backward (``chunked_conv_backward``).
+
+    ``a`` is the folded radial layer's input [E, P + 1], ``weight`` its [W, b] [Q, P + 1] (no gradient: MD
+    forces only); ``parts`` are weight's contiguous halves (``folded_constants``), else they are sliced here.
+    The gradient reaches a, x and sh; the [E, Q] weight gradient is never formed in full.
+    """
+    if weight.requires_grad:
+        raise ValueError("folded_streaming_convolution: the folded weight must not require a gradient")
+    if parts is None:
+        p = weight.shape[1] - 1
+        parts = (weight[:, :p].contiguous(), weight[:, p].contiguous())
+    return _FoldedStreamingConvolution.apply(a, weight, parts[0], parts[1], x, sh, senders, receivers, row_ptr,
+                                             kernels.id, int(chunk_edges), tile_rule)
 
 
 class _StreamingConvolution(torch.autograd.Function):

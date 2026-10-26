@@ -113,6 +113,57 @@ for n, o in zip(captured[1:], eager[1:]):
 print(json.dumps({"ok": True}))
 """
 
+FOLDED_CHUNKED = r"""
+from fastmace.kernels.oeq_streaming import folded_streaming_convolution
+from fastmace.kernels.triton.skinny_linear import folded_linear
+
+# chunked_conv_backward (opt-6 OPT6-T02): the per-edge weights a @ [W, b].T built inside the convolution and
+# the backward in edge chunks equal folded_linear followed by streaming_convolution. The last 40 edges are
+# padding past every row, as the engine's edges after the compacted count.
+a = torch.randn((edges, 9), device="cuda", generator=g)
+weight = torch.randn((problem.weight_numel, 9), device="cuda", generator=g)
+key = torch.where(torch.arange(edges, device="cuda") < edges - 40, receiver, torch.full_like(receiver, nodes))
+rows = torch.searchsorted(key, torch.arange(nodes + 1, device="cuda")).to(torch.int32)
+
+
+def reference_path(x, y, ar, kernels):
+    return streaming_convolution(x, y, folded_linear(ar, weight), sender.int(), receiver.int(), rows, kernels)
+
+
+def chunked_path(chunk, parts=None):
+    def path(x, y, ar, kernels):
+        return folded_streaming_convolution(ar, weight, x, y, sender.int(), receiver.int(), rows, kernels, chunk,
+                                            parts=parts)
+    return path
+
+
+def gradients(path, kernels):
+    xr, yr, ar = (t.clone().requires_grad_() for t in (X, Y, a))
+    out = path(xr, yr, ar, kernels)
+    return (out.detach(),) + torch.autograd.grad(out, (xr, yr, ar), G)
+
+
+kernels = StreamingKernels(problem, np.float32)
+reference = gradients(reference_path, kernels)
+halves = (weight[:, :8].contiguous(), weight[:, 8].contiguous())
+for chunk, parts in ((64, None), (150, halves), (399, None), (4096, None)):
+    out, dx, dy, da = gradients(chunked_path(chunk, parts), kernels)
+    assert torch.equal(out, reference[0]), chunk  # the same GEMM and forward kernel
+    assert torch.equal(dy, reference[2]), chunk  # per edge, no atomics
+    assert torch.equal(da, reference[3]), chunk  # the same input-gradient reduction order per row
+    torch.testing.assert_close(dx, reference[1], rtol=1e-5, atol=1e-5)  # atomic sender sums
+
+graph = torch.cuda.CUDAGraph()
+with torch.cuda.graph(graph):
+    captured = gradients(chunked_path(64), kernels)
+graph.replay()
+torch.cuda.synchronize()
+for n, o in zip(captured, reference):
+    torch.testing.assert_close(n, o, rtol=1e-5, atol=1e-5)
+assert torch.equal(captured[3], reference[3])
+print(json.dumps({"ok": True}))
+"""
+
 AGAINST_BASELINE = r"""
 directory = Path(os.environ["FASTMACE_BASELINE"]).expanduser() / "Experiments" / "Langevin_Thermostat" / "langevin"
 package = types.ModuleType("langevin")
@@ -154,6 +205,10 @@ def run_child(body):
 
 def test_message_and_gradients_match_oeq():
     assert run_child(AGAINST_OEQ) == {"ok": True}
+
+
+def test_chunked_folded_backward_matches_the_unchunked_path():
+    assert run_child(FOLDED_CHUNKED) == {"ok": True}
 
 
 def test_kernels_equal_baseline():

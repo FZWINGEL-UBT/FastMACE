@@ -65,6 +65,7 @@ AUTO_RULES = {
     "RewriteConfig.folded_backward_tiles": "on_with_fused_folded_backward",
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
+    "RewriteConfig.chunked_conv_backward": "never_automatic",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",

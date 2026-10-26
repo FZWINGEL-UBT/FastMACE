@@ -23,6 +23,10 @@ module switches became these records (docs/design/switch-map.md, section 1).
   once instead of a concatenation and two copies per force call; exact, opt-in, off.
 - ``streaming_conv``: the receiver-streaming OEq convolution (OEq PR 223 kernels) in every
   interaction with an OEq-fused convolution.
+- ``chunked_conv_backward`` (opt-6 OPT6-T02): the streaming convolution builds its per-edge weights from the
+  folded layer's input, and its backward runs in L2-sized edge chunks whose weight gradients the folded layer's
+  input gradient reads at once (two slots, a side stream), so the [E, Q] weight gradient never reaches DRAM;
+  exact, opt-in, off.
 - ``reassociate_first``: the first interaction summed per receiver and sender species before
   its last radial layer; needs the structure's one-hot species as ``Context.inputs["node_attrs"]``.
 - ``segmented_first_sum``: that sum as a run-segmented Triton kernel.
@@ -283,6 +287,28 @@ def streaming_convolutions(model):
     return names
 
 
+def chunked_conv_backwards(model):
+    """The streaming backward in L2-sized edge chunks in every streaming folded interaction; returns their names.
+
+    Sets ``chunked_backward_edges`` (``oeq_streaming.l2_chunk_edges`` for the GPU, the weight width and the
+    dtype); the folded forward then hands the folded layer's input to ``folded_streaming_convolution``. A
+    reassociated interaction keeps its own path.
+    """
+    from fastmace.kernels.oeq_streaming import l2_chunk_edges
+
+    names = []
+    for index, interaction in _folded_interactions(model, "chunked_conv_backward"):
+        kernels = getattr(interaction, "streaming_kernels", None)
+        if kernels is None:
+            continue
+        weight = interaction.conv_tp_weights.folded_weight()
+        if weight.device.type != "cuda":
+            raise RewriteError(f"chunked_conv_backward needs the model on a CUDA device (interactions.{index})")
+        interaction.chunked_backward_edges = l2_chunk_edges(weight.device, kernels.weight_dim, weight.element_size())
+        names.append(f"interactions.{index}")
+    return names
+
+
 def superset_columns(node_attrs, species_columns=None):
     """The node_attrs columns of the species superset: ``species_columns`` when given (the force
     field's, SPEC §8.5), else the columns of the species in ``node_attrs``."""
@@ -422,6 +448,17 @@ def _streaming_support(model):
     available = streaming_available()
     if not available:
         return Support(False, available.reason)
+    return verdict
+
+
+def _chunked_support(model):
+    import torch
+
+    verdict = _streaming_support(model)
+    if not verdict.supported:
+        return verdict
+    if not torch.cuda.is_available():
+        return Support(False, "needs CUDA (the streaming kernels and the L2 size)")
     return verdict
 
 
@@ -603,6 +640,11 @@ RECORDS = {
                               constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
                               deterministic=False,  # OEq kernels add sender gradients atomically
                               memory=memory_terms.streaming_conv),
+    # opt-6 OPT6-T02: the same kernels on edge ranges; only the atomic sender additions change order.
+    "chunked_conv_backward": _record("chunked_conv_backward", _chunked_support, _apply(chunked_conv_backwards),
+                                     ("streaming_conv", "fused_folded_backward"), exactness="exact", default="off",
+                                     constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
+                                     deterministic=False),
     "reassociate_first": _record("reassociate_first", _reassociate_support, _apply_reassociate, ("fold_cutoff",),
                                  constraints=_FIRST, memory=memory_terms.reassociate_first),
     "segmented_first_sum": _record("segmented_first_sum", _reassociate_support, _apply(segment_first_sum),
@@ -612,7 +654,7 @@ RECORDS = {
 
 __all__ = [
     "FIXED_SPECIES_SUPERSET", "MACE_VERSIONS", "OEQ", "PER_ENGINE_EDGE_COUNTER", "RECORDS", "SINGLE_GRAPH",
-    "SORT_RECEIVERS", "bind_streaming_count", "density_before_linear",
+    "SORT_RECEIVERS", "bind_streaming_count", "chunked_conv_backwards", "density_before_linear",
     "direct_node_feats", "factor_species_radial", "fold_radial_cutoff", "folded_backward_tiles", "folded_constants",
     "fuse_radial_hidden",
     "fused_folded_backward",

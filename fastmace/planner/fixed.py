@@ -90,6 +90,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.fused_folded_backward": "on_with_stage1_fold_cutoff_if_model_supports",
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
+    "RewriteConfig.chunked_conv_backward": "never_automatic",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
@@ -117,6 +118,7 @@ STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
+    ("chunked_conv_backward", "fold_cutoff"),
     ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
@@ -126,7 +128,7 @@ STAGE2_SUPPORT = (
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
-                  "direct_node_feats", "folded_constants", "streaming_conv",
+                  "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
@@ -888,6 +890,11 @@ class FixedPlanner:
         needs("streaming_conv", r.streaming_conv != "off", hybrid and v["fold_cutoff"] and v["sort_receivers"],
               "the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming "
               "kernels on unsorted edges give wrong results)")
+        # opt-6 OPT6-T02 (exact, opt-in until its full-step A/B).
+        needs("chunked_conv_backward", r.chunked_conv_backward == "on",
+              v["streaming_conv"] and v["fused_folded_backward"], "streaming_conv and fused_folded_backward")
+        if r.chunked_conv_backward == "auto":
+            v["_why"]["chunked_conv_backward"] = "off: only an explicit 'on' enables it (OPT6-T02, opt-in)"
         note("block_linear", hybrid if r.block_linear == "auto" else r.block_linear == "on",
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")
@@ -1011,6 +1018,12 @@ class FixedPlanner:
         if v["streaming_conv"] and not v["sort_receivers"]:  # cannot happen after stage 1; kept as the hard rule
             book.refuse("RewriteConfig.streaming_conv needs sort_receivers (NeighbourConfig.sort_receivers='on')",
                         "streaming-needs-sorted-receivers")
+        if v["chunked_conv_backward"] and not (v["streaming_conv"] and v["fused_folded_backward"]):
+            if "chunked_conv_backward" in explicit:
+                book.refuse("RewriteConfig.chunked_conv_backward='on' requires streaming_conv and "
+                            "fused_folded_backward, which are not both on", "rewrite-requirement-missing")
+            v["chunked_conv_backward"] = False
+            v["_why"]["chunked_conv_backward"] += "; off: requires streaming_conv and fused_folded_backward"
         for name in REWRITE_FIELDS:
             item = f"RewriteConfig.{name}"
             book.decide(item, _toggle(v[name]), _why(getattr(self.rewrites, name), AUTO_RULES[item], v["_why"][name]))

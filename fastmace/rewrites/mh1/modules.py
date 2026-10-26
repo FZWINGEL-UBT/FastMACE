@@ -8,7 +8,8 @@ interaction or radial network:
   (folded_backward_tiles), ``fused_hidden`` (fused_radial_hidden);
 - the interaction: ``density_before_linear`` (density_first), ``joint_radial_weight`` and
   ``joint_radial_widths`` (joint_radial_input), ``first_reassociation`` (reassociate_first),
-  ``streaming_kernels`` and ``streaming_count`` (streaming_conv), ``residual_linear``
+  ``streaming_kernels`` and ``streaming_count`` (streaming_conv), ``chunked_backward_edges``
+  (chunked_conv_backward: edges per chunk, 0 = off), ``residual_linear``
   (merged_residual, ``fastmace.rewrites.linear``), ``gated_rows`` (gated_rows,
   ``fastmace.rewrites.fusion``: the residual products, gate and linear_2 on per-segment rows);
 - ``FirstInteractionReassociation.segmented`` (segmented_first_sum).
@@ -250,6 +251,9 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     source_embedding = self.source_embedding(node_attrs)
     target_embedding = self.target_embedding(node_attrs)
     reassociation = getattr(self, "first_reassociation", None)  # reassociate_first
+    # chunked_conv_backward: the streaming convolution takes the folded layer's input and applies its weight itself.
+    chunked = reassociation is None and getattr(self, "chunked_backward_edges", 0) > 0
+    tp_weights = augmented = None
     joint = getattr(self, "joint_radial_weight", None)  # joint_radial_input
     if joint is not None:
         # Both first layers at once; the gathered species terms join inside the add.
@@ -257,13 +261,17 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         hidden = (first + source_embedding[edge_index[0]]
                   + target_embedding[edge_index[1]])
         conv_hidden, density_hidden = hidden.split(self.joint_radial_widths, dim=1)
-        if reassociation is None:
+        if chunked:
+            augmented = self.conv_tp_weights.augmented_after_first(conv_hidden, cutoff)
+        elif reassociation is None:
             tp_weights = self.conv_tp_weights.after_first(conv_hidden, cutoff)
         edge_density = torch.tanh(self.density_fn.after_first(density_hidden) ** 2)
     else:
         edge_feats = torch.cat([edge_feats, source_embedding[edge_index[0]],
                                 target_embedding[edge_index[1]]], dim=-1)
-        if reassociation is None:
+        if chunked:
+            augmented = self.conv_tp_weights.augmented(edge_feats, cutoff)
+        elif reassociation is None:
             tp_weights = self.conv_tp_weights(edge_feats, cutoff)  # changed: cutoff applied inside
         edge_density = torch.tanh(self.density_fn(edge_feats) ** 2)
     if cutoff is not None:
@@ -275,7 +283,7 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         message = reassociation(node_feats, node_attrs, edge_attrs, augmented, edge_index,
                                 self.conv_tp_weights.folded_weight())
     elif getattr(self, "streaming_kernels", None) is not None:  # streaming_conv
-        message = streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes)
+        message = streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented)
     elif hasattr(self, "conv_fusion"):
         message = self.conv_tp(node_feats, edge_attrs, tp_weights, edge_index)
     else:
@@ -306,9 +314,13 @@ setattr(cutoff_folded_forward, READS_RESIDUAL_LINEAR, True)
 setattr(cutoff_folded_forward, READS_GATED_ROWS, True)
 
 
-def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes):
-    """The interaction's OEq convolution through the receiver-streaming kernels (attached as streaming_kernels)."""
-    from fastmace.kernels.oeq_streaming import streaming_convolution
+def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented=None):
+    """The interaction's OEq convolution through the receiver-streaming kernels (attached as streaming_kernels).
+
+    With ``augmented`` (chunked_conv_backward) the per-edge weights are ``augmented @ [W, b].T`` of the folded
+    radial layer, built inside the convolution, whose backward runs in L2-sized edge chunks.
+    """
+    from fastmace.kernels.oeq_streaming import folded_streaming_convolution, streaming_convolution
     sender, receiver = edge_index[0], edge_index[1]
     # The compacted count (the engine registers the neighbour list's GPU counter) ends the
     # receiver-sorted edges within the cutoff; the padding after it goes past every row. (A float32
@@ -321,8 +333,15 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
     conv = self.conv_tp
     transpose = self.streaming_kernels.layout == "mul_ir" and conv.layout_transpose_in is not None
     feats = conv.layout_transpose_in(node_feats) if transpose else node_feats
-    message = streaming_convolution(feats, edge_attrs, tp_weights, sender.to(torch.int32),
-                                    receiver.to(torch.int32), row_ptr, self.streaming_kernels)
+    if augmented is not None:
+        radial = self.conv_tp_weights
+        message = folded_streaming_convolution(augmented, radial.folded_weight(), feats, edge_attrs,
+                                               sender.to(torch.int32), receiver.to(torch.int32), row_ptr,
+                                               self.streaming_kernels, self.chunked_backward_edges,
+                                               radial.folded_tiles, radial.folded_parts)
+    else:
+        message = streaming_convolution(feats, edge_attrs, tp_weights, sender.to(torch.int32),
+                                        receiver.to(torch.int32), row_ptr, self.streaming_kernels)
     if transpose:
         message = conv.layout_transpose_out(message)
     return message

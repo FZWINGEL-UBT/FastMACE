@@ -78,21 +78,33 @@ def _triton_kernel():
     return kernel
 
 
-def _input_grad(grad, main, last, tile_rule):
-    """The Triton input gradient [E, P + 1] from the contiguous halves ``main`` [Q, P] and ``last`` [Q]."""
+def _input_grad(grad, main, last, tile_rule, out=None):
+    """The Triton input gradient [E, P + 1] from the contiguous halves ``main`` [Q, P] and ``last`` [Q]; into
+    ``out`` (contiguous rows, such as a row slice) when given (``chunked_conv_backward``, opt-6 OPT6-T02)."""
     import triton
 
     from fastmace.kernels.triton import tile_rule as rules
     grad = grad.contiguous()
     rows, q = grad.shape
     p = main.shape[1]
-    out = torch.empty((rows, p + 1), dtype=grad.dtype, device=grad.device)
+    if out is None:
+        out = torch.empty((rows, p + 1), dtype=grad.dtype, device=grad.device)
     if rows:
         block_m, block_k, warps, stages = tile_choice(rows, rules.device_sms(grad.device), tile_rule)
         _triton_kernel()[(triton.cdiv(rows, block_m),)](
             grad, main, last, out, rows, q, p, BLOCK_M=block_m,
             BLOCK_P=max(16, triton.next_power_of_2(p)), BLOCK_K=block_k,
             num_warps=warps, num_stages=stages)
+    return out
+
+
+def input_grad_into(grad, weight, main, last, out, tile_rule="fixed"):
+    """``out[:] = grad @ weight`` for grad [rows, Q] and weight [Q, P + 1] (its halves ``main``, ``last``): the
+    Triton kernel where it applies, PyTorch otherwise; ``out`` is a contiguous [rows, P + 1] buffer."""
+    if _uses_triton(grad, weight):
+        _input_grad(grad, main, last, tile_rule, out)
+    else:
+        torch.mm(grad, weight, out=out)
     return out
 
 
