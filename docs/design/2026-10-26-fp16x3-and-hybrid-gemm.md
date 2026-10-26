@@ -117,28 +117,41 @@ Replacing tile-wide `tl.max` with per-row `tl.max(..., axis=1)` for $A$ (`[BLOCK
 | **Max** `max_rel` error ratio vs IEEE | $1.000\times$ | $1.796\times$ | **$1.575\times$** |
 | Products with higher error than `cuBLAS IEEE` | 0 of 52 | 6 of 52 | **3 of 52** |
 
-### 3.2 Path B: Single-kernel fused `64 SIMT + 32 MMA` NVRTC GEMM (`hybrid_gemm_64_32`) on `sm_120`
+### 3.2 Path B: Double-Buffered Pipelined `SIMT + 3×FP16` NVRTC Kernels (`OPT5-T08`) on `sm_120`
 
-Built in `tools/bench/opt5_t08_hybrid_gemm.py` (256 threads = 4 SIMT warps computing `64×64` in IEEE FP32 + 4 MMA
-warps computing `64×32` in Exponent-Shifted `3×FP16`, sharing one `64×16` $A$ tile in `14.5 KiB` shared memory,
-`127` registers, `0` spill, 2 blocks/SM):
+We engineered and benchmarked four progressively optimized versions of the single-launch fused `SIMT + 3×FP16`
+NVRTC kernel (`tools/bench/opt5_t08_hybrid_gemm.py`):
+1. **Coalesced `float4` global loads + register prefetching (2-stage software pipeline):** global loads for
+   `k0 + BK` are issued into registers at the start of each step while warps compute stage `k0`, cutting
+   `__syncthreads()` from 2 per step to **1 per step**.
+2. **Post-barrier overlapped `split_f16x2`:** `A` and `B` are staged in shared memory as plain FP32; the MMA
+   warps execute `split_f16x2` *after* `__syncthreads()` in parallel with the SIMT warps' `fma.rn.f32` loop.
+3. **Single MMA accumulator array (`mma_acc` + 4-register `tmp[4]`):** eliminates the 32-register `mma_cross`
+   array, keeping both `hybrid_gemm_64_32` (`4×4` warps, `64×96` tile) and `hybrid_gemm_6x2_64_128` (`6` SIMT
+   warps on `64×96` + `2` MMA warps on `64×32` = **`64×128` power-of-two tile**) at **128 registers with 0 spill
+   and 2 blocks (16 warps) per SM**.
+4. **Vectorized `ld.shared.v4.f32` SIMT inner loop.**
 
-| Shape (`[M, K, N]`) | `cuBLAS IEEE` (µs) | `triton_tf32x3` (µs) | `triton_fp16x3` tile-norm (µs) | `triton_fp16x3` row/col-norm (µs) | **`nvrtc_hybrid_64_32` (µs)** | `nvrtc_hybrid_64_32` `max_rel` vs `cuBLAS IEEE` |
+| Shape (`[M, K, N]`) | `cuBLAS IEEE` (µs) | `triton_tf32x3` (µs) | `triton_fp16x3` tile-norm (µs) | **`nvrtc_hybrid_64_32` (µs)** | **`nvrtc_hybrid_6x2_64_128` (µs)** | Hybrid Accuracy (`max_rel` vs `cuBLAS`) |
 | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| `NaCl [1512, 512, 512]` | **73.07** | 142.03 | 77.48 | 107.50 | **80.08** | $9.83\times 10^{-7}$ vs $3.41\times 10^{-7}$ |
-| `NbCl5 [5832, 512, 512]` | **241.95** | 491.57 | 276.50 | 352.83 | **295.32** | $9.11\times 10^{-7}$ vs $9.11\times 10^{-7}$ |
-| `NbCl5 [13608, 512, 512]` | **481.44** | 1,128.96 | 612.30 | 816.83 | **725.11** | $9.37\times 10^{-7}$ vs $9.37\times 10^{-7}$ |
-| `OMOL [1944, 1024, 1024]` | **301.32** | 664.62 | 354.25 | 477.86 | **384.05** | $1.57\times 10^{-6}$ vs $8.00\times 10^{-7}$ |
+| `NaCl [1512, 512, 512]` | 73.75–74.37 | 142.03 | 77.48 | **67.67–72.99 (−1.0 to −9.0 %)** | **72.10–73.86 (−0.7 to −2.2 %)** | $9.83\times 10^{-7}$ vs $3.41\times 10^{-7}$ |
+| `NbCl5 [5832, 512, 512]` | **233.95–237.19** | 491.57 | 276.50 | 261.74–268.00 | **251.76–254.30 (+6.1 to +7.6 %)** | $9.21\times 10^{-7}$ vs $9.11\times 10^{-7}$ |
+| `NbCl5 [13608, 512, 512]` | **475.61–484.20** | 1,128.96 | 612.30 | 615.81–616.33 | **579.89–580.66 (+19.8 %)** | $9.87\times 10^{-7}$ vs $9.37\times 10^{-7}$ |
+| `OMOL [1944, 1024, 1024]` | **299.36–299.83** | 664.62 | 354.25 | 319.17–330.39 | **311.15–316.97 (+3.9 to +5.7 %)** | $1.62\times 10^{-6}$ vs $8.00\times 10^{-7}$ |
 
-**Diagnosis:**
-1. The fused `64+32` NVRTC kernel is **1.66–1.77× faster than `triton_tf32x3`** and matches `cuBLAS IEEE` within
-   `9.6 %` on `NaCl` (`80.1` vs `73.1 µs`), with exact FP32-class accuracy (`9.11e-7` vs `9.11e-7` on `NbCl5`).
-2. However, on `sm_120` it remains `9.6–22 %` behind `cuBLAS IEEE` (`295.3` vs `242.0 µs` on `NbCl5 5832×512×512`)
-   because (a) synchronous 1-stage shared-memory loading (`__syncthreads()` every `BK = 16` steps) stalls both the
-   SIMT and MMA warps at every tile boundary, and (b) Triton's 3-stage `cp.async` pipelining in standalone
-   `triton_fp16x3` (`276.5 µs`) already beats the 1-stage fused NVRTC kernel (`295.3 µs`).
-3. **Conclusion & next step for `sm_80` / `sm_89`:** On `sm_120`, `cuBLAS IEEE FP32` remains the fastest dense
-   GEMM. On `sm_89` (RTX 4000 Ada workstations `leto`/`murphy` and Modal L4) and `sm_80` (A100), where 16-bit FP16
-   Tensor Cores are **4× to 16× faster than FP32 SIMT** and **2× faster than TF32**, standalone `triton_fp16x3`
-   (Path A, with Triton's 3-stage `cp.async` pipeline and `1.8×` measured speedup over `triton_tf32x3`) is ready
-   to benchmark and adopt as soon as those GPUs are run.
+**Why the pipelined NVRTC kernel beats `cuBLAS IEEE` on `NaCl` (−1 to −9 %) but stays 4–7 % behind on `5832` / `1944`:**
+- Keeping 2 blocks (16 warps) per SM to hide `__syncthreads()` latency caps each thread at `128` registers (`32`
+  accumulators per SIMT thread = `8×4` thread tile, `64×128` block tile).
+- On `NaCl [1512, 512, 512]`, the added `3×FP16` Tensor Core throughput outweighs the smaller `64×128` block
+  tile, beating `cuBLAS IEEE FP32` (`67.67–72.10 µs` vs `73.75–74.37 µs`).
+- On very large $M$ (`5832` and `13608`), `cuBLAS`'s pure-SIMT `128×128` block tile (`8×8 = 64` accumulators per
+  thread) achieves 2× higher global-memory $B$-tile reuse and 1.5× higher FMA-per-shared-load ratio than a
+  `64×128` tile, giving `cuBLAS` a 4–7 % edge on `5832` (`234` vs `252 µs`) and `1944×1024×1024` (`299` vs
+  `311 µs`).
+- **Actionable conclusion:**
+  1. On `sm_120` (RTX 5060 Ti), `cuBLAS IEEE FP32` stays the default because the small gain on `NaCl` (`~6 µs`
+     per layer) is offset by the 4–7 % loss on `NbCl5`.
+  2. On `sm_89` (RTX 4000 Ada workstations `leto`/`murphy` and Modal L4) and `sm_80` (A100), where 16-bit FP16
+     Tensor Cores are **4× to 16× faster than FP32 SIMT** and **2× faster than TF32**, standalone `triton_fp16x3`
+     (Path A, **1.78–1.88× faster than `triton_tf32x3`** with better-than-`tf32x3` accuracy across all 52 real
+     `MH-1` products) is ready to benchmark and enable.
