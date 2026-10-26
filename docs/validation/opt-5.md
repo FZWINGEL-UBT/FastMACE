@@ -13,6 +13,8 @@ RTX 5060 Ti (`sm_120`, 36 SMs, 16 GiB), WSL2 Ubuntu 24.04, driver 610.88, `~/env
 | **OPT5-T03** | Radial folded last layer (`[E, 65] @ [65, 1280]` and `K = 68`) `64 + tail` hybrid/streaming Triton kernel | `≤ 150 / 1,000 / 1,450 µs` on `NaCl` ($E=8,192$), `NbCl5` ($56,320$), `NaNbO3` ($82,688$) | Best Triton `64 + 1` with `.cs` streaming stores (`evict_first`): `160.7 / 1,440.3 / 2,435.8 µs` vs cuBLAS `K = 65` non-contiguous `199.8 / 1,339.4 / 1,984.1 µs` and cuBLAS `K = 64` floor `150.3 / 1,052.6 / 1,546.3 µs`. | **Cut at Wave 1 falsifier**: even cuBLAS at `K = 64` (`1,053 / 1,546 µs`) is above the `1,000 / 1,450 µs` targets, and Triton's IEEE `tl.dot` is compute-limited (`OPT4-T01` confirmed). |
 | **OPT5-T04** | Complementary operator fusion: `gated_segment_gemm` (gate scaling in `segment_gemm` prologue) | `≥ 5 %` faster than sequential gate + `segment_gemm` on `NbCl5` (`atoms = 1,944`) | Forward-only CUDA-graph replay on `NbCl5`: `184.33 → 177.44 µs` (`0.9626×`, **−3.7 %**, bitwise equal `max_abs_diff = 0.0`). On `NaCl` (`atoms = 216`, where `segment_gemm` uses cuBLAS): `44.38 → 35.40 µs` in isolation, but full-step `OPT-T02` stage C regressed `NbCl5` by `+1.6–2.0 %` because backward still needs the gated rows. | **Cut at Wave 1 falsifier** (`−3.7 % < 5 %` on `NbCl5`, and backward materialisation remains required). |
 | **OPT5-T05** | Libra/HC-SpMM hybrid shape dispatcher (`uses_tf32x3_tile(k, n)` in `tf32x3_gemm.py` and `segment_gemm.py`) | Eliminate the `2.0–6.9×` sub-tile accuracy spikes of `OPT4-T03`, reduce the systematic energy offset, and pass the force/stress gate on `MH-1` (`NaCl`, `NbCl5`) and `OMOL-0 XL` | Keeping sub-tile products ($\min(K, N) < 32$, i.e. $K \in \{6, 16\}$ species inputs and $N \in \{1, 6\}$ readout heads, $< 0.4\%$ of FLOPs) on SIMT IEEE FP32 while routing $\min(K, N) \ge 32$ to 3×TF32 cuts worst per-product cancellation-scaled error ratio `tf32x3 / ieee` from **6.90× → 1.73× (`NaCl`)**, **6.90× → 1.52× (`NbCl5`)**, and **2.74× → 1.30× (`OMOL-0 XL`)**, and lowers the `MH-1` gate energy error by **31–39 %** (`ratio 0.45 → 0.28 / 0.32`). | **Adopted inside opt-in `tf32x3_gemms`**; CPU (8/8) and GPU (8/8) unit tests and `NaCl`/`NbCl5` force gates pass. |
+| **OPT5-T06** | Exponent-shifted `3×FP16` (`big = fp16(x)`, `small = fp16((x - fp32(big)) * 2048)`, `c = 3` at `512` FLOP/cycle/SM 16-bit Tensor Core rate) in `megakernel_probe.py` and standalone Triton kernel | Pass single-SM co-execution gate (`keep ≥ 0.90, gain ≥ 1.10`) on `sm_120`; compare standalone kernel speed vs `triton_tf32x3` and `cublas_ieee` | **Passes the single-SM co-execution gate on `sm_120`:** `x3 inter fp16 4×4` (with in-kernel `split_fp16x2`) achieves **`keep = 0.92`, `gain = 1.22×`** (`157.7` SIMT + `82.8` useful `3×FP16` = `240.5` vs `196.8` FLOP/cycle/SM), and `gemm` upper bound reaches **`gain = 1.28×`**. Standalone Triton `triton_fp16x3` is **1.78–1.88× faster than `triton_tf32x3`** on all production shapes (`77.5 µs` vs `142.0 µs` on NaCl `1512×512×512`, matching `cublas_ieee`'s `77.5 µs`!), and end-to-end `MH-1 NaCl` energy/force differences vs default FP32 are `3.77e-5 eV` and `4.14e-7 eV/Å`. | **First `sm_120` co-execution gate pass (`gain = 1.22×`); standalone Triton kernel is `1.00–1.25×` of cuBLAS IEEE on `sm_120` (`1.8×` faster than `tf32x3`)**. Two-stream column split (`241.3 µs` vs `227.9 µs` on `NbCl5 5832×512×512`) still pays stream-join overhead; realizing the `1.22×` single-SM gain in production requires a fused persistent SIMT+`3×FP16` C++/CUTLASS kernel. |
+| **OPT5-T07** | Time-step delta GEMM ($Y_t = Y_{t-1} + \Delta X_t W$ across `1 fs` steps) and 50/50 channel-magnitude split (CUDA cores IEEE FP32 on top-norm channels + `1×TF32` or `2×FP16` Tensor Cores on tail/delta) | Cancellation-scaled error $\le 2\times$ IEEE FP32 on real `MH-1` force-call operands | Across a `1 fs` 300 K step (`Δr ≈ 0.006 Å`), intermediate equivariant features change by `‖ΔX‖ / ‖X‖ = 20.8 %` (median across 52 products), making `1×TF32` delta GEMM `1,838×` (median) to `6,130×` (max) worse than IEEE FP32, and `2×FP16` delta GEMM `482×` (median) worse. In 50/50 channel-norm splits, MACE's weight norms are nearly uniform across channels, giving `1,343×` (`1×TF32` tail) and `411×` (`2×FP16` tail) worse error than IEEE. | **Rejected (falsified by accuracy on real MACE operands)**: equivariant message features rotate/change by ~21 % per `1 fs` step and have flat channel norms, so neither `c = 1` delta nor `c = 2` channel-tail shortcuts preserve FP32 accuracy. |
 
 ## 2. Detailed evidence for `OPT5-T05` (`uses_tf32x3_tile`)
 
@@ -58,6 +60,69 @@ Tensor Cores; sub-tile products ($\min(K, N) < 32$, $< 0.4\%$ of atom-GEMM FLOPs
 | `NbCl5` (1,944 atoms) | Pure `tf32x3` (`OPT4-T03`) | 3.3×10⁻⁴ (0.45) | 8.05×10⁻⁵ (1.00) | 7.8×10⁻⁸ (0.79) | pass |
 | `NbCl5` (1,944 atoms) | **Hybrid `OPT5-T05`** | **2.27×10⁻⁴ (0.32, −31 %)** | **8.00×10⁻⁵ (1.00)** | 7.42×10⁻⁸ (0.76) | **pass** |
 
+
+## 3. Detailed evidence for `OPT5-T06` (Exponent-Shifted `3×FP16`) and `OPT5-T07` (Delta / Channel-Split GEMMs)
+
+### 3.1 Why Exponent-Shifted `3×FP16` passes the `sm_120` co-execution gate (`OPT5-T06a`)
+
+On `sm_120` (RTX 5060 Ti), TF32 Tensor Cores run at `256` FLOP/cycle/SM (`1×` FP32 CUDA cores), while 16-bit
+(BF16/FP16) Tensor Cores run at `512` FLOP/cycle/SM (`2×` FP32 CUDA cores). Previously (`OPT4-T07`), only BF16
+(7-bit mantissa, requiring `BF16×6`, `c = 6`) was tested at the `512` FLOP/cycle/SM rate, yielding the same
+`512 / 6 = 85.3` FLOP/cycle/SM ceiling as `3×TF32` (`256 / 3 = 85.3`).
+
+IEEE FP16 has **10 explicit mantissa bits** (11 with the hidden bit)—identical to TF32's mantissa precision—and
+`mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32` accumulates in full FP32. Shifting the remainder by
+$2^{11} = 2048.0$ on the CUDA cores before converting to FP16:
+$$\text{big} = \text{fp16}(x), \qquad \text{small} = \text{fp16}\big((x - \text{fp32}(\text{big})) \times 2048.0\big)$$
+aligns `small`'s FP16 exponent with `big`'s so `small` never underflows FP16, requiring only **3 FP16 MMAs
+(`c = 3`)** at the `512` FLOP/cycle/SM rate (`170.7` useful FLOP/cycle/SM ceiling, **2× `3×TF32`**).
+
+Measured on `sm_120` (`tools/megakernel_probe.py --kinds fp16`, `results/opt5-T06-fp16x3-20261026/probe/summary.json`):
+
+| Variant (`fp16`, `c = 3`) | `S×M` | Regs | `simt` / `s_all` | `mma` / `m_all` | `both`: `simt`, `mma` | `keep` | `mma%` | `gain` | Verdict |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `smem` | `8×8` | 127 | 199.4 / 207.2 | 507.8 / 508.5 | 183.1, 186.2 | **0.92** | 0.37 | **1.18** | **PASS** |
+| `gemm` (upper bound) | `4×4` | 162 | 172.8 / 195.8 | 480.9 / 510.4 | 159.5, 275.8 | **0.92** | 0.57 | **1.28** | **PASS** |
+| `gemm` (upper bound) | `6×2` | 162 | 183.9 / 195.8 | 239.9 / 510.3 | 178.3, 129.5 | **0.97** | 0.54 | **1.13** | **PASS** |
+| **`x3` (split in kernel)** | `4×4` | 238 | 171.6 / 196.8 | 156.4 / 165.5 | **157.7, 82.8** | **0.92** | 0.53 | **1.22** | **PASS** |
+| **`x3` (split in kernel)** | `6×2` | 238 | 183.7 / 196.8 | 78.2 / 165.4 | **177.6, 39.6** | **0.97** | 0.51 | **1.10** | **PASS** |
+| `x3_pipe` (SIMT producer) | `4×4` | 194 | 161.1 / 190.2 | 156.4 / 165.5 | 102.4, **119.6** | 0.64 | **0.76** | **1.17** | fail (`keep`) |
+
+### 3.2 Standalone Triton `3×FP16` kernel speed and accuracy (`OPT5-T06b`, `results/opt5-T06-fp16x3-20261026/summary.json`)
+
+With tile-level IEEE exponent bit-masking (`tl.max(tl.abs(a).to(tl.int32, bitcast=True)) & 0x7F800000`),
+`triton_fp16x3_kernel` (`tools/bench/opt5_t06_t07_bench.py`) is **1.78–1.88× faster than `triton_tf32x3`** on
+`sm_120` and more accurate than both `cublas_ieee` and `triton_tf32x3`:
+
+| Shape (`[M, K, N]`) | `cublas_ieee` (µs) | `triton_tf32x3` (µs) | **`triton_fp16x3` (µs)** | Speedup vs `tf32x3` | `cublas_ieee` `max_rel` / `cancel` | `triton_tf32x3` `max_rel` / `cancel` | **`triton_fp16x3` `max_rel` / `cancel`** |
+| --- | ---: | ---: | ---: | ---: | --- | --- | --- |
+| `NaCl [1512, 512, 512]` | 77.46 | 142.03 | **77.48** | **1.83×** | 3.41e-7 / 1.26e-7 | 2.29e-7 / 8.19e-8 | **2.02e-7 / 7.50e-8** |
+| `NbCl5 [5832, 512, 512]` | 227.90 | 491.57 | **276.50** | **1.78×** | 9.11e-7 / 3.37e-7 | 2.38e-7 / 8.86e-8 | **2.13e-7 / 8.40e-8** |
+| `NbCl5 [13608, 512, 512]` | 490.95 | 1,128.96 | **612.30** | **1.84×** | 9.37e-7 / 3.80e-7 | 2.37e-7 / 8.71e-8 | **2.17e-7 / 8.54e-8** |
+| `OMOL [1944, 1024, 1024]` | 324.33 | 664.62 | **354.25** | **1.88×** | 8.00e-7 / 2.02e-7 | 2.66e-7 / 6.88e-8 | **2.61e-7 / 6.81e-8** |
+
+- On a full `MH-1 NaCl` 3×3×3 force call (`52` products), replacing all full-tile atom GEMMs with
+  `triton_fp16x3_kernel` gives:
+  - Energy difference vs default FP32: **`3.77×10⁻⁵ eV`** (smaller than `tf32x3`'s `4.36×10⁻⁵ eV`, because
+    `cvt.rn.f16` rounds to nearest-even rather than truncating);
+  - Max force component difference vs default FP32: **`4.14×10⁻⁷ eV/Å`** (vs `tf32x3`'s `3.73×10⁻⁷ eV/Å`, 9×
+    below the float32 calculator's `3.8×10⁻⁶ eV/Å` error);
+  - Median cancellation-scaled error ratio vs cuBLAS IEEE: **`0.594×`** (more accurate than IEEE on 45 of 52
+    products; 1 product with mixed active/inactive species rows $1.0$ vs $10^{-25}$ inside one `64×32` tile
+    underflows tile-wide FP16 scaling on the $10^{-25}$ row without affecting energy or forces).
+
+### 3.3 Why Time-Step Delta GEMM and Channel-Magnitude Split fail (`OPT5-T07`)
+
+Tested on the 52 real `MH-1 NaCl` products across two consecutive `1 fs` 300 K steps (`Δr ≈ 0.006 Å`,
+`results/opt5-T06-fp16x3-20261026/summary.json`):
+- **Time-step delta GEMM ($Y_1 = Y_0 + (A_1 - A_0) B$):** even for a $0.006\text{ \AA}$ step, intermediate
+  equivariant spherical-harmonic and message features change by **`‖A₁ − A₀‖ / ‖A₁‖ = 20.8 %` (median)**, not
+  $1\%$. Multiplying $(A_1 - A_0) B$ in `1×TF32` (`c = 1`) produces a median error **1,838× worse than IEEE
+  FP32** (max **6,130×**); `2×FP16` (`c = 2`) is **482× worse** (median).
+- **Channel-magnitude split (top 50 % of $K$ by weight norm in IEEE FP32 on CUDA cores + bottom 50 % in
+  `1×TF32` or `2×FP16` on Tensor Cores):** MACE's equivariant linear weights have nearly uniform row norms, so
+  the bottom 50 % of channels still carry ~40 % of the product norm. `1×TF32` on the tail is **1,343× worse than
+  IEEE** (median), and `2×FP16` is **411× worse**.
 ## 3. Records and files
 
 - Probe and Wave-1 microbenchmarks:

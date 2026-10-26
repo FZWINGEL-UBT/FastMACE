@@ -1,0 +1,1640 @@
+{
+ "meta": {
+  "date_utc": "2026-10-26T13:35:31+00:00",
+  "label": "local-rtx5060ti-fp16x3",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "capability": "12.0",
+  "sms": 36,
+  "clock_khz_nominal": 2572000,
+  "torch": "2.14.1+cu130",
+  "cuda": "13.0",
+  "budget_cycles": 2000000,
+  "repeats": 5,
+  "nvrtc_log": "\u0000",
+  "kernels": {
+   "reg_tf32": {
+    "regs": 52,
+    "max_threads": 512,
+    "smem_bytes": 8,
+    "local_bytes": 0
+   },
+   "reg_bf16": {
+    "regs": 52,
+    "max_threads": 512,
+    "smem_bytes": 8,
+    "local_bytes": 0
+   },
+   "reg_fp16": {
+    "regs": 52,
+    "max_threads": 512,
+    "smem_bytes": 8,
+    "local_bytes": 0
+   },
+   "smem_tf32": {
+    "regs": 127,
+    "max_threads": 512,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "smem_bf16": {
+    "regs": 127,
+    "max_threads": 512,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "smem_fp16": {
+    "regs": 127,
+    "max_threads": 512,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "gemm_tf32": {
+    "regs": 162,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "gemm_bf16": {
+    "regs": 162,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "gemm_fp16": {
+    "regs": 162,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "x3_tf32": {
+    "regs": 205,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "x3_fp16": {
+    "regs": 238,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "x3_pipe_tf32": {
+    "regs": 194,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   },
+   "x3_pipe_fp16": {
+    "regs": 194,
+    "max_threads": 256,
+    "smem_bytes": 35848,
+    "local_bytes": 0
+   }
+  },
+  "rule": {
+   "keep_min": 0.9,
+   "gain_min": 1.1,
+   "primary": {
+    "tf32": "3xTF32",
+    "bf16": "BF16x6",
+    "fp16": "3xFP16"
+   }
+  }
+ },
+ "rows": [
+  {
+   "variant": "reg",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 36,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 52,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 216.33305629462302,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 22.17301606075906,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 509.6892741195861,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.428610616897096
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 187.89761901703397,
+     "mma_flop_per_cycle_sm": 337.04795217269714,
+     "simt_tflops": 19.28835218118563,
+     "mma_tflops": 34.60168697516783
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 229.2725941271741,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 23.557610245217784,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 511.79528911647856,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.66042043642913
+    }
+   },
+   "keep": 0.8685571323928278,
+   "mma_share": 0.6612812340516647,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.387892084319412,
+     "gain_vs_best_single": 1.3095631318298362,
+     "mma_alone_fp32_equiv_vs_simt": 0.7853465744742566
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "reg",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3f",
+   "grid": 36,
+   "simt_warps": 6,
+   "mma_warps": 2,
+   "regs": 52,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 211.88644074768695,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 21.788917050409296,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 255.02699384584832,
+     "simt_tflops": 0.0,
+     "mma_tflops": 26.2408510989125
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 203.903792226032,
+     "mma_flop_per_cycle_sm": 165.32485091652077,
+     "simt_tflops": 20.97155297275983,
+     "mma_tflops": 16.999148559721988
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 229.1605271413738,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 23.574289778566666,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 511.80582777550546,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.66373926431856
+    }
+   },
+   "keep": 0.9623258171052077,
+   "mma_share": 0.6482641246065575,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.22240986705375,
+     "gain_vs_best_single": 1.1302647933999665,
+     "mma_alone_fp32_equiv_vs_simt": 0.40120074530792793
+    }
+   },
+   "pass": true
+  },
+  {
+   "variant": "reg",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x7f",
+   "grid": 36,
+   "simt_warps": 7,
+   "mma_warps": 1,
+   "regs": 52,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 220.76460401071552,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 22.697334692984594,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 127.42009808304938,
+     "simt_tflops": 0.0,
+     "mma_tflops": 13.11100287741249
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 216.45158107789794,
+     "mma_flop_per_cycle_sm": 82.27384082589262,
+     "simt_tflops": 22.24825849646873,
+     "mma_tflops": 8.458005466765579
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 229.17526370413418,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 23.564081176160595,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 511.8297137138131,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.66079722915983
+    }
+   },
+   "keep": 0.9804632497490031,
+   "mma_share": 0.6456896679852537,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.1046888416708844,
+     "gain_vs_best_single": 1.0641471105772287,
+     "mma_alone_fp32_equiv_vs_simt": 0.19239210116138702
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "reg",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3",
+   "grid": 36,
+   "simt_warps": 2,
+   "mma_warps": 6,
+   "regs": 52,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 108.82599460180344,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 11.198040646687337,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 510.29419775014117,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.540549793827715
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 97.78261593462432,
+     "mma_flop_per_cycle_sm": 414.3014489456429,
+     "simt_tflops": 10.048663884259884,
+     "mma_tflops": 42.633723382796965
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 229.20251367981163,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 23.56805059540668,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 511.80397140705213,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.6653059498618
+    }
+   },
+   "keep": 0.8985226029168207,
+   "mma_share": 0.8118874382116729,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 2.167525321313225,
+     "gain_vs_best_single": 1.0291470853850504,
+     "mma_alone_fp32_equiv_vs_simt": 1.5630279010001797
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "reg",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xff",
+   "grid": 36,
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "regs": 52,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 229.2025711679747,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 23.55928740666461,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 509.43866057313386,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.419295836179
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 228.32927098066705,
+     "mma_flop_per_cycle_sm": 77.52312260181469,
+     "simt_tflops": 23.461672855726015,
+     "mma_tflops": 7.947091972284541
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 243.55280961760866,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 25.04812794924777,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 511.9009157854453,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.67178022476376
+    }
+   },
+   "keep": 0.9961898325011911,
+   "mma_share": 0.152173615003225,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.1089330741480465,
+     "gain_vs_best_single": 1.0435942506555356,
+     "mma_alone_fp32_equiv_vs_simt": 0.7408856104553088
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "reg",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 36,
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "regs": 52,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 216.45416071349212,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 22.208499051089554,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 511.7936517197889,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.660583375760645
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 187.25490699797842,
+     "mma_flop_per_cycle_sm": 360.6801315974799,
+     "simt_tflops": 19.23465666041634,
+     "mma_tflops": 37.054219247059194
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 243.57088545720035,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 25.049858897899327,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 511.9036408793363,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.66719883834393
+    }
+   },
+   "keep": 0.8651019060143498,
+   "mma_share": 0.7047374081047709,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.4205391872206485,
+     "gain_vs_best_single": 1.2623906874309148,
+     "mma_alone_fp32_equiv_vs_simt": 0.7881478616269562
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "reg",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xff",
+   "grid": 36,
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "regs": 52,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 229.2747158327885,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 23.576690526681773,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 511.80129257657507,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.6561464385141
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 228.9031722943539,
+     "mma_flop_per_cycle_sm": 79.54309189406027,
+     "simt_tflops": 23.542243467709994,
+     "mma_tflops": 8.220572653317411
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 243.41462039840934,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 25.0274933662829,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 512.0210251645029,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.676070044563495
+    }
+   },
+   "keep": 0.998379483158075,
+   "mma_share": 0.15541791911781686,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.114024000995026,
+     "gain_vs_best_single": 1.0493105789659862,
+     "mma_alone_fp32_equiv_vs_simt": 0.7440874160030726
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "smem",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 36,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 127,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 173.4290226641623,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.777645085772527,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 428.9754267989823,
+     "simt_tflops": 0.0,
+     "mma_tflops": 44.106667977834014
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 155.47259785199049,
+     "mma_flop_per_cycle_sm": 257.8015788620133,
+     "simt_tflops": 15.912339167324879,
+     "mma_tflops": 26.382826284792362
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 199.36200703622234,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.366501564902375,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 507.92105995736046,
+     "simt_tflops": 0.0,
+     "mma_tflops": 51.955409278548586
+    }
+   },
+   "keep": 0.8964623997971571,
+   "mma_share": 0.6009705049674535,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.391961124869709,
+     "gain_vs_best_single": 1.2108949998120764,
+     "mma_alone_fp32_equiv_vs_simt": 0.8244975767976936
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "smem",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3f",
+   "grid": 36,
+   "simt_warps": 6,
+   "mma_warps": 2,
+   "regs": 127,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 183.91238729071836,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 18.76446519783545,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 214.24755807435673,
+     "simt_tflops": 0.0,
+     "mma_tflops": 21.96601710888953
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 176.71843739648193,
+     "mma_flop_per_cycle_sm": 124.24503351723898,
+     "simt_tflops": 18.007160895112758,
+     "mma_tflops": 12.653452704331482
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 199.37073067824718,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.317312428044897,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 507.8144891968778,
+     "simt_tflops": 0.0,
+     "mma_tflops": 51.960244243581194
+    }
+   },
+   "keep": 0.9608838208224406,
+   "mma_share": 0.5799134171420451,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.1860726282894791,
+     "gain_vs_best_single": 1.0941096911608745,
+     "mma_alone_fp32_equiv_vs_simt": 0.38831453249835796
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "smem",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x7f",
+   "grid": 36,
+   "simt_warps": 7,
+   "mma_warps": 1,
+   "regs": 127,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 191.44315553443226,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.516013555645387,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 107.4696364068144,
+     "simt_tflops": 0.0,
+     "mma_tflops": 11.00225482383701
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 187.95670994841592,
+     "mma_flop_per_cycle_sm": 62.06795470821381,
+     "simt_tflops": 19.152312359908752,
+     "mma_tflops": 6.325142186232549
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 199.3746288462051,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.3048526775385,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 508.0018906350958,
+     "simt_tflops": 0.0,
+     "mma_tflops": 51.979281440217825
+    }
+   },
+   "keep": 0.981788611996686,
+   "mma_share": 0.5775394500569672,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.089858906692336,
+     "gain_vs_best_single": 1.0465024029984975,
+     "mma_alone_fp32_equiv_vs_simt": 0.18712192679649894
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "smem",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3",
+   "grid": 36,
+   "simt_warps": 2,
+   "mma_warps": 6,
+   "regs": 127,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 88.66427404446821,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 9.072649811975054,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 468.652966634362,
+     "simt_tflops": 0.0,
+     "mma_tflops": 47.93524183414465
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 83.06350034379807,
+     "mma_flop_per_cycle_sm": 361.88073091899696,
+     "simt_tflops": 8.483304119870333,
+     "mma_tflops": 36.95651615511358
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 199.39331941051807,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.312123338503447,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 508.0087654415041,
+     "simt_tflops": 0.0,
+     "mma_tflops": 51.984189610193155
+    }
+   },
+   "keep": 0.9368316747525485,
+   "mma_share": 0.7721720690639144,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 2.297322262492924,
+     "gain_vs_best_single": 1.0215508285448887,
+     "mma_alone_fp32_equiv_vs_simt": 1.761900801967191
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "smem",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xff",
+   "grid": 36,
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "regs": 127,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 199.3688667202688,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.313509740222834,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 430.10428849463557,
+     "simt_tflops": 0.0,
+     "mma_tflops": 43.986607106964875
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 189.0172244644253,
+     "mma_flop_per_cycle_sm": 117.83838347637604,
+     "simt_tflops": 19.234860202314938,
+     "mma_tflops": 12.003003297603026
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 205.5877099362953,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.927647968202738,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 508.4015116174511,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.02256144647881
+    }
+   },
+   "keep": 0.948077940020757,
+   "mma_share": 0.2739763044186567,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.1450969721543165,
+     "gain_vs_best_single": 1.1104588192259097,
+     "mma_alone_fp32_equiv_vs_simt": 0.719109751303527
+    }
+   },
+   "pass": true
+  },
+  {
+   "variant": "smem",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 36,
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "regs": 127,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 173.4295511905056,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.678092668441607,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 507.74672195046344,
+     "simt_tflops": 0.0,
+     "mma_tflops": 51.94179038285953
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 153.16145378706662,
+     "mma_flop_per_cycle_sm": 318.0381177762242,
+     "simt_tflops": 15.582533622151463,
+     "mma_tflops": 32.34772731984239
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 205.5871035913845,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.93868800346412,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 508.4160008540838,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.018221180515006
+    }
+   },
+   "keep": 0.8831335417504755,
+   "mma_share": 0.6263715825766621,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.4944059875227491,
+     "gain_vs_best_single": 1.2606537821924735,
+     "mma_alone_fp32_equiv_vs_simt": 0.9758942818857198
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "smem",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xff",
+   "grid": 36,
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "regs": 127,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 199.35555277956382,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.310344674233573,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 507.7804969071665,
+     "simt_tflops": 0.0,
+     "mma_tflops": 51.95532811254938
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 183.05650968562253,
+     "mma_flop_per_cycle_sm": 186.1818941494305,
+     "simt_tflops": 18.63224388758709,
+     "mma_tflops": 18.94951222028815
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 207.2395834283773,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 21.09043290395042,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 508.53636455299846,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.02641796070847
+    }
+   },
+   "keep": 0.9182413388205752,
+   "mma_share": 0.36665822197473774,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.2295475980034667,
+     "gain_vs_best_single": 1.1827718286911117,
+     "mma_alone_fp32_equiv_vs_simt": 0.849036624642608
+    }
+   },
+   "pass": true
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 36,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 162,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 172.76995365228956,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.625728811702114,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 480.9307171562066,
+     "simt_tflops": 0.0,
+     "mma_tflops": 49.193522737870495
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 159.4862967439111,
+     "mma_flop_per_cycle_sm": 275.7802391426791,
+     "simt_tflops": 16.237905228395714,
+     "mma_tflops": 28.07386955712293
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 195.77489597493098,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.959958573798144,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 510.3970233891824,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.22409641163821
+    }
+   },
+   "keep": 0.9231136165313059,
+   "mma_share": 0.5734302869515101,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.4551896195491767,
+     "gain_vs_best_single": 1.284194492214148,
+     "mma_alone_fp32_equiv_vs_simt": 0.9278826304179217
+    }
+   },
+   "pass": true
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3f",
+   "grid": 36,
+   "simt_warps": 6,
+   "mma_warps": 2,
+   "regs": 162,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 183.8658426260209,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 18.747309709222755,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 239.92063207187715,
+     "simt_tflops": 0.0,
+     "mma_tflops": 24.571895283789658
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 178.33138280316444,
+     "mma_flop_per_cycle_sm": 129.49572367176137,
+     "simt_tflops": 18.171253592445016,
+     "mma_tflops": 13.18138270299965
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 195.7719852481625,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.959515167799985,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 510.34891352093143,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.21991313054241
+    }
+   },
+   "keep": 0.9698994672212531,
+   "mma_share": 0.5397440084809634,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.2046643403886832,
+     "gain_vs_best_single": 1.1314010211742684,
+     "mma_alone_fp32_equiv_vs_simt": 0.4349559596375031
+    }
+   },
+   "pass": true
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x7f",
+   "grid": 36,
+   "simt_warps": 7,
+   "mma_warps": 1,
+   "regs": 162,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 189.85198464877698,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.3497521153785,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 120.39547337244137,
+     "simt_tflops": 0.0,
+     "mma_tflops": 12.32843501698088
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 187.1805220366405,
+     "mma_flop_per_cycle_sm": 64.01713966666436,
+     "simt_tflops": 19.076104481589514,
+     "mma_tflops": 6.513920503888179
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 195.79370024794588,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.95736964839112,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 510.3392194716414,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.21441113914803
+    }
+   },
+   "keep": 0.985928708530076,
+   "mma_share": 0.5317238088231807,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 1.0983270413419857,
+     "gain_vs_best_single": 1.064996311567399,
+     "mma_alone_fp32_equiv_vs_simt": 0.21138480343897204
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3",
+   "grid": 36,
+   "simt_warps": 2,
+   "mma_warps": 6,
+   "regs": 162,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 91.00461423809686,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 9.31213107672897,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 494.91336074350045,
+     "simt_tflops": 0.0,
+     "mma_tflops": 50.66550207766875
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 85.09912503557592,
+     "mma_flop_per_cycle_sm": 358.56787787787863,
+     "simt_tflops": 8.704584329376495,
+     "mma_tflops": 36.66062497465462
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 195.77920716541743,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.96474327034896,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 510.3210482985467,
+     "simt_tflops": 0.0,
+     "mma_tflops": 52.217363913408626
+    }
+   },
+   "keep": 0.935107804676032,
+   "mma_share": 0.7245063607480869,
+   "decompositions": {
+    "3xFP16": {
+     "c": 3,
+     "useful_vs_simt": 2.2484766592110765,
+     "gain_vs_best_single": 1.0451658986542947,
+     "mma_alone_fp32_equiv_vs_simt": 1.8127775347326547
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "skipped": "384 threads > 256 at 162 registers"
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "skipped": "384 threads > 256 at 162 registers"
+  },
+  {
+   "variant": "gemm",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "skipped": "512 threads > 256 at 162 registers"
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 36,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 238,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 171.59144510362364,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.522913636659602,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 156.35972554540558,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.000479984098757
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 157.6527577812829,
+     "mma_flop_per_cycle_sm": 82.76136433495458,
+     "simt_tflops": 16.06539514549191,
+     "mma_tflops": 8.453350866299344
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 196.78521931706507,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.061894120080485,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 165.4772366059168,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.914465284981365
+    }
+   },
+   "keep": 0.91876816869324,
+   "mma_share": 0.5293010335383415,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 1.4010845469076387,
+     "gain_vs_best_single": 1.2217082306820843,
+     "mma_alone_fp32_equiv_vs_simt": 0.9112326401294676
+    }
+   },
+   "pass": true
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3f",
+   "grid": 36,
+   "simt_warps": 6,
+   "mma_warps": 2,
+   "regs": 238,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 183.74399159579795,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 18.746297850564748,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 78.21810427737881,
+     "simt_tflops": 0.0,
+     "mma_tflops": 8.006756335826942
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 177.55929098369427,
+     "mma_flop_per_cycle_sm": 39.58967696862581,
+     "simt_tflops": 18.09225807172335,
+     "mma_tflops": 4.034156157239218
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 196.78101278056812,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.03405082702302,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 165.44159484721752,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.920554142936282
+    }
+   },
+   "keep": 0.9663406647564898,
+   "mma_share": 0.5061446750004577,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 1.1818017343936162,
+     "gain_vs_best_single": 1.1035056933793932,
+     "mma_alone_fp32_equiv_vs_simt": 0.4256906775457663
+    }
+   },
+   "pass": true
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x7f",
+   "grid": 36,
+   "simt_warps": 7,
+   "mma_warps": 1,
+   "regs": 238,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 190.1962547979945,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.38320848658158,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 39.189999980066936,
+     "simt_tflops": 0.0,
+     "mma_tflops": 4.012835763313767
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 187.14555350850657,
+     "mma_flop_per_cycle_sm": 19.78427137482136,
+     "simt_tflops": 19.0772478425033,
+     "mma_tflops": 2.0162358869552723
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 196.78346803535158,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.045186391409935,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 165.4107948826967,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.902462198354602
+    }
+   },
+   "keep": 0.9839602452070991,
+   "mma_share": 0.5048295836918643,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 1.0879805446385153,
+     "gain_vs_best_single": 1.051561022626929,
+     "mma_alone_fp32_equiv_vs_simt": 0.2060503242910342
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3",
+   "grid": 36,
+   "simt_warps": 2,
+   "mma_warps": 6,
+   "regs": 238,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 91.63862862115329,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 9.37621101268413,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 160.85669059315927,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.444634978299817
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 83.42400829260343,
+     "mma_flop_per_cycle_sm": 115.92988049855487,
+     "simt_tflops": 8.531385852308958,
+     "mma_tflops": 11.885153432513968
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 196.7825254529145,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.04512896772909,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 165.47246840957976,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.930630912337918
+    }
+   },
+   "keep": 0.910358541456243,
+   "mma_share": 0.7207028819942973,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 2.1754350953386123,
+     "gain_vs_best_single": 1.013067030887654,
+     "mma_alone_fp32_equiv_vs_simt": 1.755337165270805
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "skipped": "384 threads > 256 at 238 registers"
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "skipped": "384 threads > 256 at 238 registers"
+  },
+  {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "skipped": "512 threads > 256 at 238 registers"
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 36,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 194,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 161.0962897332805,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 16.43443543349268,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 156.43345132402942,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.00209434073754
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 102.38440304275818,
+     "mma_flop_per_cycle_sm": 119.5757927102455,
+     "simt_tflops": 10.45107627516754,
+     "mma_tflops": 12.204095080092506
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 190.20688094669373,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.371878817744246,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 165.4688444217917,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.910082853821336
+    }
+   },
+   "keep": 0.6355478652690958,
+   "mma_share": 0.764387614657695,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 1.3778107250048568,
+     "gain_vs_best_single": 1.1669409363545,
+     "mma_alone_fp32_equiv_vs_simt": 0.9710555816215809
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3f",
+   "grid": 36,
+   "simt_warps": 6,
+   "mma_warps": 2,
+   "regs": 194,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 175.03611988355243,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.844224327531087,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 78.19412961656217,
+     "simt_tflops": 0.0,
+     "mma_tflops": 8.008189905071063
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 123.76078309023194,
+     "mma_flop_per_cycle_sm": 58.842267859373194,
+     "simt_tflops": 12.628040958787171,
+     "mma_tflops": 6.004279348679709
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 190.21619268562358,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.400184137774602,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 165.361587884807,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.898750790520737
+    }
+   },
+   "keep": 0.707058538389489,
+   "mma_share": 0.7525151587199189,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 1.0432306833074614,
+     "gain_vs_best_single": 0.9599763741008057,
+     "mma_alone_fp32_equiv_vs_simt": 0.44673139274672535
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x7f",
+   "grid": 36,
+   "simt_warps": 7,
+   "mma_warps": 1,
+   "regs": 194,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 182.0504413645925,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 18.574504896635,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 38.95686633890203,
+     "simt_tflops": 0.0,
+     "mma_tflops": 3.9895608281205037
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 134.1301359099466,
+     "mma_flop_per_cycle_sm": 29.43421180713013,
+     "simt_tflops": 13.696165331189603,
+     "mma_tflops": 3.005580873575756
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 190.21705257943987,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.389501662452407,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 165.40465615542206,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.903886519699494
+    }
+   },
+   "keep": 0.7367745714020222,
+   "mma_share": 0.7555590213819983,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 0.8984561997820503,
+     "gain_vs_best_single": 0.8598826734988325,
+     "mma_alone_fp32_equiv_vs_simt": 0.21398940890718907
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0x3",
+   "grid": 36,
+   "simt_warps": 2,
+   "mma_warps": 6,
+   "regs": 194,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 83.7836059370202,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 8.57109370278532,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 160.78504358164002,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.44548859810777
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 44.91048334760006,
+     "mma_flop_per_cycle_sm": 143.71078670583856,
+     "simt_tflops": 4.5960854830185225,
+     "mma_tflops": 14.689284447077055
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 190.20560810490514,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 19.389861557917204,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 165.44587496568573,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.90139617359401
+    }
+   },
+   "keep": 0.536029487455566,
+   "mma_share": 0.8938069331857235,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 2.2512909052306065,
+     "gain_vs_best_single": 0.9916703925438797,
+     "mma_alone_fp32_equiv_vs_simt": 1.9190513679072432
+    }
+   },
+   "pass": false
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 4,
+   "skipped": "384 threads > 256 at 194 registers"
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 4,
+   "mma_warps": 8,
+   "skipped": "384 threads > 256 at 194 registers"
+  },
+  {
+   "variant": "x3_pipe",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_warps": 8,
+   "mma_warps": 8,
+   "skipped": "512 threads > 256 at 194 registers"
+  }
+ ],
+ "verdict": {
+  "pass_any": true,
+  "pass_realistic": true,
+  "best_realistic": {
+   "variant": "x3",
+   "kind": "fp16",
+   "sched_mode": "interleaved",
+   "simt_mask": "0xf",
+   "grid": 36,
+   "simt_warps": 4,
+   "mma_warps": 4,
+   "regs": 238,
+   "one_block_per_sm": true,
+   "modes": {
+    "simt_alone": {
+     "simt_flop_per_cycle_sm": 171.59144510362364,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 17.522913636659602,
+     "mma_tflops": 0.0
+    },
+    "mma_alone": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 156.35972554540558,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.000479984098757
+    },
+    "both": {
+     "simt_flop_per_cycle_sm": 157.6527577812829,
+     "mma_flop_per_cycle_sm": 82.76136433495458,
+     "simt_tflops": 16.06539514549191,
+     "mma_tflops": 8.453350866299344
+    },
+    "simt_all": {
+     "simt_flop_per_cycle_sm": 196.78521931706507,
+     "mma_flop_per_cycle_sm": 0.0,
+     "simt_tflops": 20.061894120080485,
+     "mma_tflops": 0.0
+    },
+    "mma_all": {
+     "simt_flop_per_cycle_sm": 0.0,
+     "mma_flop_per_cycle_sm": 165.4772366059168,
+     "simt_tflops": 0.0,
+     "mma_tflops": 16.914465284981365
+    }
+   },
+   "keep": 0.91876816869324,
+   "mma_share": 0.5293010335383415,
+   "decompositions": {
+    "3xFP16 in kernel": {
+     "c": 1,
+     "useful_vs_simt": 1.4010845469076387,
+     "gain_vs_best_single": 1.2217082306820843,
+     "mma_alone_fp32_equiv_vs_simt": 0.9112326401294676
+    }
+   },
+   "pass": true
+  }
+ }
+}

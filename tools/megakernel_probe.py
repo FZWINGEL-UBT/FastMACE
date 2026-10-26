@@ -53,21 +53,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 VARIANTS = ("reg", "smem", "gemm", "x3", "x3_pipe")
-KINDS = ("tf32", "bf16")
+KINDS = ("tf32", "bf16", "fp16")
 CONFIGS = ("4x4", "8x4", "4x8", "8x8")  # S x M warps per block
 SCHED_MODES = ("interleaved", "sched_iso")
 # FP32-equivalent products per MMA product for an FP32-accurate decomposition.
-DECOMPOSITIONS = {"tf32": {"3xTF32": 3}, "bf16": {"BF16x6": 6, "BF16x3": 3}}
-PRIMARY = {"tf32": "3xTF32", "bf16": "BF16x6"}
-X3 = {"3xTF32 in kernel": 1}  # the x3/x3_pipe variants' MMA rate already counts useful products
-
+DECOMPOSITIONS = {"tf32": {"3xTF32": 3}, "bf16": {"BF16x6": 6, "BF16x3": 3}, "fp16": {"3xFP16": 3}}
+PRIMARY = {"tf32": "3xTF32", "bf16": "BF16x6", "fp16": "3xFP16"}
+X3 = {"tf32": {"3xTF32 in kernel": 1}, "fp16": {"3xFP16 in kernel": 1}}
 
 def decompositions(variant, kind):
-    return X3 if variant in ("x3", "x3_pipe") else DECOMPOSITIONS[kind]
+    return X3[kind] if variant in ("x3", "x3_pipe") else DECOMPOSITIONS[kind]
 
 
 def primary(variant, kind):
-    return next(iter(X3)) if variant in ("x3", "x3_pipe") else PRIMARY[kind]
+    return next(iter(X3[kind])) if variant in ("x3", "x3_pipe") else PRIMARY[kind]
 
 
 KEEP_MIN = 0.90
@@ -85,8 +84,13 @@ __device__ __forceinline__ void mma_op(int kind, float* d, const unsigned* a, co
                  "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"
                  : "+f"(d[0]), "+f"(d[1]), "+f"(d[2]), "+f"(d[3])
                  : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
-  } else {
+  } else if (kind == 1) {
     asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 "
+                 "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"
+                 : "+f"(d[0]), "+f"(d[1]), "+f"(d[2]), "+f"(d[3])
+                 : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
+  } else {
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
                  "{%0,%1,%2,%3}, {%4,%5,%6,%7}, {%8,%9}, {%0,%1,%2,%3};"
                  : "+f"(d[0]), "+f"(d[1]), "+f"(d[2]), "+f"(d[3])
                  : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]), "r"(b[0]), "r"(b[1]));
@@ -108,6 +112,22 @@ __device__ __forceinline__ void split_tf32(unsigned x, unsigned& big, unsigned& 
   asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(big) : "f"(__uint_as_float(x)));
   const float r = __uint_as_float(x) - __uint_as_float(big);
   asm("cvt.rna.tf32.f32 %0, %1;" : "=r"(small) : "f"(r));
+}
+
+__device__ __forceinline__ void split_fp16x2(unsigned x0, unsigned x1, unsigned& big, unsigned& small) {
+  const float f0 = __uint_as_float(x0), f1 = __uint_as_float(x1);
+  asm("cvt.rn.f16x2.f32 %0, %2, %1;" : "=r"(big) : "f"(f0), "f"(f1));
+  float b0, b1;
+  asm("{ .reg .b16 lo, hi; mov.b32 {lo, hi}, %2; cvt.f32.f16 %0, lo; cvt.f32.f16 %1, hi; }"
+      : "=f"(b0), "=f"(b1) : "r"(big));
+  const float r0 = (f0 - b0) * 2048.0f, r1 = (f1 - b1) * 2048.0f;
+  asm("cvt.rn.f16x2.f32 %0, %2, %1;" : "=r"(small) : "f"(r0), "f"(r1));
+}
+
+template <int KIND>
+__device__ __forceinline__ void split_elem(unsigned x, unsigned& big, unsigned& small) {
+  if (KIND == 0) split_tf32(x, big, small);
+  else split_fp16x2(x, x ^ 1u, big, small);
 }
 
 __device__ __forceinline__ unsigned long long gtimer() {
@@ -184,8 +204,8 @@ __device__ void body(unsigned simt_mask, int s_warps, int m_warps, long long bud
           for (int s = 0; s < splits; ++s) {
             const unsigned idx = (split_idx + (unsigned)(s * 32)) & (KSM * 4 * 128 - 1);
             unsigned big_a, small_a, big_b, small_b;
-            split_tf32(mA[idx], big_a, small_a);
-            split_tf32(mB[idx], big_b, small_b);
+            split_elem<KIND>(mA[idx], big_a, small_a);
+            split_elem<KIND>(mB[idx], big_b, small_b);
             mA[idx] = big_a; mAs[idx] = small_a;
             mB[idx] = big_b; mBs[idx] = small_b;
           }
@@ -256,19 +276,18 @@ __device__ void body(unsigned simt_mask, int s_warps, int m_warps, long long bud
             unsigned ab[MT][4], as[MT][4], bb[NT / 2][4], bs[NT / 2][4];
 #pragma unroll
             for (int m = 0; m < MT; ++m)
-#pragma unroll
-              for (int i = 0; i < 4; ++i) split_tf32(fa[m][i], ab[m][i], as[m][i]);
+              for (int i = 0; i < 4; ++i) split_elem<KIND>(fa[m][i], ab[m][i], as[m][i]);
 #pragma unroll
             for (int n = 0; n < NT / 2; ++n)
 #pragma unroll
-              for (int i = 0; i < 4; ++i) split_tf32(fb[n][i], bb[n][i], bs[n][i]);
+              for (int i = 0; i < 4; ++i) split_elem<KIND>(fb[n][i], bb[n][i], bs[n][i]);
 #pragma unroll
             for (int m = 0; m < MT; ++m)
 #pragma unroll
               for (int n = 0; n < NT; ++n) {
-                mma_op(0, d[m][n], as[m], &bb[n >> 1][(n & 1) * 2]);
-                mma_op(0, d[m][n], ab[m], &bs[n >> 1][(n & 1) * 2]);
-                mma_op(0, d[m][n], ab[m], &bb[n >> 1][(n & 1) * 2]);
+                mma_op(KIND, d[m][n], as[m], &bb[n >> 1][(n & 1) * 2]);
+                mma_op(KIND, d[m][n], ab[m], &bs[n >> 1][(n & 1) * 2]);
+                mma_op(KIND, d[m][n], ab[m], &bb[n >> 1][(n & 1) * 2]);
               }
           } else if (VAR == 4) {
 #pragma unroll
@@ -277,8 +296,8 @@ __device__ void body(unsigned simt_mask, int s_warps, int m_warps, long long bud
               ldsm_x4(as_m, as_base + (ks * 4 + m) * 512);
 #pragma unroll
               for (int n = 0; n < NT; ++n) {
-                mma_op(0, d[m][n], as_m, &fb[n >> 1][(n & 1) * 2]);
-                mma_op(0, d[m][n], fa[m], &fb[n >> 1][(n & 1) * 2]);
+                mma_op(KIND, d[m][n], as_m, &fb[n >> 1][(n & 1) * 2]);
+                mma_op(KIND, d[m][n], fa[m], &fb[n >> 1][(n & 1) * 2]);
               }
             }
 #pragma unroll
@@ -287,8 +306,8 @@ __device__ void body(unsigned simt_mask, int s_warps, int m_warps, long long bud
               ldsm_x4(bs_n, bs_base + (ks * 4 + n) * 512);
 #pragma unroll
               for (int m = 0; m < MT; ++m) {
-                mma_op(0, d[m][n * 2], fa[m], &bs_n[0]);
-                mma_op(0, d[m][n * 2 + 1], fa[m], &bs_n[2]);
+                mma_op(KIND, d[m][n * 2], fa[m], &bs_n[0]);
+                mma_op(KIND, d[m][n * 2 + 1], fa[m], &bs_n[2]);
               }
             }
           } else {
@@ -322,12 +341,17 @@ extern "C" __global__ void __launch_bounds__(VAR >= 2 ? 256 : 512) NAME(unsigned
     body<VAR, KIND>(simt_mask, s, m, budget, fill, in, out, rec, smid); }
 PROBE(probe_reg_tf32, 0, 0)
 PROBE(probe_reg_bf16, 0, 1)
+PROBE(probe_reg_fp16, 0, 2)
 PROBE(probe_smem_tf32, 1, 0)
 PROBE(probe_smem_bf16, 1, 1)
+PROBE(probe_smem_fp16, 1, 2)
 PROBE(probe_gemm_tf32, 2, 0)
 PROBE(probe_gemm_bf16, 2, 1)
+PROBE(probe_gemm_fp16, 2, 2)
 PROBE(probe_x3_tf32, 3, 0)
+PROBE(probe_x3_fp16, 3, 2)
 PROBE(probe_x3_pipe_tf32, 4, 0)
+PROBE(probe_x3_pipe_fp16, 4, 2)
 """
 
 
@@ -367,7 +391,7 @@ def compile_module(capability):
     kernels = {}
     for variant in VARIANTS:
         for kind in KINDS:
-            if variant in ("x3", "x3_pipe") and kind != "tf32":
+            if variant in ("x3", "x3_pipe") and kind not in ("tf32", "fp16"):
                 continue
             name = f"probe_{variant}_{kind}"
             fn = check(driver.cuModuleGetFunction(module, name.encode()), name)
@@ -514,7 +538,8 @@ def main(argv=None):
     buffers = (inp, torch.empty(max(grids) * 32 * max_warps, device="cuda"),
                torch.zeros(max(grids) * max_warps * REC, dtype=torch.int64, device="cuda"),
                torch.zeros(max(grids), dtype=torch.int32, device="cuda"))
-    fills = {"tf32": int.from_bytes(torch.tensor([1e-3]).numpy().tobytes(), "little"), "bf16": 0x3A833A83}
+    fills = {"tf32": int.from_bytes(torch.tensor([1e-3]).numpy().tobytes(), "little"),
+             "bf16": 0x3A833A83, "fp16": 0x14001400}
     meta = {"date_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"), "label": args.label,
             "gpu": props.name, "capability": f"{cap[0]}.{cap[1]}", "sms": sms, "clock_khz_nominal": int(clock_khz),
             "torch": torch.__version__, "cuda": torch.version.cuda, "budget_cycles": args.budget,
@@ -547,7 +572,7 @@ def main(argv=None):
                         continue
                     for grid in grids:
                         row = measure(torch, kernel, variant, kind, grid, s, m, args.budget, fills[kind], buffers,
-                                      args.repeats, sched_mode=sched_mode, x3_kernel=kernels.get(("x3", "tf32")))
+                                      args.repeats, sched_mode=sched_mode, x3_kernel=kernels.get(("x3", kind)))
                         rows.append(row)
                         md = row["modes"]
                         d = row["decompositions"][primary(variant, kind)]
