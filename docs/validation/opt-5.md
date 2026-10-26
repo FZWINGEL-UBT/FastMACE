@@ -147,6 +147,21 @@ No production code or default changed; no hybrid force/stress or MD qualificatio
 The normalized standalone `3×FP16` candidate remains separate and unqualified on the target datacenter GPUs.
 All work stayed on the local PC; NAS sync and workstation jobs remain paused by the owner's instruction.
 
+### 3.5 Profile of the rejected larger hybrids (`OPT5-T08`)
+
+Nsight Compute and sustained-power measurements are recorded in
+[the design report, §3.4](../design/2026-10-26-fp16x3-and-hybrid-gemm.md#34-why-the-hybrid-loses-nsight-compute-and-sustained-power-profile-26-october-2026)
+and in `results/opt5-T08-profile-20261026/`. At `[13608, 512, 512]`, cuBLAS keeps issue activity at
+76.6 % and FMA-pipe activity at 70.2 %. The hybrids fall to 58–62 % issue and 50–52 % FMA while activating
+the Tensor pipe only 23–25 % of cycles; barrier stalls rise from 0.13 to 0.97–1.92 per issued instruction.
+Reducing shared-memory wavefronts and bank conflicts did not recover the gap, and DRAM/L2 were not saturated.
+
+Under sustained replay all major kernels sit at the 180 W power cap. Three one-pass cuBLAS FP16 GEMMs
+would take 523.6 µs, essentially the 522.3 µs FP32 time, before split/rescaling overhead; the previous
+hybrid takes 617.5 µs and uses about 18 % more energy per GEMM. This confirms the rejection: the current
+hybrid trades away more SIMT efficiency and synchronization time than the Tensor cores return on `sm_120`.
+It does not qualify or disqualify the separate normalized standalone path on `sm_80`/`sm_89`.
+
 ## 4. Records and files
 
 - Probe and Wave-1 microbenchmarks:
@@ -162,3 +177,5 @@ All work stayed on the local PC; NAS sync and workstation jobs remain paused by 
   - `tools/bench/opt5_t06_t07_bench.py`, `results/opt5-T06-fp16x3-20261026/`;
   - `tools/bench/opt5_t08_hybrid_gemm.py`, `results/opt5-T08-hybrid-gemm-20261026/summary.json`.
   - `tools/bench/opt5_t08_large_gemm.py`, `results/opt5-T08-large-20261026/` (six screens and final validation).
+  - `tools/bench/opt5_t08_profile.py`, `results/opt5-T08-profile-20261026/` (Nsight Compute raw metrics,
+    sustained clock/power runs and tensor-core energy controls).

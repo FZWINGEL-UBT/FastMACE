@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "utc": "2026-10-26T15:22:13.213183Z",
+    "gpu": "NVIDIA GeForce RTX 5060 Ti",
+    "capability": [
+      12,
+      0
+    ],
+    "torch": "2.14.1+cu130",
+    "triton": "3.8.0",
+    "cuda": "13.0",
+    "commit": "d15bae6bf68aeb1aacb71e0b41fa8dcab62807fc",
+    "protocol": "CUDA graph of 80 calls replayed for 4.0 s per kernel; nvidia-smi every 50 ms"
+  },
+  "windows": [
+    {
+      "kernel": "cublas",
+      "shape": [
+        13608,
+        512,
+        512
+      ],
+      "start": 1793028135.7177298,
+      "stop": 1793028139.897444,
+      "us_per_call": 522.3151245117188,
+      "tflops": 13.659399793696629,
+      "samples": 62,
+      "sm_mhz_median": 2520.0,
+      "power_w_median": 180.01,
+      "temp_c_max": 65.0,
+      "throttle_reasons": [
+        "0x0000000000000000",
+        "0x0000000000000004"
+      ],
+      "fp32_peak_tflops_at_clock": 23.22432,
+      "fraction_of_fp32_peak": 0.5881506883171016
+    },
+    {
+      "kernel": "cublas_fp16",
+      "shape": [
+        13608,
+        512,
+        512
+      ],
+      "start": 1793028141.0729203,
+      "stop": 1793028145.2622437,
+      "us_per_call": 174.5360107421875,
+      "tflops": 40.877014855911916,
+      "samples": 63,
+      "sm_mhz_median": 2685.0,
+      "power_w_median": 180.07,
+      "temp_c_max": 68.0,
+      "throttle_reasons": [
+        "0x0000000000000000"
+      ],
+      "fp32_peak_tflops_at_clock": 24.74496,
+      "fraction_of_fp32_peak": 1.6519329534544376
+    },
+    {
+      "kernel": "triton_fp16x3_rowcol",
+      "shape": [
+        13608,
+        512,
+        512
+      ],
+      "start": 1793028146.2790353,
+      "stop": 1793028150.4091094,
+      "us_per_call": 860.2656046549479,
+      "tflops": 8.293381794407146,
+      "samples": 62,
+      "sm_mhz_median": 2745.0,
+      "power_w_median": 180.02,
+      "temp_c_max": 69.0,
+      "throttle_reasons": [
+        "0x0000000000000000"
+      ],
+      "fp32_peak_tflops_at_clock": 25.29792,
+      "fraction_of_fp32_peak": 0.3278286038696915
+    },
+    {
+      "kernel": "hybrid_gemm_6x2_64_128",
+      "shape": [
+        13608,
+        512,
+        512
+      ],
+      "start": 1793028151.4144592,
+      "stop": 1793028156.3589218,
+      "us_per_call": 617.463623046875,
+      "tflops": 11.554544814793699,
+      "samples": 77,
+      "sm_mhz_median": 2475.0,
+      "power_w_median": 180.01,
+      "temp_c_max": 67.0,
+      "throttle_reasons": [
+        "0x0000000000000000",
+        "0x0000000000000004"
+      ],
+      "fp32_peak_tflops_at_clock": 22.8096,
+      "fraction_of_fp32_peak": 0.5065649908281469
+    }
+  ],
+  "samples": 398
+}

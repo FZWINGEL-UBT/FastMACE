@@ -96,6 +96,9 @@ exponent-range accuracy fail before any integration gate. See
 [the measured report](../docs/design/2026-10-26-fp16x3-and-hybrid-gemm.md#33-larger-tiles-and-pre-split-b-not-qualified-26-october-2026).
 The standalone normalized `3×FP16` path for `sm_80`/`sm_89` remains a candidate, not an adoption.
 The owner has paused **all NAS sync and workstation jobs until explicit permission**; this continuation was local only.
+Profile follow-up: Nsight Compute attributes the loss mainly to barrier-coupled SIMT/MMA roles, lower
+issue/FMA activity and only 23–25 % Tensor-pipe activity; sustained kernels are at the 180 W cap, where
+three one-pass cuBLAS FP16 GEMMs already equal the FP32 time before overhead. See design report §3.4.
 
 ```text
 Wave 1 (falsifiers first, no library edits):

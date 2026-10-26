@@ -219,6 +219,70 @@ the old control. Prefetching packed B through shared memory also failed to produ
 cuBLAS IEEE on `sm_120`. No force/stress gate or MD timing was run for these rejected hybrid candidates:
 they fail the earlier per-product accuracy and general-speed requirements.
 
+### 3.4 Why the hybrid loses: Nsight Compute and sustained-power profile (26 October 2026)
+
+Tool: `tools/bench/opt5_t08_profile.py`. Records:
+`results/opt5-T08-profile-20261026/{sustain.json,sustain.smi.csv,tensor-energy.json,tensor-energy.smi.csv,ncu_raw.csv}`.
+Nsight Compute used the full metric set, base clock control, three warm-up launches and then one measured
+launch for each of four kernels at three shapes. The sustained run replayed a CUDA graph of 80 calls for
+4 s per kernel while `nvidia-smi` sampled clock, power and throttle state every 50 ms.
+
+At `[13608, 512, 512]`, cuBLAS selects CUTLASS `cutlass_80_simt_sgemm_128x128_8x4_nn_align1`
+(128 threads/block, 200 registers/thread). The hybrid candidates use 256 threads/block and
+128 registers/thread. Percentages below are Nsight Compute pipe-active or issue-active values, not
+direct FLOP rates.
+
+| Kernel | NCU duration (µs) | Issue active | FMA pipe | Tensor pipe | Shared wavefronts | Barrier stall* | DRAM |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| cuBLAS FP32 | 523.6 | 76.6 % | 70.2 % | 0 % | 52.3 % | 0.13 | 25.5 % |
+| Previous `6×2` hybrid | 615.0 | 61.5 % | 52.2 % | 24.8 % | 69.0 % | 0.97 | 44.2 % |
+| Packed `64×128` | 597.7 | 62.4 % | 51.1 % | 24.7 % | 51.8 % | 1.34 | 44.0 % |
+| Packed `128×128` | 601.6 | 58.2 % | 50.1 % | 22.7 % | 38.5 % | 1.92 | 43.2 % |
+
+\*Average warps stalled at barriers per issued instruction.
+
+The profile rules out the simplest explanations:
+
+- **Not DRAM-bound:** DRAM throughput is at most 44 % and L2 at most 32 % in these NCU launches.
+- **Shared-memory bank conflicts are not decisive:** the packed `64×128` kernel cuts shared wavefronts
+  from 69.0 % to 51.8 % and bank conflicts from 7.37 million to 1.04 million versus the previous hybrid,
+  yet improves only 615.0 → 597.7 µs and remains 14 % slower than cuBLAS.
+- **Synchronization and lost SIMT efficiency dominate:** every hybrid couples SIMT and MMA warps at tile
+  barriers. Barrier stalls are 0.97–1.92 per issued instruction versus cuBLAS's 0.13; short-scoreboard
+  stalls are 0.35–0.68 versus 0.08. Issue activity falls from 76.6 % to 58–62 %, and FMA-pipe activity
+  from 70.2 % to 50–52 %. The Tensor pipe is active only 23–25 % of cycles, so it compensates for part of
+  the lost FP32 work rather than adding a second full-rate stream on top of an equally efficient SIMT path.
+- **More resident warps do not fix it:** the hybrids have about 32 % active warps versus cuBLAS's 17 %,
+  but lower issue activity. cuBLAS spends 200 registers/thread on a larger per-thread accumulator tile;
+  the hybrids are capped at 128 registers/thread to keep two 256-thread blocks resident while also holding
+  MMA accumulators in registers.
+
+#### Sustained power ceiling
+
+At the same `[13608, 512, 512]` shape, every sustained kernel below sits at the card's 180 W cap.
+Energy is median sampled power × sustained time per GEMM.
+
+| Kernel | Sustained time (µs) | Throughput | Median SM clock | Energy/GEMM |
+| --- | ---: | ---: | ---: | ---: |
+| cuBLAS FP32 | 522.3 | 13.66 TFLOP/s | 2520 MHz | 94.0 mJ |
+| cuBLAS FP16, one pass (not FP32-accurate) | 174.5 | 40.88 TFLOP/s | 2685 MHz | 31.4 mJ |
+| Previous `6×2` hybrid | 617.5 | 11.55 TFLOP/s | 2475 MHz | 111.1 mJ |
+| Triton row/column-normalized `3×FP16` | 860.3 | 8.29 TFLOP/s | 2745 MHz | 154.8 mJ |
+
+Three one-pass FP16 cuBLAS calls would take `3 × 174.5 = 523.6 µs`, essentially the FP32 time, before
+any split, rescaling or synchronization work. A fused three-pass kernel shares operand loads, so this is
+not a hard lower bound; it does show that cuBLAS-quality FP16 execution leaves only a few percent of
+energy/time headroom for the extra work on this GPU and shape. The measured hybrids use 18 % more energy
+per GEMM than FP32 cuBLAS, and the current normalized Triton kernel 65 % more.
+
+**Profile verdict:** a faster kernel is not mathematically excluded, but it must preserve cuBLAS-level
+SIMT issue/FMA efficiency while adding Tensor-core work, or reach near-cuBLAS FP16 efficiency in a
+normalized tensor-only three-pass kernel. The present designs trade roughly 18 points of FMA-pipe activity
+and 15 points of issue activity for 23–25 % Tensor-pipe activity, then lose more to barrier coupling.
+That trade is negative on `sm_120`, and the 180 W cap removes the clock headroom that raw peak-FLOP
+arithmetic suggests. No further hybrid variant is justified without a design that first removes the
+per-tile SIMT/MMA barrier coupling.
+
 The separate **row/column-normalized standalone `3×FP16` path** remains a candidate for `sm_80`/`sm_89`,
 not an adopted backend. Its previously recorded local evidence does not qualify another GPU, a complete
 force/stress gate or MD. Workstation validation and NAS synchronization wait for the owner's explicit permission.
