@@ -132,6 +132,21 @@ Tested on the 52 real `MH-1 NaCl` products across two consecutive `1 fs` 300 K s
   `1×TF32` or `2×FP16` on Tensor Cores):** MACE's equivariant linear weights have nearly uniform row norms, so
   the bottom 50 % of channels still carry ~40 % of the product norm. `1×TF32` on the tail is **1,343× worse than
   IEEE** (median), and `2×FP16` is **411× worse**.
+
+### 3.4 Larger hybrid GEMMs: screen completed, candidates rejected (`OPT5-T08`)
+
+The owner's larger-system follow-up is recorded in
+[the design report, §3.3](../design/2026-10-26-fp16x3-and-hybrid-gemm.md#33-larger-tiles-and-pre-split-b-not-qualified-26-october-2026).
+It tested pre-split B, row/column partitions, larger tiles, aligned vector loads and asynchronous/staged B,
+with the old kernels and cuBLAS in the same alternating-order process. The final screen includes
+32,768-row and larger 1,024-channel products, packing costs, boundary/replay checks and real MH-1 operands.
+
+Boundary indexing, repeatability and graph replay passed. The candidates did **not** establish a
+general speed win and failed cancellation-scaled real-operand and wide-exponent-range accuracy checks.
+No production code or default changed; no hybrid force/stress or MD qualification is claimed.
+The normalized standalone `3×FP16` candidate remains separate and unqualified on the target datacenter GPUs.
+All work stayed on the local PC; NAS sync and workstation jobs remain paused by the owner's instruction.
+
 ## 4. Records and files
 
 - Probe and Wave-1 microbenchmarks:
@@ -146,3 +161,4 @@ Tested on the 52 real `MH-1 NaCl` products across two consecutive `1 fs` 300 K s
   - `docs/design/2026-10-26-fp16x3-and-hybrid-gemm.md`;
   - `tools/bench/opt5_t06_t07_bench.py`, `results/opt5-T06-fp16x3-20261026/`;
   - `tools/bench/opt5_t08_hybrid_gemm.py`, `results/opt5-T08-hybrid-gemm-20261026/summary.json`.
+  - `tools/bench/opt5_t08_large_gemm.py`, `results/opt5-T08-large-20261026/` (six screens and final validation).

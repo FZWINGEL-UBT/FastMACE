@@ -139,19 +139,86 @@ NVRTC kernel (`tools/bench/opt5_t08_hybrid_gemm.py`):
 | `NbCl5 [13608, 512, 512]` | **475.61–484.20** | 1,128.96 | 612.30 | 615.81–616.33 | **579.89–580.66 (+19.8 %)** | $9.87\times 10^{-7}$ vs $9.37\times 10^{-7}$ |
 | `OMOL [1944, 1024, 1024]` | **299.36–299.83** | 664.62 | 354.25 | 319.17–330.39 | **311.15–316.97 (+3.9 to +5.7 %)** | $1.62\times 10^{-6}$ vs $8.00\times 10^{-7}$ |
 
-**Why the pipelined NVRTC kernel beats `cuBLAS IEEE` on `NaCl` (−1 to −9 %) but stays 4–7 % behind on `5832` / `1944`:**
-- Keeping 2 blocks (16 warps) per SM to hide `__syncthreads()` latency caps each thread at `128` registers (`32`
-  accumulators per SIMT thread = `8×4` thread tile, `64×128` block tile).
-- On `NaCl [1512, 512, 512]`, the added `3×FP16` Tensor Core throughput outweighs the smaller `64×128` block
-  tile, beating `cuBLAS IEEE FP32` (`67.67–72.10 µs` vs `73.75–74.37 µs`).
-- On very large $M$ (`5832` and `13608`), `cuBLAS`'s pure-SIMT `128×128` block tile (`8×8 = 64` accumulators per
-  thread) achieves 2× higher global-memory $B$-tile reuse and 1.5× higher FMA-per-shared-load ratio than a
-  `64×128` tile, giving `cuBLAS` a 4–7 % edge on `5832` (`234` vs `252 µs`) and `1944×1024×1024` (`299` vs
-  `311 µs`).
-- **Actionable conclusion:**
-  1. On `sm_120` (RTX 5060 Ti), `cuBLAS IEEE FP32` stays the default because the small gain on `NaCl` (`~6 µs`
-     per layer) is offset by the 4–7 % loss on `NbCl5`.
-  2. On `sm_89` (RTX 4000 Ada workstations `leto`/`murphy` and Modal L4) and `sm_80` (A100), where 16-bit FP16
-     Tensor Cores are **4× to 16× faster than FP32 SIMT** and **2× faster than TF32**, standalone `triton_fp16x3`
-     (Path A, **1.78–1.88× faster than `triton_tf32x3`** with better-than-`tf32x3` accuracy across all 52 real
-     `MH-1` products) is ready to benchmark and enable.
+**Interpretation and limits:** the register/shared-memory tradeoff motivates larger tiles, but it is not
+a measured attribution of the cuBLAS performance gap. No profiler evidence here establishes cuBLAS's
+internal tile or which memory level limits it. The later screen below queries occupancy directly and
+includes packing costs, larger matrices, boundary checks and real-operand accuracy.
+
+### 3.3 Larger tiles and pre-split B: not qualified (26 October 2026)
+
+Owner request: make the hybrid faster for more atoms. Tool:
+`tools/bench/opt5_t08_large_gemm.py`. Records:
+`results/opt5-T08-large-20261026/{screen1,screen2,screen3,screen4,screen5,screen6,validation}.json`.
+These are dense GEMM screens, not MD trajectories; `M` is matrix rows, not necessarily atoms.
+
+**Setup:** local `Fabi-PC`, RTX 5060 Ti (`sm_120`, 36 SMs), WSL
+`~/environments/mace_cueq_oeq/bin/python` (Python 3.10.12, torch 2.14.1+cu130,
+Triton 3.8.0). IEEE FP32 cuBLAS versus FP32 SIMT + scaled-residual `3×FP16` MMA;
+TF32 disabled. FastMACE baseline `e63665b4`, with the new benchmark source;
+each JSON records the measured script and imported baseline SHA-256 hashes.
+The metadata field `driver = 13030` is CUDA's driver API version, not an NVIDIA
+driver package number. All runs used a quiet `tools/ci/local_gpu.py` reservation.
+No workstation job or NAS synchronization was performed.
+
+**Variants tested:**
+
+- Pack B once into the `hi/lo` FP16 pairs needed by MMA, eliminating repeated B splitting in each output tile.
+  Report both already-packed GEMM and packing-plus-GEMM; do not assume reusable weights for every force-call product.
+- Larger `128×128` row-partitioned tiles, shared accumulator storage for mutually exclusive SIMT/MMA warp roles,
+  and `cp.async` B staging. The first row variants spilled; the asynchronous variant did not close the timing gap.
+- `64×128` and `128×128` column partitions with aligned vector loads, packed B read directly or staged in shared memory.
+  These aligned variants require `K % 16 == 0` and `N % 128 == 0`; they are not general drop-in GEMMs.
+
+The CUDA occupancy query reports **two active blocks/SM for both old controls and all four final candidates**.
+The old `6×2` control uses 26,624 shared bytes/block, 128 registers/thread and no local-memory spill;
+the packed column variants use 21,504 / 29,696 shared bytes/block, 128 registers and no spill.
+This disproves the earlier hypothesis that the old padded kernel was restricted to one block/SM by a
+48 KiB aggregate shared-memory limit. Removing padding had already slowed the kernel; it was restored.
+
+#### Final same-process timings
+
+`validation.json`: 80 GEMMs per CUDA-graph replay, 12 blocks, reversed execution order on alternate blocks.
+Medians in microseconds; both new columns **include B packing on every call**.
+The fixed candidates are shown across all shapes, rather than selecting a different kernel for each shape.
+
+| `[M, K, N]` | cuBLAS IEEE | Previous `6×2`, `64×128` | New packed `64×128` | New packed `128×128` |
+| --- | ---: | ---: | ---: | ---: |
+| `[1512, 512, 512]` | 67.90 | 67.52 | 69.31 | 92.55 |
+| `[5832, 512, 512]` | 245.77 | 269.67 | 241.71 | 285.59 |
+| `[13608, 512, 512]` | 527.83 | 613.62 | 616.55 | 596.65 |
+| `[1944, 1024, 1024]` | 330.22 | 338.20 | 337.35 | 375.12 |
+| `[32768, 512, 512]` | 1261.27 | 1498.13 | 1545.29 | 1545.68 |
+| `[5832, 1024, 1024]` | 912.25 | 1028.52 | 974.71 | 1035.22 |
+
+Packing alone costs about 4.4 µs for `512×512` B and 15.8 µs for `1024×1024`.
+The small apparent win at 5,832 rows is not reliable evidence of superiority: cuBLAS's blocks range
+220.44–258.65 µs and the new packed path's 230.56–287.18 µs. Independently timed packing-plus-GEMM can
+even appear faster than GEMM alone in this noisy run; do not infer a negative packing cost from their medians.
+At 13,608 rows the new larger tile remains 13% slower than cuBLAS; at 32,768 rows neither tile improves on
+the old control. Prefetching packed B through shared memory also failed to produce a general win.
+
+#### Numerical and indexing checks
+
+- **18 boundary cases passed:** partial M tiles, the generic row candidate's odd K/N tails, output canaries,
+  repeated-launch bitwise equality, and packing-plus-GEMM CUDA-graph replay equality.
+  Worst max-relative error against a float64 product was `8.14e-7` on these Gaussian inputs.
+- **Real operands:** capture one rattled MH-1 NaCl 3×3×3 force call (216 atoms, seed 20261024,
+  ±0.05 Å displacement), then replay its 52 products individually. Model and structure SHA-256 hashes and
+  the capture plan are in the JSON. Structures came from the frozen research-baseline export
+  (`research-engine-baseline-20261017`, `d2faa9fd`); the control here is cuBLAS, not the research MD engine.
+  The generic row candidate covers all 52 products; each aligned column candidate covers 38.
+  All outputs are finite, but 36/52 row products and 28/38 products for each column variant have
+  cancellation-scaled error greater than twice IEEE. For a full-tile `[648,128,512]` product,
+  the column variants reach `0.244` versus IEEE's `3.08e-7` in the cancellation-scaled metric,
+  despite a superficially good `2.98e-7` global max-relative error.
+- **Dynamic range fails:** reciprocal operand scalings `A *= 2**-30, B /= 2**-30` and
+  `A *= 2**20, B /= 2**20` leave the exact product scale unchanged but produce nonfinite hybrid output
+  for every final candidate. The fixed FP16 split does not preserve FP32's exponent range.
+
+**Decision:** do not integrate these candidates or claim a larger-system MD speedup. Production remains
+cuBLAS IEEE on `sm_120`. No force/stress gate or MD timing was run for these rejected hybrid candidates:
+they fail the earlier per-product accuracy and general-speed requirements.
+
+The separate **row/column-normalized standalone `3×FP16` path** remains a candidate for `sm_80`/`sm_89`,
+not an adopted backend. Its previously recorded local evidence does not qualify another GPU, a complete
+force/stress gate or MD. Workstation validation and NAS synchronization wait for the owner's explicit permission.

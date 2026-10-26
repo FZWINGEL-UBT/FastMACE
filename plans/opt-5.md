@@ -89,6 +89,14 @@ Ceilings are fractions of the `v1.0.0` step time (`plans/opt-4.md §1`: NaCl 3.0
 | **OPT5-T07** | Time-step delta GEMM ($Y_1 = Y_0 + \Delta A \cdot B$) & 50/50 channel-norm split | `fastmace/opt5-T07` | local `sm_120` | Accuracy $\le 2\times$ IEEE on real `MH-1 NaCl` operands | **Done (falsified):** `20.8 %` per-step feature change and flat weight norms give `411–1,838×` worse error than IEEE. |
 | **OPT5-T08** | Single-kernel fused `64 + 32` column-split `SIMT + 3×FP16` NVRTC GEMM on `sm_120` ([design](../docs/design/2026-10-26-fp16x3-and-hybrid-gemm.md)) | `fastmace/opt5-T08` | local `sm_120` | Beat `cuBLAS IEEE FP32` in CUDA-graph replay microbenchmark on `[1512, 512, 512]`, `[5832, 512, 512]`, `[13608, 512, 512]`, `[1944, 1024, 1024]` and pass FP32 accuracy check | Microbenchmark verdict recorded in `docs/validation/opt-5.md`; if it beats `cuBLAS IEEE` on `sm_120`, wire into `BlockLinear`; if not, keep standalone `3×FP16` for `sm_80`/`sm_89`. |
 
+**OPT5-T08 larger-system follow-up (26 October 2026): screen complete; not adopted.**
+Pre-split B and larger row/column tiles were measured through 32,768 rows, including packing overhead,
+boundary/replay checks and real MH-1 products. No reliable general cuBLAS win; real-operand and
+exponent-range accuracy fail before any integration gate. See
+[the measured report](../docs/design/2026-10-26-fp16x3-and-hybrid-gemm.md#33-larger-tiles-and-pre-split-b-not-qualified-26-october-2026).
+The standalone normalized `3×FP16` path for `sm_80`/`sm_89` remains a candidate, not an adoption.
+The owner has paused **all NAS sync and workstation jobs until explicit permission**; this continuation was local only.
+
 ```text
 Wave 1 (falsifiers first, no library edits):
   OPT5-T01 (scheduler-isolated & asymmetric bar.sync probe on sm_120 / L4 / A100)
