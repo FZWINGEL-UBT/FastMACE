@@ -1,0 +1,99 @@
+{
+  "hardware": "NVIDIA GeForce RTX 5060 Ti (sm_120, GB206)",
+  "driver": "610.88",
+  "cuda": "13.3",
+  "implementation": "RIKEN-RCCS/GEMMul8 commit 68c2ee3 (INT8 Ozaki Scheme II)",
+  "shapes": {
+    "13608_512_512": {
+      "cublas_sgemm_us": 472.57,
+      "cublaslt_best_us": 427.02,
+      "moduli": {
+        "6": {
+          "fastmode": true,
+          "workspace_mb": 179.7,
+          "maxdiff_vs_cublas": 2.596e-5,
+          "full_us": 1701.91,
+          "reuse_b_us": 1619.66,
+          "ratio_vs_cublas": 3.43
+        },
+        "7": {
+          "fastmode": true,
+          "workspace_mb": 186.6,
+          "maxdiff_vs_cublas": 1.937e-6,
+          "full_us": 2059.23,
+          "reuse_b_us": 1767.79,
+          "ratio_vs_cublas": 3.74
+        },
+        "8": {
+          "fastmode": true,
+          "workspace_mb": 220.1,
+          "maxdiff_vs_cublas": 8.047e-7,
+          "full_us": 2254.49,
+          "reuse_b_us": 1983.56,
+          "ratio_vs_cublas": 4.20
+        }
+      }
+    },
+    "1512_512_512": {
+      "cublas_sgemm_us": 68.36,
+      "cublaslt_best_us": 61.76,
+      "moduli": {
+        "6": {
+          "fastmode": true,
+          "workspace_mb": 49.7,
+          "maxdiff_vs_cublas": 2.587e-5,
+          "full_us": 118.08,
+          "reuse_b_us": 93.91,
+          "ratio_vs_cublas": 1.37
+        },
+        "7": {
+          "fastmode": true,
+          "workspace_mb": 50.7,
+          "maxdiff_vs_cublas": 1.729e-6,
+          "full_us": 121.16,
+          "reuse_b_us": 98.16,
+          "ratio_vs_cublas": 1.44
+        },
+        "8": {
+          "fastmode": true,
+          "workspace_mb": 54.7,
+          "maxdiff_vs_cublas": 9.537e-7,
+          "full_us": 149.48,
+          "reuse_b_us": 196.14,
+          "ratio_vs_cublas": 2.87
+        }
+      }
+    },
+    "1944_1024_1024": {
+      "cublas_sgemm_us": 313.61,
+      "cublaslt_best_us": 283.35,
+      "moduli": {
+        "6": {
+          "fastmode": true,
+          "workspace_mb": 79.8,
+          "maxdiff_vs_cublas": 5.022e-5,
+          "full_us": 421.49,
+          "reuse_b_us": 368.83,
+          "ratio_vs_cublas": 1.18
+        },
+        "7": {
+          "fastmode": true,
+          "workspace_mb": 82.7,
+          "maxdiff_vs_cublas": 3.323e-6,
+          "full_us": 474.22,
+          "reuse_b_us": 438.19,
+          "ratio_vs_cublas": 1.40
+        },
+        "8": {
+          "fastmode": true,
+          "workspace_mb": 93.2,
+          "maxdiff_vs_cublas": 7.250e-7,
+          "full_us": 591.17,
+          "reuse_b_us": 481.77,
+          "ratio_vs_cublas": 1.54
+        }
+      }
+    }
+  },
+  "verdict": "Rejected: 8-moduli FP32-accurate GEMMul8 is 1.54x-4.20x slower than cuBLAS SGEMM and 1.70x-4.65x slower than cuBLASLt across all tested shapes, with 50-220 MB workspace overhead per GEMM. Falsification kill criterion met."
+}

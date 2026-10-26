@@ -193,6 +193,42 @@ runs at 194.5 µs, slower than cuBLAS FP16 (174.5 µs), so the TMA/`mbarrier` pa
 build on. A fused Triton A-split costs 174.6 µs (≈ a plain copy), yet split+GEMM is 682 vs 504 µs.
 All negative; GEMM-level hybrid work on `sm_120` is closed.
 
+### 3.9 Native cuBLASLt search, GEMMul8 Ozaki II, and forward graph audit (`OPT5-T09`)
+
+Following external research recommendations on sm_120 FP32 GEMMs, three independent directions were evaluated:
+
+1. **Native cuBLASLt algorithm search (`tools/bench/opt5_t09_cublaslt_bench.cu`):**
+   Native heuristic enumeration with workspace allowances (0, 4 MB, 32 MB) on the GeForce RTX 5060 Ti:
+   - `[13608, 512, 512]` (tall-and-narrow atom GEMM): cuBLAS SGEMM baseline takes **505.23 µs** (128×128 tile 20, 6 waves).
+     cuBLASLt tile 24 (`256×128`, stages=26, splitk=1, 4 MB workspace) achieves **427.02 µs** (**−15.5 %**, 16.3 TFLOPS equivalent),
+     yielding exact IEEE float32 outputs (`maxdiff=0` vs cuBLAS). This confirms the 3-wave CTA quantization hypothesis.
+   - `[1512, 512, 512]`: cuBLAS SGEMM 71.36 µs -> cuBLASLt tile 18 (`128×64`, stages=28) **61.76 µs** (**−13.5 %**).
+   - `[1944, 1024, 1024]`: cuBLAS SGEMM 307.97 µs -> cuBLASLt tile 24 **283.35 µs** (**−8.0 %**).
+   - `[216, 512, 512]`: cuBLAS SGEMM 21.14 µs -> cuBLASLt tile 16 **18.53 µs** (**−12.3 %**).
+   - `[5832, 512, 512]`: cuBLAS SGEMM 226.24 µs -> cuBLASLt tile 24 **206.61 µs** (**−8.7 %**).
+   - Records: `results/opt5-T09-screens-20261026/cublaslt_summary.json` and `lt_*.txt`.
+
+2. **GEMMul8 Ozaki II evaluation (`tools/bench/opt5_t09_gemmul8_bench.cu`):**
+   Tested RIKEN RCCS's GEMMul8 INT8 Ozaki Scheme II (`sm_120`, CUDA 13.3) with 6, 7, and 8 moduli, fast/accurate scaling,
+   and constant-B matrix preprocessing reuse (`skip_scalB=true`):
+   - `[13608, 512, 512]`: cuBLAS SGEMM runs in **472.57 µs** (cuBLASLt 427.02 µs).
+     GEMMul8 with 8 moduli (required for FP32 cancellation-scaled accuracy, `maxdiff=8.05e-7`) takes **1,983.56 µs**
+     with preprocessed B reuse (**4.20× slower** than cuBLAS, 4.65× slower than cuBLASLt), requiring **220.1 MB workspace**.
+     At 6 moduli (`maxdiff=2.60e-5`, insufficient for FP32), it takes 1,619.66 µs (3.43× slower).
+   - `[1512, 512, 512]`: cuBLAS SGEMM 68.36 µs -> GEMMul8 8-moduli **196.14 µs** (**2.87× slower**, 54.7 MB workspace).
+   - `[1944, 1024, 1024]`: cuBLAS SGEMM 313.61 µs -> GEMMul8 8-moduli **481.77 µs** (**1.54× slower**, 93.2 MB workspace).
+   - **Verdict:** Decisively fails the falsification kill criterion (must beat 495 µs; actual 1,984 µs). **Rejected.**
+   - Records: `results/opt5-T09-screens-20261026/gemmul8_summary.json`.
+
+3. **MACE forward graph audit for linear work elimination:**
+   Audited against MACE MH-1 layer definitions and FastMACE's `docs/design/opt-T08-linear-audit.md`:
+   - All exact and round-off foldable linear chains in MACE MH-1 (`species_tables` C1, `fold_readout_tail` C2,
+     `fold_product_linear` C3) were implemented in OPT-T08 and adopted as production defaults on 21 October 2026,
+     reducing force-stage time by 8–10 % on NaCl and NbCl5.
+   - The remaining atom-level GEMMs (such as `linear_2`) are sandwiched between non-linearities (equivariant gate
+     before, symmetric contraction after) with distinct per-$l$ weights and cannot be algebraically folded without
+     breaking physical equivariance or numerical accuracy.
+
 ## 4. Records and files
 
 - Probe and Wave-1 microbenchmarks:
@@ -216,3 +252,6 @@ All negative; GEMM-level hybrid work on `sm_120` is closed.
     baseline options, tensor-only sweep, producer-side split and epilogue screens).
   - `tools/bench/opt5_t09_producer.py`, `results/opt5-T09-screens-20261026/{setmaxnreg,producer}.json`
     (warpgroup `setmaxnreg` variant and fused producer split).
+  - `tools/bench/opt5_t09_cublaslt_bench.cu`, `tools/bench/opt5_t09_gemmul8_bench.cu`,
+    `results/opt5-T09-screens-20261026/{cublaslt_summary.json,gemmul8_summary.json}` (native cuBLASLt and
+    GEMMul8 Ozaki II evaluations).
