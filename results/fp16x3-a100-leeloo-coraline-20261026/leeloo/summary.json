@@ -1,0 +1,2837 @@
+{
+  "tool": "fp16x3_gemm_screen",
+  "created_utc": "2026-10-26T21:52:16.693148+00:00",
+  "gpu": "NVIDIA RTX 4000 Ada Generation",
+  "capability": "8.9",
+  "torch": "2.14.1+cu130",
+  "cuda": "13.0",
+  "triton": "3.8.0",
+  "source_commit": "a8ace90b086dcee57cf654e5637e8bac77dc7ffe",
+  "configs": [
+    [
+      64,
+      64,
+      32,
+      4,
+      3
+    ],
+    [
+      128,
+      64,
+      32,
+      4,
+      3
+    ],
+    [
+      64,
+      128,
+      32,
+      4,
+      3
+    ],
+    [
+      128,
+      128,
+      32,
+      8,
+      3
+    ]
+  ],
+  "mode": "best-of-fixed-tiles screen (not a production shape rule)",
+  "structures": {
+    "NaCl": {
+      "unique_geometries": 46,
+      "weighted_us_per_force_call": {
+        "cublas_ieee": 1734.33,
+        "triton_fp16x3_rowcol": 2966.3299999999995
+      },
+      "fp16x3_over_cublas_weighted": 1.710360773324569,
+      "worst_cancel_scaled": {
+        "cublas_ieee": 3.6304738147697996e-07,
+        "triton_fp16x3_rowcol": 2.843694953939293e-07
+      },
+      "worst_cancel_ratio_fp16x3_over_ieee": 0.7832847994579478,
+      "rows": [
+        {
+          "m": 1512,
+          "k": 512,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 49.56,
+          "triton_fp16x3_rowcol_us": 61.71,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 8.222452140959355e-07,
+              "frob_rel": 4.049272885226272e-07,
+              "cancel_scaled": 2.7971578698237656e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.0544879422758822e-07,
+              "frob_rel": 1.4486715997593883e-07,
+              "cancel_scaled": 6.723228673348896e-08
+            }
+          }
+        },
+        {
+          "m": 648,
+          "k": 512,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 8.0,
+          "cublas_ieee_us": 34.38,
+          "triton_fp16x3_rowcol_us": 30.96,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.7654058354575133e-07,
+              "frob_rel": 2.3671949640976515e-07,
+              "cancel_scaled": 1.438296502635371e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.2282711882421763e-07,
+              "frob_rel": 1.4516870014778776e-07,
+              "cancel_scaled": 7.405180579201154e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 512,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 11.0,
+          "cublas_ieee_us": 16.21,
+          "triton_fp16x3_rowcol_us": 25.91,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 2.901686909435363e-07,
+              "frob_rel": 2.0634138211103312e-07,
+              "cancel_scaled": 8.715640522599557e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.9706807970562408e-07,
+              "frob_rel": 1.440051306588673e-07,
+              "cancel_scaled": 6.726790162552065e-08
+            }
+          }
+        },
+        {
+          "m": 1080,
+          "k": 512,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 57.3,
+          "triton_fp16x3_rowcol_us": 56.91,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 2.6639691873516837e-07,
+              "frob_rel": 1.7342949299707662e-07,
+              "cancel_scaled": 8.984535033620057e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.1965423972465822e-07,
+              "frob_rel": 1.453679868497046e-07,
+              "cancel_scaled": 7.577519435599595e-08
+            }
+          }
+        },
+        {
+          "m": 8192,
+          "k": 68,
+          "n": 1280,
+          "op": "aten::mm",
+          "category": "Radial networks: folded last layer, forward GEMM",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 143.56,
+          "triton_fp16x3_rowcol_us": 712.44,
+          "best_config": [
+            128,
+            128,
+            32,
+            8,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.5973905293542154e-07,
+              "frob_rel": 1.4884102281699915e-07,
+              "cancel_scaled": 3.6304738147697996e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.3282887771202834e-07,
+              "frob_rel": 1.2680078115492722e-07,
+              "cancel_scaled": 2.2755871135713132e-07
+            }
+          }
+        },
+        {
+          "m": 8192,
+          "k": 64,
+          "n": 64,
+          "op": "aten::addmm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 9.4,
+          "triton_fp16x3_rowcol_us": 10.68,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.440501074994394e-07,
+              "frob_rel": 1.4257275497996227e-07,
+              "cancel_scaled": 2.7584636702773517e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.302028640679271e-07,
+              "frob_rel": 1.260126324401715e-07,
+              "cancel_scaled": 1.8365675916641287e-07
+            }
+          }
+        },
+        {
+          "m": 8192,
+          "k": 64,
+          "n": 64,
+          "op": "aten::mm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 9.8,
+          "triton_fp16x3_rowcol_us": 11.01,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.457749484300286e-07,
+              "frob_rel": 1.446635618152359e-07,
+              "cancel_scaled": 3.0193175557630737e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.0621465193228877e-07,
+              "frob_rel": 1.258584877630138e-07,
+              "cancel_scaled": 1.9297563752425503e-07
+            }
+          }
+        },
+        {
+          "m": 1080,
+          "k": 512,
+          "n": 384,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 43.65,
+          "triton_fp16x3_rowcol_us": 60.54,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.259790897719596e-07,
+              "frob_rel": 2.3748651720917413e-07,
+              "cancel_scaled": 1.3037815562956148e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.0006601135170118e-07,
+              "frob_rel": 1.4467388674893345e-07,
+              "cancel_scaled": 6.926041527779263e-08
+            }
+          }
+        },
+        {
+          "m": 1080,
+          "k": 384,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 41.91,
+          "triton_fp16x3_rowcol_us": 46.66,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 8.158088502345706e-07,
+              "frob_rel": 3.5182528071615463e-07,
+              "cancel_scaled": 3.190117717604099e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.442870917259357e-07,
+              "frob_rel": 1.397940111752177e-07,
+              "cancel_scaled": 8.481332405071913e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 2048,
+          "n": 384,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 38.95,
+          "triton_fp16x3_rowcol_us": 89.77,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.29508966795132e-07,
+              "frob_rel": 2.9166893383841233e-07,
+              "cancel_scaled": 6.698254323095896e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 3.196029808021853e-07,
+              "frob_rel": 1.9206166582961662e-07,
+              "cancel_scaled": 4.8603611810625355e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 512,
+          "n": 128,
+          "op": "aten::addmm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 7.54,
+          "triton_fp16x3_rowcol_us": 23.04,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.3429885458408563e-07,
+              "frob_rel": 1.3001762043916725e-07,
+              "cancel_scaled": 4.0969579111657415e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.7830409908140163e-07,
+              "frob_rel": 1.43950245137399e-07,
+              "cancel_scaled": 5.876507195230626e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 384,
+          "n": 2048,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 35.39,
+          "triton_fp16x3_rowcol_us": 46.4,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.245960562601415e-07,
+              "frob_rel": 2.4953021214910783e-07,
+              "cancel_scaled": 2.088468827855747e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.256367259689255e-07,
+              "frob_rel": 1.3994187359431337e-07,
+              "cancel_scaled": 8.594837351500256e-08
+            }
+          }
+        },
+        {
+          "m": 8192,
+          "k": 128,
+          "n": 10,
+          "op": "aten::mm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 11.07,
+          "triton_fp16x3_rowcol_us": 11.07,
+          "best_config": [
+            128,
+            128,
+            32,
+            8,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.114755037669895e-07,
+              "frob_rel": 2.0781516873843463e-07,
+              "cancel_scaled": 2.843694953939293e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 4.114755037669895e-07,
+              "frob_rel": 2.0781516873843463e-07,
+              "cancel_scaled": 2.843694953939293e-07
+            }
+          }
+        },
+        {
+          "m": 1512,
+          "k": 512,
+          "n": 256,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 26.8,
+          "triton_fp16x3_rowcol_us": 31.0,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 8.531386071044174e-07,
+              "frob_rel": 4.049762316785241e-07,
+              "cancel_scaled": 2.974938355635877e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.0174448528242211e-07,
+              "frob_rel": 1.452625932869062e-07,
+              "cancel_scaled": 6.821896127847213e-08
+            }
+          }
+        },
+        {
+          "m": 1512,
+          "k": 256,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 26.97,
+          "triton_fp16x3_rowcol_us": 31.14,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 6.360093955970566e-07,
+              "frob_rel": 2.8727859763039057e-07,
+              "cancel_scaled": 3.021028228844965e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.794328990257405e-07,
+              "frob_rel": 1.348862790044499e-07,
+              "cancel_scaled": 1.0285684245055737e-07
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 512,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 7.28,
+          "triton_fp16x3_rowcol_us": 23.34,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.5150636300449235e-07,
+              "frob_rel": 1.3010283878553275e-07,
+              "cancel_scaled": 4.6224850504933245e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.7218362881103582e-07,
+              "frob_rel": 1.443249450409121e-07,
+              "cancel_scaled": 5.5201871089725944e-08
+            }
+          }
+        },
+        {
+          "m": 648,
+          "k": 512,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 12.24,
+          "triton_fp16x3_rowcol_us": 23.69,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.5397902306613327e-07,
+              "frob_rel": 1.511181249790661e-07,
+              "cancel_scaled": 5.5885810240712146e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.9670882469177505e-07,
+              "frob_rel": 1.447041693983444e-07,
+              "cancel_scaled": 6.835452242121755e-08
+            }
+          }
+        },
+        {
+          "m": 648,
+          "k": 128,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 10.54,
+          "triton_fp16x3_rowcol_us": 9.34,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.065434593845564e-07,
+              "frob_rel": 2.0282929503218832e-07,
+              "cancel_scaled": 2.9388928121173995e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.6322023110538172e-07,
+              "frob_rel": 1.2878043812273205e-07,
+              "cancel_scaled": 1.143570586242437e-07
+            }
+          }
+        },
+        {
+          "m": 1512,
+          "k": 512,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 20.57,
+          "triton_fp16x3_rowcol_us": 24.2,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.1365049761537495e-07,
+              "frob_rel": 2.879775717891946e-07,
+              "cancel_scaled": 1.4501415169021678e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.3692894074046496e-07,
+              "frob_rel": 1.4433625256161984e-07,
+              "cancel_scaled": 8.327385942224914e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 2048,
+          "n": 256,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 23.74,
+          "triton_fp16x3_rowcol_us": 89.54,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.123442446597485e-07,
+              "frob_rel": 2.555328908007794e-07,
+              "cancel_scaled": 5.115612686046404e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 3.200011974049156e-07,
+              "frob_rel": 1.9355351683698087e-07,
+              "cancel_scaled": 5.406068806445697e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 89,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 5.0,
+          "cublas_ieee_us": 5.47,
+          "triton_fp16x3_rowcol_us": 12.64,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.5446417378447336e-07,
+              "frob_rel": 9.54058077397068e-08,
+              "cancel_scaled": 1.0587573010908041e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.3081691756211056e-07,
+              "frob_rel": 1.2663144979877426e-07,
+              "cancel_scaled": 1.5509498548557971e-07
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 256,
+          "n": 2048,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 25.21,
+          "triton_fp16x3_rowcol_us": 32.42,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.692691187321346e-07,
+              "frob_rel": 2.054987678323892e-07,
+              "cancel_scaled": 1.5757362812818108e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.2703584538230307e-07,
+              "frob_rel": 1.3486979371477239e-07,
+              "cancel_scaled": 9.736532056647702e-08
+            }
+          }
+        },
+        {
+          "m": 1512,
+          "k": 128,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 15.96,
+          "triton_fp16x3_rowcol_us": 19.86,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.732690411430049e-07,
+              "frob_rel": 2.0375666823572808e-07,
+              "cancel_scaled": 3.194847245825758e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.125941181617155e-07,
+              "frob_rel": 1.294245387674891e-07,
+              "cancel_scaled": 1.3088362963182424e-07
+            }
+          }
+        },
+        {
+          "m": 1080,
+          "k": 512,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 16.47,
+          "triton_fp16x3_rowcol_us": 25.87,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.0095695615539453e-07,
+              "frob_rel": 2.0719991811812065e-07,
+              "cancel_scaled": 9.533238176832875e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.9648788460192568e-07,
+              "frob_rel": 1.445439716497761e-07,
+              "cancel_scaled": 6.435502922918328e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 128,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 3.0,
+          "cublas_ieee_us": 6.51,
+          "triton_fp16x3_rowcol_us": 8.02,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 2.2170441599010963e-07,
+              "frob_rel": 1.1088507244291563e-07,
+              "cancel_scaled": 1.1605985249565204e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.6950859972668154e-07,
+              "frob_rel": 1.2865502442204448e-07,
+              "cancel_scaled": 9.888679303011088e-08
+            }
+          }
+        },
+        {
+          "m": 8192,
+          "k": 10,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 8.73,
+          "triton_fp16x3_rowcol_us": 9.05,
+          "best_config": [
+            128,
+            128,
+            32,
+            8,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.5768542032923738e-07,
+              "frob_rel": 5.8854611625007366e-08,
+              "cancel_scaled": 2.7276674910101136e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.5768542032923738e-07,
+              "frob_rel": 5.8854611625007366e-08,
+              "cancel_scaled": 2.7276674910101136e-07
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 512,
+          "n": 89,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 6.46,
+          "triton_fp16x3_rowcol_us": 55.49,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.3899131336202837e-07,
+              "frob_rel": 1.1724028818303188e-07,
+              "cancel_scaled": 3.8889201508647136e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.0059055494308606e-07,
+              "frob_rel": 1.4522842769096347e-07,
+              "cancel_scaled": 5.470001292523297e-08
+            }
+          }
+        },
+        {
+          "m": 1080,
+          "k": 128,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 15.85,
+          "triton_fp16x3_rowcol_us": 18.58,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.826866706162186e-07,
+              "frob_rel": 2.0430471447723204e-07,
+              "cancel_scaled": 3.252717157451325e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.8530091767012018e-07,
+              "frob_rel": 1.2998755790433718e-07,
+              "cancel_scaled": 1.2963139305459273e-07
+            }
+          }
+        },
+        {
+          "m": 648,
+          "k": 128,
+          "n": 130,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 7.0,
+          "triton_fp16x3_rowcol_us": 7.37,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.7543726688090672e-07,
+              "frob_rel": 1.1033927225749651e-07,
+              "cancel_scaled": 1.203290561401019e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.42491172991682e-07,
+              "frob_rel": 1.3117681935133393e-07,
+              "cancel_scaled": 1.408436793134255e-07
+            }
+          }
+        },
+        {
+          "m": 1512,
+          "k": 128,
+          "n": 130,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 11.32,
+          "triton_fp16x3_rowcol_us": 10.22,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.105579052247133e-07,
+              "frob_rel": 2.043053002926698e-07,
+              "cancel_scaled": 2.453279729564508e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.6984414023962996e-07,
+              "frob_rel": 1.2921783579413544e-07,
+              "cancel_scaled": 1.184517320109473e-07
+            }
+          }
+        },
+        {
+          "m": 1080,
+          "k": 128,
+          "n": 130,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 7.52,
+          "triton_fp16x3_rowcol_us": 9.96,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.572640997945959e-07,
+              "frob_rel": 2.0296345323048234e-07,
+              "cancel_scaled": 3.397887701170598e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.897168514503413e-07,
+              "frob_rel": 1.3047318892918993e-07,
+              "cancel_scaled": 1.1757712411025213e-07
+            }
+          }
+        },
+        {
+          "m": 1512,
+          "k": 130,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 8.16,
+          "triton_fp16x3_rowcol_us": 20.43,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.812582728814313e-07,
+              "frob_rel": 2.0445269544981083e-07,
+              "cancel_scaled": 2.623504388856323e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.830235945091668e-07,
+              "frob_rel": 1.3136231875917908e-07,
+              "cancel_scaled": 1.360037458581898e-07
+            }
+          }
+        },
+        {
+          "m": 8192,
+          "k": 64,
+          "n": 1,
+          "op": "aten::addmm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 3.66,
+          "triton_fp16x3_rowcol_us": 3.67,
+          "best_config": [
+            128,
+            128,
+            32,
+            8,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.0864346026580576e-07,
+              "frob_rel": 8.702343184140227e-08,
+              "cancel_scaled": 8.315758037166197e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.0864346026580576e-07,
+              "frob_rel": 8.702343184140227e-08,
+              "cancel_scaled": 8.315758037166197e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 512,
+          "n": 96,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 6.79,
+          "triton_fp16x3_rowcol_us": 25.48,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.2186817247849048e-07,
+              "frob_rel": 1.1905220772458894e-07,
+              "cancel_scaled": 3.913834826166507e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.7384370317948828e-07,
+              "frob_rel": 1.4597041077742315e-07,
+              "cancel_scaled": 6.102346800710602e-08
+            }
+          }
+        },
+        {
+          "m": 1080,
+          "k": 130,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 7.51,
+          "triton_fp16x3_rowcol_us": 20.28,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.6136815511711885e-07,
+              "frob_rel": 1.1065873630446346e-07,
+              "cancel_scaled": 9.519808932336466e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.908933638825384e-07,
+              "frob_rel": 1.3144044977932434e-07,
+              "cancel_scaled": 1.1590252477473666e-07
+            }
+          }
+        },
+        {
+          "m": 648,
+          "k": 130,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 5.9,
+          "triton_fp16x3_rowcol_us": 20.1,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.4149810047765433e-07,
+              "frob_rel": 1.1062057406047344e-07,
+              "cancel_scaled": 9.454269895312399e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.6464617810558667e-07,
+              "frob_rel": 1.31192615985633e-07,
+              "cancel_scaled": 1.0830989303183678e-07
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 6,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 5.73,
+          "triton_fp16x3_rowcol_us": 5.73,
+          "best_config": [
+            128,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 6.738260609802716e-08,
+              "frob_rel": 4.5768346081092196e-08,
+              "cancel_scaled": 1.5853437118106447e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 6.738260609802716e-08,
+              "frob_rel": 4.5768346081092196e-08,
+              "cancel_scaled": 1.5853437118106447e-07
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 128,
+          "n": 130,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 4.47,
+          "triton_fp16x3_rowcol_us": 7.24,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.9585960940646003e-07,
+              "frob_rel": 1.0989612893137733e-07,
+              "cancel_scaled": 9.988098698622581e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.7416316430875927e-07,
+              "frob_rel": 1.274778485420073e-07,
+              "cancel_scaled": 8.862617417760874e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 130,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 4.71,
+          "triton_fp16x3_rowcol_us": 20.04,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.4194703222665318e-07,
+              "frob_rel": 1.1078067656883546e-07,
+              "cancel_scaled": 8.511861363332281e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.4577989651729972e-07,
+              "frob_rel": 1.3170490507042028e-07,
+              "cancel_scaled": 8.894983438057937e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 96,
+          "n": 6,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 4.78,
+          "triton_fp16x3_rowcol_us": 4.76,
+          "best_config": [
+            128,
+            128,
+            32,
+            8,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.1996564277951585e-07,
+              "frob_rel": 8.63912779787993e-08,
+              "cancel_scaled": 5.99793585439505e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.1996564277951585e-07,
+              "frob_rel": 8.63912779787993e-08,
+              "cancel_scaled": 5.99793585439505e-08
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 96,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 5.3,
+          "triton_fp16x3_rowcol_us": 6.07,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.346464363646607e-07,
+              "frob_rel": 9.730921993729678e-08,
+              "cancel_scaled": 1.0717050291797818e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.8295045057982401e-07,
+              "frob_rel": 1.2709414540026471e-07,
+              "cancel_scaled": 1.253907863812519e-07
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 512,
+          "n": 6,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 5.36,
+          "triton_fp16x3_rowcol_us": 6.69,
+          "best_config": [
+            128,
+            128,
+            32,
+            8,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.2852079563724077e-07,
+              "frob_rel": 1.0112632311852394e-07,
+              "cancel_scaled": 3.0113571748039876e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.2852079563724077e-07,
+              "frob_rel": 1.0112632311852394e-07,
+              "cancel_scaled": 3.0113571748039876e-08
+            }
+          }
+        },
+        {
+          "m": 29,
+          "k": 86,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 5.6,
+          "triton_fp16x3_rowcol_us": 13.16,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.1375349177749635e-07,
+              "frob_rel": 8.251780407192558e-08,
+              "cancel_scaled": 8.743993378067295e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.5532645217275758e-07,
+              "frob_rel": 1.2602244454423766e-07,
+              "cancel_scaled": 1.0589688158218925e-07
+            }
+          }
+        },
+        {
+          "m": 13,
+          "k": 28,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 4.67,
+          "triton_fp16x3_rowcol_us": 3.65,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 7.45270766633331e-08,
+              "frob_rel": 6.342446809689384e-08,
+              "cancel_scaled": 1.0140017106708728e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 7.45270766633331e-08,
+              "frob_rel": 6.342446809689384e-08,
+              "cancel_scaled": 1.0140017106708728e-07
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 6,
+          "n": 96,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 5.41,
+          "triton_fp16x3_rowcol_us": 5.39,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.380049465108731e-07,
+              "frob_rel": 5.484433461880246e-08,
+              "cancel_scaled": 1.636551962463447e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.380049465108731e-07,
+              "frob_rel": 5.484433461880246e-08,
+              "cancel_scaled": 1.636551962463447e-07
+            }
+          }
+        },
+        {
+          "m": 216,
+          "k": 89,
+          "n": 6,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 5.0,
+          "triton_fp16x3_rowcol_us": 6.09,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.8191862574513985e-07,
+              "frob_rel": 8.37270028265387e-08,
+              "cancel_scaled": 8.260160712499814e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.8191862574513985e-07,
+              "frob_rel": 8.37270028265387e-08,
+              "cancel_scaled": 8.260160712499814e-08
+            }
+          }
+        }
+      ]
+    },
+    "NbCl5": {
+      "unique_geometries": 46,
+      "weighted_us_per_force_call": {
+        "cublas_ieee": 11446.17,
+        "triton_fp16x3_rowcol": 15259.610000000002
+      },
+      "fp16x3_over_cublas_weighted": 1.333162970670539,
+      "worst_cancel_scaled": {
+        "cublas_ieee": 4.3474476958159424e-07,
+        "triton_fp16x3_rowcol": 2.8840406670159775e-07
+      },
+      "worst_cancel_ratio_fp16x3_over_ieee": 0.663387087966953,
+      "rows": [
+        {
+          "m": 5832,
+          "k": 512,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 8.0,
+          "cublas_ieee_us": 225.27,
+          "triton_fp16x3_rowcol_us": 221.68,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.225822510704884e-07,
+              "frob_rel": 2.3681466625749524e-07,
+              "cancel_scaled": 1.500902170108154e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.400892819445496e-07,
+              "frob_rel": 1.4498011372954633e-07,
+              "cancel_scaled": 8.131124655844727e-08
+            }
+          }
+        },
+        {
+          "m": 13608,
+          "k": 512,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 546.5,
+          "triton_fp16x3_rowcol_us": 506.11,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.0468469535882073e-06,
+              "frob_rel": 4.0534824697744924e-07,
+              "cancel_scaled": 3.778988414575031e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.5168054621378424e-07,
+              "frob_rel": 1.4461412727037793e-07,
+              "cancel_scaled": 9.073634551519655e-08
+            }
+          }
+        },
+        {
+          "m": 9720,
+          "k": 512,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 356.74,
+          "triton_fp16x3_rowcol_us": 366.08,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.0709781736486715e-06,
+              "frob_rel": 4.059870547444961e-07,
+              "cancel_scaled": 3.822728859717098e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.214487596749491e-07,
+              "frob_rel": 1.4470028152707515e-07,
+              "cancel_scaled": 8.69227916461999e-08
+            }
+          }
+        },
+        {
+          "m": 56320,
+          "k": 68,
+          "n": 1280,
+          "op": "aten::mm",
+          "category": "Radial networks: folded last layer, forward GEMM",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 1031.57,
+          "triton_fp16x3_rowcol_us": 4629.7,
+          "best_config": [
+            128,
+            128,
+            32,
+            8,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.860549133875123e-07,
+              "frob_rel": 1.4831032857886685e-07,
+              "cancel_scaled": 3.802646974289749e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.5396848361179956e-07,
+              "frob_rel": 1.2678614410335636e-07,
+              "cancel_scaled": 2.618608699674692e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 512,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 11.0,
+          "cublas_ieee_us": 94.72,
+          "triton_fp16x3_rowcol_us": 85.12,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.1905242295449584e-07,
+              "frob_rel": 2.3697743425072062e-07,
+              "cancel_scaled": 1.4447802898677242e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.2454976709321538e-07,
+              "frob_rel": 1.450081476819553e-07,
+              "cancel_scaled": 7.938595478863033e-08
+            }
+          }
+        },
+        {
+          "m": 9720,
+          "k": 384,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 270.62,
+          "triton_fp16x3_rowcol_us": 276.95,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 9.202697976513881e-07,
+              "frob_rel": 3.5106489698915067e-07,
+              "cancel_scaled": 3.463270798025312e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.4453398819780437e-07,
+              "frob_rel": 1.4005918037958674e-07,
+              "cancel_scaled": 9.48442826501209e-08
+            }
+          }
+        },
+        {
+          "m": 9720,
+          "k": 512,
+          "n": 384,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 276.85,
+          "triton_fp16x3_rowcol_us": 278.39,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.0162364807323e-07,
+              "frob_rel": 2.3693170528504444e-07,
+              "cancel_scaled": 1.8796574608250404e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.2153936782069813e-07,
+              "frob_rel": 1.4459356867165327e-07,
+              "cancel_scaled": 8.467490381295243e-08
+            }
+          }
+        },
+        {
+          "m": 13608,
+          "k": 512,
+          "n": 256,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 256.66,
+          "triton_fp16x3_rowcol_us": 249.52,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.3036523893413736e-06,
+              "frob_rel": 4.0531698457733734e-07,
+              "cancel_scaled": 4.3474476958159424e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.3443799557330134e-07,
+              "frob_rel": 1.448494325448162e-07,
+              "cancel_scaled": 7.897462527968506e-08
+            }
+          }
+        },
+        {
+          "m": 56320,
+          "k": 64,
+          "n": 64,
+          "op": "aten::addmm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 56.46,
+          "triton_fp16x3_rowcol_us": 51.14,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.578578794493888e-07,
+              "frob_rel": 1.4383976332310404e-07,
+              "cancel_scaled": 4.130143845120508e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.1109676508839688e-07,
+              "frob_rel": 1.248698614471703e-07,
+              "cancel_scaled": 2.0666597291046935e-07
+            }
+          }
+        },
+        {
+          "m": 56320,
+          "k": 64,
+          "n": 64,
+          "op": "aten::mm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 56.23,
+          "triton_fp16x3_rowcol_us": 51.42,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.6924952603692283e-07,
+              "frob_rel": 1.4363633149687917e-07,
+              "cancel_scaled": 3.2975362412368234e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.9341781571566447e-07,
+              "frob_rel": 1.2473136608984488e-07,
+              "cancel_scaled": 2.2684422440012223e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 384,
+          "n": 2048,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 264.09,
+          "triton_fp16x3_rowcol_us": 233.18,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.989926670045706e-07,
+              "frob_rel": 2.0631716308729311e-07,
+              "cancel_scaled": 1.525578820899631e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.16214908022343e-07,
+              "frob_rel": 1.40050596295526e-07,
+              "cancel_scaled": 8.521450579873994e-08
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 2048,
+          "n": 384,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 220.55,
+          "triton_fp16x3_rowcol_us": 212.43,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.4708964078231326e-07,
+              "frob_rel": 2.7635709576109364e-07,
+              "cancel_scaled": 5.652982755913349e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 3.5937226398451134e-07,
+              "frob_rel": 1.9104771656739728e-07,
+              "cancel_scaled": 6.333607027054037e-08
+            }
+          }
+        },
+        {
+          "m": 13608,
+          "k": 256,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 263.69,
+          "triton_fp16x3_rowcol_us": 281.08,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 6.592911835608009e-07,
+              "frob_rel": 2.8706625877341474e-07,
+              "cancel_scaled": 3.429205098827931e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.0254763967338776e-07,
+              "frob_rel": 1.350296479166221e-07,
+              "cancel_scaled": 9.95787036642668e-08
+            }
+          }
+        },
+        {
+          "m": 13608,
+          "k": 512,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 129.88,
+          "triton_fp16x3_rowcol_us": 141.02,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.146729922970027e-06,
+              "frob_rel": 4.043325823365968e-07,
+              "cancel_scaled": 3.695689913163607e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.3429724228761748e-07,
+              "frob_rel": 1.4473517082232625e-07,
+              "cancel_scaled": 8.466138561986389e-08
+            }
+          }
+        },
+        {
+          "m": 56320,
+          "k": 128,
+          "n": 10,
+          "op": "aten::mm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 44.04,
+          "triton_fp16x3_rowcol_us": 44.08,
+          "best_config": [
+            128,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.193743908531318e-07,
+              "frob_rel": 2.0212292283674827e-07,
+              "cancel_scaled": 2.8840406670159775e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 4.193743908531318e-07,
+              "frob_rel": 2.0212292283674827e-07,
+              "cancel_scaled": 2.8840406670159775e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 2048,
+          "n": 256,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 149.2,
+          "triton_fp16x3_rowcol_us": 216.99,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.2484359933414605e-07,
+              "frob_rel": 2.7693977501952545e-07,
+              "cancel_scaled": 5.538424614319803e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 3.521378931108378e-07,
+              "frob_rel": 1.9125267843844077e-07,
+              "cancel_scaled": 5.992905460768389e-08
+            }
+          }
+        },
+        {
+          "m": 13608,
+          "k": 128,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 143.67,
+          "triton_fp16x3_rowcol_us": 158.25,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.5331504234834563e-07,
+              "frob_rel": 2.0285232777078263e-07,
+              "cancel_scaled": 3.582087365622807e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.671432222887809e-07,
+              "frob_rel": 1.2895991920999036e-07,
+              "cancel_scaled": 1.634279480637715e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 256,
+          "n": 2048,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 157.5,
+          "triton_fp16x3_rowcol_us": 160.77,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 7.155395935373717e-07,
+              "frob_rel": 2.8653738998348464e-07,
+              "cancel_scaled": 3.7073649260604014e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.865374349549979e-07,
+              "frob_rel": 1.349862633468248e-07,
+              "cancel_scaled": 9.999627755781896e-08
+            }
+          }
+        },
+        {
+          "m": 56320,
+          "k": 10,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 49.42,
+          "triton_fp16x3_rowcol_us": 39.15,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.0782108446847158e-07,
+              "frob_rel": 5.847186606767816e-08,
+              "cancel_scaled": 2.43416657675075e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.0782108446847158e-07,
+              "frob_rel": 5.847186606767816e-08,
+              "cancel_scaled": 2.43416657675075e-07
+            }
+          }
+        },
+        {
+          "m": 9720,
+          "k": 512,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 99.6,
+          "triton_fp16x3_rowcol_us": 114.1,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 2.663054191164555e-07,
+              "frob_rel": 1.8743995359643296e-07,
+              "cancel_scaled": 9.470694647594692e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.2193259763602486e-07,
+              "frob_rel": 1.4480446786254054e-07,
+              "cancel_scaled": 7.74579235438924e-08
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 512,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 4.0,
+          "cublas_ieee_us": 23.31,
+          "triton_fp16x3_rowcol_us": 28.31,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.8528520244938803e-07,
+              "frob_rel": 2.399797249948914e-07,
+              "cancel_scaled": 1.224923142535169e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.4116605701662903e-07,
+              "frob_rel": 1.4570848809392163e-07,
+              "cancel_scaled": 7.042445563059306e-08
+            }
+          }
+        },
+        {
+          "m": 5832,
+          "k": 512,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 48.5,
+          "triton_fp16x3_rowcol_us": 56.52,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.064117404452219e-06,
+              "frob_rel": 4.0564522887717185e-07,
+              "cancel_scaled": 3.6147179623548074e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.2295584659600772e-07,
+              "frob_rel": 1.4551632987571967e-07,
+              "cancel_scaled": 7.163779104727763e-08
+            }
+          }
+        },
+        {
+          "m": 5832,
+          "k": 128,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 63.63,
+          "triton_fp16x3_rowcol_us": 65.7,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 6.654139932646842e-07,
+              "frob_rel": 2.0308613910460825e-07,
+              "cancel_scaled": 3.88929971308368e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.0644934828099084e-07,
+              "frob_rel": 1.2909304957541793e-07,
+              "cancel_scaled": 1.3552086814050652e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 89,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 5.0,
+          "cublas_ieee_us": 18.52,
+          "triton_fp16x3_rowcol_us": 43.74,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.2136965429821234e-07,
+              "frob_rel": 1.70372412262225e-07,
+              "cancel_scaled": 2.971149920436063e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.2092869692779922e-07,
+              "frob_rel": 1.2708437792524063e-07,
+              "cancel_scaled": 1.6926697819130313e-07
+            }
+          }
+        },
+        {
+          "m": 9720,
+          "k": 128,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 103.77,
+          "triton_fp16x3_rowcol_us": 109.17,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.414957981962158e-07,
+              "frob_rel": 2.0294746191563465e-07,
+              "cancel_scaled": 3.503554379614666e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.3143558155898285e-07,
+              "frob_rel": 1.2910518120017764e-07,
+              "cancel_scaled": 1.547620335790798e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 128,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 3.0,
+          "cublas_ieee_us": 28.78,
+          "triton_fp16x3_rowcol_us": 25.32,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.414767735978696e-07,
+              "frob_rel": 2.035096236509209e-07,
+              "cancel_scaled": 3.302912212522744e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.024272082703086e-07,
+              "frob_rel": 1.295641431641948e-07,
+              "cancel_scaled": 1.351385347229914e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 512,
+          "n": 128,
+          "op": "aten::addmm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 30.14,
+          "triton_fp16x3_rowcol_us": 30.78,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 6.580078750593445e-07,
+              "frob_rel": 2.882279441098082e-07,
+              "cancel_scaled": 2.3336762144330478e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.9844318930026052e-07,
+              "frob_rel": 1.4458838220133455e-07,
+              "cancel_scaled": 6.694646282232443e-08
+            }
+          }
+        },
+        {
+          "m": 13608,
+          "k": 128,
+          "n": 130,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 58.1,
+          "triton_fp16x3_rowcol_us": 65.69,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 6.167687050807572e-07,
+              "frob_rel": 2.0277924590259932e-07,
+              "cancel_scaled": 4.004240315843594e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.1312081326123534e-07,
+              "frob_rel": 1.295879491458275e-07,
+              "cancel_scaled": 1.2628888241102887e-07
+            }
+          }
+        },
+        {
+          "m": 13608,
+          "k": 130,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 38.23,
+          "triton_fp16x3_rowcol_us": 108.25,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.323345149367133e-07,
+              "frob_rel": 2.0443772092137733e-07,
+              "cancel_scaled": 3.2626848207936923e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.8579600307129536e-07,
+              "frob_rel": 1.3129755004708e-07,
+              "cancel_scaled": 1.3159401870454786e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 512,
+          "n": 89,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 21.25,
+          "triton_fp16x3_rowcol_us": 58.53,
+          "best_config": [
+            128,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 6.290510302443384e-07,
+              "frob_rel": 2.886055046487228e-07,
+              "cancel_scaled": 1.782518934023536e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.4182815205432653e-07,
+              "frob_rel": 1.4470943545566825e-07,
+              "cancel_scaled": 7.324340367616383e-08
+            }
+          }
+        },
+        {
+          "m": 9720,
+          "k": 128,
+          "n": 130,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 39.37,
+          "triton_fp16x3_rowcol_us": 47.62,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.603323801189313e-07,
+              "frob_rel": 2.040750911979644e-07,
+              "cancel_scaled": 3.2580722410233224e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.308514314998378e-07,
+              "frob_rel": 1.2966676846174426e-07,
+              "cancel_scaled": 1.339627836514206e-07
+            }
+          }
+        },
+        {
+          "m": 9720,
+          "k": 130,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 29.57,
+          "triton_fp16x3_rowcol_us": 86.52,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.136994733439323e-07,
+              "frob_rel": 2.0441010254857077e-07,
+              "cancel_scaled": 3.16077803104442e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.0652898013344688e-07,
+              "frob_rel": 1.31015499926299e-07,
+              "cancel_scaled": 1.5034609461998043e-07
+            }
+          }
+        },
+        {
+          "m": 56320,
+          "k": 64,
+          "n": 1,
+          "op": "aten::addmm",
+          "category": "Radial networks: other GEMMs",
+          "invocations_per_call": 2.0,
+          "cublas_ieee_us": 13.11,
+          "triton_fp16x3_rowcol_us": 13.1,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.0716931378359554e-07,
+              "frob_rel": 8.30099395504295e-08,
+              "cancel_scaled": 8.910029470580371e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.0716931378359554e-07,
+              "frob_rel": 8.30099395504295e-08,
+              "cancel_scaled": 8.910029470580371e-08
+            }
+          }
+        },
+        {
+          "m": 5832,
+          "k": 128,
+          "n": 130,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 26.0,
+          "triton_fp16x3_rowcol_us": 29.39,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.200107021950547e-07,
+              "frob_rel": 2.0371888596516067e-07,
+              "cancel_scaled": 2.834704397679785e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.7993115343997345e-07,
+              "frob_rel": 1.2980151237320014e-07,
+              "cancel_scaled": 1.233390061036732e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 512,
+          "n": 96,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 20.95,
+          "triton_fp16x3_rowcol_us": 28.0,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.549389960531738e-07,
+              "frob_rel": 2.879913461448247e-07,
+              "cancel_scaled": 1.770105440669531e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.1637198835025872e-07,
+              "frob_rel": 1.4426099283036008e-07,
+              "cancel_scaled": 6.096160074513419e-08
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 96,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 18.72,
+          "triton_fp16x3_rowcol_us": 20.87,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 3.9239157628780664e-07,
+              "frob_rel": 1.7677339155195497e-07,
+              "cancel_scaled": 3.1296606501124314e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.4374136092385645e-07,
+              "frob_rel": 1.2782915406415613e-07,
+              "cancel_scaled": 1.5929878671347506e-07
+            }
+          }
+        },
+        {
+          "m": 5832,
+          "k": 130,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 16.88,
+          "triton_fp16x3_rowcol_us": 44.41,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.900831796169065e-07,
+              "frob_rel": 2.0573123493018446e-07,
+              "cancel_scaled": 3.790499699993528e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.046785168857124e-07,
+              "frob_rel": 1.3096005406672244e-07,
+              "cancel_scaled": 1.1663609724218892e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 512,
+          "n": 6,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 10.65,
+          "triton_fp16x3_rowcol_us": 15.77,
+          "best_config": [
+            128,
+            128,
+            32,
+            8,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.7500406220199127e-07,
+              "frob_rel": 1.4957866302211043e-07,
+              "cancel_scaled": 4.5762513106029074e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.7500406220199127e-07,
+              "frob_rel": 1.4957866302211043e-07,
+              "cancel_scaled": 4.5762513106029074e-08
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 128,
+          "n": 130,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 10.71,
+          "triton_fp16x3_rowcol_us": 10.84,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 5.058892056099168e-07,
+              "frob_rel": 2.0337457035715246e-07,
+              "cancel_scaled": 3.337954878564171e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 2.081996070169147e-07,
+              "frob_rel": 1.2872665855032944e-07,
+              "cancel_scaled": 1.1735845481723625e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 6,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 32.27,
+          "triton_fp16x3_rowcol_us": 32.23,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 8.917973845722403e-08,
+              "frob_rel": 5.470219089517483e-08,
+              "cancel_scaled": 2.1609243517921795e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 8.917973845722403e-08,
+              "frob_rel": 5.470219089517483e-08,
+              "cancel_scaled": 2.1609243517921795e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 130,
+          "n": 128,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 10.89,
+          "triton_fp16x3_rowcol_us": 22.37,
+          "best_config": [
+            64,
+            128,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 4.4972903462903074e-07,
+              "frob_rel": 2.042383467714834e-07,
+              "cancel_scaled": 2.5483925444529826e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.884082182909164e-07,
+              "frob_rel": 1.3115892414971866e-07,
+              "cancel_scaled": 1.2111567770101763e-07
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 96,
+          "n": 6,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 6.29,
+          "triton_fp16x3_rowcol_us": 6.28,
+          "best_config": [
+            128,
+            128,
+            32,
+            8,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.0608759093071684e-07,
+              "frob_rel": 8.273828547435264e-08,
+              "cancel_scaled": 6.859526591297835e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.0608759093071684e-07,
+              "frob_rel": 8.273828547435264e-08,
+              "cancel_scaled": 6.859526591297835e-08
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 89,
+          "n": 6,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 6.49,
+          "triton_fp16x3_rowcol_us": 7.4,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.0677585970447865e-07,
+              "frob_rel": 7.897900596775652e-08,
+              "cancel_scaled": 7.504227632740474e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.0677585970447865e-07,
+              "frob_rel": 7.897900596775652e-08,
+              "cancel_scaled": 7.504227632740474e-08
+            }
+          }
+        },
+        {
+          "m": 1944,
+          "k": 6,
+          "n": 96,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 23.49,
+          "triton_fp16x3_rowcol_us": 23.55,
+          "best_config": [
+            128,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.1264319269700076e-07,
+              "frob_rel": 5.455091901170158e-08,
+              "cancel_scaled": 1.76446513174458e-07
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.1264319269700076e-07,
+              "frob_rel": 5.455091901170158e-08,
+              "cancel_scaled": 1.76446513174458e-07
+            }
+          }
+        },
+        {
+          "m": 13,
+          "k": 28,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 4.18,
+          "triton_fp16x3_rowcol_us": 3.36,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 9.106470425214125e-08,
+              "frob_rel": 6.543085419385975e-08,
+              "cancel_scaled": 9.037899131445284e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 9.106470425214125e-08,
+              "frob_rel": 6.543085419385975e-08,
+              "cancel_scaled": 9.037899131445284e-08
+            }
+          }
+        },
+        {
+          "m": 29,
+          "k": 86,
+          "n": 512,
+          "op": "aten::mm",
+          "category": "Atom-level linear layers (GEMM)",
+          "invocations_per_call": 1.0,
+          "cublas_ieee_us": 5.57,
+          "triton_fp16x3_rowcol_us": 13.13,
+          "best_config": [
+            64,
+            64,
+            32,
+            4,
+            3
+          ],
+          "refused": [],
+          "errors": {
+            "cublas_ieee": {
+              "max_rel": 1.261136267444182e-07,
+              "frob_rel": 8.389646748381913e-08,
+              "cancel_scaled": 8.005577756303073e-08
+            },
+            "triton_fp16x3_rowcol": {
+              "max_rel": 1.6597274704040234e-07,
+              "frob_rel": 1.230291986616493e-07,
+              "cancel_scaled": 1.030685234279635e-07
+            }
+          }
+        }
+      ]
+    }
+  },
+  "verdict": {
+    "stop_rule": "continue only if FP16x3 <= 0.90x cuBLAS weighted per force call on every structure and worst cancellation-scaled error <= 2x IEEE",
+    "passes": false
+  }
+}

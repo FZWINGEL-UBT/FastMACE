@@ -266,6 +266,35 @@ exploratory evidence.
 Records: `tools/bench/ab_library_receiver.py` and
 `results/receiver-blas-ab-20261026/{receiver-ba,receiver-video-free,cublaslt-ba,receiver-ab}.json`.
 
+### 3.11 Standalone `3×FP16` on A100 and workstation GPUs (26 October 2026)
+
+The audit's one high conditional candidate was tested with
+`tools/bench/fp16x3_gemm_screen.py` (FastMACE `ecfcc323`): cuBLAS IEEE FP32 against the
+row/col-normalized Triton `3×FP16` kernel, best of four fixed tiles, on the production
+`gemms.csv` geometries of NaCl and NbCl5, weighted by invocations per force call. Errors are
+against FP64 products of the same synthetic FP32 operands. This is a GEMM screen, not an MD
+step or a force gate.
+
+| GPU | Provider / environment | NaCl FP16×3 ÷ cuBLAS | NbCl5 FP16×3 ÷ cuBLAS | Worst cancellation error ÷ IEEE |
+| --- | --- | ---: | ---: | ---: |
+| A100-SXM4-40GB (`sm_80`) | Colab, pinned hybrid stack, torch 2.14.1+cu130, Triton 3.8.0, driver 580.82.07 | **1.69×** (3,489.6 vs 2,062.5 µs/call) | **1.12×** (10,222.6 vs 9,157.7 µs/call) | 0.63 / 0.68 |
+| RTX A4000 (`sm_86`, coraline) | NAS `mace_cueq_latest`, same torch/Triton, driver 595.99.02 | **1.62×** (4,051.7 vs 2,498.4 µs/call) | **1.43×** (22,436.7 vs 15,716.9 µs/call) | 0.78 / 0.70 |
+| RTX 4000 Ada (`sm_89`, leeloo) | NAS `mace_cueq_latest`, same torch/Triton, driver 595.99.02 | **1.71×** (2,966.3 vs 1,734.3 µs/call) | **1.33×** (15,259.6 vs 11,446.2 µs/call) | 0.78 / 0.66 |
+
+**Verdict: rejected.** The stop rule (≤0.90× cuBLAS on every structure and ≤2× IEEE
+cancellation error) fails on speed on all three GPUs, while accuracy passes comfortably.
+The Triton kernel still loads FP32 operands and, per K-tile, computes exponent maxima,
+normalizes, splits into big/small FP16, runs three dots and rescales; on the tall-narrow
+`K=N=512` production shapes that overhead outweighs the FP16 Tensor-Core rate. No
+`fp16x3_gemms` record was built and no force gate was run.
+
+Colab L4 was started and then cancelled by the owner before completion; its VM is stopped.
+Leto was not used: another user had an active rsync there, so leeloo (same GPU model) ran
+instead. The workstation runs used bench files copied from `ecfcc323` into
+`/mnt/homes/zwingel/fp16x3-screen/`; the NAS FastMACE checkout itself was not changed (its
+`.source_commit` is `a8ace90b`, which the summaries record). Colab A100 used 1.23 CU
+(29.68 → 28.45). Records: `results/fp16x3-a100-leeloo-coraline-20261026/`.
+
 ## 4. Records and files
 
 - Probe and Wave-1 microbenchmarks:
@@ -292,3 +321,5 @@ Records: `tools/bench/ab_library_receiver.py` and
   - `tools/bench/opt5_t09_cublaslt_bench.cu`, `tools/bench/opt5_t09_gemmul8_bench.cu`,
     `results/opt5-T09-screens-20261026/{cublaslt_summary.json,gemmul8_summary.json}` (native cuBLASLt and
     GEMMul8 Ozaki II evaluations).
+  - `tools/bench/fp16x3_gemm_screen.py`, `results/fp16x3-a100-leeloo-coraline-20261026/`
+    (standalone `3×FP16` on Colab A100, coraline and leeloo; §3.11).

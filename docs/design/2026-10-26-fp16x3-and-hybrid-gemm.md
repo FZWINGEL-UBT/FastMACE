@@ -79,6 +79,10 @@ end-to-end, **standalone `3×FP16` is directly valuable on `sm_80` (A100) and `s
     `triton_fp16x3_kernel` (and CUTLASS `3×FP16`) against `cuBLAS IEEE FP32` on the 92 production shapes of
     `gemms.csv`, and expose it as `RewriteConfig.fp16x3_gemms` (or upgrade `tf32x3_gemms` to `fp16x3` where
     faster).
+  - **Tested 26 October 2026:** `tools/bench/fp16x3_gemm_screen.py` on Colab A100 (`sm_80`), coraline
+    RTX A4000 (`sm_86`) and leeloo RTX 4000 Ada (`sm_89`) gave FP16×3/cuBLAS weighted GEMM ratios of
+    1.12–1.71× (slower on every structure), with worst cancellation errors 0.63–0.78× IEEE.
+    **Rejected; no `fp16x3_gemms` record.** See `docs/validation/opt-5.md` §3.11.
 
 ### Path B: Single-Kernel Fused `SIMT + 3×FP16` on RTX 5060 Ti (`sm_120`)
 - On `sm_120`, standalone `3×FP16` has a `170.7` FLOP/cycle/SM ceiling vs `256` for FP32 CUDA cores, so
