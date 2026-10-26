@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "run_id": "post1-alchemi-20261025",
+  "started_utc": "2026-10-26T00:04:45+00:00",
+  "protocol": {
+    "warmup_steps": 300,
+    "timed_blocks": 4,
+    "steps_per_block": 300
+  },
+  "validation": [
+    {
+      "case": "NaCl216",
+      "reference_finite": true,
+      "sides": {
+        "fastmace": {
+          "finite": true,
+          "energy_error_eV": -3.2862556508916896e-05,
+          "energy_error_eV_atom": -1.5214146531905971e-07,
+          "force_max_abs_error_eV_A": 1.5425030145396845e-06,
+          "force_rms_error_eV_A": 5.145552068600924e-07
+        },
+        "alchemi": {
+          "finite": true,
+          "energy_error_eV": -0.0010655656258222734,
+          "energy_error_eV_atom": -4.933174193621636e-06,
+          "force_max_abs_error_eV_A": 1.5407971434462524e-06,
+          "force_rms_error_eV_A": 4.895665248999762e-07
+        }
+      },
+      "passed": true
+    },
+    {
+      "case": "NbCl5_1944",
+      "reference_finite": true,
+      "sides": {
+        "fastmace": {
+          "finite": true,
+          "energy_error_eV": -0.000376157091523055,
+          "energy_error_eV_atom": -1.9349644625671552e-07,
+          "force_max_abs_error_eV_A": 7.077228646672456e-05,
+          "force_rms_error_eV_A": 9.746210172426373e-06
+        },
+        "alchemi": {
+          "finite": true,
+          "energy_error_eV": 0.02107652228914958,
+          "energy_error_eV_atom": 1.0841832453266245e-05,
+          "force_max_abs_error_eV_A": 7.624551644317063e-05,
+          "force_rms_error_eV_A": 9.783953103353454e-06
+        }
+      },
+      "passed": true
+    }
+  ],
+  "timing_order": [
+    {
+      "round": 1,
+      "case": "NaCl216",
+      "engine": "fastmace"
+    },
+    {
+      "round": 1,
+      "case": "NaCl216",
+      "engine": "alchemi"
+    },
+    {
+      "round": 1,
+      "case": "NbCl5_1944",
+      "engine": "fastmace"
+    },
+    {
+      "round": 1,
+      "case": "NbCl5_1944",
+      "engine": "alchemi"
+    },
+    {
+      "round": 2,
+      "case": "NaCl216",
+      "engine": "alchemi"
+    },
+    {
+      "round": 2,
+      "case": "NaCl216",
+      "engine": "fastmace"
+    },
+    {
+      "round": 2,
+      "case": "NbCl5_1944",
+      "engine": "alchemi"
+    },
+    {
+      "round": 2,
+      "case": "NbCl5_1944",
+      "engine": "fastmace"
+    }
+  ],
+  "status": "complete",
+  "finished_utc": "2026-10-26T00:44:05+00:00"
+}

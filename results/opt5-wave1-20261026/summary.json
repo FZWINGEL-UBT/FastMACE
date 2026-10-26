@@ -1,0 +1,141 @@
+{
+  "opt5_t02": {
+    "shape": [
+      5832,
+      512,
+      512
+    ],
+    "times_us": {
+      "cublas_ieee_fp32": 229.55,
+      "triton_builtin_tf32x3": 497.49,
+      "triton_ptx_rna_3xTF32": 543.18,
+      "triton_ptx_rna_4xTF32": 763.89
+    },
+    "accuracy": {
+      "cublas_ieee_fp32": {
+        "mean_signed_bias": -9.319009133186021e-09,
+        "sum_signed_bias": -0.027826412167547332,
+        "max_abs_err": 0.0001674123041226494,
+        "rms_err": 1.4472258645240802e-05,
+        "cancel_scaled_max": 4.868632018158969e-07
+      },
+      "triton_builtin_tf32x3": {
+        "mean_signed_bias": -2.84371526153318e-06,
+        "sum_signed_bias": -8.491288271493891,
+        "max_abs_err": 3.487239531807518e-05,
+        "rms_err": 5.0055616559858e-06,
+        "cancel_scaled_max": 1.0338260617017613e-07
+      },
+      "triton_ptx_rna_3xTF32": {
+        "mean_signed_bias": -0.00010562646960841855,
+        "sum_signed_bias": -315.3989482272241,
+        "max_abs_err": 0.0006437828118350808,
+        "rms_err": 0.00013957432895277027,
+        "cancel_scaled_max": 1.666846229507481e-06
+      },
+      "triton_ptx_rna_4xTF32": {
+        "mean_signed_bias": -0.00010603979172612305,
+        "sum_signed_bias": -316.6331214575358,
+        "max_abs_err": 0.0006437828118350808,
+        "rms_err": 0.00014000054958930418,
+        "cancel_scaled_max": 1.666846229507481e-06
+      }
+    }
+  },
+  "opt5_t03": {
+    "NaCl_8192": {
+      "E": 8192,
+      "falsifier_limit_us": 150.0,
+      "cublas_k65_noncontig_wt_us": 199.81,
+      "cublas_k65_contig_wt_us": 151.7,
+      "cublas_k68_noncontig_wt_us": 189.83,
+      "cublas_k68_contig_wt_us": 159.47,
+      "cublas_k64_only_us": 150.31,
+      "fill_only_us": 120.78,
+      "triton_k65_64x128_w4_us": 241.37,
+      "triton_k65_64x128_w4_err_ratio": 1.0,
+      "triton_k68_64x128_w4_us": 205.22,
+      "triton_k65_64x256_w8_us": 238.61,
+      "triton_k65_64x256_w8_err_ratio": 1.0,
+      "triton_k68_64x256_w8_us": 216.36,
+      "triton_k65_128x128_w8_us": 303.67,
+      "triton_k65_128x128_w8_err_ratio": 1.0,
+      "triton_k68_128x128_w8_us": 1664.36,
+      "triton_k65_64x64_w4_us": 160.74,
+      "triton_k65_64x64_w4_err_ratio": 1.0,
+      "triton_k68_64x64_w4_us": 165.69
+    },
+    "NbCl5_56320": {
+      "E": 56320,
+      "falsifier_limit_us": 1000.0,
+      "cublas_k65_noncontig_wt_us": 1339.4,
+      "cublas_k65_contig_wt_us": 1094.57,
+      "cublas_k68_noncontig_wt_us": 1338.49,
+      "cublas_k68_contig_wt_us": 1137.24,
+      "cublas_k64_only_us": 1052.62,
+      "fill_only_us": 816.96,
+      "triton_k65_64x128_w4_us": 1548.59,
+      "triton_k65_64x128_w4_err_ratio": 1.0,
+      "triton_k68_64x128_w4_us": 1410.21,
+      "triton_k65_64x256_w8_us": 1632.71,
+      "triton_k65_64x256_w8_err_ratio": 1.0,
+      "triton_k68_64x256_w8_us": 1419.61,
+      "triton_k65_128x128_w8_us": 1612.42,
+      "triton_k65_128x128_w8_err_ratio": 1.0,
+      "triton_k68_128x128_w8_us": 12198.43,
+      "triton_k65_64x64_w4_us": 1440.29,
+      "triton_k65_64x64_w4_err_ratio": 1.0,
+      "triton_k68_64x64_w4_us": 1509.06
+    },
+    "NaNbO3_82688": {
+      "E": 82688,
+      "falsifier_limit_us": 1450.0,
+      "cublas_k65_noncontig_wt_us": 1984.08,
+      "cublas_k65_contig_wt_us": 1615.69,
+      "cublas_k68_noncontig_wt_us": 1987.31,
+      "cublas_k68_contig_wt_us": 1664.24,
+      "cublas_k64_only_us": 1546.3,
+      "fill_only_us": 1196.73,
+      "triton_k65_64x128_w4_us": 2599.96,
+      "triton_k65_64x128_w4_err_ratio": 1.0,
+      "triton_k68_64x128_w4_us": 2343.61,
+      "triton_k65_64x256_w8_us": 2466.04,
+      "triton_k65_64x256_w8_err_ratio": 1.0,
+      "triton_k68_64x256_w8_us": 2189.22,
+      "triton_k65_128x128_w8_us": 2435.81,
+      "triton_k65_128x128_w8_err_ratio": 1.0,
+      "triton_k68_128x128_w8_us": 17875.71,
+      "triton_k65_64x64_w4_us": 2600.88,
+      "triton_k65_64x64_w4_err_ratio": 1.0,
+      "triton_k68_64x64_w4_us": 2686.52
+    }
+  },
+  "opt5_t04": {
+    "NaCl_216": {
+      "atoms": 216,
+      "choices": [
+        "cublas",
+        "cublas",
+        "cublas",
+        "cublas"
+      ],
+      "seq_us": 44.38,
+      "fused_prologue_us": 35.4,
+      "ratio_fused_over_seq": 0.7977,
+      "max_abs_diff": 0.0
+    },
+    "NbCl5_1944": {
+      "atoms": 1944,
+      "choices": [
+        "cublas",
+        "triton",
+        "triton",
+        "triton"
+      ],
+      "seq_us": 184.33,
+      "fused_prologue_us": 177.44,
+      "ratio_fused_over_seq": 0.9626,
+      "max_abs_diff": 0.0
+    }
+  }
+}

@@ -90,6 +90,18 @@ The most realistic variants, a 64×64 tensor-core warp tile (128 accumulators) b
 sm_89 alone, because each later stage needs ≥ 10 % whole-step gain on the reference GPU. For a future GPU whose
 TF32 tensor-core rate is several times its FP32 rate, re-run the probe (about 10 s of GPU time) first.
 
+**Round 5 follow-up (`OPT5-T01` and `OPT5-T02`, 26 October 2026, `docs/validation/opt5-T01-scheduler-probe.md`):**
+- **Warp-scheduler isolation (`sched_iso`):** pinning SIMT and MMA warps to disjoint warp schedulers (`w % 4`) drops
+  `4×4` gain from `1.03–1.05` (`interleaved`) to `0.72` on `sm_120`, because each SM sub-partition owns its own
+  private FFMA pipeline and its own private Tensor Core unit (`m_both = 127.5` of `255.2` FLOP/cycle/SM).
+  Asymmetric interleaved ratios (`6×2`, `7×1`) reach `keep = 0.97–0.99` with `gain = 1.01–1.03`.
+- **DeepSeek-style producer/consumer split (`x3_pipe`):** offloading the `cvt.rna.tf32` + `sub.f32` operand split
+  from the MMA warps onto the SIMT warps (via non-blocking PTX `bar.arrive 1` and a 4-stage shared-memory buffer)
+  lowers kernel register usage (`205 → 194`, 0 spill) and raises concurrent 3×TF32 MMA throughput by **+35.6 %**
+  at `4×4` (`45.2 → 61.3` FLOP/cycle/SM, `mma_share` `0.56 → 0.76`) and **+21.3 %** at `2×6` (`60.1 → 72.9`,
+  `mma_share` `0.73 → 0.89`). On `sm_120`, where TF32 MMA rate equals FP32 FFMA rate, the SIMT producer cost still
+  makes net `gain = 0.85 < 1.0`. Dense single-SM GEMM co-execution on `sm_120` remains closed.
+
 ## What would come after a pass (stages 2–4 of the proposal)
 
 1. A persistent linear-block engine: the irrep GEMMs of one interaction with their elementwise work. This

@@ -71,8 +71,14 @@ def _gemm(a, a_offset, a_n, a_m, b, c, c_offset, c_n, c_m, rows, dim, choice, pr
 
 def _choices(rows_per_product, weights, device, dtype, precision="ieee"):
     sms = tile_rule.device_sms(device) if dtype == torch.float32 else None
-    if precision != "ieee" and sms:  # tf32x3_gemms: every product, since cuBLAS's would be IEEE (OPT4-T03)
-        return [tile_rule.GemmChoice("triton", reason=f"{precision}: every product") for _ in rows_per_product]
+    if precision != "ieee" and sms:  # tf32x3_gemms: 3xTF32 where K, N >= BLOCK_K, SIMT IEEE below (OPT4-T03, OPT5-T05)
+        return [
+            tile_rule.GemmChoice("triton", reason=f"{precision}: K, N >= {tile_rule.BLOCK_K}")
+            if int(w.shape[0]) >= tile_rule.BLOCK_K and int(w.shape[1]) >= tile_rule.BLOCK_K
+            else tile_rule.GemmChoice("cublas", reason=f"{precision}: sub-tile K={int(w.shape[0])}, "
+                                                       f"N={int(w.shape[1])} kept on SIMT IEEE")
+            for w in weights
+        ]
     return [tile_rule.segment_gemm_choice(rows, int(w.shape[1]), int(w.shape[0]), sms)
             for rows, w in zip(rows_per_product, weights)]
 

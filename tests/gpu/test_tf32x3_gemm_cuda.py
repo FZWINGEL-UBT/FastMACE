@@ -78,3 +78,17 @@ def test_joined_products_in_tf32x3_equal_the_dense_op():
     out = joined_products(rows, weights, [w.t().contiguous() for w in weights], offsets, dims, width, "tf32x3")
     for x, w, offset, d, m in zip(rows, weights, offsets, dims, muls):
         assert torch.equal(out[:, offset:offset + d * m].reshape(atoms * d, m), tf32x3_mm(x, w))
+
+
+def test_subtile_products_use_simt_ieee():
+    from fastmace.kernels.triton.tf32x3_gemm import tf32x3_mm, uses_tf32x3_tile
+
+    torch.backends.cuda.matmul.fp32_precision = "ieee"
+    assert not uses_tf32x3_tile(6, 96)
+    assert not uses_tf32x3_tile(512, 6)
+    assert uses_tf32x3_tile(32, 32)
+    for shape in [(216, 6, 96), (216, 512, 6), (216, 1024, 1)]:
+        a, b = _operands(*shape)
+        got = tf32x3_mm(a, b)
+        assert torch.equal(got, a @ b)
+        assert torch.equal(tf32x3_mm(a.t().contiguous().t(), b), got)

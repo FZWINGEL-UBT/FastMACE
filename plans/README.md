@@ -18,6 +18,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | 4. Physics | [phase-4.md](phase-4.md) | **complete**, tag `fastmace-4`; [acceptance report](../docs/validation/phase-4.md) |
 | 5. Planner completion | [phase-5.md](phase-5.md) | **complete**, tag `fastmace-5`; [acceptance report](../docs/validation/phase-5.md) |
 | 6. Release | [phase-6.md](phase-6.md) | **released `v1.0.0`**, PyPI packages and docs live; Python 3.13 public-index hybrid install verified; [release evidence](../docs/validation/release-1.0.0.md) |
+| Optimisation round 5 | [opt-5.md](opt-5.md) | **complete** (26 October 2026); `uses_tf32x3_tile` hybrid SIMT/TC shape dispatch adopted inside `tf32x3_gemms` (`6.90× → 1.52–1.73×` max error ratio vs IEEE, `−31 to −39 %` gate energy offset); `sched_iso` and `x3_pipe` probes recorded; [report](../docs/validation/opt-5.md) |
 
 ## Workstation availability (owner, 20 October 2026)
 

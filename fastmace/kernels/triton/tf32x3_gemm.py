@@ -65,16 +65,26 @@ def supported(device) -> tuple[bool, str]:
     return True, "ok"
 
 
+def uses_tf32x3_tile(k: int, n: int) -> bool:
+    """Whether ``[M, k] @ [k, n]`` fills at least one ``BLOCK_K x BLOCK_K`` (32 x 32) tile along K and N
+    (OPT5-T05). Below ``BLOCK_K`` (e.g. K = 6 species inputs or N = 1..6 readout heads), a 64x64x32 tensor-core
+    tile is >= 50-98 % zero-padded, slower than cuBLAS SIMT FP32, and up to 6.9x less accurate than IEEE
+    (OPT4-T03 §3); those sub-tile products run on SIMT IEEE FP32."""
+    return int(k) >= tile_rule.BLOCK_K and int(n) >= tile_rule.BLOCK_K
+
+
 def _launch(a, b, out):
     import triton
 
     m, k = a.shape
     n = b.shape[1]
+    if not uses_tf32x3_tile(k, n):
+        torch.mm(a.contiguous(), b.contiguous(), out=out)
+        return
     grid = (triton.cdiv(m, tile_rule.BLOCK_M), triton.cdiv(n, tile_rule.BLOCK_N))
     _kernel()[grid](a, b, out, m, n, k, a.stride(0), a.stride(1), b.stride(0), b.stride(1), out.stride(0),
                     out.stride(1), BLOCK_M=tile_rule.BLOCK_M, BLOCK_N=tile_rule.BLOCK_N, BLOCK_K=tile_rule.BLOCK_K,
                     PRECISION=PRECISION, num_warps=tile_rule.NUM_WARPS, num_stages=tile_rule.NUM_STAGES)
-
 
 @torch.library.custom_op("fastmace::tf32x3_mm", mutates_args=())
 def tf32x3_mm(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
@@ -137,4 +147,4 @@ def tf32x3_matmul(a, b, b_t=None):
     return Tf32x3Matmul.apply(a, b, b_t)
 
 
-__all__ = ["MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "supported", "tf32x3_matmul", "tf32x3_mm"]
+__all__ = ["MIN_CAPABILITY", "PRECISION", "Tf32x3Matmul", "supported", "tf32x3_matmul", "tf32x3_mm", "uses_tf32x3_tile"]

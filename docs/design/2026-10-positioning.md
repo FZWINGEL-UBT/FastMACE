@@ -42,17 +42,17 @@ documented.
 | **MACE ML-IAP + LAMMPS** | Ours (Symmetrix study): Symmetrix-XL's README puts ML-IAP 5× slower per atom-step than Symmetrix-XL, which is 1.07–2.0× slower than FastMACE on our cells | Not in one evaluation (one system per LAMMPS run) | All of LAMMPS (`fix nve/nvt/npt/langevin`, many more) | Yes, LAMMPS barostats | Yes, LAMMPS `fix atom/swap`, `fix gcmc` (each change re-evaluates the model) | LAMMPS restart files | LAMMPS `pair_style dispersion/d3` combinable via `hybrid/overlay` (not checked with ML-IAP) | Not documented for ML-IAP; MH-1 supported since 0.3.15 | Build LAMMPS from source with Kokkos, ML-IAP, Python, MPI; docs call the interface "in beta testing" |
 | **mace-torch ASE calculator** | Ours (research engine, SPEC §3): FastMACE 3–22× faster in NVT | No | All of ASE (CPU-side loop) | ASE NPT integrators | Any ASE/Python MC | ASE trajectories, no full-state restart | `torch-dftd` SumCalculator | Yes (reference implementation, with known bugs FastMACE fixes) | `pip install mace-torch`; the simplest |
 | **Symmetrix-XL 0.1.1** | Ours (OMAT-0 medium, same GPU, native LAMMPS loop): 2.0× (NaCl), 1.07× (NaNbO3), 1.38× (NbCl5) slower than FastMACE; MH-1 not supported (MACE 0.3.15 notes); ASE path 1.9–2.5× slower (leto) | No | LAMMPS's, or ASE's | Via LAMMPS | Via LAMMPS | Via LAMMPS | Via LAMMPS | Only through the third-party Symmetrix-Polar patch | Prebuilt arch-specific wheels (e.g. sm_86, sm_89, sm_120), or a C++/Kokkos/CUDA build; conda recipe pending. Its edge: far lower memory, MPI multi-GPU, CPU and AMD |
-| **NVIDIA ALCHEMI Toolkit 0.2.0** | Not measured by us; vendor claims are for batched throughput | Yes, batch-first with in-flight batching | NVE, NVT, NPT (MTK) | Yes | Not documented | ? | Yes, DFT-D3(BJ) and Ewald/PME composable with MLIPs | No | `pip install nvalchemi-toolkit` |
+| **NVIDIA ALCHEMI Toolkit 0.2.0** | Ours, same GPU and cells (`OMAT-0 medium`, `enable_cueq=True, compile_model=True`, FP32): NaCl 15.7–15.9 ms (9.5–9.6× slower than FastMACE's 1.65 ms), NbCl5 27.2–27.4 ms (2.74–2.77× slower than FastMACE's 9.90–9.92 ms); 324–326 s per-process compile setup (`docs/validation/alchemi-comparison-20261025.md`) | Yes, batch-first with in-flight batching | NVE, NVT, NPT (MTK) | Yes | Not documented | ? | Yes, DFT-D3(BJ) and Ewald/PME composable with MLIPs | No | `pip install nvalchemi-toolkit` |
 | **mace-million** | Not measured; targets million-atom cells on one GPU | No | Via LAMMPS | Via LAMMPS | Via LAMMPS | Via LAMMPS | Via LAMMPS | No | Patched LAMMPS build plus Python env |
 
 ## 3. What is distinct about FastMACE
 
 Stated without exaggeration:
 
-1. **Fastest single-structure MACE MD step we have measured.** On our own GPUs and cells it beats TorchSim
-   (3.8–10×), Symmetrix-XL's LAMMPS loop (1.07–2.0×) and stock ASE (3–22×). The margin is largest on small
-   cells (hundreds of atoms), where launch overhead dominates. That is exactly the regime of long single
-   trajectories such as anneal/quench. On 1,000–2,000 atom cells Symmetrix-XL is close.
+1. **Fastest single-structure MACE MD step we have measured.** On our own GPUs and cells it beats NVIDIA ALCHEMI
+   0.2.0 (2.7–9.6×), TorchSim 0.6.2 (3.8–10×), Symmetrix-XL's LAMMPS loop (1.07–2.0×) and stock ASE (3–22×).
+   The margin is largest on small cells (hundreds of atoms), where launch overhead dominates. That is exactly the
+   regime of long single trajectories such as anneal/quench. On 1,000–2,000 atom cells Symmetrix-XL is close.
 2. **Exactness with self-checks.** Every rewrite is exact to rounding and checked against the original module
    at setup. An accuracy gate runs on the user's structure through the captured path, with safe fallback.
    No other tool listed here gates its fast path against MACE on the user's own input.

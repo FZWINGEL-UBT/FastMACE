@@ -52,21 +52,22 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-VARIANTS = ("reg", "smem", "gemm", "x3")
+VARIANTS = ("reg", "smem", "gemm", "x3", "x3_pipe")
 KINDS = ("tf32", "bf16")
 CONFIGS = ("4x4", "8x4", "4x8", "8x8")  # S x M warps per block
+SCHED_MODES = ("interleaved", "sched_iso")
 # FP32-equivalent products per MMA product for an FP32-accurate decomposition.
 DECOMPOSITIONS = {"tf32": {"3xTF32": 3}, "bf16": {"BF16x6": 6, "BF16x3": 3}}
 PRIMARY = {"tf32": "3xTF32", "bf16": "BF16x6"}
-X3 = {"3xTF32 in kernel": 1}  # the x3 variant's MMA rate already counts useful products
+X3 = {"3xTF32 in kernel": 1}  # the x3/x3_pipe variants' MMA rate already counts useful products
 
 
 def decompositions(variant, kind):
-    return X3 if variant == "x3" else DECOMPOSITIONS[kind]
+    return X3 if variant in ("x3", "x3_pipe") else DECOMPOSITIONS[kind]
 
 
 def primary(variant, kind):
-    return next(iter(X3)) if variant == "x3" else PRIMARY[kind]
+    return next(iter(X3)) if variant in ("x3", "x3_pipe") else PRIMARY[kind]
 
 
 KEEP_MIN = 0.90
@@ -115,22 +116,30 @@ __device__ __forceinline__ unsigned long long gtimer() {
   return t;
 }
 
-// VAR: 0 reg, 1 smem (32x32 MMA warp tile), 2 gemm (64x64 MMA warp tile), 3 x3 (gemm with the 3xTF32 split).
-// KIND: 0 tf32, 1 bf16.
+// VAR: 0 reg, 1 smem (32x32 MMA warp tile), 2 gemm (64x64 MMA warp tile), 3 x3 (gemm with inline 3xTF32 split),
+//      4 x3_pipe (DeepSeek-style: SIMT warps split FP32->(big,small) TF32 into shared memory; MMA warps issue
+//      pure ldmatrix+mma). KIND: 0 tf32, 1 bf16.
 template <int VAR, int KIND>
-__device__ void body(int s_warps, long long budget, unsigned fill, const float* __restrict__ in,
-                     float* __restrict__ out, long long* __restrict__ rec, int* __restrict__ smid) {
+__device__ void body(unsigned simt_mask, int s_warps, int m_warps, long long budget, unsigned fill,
+                     const float* __restrict__ in, float* __restrict__ out, long long* __restrict__ rec,
+                     int* __restrict__ smid) {
   constexpr int MT = VAR >= 2 ? 4 : 2;  // m16 tiles per warp tile
   constexpr int NT = VAR >= 2 ? 8 : 4;  // n8 tiles per warp tile
-  __shared__ __align__(16) float sA[KS * 32];        // SIMT A: 8 float4 per k-step
-  __shared__ __align__(16) float sB[KS * 64];        // SIMT B: 16 float4 per k-step
-  __shared__ __align__(16) unsigned mA[KS * 4 * 128];  // MMA A: KS x up to 4 fragments of 512 B
-  __shared__ __align__(16) unsigned mB[KS * 4 * 128];  // MMA B: KS x up to 4 x4-loads of 512 B
+  constexpr int KSM = VAR == 4 ? 4 : KS; // 4-stage circular shared-memory buffer for x3_pipe (fits 48 KiB static smem)
+  __shared__ __align__(16) float sA[KS * 32];          // SIMT A: 8 float4 per k-step
+  __shared__ __align__(16) float sB[KS * 64];          // SIMT B: 16 float4 per k-step
+  __shared__ __align__(16) unsigned mA[KSM * 4 * 128]; // MMA A: KSM x up to 4 fragments of 512 B
+  __shared__ __align__(16) unsigned mB[KSM * 4 * 128]; // MMA B: KSM x up to 4 x4-loads of 512 B
+  __shared__ __align__(16) unsigned mAs[VAR == 4 ? KSM * 4 * 128 : 16]; // x3_pipe small-part A fragments
+  __shared__ __align__(16) unsigned mBs[VAR == 4 ? KSM * 4 * 128 : 16]; // x3_pipe small-part B fragments
   __shared__ long long t0s;
   const int tid = threadIdx.x, lane = tid & 31, warp = tid >> 5;
   for (int i = tid; i < KS * 32; i += blockDim.x) sA[i] = in[i & 63];
   for (int i = tid; i < KS * 64; i += blockDim.x) sB[i] = in[(i + 7) & 63];
-  for (int i = tid; i < KS * 4 * 128; i += blockDim.x) { mA[i] = fill; mB[i] = fill; }
+  for (int i = tid; i < KSM * 4 * 128; i += blockDim.x) {
+    mA[i] = fill; mB[i] = fill;
+    if (VAR == 4) { mAs[i] = fill ^ 1u; mBs[i] = fill ^ 2u; }
+  }
   __syncthreads();
   if (tid == 0) {
     unsigned s; asm volatile("mov.u32 %0, %smid;" : "=r"(s)); smid[blockIdx.x] = (int)s;
@@ -141,7 +150,7 @@ __device__ void body(int s_warps, long long budget, unsigned fill, const float* 
   const unsigned long long g0 = gtimer();
   long long chunks = 0;
   float sum = 0.f;
-  const bool simt = warp < s_warps;
+  const bool simt = ((simt_mask >> warp) & 1u) != 0u;
   if (simt) {
     if (VAR == 0) {
       float acc[REG_CHAINS];
@@ -165,7 +174,24 @@ __device__ void body(int s_warps, long long budget, unsigned fill, const float* 
         for (int j = 0; j < 8; ++j) acc[i][j] = 0.f;
       const unsigned a_base = (unsigned)__cvta_generic_to_shared(sA) + 16u * (lane >> 3);
       const unsigned b_base = (unsigned)__cvta_generic_to_shared(sB) + 16u * (lane & 7);
+      unsigned split_idx = (unsigned)tid;
       do {
+        if (VAR == 4 && m_warps > 0) {
+          // Producer duty: split 256 FP32 values per chunk across the active SIMT threads into mA/mAs and mB/mBs,
+          // then signal named PTX barrier 1 (non-blocking arrive, never __syncthreads()).
+          const int splits = (256 + (s_warps * 32) - 1) / (s_warps * 32);
+#pragma unroll 1
+          for (int s = 0; s < splits; ++s) {
+            const unsigned idx = (split_idx + (unsigned)(s * 32)) & (KSM * 4 * 128 - 1);
+            unsigned big_a, small_a, big_b, small_b;
+            split_tf32(mA[idx], big_a, small_a);
+            split_tf32(mB[idx], big_b, small_b);
+            mA[idx] = big_a; mAs[idx] = small_a;
+            mB[idx] = big_b; mBs[idx] = small_b;
+          }
+          split_idx += 256u;
+          asm volatile("bar.arrive 1, %0;" :: "r"((s_warps + m_warps) * 32));
+        }
 #pragma unroll
         for (int k = 0; k < KS; ++k) {
           const float4 a0 = lds4(a_base + k * 128), a1 = lds4(a_base + k * 128 + 64);
@@ -215,14 +241,17 @@ __device__ void body(int s_warps, long long budget, unsigned fill, const float* 
       // Each lane addresses one 16-byte row; one x4 load reads 512 contiguous bytes (conflict-free).
       const unsigned a_base = (unsigned)__cvta_generic_to_shared(mA) + 16u * lane;
       const unsigned b_base = (unsigned)__cvta_generic_to_shared(mB) + 16u * lane;
+      const unsigned as_base = (unsigned)__cvta_generic_to_shared(mAs) + 16u * lane;
+      const unsigned bs_base = (unsigned)__cvta_generic_to_shared(mBs) + 16u * lane;
       do {
-#pragma unroll
+#pragma unroll 1
         for (int k = 0; k < KS; ++k) {
+          const int ks = k & (KSM - 1);
           unsigned fa[MT][4], fb[NT / 2][4];
 #pragma unroll
-          for (int m = 0; m < MT; ++m) ldsm_x4(fa[m], a_base + (k * 4 + m) * 512);
+          for (int m = 0; m < MT; ++m) ldsm_x4(fa[m], a_base + (ks * 4 + m) * 512);
 #pragma unroll
-          for (int n = 0; n < NT / 2; ++n) ldsm_x4(fb[n], b_base + (k * 4 + n) * 512);
+          for (int n = 0; n < NT / 2; ++n) ldsm_x4(fb[n], b_base + (ks * 4 + n) * 512);
           if (VAR == 3) {
             unsigned ab[MT][4], as[MT][4], bb[NT / 2][4], bs[NT / 2][4];
 #pragma unroll
@@ -241,6 +270,27 @@ __device__ void body(int s_warps, long long budget, unsigned fill, const float* 
                 mma_op(0, d[m][n], ab[m], &bs[n >> 1][(n & 1) * 2]);
                 mma_op(0, d[m][n], ab[m], &bb[n >> 1][(n & 1) * 2]);
               }
+          } else if (VAR == 4) {
+#pragma unroll
+            for (int m = 0; m < MT; ++m) {
+              unsigned as_m[4];
+              ldsm_x4(as_m, as_base + (ks * 4 + m) * 512);
+#pragma unroll
+              for (int n = 0; n < NT; ++n) {
+                mma_op(0, d[m][n], as_m, &fb[n >> 1][(n & 1) * 2]);
+                mma_op(0, d[m][n], fa[m], &fb[n >> 1][(n & 1) * 2]);
+              }
+            }
+#pragma unroll
+            for (int n = 0; n < NT / 2; ++n) {
+              unsigned bs_n[4];
+              ldsm_x4(bs_n, bs_base + (ks * 4 + n) * 512);
+#pragma unroll
+              for (int m = 0; m < MT; ++m) {
+                mma_op(0, d[m][n * 2], fa[m], &bs_n[0]);
+                mma_op(0, d[m][n * 2 + 1], fa[m], &bs_n[2]);
+              }
+            }
           } else {
 #pragma unroll
             for (int m = 0; m < MT; ++m)
@@ -267,8 +317,9 @@ __device__ void body(int s_warps, long long budget, unsigned fill, const float* 
 
 // The gemm variant's 128 MMA accumulators need up to 255 registers, hence at most 256 threads.
 #define PROBE(NAME, VAR, KIND) \
-extern "C" __global__ void __launch_bounds__(VAR >= 2 ? 256 : 512) NAME(int s, long long budget, unsigned fill, \
-    const float* in, float* out, long long* rec, int* smid) { body<VAR, KIND>(s, budget, fill, in, out, rec, smid); }
+extern "C" __global__ void __launch_bounds__(VAR >= 2 ? 256 : 512) NAME(unsigned simt_mask, int s, int m, \
+    long long budget, unsigned fill, const float* in, float* out, long long* rec, int* smid) { \
+    body<VAR, KIND>(simt_mask, s, m, budget, fill, in, out, rec, smid); }
 PROBE(probe_reg_tf32, 0, 0)
 PROBE(probe_reg_bf16, 0, 1)
 PROBE(probe_smem_tf32, 1, 0)
@@ -276,6 +327,7 @@ PROBE(probe_smem_bf16, 1, 1)
 PROBE(probe_gemm_tf32, 2, 0)
 PROBE(probe_gemm_bf16, 2, 1)
 PROBE(probe_x3_tf32, 3, 0)
+PROBE(probe_x3_pipe_tf32, 4, 0)
 """
 
 
@@ -286,7 +338,7 @@ def ops_per_chunk(variant, kind, role):
         return 32 * 2 * (32 * 16 if variant == "reg" else 8 * 64)
     if variant == "reg":
         return 8 * 8 * mma_flops
-    mt, nt = (4, 8) if variant in ("gemm", "x3") else (2, 4)
+    mt, nt = (4, 8) if variant in ("gemm", "x3", "x3_pipe") else (2, 4)
     return 8 * mt * nt * mma_flops
 
 
@@ -315,7 +367,7 @@ def compile_module(capability):
     kernels = {}
     for variant in VARIANTS:
         for kind in KINDS:
-            if variant == "x3" and kind != "tf32":
+            if variant in ("x3", "x3_pipe") and kind != "tf32":
                 continue
             name = f"probe_{variant}_{kind}"
             fn = check(driver.cuModuleGetFunction(module, name.encode()), name)
@@ -329,13 +381,39 @@ def compile_module(capability):
     return module, kernels, log.decode(errors="replace").strip()
 
 
-def launch(torch, kernel, grid, s_warps, m_warps, budget, fill, buffers):
+def make_simt_mask(s_warps: int, m_warps: int, sched_mode: str = "interleaved") -> int:
+    """Bitmask of warps assigned to the SIMT role (bit w == 1 -> SIMT, 0 -> MMA).
+
+    - 'interleaved': warps 0 .. s_warps-1 are SIMT (original OPT4-T07 mapping).
+    - 'sched_iso': group warps by SM sub-partition (warp % 4) so SIMT and MMA warps sit on separate
+      warp schedulers whenever possible.
+    """
+    total = s_warps + m_warps
+    if s_warps <= 0:
+        return 0
+    if m_warps <= 0:
+        return (1 << total) - 1
+    if sched_mode == "interleaved":
+        return (1 << s_warps) - 1
+    if sched_mode == "sched_iso":
+        # Order warps by scheduler (0, 1, 2, 3) then by slot on that scheduler (0, 4, 8, ...).
+        ordered = [w for sched in range(4) for w in range(sched, total, 4)]
+        mask = 0
+        for w in ordered[:s_warps]:
+            mask |= 1 << w
+        return mask
+    raise ValueError(f"unknown sched_mode: {sched_mode!r}")
+
+
+def launch(torch, kernel, grid, s_warps, m_warps, budget, fill, buffers, sched_mode="interleaved"):
     from cuda.bindings import driver
 
     warps = s_warps + m_warps
+    simt_mask = make_simt_mask(s_warps, m_warps, sched_mode)
     inp, out, rec, smid = buffers
     rec.zero_()
-    args = [ctypes.c_int(s_warps), ctypes.c_longlong(budget), ctypes.c_uint(fill),
+    args = [ctypes.c_uint(simt_mask), ctypes.c_int(s_warps), ctypes.c_int(m_warps),
+            ctypes.c_longlong(budget), ctypes.c_uint(fill),
             ctypes.c_void_p(inp.data_ptr()), ctypes.c_void_p(out.data_ptr()), ctypes.c_void_p(rec.data_ptr()),
             ctypes.c_void_p(smid.data_ptr())]
     argv = (ctypes.c_void_p * len(args))(*[ctypes.addressof(a) for a in args])
@@ -345,7 +423,6 @@ def launch(torch, kernel, grid, s_warps, m_warps, budget, fill, buffers):
     torch.cuda.synchronize()
     r = rec[: grid * warps * REC].view(grid, warps, REC).cpu().tolist()
     return r, smid[:grid].cpu().tolist()
-
 
 def side_rates(records, variant, kind, role):
     """Per block: the side's FLOPs per cycle (sum over its warps); and the chip's FLOPs per ns."""
@@ -360,20 +437,23 @@ def side_rates(records, variant, kind, role):
     return (statistics.median(per_block) if per_block else 0.0), per_ns
 
 
-def measure(torch, kernel, variant, kind, grid, s, m, budget, fill, buffers, repeats):
+def measure(torch, kernel, variant, kind, grid, s, m, budget, fill, buffers, repeats, sched_mode="interleaved",
+            x3_kernel=None):
     # *_all: every warp of the block on one side, the alternative to splitting the warps between the sides.
+    # For x3_pipe, mma_alone / mma_all have no SIMT producer warps, so compare against inline x3's standalone MMA rate.
     modes = {"simt_alone": (s, 0), "mma_alone": (0, m), "both": (s, m), "simt_all": (s + m, 0),
              "mma_all": (0, s + m)}
     raw = {}
     unique = True
     for mode, (sw, mw) in modes.items():
+        active_kernel = x3_kernel if (variant == "x3_pipe" and sw == 0 and x3_kernel is not None) else kernel
+        active_variant = "x3" if (variant == "x3_pipe" and sw == 0 and x3_kernel is not None) else variant
         samples = []
         for _ in range(repeats):
-            recs, smids = launch(torch, kernel, grid, sw, mw, budget, fill, buffers)
+            recs, smids = launch(torch, active_kernel, grid, sw, mw, budget, fill, buffers, sched_mode=sched_mode)
             unique &= len(set(smids)) == len(smids)
-            # role id: warps < sw are SIMT (0); the rest MMA (1)
-            simt = side_rates(recs, variant, kind, 0) if sw else (0.0, 0.0)
-            mma = side_rates(recs, variant, kind, 1) if mw else (0.0, 0.0)
+            simt = side_rates(recs, active_variant, kind, 0) if sw else (0.0, 0.0)
+            mma = side_rates(recs, active_variant, kind, 1) if mw else (0.0, 0.0)
             samples.append((simt, mma))
         raw[mode] = {
             "simt_flop_per_cycle_sm": statistics.median(x[0][0] for x in samples),
@@ -387,7 +467,8 @@ def measure(torch, kernel, variant, kind, grid, s, m, budget, fill, buffers, rep
     m_all = max(ma, raw["mma_all"]["mma_flop_per_cycle_sm"])
     sb = raw["both"]["simt_flop_per_cycle_sm"]
     mb = raw["both"]["mma_flop_per_cycle_sm"]
-    row = {"variant": variant, "kind": kind, "grid": grid, "simt_warps": s, "mma_warps": m,
+    row = {"variant": variant, "kind": kind, "sched_mode": sched_mode,
+           "simt_mask": hex(make_simt_mask(s, m, sched_mode)), "grid": grid, "simt_warps": s, "mma_warps": m,
            "regs": kernel["regs"], "one_block_per_sm": unique, "modes": raw,
            "keep": sb / sa, "mma_share": mb / ma, "decompositions": {}}
     for name, c in decompositions(variant, kind).items():
@@ -406,7 +487,8 @@ def main(argv=None):
     p.add_argument("--label", default="", help="Machine label for the record")
     p.add_argument("--variants", nargs="+", default=list(VARIANTS), choices=VARIANTS)
     p.add_argument("--kinds", nargs="+", default=list(KINDS), choices=KINDS)
-    p.add_argument("--configs", nargs="+", default=list(CONFIGS), help="SxM warps per block, multiples of 4")
+    p.add_argument("--configs", nargs="+", default=list(CONFIGS), help="SxM warps per block")
+    p.add_argument("--sched-modes", nargs="+", default=["interleaved"], choices=SCHED_MODES)
     p.add_argument("--grids", nargs="+", default=["1", "sm"], help="blocks: integers or 'sm' (one per SM)")
     p.add_argument("--budget", type=int, default=2_000_000, help="cycles per launch")
     p.add_argument("--repeats", type=int, default=5)
@@ -444,7 +526,7 @@ def main(argv=None):
     # Warm-up: clocks up, module resident.
     for _ in range(3):
         launch(torch, kernels[("reg", "tf32")], sms, 4, 4, args.budget, fills["tf32"], buffers)
-    print(f"{'variant':6} {'kind':4} {'grid':>4} {'SxM':>4} {'regs':>4} | "
+    print(f"{'variant':7} {'sched':5} {'kind':4} {'grid':>4} {'SxM':>4} {'regs':>4} | "
           f"{'simt':>6} {'mma':>6} {'s_all':>6} {'m_all':>6} | {'s_both':>6} {'m_both':>6} | "
           f"{'keep':>5} {'mma%':>5} {'gain':>5} {'decomp':>7} | verdict", flush=True)
     for variant in args.variants:
@@ -452,33 +534,37 @@ def main(argv=None):
             if (variant, kind) not in kernels:
                 continue
             kernel = kernels[(variant, kind)]
-            for config in args.configs:
-                s, m = (int(v) for v in config.split("x"))
-                if 32 * (s + m) > kernel["max_threads"]:
-                    rows.append({"variant": variant, "kind": kind, "simt_warps": s, "mma_warps": m,
-                                 "skipped": f"{32 * (s + m)} threads > {kernel['max_threads']} at "
-                                            f"{kernel['regs']} registers"})
-                    print(f"{variant:6} {kind:4} {'':>4} {config:>4} {kernel['regs']:>4} | skipped "
-                          f"({kernel['max_threads']} threads max)", flush=True)
-                    continue
-                for grid in grids:
-                    row = measure(torch, kernel, variant, kind, grid, s, m, args.budget, fills[kind], buffers,
-                                  args.repeats)
-                    rows.append(row)
-                    md = row["modes"]
-                    d = row["decompositions"][primary(variant, kind)]
-                    print(f"{variant:6} {kind:4} {grid:>4} {config:>4} {row['regs']:>4} | "
-                          f"{md['simt_alone']['simt_flop_per_cycle_sm']:6.1f} "
-                          f"{md['mma_alone']['mma_flop_per_cycle_sm']:6.1f} "
-                          f"{md['simt_all']['simt_flop_per_cycle_sm']:6.1f} "
-                          f"{md['mma_all']['mma_flop_per_cycle_sm']:6.1f} | "
-                          f"{md['both']['simt_flop_per_cycle_sm']:6.1f} {md['both']['mma_flop_per_cycle_sm']:6.1f} | "
-                          f"{row['keep']:5.2f} {row['mma_share']:5.2f} {d['gain_vs_best_single']:5.2f} "
-                          f"{primary(variant, kind)[:7]:>7} | {'PASS' if row['pass'] else 'fail'}"
-                          f"{'' if row['one_block_per_sm'] else ' (shared SM!)'}", flush=True)
+            for sched_mode in args.sched_modes:
+                for config in args.configs:
+                    s, m = (int(v) for v in config.split("x"))
+                    if 32 * (s + m) > kernel["max_threads"]:
+                        rows.append({"variant": variant, "kind": kind, "sched_mode": sched_mode,
+                                     "simt_warps": s, "mma_warps": m,
+                                     "skipped": f"{32 * (s + m)} threads > {kernel['max_threads']} at "
+                                                f"{kernel['regs']} registers"})
+                        print(f"{variant:7} {sched_mode[:5]:5} {kind:4} {'':>4} {config:>4} {kernel['regs']:>4} | "
+                              f"skipped ({kernel['max_threads']} threads max)", flush=True)
+                        continue
+                    for grid in grids:
+                        row = measure(torch, kernel, variant, kind, grid, s, m, args.budget, fills[kind], buffers,
+                                      args.repeats, sched_mode=sched_mode, x3_kernel=kernels.get(("x3", "tf32")))
+                        rows.append(row)
+                        md = row["modes"]
+                        d = row["decompositions"][primary(variant, kind)]
+                        print(f"{variant:7} {sched_mode[:5]:5} {kind:4} {grid:>4} {config:>4} {row['regs']:>4} | "
+                              f"{md['simt_alone']['simt_flop_per_cycle_sm']:6.1f} "
+                              f"{md['mma_alone']['mma_flop_per_cycle_sm']:6.1f} "
+                              f"{md['simt_all']['simt_flop_per_cycle_sm']:6.1f} "
+                              f"{md['mma_all']['mma_flop_per_cycle_sm']:6.1f} | "
+                              f"{md['both']['simt_flop_per_cycle_sm']:6.1f} "
+                              f"{md['both']['mma_flop_per_cycle_sm']:6.1f} | "
+                              f"{row['keep']:5.2f} {row['mma_share']:5.2f} {d['gain_vs_best_single']:5.2f} "
+                              f"{primary(variant, kind)[:7]:>7} | {'PASS' if row['pass'] else 'fail'}"
+                              f"{'' if row['one_block_per_sm'] else ' (shared SM!)'}", flush=True)
     measured = [r for r in rows if "skipped" not in r]
     # The decomposition measured in the kernel where it ran, else the gemm variant's upper bound.
-    realistic = ([r for r in measured if r["variant"] == "x3"] or [r for r in measured if r["variant"] == "gemm"]
+    realistic = ([r for r in measured if r["variant"] in ("x3", "x3_pipe")]
+                 or [r for r in measured if r["variant"] == "gemm"]
                  or [r for r in measured if r["variant"] == "smem"])
     verdict = {"pass_any": any(r["pass"] for r in measured), "pass_realistic": any(r["pass"] for r in realistic),
                "best_realistic": max(realistic, key=lambda r: (r["keep"] >= KEEP_MIN,
