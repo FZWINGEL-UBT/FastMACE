@@ -389,6 +389,44 @@ The pre-split tensor kernel tying cuBLAS *before* its recurring A-preparation co
 it confirms the recurring operand preparation, not arithmetic throughput, is the remaining barrier.
 Production remains cuBLAS IEEE FP32 on this GPU.
 
+### 3.7 Warpgroup registers, CUTLASS/TMA check, and fused producer split (26 October 2026)
+
+Records: `results/opt5-T09-screens-20261026/{setmaxnreg,producer}.json`; CUTLASS run described below.
+
+**1. 4+4 warpgroup layout with `setmaxnreg` (`sm_120a`) — improves its own control, still loses.**
+`col128_4x4_setmaxnreg` in `tools/bench/opt5_t08_large_gemm.py`: four SIMT warps + four MMA warps
+(warpgroup-aligned), SIMT warpgroup `setmaxnreg.inc 232`, MMA warpgroup `setmaxnreg.dec 64`, compiled
+for `sm_120a` in a separate NVRTC module. It compiles to 165 registers/thread, no local spill, one
+block/SM. Against its direct 128-register control (`col128_s4_packed`, 96 local bytes of spill) it is
+much faster: 716.3 vs 1,002.7 µs at `[13608, 512, 512]`, 296.7 vs 440.7 at 5,832 rows. Register headroom
+is therefore real for this layout. But the 4+4 / `BM=128` layout itself remains slower than the 6+2
+`BM=64` packed kernel (606.6 µs) and cuBLAS (530.6 µs) in the same run. Giving the SIMT side registers
+does not rescue a layout whose tile/work partition is inferior; no further register variant is justified.
+
+**2. CUTLASS GeForce SM120 dense GEMM (TMA/`mbarrier` machinery) — runs, no rate advantage.**
+NVIDIA's CuTe DSL `blackwell_geforce` dense GEMM example (CUTLASS repo, sparse checkout in `~/tmp`,
+DSL 4.8.1 in a temporary target directory, no environment changed) passes on this GPU at
+`[13608, 512, 512]` FP16→FP32 in **194.5 µs** per iteration (tile `128×256×64`). That is slower than
+cuBLAS FP16's 174.5 µs from §3.4. The TMA/`mbarrier` pipeline therefore shows no per-pass rate advantage
+to build on; adapting the example to a normalized three-product kernel would start from a slower FP16
+base than cuBLAS and remains a project-scale effort with at most a few-percent theoretical ceiling
+(§3.4). Not pursued.
+
+**3. Fused producer-side A split — preparation is cheap when fused, total still loses.**
+`tools/bench/opt5_t09_producer.py`: a single Triton kernel splitting FP32 `A` into FP16 high/low parts
+with per-row power-of-two scales takes **174.6 µs**, versus 1,223.8 µs for the unfused PyTorch version
+and 172.8 µs for a plain FP32 copy of `A`. A producer emitting high/low parts instead of FP32 `A`
+would therefore pay almost nothing beyond the write it already performs (subject to obtaining each
+row's scale, which a row-producing kernel has and an elementwise one may not). But split + pre-split
+GEMM totals **682.1 µs** against cuBLAS's 503.7 µs, and even with free producer emission the GEMM alone
+(507.6 µs) only ties cuBLAS. There is no end-to-end win to collect on this GPU.
+
+**Verdict:** all three follow-ups are negative. The hybrid's problem is not one remaining trick; at
+measured efficiencies the FP32 and FP16×3 paths cost the same energy per useful FLOP on `sm_120`, and
+every structural variant pays at least as much in staging, instructions, or lost SIMT efficiency as it
+recovers. Further GEMM work on this GPU is closed; the normalized tensor path's remaining case is
+`sm_80`/`sm_89` hardware, pending the owner's permission for workstation/Modal runs.
+
 The separate **row/column-normalized standalone `3×FP16` path** remains a candidate for `sm_80`/`sm_89`,
 not an adopted backend. Its previously recorded local evidence does not qualify another GPU, a complete
 force/stress gate or MD. Workstation validation and NAS synchronization wait for the owner's explicit permission.

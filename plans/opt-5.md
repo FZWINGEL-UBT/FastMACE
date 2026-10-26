@@ -104,6 +104,9 @@ were implemented and rejected; barrier stalls fell 35 % but every shape was slow
 LSU/instruction work dominate). Separate kernels and `mbarrier` rings remain untested hypotheses.
 OPT5-T09 follow-up: all five further screens (concurrent two-kernel split, BK=32, swizzling, cuBLASLt/layout,
 tensor-only sweep, pre-split operands/epilogue) were negative or neutral on `sm_120`; see design report §3.6.
+Final follow-ups: 4+4 `setmaxnreg` warpgroup variant, CUTLASS GeForce FP16 check and fused producer split
+all negative (design report §3.7). GEMM-level hybrid work on `sm_120` is closed; `sm_80`/`sm_89`
+qualification of the normalized standalone path awaits owner permission (NAS/workstation pause).
 
 ```text
 Wave 1 (falsifiers first, no library edits):

@@ -184,6 +184,15 @@ BK=32 staging and block swizzling give no general gain; cuBLASLt and transposed 
 kernel ties cuBLAS (506 vs 501 µs) only before its 1,231 µs recurring A-preparation cost. CUTLASS was
 availability-checked (DSL wheel ships SM100 helpers only) but not benchmarked. No direction is adopted.
 
+### 3.8 Warpgroup registers, CUTLASS check, fused producer split (`OPT5-T09`)
+
+Recorded in [the design report, §3.7](../design/2026-10-26-fp16x3-and-hybrid-gemm.md#37-warpgroup-registers-cutlasstma-check-and-fused-producer-split-26-october-2026).
+The 4+4 warpgroup `setmaxnreg` variant (`sm_120a`, 165 registers, no spill) beats its spilling control
+by ~29 % but remains slower than the 6+2 kernel and cuBLAS. NVIDIA's CUTLASS GeForce SM120 FP16 GEMM
+runs at 194.5 µs, slower than cuBLAS FP16 (174.5 µs), so the TMA/`mbarrier` path offers no base rate to
+build on. A fused Triton A-split costs 174.6 µs (≈ a plain copy), yet split+GEMM is 682 vs 504 µs.
+All negative; GEMM-level hybrid work on `sm_120` is closed.
+
 ## 4. Records and files
 
 - Probe and Wave-1 microbenchmarks:
@@ -205,3 +214,5 @@ availability-checked (DSL wheel ships SM100 helpers only) but not benchmarked. N
     `results/opt5-T08-profile-20261026/ncu_decoupled_raw.csv` (subgroup-barrier decoupling experiment).
   - `tools/bench/opt5_t09_screens.py`, `results/opt5-T09-screens-20261026/` (concurrent split, FP32
     baseline options, tensor-only sweep, producer-side split and epilogue screens).
+  - `tools/bench/opt5_t09_producer.py`, `results/opt5-T09-screens-20261026/{setmaxnreg,producer}.json`
+    (warpgroup `setmaxnreg` variant and fused producer split).

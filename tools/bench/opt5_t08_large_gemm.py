@@ -578,6 +578,18 @@ STAGED_COL(col64_aligned_staged,64)
 STAGED_COL(col128_aligned_staged,128)
 """
 
+SETMAX_SRC = r"""
+// 4 SIMT warps + 4 MMA warps (warpgroup-aligned), compiled for sm_120a so the
+// SIMT warpgroup may raise its register limit and the MMA warpgroup lower its.
+extern "C" __global__ void __launch_bounds__(256) col128_4x4_setmaxnreg(
+ const float* A,const float* B,const uint4* P,float* C,int M,int N,int K,int NP) {
+  const int warp=threadIdx.x/32;
+  if(warp<4) { asm volatile("setmaxnreg.inc.sync.aligned.u32 232;" ::: "memory"); }
+  else { asm volatile("setmaxnreg.dec.sync.aligned.u32 64;" ::: "memory"); }
+  column_hybrid<128,4,true,true>(A,B,P,C,M,N,K,NP); }
+"""
+
+_KEEPALIVE = []
 
 def checked(result):
     if int(result[0]):
@@ -623,6 +635,24 @@ def compile_kernels():
             ("local_bytes", "CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES"))}
         props["active_blocks_per_sm"] = int(checked(driver.cuOccupancyMaxActiveBlocksPerMultiprocessor(fn, 256, 0)))
         kernels[name] = dict(fn=fn, bm=bm, bn=bn, aligned="aligned" in name, **props)
+    prog2 = checked(nvrtc.nvrtcCreateProgram((src + SETMAX_SRC).encode(), b"setmax.cu", 0, [], []))
+    opts2 = [f"-arch=sm_{cap[0]}{cap[1]}a".encode(), b"-std=c++17"]
+    result2 = nvrtc.nvrtcCompileProgram(prog2, len(opts2), opts2)
+    log2 = b" " * checked(nvrtc.nvrtcGetProgramLogSize(prog2))
+    checked(nvrtc.nvrtcGetProgramLog(prog2, log2))
+    if int(result2[0]):
+        raise RuntimeError(log2.decode())
+    cubin2 = b" " * checked(nvrtc.nvrtcGetCUBINSize(prog2))
+    checked(nvrtc.nvrtcGetCUBIN(prog2, cubin2))
+    checked(nvrtc.nvrtcDestroyProgram(prog2))
+    module2 = checked(driver.cuModuleLoadData(cubin2))
+    fn2 = checked(driver.cuModuleGetFunction(module2, b"col128_4x4_setmaxnreg"))
+    props2 = {key: int(checked(driver.cuFuncGetAttribute(getattr(attr, code), fn2))) for key, code in (
+        ("registers", "CU_FUNC_ATTRIBUTE_NUM_REGS"), ("shared_bytes", "CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES"),
+        ("local_bytes", "CU_FUNC_ATTRIBUTE_LOCAL_SIZE_BYTES"))}
+    props2["active_blocks_per_sm"] = int(checked(driver.cuOccupancyMaxActiveBlocksPerMultiprocessor(fn2, 256, 0)))
+    kernels["col128_4x4_setmaxnreg"] = dict(fn=fn2, bm=128, bn=96, aligned=False, **props2)
+    _KEEPALIVE.append(module2)
     return module, kernels
 
 
