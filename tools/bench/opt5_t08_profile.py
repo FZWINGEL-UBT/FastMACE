@@ -28,7 +28,7 @@ import triton
 baseline = large.baseline
 SHAPES = [(1512, 512, 512), (13608, 512, 512), (1944, 1024, 1024)]
 KERNELS = ["cublas", "hybrid_gemm_6x2_64_128", "col64_aligned_packed", "col128_aligned_packed"]
-ALL_KERNELS = KERNELS + ["cublas_fp16", "triton_fp16x3_rowcol"]
+ALL_KERNELS = KERNELS + ["col64_aligned_decoupled", "cublas_fp16", "triton_fp16x3_rowcol"]
 
 
 def make_calls(kernels, shape):

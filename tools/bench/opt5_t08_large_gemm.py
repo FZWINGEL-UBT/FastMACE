@@ -369,6 +369,157 @@ __device__ void column_hybrid(const float* __restrict__ A,const float* __restric
     }
   }
 }
+
+__device__ __forceinline__ void sync_simt_192() {
+  asm volatile("barrier.cta.sync 1, 192;" ::: "memory");
+}
+__device__ __forceinline__ void sync_mma_64() {
+  asm volatile("barrier.cta.sync 2, 64;" ::: "memory");
+}
+
+// Design-1 falsification variant: SIMT and MMA roles have disjoint A staging
+// (A is loaded twice) and synchronize only within their own warp group.
+// SIMT still uses FP32 B staging; MMA reads pre-packed B directly from global.
+__device__ void column_hybrid_decoupled(const float* __restrict__ A,const float* __restrict__ B,
+                                        const uint4* __restrict__ P,float* __restrict__ C,
+                                        int M,int N,int K,int NP) {
+  constexpr int BM=64, BK=16, SN=96, BN=128;
+  __shared__ __align__(16) float sa_s[2][BK][BM+4];
+  __shared__ __align__(16) float sb_s[2][BK][SN+4];
+  __shared__ __align__(16) float sa_m[2][BK][BM+4];
+  const int t=threadIdx.x,w=t/32,l=t%32,row=blockIdx.x*BM,col=blockIdx.y*BN;
+  float acc[32];
+  #pragma unroll
+  for(int i=0;i<32;++i) acc[i]=0;
+  if(w<6) {
+    const int ts=t, sr=ts/(SN/4), sc=(ts%(SN/4))*4;
+    auto load_s=[&](int kk,float4 (&a)[2],float4 (&b)[2]) {
+      #pragma unroll
+      for(int i=0;i<2;++i) {
+        const int q=ts+i*192, r=q/4, k=(q%4)*4;
+        a[i]=make_float4(0,0,0,0);
+        if(q<256 && row+r<M) a[i]=*reinterpret_cast<const float4*>(&A[(row+r)*K+kk+k]);
+      }
+      #pragma unroll
+      for(int i=0;i<2;++i) {
+        const int q=ts+i*192, k=q/(SN/4), c=(q%(SN/4))*4;
+        b[i]=make_float4(0,0,0,0);
+        if(kk+k<K && col+c+3<N) b[i]=*reinterpret_cast<const float4*>(&B[(kk+k)*N+col+c]);
+      }
+    };
+    auto store_s=[&](int s,const float4 (&a)[2],const float4 (&b)[2]) {
+      #pragma unroll
+      for(int i=0;i<2;++i) {
+        const int q=ts+i*192, r=q/4, k=(q%4)*4;
+        if(q<256) {
+          sa_s[s][k][r]=a[i].x; sa_s[s][k+1][r]=a[i].y;
+          sa_s[s][k+2][r]=a[i].z; sa_s[s][k+3][r]=a[i].w;
+        }
+      }
+      #pragma unroll
+      for(int i=0;i<2;++i) {
+        const int q=ts+i*192, k=q/(SN/4), c=(q%(SN/4))*4;
+        *reinterpret_cast<float4*>(&sb_s[s][k][c])=b[i];
+      }
+    };
+    float4 pa[2],pb[2];
+    load_s(0,pa,pb); store_s(0,pa,pb); sync_simt_192();
+    int s=0;
+    for(int kk=0;kk<K;kk+=BK) {
+      if(kk+BK<K) load_s(kk+BK,pa,pb);
+      #pragma unroll 4
+      for(int k=0;k<BK;++k) {
+        const float4 v=*reinterpret_cast<const float4*>(&sb_s[s][k][sc]);
+        const float bv[4]={v.x,v.y,v.z,v.w};
+        #pragma unroll
+        for(int i=0;i<8;i+=4) {
+          const float4 u=*reinterpret_cast<const float4*>(&sa_s[s][k][sr*8+i]);
+          const float av[4]={u.x,u.y,u.z,u.w};
+          #pragma unroll
+          for(int ii=0;ii<4;++ii) {
+            #pragma unroll
+            for(int j=0;j<4;++j) acc[(i+ii)*4+j]=fmaf(av[ii],bv[j],acc[(i+ii)*4+j]);
+          }
+        }
+      }
+      if(kk+BK<K) { store_s(s^1,pa,pb); s^=1; sync_simt_192(); }
+    }
+    #pragma unroll
+    for(int i=0;i<8;++i) {
+      #pragma unroll
+      for(int j=0;j<4;++j) {
+        const int r=row+sr*8+i, c=col+sc+j;
+        if(r<M && c<N) C[r*N+c]=acc[i*4+j];
+      }
+    }
+  } else {
+    const int tm=t-192;
+    auto load_m=[&](int kk,float4 (&a)[4]) {
+      #pragma unroll
+      for(int i=0;i<4;++i) {
+        const int q=tm+i*64, r=q/4, k=(q%4)*4;
+        a[i]=make_float4(0,0,0,0);
+        if(row+r<M) a[i]=*reinterpret_cast<const float4*>(&A[(row+r)*K+kk+k]);
+      }
+    };
+    auto store_m=[&](int s,const float4 (&a)[4]) {
+      #pragma unroll
+      for(int i=0;i<4;++i) {
+        const int q=tm+i*64, r=q/4, k=(q%4)*4;
+        sa_m[s][k][r]=a[i].x; sa_m[s][k+1][r]=a[i].y;
+        sa_m[s][k+2][r]=a[i].z; sa_m[s][k+3][r]=a[i].w;
+      }
+    };
+    float4 pa[4];
+    load_m(0,pa); store_m(0,pa); sync_mma_64();
+    int s=0;
+    for(int kk=0;kk<K;kk+=BK) {
+      if(kk+BK<K) load_m(kk+BK,pa);
+      const int k=(l%4)*2;
+      unsigned ah[2][4],al[2][4];
+      #pragma unroll
+      for(int m=0;m<2;++m) {
+        const int r=(w-6)*32+m*16+l/4;
+        split_f16x2(sa_m[s][k][r],sa_m[s][k+1][r],ah[m][0],al[m][0]);
+        split_f16x2(sa_m[s][k][r+8],sa_m[s][k+1][r+8],ah[m][1],al[m][1]);
+        split_f16x2(sa_m[s][k+8][r],sa_m[s][k+9][r],ah[m][2],al[m][2]);
+        split_f16x2(sa_m[s][k+8][r+8],sa_m[s][k+9][r+8],ah[m][3],al[m][3]);
+      }
+      #pragma unroll
+      for(int n=0;n<4;++n) {
+        unsigned bh[2],bl[2];
+        const int c=col+SN+n*8+l/4;
+        uint4 v=make_uint4(0,0,0,0);
+        if(c<NP) v=P[(kk/16*NP+c)*4+l%4];
+        bh[0]=v.x; bh[1]=v.y; bl[0]=v.z; bl[1]=v.w;
+        #pragma unroll
+        for(int m=0;m<2;++m) {
+          float* out=&acc[(m*4+n)*4];
+          float tmp[4]={0,0,0,0};
+          mma_fp16(out,ah[m],bh);
+          mma_fp16(tmp,ah[m],bl); mma_fp16(tmp,al[m],bh);
+          #pragma unroll
+          for(int q=0;q<4;++q) out[q]=fmaf(tmp[q],1.0f/2048,out[q]);
+        }
+      }
+      if(kk+BK<K) { store_m(s^1,pa); s^=1; sync_mma_64(); }
+    }
+    #pragma unroll
+    for(int m=0;m<2;++m) {
+      #pragma unroll
+      for(int n=0;n<4;++n) {
+        #pragma unroll
+        for(int q=0;q<4;++q) {
+          const int r=row+(w-6)*32+m*16+l/4+(q/2)*8, c=col+SN+n*8+2*(l%4)+q%2;
+          if(r<M && c<N) C[r*N+c]=acc[(m*4+n)*4+q];
+        }
+      }
+    }
+  }
+}
+extern "C" __global__ void __launch_bounds__(256,2) col64_aligned_decoupled(
+ const float* A,const float* B,const uint4* P,float* C,int M,int N,int K,int NP) {
+ column_hybrid_decoupled(A,B,P,C,M,N,K,NP); }
 #define COL(NAME,BM,SW,PACK,CROSS,RES) \
 extern "C" __global__ void __launch_bounds__(256,RES) NAME( \
  const float* A,const float* B,const uint4* P,float* C,int M,int N,int K,int NP) { \
@@ -431,6 +582,7 @@ def compile_kernels():
     specs.append(("row128_async", 128, 128))
     specs += [(f"col{bm}_aligned_{kind}", bm, 128) for bm in (64, 128) for kind in ("inline", "packed")]
     specs += [(f"col{bm}_aligned_staged", bm, 128) for bm in (64, 128)]
+    specs.append(("col64_aligned_decoupled", 64, 128))
     for name, bm, bn in specs:
         fn = checked(driver.cuModuleGetFunction(module, name.encode()))
         props = {key: int(checked(driver.cuFuncGetAttribute(getattr(attr, code), fn))) for key, code in (

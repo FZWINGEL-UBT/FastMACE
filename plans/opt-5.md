@@ -99,6 +99,9 @@ The owner has paused **all NAS sync and workstation jobs until explicit permissi
 Profile follow-up: Nsight Compute attributes the loss mainly to barrier-coupled SIMT/MMA roles, lower
 issue/FMA activity and only 23–25 % Tensor-pipe activity; sustained kernels are at the 180 W cap, where
 three one-pass cuBLAS FP16 GEMMs already equal the FP32 time before overhead. See design report §3.4.
+Subgroup-barrier follow-up: independent SIMT/MMA pipelines with named PTX barriers and disjoint A staging
+were implemented and rejected; barrier stalls fell 35 % but every shape was slower (duplicate staging and
+LSU/instruction work dominate). Separate kernels and `mbarrier` rings remain untested hypotheses.
 
 ```text
 Wave 1 (falsifiers first, no library edits):

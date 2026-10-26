@@ -162,6 +162,18 @@ hybrid takes 617.5 µs and uses about 18 % more energy per GEMM. This confirms t
 hybrid trades away more SIMT efficiency and synchronization time than the Tensor cores return on `sm_120`.
 It does not qualify or disqualify the separate normalized standalone path on `sm_80`/`sm_89`.
 
+### 3.6 Subgroup-barrier decoupling: implemented, no gain (`OPT5-T08`)
+
+The lowest-risk design from an external research report—independent SIMT/MMA pipelines synchronized only
+by named PTX barriers—was implemented as `col64_aligned_decoupled` and measured in
+[the design report, §3.5](../design/2026-10-26-fp16x3-and-hybrid-gemm.md#35-subgroup-barrier-decoupling-implemented-no-gain-26-october-2026).
+Cross-group barriers are removed and the NCU barrier-stall metric falls 1.357 → 0.880 at
+`[13608, 512, 512]`, but the kernel is 5.3 % slower than the coupled packed kernel there and slower on
+every tested shape. Duplicate `A` staging raises instruction count and LSU activity while FMA/Tensor
+activity falls. Boundary/replay checks pass; real-operand accuracy is unchanged and still fails.
+Design 1 is therefore rejected. Separate concurrent kernels and `mbarrier` rings remain untested, with
+lower expected value after this result.
+
 ## 4. Records and files
 
 - Probe and Wave-1 microbenchmarks:
@@ -179,3 +191,5 @@ It does not qualify or disqualify the separate normalized standalone path on `sm
   - `tools/bench/opt5_t08_large_gemm.py`, `results/opt5-T08-large-20261026/` (six screens and final validation).
   - `tools/bench/opt5_t08_profile.py`, `results/opt5-T08-profile-20261026/` (Nsight Compute raw metrics,
     sustained clock/power runs and tensor-core energy controls).
+  - `results/opt5-T08-large-20261026/{screen7-decoupled,validation-decoupled}.json`,
+    `results/opt5-T08-profile-20261026/ncu_decoupled_raw.csv` (subgroup-barrier decoupling experiment).

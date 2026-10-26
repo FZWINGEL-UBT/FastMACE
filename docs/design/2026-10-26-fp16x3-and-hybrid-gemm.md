@@ -283,6 +283,66 @@ That trade is negative on `sm_120`, and the 180 W cap removes the clock headroom
 arithmetic suggests. No further hybrid variant is justified without a design that first removes the
 per-tile SIMT/MMA barrier coupling.
 
+### 3.5 Subgroup-barrier decoupling: implemented, no gain (26 October 2026)
+
+ChatGPT Deep Research proposed, as its lowest-risk design, independent SIMT and MMA pipelines in one CTA.
+We implemented that design as `col64_aligned_decoupled` in `tools/bench/opt5_t08_large_gemm.py`.
+Records: `results/opt5-T08-large-20261026/{screen7-decoupled,validation-decoupled}.json` and
+`results/opt5-T08-profile-20261026/ncu_decoupled_raw.csv`.
+
+**What changed relative to `col64_aligned_packed`:**
+
+- Six SIMT warps synchronize only with `barrier.cta.sync 1, 192`; two MMA warps only with
+  `barrier.cta.sync 2, 64`. The unaligned named-barrier form and participant counts were checked against
+  the PTX ISA documentation.
+- SIMT and MMA each stage a private copy of the FP32 `A` tile (so `A` staging traffic doubles), SIMT stages
+  its FP32 `B` tile, and MMA reads pre-packed `B` directly from global memory.
+- Arithmetic, output partition and accumulator layout are unchanged. The kernel uses 126 registers/thread,
+  30,208 shared bytes/block, no local-memory spill and still fits two blocks/SM, versus 128 registers and
+  21,504 shared bytes for the coupled packed kernel.
+
+**Graph-replay timings (already-packed B, medians, µs):**
+
+| `[M, K, N]` | cuBLAS IEEE | Coupled packed `64×128` | Decoupled `64×128` | Decoupled vs coupled |
+| --- | ---: | ---: | ---: | ---: |
+| `[1512, 512, 512]` | 67.85 | 66.82 | 67.32 | +0.7 % |
+| `[5832, 512, 512]` | 242.50 | 254.57 | 267.52 | +5.1 % |
+| `[13608, 512, 512]` | 517.81 | 584.15 | 615.07 | +5.3 % |
+| `[1944, 1024, 1024]` | 329.38 | 323.75 | 339.95 | +5.0 % |
+| `[32768, 512, 512]` | 1260.33 | 1539.21 | 1567.07 | +1.8 % |
+| `[5832, 1024, 1024]` | 908.91 | 971.73 | 1004.64 | +3.4 % |
+
+Including B packing on every call also leaves the decoupled kernel slower on every shape.
+
+**Nsight Compute at `[13608, 512, 512]`:**
+
+| Kernel | NCU duration (µs) | Issue active | FMA pipe | Tensor pipe | LSU pipe | Barrier stall* | Instructions |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| cuBLAS FP32 | 526.5 | 76.3 % | 70.3 % | 0 % | 39.2 % | 0.129 | 128.3 M |
+| Coupled packed | 600.1 | 61.6 % | 51.2 % | 24.7 % | 47.1 % | 1.357 | 117.9 M |
+| Decoupled | 619.6 | 62.9 % | 49.4 % | 23.9 % | 50.9 % | 0.880 | 123.3 M |
+
+\*Average warps stalled at barriers per issued instruction.
+
+The named barriers work: cross-group synchronization is removed and the barrier-stall metric falls by
+35 %. It does not approach cuBLAS's 0.129 because each subgroup still synchronizes its own double-buffered
+staging pipeline every K tile. The recovered synchronization time is more than spent on duplicate `A`
+loads/stores and subgroup load work: instruction count rises 4.6 %, LSU-pipe activity rises, and both FMA
+and Tensor activity fall slightly.
+
+**Accuracy unchanged, still failing:** the decoupled kernel passes the same four aligned boundary cases
+(bitwise repeat and CUDA-graph replay, output canaries intact, worst max-relative error `8.14e-7`).
+On the 38 captured real MH-1 products it is finite everywhere and has the same error distribution as the
+coupled kernel in the same run, with 27 products above twice IEEE cancellation-scaled error; both reciprocal
+exponent-range scalings still produce nonfinite output. Synchronization was never the accuracy problem.
+
+**Verdict:** Design 1 is falsified as implemented. Barrier coupling is real but not the dominant recoverable
+cost; removing it does not justify the duplicate staging work. This does not falsify completely separate
+kernels or a deeper `mbarrier` producer–consumer design, but it lowers their expected value: the remaining
+gap is principally lost SIMT efficiency, instruction/LSU work and the power ceiling. ChatGPT's claims about
+CUTLASS SM120 warp specialization, `setmaxnreg`, TMA pipelines and green contexts were not tested here and
+remain hypotheses, not evidence for this kernel.
+
 The separate **row/column-normalized standalone `3×FP16` path** remains a candidate for `sm_80`/`sm_89`,
 not an adopted backend. Its previously recorded local evidence does not qualify another GPU, a complete
 force/stress gate or MD. Workstation validation and NAS synchronization wait for the owner's explicit permission.
