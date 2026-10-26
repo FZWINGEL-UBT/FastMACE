@@ -1,0 +1,488 @@
+{
+  "candidate": "receiver",
+  "qualification": "User reported video playback may have affected these receiver timings. Do not use this run for adoption; valid flags below only check graph captures, recompilation and WSL-visible GPU processes.",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "created_utc": "2026-10-26T21:02:48.584430+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "cuda": "13.0",
+  "fastmace_commit": "20c518bf2e4cba69bfb0daed19342c18d43ded7c",
+  "packages": {
+    "mace-torch": "0.3.16",
+    "openequivariance": "0.7.0",
+    "cuequivariance": "0.12.0",
+    "triton": "3.8.0",
+    "ase": "3.27.0"
+  },
+  "backend": "hybrid",
+  "precision": "float32",
+  "tf32": false,
+  "temperature_K": 300,
+  "cublaslt_workspace_mib": null,
+  "order": "ab",
+  "pattern": "abba",
+  "warmup": 300,
+  "block": 150,
+  "blocks": 6,
+  "structures": {
+    "NaCl@1x1x1": {
+      "spec": "NaCl@1x1x1",
+      "natoms": 8,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abba",
+        "order": [
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 0.8542459933960345,
+            "mean_ms": 0.9272402511204644,
+            "min_ms": 0.8079604466911405,
+            "max_ms": 1.3417149333205693,
+            "stdev_ms": 0.20403216064796365,
+            "spread": 0.6248252736983883,
+            "block_ms": [
+              1.3417149333205693,
+              0.8396029799284103,
+              0.8079604466911405,
+              0.8656711599905975,
+              0.8550557334092446,
+              0.8534362533828244
+            ]
+          },
+          "b": {
+            "median_ms": 0.8879579399945214,
+            "mean_ms": 0.9862533789095728,
+            "min_ms": 0.8703229733509943,
+            "max_ms": 1.48764053999912,
+            "stdev_ms": 0.24581753992766397,
+            "spread": 0.6952103684685047,
+            "block_ms": [
+              1.48764053999912,
+              0.8703229733509943,
+              0.899843580070107,
+              0.8906488866584065,
+              0.8852669933306364,
+              0.8837973000481725
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0394639797659055,
+        "pair_ratios_b_over_a": [
+          1.1087605146626816,
+          1.0365887141386794,
+          1.1137223161792853,
+          1.0288535968647496,
+          1.0353325037666663,
+          1.035575060873034
+        ]
+      },
+      "setup_s": {
+        "a": 44.175462888000766,
+        "b": 23.352646734012524
+      },
+      "capture_calls": {
+        "a": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 256)"
+          ]
+        },
+        "b": {
+          "kind": "receiver",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 256)"
+          ]
+        }
+      },
+      "initial_max_force_difference_eV_per_A": 5.945370062931943e-08,
+      "initial_energy_difference_eV": 0.0,
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "captures_during_timing": {
+        "a": 1,
+        "b": 1
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 172.74312907817338,
+          "potential_eV_atom": -6.8568064868450165,
+          "kinetic_eV_atom": 0.022328769101267583
+        },
+        "b": {
+          "temperature_K": 172.74312130494377,
+          "potential_eV_atom": -6.856806457042694,
+          "kinetic_eV_atom": 0.022328768096500272
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": false
+    },
+    "NaCl": {
+      "spec": "NaCl",
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abba",
+        "order": [
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 2.9954162433568854,
+            "mean_ms": 3.000234335583324,
+            "min_ms": 2.9579689733024375,
+            "max_ms": 3.04852482668745,
+            "stdev_ms": 0.04089032957447171,
+            "spread": 0.030231475704200962,
+            "block_ms": [
+              2.972865573343976,
+              2.9579689733024375,
+              2.9622168200633796,
+              3.017966913369795,
+              3.041862906732907,
+              3.04852482668745
+            ]
+          },
+          "b": {
+            "median_ms": 3.208573180017993,
+            "mean_ms": 3.2107724677836007,
+            "min_ms": 3.1777868800175684,
+            "max_ms": 3.2434013199720844,
+            "stdev_ms": 0.021934421230148177,
+            "spread": 0.020449725243339482,
+            "block_ms": [
+              3.2434013199720844,
+              3.20337852666853,
+              3.204047986655496,
+              3.1777868800175684,
+              3.2130983733804896,
+              3.2229217200074345
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0711610405177705,
+        "pair_ratios_b_over_a": [
+          1.0910016749676983,
+          1.0829655603493717,
+          1.0816385772149326,
+          1.0529561692475025,
+          1.056292959905776,
+          1.057206978205746
+        ]
+      },
+      "setup_s": {
+        "a": 33.48963074799394,
+        "b": 27.59321131798788
+      },
+      "capture_calls": {
+        "a": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 7168)"
+          ]
+        },
+        "b": {
+          "kind": "receiver",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 7168)"
+          ]
+        }
+      },
+      "initial_max_force_difference_eV_per_A": 3.1688250601291656e-07,
+      "initial_energy_difference_eV": 2.384185791015625e-07,
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "captures_during_timing": {
+        "a": 0,
+        "b": 0
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 193.61420970709665,
+          "potential_eV_atom": -6.860959205362532,
+          "kinetic_eV_atom": 0.025026564045379486
+        },
+        "b": {
+          "temperature_K": 193.61422160813385,
+          "potential_eV_atom": -6.860959204258742,
+          "kinetic_eV_atom": 0.02502656558370702
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NaNbO3": {
+      "spec": "NaNbO3",
+      "natoms": 1080,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abba",
+        "order": [
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 20.219470523346295,
+            "mean_ms": 20.247416179999064,
+            "min_ms": 20.150009800078504,
+            "max_ms": 20.444564739979494,
+            "stdev_ms": 0.10834263989358436,
+            "spread": 0.014567885917728875,
+            "block_ms": [
+              20.150009800078504,
+              20.169205966619,
+              20.444564739979494,
+              20.281775526624795,
+              20.246634460054338,
+              20.19230658663825
+            ]
+          },
+          "b": {
+            "median_ms": 22.181018873282788,
+            "mean_ms": 22.194777325526555,
+            "min_ms": 22.107027813326567,
+            "max_ms": 22.307650139943384,
+            "stdev_ms": 0.08054248324086054,
+            "spread": 0.009044775073811758,
+            "block_ms": [
+              22.123918146632302,
+              22.156223453251492,
+              22.307650139943384,
+              22.268030106691487,
+              22.20581429331408,
+              22.107027813326567
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.097012844509039,
+        "pair_ratios_b_over_a": [
+          1.0979606643439999,
+          1.0985173878397148,
+          1.0911286409693337,
+          1.0979329732477932,
+          1.0967657038074705,
+          1.0948242945139977
+        ]
+      },
+      "setup_s": {
+        "a": 38.237488319005934,
+        "b": 29.01163244700001
+      },
+      "capture_calls": {
+        "a": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 87040)"
+          ]
+        },
+        "b": {
+          "kind": "receiver",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 87040)"
+          ]
+        }
+      },
+      "initial_max_force_difference_eV_per_A": 2.0712614059448242e-06,
+      "initial_energy_difference_eV": 9.775161743164062e-06,
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "captures_during_timing": {
+        "a": 0,
+        "b": 0
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 211.59290267674507,
+          "potential_eV_atom": -11.850899278896826,
+          "kinetic_eV_atom": 0.027350489090642464
+        },
+        "b": {
+          "temperature_K": 211.59277951589507,
+          "potential_eV_atom": -11.850899254613452,
+          "kinetic_eV_atom": 0.02735047317087653
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NbCl5": {
+      "spec": "NbCl5",
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abba",
+        "order": [
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 22.154063633352052,
+            "mean_ms": 22.247368214448215,
+            "min_ms": 21.885061473294627,
+            "max_ms": 22.879743386680882,
+            "stdev_ms": 0.4020267856996483,
+            "spread": 0.0448983956103115,
+            "block_ms": [
+              21.94319858671709,
+              21.91655312664807,
+              21.885061473294627,
+              22.879743386680882,
+              22.364928679987013,
+              22.494724033361614
+            ]
+          },
+          "b": {
+            "median_ms": 23.39843392333326,
+            "mean_ms": 23.445861214454954,
+            "min_ms": 23.060756099973027,
+            "max_ms": 23.984072926687077,
+            "stdev_ms": 0.3824791149105771,
+            "spread": 0.03946062500333857,
+            "block_ms": [
+              23.143945759996615,
+              23.135888473382995,
+              23.060756099973027,
+              23.984072926687077,
+              23.652922086669907,
+              23.69758194002012
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0561689408577783,
+        "pair_ratios_b_over_a": [
+          1.0547206993790947,
+          1.0556353610756588,
+          1.0537213307859814,
+          1.0482666925647892,
+          1.0575898731944287,
+          1.05347289012635
+        ]
+      },
+      "setup_s": {
+        "a": 33.558014884998556,
+        "b": 27.133643674009363
+      },
+      "capture_calls": {
+        "a": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 51200)"
+          ]
+        },
+        "b": {
+          "kind": "receiver",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 51200)"
+          ]
+        }
+      },
+      "initial_max_force_difference_eV_per_A": 1.5497207641601562e-06,
+      "initial_energy_difference_eV": 2.86102294921875e-06,
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "captures_during_timing": {
+        "a": 1,
+        "b": 1
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 214.605811285894,
+          "potential_eV_atom": -10.596763756540087,
+          "kinetic_eV_atom": 0.027739937522055693
+        },
+        "b": {
+          "temperature_K": 214.60581778220728,
+          "potential_eV_atom": -10.596763759483526,
+          "kinetic_eV_atom": 0.027739938361768857
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": false
+    }
+  }
+}

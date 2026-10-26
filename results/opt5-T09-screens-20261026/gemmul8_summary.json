@@ -2,7 +2,8 @@
   "hardware": "NVIDIA GeForce RTX 5060 Ti (sm_120, GB206)",
   "driver": "610.88",
   "cuda": "13.3",
-  "implementation": "RIKEN-RCCS/GEMMul8 commit 68c2ee3 (INT8 Ozaki Scheme II)",
+  "implementation": "RIKEN-RCCS/GEMMul8 commit 5f3fae8 (INT8 Ozaki Scheme II)",
+  "qualification": "Exploratory only: skip_scalB reused the column-major B operand (the row-major activation), not the constant row-major B weights. Reuse timings are not valid for changing MD activations. Accuracy against FP64/cancellation-scaled gates was not measured.",
   "shapes": {
     "13608_512_512": {
       "cublas_sgemm_us": 472.57,
@@ -95,5 +96,5 @@
       }
     }
   },
-  "verdict": "Rejected: 8-moduli FP32-accurate GEMMul8 is 1.54x-4.20x slower than cuBLAS SGEMM and 1.70x-4.65x slower than cuBLASLt across all tested shapes, with 50-220 MB workspace overhead per GEMM. Falsification kill criterion met."
+  "verdict": "Inconclusive for constant-weight reuse and production accuracy; retain measurements only as a synthetic screen."
 }

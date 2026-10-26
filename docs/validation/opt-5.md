@@ -195,39 +195,76 @@ All negative; GEMM-level hybrid work on `sm_120` is closed.
 
 ### 3.9 Native cuBLASLt search, GEMMul8 Ozaki II, and forward graph audit (`OPT5-T09`)
 
-Following external research recommendations on sm_120 FP32 GEMMs, three independent directions were evaluated:
+The initial screens below were **exploratory, not production qualification**. Their earlier
+interpretations overstated both the speed and numerical evidence.
 
-1. **Native cuBLASLt algorithm search (`tools/bench/opt5_t09_cublaslt_bench.cu`):**
-   Native heuristic enumeration with workspace allowances (0, 4 MB, 32 MB) on the GeForce RTX 5060 Ti:
-   - `[13608, 512, 512]` (tall-and-narrow atom GEMM): cuBLAS SGEMM baseline takes **505.23 µs** (128×128 tile 20, 6 waves).
-     cuBLASLt tile 24 (`256×128`, stages=26, splitk=1, 4 MB workspace) achieves **427.02 µs** (**−15.5 %**, 16.3 TFLOPS equivalent),
-     yielding exact IEEE float32 outputs (`maxdiff=0` vs cuBLAS). This confirms the 3-wave CTA quantization hypothesis.
-   - `[1512, 512, 512]`: cuBLAS SGEMM 71.36 µs -> cuBLASLt tile 18 (`128×64`, stages=28) **61.76 µs** (**−13.5 %**).
-   - `[1944, 1024, 1024]`: cuBLAS SGEMM 307.97 µs -> cuBLASLt tile 24 **283.35 µs** (**−8.0 %**).
-   - `[216, 512, 512]`: cuBLAS SGEMM 21.14 µs -> cuBLASLt tile 16 **18.53 µs** (**−12.3 %**).
-   - `[5832, 512, 512]`: cuBLAS SGEMM 226.24 µs -> cuBLASLt tile 24 **206.61 µs** (**−8.7 %**).
-   - Records: `results/opt5-T09-screens-20261026/cublaslt_summary.json` and `lt_*.txt`.
+1. **Native cuBLASLt heuristic screen** (`tools/bench/opt5_t09_cublaslt_bench.cu`): on the local
+   RTX 5060 Ti, a synthetic `[13608, 512, 512]` product took 505.23 µs with cuBLAS SGEMM and
+   427.02 µs with one cuBLASLt candidate. This is one non-alternating run, not a measured MD-step
+   speedup. The numerical comparison sampled every 997th output element against SGEMM, not the
+   entire output or an FP64 reference: a zero sampled difference does **not** establish bitwise
+   identity, IEEE-equivalence, or force accuracy. The tile/CTA explanation is a hypothesis, not a
+   measured cause. See `results/opt5-T09-screens-20261026/cublaslt_summary.json` and `lt_*.txt`.
+   The custom dispatcher used in the subsequent synthetic microbenchmarks was not integrated into
+   FastMACE's force or MD path, and its shape-keyed cache and device-specific tile rule are not
+   suitable for production under the project's generality and isolation rules.
 
-2. **GEMMul8 Ozaki II evaluation (`tools/bench/opt5_t09_gemmul8_bench.cu`):**
-   Tested RIKEN RCCS's GEMMul8 INT8 Ozaki Scheme II (`sm_120`, CUDA 13.3) with 6, 7, and 8 moduli, fast/accurate scaling,
-   and constant-B matrix preprocessing reuse (`skip_scalB=true`):
-   - `[13608, 512, 512]`: cuBLAS SGEMM runs in **472.57 µs** (cuBLASLt 427.02 µs).
-     GEMMul8 with 8 moduli (required for FP32 cancellation-scaled accuracy, `maxdiff=8.05e-7`) takes **1,983.56 µs**
-     with preprocessed B reuse (**4.20× slower** than cuBLAS, 4.65× slower than cuBLASLt), requiring **220.1 MB workspace**.
-     At 6 moduli (`maxdiff=2.60e-5`, insufficient for FP32), it takes 1,619.66 µs (3.43× slower).
-   - `[1512, 512, 512]`: cuBLAS SGEMM 68.36 µs -> GEMMul8 8-moduli **196.14 µs** (**2.87× slower**, 54.7 MB workspace).
-   - `[1944, 1024, 1024]`: cuBLAS SGEMM 313.61 µs -> GEMMul8 8-moduli **481.77 µs** (**1.54× slower**, 93.2 MB workspace).
-   - **Verdict:** Decisively fails the falsification kill criterion (must beat 495 µs; actual 1,984 µs). **Rejected.**
-   - Records: `results/opt5-T09-screens-20261026/gemmul8_summary.json`.
+2. **GEMMul8 Ozaki II screen** (`tools/bench/opt5_t09_gemmul8_bench.cu`): the previous claim that
+   it reused the constant row-major weight matrix was wrong. The benchmark computes row-major
+   `A @ B` as column-major `Bᵀ @ Aᵀ`, so GEMMul8's `skip_scalB` reused the encoded **activation
+   A**, not the constant weight B. The reported reuse timings therefore do not represent an MD
+   step with changing activations. Its absolute error against SGEMM on synthetic operands is not
+   an FP64 or cancellation-scaled accuracy gate; eight moduli have **not** been qualified as
+   FP32-accurate. `gemmul8_summary.json` preserves the screen's numbers but its reuse fields and
+   previous verdict must not be treated as evidence for constant-weight reuse.
 
-3. **MACE forward graph audit for linear work elimination:**
-   Audited against MACE MH-1 layer definitions and FastMACE's `docs/design/opt-T08-linear-audit.md`:
-   - All exact and round-off foldable linear chains in MACE MH-1 (`species_tables` C1, `fold_readout_tail` C2,
-     `fold_product_linear` C3) were implemented in OPT-T08 and adopted as production defaults on 21 October 2026,
-     reducing force-stage time by 8–10 % on NaCl and NbCl5.
-   - The remaining atom-level GEMMs (such as `linear_2`) are sandwiched between non-linearities (equivariant gate
-     before, symmetric contraction after) with distinct per-$l$ weights and cannot be algebraically folded without
-     breaking physical equivariance or numerical accuracy.
+3. **MACE linear audit:** OPT-T08 identified and implemented `species_tables`,
+   `fold_readout_tail`, and `fold_product_linear`; see `docs/design/opt-T08-linear-audit.md`
+   and `docs/validation/opt-T08-linear.md`. The audit identifies nonlinear boundaries around
+   `linear_2` that prevent the simple consecutive-linear fold considered there. It does not
+   prove that all other graph-level optimizations are exhausted.
+
+### 3.10 Default decision: receiver-owned backward and cuBLASLt (26 October 2026)
+
+**Decision: leave both production defaults unchanged.** The owner specified that a gain around 1 %
+on only some cases is not enough to change the defaults. The receiver path is slower in every valid
+repeat below. PyTorch's cuBLASLt preference showed mixed block ratios and no established consistent
+gain. These observations cover the listed systems on one GPU, not every possible crystal or GPU.
+
+Same-process, CUDA-graph NVT step A/B: local WSL RTX 5060 Ti (`sm_120`, driver 610.88),
+`~/environments/mace_cueq_oeq` (torch 2.14.1+cu130, MACE 0.3.16, OEq 0.7.0, cuEq 0.12.0),
+FastMACE `20c518bf`, MH-1 `mh1-r2scan`, hybrid float32, TF32 off, 300 K. R2SCAN benchmark CIFs
+are repeated as shown. Each comparison builds two independent engines, selects the candidate before
+graph capture, and alternates six 150-step blocks in ABBA order. The receiver runs use 300 warm-up
+steps (NaCl 216 and NaNbO3) or 1,000 (NaCl 8 and NbCl5). The user stopped video playback before
+these receiver repeats; the user reported the cuBLASLt tests were unaffected by playback.
+
+| Crystal (atoms) | Edge backward (ms/step) | Receiver backward (ms/step) | Change | cuBLAS (ms/step) | cuBLASLt preference (ms/step) | Change |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| NaCl 1×1×1 (8) | 0.838 | 0.927 | +10.6 % | invalid | invalid | — |
+| NaCl 3×3×3 (216) | 3.004 | 3.221 | +7.2 % | 3.009 | 2.974 | −1.2 % |
+| NaNbO3 3×3×3 (1,080) | 20.175 | 22.065 | +9.4 % | 20.232 | 20.435 | +1.0 % |
+| NbCl5 3×3×3 (1,944) | 22.691 | 23.713 | +4.5 % | invalid | invalid | — |
+
+The cuBLASLt small and large runs are invalid because both sides captured another graph during
+timing. On the two valid cuBLASLt cases, block-pair ratios straddled 1 (NaCl 0.984–1.011,
+NaNbO3 0.986–1.071): the small median differences do not establish a robust speedup or slowdown.
+The comparison requested PyTorch's experimental `preferred_blas_library("cublaslt")` with a
+32 MiB workspace before each candidate capture; it did **not** run the earlier custom tile
+dispatcher in the MD engine. That dispatcher remains an unqualified prototype, not a valid
+production replacement.
+
+Receiver capture instrumentation observed launches of the intended edge and receiver backward
+kernels for the respective engines; the valid measurements had no recompilation, timed capture,
+or other WSL-visible GPU compute process. Initial force differences are in the records, but are
+not a force/stress gate. No production code changed and no accuracy qualification was attempted.
+The earlier reported 3.4 % receiver win used a 54-atom primitive NaCl repeat, not the 216-atom
+benchmark, and did not use alternating MD blocks. The owner also reported that video playback may
+have affected earlier receiver runs, so `receiver-ab.json` is retained only as contaminated
+exploratory evidence.
+
+Records: `tools/bench/ab_library_receiver.py` and
+`results/receiver-blas-ab-20261026/{receiver-ba,receiver-video-free,cublaslt-ba,receiver-ab}.json`.
 
 ## 4. Records and files
 

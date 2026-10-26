@@ -1,0 +1,487 @@
+{
+  "candidate": "cublaslt",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "created_utc": "2026-10-26T21:09:23.766320+00:00",
+  "host": "Fabi-PC",
+  "python": "/home/fzwin/environments/mace_cueq_oeq/bin/python",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "torch": "2.14.1+cu130",
+  "cuda": "13.0",
+  "fastmace_commit": "20c518bf2e4cba69bfb0daed19342c18d43ded7c",
+  "packages": {
+    "mace-torch": "0.3.16",
+    "openequivariance": "0.7.0",
+    "cuequivariance": "0.12.0",
+    "triton": "3.8.0",
+    "ase": "3.27.0"
+  },
+  "backend": "hybrid",
+  "precision": "float32",
+  "tf32": false,
+  "temperature_K": 300,
+  "cublaslt_workspace_mib": 32,
+  "order": "ba",
+  "pattern": "abba",
+  "warmup": 300,
+  "block": 150,
+  "blocks": 6,
+  "structures": {
+    "NaCl@1x1x1": {
+      "spec": "NaCl@1x1x1",
+      "natoms": 8,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abba",
+        "order": [
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 0.8284494666440878,
+            "mean_ms": 0.9340249688830227,
+            "min_ms": 0.8108129400837546,
+            "max_ms": 1.440868613329561,
+            "stdev_ms": 0.2492358747733683,
+            "spread": 0.7605239650863173,
+            "block_ms": [
+              1.440868613329561,
+              0.8309203933458775,
+              0.8108129400837546,
+              0.8259785399422981,
+              0.8218852666323073,
+              0.8736840599643376
+            ]
+          },
+          "b": {
+            "median_ms": 0.8413353566720616,
+            "mean_ms": 0.9413897533118466,
+            "min_ms": 0.8022176466571788,
+            "max_ms": 1.423110653316447,
+            "stdev_ms": 0.2390216726824804,
+            "spread": 0.7379851586354785,
+            "block_ms": [
+              1.423110653316447,
+              0.8517937866660455,
+              0.8022176466571788,
+              0.914032039969849,
+              0.8308769266780777,
+              0.8263074665834816
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0155542257515988,
+        "pair_ratios_b_over_a": [
+          0.9876755174976858,
+          1.0251208099925395,
+          0.9893991659461084,
+          1.106605069949762,
+          1.0109402862063872,
+          0.945773769315661
+        ]
+      },
+      "setup_s": {
+        "b": 27.661216375010554,
+        "a": 16.37386179600435
+      },
+      "capture_calls": {
+        "b": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 256)"
+          ]
+        },
+        "a": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 256)"
+          ]
+        }
+      },
+      "initial_max_force_difference_eV_per_A": 2.6542693376541138e-08,
+      "initial_energy_difference_eV": 0.0,
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "captures_during_timing": {
+        "b": 1,
+        "a": 1
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 172.74314383329644,
+          "potential_eV_atom": -6.856806457042694,
+          "kinetic_eV_atom": 0.022328771008514128
+        },
+        "a": {
+          "temperature_K": 172.74311556338196,
+          "potential_eV_atom": -6.856806367635727,
+          "kinetic_eV_atom": 0.02232876735434625
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": false
+    },
+    "NaCl": {
+      "spec": "NaCl",
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abba",
+        "order": [
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 3.0091926766423667,
+            "mean_ms": 2.9998228488774554,
+            "min_ms": 2.9347869933311204,
+            "max_ms": 3.058847453309378,
+            "stdev_ms": 0.044374466400849216,
+            "spread": 0.04122715735061652,
+            "block_ms": [
+              2.9347869933311204,
+              3.0095092932848884,
+              2.9628391599787087,
+              3.0240781333607933,
+              3.058847453309378,
+              3.0088760599998445
+            ]
+          },
+          "b": {
+            "median_ms": 2.973986640038978,
+            "mean_ms": 2.9837519966854917,
+            "min_ms": 2.9551841000405448,
+            "max_ms": 3.0283445866856105,
+            "stdev_ms": 0.02968903799998998,
+            "spread": 0.024600139644240914,
+            "block_ms": [
+              2.966401913339117,
+              2.960101813368965,
+              2.9551841000405448,
+              3.0283445866856105,
+              3.010908199939877,
+              2.9815713667388386
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9883005043589727,
+        "pair_ratios_b_over_a": [
+          1.0107724751676483,
+          0.9835828784359741,
+          0.9974163093152114,
+          1.0014108277420979,
+          0.9843276743606041,
+          0.9909252848184756
+        ]
+      },
+      "setup_s": {
+        "b": 19.58030685799895,
+        "a": 19.284704102014075
+      },
+      "capture_calls": {
+        "b": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 7168)"
+          ]
+        },
+        "a": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 7168)"
+          ]
+        }
+      },
+      "initial_max_force_difference_eV_per_A": 2.6872172043113096e-07,
+      "initial_energy_difference_eV": 0.0,
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "captures_during_timing": {
+        "b": 0,
+        "a": 0
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 193.61421906944986,
+          "potential_eV_atom": -6.860959234061064,
+          "kinetic_eV_atom": 0.025026565255556844
+        },
+        "a": {
+          "temperature_K": 193.61422755287035,
+          "potential_eV_atom": -6.86095925503307,
+          "kinetic_eV_atom": 0.025026566352123393
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NaNbO3": {
+      "spec": "NaNbO3",
+      "natoms": 1080,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abba",
+        "order": [
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 20.231558169956166,
+            "mean_ms": 20.235359079977368,
+            "min_ms": 19.827928566664923,
+            "max_ms": 20.58478861329301,
+            "stdev_ms": 0.32088715075846896,
+            "spread": 0.037409874230647434,
+            "block_ms": [
+              19.827928566664923,
+              19.97173741993417,
+              20.58478861329301,
+              20.564583540059783,
+              20.38780825329013,
+              20.075308086622197
+            ]
+          },
+          "b": {
+            "median_ms": 20.434512100036955,
+            "mean_ms": 20.513605049992396,
+            "min_ms": 19.911110839942317,
+            "max_ms": 21.491869326661497,
+            "stdev_ms": 0.5578814074470071,
+            "spread": 0.07735729040070016,
+            "block_ms": [
+              20.7083452133035,
+              19.911110839942317,
+              20.34587920003105,
+              20.52314500004286,
+              20.101280719973147,
+              21.491869326661497
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0100315521116003,
+        "pair_ratios_b_over_a": [
+          1.0444028554812703,
+          0.9969643812795507,
+          0.9883938855166245,
+          0.9979849560319954,
+          0.9859461336031181,
+          1.0705623661628023
+        ]
+      },
+      "setup_s": {
+        "b": 20.811718951998046,
+        "a": 20.923858620997635
+      },
+      "capture_calls": {
+        "b": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 87040)"
+          ]
+        },
+        "a": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 87040)"
+          ]
+        }
+      },
+      "initial_max_force_difference_eV_per_A": 2.086162567138672e-06,
+      "initial_energy_difference_eV": 1.0251998901367188e-05,
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "captures_during_timing": {
+        "b": 0,
+        "a": 0
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 211.59297201643122,
+          "potential_eV_atom": -11.850899263664529,
+          "kinetic_eV_atom": 0.02735049805348718
+        },
+        "a": {
+          "temperature_K": 211.5929889200065,
+          "potential_eV_atom": -11.850899316425677,
+          "kinetic_eV_atom": 0.02735050023844256
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NbCl5": {
+      "spec": "NbCl5",
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abba",
+        "order": [
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a",
+          "a",
+          "b",
+          "b",
+          "a"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 22.440214103310915,
+            "mean_ms": 22.553255083346613,
+            "min_ms": 22.034832953359,
+            "max_ms": 23.360816553370874,
+            "stdev_ms": 0.4856402566291959,
+            "spread": 0.05908961447102384,
+            "block_ms": [
+              22.312355173344258,
+              22.207024306699168,
+              22.034832953359,
+              23.360816553370874,
+              22.836428480028797,
+              22.568073033277567
+            ]
+          },
+          "b": {
+            "median_ms": 22.550341046589892,
+            "mean_ms": 22.668682866658656,
+            "min_ms": 22.220529166709944,
+            "max_ms": 23.519682713376824,
+            "stdev_ms": 0.4986470092682028,
+            "spread": 0.057611259358906236,
+            "block_ms": [
+              22.275960006712317,
+              22.220529166709944,
+              22.344633353253208,
+              23.519682713376824,
+              22.75604873992658,
+              22.895243219973054
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.004907570969331,
+        "pair_ratios_b_over_a": [
+          0.9983688334848927,
+          1.0006081346075126,
+          1.0140595756069475,
+          1.0068005396833197,
+          0.9964801965345627,
+          1.0144970368632298
+        ]
+      },
+      "setup_s": {
+        "b": 20.052661351001007,
+        "a": 21.473476512008347
+      },
+      "capture_calls": {
+        "b": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 51200)"
+          ]
+        },
+        "a": {
+          "kind": "edge",
+          "launches": 4,
+          "graph_keys": [
+            "ACP",
+            "('B', 51200)"
+          ]
+        }
+      },
+      "initial_max_force_difference_eV_per_A": 1.3709068298339844e-06,
+      "initial_energy_difference_eV": 1.9073486328125e-06,
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "captures_during_timing": {
+        "b": 1,
+        "a": 1
+      },
+      "observables": {
+        "b": {
+          "temperature_K": 214.60579128729862,
+          "potential_eV_atom": -10.596763820805176,
+          "kinetic_eV_atom": 0.027739934937038153
+        },
+        "a": {
+          "temperature_K": 214.60579002542949,
+          "potential_eV_atom": -10.596763825588265,
+          "kinetic_eV_atom": 0.02773993477392901
+        }
+      },
+      "other_gpu_processes": [],
+      "valid": false
+    }
+  }
+}
