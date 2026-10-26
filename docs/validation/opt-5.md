@@ -295,6 +295,31 @@ instead. The workstation runs used bench files copied from `ecfcc323` into
 `.source_commit` is `a8ace90b`, which the summaries record). Colab A100 used 1.23 CU
 (29.68 → 28.45). Records: `results/fp16x3-a100-leeloo-coraline-20261026/`.
 
+### 3.12 Megakernel falsifiers: cuBLASDx, branch streams, persistent scheduling (26 October 2026)
+
+Three cheap gates from the external megakernel proposal were run on the local RTX 5060 Ti.
+Records: `tools/bench/cublasdx_block_bench.cu`, `tools/bench/stream_branch_probe.py`,
+`results/megakernel-falsifiers-20261026/`.
+
+1. **cuBLASDx FP32 block GEMM.** MathDx 25.6.0 headers (scratch download only; nothing
+   installed into an environment), SM120 descriptor forwarded to the SM89 implementation.
+   On 2,048 independent 64×64×64 FP32 block GEMMs (one CTA per tile, 49,152 B shared):
+   cuBLASDx **149.48 µs (7.18 TFLOPS)** against cuBLAS strided-batched **140.72 µs
+   (7.63 TFLOPS)**, ratio **1.062**, exact against cuBLAS. It fails the within-5% primitive
+   gate on its own block-tile problem, before any production-shape grid tiling, boundary
+   predication, or epilogue work. No GEMM+consumer regional prototype was built.
+2. **Independent branches on two streams.** An atom-style FP32 GEMM and an edge-style radial
+   elementwise workload, sequentially versus concurrently in CUDA-graph replays:
+   NaCl-like **1.151×** (concurrent slower), NbCl5-like **0.995×**, NaNbO3-like **0.985×**.
+   No reliable critical-path gain on the large cases. Together with the ~0.5% graph-gap
+   ceiling on NbCl5, this does not justify a Mirage-style persistent SM scheduler.
+3. **Radial-producer/convolution fusion** was not reopened: its new primitive (cuBLASDx)
+   failed gate 1, and the SIMT form already failed twice (research `triton_conv_probe`;
+   FastMACE OPT2-T01 at 18% of FMA peak, with the backward materialisation unchanged).
+
+**Verdict:** no persistent megakernel, cuBLASDx region, or fused radial producer is built.
+Production stays with CUDA graphs, cuBLAS, and the OEq streaming convolution.
+
 ## 4. Records and files
 
 - Probe and Wave-1 microbenchmarks:

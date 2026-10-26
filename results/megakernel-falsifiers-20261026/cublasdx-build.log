@@ -1,0 +1,82 @@
+/mnt/d/Margraf/FastMACE/tools/bench/cublasdx_block_bench.cu(42): warning #177-D: function "time_kernel" was declared but never referenced
+  static float time_kernel(void (*fn)(void*), void* arg, int reps) {
+               ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/external/cutlass/include/cutlass/platform/platform.h:599:33: warning: ‘long4’ is deprecated: use long4_16a or long4_32a [-Wdeprecated-declarations]
+  599 | struct alignment_of<long4> {
+      |                                 ^    
+In file included from /usr/local/cuda-13.3/targets/x86_64-linux/include/driver_types.h:61,
+                 from /usr/local/cuda/bin/../targets/x86_64-linux/include/builtin_types.h:59,
+                 from /usr/local/cuda/bin/../targets/x86_64-linux/include/crt/host_runtime.h:58,
+                 from /usr/lib/gcc/x86_64-linux-gnu/13/include/stddef.h:218:
+/usr/local/cuda-13.3/targets/x86_64-linux/include/vector_types.h:535:98: note: declared here
+  535 | typedef __device_builtin__ struct long4 __VECTOR_TYPE_DEPRECATED__("use long4_16a or long4_32a") long4;
+      |                                                                                                  ^~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/external/cutlass/include/cutlass/platform/platform.h:603:33: warning: ‘ulong4’ is deprecated: use ulong4_16a or ulong4_32a [-Wdeprecated-declarations]
+  603 | struct alignment_of<ulong4> {
+      |                                 ^     
+/usr/local/cuda-13.3/targets/x86_64-linux/include/vector_types.h:536:101: note: declared here
+  536 | typedef __device_builtin__ struct ulong4 __VECTOR_TYPE_DEPRECATED__("use ulong4_16a or ulong4_32a") ulong4;
+      |                                                                                                     ^~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/external/cutlass/include/cutlass/platform/platform.h:619:33: warning: ‘longlong4’ is deprecated: use longlong4_16a or longlong4_32a [-Wdeprecated-declarations]
+  619 | struct alignment_of<longlong4> {
+      |                                 ^        
+/usr/local/cuda-13.3/targets/x86_64-linux/include/vector_types.h:553:110: note: declared here
+  553 | typedef __device_builtin__ struct longlong4 __VECTOR_TYPE_DEPRECATED__("use longlong4_16a or longlong4_32a") longlong4;
+      |                                                                                                              ^~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/external/cutlass/include/cutlass/platform/platform.h:623:33: warning: ‘ulonglong4’ is deprecated: use ulonglong4_16a or ulonglong4_32a [-Wdeprecated-declarations]
+  623 | struct alignment_of<ulonglong4> {
+      |                                 ^         
+/usr/local/cuda-13.3/targets/x86_64-linux/include/vector_types.h:554:113: note: declared here
+  554 | typedef __device_builtin__ struct ulonglong4 __VECTOR_TYPE_DEPRECATED__("use ulonglong4_16a or ulonglong4_32a") ulonglong4;
+      |                                                                                                                 ^~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/external/cutlass/include/cutlass/platform/platform.h:627:33: warning: ‘double4’ is deprecated: use double4_16a or double4_32a [-Wdeprecated-declarations]
+  627 | struct alignment_of<double4> {
+      |                                 ^      
+/usr/local/cuda-13.3/targets/x86_64-linux/include/vector_types.h:564:104: note: declared here
+  564 | typedef __device_builtin__ struct double4 __VECTOR_TYPE_DEPRECATED__("use double4_16a or double4_32a") double4;
+      |                                                                                                        ^~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:34:79: warning: ‘template<cublasdx::transpose_mode A, cublasdx::transpose_mode B> struct cublasdx::TransposeMode’ is deprecated [-Wdeprecated-declarations]
+   34 |     template<transpose_mode A, transpose_mode B>
+      |                                                                               ^            
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:29:23: note: declared here
+   29 |     struct [[deprecated]] TransposeMode: commondx::detail::operator_expression {
+      |                       ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:37:79: warning: ‘template<cublasdx::transpose_mode A, cublasdx::transpose_mode B> struct cublasdx::TransposeMode’ is deprecated [-Wdeprecated-declarations]
+   37 |     template<transpose_mode A, transpose_mode B>
+      |                                                                               ^            
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:29:23: note: declared here
+   29 |     struct [[deprecated]] TransposeMode: commondx::detail::operator_expression {
+      |                       ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:41:46: warning: ‘template<cublasdx::transpose_mode A, cublasdx::transpose_mode B> struct cublasdx::TransposeMode’ is deprecated [-Wdeprecated-declarations]
+   41 |         using default_blas_transpose_mode_operator = TransposeMode<T, N>;
+      |                                              ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:29:23: note: declared here
+   29 |     struct [[deprecated]] TransposeMode: commondx::detail::operator_expression {
+      |                       ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:48:97: warning: ‘template<cublasdx::transpose_mode A, cublasdx::transpose_mode B> struct cublasdx::TransposeMode’ is deprecated [-Wdeprecated-declarations]
+   48 |     struct is_operator<cublasdx::operator_type, cublasdx::operator_type::transpose_mode, cublasdx::TransposeMode<A, B>>:
+      |                                                                                                 ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:29:23: note: declared here
+   29 |     struct [[deprecated]] TransposeMode: commondx::detail::operator_expression {
+      |                       ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:53:62: warning: ‘template<cublasdx::transpose_mode A, cublasdx::transpose_mode B> struct cublasdx::TransposeMode’ is deprecated [-Wdeprecated-declarations]
+   53 |     struct get_operator_type<cublasdx::operator_type, cublasdx::TransposeMode<A, B>> {
+      |                                                              ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:29:23: note: declared here
+   29 |     struct [[deprecated]] TransposeMode: commondx::detail::operator_expression {
+      |                       ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/traits/blas_traits.hpp:167:14: warning: ‘template<cublasdx::transpose_mode A, cublasdx::transpose_mode B> struct cublasdx::TransposeMode’ is deprecated [-Wdeprecated-declarations]
+  167 |             using type = TransposeMode<a, b>;
+      |              ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:29:23: note: declared here
+   29 |     struct [[deprecated]] TransposeMode: commondx::detail::operator_expression {
+      |                       ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/traits/blas_traits.hpp:174:32: warning: ‘template<cublasdx::transpose_mode A, cublasdx::transpose_mode B> struct cublasdx::TransposeMode’ is deprecated [-Wdeprecated-declarations]
+  174 |         struct convert_to_arrangement<TransposeMode<A, B>> {
+      |                                ^~~~~~~~~~~~~
+/home/fzwin/tmp/mathdx-pkg/nvidia/mathdx/include/cublasdx/operators/transpose_mode.hpp:29:23: note: declared here
+   29 |     struct [[deprecated]] TransposeMode: commondx::detail::operator_expression {
+      |                       ^~~~~~~~~~~~~

@@ -1,0 +1,32 @@
+{
+  "gpu": "NVIDIA GeForce RTX 5060 Ti (sm_120)",
+  "date": "2026-10-26",
+  "cublasdx_block_gemm": {
+    "source": "tools/bench/cublasdx_block_bench.cu, MathDx 25.6.0 headers (nvidia-mathdx wheel, scratch only)",
+    "problem": "2048 independent 64x64x64 FP32 block GEMMs, one CTA per tile",
+    "shared_memory_bytes": 49152,
+    "block_dim": 128,
+    "maxdiff_vs_cublas": 0.0,
+    "cublasdx_us": 149.48,
+    "cublas_batched_us": 140.72,
+    "cublasdx_tflops": 7.183,
+    "cublas_tflops": 7.63,
+    "ratio_dx_over_cublas": 1.062,
+    "verdict": "Fails the within-5% primitive gate on its own block-tile problem; no regional consumer prototype built."
+  },
+  "independent_branch_streams": {
+    "source": "tools/bench/stream_branch_probe.py (results/megakernel-falsifiers-20261026/stream_branch_probe.json)",
+    "cases": {
+      "NaCl_like": {"sequential_us": 188.55, "concurrent_us": 217.11, "ratio": 1.151},
+      "NbCl5_like": {"sequential_us": 1206.82, "concurrent_us": 1200.57, "ratio": 0.995},
+      "NaNbO3_like": {"sequential_us": 1595.65, "concurrent_us": 1572.17, "ratio": 0.985}
+    },
+    "verdict": "No reliable critical-path gain: slower on the small case, neutral (<=1.5%) on large cases. Persistent task-graph scheduling is not justified by this probe."
+  },
+  "radial_producer_convolution": {
+    "verdict": "Not reopened. The cuBLASDx primitive gate failed, and the SIMT form of this fusion already failed twice (research triton_conv_probe and FastMACE OPT2-T01, in-kernel weight generation at 18% of FMA peak, backward materialisation unchanged)."
+  },
+  "persistent_task_graph": {
+    "verdict": "Not justified. Graph gaps are ~0.5% on NbCl5 and the stream probe shows no overlap headroom on large cases."
+  }
+}
