@@ -422,7 +422,7 @@ class Rewrite:
     conflicts: tuple[str, ...]
     mace_versions: SpecifierSet      # ">=0.3.16,<0.3.17"
     source_hashes: dict[str, str]    # qualified name -> sha256 of inspect.getsource (as today)
-    exactness: Literal["exact", "rounding", "approximate"]
+    exactness: Literal["exact", "rounding", "certified", "approximate"]
     default: Literal["on", "off", "auto"]
     workload_constraints: tuple[str, ...]  # e.g. ("fixed_species_superset", "single_graph")
     apply: Callable[[Model, Context], None]
@@ -433,6 +433,16 @@ class Rewrite:
 - `"exact"` means bit-for-bit identical math up to summation order.
 - `"rounding"` covers reassociation, folded or factored weights and changed
   GEMM grouping; most adopted rewrites are of this kind (§6.2 column).
+- `"certified"` (owner decision 61, 27 October 2026) is an approximation
+  that carries a certificate, computed at setup for the plan's own model,
+  species superset and domain: against a float64 evaluation of the same
+  weights, the float32 replacement's error is at most the float32 error of
+  the computation it replaces, for its values and their first derivatives,
+  each normalised per output, worst case on a dense grid. The record's
+  self-check holds the certificate; a ratio above 1 fails it (§9.3 rule 13
+  then turns the record off). Float32 plans only: the certificate bounds
+  float32 rounding, not float64's. A certified record may become a default
+  by owner decision after its gate and A/B, like a rounding-class one.
 - `"approximate"` rewrites are never default.
 
 ### 6.2 Catalogue for 1.0 (adopted today unless marked; defaults as in `main.py` on 16 October 2026)
@@ -455,6 +465,8 @@ class Rewrite:
 | `fx_e3nn_linear` (e3nn's `o3.Linear` code as its own fx graph instead of the TorchScript a checkpoint restores, so dynamo traces it; FastMACE optimisation round 4, OPT4-T02) | rounding (eager bitwise on the CPU; compiled, Inductor fuses what ran eagerly; deterministic) | a model with TorchScript `o3.Linear`; by default the qualified POLAR-1 checkpoints (S, M, L), hybrid float32, not `reproducible=True` | POLAR-1-S: PolarMACE's forward compiles (31 graphs → 5, 1,226 → 642 kernels per NaCl force call); with `polar_graph_sums` NaCl −24 % (sm_120) / −19 % (sm_89 L4), NbCl5 −18 % / −16 % | default on for POLAR-1-S, -M and -L by owner decision 58, 24 October 2026 (L after its local NbCl5 gate); other models off unless requested |
 | `polar_graph_sums` (PolarMACE's one-graph per-graph sums as a sum over atoms and a broadcast instead of `scatter_add_` and `x[batch]`; OPT4-T02) | rounding (another summation order; deterministic, no atomics) | PolarMACE, one graph per batch; by default as `fx_e3nn_linear` | alone NaCl −8 %, NbCl5 −9 % of the force call (the float64 `index_put` backward); none on top of `fx_e3nn_linear` | default on with `fx_e3nn_linear` by owner decision 58 |
 | `streaming_conv` (OEq PR 223 kernels, NVRTC) | exact (summation order; atomic sums, not bitwise reproducible) | folded MH-1 class, `GENERIC_*` with OEq fusion | −7.7% NaNbO3; generic −16 to −28% with reassociation | OEq present; per-engine edge counter (§8.1) |
+| `chunked_conv_backward` (the streaming backward in L2-sized edge chunks, each chunk's weight gradient read at once by the folded layer's input gradient on a side stream; optimisation round 6, OPT6-T02) | exact (the same kernels per edge; atomic sender sums as `streaming_conv`, not bitwise reproducible) | with `streaming_conv` and `fused_folded_backward` (MH-1 class); weights of at most 4 L2s run unchunked | NbCl5 −2.0 to −3.3 %, NaNbO3 −3.1 to −3.6 % (sm_120); NaCl +0.8 % | default on by owner decision 60, 27 October 2026 |
+| `radial_tables` (per-species-pair Chebyshev tables for the radial chain r → `[h c, c]` and the edge density, fitted at setup; optimisation round 6, OPT6-T04/T05) | certified (§6.1; deterministic) | factored folded MH-1 class, float32 | stub ceiling per force call NbCl5 −7.2 %, NaNbO3 −16 %, NaCl −10 % (sm_120) | opt-in; class by owner decision 61, 27 October 2026 |
 | `generic_species_skip` | exact (absent columns multiply zeros) | MP-0/density family | −7 to −39% | fixed species superset |
 | `generic_fused_radial_backward` | rounding | MP-0/density family | −3 to −5% large cells | — |
 | `polar_uvu` (PR 1711) | rounding (GEMM form) | PolarMACE | 4–5× faster with the MH-1 rewrites (step time ÷ 4–5) | — |
@@ -3131,3 +3143,17 @@ OpenEquivariance 0.7.0, Linux x86_64 and manylinux_2_28 constraints stay unchang
 Acceptance is a fresh Python 3.13 installation with the prebuilt extension,
 hybrid NaCl MD and no g++/Ninja/nvcc invocation. A C compiler for Triton's
 launcher remains a requirement. Results: `docs/validation/6-T15.md`.
+
+**Optimisation round 6 (27 October 2026, owner decisions 60 and 61; `plans/opt-6.md`):**
+- **Decision 60 (owner: "yes"), `RewriteConfig.chunked_conv_backward` on by
+  default** wherever `streaming_conv` and `fused_folded_backward` are (planner
+  rule `on_with_streaming_conv_and_fused_folded_backward`). Exact class. The op
+  keeps cells whose per-edge weights fit `UNCHUNKED_L2_MULTIPLE` (4) L2s on the
+  unchunked backward. Same-process A/B on the RTX 5060 Ti: NbCl5 0.973 / 0.967,
+  NaNbO3 0.969 / 0.964, NaCl 1.008 / 1.009 (`docs/validation/opt6-T02.md`).
+- **Decision 61 (owner: "think about a good class"), the `certified` exactness
+  class** (§6.1): an approximation with a setup-time certificate that its float32
+  error is at most that of the float32 computation it replaces, values and first
+  derivatives, against float64 of the same weights; float32 plans only; the
+  self-check holds the certificate. First record: `radial_tables` (opt-in,
+  `never_automatic`; refused in float64 plans).
