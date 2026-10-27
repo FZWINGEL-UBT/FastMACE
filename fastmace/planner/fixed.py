@@ -107,6 +107,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
     "RewriteConfig.combo_kernels": "never_automatic",
+    "RewriteConfig.save_transcendentals": "never_automatic",
     "RewriteConfig.tf32x3_gemms": "never_automatic",
     "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
@@ -138,7 +139,7 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
-                  "combo_kernels", "tf32x3_gemms",
+                  "combo_kernels", "save_transcendentals", "tf32x3_gemms",
                   "fx_e3nn_linear", "polar_graph_sums")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
@@ -998,6 +999,9 @@ class FixedPlanner:
         note("combo_kernels", r.combo_kernels == "on",
              "on: Inductor's pointwise combo kernels in the compiled model" if r.combo_kernels == "on"
              else "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)")
+        note("save_transcendentals", r.save_transcendentals == "on",
+             "on: transcendental ops saved for the backward, not recomputed (ideas-20261027 D3)"
+             if r.save_transcendentals == "on" else "off: only an explicit 'on' enables it (ideas-20261027 D3)")
         needs("tf32x3_gemms", r.tf32x3_gemms == "on", v["block_linear"], "block_linear")
         if r.tf32x3_gemms == "auto":
             v["_why"]["tf32x3_gemms"] = "off: only an explicit 'on' enables it (OPT4-T03, accuracy screen)"

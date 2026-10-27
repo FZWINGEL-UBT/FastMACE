@@ -178,6 +178,10 @@ class RewriteConfig:
     # one launch; rounding (the energy moves by ~1e-9 relative), not adopted (opt-3 OPT3-T04,
     # fastmace.rewrites.inductor); opt-in, auto = off.
     combo_kernels: Toggle = "auto"
+    # A custom AOTAutograd partitioner for the compiled model that saves transcendental ops (exp, tanh, sigmoid,
+    # ...) for the backward instead of recomputing them there (ideas-20261027 D3; fastmace.rewrites.inductor):
+    # float64 MD step 0.970-0.979 on the RTX 5060 Ti; exact; opt-in, auto = off.
+    save_transcendentals: Toggle = "auto"
     # Every atom GEMM (block linears, segment_gemm, species skip, reassociated first interaction) and its input
     # gradients as 3xTF32 through Triton's tf32x3 (opt-4 OPT4-T03 stage 1, fastmace.rewrites.precision); rounding,
     # not IEEE-equivalent under cancellation; float32 on compute capability >= 8.0 only; opt-in, auto = off.

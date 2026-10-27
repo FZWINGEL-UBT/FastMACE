@@ -81,6 +81,7 @@ AUTO_RULES = {
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
     "RewriteConfig.combo_kernels": "never_automatic",
+    "RewriteConfig.save_transcendentals": "never_automatic",
     "RewriteConfig.tf32x3_gemms": "never_automatic",
     "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
