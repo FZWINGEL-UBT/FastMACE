@@ -8,6 +8,11 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- Float64 package (owner decision 63, `docs/validation/f64-T01.md`): `EngineConfig.fp64_emulation` (cuBLAS's float64
+  emulation on INT8 tensor cores where the measured float64 rate is below 1/8 of float32), float64 radial tables,
+  and the rounding-class rewrites in float64 plans that are not reproducible. MH-1 float64 MD step 0.57 (NaCl),
+  0.42 (NbCl5), 0.49 (NaNbO3) of stock on the RTX 5060 Ti; forces within 4e-14 eV/Å of stock.
+
 - `RewriteConfig.chunked_conv_backward` (opt-6 OPT6-T02): MH-1's streaming convolution builds its per-edge
   weights from the folded radial layer's input and runs its backward in L2-sized edge chunks, so the
   `[E, 1280]` weight gradient never reaches DRAM. Exact (values per edge unchanged; only the order of the

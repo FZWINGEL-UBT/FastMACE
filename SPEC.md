@@ -2697,6 +2697,20 @@ Open decisions for the owner:
    unchanged, full-step b/a NaCl 0.90, NbCl5 0.92, NaNbO3 0.81 on the RTX
    5060 Ti; on the RTX 4000 Ada (sm_89, leto) NaCl 0.914, NbCl5 0.904,
    NaNbO3 0.832 in both build orders (`docs/validation/opt6-T05.md`).
+63. Decided (user, 27 October 2026, f64-T01: "do that", to the float64
+   package): float64 plans that are not reproducible take (a) the hybrid
+   backend where the planner allows it (already the minimal planner's rule),
+   (b) `EngineConfig.fp64_emulation`, cuBLAS's float64 emulation on INT8 tensor
+   cores (strategy eager), where the GPU's measured float64 multiply-add rate is
+   below 1/8 of its float32 rate (`kernels.triton.fp64_rate`; the compute
+   capability cannot tell), set before the first float64 product and checked
+   at build, (c) the rounding-class rewrites `species_tables`,
+   `fold_readout_tail` and `fold_product_linear`, and (d) float64 radial tables
+   (fit and certificate held to float64 rounding: tolerance 3e-13, bound 1e-12).
+   Reproducible plans keep native products and MACE's code. Measured: MD step
+   0.57 (NaCl), 0.42 (NbCl5), 0.49 (NaNbO3) of stock float64 on the RTX 5060 Ti;
+   forces within 4e-14 eV/Å, stress within 1e-16 eV/Å³; 20 ps NVE drift equal
+   to stock to seven digits (`docs/validation/f64-T01.md`).
 
 ---
 
