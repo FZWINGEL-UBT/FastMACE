@@ -82,13 +82,14 @@ def test_default_registry_holds_the_family_after_the_fusion_family():
 
 
 def test_planner_turns_them_on_by_default():
-    """Owner decision, 21 October 2026 (OPT-DEF-2): auto = on where the model takes them, float32, not reproducible."""
+    """Owner decisions, 21 October 2026 (OPT-DEF-2) and 63 (27 October 2026): auto = on where the model takes them,
+    float32 and float64, not reproducible."""
     from fastmace.config import RewriteConfig
     from fastmace.planner import fixed
 
-    assert fixed.AUTO_RULES["RewriteConfig.species_tables"] == "on_float32_unless_reproducible_if_model_supports"
+    assert fixed.AUTO_RULES["RewriteConfig.species_tables"] == "on_unless_reproducible_if_model_supports"
     assert fixed.AUTO_RULES["RewriteConfig.fold_readout_tail"] == (
-        "on_with_block_linear_float32_unless_reproducible_if_model_supports")
+        "on_with_block_linear_unless_reproducible_if_model_supports")
     assert fixed.AUTO_RULES["RewriteConfig.fold_product_linear"] == (
         "on_with_species_tables_and_block_linear_if_model_supports")
     assert all(getattr(RewriteConfig(), name) == "auto" for name in NAMES)
@@ -413,18 +414,22 @@ def test_default_mh1_hybrid_plan_has_all_three_on():
     assert plan.engine.fused_integrator is True  # OPT3-T03, owner decision 21 October 2026
 
 
-@pytest.mark.parametrize(("precision", "reproducible"), [("float64", False), ("float64", True), ("float32", True)])
-def test_float64_and_reproducible_plans_keep_the_stock_products(precision, reproducible):
+@pytest.mark.parametrize(("precision", "reproducible"), [("float64", True), ("float32", True)])
+def test_reproducible_plans_keep_the_stock_products(precision, reproducible):
     """Rounding class (C2, C3) and species_tables (not bitwise on the GPU) stay off; the bitwise ones stay on."""
     from fastmace.config import EngineConfig
 
-    configs = {"engine": EngineConfig(backend="cueq")} if reproducible else {}
-    plan = _default_plan(precision=precision, reproducible=reproducible, **configs)
+    plan = _default_plan(precision=precision, reproducible=reproducible, engine=EngineConfig(backend="cueq"))
     assert all(getattr(plan.rewrites, name) == "off" for name in NAMES), plan.rewrites
     assert plan.engine.overlap_rebuild is True and plan.engine.fused_integrator is True  # exact: stays on
     reason = str(plan.decision("RewriteConfig.species_tables")[2])
-    assert ("reproducible=True keeps the stock products" if reproducible else "float64 keeps the stock products") \
-        in reason
+    assert "reproducible=True keeps the stock products" in reason
+
+
+def test_float64_plans_take_them_by_default():
+    """Owner decision 63 (f64-T01): float64 plans that are not reproducible take the three records too."""
+    plan = _default_plan(precision="float64")
+    assert all(getattr(plan.rewrites, name) == "on" for name in NAMES), plan.rewrites
 
 
 def test_an_explicit_on_is_kept_in_float64():
@@ -438,8 +443,8 @@ def test_an_explicit_product_fold_without_tables_is_refused_in_float64():
     from fastmace.config import RewriteConfig
     from fastmace.errors import PlanRefused
 
-    with pytest.raises(PlanRefused, match="requires species_tables"):
-        _default_plan(precision="float64", rewrites=RewriteConfig(fold_product_linear="on"))
+    with pytest.raises(PlanRefused, match="fold_product_linear='on' requires .*species_tables"):
+        _default_plan(precision="float64", rewrites=RewriteConfig(fold_product_linear="on", species_tables="off"))
 
 
 @pytest.mark.parametrize(("label", "tables", "tail"), [
