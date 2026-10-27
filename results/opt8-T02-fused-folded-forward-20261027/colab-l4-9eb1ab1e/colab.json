@@ -1,0 +1,84 @@
+{
+  "provider": "colab",
+  "date_utc": "2026-10-27T17:33:43Z",
+  "session": "fm-l4-20261027-173343-2ef458",
+  "gpu": "L4",
+  "commit": "9eb1ab1e62467ad14f85f9c86ebe705e5243679b",
+  "requested_commit": "9eb1ab1e",
+  "commands_text": [
+    "python tools/ab_rewrites.py --output $OUT/nbcl5-ab --checkpoint $FASTMACE_MODELS/mace-mh-1.model --structures NbCl5 --a fused_folded_forward=off --b fused_folded_forward=on --order ab --pattern abab",
+    "python tools/ab_rewrites.py --output $OUT/nanbo3-ab --checkpoint $FASTMACE_MODELS/mace-mh-1.model --structures NaNbO3 --a fused_folded_forward=off --b fused_folded_forward=on --order ab --pattern abab"
+  ],
+  "commands": [
+    {
+      "command": "python tools/ab_rewrites.py --output $OUT/nbcl5-ab --checkpoint $FASTMACE_MODELS/mace-mh-1.model --structures NbCl5 --a fused_folded_forward=off --b fused_folded_forward=on --order ab --pattern abab",
+      "exit": 0,
+      "wall_s": 471
+    },
+    {
+      "command": "python tools/ab_rewrites.py --output $OUT/nanbo3-ab --checkpoint $FASTMACE_MODELS/mace-mh-1.model --structures NaNbO3 --a fused_folded_forward=off --b fused_folded_forward=on --order ab --pattern abab",
+      "exit": 0,
+      "wall_s": 443
+    }
+  ],
+  "exit": 0,
+  "stack": "f00d5798f8b5",
+  "models": [
+    "mh-1"
+  ],
+  "out": "/home/fzwin/fastmace-colab-runs/opt8-T02-l4b",
+  "timings": {
+    "allocate_s": 4.8,
+    "upload_s": 17.5,
+    "setup_step_s": 42,
+    "cache_restore_s": 551.8,
+    "pack_download_s": 20.8,
+    "unpack_s": 0.8,
+    "install_s": 33.1,
+    "models_s": 2.7
+  },
+  "cu_before": 21.74,
+  "rate_per_h": 5.3,
+  "active_before": 1,
+  "gpu_name": "NVIDIA L4",
+  "driver": "580.82.07",
+  "gpu_memory": "23034 MiB",
+  "capability": "8.9",
+  "cuda_driver": "13.0",
+  "cpus": 12,
+  "ram_gib": 53.0,
+  "cache_key": "sm89-py310-f00d5798f8b5",
+  "cache_hit": true,
+  "cache_bytes_in": 816067104,
+  "setup_s": 631.8,
+  "cache_bytes_out": 21467609,
+  "cache_saved": true,
+  "environment": {
+    "python": "3.10.22",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance_torch": "0.12.0",
+      "openequivariance": "0.7.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "ase": "3.27.0",
+      "numpy": "2.2.6",
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0"
+    },
+    "torch_cuda": "13.0",
+    "cuda_available": true,
+    "pip_freeze_sha256": "2b05fb7fcb3cfc72dd0880fc327e6e81c097f29c86389b2a5f416286392d0b08",
+    "unpack_s": 0.8,
+    "install_s": 33.1,
+    "models_s": 2.7
+  },
+  "env_matches_manifest": true,
+  "stopped": true,
+  "cu_after": 20.51,
+  "active_after": 0,
+  "wall_s": 1578.5,
+  "cu_used": 1.23
+}
