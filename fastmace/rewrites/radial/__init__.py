@@ -39,6 +39,16 @@ INITIAL_PIECES = 8
 MAX_DEPTH = 9  # bins: INITIAL_PIECES * 2**MAX_DEPTH, so that every piece boundary is a bin boundary
 TOLERANCE = 1e-7
 FLOOR = 1e-6
+# Float64 tables (float64 plans; owner request, 27 October 2026): the same fit held to float64 rounding.
+DEGREE_64 = 16
+TOLERANCE_64 = 3e-13  # MH-1 NaCl, NbCl5: certificate <= 0.52 (1e-12 failed at 1.25-1.96)
+FLOOR_64 = 1e-1  # with TOLERANCE_64: within 3e-14 of each output's largest value on the domain
+# Their certificate: the largest error, per output scale, over this bound (about 5,000 float64 ulps). The float32
+# certificate's yardstick, the network's own rounding error, is zero when the float64 network is the reference.
+CERTIFY_BOUND_64 = 1e-12
+# Their domain's lower end: exact in float32, as Triton passes the kernels' scalar bounds in float32 (0.3 rounds
+# up, and an edge at exactly 0.3 Å then reads as below the domain, with a zero slope).
+R_LO_64 = 0.25
 CERTIFY_POINTS = 6000  # uniform and as many random lengths; the w-level tensors are [12000, 1280] float64
 FIXED_SPECIES_SUPERSET = "fixed_species_superset"
 
@@ -213,24 +223,29 @@ def _truth(chain, pairs, r, derivative=False):
         return torch.stack([v for v, _ in both]), torch.stack([d for _, d in both])
 
 
-def fit(chain, pairs, r_max):
-    """The tables of ``chain`` for ``pairs`` (float64 fit, float32 tables): a dict of tensors and constants.
+def fit(chain, pairs, r_max, table_dtype=None):
+    """The tables of ``chain`` for ``pairs`` (float64 fit; float32 tables, or float64 ones with
+    ``table_dtype=torch.float64``): a dict of tensors and constants.
 
     A piece is split until both its values and its r-derivatives (the derivative series) are within
-    ``TOLERANCE`` of the local largest value or derivative at the test points."""
+    ``TOLERANCE`` (float64 tables: ``TOLERANCE_64``) of the local largest value or derivative at the test points."""
     import numpy as np
     import torch
 
     dtype = torch.float64
-    terms = DEGREE + 1
-    domain = torch.linspace(R_LO, r_max, 4097, dtype=dtype)[:-1]
+    table_dtype = torch.float32 if table_dtype is None else table_dtype
+    wide = table_dtype == torch.float64
+    degree, tolerance, floor_factor = (DEGREE_64, TOLERANCE_64, FLOOR_64) if wide else (DEGREE, TOLERANCE, FLOOR)
+    terms = degree + 1
+    r_lo = R_LO_64 if wide else R_LO
+    domain = torch.linspace(r_lo, r_max, 4097, dtype=dtype)[:-1]
     values, slopes = _truth(chain, pairs, domain, derivative=True)
-    floor = FLOOR * values.abs().amax(dim=1, keepdim=True)  # [P, 1, J]
-    dfloor = FLOOR * slopes.abs().amax(dim=1, keepdim=True)
+    floor = floor_factor * values.abs().amax(dim=1, keepdim=True)  # [P, 1, J]
+    dfloor = floor_factor * slopes.abs().amax(dim=1, keepdim=True)
     nodes, tests = _nodes(terms, dtype), torch.linspace(-1.0, 1.0, 2 * terms + 1, dtype=dtype)
     points = torch.cat([nodes, tests])
-    unit = (r_max - R_LO) / INITIAL_PIECES
-    pending = [(R_LO + i * unit, R_LO + (i + 1) * unit, 0) for i in range(INITIAL_PIECES)]
+    unit = (r_max - r_lo) / INITIAL_PIECES
+    pending = [(r_lo + i * unit, r_lo + (i + 1) * unit, 0) for i in range(INITIAL_PIECES)]
     accepted, worst = [], 0.0
     while pending:
         starts = torch.tensor([a for a, _, _ in pending], dtype=dtype)
@@ -240,8 +255,11 @@ def fit(chain, pairs, r_max):
         shape = (len(pairs), len(pending), len(points), -1)
         values, slopes = values.reshape(shape), slopes.reshape(shape)  # [P, pieces, points, J]
         coef = _coefficients(values[:, :, :terms])
-        dcoef = torch.from_numpy(np.polynomial.chebyshev.chebder(coef.numpy(), axis=2)) * (
-            2.0 / widths)[None, :, None, None]
+        if wide:  # float64: the derivative series from the exact derivatives, as differentiating the value series
+            dcoef = _coefficients(slopes[:, :, :terms])  # amplifies its rounding by ~degree^2 / width (f64-T01)
+        else:
+            dcoef = torch.from_numpy(np.polynomial.chebyshev.chebder(coef.numpy(), axis=2)) * (
+                2.0 / widths)[None, :, None, None]
         x = tests.expand(len(pairs), len(pending), -1)
         error = (_series(coef, x) - values[:, :, terms:]).abs() / torch.maximum(
             values.abs().amax(dim=2, keepdim=True), floor[:, None])
@@ -249,25 +267,29 @@ def fit(chain, pairs, r_max):
             slopes.abs().amax(dim=2, keepdim=True), dfloor[:, None])
         relative = torch.maximum(error.amax(dim=(0, 2, 3)), derror.amax(dim=(0, 2, 3)))  # per piece
         following = []
-        for (a, b, level), err, piece_coef in zip(pending, relative.tolist(), coef.unbind(1)):
-            if err > TOLERANCE and level < MAX_DEPTH:
+        for (a, b, level), err, piece_coef, piece_dcoef in zip(pending, relative.tolist(), coef.unbind(1),
+                                                               dcoef.unbind(1)):
+            if err > tolerance and level < MAX_DEPTH:
                 middle = 0.5 * (a + b)
                 following += [(a, middle, level + 1), (middle, b, level + 1)]
             else:
-                accepted.append((a, b, piece_coef))
+                accepted.append((a, b, piece_coef, piece_dcoef))
                 worst = max(worst, err)
         pending = following
     accepted.sort(key=lambda item: item[0])
-    coef = torch.stack([c for _, _, c in accepted], dim=1)  # [P, K, T, J]
-    scales = torch.tensor([2.0 / (b - a) for a, b, _ in accepted], dtype=dtype)
-    dcoef = torch.from_numpy(np.polynomial.chebyshev.chebder(coef.numpy(), axis=2)) * scales[None, :, None, None]
-    starts = torch.tensor([a for a, _, _ in accepted], dtype=dtype)
+    coef = torch.stack([c for _, _, c, _ in accepted], dim=1)  # [P, K, T, J]
+    scales = torch.tensor([2.0 / (b - a) for a, b, _, _ in accepted], dtype=dtype)
+    if wide:
+        dcoef = torch.stack([d for _, _, _, d in accepted], dim=1)
+    else:
+        dcoef = torch.from_numpy(np.polynomial.chebyshev.chebder(coef.numpy(), axis=2)) * scales[None, :, None, None]
+    starts = torch.tensor([a for a, _, _, _ in accepted], dtype=dtype)
     n_bins = INITIAL_PIECES * 2 ** MAX_DEPTH
-    centres = R_LO + (torch.arange(n_bins, dtype=dtype) + 0.5) * (r_max - R_LO) / n_bins
+    centres = r_lo + (torch.arange(n_bins, dtype=dtype) + 0.5) * (r_max - r_lo) / n_bins
     bins = (torch.searchsorted(starts, centres, right=True) - 1).to(torch.int32)
-    return dict(coef=coef.to(torch.float32).contiguous(), dcoef=dcoef.to(torch.float32).contiguous(),
-                starts=starts.to(torch.float32), scales=scales.to(torch.float32), bins=bins,
-                r_lo=float(R_LO), bin_scale=float(n_bins / (r_max - R_LO)), r_max=float(r_max), fit_error=worst)
+    return dict(coef=coef.to(table_dtype).contiguous(), dcoef=dcoef.to(table_dtype).contiguous(),
+                starts=starts.to(table_dtype), scales=scales.to(table_dtype), bins=bins,
+                r_lo=float(r_lo), bin_scale=float(n_bins / (r_max - r_lo)), r_max=float(r_max), fit_error=worst)
 
 
 # --------------------------------------------------------------------------- certificate
@@ -306,13 +328,15 @@ def certify(table, chain64, chain32, pairs, r_max, seed=0):
     import torch
 
     generator = torch.Generator().manual_seed(seed)
-    r64 = torch.cat([torch.linspace(R_LO, r_max, CERTIFY_POINTS + 1, dtype=torch.float64)[:-1],
-                     R_LO + (r_max - R_LO) * torch.rand(CERTIFY_POINTS, generator=generator, dtype=torch.float64)])
-    r64 = r64.to(torch.float32).to(torch.float64)  # the float32 lengths the GPU sees
+    r_lo = table.r_lo
+    r64 = torch.cat([torch.linspace(r_lo, r_max, CERTIFY_POINTS + 1, dtype=torch.float64)[:-1],
+                     r_lo + (r_max - r_lo) * torch.rand(CERTIFY_POINTS, generator=generator, dtype=torch.float64)])
+    r64 = r64.to(table.coef.dtype).to(torch.float64)  # the lengths the GPU sees (float32 for float32 tables)
     physical = r64 >= R_PHYSICAL
     folded64 = chain64.folded
-    r32 = r64.to(device=table.coef.device, dtype=torch.float32)
-    out, worst = {}, 0.0
+    r32 = r64.to(device=table.coef.device, dtype=table.coef.dtype)
+    wide = table.coef.dtype == torch.float64
+    out, worst, largest = {}, 0.0, 0.0
 
     def to_w(g):
         g = g.detach().to(torch.float64).cpu()
@@ -333,11 +357,16 @@ def certify(table, chain64, chain32, pairs, r_max, seed=0):
                 tab_error = (tabled[region] - e).abs() / scale
                 for columns in (slice(0, -1), slice(-1, None)):  # w, then the density
                     err_net, err_tab = net_error[:, columns].max().item(), tab_error[:, columns].max().item()
-                    ratios.append(0.0 if err_tab == 0.0 else (err_tab / err_net if err_net > 0 else float("inf")))
+                    largest = max(largest, err_tab)
+                    if wide:  # the float64 network is the reference itself: a fixed bound instead (f64-T01)
+                        ratios.append(err_tab / CERTIFY_BOUND_64)
+                    else:
+                        ratios.append(0.0 if err_tab == 0.0 else (err_tab / err_net if err_net > 0 else float("inf")))
         out[f"{s}-{t}"] = max(ratios)
         worst = max(worst, out[f"{s}-{t}"])
-    return {"worst": worst, "pairs": out, "points": int(r64.numel()), "r": [R_LO, r_max],
-            "physical_from": R_PHYSICAL}
+    return {"worst": worst, "pairs": out, "points": int(r64.numel()), "r": [r_lo, r_max],
+            "physical_from": R_PHYSICAL, "largest_error": largest,
+            "bound": "CERTIFY_BOUND_64 of each output's scale" if wide else "the float32 network's error"}
 
 
 # --------------------------------------------------------------------------- apply and self-check
@@ -359,9 +388,8 @@ def tabulate_radials(model, context):
     from fastmace.rewrites import mh1
 
     parameter = next(model.parameters())
-    if parameter.dtype != torch.float32:
-        raise RewriteError(f"radial_tables: float32 models only (the certificate bounds float32 rounding), "
-                           f"not {parameter.dtype}")
+    if parameter.dtype not in (torch.float32, torch.float64):
+        raise RewriteError(f"radial_tables: float32 or float64 models only, not {parameter.dtype}")
     factored = _factored(model)
     if not factored or len(factored) != len(model.interactions):
         raise RewriteError("radial_tables: every interaction must be a factored MH-1 interaction")
@@ -374,8 +402,8 @@ def tabulate_radials(model, context):
     names = []
     for index, interaction in factored:
         chain64 = _Chain(model, interaction, columns, torch.float64, torch.device("cpu"))
-        chain32 = _Chain(model, interaction, columns, torch.float32, parameter.device)
-        table = _table_module(fit(chain64, pairs, r_max), columns, parameter.device)
+        chain32 = _Chain(model, interaction, columns, parameter.dtype, parameter.device)
+        table = _table_module(fit(chain64, pairs, r_max, table_dtype=parameter.dtype), columns, parameter.device)
         table.certificate = certify(table, chain64, chain32, pairs, r_max, seed=index)
         interaction.radial_table = table
         names.append(f"interactions.{index} ({table.coef.shape[1]} pieces, {len(pairs)} pairs, "
@@ -404,10 +432,9 @@ def _selfcheck(original, rewritten, context):
             failures.append(f"interactions.{index}: certificate {table.certificate.get('worst')} > 1 "
                             f"(pairs {table.certificate.get('pairs')})")
         device = table.coef.device
-        chain = _Chain(rewritten, interaction, table.columns.tolist(), torch.float32, device, radial=radial)
-        dtype = torch.float32
-        r = (R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand(257, generator=generator, dtype=torch.float32)).to(
-            device)
+        dtype = table.coef.dtype
+        chain = _Chain(rewritten, interaction, table.columns.tolist(), dtype, device, radial=radial)
+        r = (R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand(257, generator=generator, dtype=dtype)).to(device)
         for number in range(table.species ** 2):
             s, t = divmod(number, table.species)
             net, dnet = chain.with_derivative(r, s, t)
@@ -417,7 +444,7 @@ def _selfcheck(original, rewritten, context):
             name = f"interactions.{index}.{s}-{t}"
             cases.add(f"{name}.w", net[:, :-1] @ chain.folded.T, g @ chain.folded.T)
             cases.add(f"{name}.density", net[:, -1:], density)
-            weights = torch.randn((r.numel(), net.shape[1]), generator=generator, dtype=torch.float32).to(device)
+            weights = torch.randn((r.numel(), net.shape[1]), generator=generator, dtype=dtype).to(device)
             slope = radial_table_backward(r, pair, table.dcoef, table.starts, table.scales, table.bins,
                                           weights[:, :-1].contiguous(), weights[:, -1:].contiguous(), table.r_lo,
                                           table.bin_scale, table.r_max)

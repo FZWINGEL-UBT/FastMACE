@@ -979,9 +979,11 @@ class FixedPlanner:
                 book.refuse("RewriteConfig.tf32x3_gemms and grouped_launch both reroute the block linears' products",
                             "rewrite-conflict")
         # Owner decision 61 (27 October 2026): the certified class bounds float32 rounding, so float32 plans only.
-        if v["radial_tables"] and dtype != "float32":
-            book.refuse(f"RewriteConfig.radial_tables='on' needs float32, not {dtype} (its certificate bounds "
-                        "float32 rounding)", "radial-tables-needs-float32")
+        # Float64 screen (f64-T01, owner request 27 October 2026): float64 tables held to float64 rounding are
+        # allowed when asked for explicitly; reproducible plans keep MACE's radial chain. Default: owner decision.
+        if v["radial_tables"] and (dtype not in ("float32", "float64") or (dtype == "float64" and reproducible)):
+            book.refuse(f"RewriteConfig.radial_tables='on' needs float32, or float64 outside reproducible plans, not "
+                        f"{dtype}{' (reproducible)' if reproducible else ''}", "radial-tables-needs-float32")
         # OPT-DEF-2 (owner, 21 October 2026): the rounding-class OPT-T08 records keep the stock path in float64 and
         # reproducible plans. species_tables too: its tables are not bitwise the per-atom products on the GPU
         # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).
