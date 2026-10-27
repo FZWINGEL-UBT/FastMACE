@@ -83,16 +83,18 @@ def _kernels():
 
 
 def fold_tables(coef, dcoef, weight):
-    """``(G, G')`` from a table's ``coef [P, K, D + 1, J]``, ``dcoef [P, K, D, J]`` and the folded weight
-    ``[Q, J - 1]`` (``[W, b]``; the table's last column is the edge density): ``[P * K + 1, D + 1, Q]`` and
-    ``[P * K + 1, D + 1, Q]`` (the derivative series zero-padded to ``D + 1`` terms), each with a final all-zero
-    group for edges outside the domain. Computed in float64 on the tables' device."""
+    """``(G, G')`` from a table's ``coef [P, K, D + 1, J]``, ``dcoef [P, K, D', J]`` and the folded weight
+    ``[Q, J - 1]`` (``[W, b]``; the table's last column is the edge density): both ``[P * K + 1, D + 1, Q]``,
+    each with a final all-zero group for edges outside the domain. The derivative series has ``D' = D`` terms
+    when it is the value series' derivative (float32 tables) and ``D + 1`` when it is fitted itself (float64
+    tables, f64-T01); shorter series are zero-padded. Computed in float64 on the tables' device."""
     pairs, pieces, terms, _ = coef.shape
     width = weight.shape[1]
     w64 = weight.detach().to(torch.float64)
     g = torch.einsum("pktj,qj->pktq", coef[..., :width].to(torch.float64), w64)
     d = torch.einsum("pktj,qj->pktq", dcoef[..., :width].to(torch.float64), w64)
-    d = torch.cat([d, torch.zeros_like(d[:, :, :1])], dim=2)  # D derivative terms, padded to D + 1
+    if d.shape[2] < terms:
+        d = torch.cat([d, d.new_zeros((*d.shape[:2], terms - d.shape[2], d.shape[3]))], dim=2)
     zero = torch.zeros((1, terms, weight.shape[0]), dtype=torch.float64, device=coef.device)
     g = torch.cat([g.reshape(pairs * pieces, terms, -1), zero]).to(coef.dtype).contiguous()
     d = torch.cat([d.reshape(pairs * pieces, terms, -1), zero]).to(coef.dtype).contiguous()
