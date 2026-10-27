@@ -11,8 +11,13 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 - `RewriteConfig.chunked_conv_backward` (opt-6 OPT6-T02): MH-1's streaming convolution builds its per-edge
   weights from the folded radial layer's input and runs its backward in L2-sized edge chunks, so the
   `[E, 1280]` weight gradient never reaches DRAM. Exact (values per edge unchanged; only the order of the
-  existing atomic sender sums changes), opt-in (`auto` = off) until its full-step A/B is decided:
-  `docs/validation/opt6-T02.md`.
+  existing atomic sender sums changes). **On by default** (owner decision 60) with the hybrid streaming
+  convolution; cells whose weights fit four L2s keep the unchunked backward. NbCl5 −2.8 to −3.3 %, NaNbO3
+  −3.1 to −3.6 % per MD step, NaCl +0.8 % (RTX 5060 Ti): `docs/validation/opt6-T02.md`.
+- Exactness class `certified` (SPEC §6.1, owner decision 61), and its first record,
+  `RewriteConfig.radial_tables` (opt-6 OPT6-T05, opt-in): per species pair, MH-1's radial chain from the edge
+  length to the folded layer's input and the edge density as Chebyshev tables fitted and certified at setup
+  against float64; float32 plans only: `docs/validation/opt6-T05.md`.
 
 ## [1.0.0] - 2026-10-25
 

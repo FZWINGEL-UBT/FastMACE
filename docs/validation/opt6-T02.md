@@ -5,8 +5,23 @@ Plan: `plans/opt-6.md`. Falsifier: [opt6-T01.md](opt6-T01.md). Code: FastMACE `0
 `run_child.py`, `local-08b0d004/`).
 
 **Verdict: exact, gate passed. Same-process full-step A/B: NbCl5 −2.0 to −2.3 %, NaNbO3 −3.5 to −3.6 %, NaCl
-+0.6 to +1.1 % (slower).** It stays opt-in (`auto` = off). Making it a default, and whether that default needs
-a size rule that leaves NaCl-sized cells unchunked, is the owner's decision.
++0.6 to +1.1 % (slower).**
+
+**Default since 27 October 2026 (owner decision 60, "yes", with a size rule for small cells).** The planner
+rule is `on_with_streaming_conv_and_fused_folded_backward`. Inside the op, weights of at most
+`UNCHUNKED_L2_MULTIPLE` = 4 L2s run the two kernels once over all edges, as before. With that rule, on the
+default commit `2ea19f0d` (`results/opt6-T02-chunked-backward-20261027/default-2ea19f0d/`, same protocol as
+below, 07:29–07:49 UTC):
+
+| Cell | a-b b/a | b-a b/a |
+| --- | ---: | ---: |
+| NaCl | 1.0077 | 1.0087 |
+| NbCl5 | **0.9725** | **0.9669** |
+| NaNbO3 | **0.9694** | **0.9642** |
+
+NaCl stays about 0.8 % slower although it no longer chunks. So the cost there is not the chunking; its source
+is not identified (not profiled). The same CUDA kernels run per edge, and the extra work outside them is a few
+small tensors. The NaNbO3 runs overlapped CPU test runs of mine (load average 4–9); its two orders agree.
 
 ## What it does
 
@@ -77,15 +92,15 @@ a size rule that leaves NaCl-sized cells unchunked, is the owner's decision.
   - The rest is lost in the step, probably to the L2 contents the full graph leaves behind. This is not
     profiled.
 - **NaCl** has 6,912 real edges in a padded edge bucket. Its `[E, 1280]` weights (35–42 MB) nearly fit the L2
-  already, so the chunking only adds launches: about +0.03 ms.
+  already. The chunking only adds launches, but the size rule built for the default did not remove the cost (see
+  the default table above).
 - **Against the plan's T02 bar** (b/a ≤ 0.98 on NbCl5 and NaNbO3 in both orders, NaCl neutral):
   - NaNbO3 passes;
   - NbCl5 passes at the limit (0.977 / 0.980);
   - NaCl is 0.6–1.1 % slower, so it is not neutral.
-- **Possible size rule (not built):** chunk only when the weights exceed several times the L2, for example
-  `E · Q · 4 > 4 · L2`. That leaves NaCl-sized cells on the old path and keeps the rule a hardware shape rule.
+- **Size rule (built with the default):** chunk only when `E · Q · itemsize > 4 · L2`.
 
 ## Not done
 
 - An sm_89 check of the L2 rule (RTX 4000 Ada, 48 MB L2 → 2,432 edges), after the workstation pause.
-- The owner's decision on making it a default.
+- The source of NaCl's +0.8 % (not profiled).
