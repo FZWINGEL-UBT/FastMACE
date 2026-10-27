@@ -1221,7 +1221,7 @@ class FixedPlanner:
         if plan.engine.fp64_emulation == "on":  # owner decision 63: before the model's first float64 product
             from fastmace.model import compile as compiling
 
-            compiling.configure_fp64_emulation(self.environ)
+            compiling.configure_fp64_emulation(self.environ, plan.engine.fp64_emulation_mantissa_bits)
 
         from fastmace.rewrites import registry as reg
 

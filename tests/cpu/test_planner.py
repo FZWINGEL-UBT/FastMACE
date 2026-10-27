@@ -900,6 +900,23 @@ def test_fp64_emulation_without_cuda_is_off():
         assert "not available" in str(decision(plan, "EngineConfig.fp64_emulation")[2])
 
 
+def test_configure_fp64_emulation_sets_a_fixed_mantissa_only_when_asked():
+    from fastmace.model import compile as compiling
+
+    environ = {}
+    assert compiling.FP64_EMULATION_MANTISSA_VARIABLE not in compiling.configure_fp64_emulation(environ)
+    assert compiling.FP64_EMULATION_MANTISSA_VARIABLE not in environ
+    environ = {}
+    values = compiling.configure_fp64_emulation(environ, mantissa_bits=56)
+    assert values[compiling.FP64_EMULATION_MANTISSA_VARIABLE] == "56" == environ["CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT"]
+    environ = {compiling.FP64_EMULATION_MANTISSA_VARIABLE: "64"}
+    assert compiling.configure_fp64_emulation(environ, mantissa_bits=56)[compiling.FP64_EMULATION_MANTISSA_VARIABLE] == "64"
+    for bad in (True, 4, 200, 56.0, "56"):
+        with pytest.raises(ValueError, match="fp64_emulation_mantissa_bits"):
+            EngineConfig(fp64_emulation_mantissa_bits=bad)
+    assert EngineConfig(fp64_emulation_mantissa_bits=56).fp64_emulation_mantissa_bits == 56
+
+
 def test_configure_fp64_emulation_keeps_the_callers_settings():
     from fastmace.model import compile as compiling
 

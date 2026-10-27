@@ -234,6 +234,11 @@ class EngineConfig:
     # cuBLAS's float64 emulation on INT8 tensor cores (integer Ozaki scheme; f64-T01, owner decision 63): float64
     # plans that are not reproducible, on GPUs without full-rate FP64 (compute capability minor != 0).
     fp64_emulation: Toggle = "auto"
+    # With fp64_emulation on: a fixed mantissa bit count for cuBLAS's emulation
+    # (CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT) instead of its dynamic choice; None keeps the dynamic one.
+    # 56 gave the dynamic setting's product errors on MH-1's shapes and an MD step 0.81-0.94 of it on the
+    # RTX 5060 Ti (plans/ideas-20261027.md, D1). Opt-in.
+    fp64_emulation_mantissa_bits: int | None = None
     # Release cached free blocks between a stage's eager warm-up and its capture.
     empty_cache_before_capture: bool = True
     # Eager warm-ups after the first capture run inside the graph pool.
@@ -283,6 +288,10 @@ class EngineConfig:
         if self.recapture_budget != "auto":
             _count(self, "recapture_budget")
         _count(self, "graph_variant_cap", minimum=1)
+        bits = self.fp64_emulation_mantissa_bits
+        if bits is not None and (isinstance(bits, bool) or not isinstance(bits, int) or not 8 <= bits <= 128):
+            raise ValueError(f"EngineConfig.fp64_emulation_mantissa_bits must be None or an int from 8 to 128, "
+                             f"got {bits!r}")
         if self.graph_variant_cap > min(64, self.dynamo_cache_size_limit):
             raise ValueError(f"EngineConfig.graph_variant_cap must be at most 64 and at most dynamo_cache_size_limit "
                              f"({self.dynamo_cache_size_limit}), got {self.graph_variant_cap!r}")
