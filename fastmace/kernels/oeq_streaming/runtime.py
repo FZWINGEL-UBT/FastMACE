@@ -205,8 +205,15 @@ def l2_chunk_edges(device, weight_dim, itemsize):
     """Edges per chunk of ``chunked_conv_backward``: a chunk's weight gradient fills a quarter of the L2, rounded
     down to a multiple of 128 edges (at least 128). The quarter leaves room for the weights and sender features
     that stream through the L2 beside it; on the RTX 5060 Ti (32 MiB, Q = 1280) that is 1,536 edges, the best of
-    the OPT6-T01 screen (docs/validation/opt6-T01.md)."""
-    rows = l2_bytes(device) // (4 * int(weight_dim) * int(itemsize))
+    the OPT6-T01 screen (docs/validation/opt6-T01.md).
+
+    Float64 weights (f64-T03): the chunk holds ``UNCHUNKED_L2_MULTIPLE`` L2s instead. Float64 is bound by its matrix
+    products, not by the L2, and the input gradient's product per chunk runs on cuBLAS's emulation only when the
+    chunk is large: 12,288 edges took 15.3 ms for NbCl5's 56,320 against 33.6 ms in 768-edge chunks (RTX 5060 Ti)."""
+    if int(itemsize) >= 8:
+        rows = UNCHUNKED_L2_MULTIPLE * l2_bytes(device) // (int(weight_dim) * int(itemsize))
+    else:
+        rows = l2_bytes(device) // (4 * int(weight_dim) * int(itemsize))
     return max(128, rows // 128 * 128)
 
 
