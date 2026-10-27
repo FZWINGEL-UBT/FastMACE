@@ -75,6 +75,8 @@ class FusedConv:
         # receiver boundaries (no padding per receiver); 0: one receiver per warp, batches padded per receiver
         self.SPAN = int(cfg.get("span", 1))
         self.RC = int(cfg.get("rc", 4))
+        # OPT8-T01b: the forward also stores the w it builds (wout [E, Q]) for today's chunked backward
+        self.STORE = int(cfg.get("store_w", 0))
         assert self.CB == 32 and C % self.CB == 0 and self.B % 4 == 0 and self.BB % 4 == 0
         paths = schedule.paths
         assert all(p.edge_mul == 1 for p in paths)
@@ -115,7 +117,7 @@ class FusedConv:
 
     def describe(self):
         return dict(cb=self.CB, parts=self.NPARTS, b=self.B, pg=self.PG, nw=self.NW, gx=self.GX, bw=self.BW,
-                    bb=self.BB, kb=self.KB, span=self.SPAN, rc=self.RC, pad=self.WS - self.CB, da=self.DA, fast=bool(self.cfg.get("fast")), smem_f=self.smem_f, smem_b=self.smem_b)
+                    bb=self.BB, kb=self.KB, store_w=self.STORE, span=self.SPAN, rc=self.RC, pad=self.WS - self.CB, da=self.DA, fast=bool(self.cfg.get("fast")), smem_f=self.smem_f, smem_b=self.smem_b)
 
     # ------------------------------------------------------------------ pieces
     def head(self):
@@ -125,6 +127,7 @@ using int64_t = long long;
 constexpr int C = {self.C};
 constexpr int K = {self.K};
 constexpr int CB = {self.CB};
+constexpr int64_t Q = {self.NP * self.C};
 constexpr int WS = {self.WS};
 constexpr int ED = {s.edge_dim};
 constexpr int IN_DIM = {s.input_dim};
@@ -269,6 +272,7 @@ constexpr unsigned FULL = 0xffffffffu;
                 const int nb = (int)((eend - e0) < {B} ? (eend - e0) : {B});
 {self.stage_batch(B, xo)}
 {self.wgemm(local, B)}
+{self.store_w(part, B)}
                 #pragma unroll
                 for (int b = 0; b < {B}; ++b) {{
                     if (b >= nb) break;
@@ -285,6 +289,22 @@ constexpr unsigned FULL = 0xffffffffu;
     }}
 """
 
+    def store_w(self, part, B):
+        if not self.STORE:
+            return ""
+        ws = ", ".join(str(self.s.paths[pi].weight_start) for pi in part)
+        n = len(part)
+        return f"""
+                {{ const int wst[{n}] = {{{ws}}};
+                #pragma unroll
+                for (int b = 0; b < {B}; ++b) {{
+                    if (b < nb) {{
+                        #pragma unroll
+                        for (int g = 0; g < {n}; ++g) wout[(e0 + b) * Q + wst[g] + ch] = w[g][b];
+                    }}
+                }} }}
+"""
+
     def forward_source(self):
         B = self.B
         cases = "\n".join(f"    case {q}:{self.forward_part(part)}    break;" for q, part in enumerate(self.parts))
@@ -293,7 +313,7 @@ extern "C" __global__ void __launch_bounds__({self.NW * 32}, 1) fused_forward(
     int64_t N, int64_t E, const float* __restrict__ a, const float* __restrict__ W,
     const float* __restrict__ x, const float* __restrict__ sh, const int* __restrict__ senders,
     const int* __restrict__ receivers, const int* __restrict__ row_ptr, int* __restrict__ counters,
-    float* __restrict__ out) {{
+    float* __restrict__ out, float* __restrict__ wout) {{
     extern __shared__ float smem[];
     float* Ws = smem;
     const int warp = threadIdx.x >> 5, lane = threadIdx.x & 31, nw = blockDim.x >> 5;
@@ -494,12 +514,13 @@ extern "C" __global__ void __launch_bounds__({self.BW * 32}, 1) fused_backward(
             self._ctr = torch.zeros(2 * self.slices(), dtype=torch.int32, device=device)
         return self._ctr
 
-    def forward(self, a, x, sh, senders, receivers, row_ptr, out):
+    def forward(self, a, x, sh, senders, receivers, row_ptr, out, wout=None):
         N, E = x.shape[0], sh.shape[0]
         ctr = self.counters(x.device)
         ctr.zero_()
         self.mod.launch("fused_forward", self.grid(self.NW, N), self.NW * 32,
-                        (N, E, a, self.W, x, sh, senders, receivers, row_ptr, ctr, out), shared=self.smem_f)
+                        (N, E, a, self.W, x, sh, senders, receivers, row_ptr, ctr, out,
+                         out if wout is None else wout), shared=self.smem_f)
 
     def backward(self, a, x, sh, senders, receivers, row_ptr, dout, dx, dsh, da):
         N, E = x.shape[0], sh.shape[0]

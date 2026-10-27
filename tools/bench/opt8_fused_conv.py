@@ -47,7 +47,8 @@ def parse_args(argv=None):
     p.add_argument("ops", nargs="+", type=Path, help="ops-*.pt from opt8_record_operands.py")
     p.add_argument("--output", type=Path, required=True, help="JSON lines file (appended)")
     p.add_argument("--variants", nargs="+", default=["stub", "l2"],
-                   help="groups: stub (stub_fwd, stub_bwd), l2 (gemm_l2, igrad_l2), fused (fused_fwd, fused_bwd)")
+                   help="groups: stub (stub_fwd, stub_bwd), l2 (gemm_l2, igrad_l2), fused (fused_fwd, fused_bwd), "
+                        "fusedw (T01b: fusedw_fwd, fusedw_fb = fused forward storing w + today's backward, chain_fb)")
     p.add_argument("--fused-config", default="", help="key=value,... passed to the fused kernels")
     p.add_argument("--reps", type=int, default=20)
     p.add_argument("--blocks", type=int, default=9)
@@ -273,6 +274,36 @@ def run_file(path, args, out_file):
                    fused_da=rel(da_f, ref_da))
         print("exactness", {k: row[k] for k in row if k.startswith("fused_")}, flush=True)
 
+    if "fusedw" in args.variants:  # OPT8-T01b: fused forward that also stores w; today's backward on it
+        import opt8_fused_kernels as fk
+        cfg = dict(kv.split("=") for kv in args.fused_config.split(",") if kv)
+        cfg["store_w"] = "1"
+        fw = fk.FusedConv(kernels.schedule, kernels.layout, W, cfg)
+        out_w = torch.full_like(msg, float("nan"))
+        w_w = torch.full_like(w, float("nan"))
+        ref_w = w.clone()
+
+        def fusedw_fwd():
+            fw.forward(a, x, sh, s, rcv, rp, out_w, w_w)
+
+        def fusedw_bwd():
+            res["fusedw"] = streaming_conv_folded_backward(x, sh, w_w, s, rcv, dout, W, main, last, kernels.id,
+                                                           chunk, tile_rule)
+
+        fns["fusedw_fwd"] = fusedw_fwd
+        fns["fusedw_fb"] = lambda: (fusedw_fwd(), fusedw_bwd())
+        fns["chain_fb"] = lambda: (chain_fwd(), chain_bwd())
+        fusedw_fwd()
+        fusedw_bwd()
+        torch.cuda.synchronize()
+        gdx, gdsh, gda = res["fusedw"]
+        row.update(fusedw_config=dict(fw.describe(), fwd=fw.mod.attrs("fused_forward")),
+                   fusedw_w=rel(w_w, ref_w), fusedw_w_bitwise=bool(torch.equal(w_w, ref_w)),
+                   fusedw_msg=rel(out_w, ref_msg), fusedw_msg_bitwise=bool(torch.equal(out_w, ref_msg)),
+                   fusedw_dx=rel(gdx, ref_dx), fusedw_dsh=rel(gdsh, ref_dsh), fusedw_da=rel(gda, ref_da))
+        print("exactness_w", {k: row[k] for k in row if k.startswith("fusedw_") and k != "fusedw_config"},
+              flush=True)
+
     for rnd in range(args.rounds):
         graphs = {k: capture(f, args.reps, flush) for k, f in fns.items()}
         graphs["flush"] = capture(lambda: None, args.reps, flush)
@@ -291,6 +322,9 @@ def run_file(path, args, out_file):
             fused_total = med["fused_fwd"] + med["fused_bwd"]
             out.update(chain_ms=round(chain, 4), fused_ms=round(fused_total, 4),
                        fused_ratio=round(fused_total / chain, 4))
+        if "fusedw_fwd" in med:
+            out.update(fwd_ratio=round(med["fusedw_fwd"] / med["chain_fwd"], 4),
+                       fb_ratio=round(med["fusedw_fb"] / med["chain_fb"], 4))
         print(json.dumps(out), flush=True)
         with open(out_file, "a") as fh:
             fh.write(json.dumps(out) + "\n")

@@ -142,3 +142,43 @@ so this probe stops here.
 - sm_89 (workstations) and data-centre GPUs were not measured.
 - Chunks by edges instead of receivers: rc=3 against rc=2 on NaNbO3 showed a tail effect (0.90 against 0.83). A
   general edge-count chunk rule could remove it, but would not close the gap to 0.75.
+
+## T01b: fused forward that also stores `w`, today's backward unchanged (owner, 27 October 2026)
+
+**Variant.** T01's fused forward with one addition: it writes the `w` rows it builds to `w [E, 1280]`. The chunked
+backward (`streaming_conv_folded_backward`) then runs unchanged on that `w`.
+- The variant drops the cuBLAS GEMM and the streaming forward's `w` read, but keeps the `w` write.
+- Kernel configuration: `b=8,nw=12,rc=2`, as in T01, plus `store_w=1` (the stores are coalesced per path).
+- Method as in T01: same operands, the same process, CUDA graphs of 20 calls with the L2 flush subtracted, 15
+  alternating blocks × 3 rounds.
+- `chain_fb` and `fusedw_fb` are forward and backward together in one graph.
+- Run: `tools/bench/opt8_fused_conv.py --variants fusedw`; record `t01b.jsonl`.
+
+**Exactness**, on every cell, against the chain:
+- **bitwise equal:** `w` (cuBLAS and the k-loop sum in the same order) and the message, both checked from
+  NaN-filled outputs; also `dsh` and `da` (the same backward on the same `w`);
+- **`dx`:** 1.4–2.0e-7 relative, the order of its existing atomics.
+
+ms per force call, medians per round:
+
+| Cell | chain fwd | fused fwd + `w` store | fwd ratio | chain fwd + bwd | fused fwd + `w` + today's bwd | **fwd + bwd ratio** |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| NaCl | 0.201–0.206 | 0.159–0.168 | 0.79–0.83 | 0.510–0.518 | 0.488–0.493 | 0.952–0.961 |
+| NbCl5 | 2.016–2.019 | 1.329–1.342 | 0.66 | 4.054–4.086 | 3.395–3.402 | **0.831–0.839** |
+| NaNbO3 | 3.126–3.129 | 2.039–2.045 | 0.65 | 6.316–6.328 | 5.217–5.232 | **0.826–0.827** |
+
+**Stop rule** (forward + backward ≤ 0.90 of the chain on NbCl5 and NaNbO3): **met**, in every round.
+- The gain is 0.66 ms per force call on NbCl5 and 1.10 ms on NaNbO3; NaCl gains 0.02 ms.
+- It equals full fusion on NaNbO3 (T01: 1.10 ms) and comes within 0.07 ms on NbCl5 (T01: 0.73 ms).
+- The backward stays today's kernels, bitwise.
+- The `w` write costs the fused forward 0.29 ms on NbCl5 and 0.43 ms on NaNbO3.
+
+Step-level estimate (inference, no full-step A/B): about 3–4 % of an NbCl5 step and 7 % of an NaNbO3 step at the
+opt-6 step times.
+
+No record and no default were built (owner instruction). A record would replace the forward of
+`folded_streaming_convolution` (opt-in), keep its chunked backward, and then need:
+- the CPU tests and a GPU exactness test against the chain;
+- the gate, NVE drift, and the A/B in both build orders;
+- the MH-1 family (POLAR-1, OMOL-0);
+- a check on sm_89.
