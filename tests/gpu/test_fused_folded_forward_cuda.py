@@ -81,8 +81,9 @@ for layout in ("ir_mul", "mul_ir"):
             return (out.detach(),) + torch.autograd.grad(out, (xr, yr, ar), G)
 
         chain, new = grads(None), grads(fused)
-        for n, o in zip(new, chain):
-            torch.testing.assert_close(n, o, rtol=1e-5, atol=1e-5)
+        assert torch.equal(new[0], chain[0]) or not report[name]["w bitwise cuBLAS"]
+        for n, o in zip(new, chain):  # dx: atomic sender sums, the order differs between any two runs
+            torch.testing.assert_close(n, o, rtol=1e-5, atol=1e-6 * float(o.abs().max()))
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(graph):
             captured = grads(fused)
@@ -90,7 +91,7 @@ for layout in ("ir_mul", "mul_ir"):
         torch.cuda.synchronize()
         assert torch.equal(captured[0], new[0])  # the forward has no atomics: replay-stable
         for n, o in zip(captured[1:], new[1:]):
-            torch.testing.assert_close(n, o, rtol=1e-5, atol=1e-5)
+            torch.testing.assert_close(n, o, rtol=1e-5, atol=1e-6 * float(o.abs().max()))
 print(json.dumps(report))
 """
 
