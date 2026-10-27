@@ -1,0 +1,92 @@
+{
+  "provider": "colab",
+  "date_utc": "2026-10-27T15:37:17Z",
+  "session": "fm-a100-20261027-153717-6d6816",
+  "gpu": "A100",
+  "commit": "7562a4253eb68d92d5ab929822541c36629b9498",
+  "requested_commit": "7562a425",
+  "commands_text": [
+    "python tools/bench/nve_drift.py --structure NbCl5 --precision float64 --ps 3 --output $OUT/stock --rewrites radial_tables=off species_tables=off fold_readout_tail=off fold_product_linear=off --engine fp64_emulation=off",
+    "python tools/bench/nve_drift.py --structure NbCl5 --precision float64 --ps 3 --output $OUT/pkg-auto",
+    "python tools/bench/nve_drift.py --structure NbCl5 --precision float64 --ps 3 --output $OUT/pkg-emu --engine fp64_emulation=on"
+  ],
+  "commands": [
+    {
+      "command": "python tools/bench/nve_drift.py --structure NbCl5 --precision float64 --ps 3 --output $OUT/stock --rewrites radial_tables=off species_tables=off fold_readout_tail=off fold_product_linear=off --engine fp64_emulation=off",
+      "exit": 0,
+      "wall_s": 214
+    },
+    {
+      "command": "python tools/bench/nve_drift.py --structure NbCl5 --precision float64 --ps 3 --output $OUT/pkg-auto",
+      "exit": 0,
+      "wall_s": 204
+    },
+    {
+      "command": "python tools/bench/nve_drift.py --structure NbCl5 --precision float64 --ps 3 --output $OUT/pkg-emu --engine fp64_emulation=on",
+      "exit": 0,
+      "wall_s": 403
+    }
+  ],
+  "exit": 0,
+  "stack": "f00d5798f8b5",
+  "models": [
+    "mh-1",
+    "medium",
+    "polar-1-s"
+  ],
+  "out": "/home/fzwin/fastmace-acceptance/colab-f64-nve-20261027",
+  "timings": {
+    "allocate_s": 182.2,
+    "upload_s": 18.3,
+    "setup_step_s": 39,
+    "cache_restore_s": 534.8,
+    "pack_download_s": 31.1,
+    "unpack_s": 0.8,
+    "install_s": 30.8,
+    "models_s": 2.6
+  },
+  "cu_before": 28.2,
+  "rate_per_h": 0.0,
+  "active_before": 0,
+  "gpu_name": "NVIDIA A100-SXM4-40GB",
+  "driver": "580.82.07",
+  "gpu_memory": "40960 MiB",
+  "capability": "8.0",
+  "cuda_driver": "13.0",
+  "cpus": 12,
+  "ram_gib": 83.5,
+  "cache_key": "sm80-py310-f00d5798f8b5",
+  "cache_hit": true,
+  "cache_bytes_in": 674757132,
+  "setup_s": 1402.3,
+  "cache_bytes_out": 22719068,
+  "cache_saved": true,
+  "environment": {
+    "python": "3.10.22",
+    "versions": {
+      "torch": "2.14.1+cu130",
+      "triton": "3.8.0",
+      "cuequivariance": "0.12.0",
+      "cuequivariance_torch": "0.12.0",
+      "openequivariance": "0.7.0",
+      "mace-torch": "0.3.16",
+      "e3nn": "0.4.4",
+      "ase": "3.27.0",
+      "numpy": "2.2.6",
+      "pytest": "9.1.1",
+      "pytest-xdist": "3.8.0"
+    },
+    "torch_cuda": "13.0",
+    "cuda_available": true,
+    "pip_freeze_sha256": "2b05fb7fcb3cfc72dd0880fc327e6e81c097f29c86389b2a5f416286392d0b08",
+    "unpack_s": 0.8,
+    "install_s": 30.8,
+    "models_s": 2.6
+  },
+  "env_matches_manifest": true,
+  "stopped": true,
+  "cu_after": 25.17,
+  "active_after": 0,
+  "wall_s": 2268.7,
+  "cu_used": 3.03
+}

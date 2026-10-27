@@ -14,9 +14,10 @@ shares one set of pieces; a piece holds a degree-``D`` Chebyshev series per outp
 - **Backward:** ``dL/dr = sum_j dL/dg_j g_j'(r)`` from the derivative series (``dcoef``, the Chebyshev
   derivative times the piece's ``scale``), recomputed: nothing is saved but ``r`` and the pair index.
 
-Layouts: ``coef [P, K, D + 1, J]``, ``dcoef [P, K, D, J]`` (float32), ``starts``, ``scales [K]`` (float32),
-``bins [n_bins]`` (int32); ``J = Q + 1``, the folded input's width ``Q`` and the edge density. On the CPU (and as
-the certification's float32 reference) ``evaluate`` runs the same recurrence in PyTorch.
+Layouts: ``coef [P, K, D + 1, J]``, ``dcoef [P, K, D, J]``, ``starts``, ``scales [K]`` (all in the tables'
+dtype: float32, or float64 for float64 plans, which then take float64 lengths), ``bins [n_bins]`` (int32);
+``J = Q + 1``, the folded input's width ``Q`` and the edge density. On the CPU (and as the certification's
+reference) ``evaluate`` runs the same recurrence in PyTorch.
 """
 
 from __future__ import annotations
@@ -56,8 +57,8 @@ def _kernels():
                 BLOCK_E: tl.constexpr, BLOCK_J: tl.constexpr):
         base = ((pair.to(tl.int64) * K + piece.to(tl.int64)) * TERMS) * J
         mask = rows[:, None] & column_mask[None, :]
-        b1 = tl.zeros((BLOCK_E, BLOCK_J), dtype=tl.float32)
-        b2 = tl.zeros((BLOCK_E, BLOCK_J), dtype=tl.float32)
+        b1 = tl.zeros((BLOCK_E, BLOCK_J), dtype=coef_ptr.dtype.element_ty)  # float32, or float64 tables
+        b2 = tl.zeros((BLOCK_E, BLOCK_J), dtype=coef_ptr.dtype.element_ty)
         for k in tl.static_range(TERMS - 1, 0, -1):
             c = tl.load(coef_ptr + base[:, None] + k * J + j[None, :], mask=mask, other=0.0)
             b = c + 2.0 * x[:, None] * b1 - b2

@@ -1,7 +1,8 @@
-# OPT8-T02/T03: the opt-in record `fused_folded_forward` (27 October 2026)
+# OPT8-T02/T03/T04: the record `fused_folded_forward`, default on for MH-1 (27 October 2026)
 
 Plan: `plans/opt-8.md`. The probe it comes from is OPT8-T01b (`docs/validation/opt8-T01.md`). The owner asked for
-the record ("Yes build it"); it is **opt-in, not a default**. Runs and scripts:
+the record ("Yes build it"); after the gates it made it **the default for MH-1** ("Make it default for mh-1",
+owner decision 64; OPT8-T04 below). Runs and scripts:
 `results/opt8-T02-fused-folded-forward-20261027/`.
 
 **Verdict: exact, gate passed, NVE drift unchanged.**
@@ -45,7 +46,7 @@ For MH-1 on sm_120 the rule gives the configuration OPT8-T01 found best by its s
 - The MH-1 folded forward passes the interaction's attached `fused_folded_forward`.
 - **Record** `fused_folded_forward` (`fastmace/rewrites/mh1`):
   - requires `chunked_conv_backward`;
-  - exactness `exact`; default `off`;
+  - exactness `exact`; default `auto` (decision 64; `off` until then);
   - workload constraints OEq, sorted receivers and the per-engine edge counter;
   - not deterministic (the backward's atomics);
   - refuses a float64 model.
@@ -158,7 +159,7 @@ stopped afterwards; 1.2 compute units.
 
 ## Decisions for the owner
 
-1. **Default or not.** The record stays opt-in, as instructed. On this PC it is −7.2 % (NaNbO3) and −3.3 %
+1. **Default or not.** Decided: on by default for MH-1 (decision 64, OPT8-T04 below). On this PC it is −7.2 % (NaNbO3) and −3.3 %
    (NbCl5) per MD step; on the RTX 4000 Ada (murphy) −4.2 %, −1.8 % and −1.9 % (NaCl), on an Ada-class L4
    −2.3 % and −0.9 %. It is neutral on NaCl locally and on POLAR-1-S, and +3.5 % on OMOL-0. A default would need a rule: the MH-1 width, or a gain model from the folded width and the
    edge count.
@@ -173,3 +174,19 @@ stopped afterwards; 1.2 compute units.
 - MH-1 family models were not run on Ada.
 - The POLAR-1-S hot path was not traced further.
 - The CPU full suite: per the conductor, it runs before merging.
+
+## OPT8-T04: default for MH-1 (owner decision 64)
+
+The owner chose "Make it default for mh-1" after the gates above and the murphy check. Rule
+`on_for_mh1_float32_unless_reproducible`:
+
+- **On:** a label-table label of the `mh-1` checkpoint (`mh1-r2scan`, `mh1-omat`, `mh1-mp`, found by label or by
+  SHA-256 and head), a float32 plan that is not reproducible, and `chunked_conv_backward` on.
+- **Off (auto):** every other model, with the stage-2 reason "not MH-1, decision 64"; float64 and reproducible
+  plans. POLAR-1-S (neutral) and OMOL-0 XL (3.5 % slower) are the measured reasons; other models were not timed.
+- **Explicit `"on"`:** still enables it for any float32 model with `chunked_conv_backward`; float64 refuses it.
+- MH-1 heads outside the label table (for example `spice_wB97M`) and bare models planned without a label have
+  no label, so they keep it off unless asked (as decision 58's POLAR-1 defaults).
+
+Planner, switch map, SPEC §18 decision 64, CHANGELOG and the CPU tests changed; the golden plan texts were
+regenerated. No new GPU measurement: the A/Bs above are the measured basis.

@@ -93,7 +93,7 @@ def test_record_and_requirements():
 
     record = mh1.RECORDS["fused_folded_forward"]
     assert record.requires == ("chunked_conv_backward",)
-    assert record.exactness == "exact" and record.default == "off" and not record.deterministic
+    assert record.exactness == "exact" and record.default == "auto" and not record.deterministic
     order = tuple(mh1.RECORDS)
     assert order.index("chunked_conv_backward") < order.index("fused_folded_forward")
 
@@ -101,7 +101,7 @@ def test_record_and_requirements():
 def test_planner_rules():
     from fastmace.planner import fixed
 
-    assert fixed.AUTO_RULES["RewriteConfig.fused_folded_forward"] == "never_automatic"
+    assert fixed.AUTO_RULES["RewriteConfig.fused_folded_forward"] == "on_for_mh1_float32_unless_reproducible"
     assert fixed.REWRITE_FIELDS.index("fused_folded_forward") == fixed.REWRITE_FIELDS.index(
         "chunked_conv_backward") + 1
 
@@ -112,7 +112,15 @@ def test_planner_resolution():
     from fastmace.config import PrecisionConfig, RewriteConfig
     from fastmace.planner.fixed import PlanRefused
 
-    assert plan_for("mh1-r2scan").rewrites.fused_folded_forward == "off"  # opt-in
+    # Owner decision 64: on for MH-1 in float32 plans that are not reproducible; off for every other model.
+    assert plan_for("mh1-r2scan").rewrites.fused_folded_forward == "on"
+    assert plan_for("mh1-omat").rewrites.fused_folded_forward == "on"
+    for label in ("polar1-s", "omol0-xl"):
+        plan = plan_for(label)
+        assert plan.rewrites.fused_folded_forward == "off" and plan.rewrites.chunked_conv_backward == "on", label
+        assert "not MH-1, decision 64" in dict(plan.auto_options_off)["fused_folded_forward"]
+    assert plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64")).rewrites.fused_folded_forward == "off"
+    assert plan_for("omol0-xl", rewrites=RewriteConfig(fused_folded_forward="on")).rewrites.fused_folded_forward == "on"
     plan = plan_for("mh1-r2scan", rewrites=RewriteConfig(fused_folded_forward="on"))
     assert plan.rewrites.fused_folded_forward == "on" and plan.rewrites.chunked_conv_backward == "on"
     with pytest.raises(PlanRefused, match="fused_folded_forward='on' needs float32"):

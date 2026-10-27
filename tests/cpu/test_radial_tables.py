@@ -53,7 +53,7 @@ def test_the_record_is_certified_opt_in_and_deterministic():
     assert "certified" in reg.EXACTNESS
     from fastmace.planner import fixed
 
-    assert fixed.AUTO_RULES["RewriteConfig.radial_tables"] == "on_with_fold_cutoff_float32_unless_reproducible"
+    assert fixed.AUTO_RULES["RewriteConfig.radial_tables"] == "on_with_fold_cutoff_unless_reproducible"
 
 
 def test_tables_are_certified_and_the_forces_follow_the_network():
@@ -107,29 +107,36 @@ def test_the_table_gradient_is_the_derivative_of_its_values():
     torch.testing.assert_close(grad.reshape(-1), numeric, rtol=2e-2, atol=2e-3)
 
 
-def test_float64_models_are_refused():
+def test_float64_tables_follow_the_float64_network():
+    """f64-T01: float64 models get float64 tables (degree DEGREE_64, TOLERANCE_64); their forces follow the float64
+    network to float64 rounding."""
     model, batch = tiny("mh1")
     regs = _registry()
-    asked = {name: "on" for name in PACKAGE} | {"radial_tables": "on"}
+    asked = {name: "on" for name in PACKAGE}
     asked |= {name: "off" for name in regs.names() if name not in asked}
-    resolution = regs.resolve(model, asked, strict=False)
-    # Decision 62: the record's support check declines float64 models, so even "on" resolves off with the reason
-    # (and "auto", the default, skips them); applying the resolution leaves the radial chain alone.
-    decision = resolution.decision("radial_tables")
-    assert not decision.enabled and "float32 models only" in decision.reason
-    applied = regs.apply(copy.deepcopy(model), resolution, context(batch), original=model)
-    assert all(entry.name != "radial_tables" for entry in applied)
+    without = copy.deepcopy(model)
+    regs.apply(without, regs.resolve(without, asked, strict=False), context(batch), original=model)
+    tabled = copy.deepcopy(model)
+    asked["radial_tables"] = "on"
+    applied = regs.apply(tabled, regs.resolve(tabled, asked, strict=False), context(batch), original=model)
+    entry = next(entry for entry in applied if entry.name == "radial_tables")
+    tables = [interaction.radial_table for interaction in tabled.interactions]
+    assert all(table.coef.dtype == torch.float64 for table in tables)
+    assert all(table.fit_error <= radial.TOLERANCE_64 for table in tables), [t.fit_error for t in tables]
+    _, forces = energy_and_forces(without, batch)
+    _, new_forces = energy_and_forces(tabled, batch)
+    assert float((new_forces - forces).abs().max() / forces.abs().max()) < 1e-11, entry.result.detail
 
 
-def test_the_planner_refuses_radial_tables_in_float64():
+def test_the_planner_allows_float64_tables_outside_reproducible_plans():
     from test_planner import plan_for
 
     from fastmace.config import PrecisionConfig, RewriteConfig
-    from fastmace.planner.fixed import PlanRefused
 
-    with pytest.raises(PlanRefused, match="radial_tables='on' needs float32"):
-        plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"), rewrites=RewriteConfig(radial_tables="on"))
-    # Owner decision 62: on by default in float32 plans with fold_cutoff, off in float64 ones.
+    float64 = PrecisionConfig(dtype="float64")
+    assert plan_for("mh1-r2scan", precision=float64,
+                    rewrites=RewriteConfig(radial_tables="on")).rewrites.radial_tables == "on"
+    # Owner decision 62: on by default in float32 plans with fold_cutoff; decision 63 adds float64 plans.
     assert plan_for("mh1-r2scan").rewrites.radial_tables == "on"
-    assert plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64")).rewrites.radial_tables == "off"
+    assert plan_for("mh1-r2scan", precision=float64).rewrites.radial_tables == "on"
     assert plan_for("mh1-r2scan", rewrites=RewriteConfig(radial_tables="off")).rewrites.radial_tables == "off"

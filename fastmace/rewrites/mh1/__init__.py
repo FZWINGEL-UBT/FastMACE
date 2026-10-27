@@ -23,8 +23,9 @@ module switches became these records (docs/design/switch-map.md, section 1).
   once instead of a concatenation and two copies per force call; exact, opt-in, off.
 - ``streaming_conv``: the receiver-streaming OEq convolution (OEq PR 223 kernels) in every
   interaction with an OEq-fused convolution.
-- ``fused_folded_forward`` (opt-8 OPT8-T02, opt-in, float32): one kernel builds the folded layer's per-edge
-  weights and the streaming message and stores the weights for the chunked backward (``fused_folded_forwards``).
+- ``fused_folded_forward`` (opt-8 OPT8-T02, float32; on for MH-1 by decision 64): one kernel builds the folded
+  layer's per-edge weights and the streaming message and stores the weights for the chunked backward
+  (``fused_folded_forwards``).
 - ``chunked_conv_backward`` (opt-6 OPT6-T02): the streaming convolution builds its per-edge weights from the
   folded layer's input, and its backward runs in L2-sized edge chunks whose weight gradients the folded layer's
   input gradient reads at once (two slots, a side stream), so the [E, Q] weight gradient never reaches DRAM;
@@ -678,9 +679,10 @@ RECORDS = {
                                      constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
                                      deterministic=False),
     # opt-8 OPT8-T02: the folded layer fused into the streaming forward, weights stored for the unchanged chunked
-    # backward; the same FP32 sums in the same order (bitwise on sm_120). Opt-in, float32.
+    # backward; the same FP32 sums in the same order (bitwise on sm_120). Float32; default on for MH-1 by owner
+    # decision 64 (27 October 2026; the planner's rule picks the model).
     "fused_folded_forward": _record("fused_folded_forward", _chunked_support, _apply(fused_folded_forwards),
-                                    ("chunked_conv_backward",), exactness="exact", default="off",
+                                    ("chunked_conv_backward",), exactness="exact",
                                     constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
                                     deterministic=False),
     "reassociate_first": _record("reassociate_first", _reassociate_support, _apply_reassociate, ("fold_cutoff",),

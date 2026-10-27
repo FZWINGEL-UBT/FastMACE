@@ -108,3 +108,15 @@ def test_importing_the_package_does_not_import_openequivariance():
                             text=True, timeout=300, check=False)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip().splitlines()[-1] == "[]"
+
+
+def test_l2_chunk_edges_float32_and_float64(monkeypatch):
+    """chunked_conv_backward's chunk: a quarter of the L2 for float32 weights (OPT6-T01); for float64 weights
+    UNCHUNKED_L2_MULTIPLE L2s (f64-T03: the emulated input-gradient products need large chunks)."""
+    from fastmace.kernels.oeq_streaming import runtime
+
+    monkeypatch.setattr(runtime, "l2_bytes", lambda device: 32 * 2**20)
+    assert runtime.l2_chunk_edges("cuda:0", 1280, 4) == 1536
+    want = runtime.UNCHUNKED_L2_MULTIPLE * 32 * 2**20 // (1280 * 8) // 128 * 128
+    assert runtime.l2_chunk_edges("cuda:0", 1280, 8) == want
+    assert runtime.l2_chunk_edges("cuda:0", 1280, 8) == 13056

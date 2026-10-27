@@ -2697,6 +2697,31 @@ Open decisions for the owner:
    unchanged, full-step b/a NaCl 0.90, NbCl5 0.92, NaNbO3 0.81 on the RTX
    5060 Ti; on the RTX 4000 Ada (sm_89, leto) NaCl 0.914, NbCl5 0.904,
    NaNbO3 0.832 in both build orders (`docs/validation/opt6-T05.md`).
+63. Decided (user, 27 October 2026, f64-T01: "do that", to the float64
+   package): float64 plans that are not reproducible take (a) the hybrid
+   backend where the planner allows it (already the minimal planner's rule),
+   (b) `EngineConfig.fp64_emulation`, cuBLAS's float64 emulation on INT8 tensor
+   cores (strategy eager), where the GPU's measured float64 multiply-add rate is
+   below 1/8 of its float32 rate (`kernels.triton.fp64_rate`; the compute
+   capability cannot tell), set before the first float64 product and checked
+   at build, (c) the rounding-class rewrites `species_tables`,
+   `fold_readout_tail` and `fold_product_linear`, and (d) float64 radial tables
+   (fit and certificate held to float64 rounding: tolerance 3e-13, bound 1e-12).
+   Reproducible plans keep native products and MACE's code. Measured: MD step
+   0.57 (NaCl), 0.42 (NbCl5), 0.49 (NaNbO3) of stock float64 on the RTX 5060 Ti;
+   forces within 4e-14 eV/Å, stress within 1e-16 eV/Å³; 20 ps NVE drift equal
+   to stock to seven digits (`docs/validation/f64-T01.md`).
+64. Decided (user, 27 October 2026, optimisation round 8, OPT8-T02: "Make it
+   default for mh-1"): `RewriteConfig.fused_folded_forward` is on by default
+   for MH-1 (the label-table labels of the `mh-1` checkpoint: `mh1-r2scan`,
+   `mh1-omat`, `mh1-mp`, found by label or by SHA-256 and head) in float32
+   plans that are not reproducible, wherever `chunked_conv_backward` is on
+   (rule `on_for_mh1_float32_unless_reproducible`). Every other model keeps
+   the cuBLAS product unless asked: POLAR-1-S was neutral (1.004) and OMOL-0
+   XL 3.5 % slower (1.035). Measured on MH-1: exact, force gate passed, 20 ps
+   NVE drift unchanged; b/a in both build orders NaNbO3 0.928, NbCl5 0.967,
+   NaCl 0.996 on the RTX 5060 Ti and NaNbO3 0.958, NbCl5 0.982, NaCl 0.981 on
+   the RTX 4000 Ada (murphy) (`docs/validation/opt8-T02.md`).
 
 ---
 
