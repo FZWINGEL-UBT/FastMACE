@@ -2695,7 +2695,8 @@ Open decisions for the owner:
    self-check (its certificate at most 1) can still turn it off (rule 13).
    Measured: certificates 0.15–0.30, force gate passed, 20 ps NVE drift
    unchanged, full-step b/a NaCl 0.90, NbCl5 0.92, NaNbO3 0.81 on the RTX
-   5060 Ti (`docs/validation/opt6-T05.md`); the Ada check follows.
+   5060 Ti; on the RTX 4000 Ada (sm_89, leto) NaCl 0.914, NbCl5 0.904,
+   NaNbO3 0.832 in both build orders (`docs/validation/opt6-T05.md`).
 
 ---
 

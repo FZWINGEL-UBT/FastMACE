@@ -106,9 +106,23 @@ one `--quiet` reservation from 09:14 to 09:35 UTC; every run valid): see the ver
   the network's value at 0.3 Å with zero slope, not the network.
 - **Scope:** the MH-1 class only, where every interaction is factored. The generic families' radial networks
   (MP-0, OMAT-0 and others) would need their own record.
-- **Not measured:**
-  - an sm_89 A/B (workstations paused);
-  - an MC run with a species superset larger than the structure's (the tables cover the superset's pairs);
-  - the owner's default decision.
+- **Not measured:** an MC run with a species superset larger than the structure's (the tables cover the
+  superset's pairs).
+
+## Default and the Ada check (27 October 2026)
+
+**Owner decision 62:** on by default in float32 plans with `fold_cutoff` that are not reproducible (main
+`0cba0d7a`). **Ada (sm_89):** the same A/B on leto (RTX 4000 Ada Generation, driver 595.58), NAS
+`mace_cueq_oeq`, source `0cba0d7a` from a `git archive` in a scratch folder, `ada.sh` (a = `radial_tables=off`,
+b = on; the shared-workstation idle check before every job; murphy was busy with another user's jobs):
+
+| Cell | b/a, a built first | b/a, b built first | ms per MD step, a → b |
+| --- | ---: | ---: | --- |
+| NaCl | **0.914** | **0.914** | 3.06 → 2.80 |
+| NbCl5 | **0.904** | **0.904** | 24.05 → 21.75 |
+| NaNbO3 | **0.832** | **0.831** | 21.67 → 18.03 |
+
+Every run valid. The gain carries over to Ada within a few percent of sm_120's (0.90, 0.92, 0.81). Records:
+`results/opt6-T05-radial-tables-20261027/ada-leto-0cba0d7a/`.
 - **`tools/bench/opt6_radial_stub.py`** (OPT6-T04's ceiling tool) asserts the text of the old folded forward.
   It stops since this change, as designed.
