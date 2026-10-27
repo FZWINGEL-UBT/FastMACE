@@ -13,6 +13,9 @@ Branch for the plan: `fastmace/opt7-plan` (on `fastmace/f64-T01`, which is on `f
 LunaTP is slower on every large cell (backward 1.39–1.53×); the sender atomics cost at most 5 % of the backward; half
 of the backward's L2 bytes are not `w`/`dw`, but the receiver-owned remedy loses more parallelism than it saves. The
 remaining lever is the `w`/`dw` traffic (idea 2 of the post-radial-tables plan, another session).
+Fairness follow-up the same day: LunaTP's apparent NaCl win was a timing artefact; tuned, it is still 9–50 % slower
+above NaCl (it moves 1.5–2.6× the bytes). Wider (`float2`) loads in our backward: exact, 0.93–0.98 locally, neutral
+on Ada above NaCl; owner: documented, not built.
 
 ## 1. What the convolution costs now
 
