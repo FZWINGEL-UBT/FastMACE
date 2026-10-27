@@ -7,8 +7,12 @@ bound every benefit by the measured share, `S_step = 1 / ((1 - f) + f / s)`. Pro
 review the owner forwarded): **source-owned backward, then path-group traffic reduction, then derivative activity
 specialisation**.
 
-Branch for the plan: `fastmace/opt7-plan` (on `fastmace/f64-T01`, which is on `fastmace/opt6-T01`). Nothing here is
-built yet.
+Branch for the plan: `fastmace/opt7-plan` (on `fastmace/f64-T01`, which is on `fastmace/opt6-T01`).
+
+**Status, 27 October 2026: T00, T01 (a) and T02 done, no kernel built** ([report](../docs/validation/opt7-T00-T02.md)).
+LunaTP is slower on every large cell (backward 1.39–1.53×); the sender atomics cost at most 5 % of the backward; half
+of the backward's L2 bytes are not `w`/`dw`, but the receiver-owned remedy loses more parallelism than it saves. The
+remaining lever is the `w`/`dw` traffic (idea 2 of the post-radial-tables plan, another session).
 
 ## 1. What the convolution costs now
 
