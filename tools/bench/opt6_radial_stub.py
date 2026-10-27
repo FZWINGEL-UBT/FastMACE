@@ -16,9 +16,11 @@ last layer, the streaming convolution and everything after stay as in side a. Si
 live ``cutoff_folded_forward`` source with its radial section replaced (asserted by text, so a change of
 that function stops this tool instead of timing something else).
 
-Timing as ``tools/ab_rewrites.py`` (same-process alternating blocks, ``fastmace.bench.ab.run_ab``). The
-table op itself also evaluates per-edge Chebyshev series from L2-resident coefficients (about 1,700 FMAs per
-edge, forward and derivative); that arithmetic is not in the stub, so the stub is an upper bound.
+Timing as ``tools/ab_rewrites.py`` (same-process alternating blocks, ``fastmace.bench.ab.run_ab``), but by default
+(``--mode force``) one "step" is one force call at the built configuration, replayed as a captured graph: side
+b's wrong forces would heat an MD run and change its edges (the 27 October smoke in ``--mode md`` ran 2.46x
+slower). The table op itself also evaluates per-edge Chebyshev series from L2-resident coefficients (about 1,700
+FMAs per edge, forward and derivative); that arithmetic is not in the stub, so the stub is an upper bound.
 """
 
 from __future__ import annotations
@@ -95,6 +97,9 @@ def stubbed():
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument("--mode", choices=("force", "md"), default="force",
+                   help="force: time force calls at the built configuration (default); md: time MD steps (side b "
+                        "heats, since its forces are wrong: the 27 October smoke ran 2.46x slower)")
     p.add_argument("--checkpoint", type=Path, required=True)
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5", "NaNbO3"])
@@ -106,6 +111,27 @@ def parse_args(argv=None):
     p.add_argument("--pattern", choices=("abab", "abba"), default="abab")
     p.add_argument("--order", choices=("ab", "ba"), default="ab", help="Build order")
     return p.parse_args(argv)
+
+
+class ForceOnlySide:
+    """One force call per "step" (the engine's force stage on its current edges, as one captured CUDA graph) at
+    the built configuration: side b's forces are wrong, so MD steps would heat it and change its edges."""
+
+    def __init__(self, engine, torch):
+        self.engine, self.torch = engine, torch
+        self.replay = engine.captured(("opt6.force",), engine._force_stage)
+
+    def step(self):
+        self.replay()
+
+    def prepare_block(self):
+        pass
+
+    def finish_block(self):
+        pass
+
+    def synchronize(self):
+        self.torch.cuda.synchronize()
 
 
 def main(argv=None):
@@ -149,7 +175,8 @@ def main(argv=None):
             plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
             with stubbed() if side == "b" else contextlib.nullcontext():
                 engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K, check=False)
-            sides[side] = ab_step_time.FastMACESide(engine, torch)
+            sides[side] = (ForceOnlySide(engine, torch) if args.mode == "force"
+                           else ab_step_time.FastMACESide(engine, torch))
             setup[side] = time.perf_counter() - started
         for side in order:
             step_time.warm_up(sides[side], protocol.warmup)
@@ -158,10 +185,12 @@ def main(argv=None):
         changes, recompiled = ab_step_time.compile_changes(counted, ab_step_time.compile_counters(counters))
         medians = {side: result.statistics[side].median_ms for side in sides}
         blocks = {side: result.statistics[side].block_ms for side in sides}
-        entry = dict(natoms=len(base), ab=result.as_dict(), ratio_b_over_a=medians["b"] / medians["a"],
+        entry = dict(natoms=len(base), mode=args.mode, ab=result.as_dict(), ratio_b_over_a=medians["b"] / medians["a"],
                      saving_ms=medians["a"] - medians["b"],
                      pair_ratios=[b / a for a, b in zip(blocks["a"], blocks["b"])], setup_s=setup,
                      compile_during_timing=dict(changes=changes, recompiled=recompiled),
+                     observables={side: ab_step_time.FastMACESide(sides[side].engine, torch).observables()
+                                  for side in sides},
                      load_after=list(os.getloadavg()),
                      other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()])
         entry["valid"] = not recompiled and not entry["other_gpu_processes"]
