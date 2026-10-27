@@ -189,4 +189,8 @@ The owner chose "Make it default for mh-1" after the gates above and the murphy 
   no label, so they keep it off unless asked (as decision 58's POLAR-1 defaults).
 
 Planner, switch map, SPEC §18 decision 64, CHANGELOG and the CPU tests changed; the golden plan texts were
-regenerated. No new GPU measurement: the A/Bs above are the measured basis.
+regenerated. The A/Bs above are the measured basis. Check of the new default (murphy, RTX 4000 Ada, source
+`e0143c6a`, 27 October 2026): the default MH-1 plan resolves `fused_folded_forward = on` and the force/stress gate
+passes on NaCl and NbCl5 (energy ratio 0.87 and 0.12, forces 1.00 and 1.03). The merge-tier CPU suite ran on murphy
+(8 min 16 s, `-n 16`); its only real failure, `test_reproducible`'s list of nondeterministic records, is fixed. The
+Colab-driver and packaging tests need a git checkout and pass locally.
