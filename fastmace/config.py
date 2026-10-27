@@ -125,6 +125,10 @@ class RewriteConfig:
     # on with streaming_conv and fused_folded_backward (owner decision 60, 27 October 2026); cells whose weights fit
     # UNCHUNKED_L2_MULTIPLE L2s run unchunked inside the op.
     chunked_conv_backward: Toggle = "auto"
+    # The folded layer fused into the streaming forward: one kernel builds the per-edge weights a @ [W, b].T and
+    # the message and stores the weights for chunked_conv_backward (opt-8 OPT8-T02); exact (the same FP32 sums in
+    # the same order); float32 plans only; opt-in, auto = off.
+    fused_folded_forward: Toggle = "auto"
     # Certified per-species-pair Chebyshev tables for the MH-1 radial chain (r -> [h c, c] and the edge density),
     # fitted and certified at setup against float64 (opt-6 OPT6-T05; exactness "certified", owner decision 61);
     # float32 plans only; opt-in, auto = off.

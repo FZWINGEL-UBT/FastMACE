@@ -33,7 +33,8 @@ pytest.importorskip("mace")
 Z_VALUES = [8, 11, 17, 26]  # Fe absent from the structure
 MH1_ORDER = ("factor_species", "fold_cutoff", "density_first", "joint_radial_input", "fused_folded_backward",
              "folded_backward_tiles", "fused_radial_hidden", "direct_node_feats", "folded_constants",
-             "streaming_conv", "chunked_conv_backward", "reassociate_first", "segmented_first_sum")
+             "streaming_conv", "chunked_conv_backward", "fused_folded_forward", "reassociate_first",
+             "segmented_first_sum")
 # The research engine's default MH-1 package on the CPU (no OEq: no streaming; fused radial hidden is opt-in).
 PACKAGE = ("factor_species", "fold_cutoff", "density_first", "joint_radial_input", "fused_folded_backward",
            "reassociate_first", "segmented_first_sum")
@@ -123,11 +124,12 @@ def test_records_have_the_spec_fields():
     # direct_node_feats and folded_constants (opt-3 OPT3-T05) move no value: bitwise. chunked_conv_backward
     # (opt-6 OPT6-T02) runs the same kernels on edge ranges.
     exact = {"streaming_conv", "segmented_first_sum", "folded_backward_tiles", "direct_node_feats", "folded_constants",
-             "chunked_conv_backward"}
+             "chunked_conv_backward", "fused_folded_forward"}
     assert {name for name, r in mh1.RECORDS.items() if r.exactness == "exact"} == exact
     assert all(r.exactness == "rounding" for name, r in mh1.RECORDS.items() if name not in exact)
     assert {name for name, r in mh1.RECORDS.items() if r.default != "auto"} == {
-        "fused_radial_hidden", "folded_backward_tiles", "direct_node_feats", "folded_constants"}
+        "fused_radial_hidden", "folded_backward_tiles", "direct_node_feats", "folded_constants",
+        "fused_folded_forward"}
     assert mh1.RECORDS["fused_radial_hidden"].default == "off"  # opt-in, no gain (SPEC §6.2)
     pinned = {name for name, r in mh1.RECORDS.items() if r.source_hashes}
     assert pinned == {"factor_species", "fold_cutoff"}
@@ -151,7 +153,8 @@ def test_requires_graph_matches_the_spec():
         "folded_backward_tiles": ("fused_folded_backward",), "fused_radial_hidden": ("fold_cutoff",),
         "direct_node_feats": ("fold_cutoff",), "folded_constants": ("fold_cutoff",),
         "streaming_conv": ("fold_cutoff",), "chunked_conv_backward": ("streaming_conv", "fused_folded_backward"),
-        "reassociate_first": ("fold_cutoff",), "segmented_first_sum": ("reassociate_first",)}
+        "fused_folded_forward": ("chunked_conv_backward",), "reassociate_first": ("fold_cutoff",),
+        "segmented_first_sum": ("reassociate_first",)}
     regs = registry()
     assert regs.order() == (*MH1_ORDER, "block_linear", "grouped_linear", "merged_residual")
     for name in MH1_ORDER:

@@ -91,6 +91,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
+    "RewriteConfig.fused_folded_forward": "never_automatic",
     "RewriteConfig.radial_tables": "on_with_fold_cutoff_float32_unless_reproducible",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
@@ -119,7 +120,8 @@ STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
-    ("chunked_conv_backward", "fold_cutoff"), ("radial_tables", "fold_cutoff"),
+    ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
+    ("radial_tables", "fold_cutoff"),
     ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
@@ -129,7 +131,8 @@ STAGE2_SUPPORT = (
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
-                  "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward", "radial_tables",
+                  "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward",
+                  "fused_folded_forward", "radial_tables",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
@@ -895,6 +898,11 @@ class FixedPlanner:
         # are; the op itself keeps cells whose weights fit a few L2s unchunked (UNCHUNKED_L2_MULTIPLE).
         needs("chunked_conv_backward", r.chunked_conv_backward != "off",
               v["streaming_conv"] and v["fused_folded_backward"], "streaming_conv and fused_folded_backward")
+        # opt-8 OPT8-T02: opt-in (only an explicit "on"); float32 plans only (stage 2).
+        needs("fused_folded_forward", r.fused_folded_forward == "on", v["chunked_conv_backward"],
+              "chunked_conv_backward")
+        if r.fused_folded_forward == "auto":
+            v["_why"]["fused_folded_forward"] = "off: only an explicit 'on' enables it (OPT8-T02, opt-in)"
         # opt-6 OPT6-T05 (certified, owner decision 61); default on by owner decision 62 (27 October 2026) wherever
         # fold_cutoff is, float32 and not reproducible (stage 2, _fastmace_rules).
         needs("radial_tables", r.radial_tables != "off", v["fold_cutoff"], "fold_cutoff")
@@ -1036,6 +1044,15 @@ class FixedPlanner:
                             "fused_folded_backward, which are not both on", "rewrite-requirement-missing")
             v["chunked_conv_backward"] = False
             v["_why"]["chunked_conv_backward"] += "; off: requires streaming_conv and fused_folded_backward"
+        if v["fused_folded_forward"] and not v["chunked_conv_backward"]:
+            if "fused_folded_forward" in explicit:
+                book.refuse("RewriteConfig.fused_folded_forward='on' requires chunked_conv_backward, which is off",
+                            "rewrite-requirement-missing")
+            v["fused_folded_forward"] = False
+            v["_why"]["fused_folded_forward"] += "; off: requires chunked_conv_backward"
+        if v["fused_folded_forward"] and dtype != "float32":
+            book.refuse(f"RewriteConfig.fused_folded_forward='on' needs float32, not {dtype} (the fused kernel is "
+                        "float32; float64 plans keep the cuBLAS product)", "fused-folded-forward-needs-float32")
         for name in REWRITE_FIELDS:
             item = f"RewriteConfig.{name}"
             book.decide(item, _toggle(v[name]), _why(getattr(self.rewrites, name), AUTO_RULES[item], v["_why"][name]))

@@ -327,7 +327,8 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
     """The interaction's OEq convolution through the receiver-streaming kernels (attached as streaming_kernels).
 
     With ``augmented`` (chunked_conv_backward) the per-edge weights are ``augmented @ [W, b].T`` of the folded
-    radial layer, built inside the convolution, whose backward runs in L2-sized edge chunks.
+    radial layer, built inside the convolution, whose backward runs in L2-sized edge chunks; with
+    ``fused_folded_forward`` attached (opt-8 OPT8-T02) one kernel builds them and the message.
     """
     from fastmace.kernels.oeq_streaming import folded_streaming_convolution, streaming_convolution
     sender, receiver = edge_index[0], edge_index[1]
@@ -347,7 +348,8 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
         message = folded_streaming_convolution(augmented, radial.folded_weight(), feats, edge_attrs,
                                                sender.to(torch.int32), receiver.to(torch.int32), row_ptr,
                                                self.streaming_kernels, self.chunked_backward_edges,
-                                               radial.folded_tiles, radial.folded_parts)
+                                               radial.folded_tiles, radial.folded_parts,
+                                               getattr(self, "fused_folded_forward", None))
     else:
         message = streaming_convolution(feats, edge_attrs, tp_weights, sender.to(torch.int32),
                                         receiver.to(torch.int32), row_ptr, self.streaming_kernels)

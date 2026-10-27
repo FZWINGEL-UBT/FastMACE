@@ -284,27 +284,35 @@ def _(x, sh, weights, senders, receivers, dout, weight, main, last, kernel_id, c
 
 class _FoldedStreamingConvolution(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, a, weight, main, last, x, sh, senders, receivers, row_ptr, kernel_id, chunk_edges, tile_rule):
-        weights = a @ weight.t()  # folded_linear's forward
+    def forward(ctx, a, weight, main, last, x, sh, senders, receivers, row_ptr, kernel_id, chunk_edges, tile_rule,
+                fused_id):
+        if fused_id >= 0:  # fused_folded_forward (opt-8 OPT8-T02): the same weights and message from one kernel
+            from fastmace.kernels.oeq_streaming.fused_forward import fused_folded_forward
+            message, weights = fused_folded_forward(a, weight, x, sh, senders, receivers, row_ptr, fused_id)
+        else:
+            weights = a @ weight.t()  # folded_linear's forward
+            message = streaming_conv_forward(x, sh, weights, senders, row_ptr, kernel_id)
         ctx.save_for_backward(x, sh, weights, senders, receivers, weight, main, last)
         ctx.kernel_id, ctx.chunk_edges, ctx.tile_rule = kernel_id, chunk_edges, tile_rule
-        return streaming_conv_forward(x, sh, weights, senders, row_ptr, kernel_id)
+        return message
 
     @staticmethod
     def backward(ctx, dout):
         x, sh, weights, senders, receivers, weight, main, last = ctx.saved_tensors
         dx, dsh, da = streaming_conv_folded_backward(x, sh, weights, senders, receivers, dout, weight, main, last,
                                                      ctx.kernel_id, ctx.chunk_edges, ctx.tile_rule)
-        return da, None, None, None, dx, dsh, None, None, None, None, None, None
+        return da, None, None, None, dx, dsh, None, None, None, None, None, None, None
 
 
 def folded_streaming_convolution(a, weight, x, sh, senders, receivers, row_ptr, kernels, chunk_edges,
-                                 tile_rule="fixed", parts=None):
+                                 tile_rule="fixed", parts=None, fused=None):
     """``streaming_convolution(x, sh, a @ weight.T, ...)`` with the chunked backward (``chunked_conv_backward``).
 
     ``a`` is the folded radial layer's input [E, P + 1], ``weight`` its [W, b] [Q, P + 1] (no gradient: MD
     forces only); ``parts`` are weight's contiguous halves (``folded_constants``), else they are sliced here.
-    The gradient reaches a, x and sh; the [E, Q] weight gradient is never formed in full.
+    The gradient reaches a, x and sh; the [E, Q] weight gradient is never formed in full. ``fused``
+    (``fused_folded_forward``, a ``FusedFoldedForward``) builds the weights and the message in one kernel; the
+    backward is the same.
     """
     if weight.requires_grad:
         raise ValueError("folded_streaming_convolution: the folded weight must not require a gradient")
@@ -312,7 +320,8 @@ def folded_streaming_convolution(a, weight, x, sh, senders, receivers, row_ptr, 
         p = weight.shape[1] - 1
         parts = (weight[:, :p].contiguous(), weight[:, p].contiguous())
     return _FoldedStreamingConvolution.apply(a, weight, parts[0], parts[1], x, sh, senders, receivers, row_ptr,
-                                             kernels.id, int(chunk_edges), tile_rule)
+                                             kernels.id, int(chunk_edges), tile_rule,
+                                             -1 if fused is None else fused.id)
 
 
 class _StreamingConvolution(torch.autograd.Function):

@@ -23,6 +23,8 @@ module switches became these records (docs/design/switch-map.md, section 1).
   once instead of a concatenation and two copies per force call; exact, opt-in, off.
 - ``streaming_conv``: the receiver-streaming OEq convolution (OEq PR 223 kernels) in every
   interaction with an OEq-fused convolution.
+- ``fused_folded_forward`` (opt-8 OPT8-T02, opt-in, float32): one kernel builds the folded layer's per-edge
+  weights and the streaming message and stores the weights for the chunked backward (``fused_folded_forwards``).
 - ``chunked_conv_backward`` (opt-6 OPT6-T02): the streaming convolution builds its per-edge weights from the
   folded layer's input, and its backward runs in L2-sized edge chunks whose weight gradients the folded layer's
   input gradient reads at once (two slots, a side stream), so the [E, Q] weight gradient never reaches DRAM;
@@ -305,6 +307,35 @@ def chunked_conv_backwards(model):
         if weight.device.type != "cuda":
             raise RewriteError(f"chunked_conv_backward needs the model on a CUDA device (interactions.{index})")
         interaction.chunked_backward_edges = l2_chunk_edges(weight.device, kernels.weight_dim, weight.element_size())
+        names.append(f"interactions.{index}")
+    return names
+
+
+def fused_folded_forwards(model):
+    """The fused folded forward in every chunked streaming interaction; returns their names (opt-8 OPT8-T02).
+
+    Attaches ``fused_folded_forward`` (``oeq_streaming.fused_forward.FusedFoldedForward``): one kernel builds the
+    per-edge weights ``a @ [W, b].T`` and the message, stores the weights for the unchanged chunked backward.
+    Float32 only; the kernel's launch rule comes from the GPU's shared memory and SM count.
+    """
+    import torch
+
+    from fastmace.kernels.oeq_streaming.fused_forward import FusedFoldedForward
+
+    names = []
+    for index, interaction in _folded_interactions(model, "fused_folded_forward"):
+        kernels = getattr(interaction, "streaming_kernels", None)
+        if kernels is None or not getattr(interaction, "chunked_backward_edges", 0):
+            continue
+        weight = interaction.conv_tp_weights.folded_weight()
+        if weight.device.type != "cuda":
+            raise RewriteError(f"fused_folded_forward needs the model on a CUDA device (interactions.{index})")
+        if weight.dtype != torch.float32:
+            raise RewriteError(f"fused_folded_forward is float32 only, interactions.{index} is {weight.dtype}")
+        try:
+            interaction.fused_folded_forward = FusedFoldedForward(kernels, weight.shape[1], weight.device)
+        except ValueError as error:
+            raise RewriteError(f"fused_folded_forward: interactions.{index}: {error}") from error
         names.append(f"interactions.{index}")
     return names
 
@@ -646,6 +677,12 @@ RECORDS = {
                                      ("streaming_conv", "fused_folded_backward"), exactness="exact",
                                      constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
                                      deterministic=False),
+    # opt-8 OPT8-T02: the folded layer fused into the streaming forward, weights stored for the unchanged chunked
+    # backward; the same FP32 sums in the same order (bitwise on sm_120). Opt-in, float32.
+    "fused_folded_forward": _record("fused_folded_forward", _chunked_support, _apply(fused_folded_forwards),
+                                    ("chunked_conv_backward",), exactness="exact", default="off",
+                                    constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
+                                    deterministic=False),
     "reassociate_first": _record("reassociate_first", _reassociate_support, _apply_reassociate, ("fold_cutoff",),
                                  constraints=_FIRST, memory=memory_terms.reassociate_first),
     "segmented_first_sum": _record("segmented_first_sum", _reassociate_support, _apply(segment_first_sum),
@@ -656,6 +693,7 @@ RECORDS = {
 __all__ = [
     "FIXED_SPECIES_SUPERSET", "MACE_VERSIONS", "OEQ", "PER_ENGINE_EDGE_COUNTER", "RECORDS", "SINGLE_GRAPH",
     "SORT_RECEIVERS", "bind_streaming_count", "chunked_conv_backwards", "density_before_linear",
+    "fused_folded_forwards",
     "direct_node_feats", "factor_species_radial", "fold_radial_cutoff", "folded_backward_tiles", "folded_constants",
     "fuse_radial_hidden",
     "fused_folded_backward",
