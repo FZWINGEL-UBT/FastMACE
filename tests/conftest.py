@@ -82,6 +82,9 @@ def pytest_configure(config):
     cache of their own (the edge-bucket regression tests) still set one explicitly. Without this,
     torch puts its caches in /tmp, which the workstations forbid.
     """
+    from _support import naive_cueq_cache
+
+    naive_cueq_cache.install()  # in every process that runs tests (suite-speed)
     if hasattr(config, "workerinput"):  # an xdist worker inherits the controller's variables
         return
     _check_acceptance_environment(config)

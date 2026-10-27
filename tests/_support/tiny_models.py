@@ -8,6 +8,8 @@ Building a model sets torch's default dtype to float64, as MACE's calculator doe
 when it is constructed; ``tests/conftest.py`` restores the default after each test.
 """
 
+import copy
+
 import numpy as np
 import torch
 
@@ -48,12 +50,49 @@ def polar_available():
     return True
 
 
+# Built models by their arguments (suite-speed, 27 October 2026): a build takes 0.4-0.7 s on murphy, a deep
+# copy 0.05 s, and the suite builds a few thousand. Each entry keeps torch's RNG state after the build.
+_BUILT = {}
+
+
+def _frozen(value):
+    """A hashable form of a builder argument, or None when it holds an array (never cached)."""
+    if isinstance(value, (np.ndarray, torch.Tensor)):
+        return None
+    if isinstance(value, dict):
+        items = [(key, _frozen(item)) for key, item in sorted(value.items())]
+        return None if any(item is None for _, item in items) else ("dict", tuple(items))
+    if isinstance(value, (list, tuple)):
+        items = [_frozen(item) for item in value]
+        return None if any(item is None for item in items) else (type(value).__name__, tuple(items))
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return (type(value).__qualname__, repr(value))
+
+
 def tiny_mace_model(z_values, interaction="RealAgnosticResidualInteractionBlock", interaction_first=None,
                     polar=False, **options):
-    """A tiny random ScaleShiftMACE (or PolarMACE) in float64; options go to its constructor."""
+    """A tiny random ScaleShiftMACE (or PolarMACE) in float64; options go to its constructor.
+
+    The first build of each set of arguments is kept; later calls get a deep copy of it (bitwise the same
+    weights, a model of their own) and leave torch's default dtype and RNG state as a build does.
+    """
     # e3nn ships a constants file that torch>=2.6 refuses to load by default
     # (it contains `slice`); allow it for this test process only.
     torch.serialization.add_safe_globals([slice])
+    key = _frozen((list(z_values), interaction, interaction_first, polar, options))
+    if key is not None and key in _BUILT:
+        model, rng = _BUILT[key]
+        torch.set_default_dtype(torch.float64)
+        torch.set_rng_state(rng)
+        return copy.deepcopy(model)
+    model = _build(z_values, interaction, interaction_first, polar, **options)
+    if key is not None:
+        _BUILT[key] = (copy.deepcopy(model), torch.get_rng_state())
+    return model
+
+
+def _build(z_values, interaction, interaction_first, polar, **options):
     from e3nn import o3
     from mace import modules
     from mace.tools import utils
