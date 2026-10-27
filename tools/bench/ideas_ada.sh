@@ -22,7 +22,7 @@ others() {
   local gpu busy suite
   gpu=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | tr -d ' ' | paste -sd, -)
   busy=$(ps -eo user,pcpu,comm --no-headers | awk '$1 != "root" && $1 != "zwingel" && $2 > 20 {print $1":"$3":"$2}' | paste -sd, -)
-  suite=$(pgrep -f pytest | paste -sd, -)
+  suite=$(pgrep -f "[p]ytest" | paste -sd, -)
   [ -n "$gpu$busy$suite" ] && { echo "gpu=[$gpu] busy=[$busy] pytest=[$suite]"; return 0; }
   return 1
 }
