@@ -256,9 +256,12 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
     chunked = reassociation is None and getattr(self, "chunked_backward_edges", 0) > 0
     tp_weights = augmented = None
     table = getattr(self, "radial_table", None)  # radial_tables: edge_feats are then the edge lengths [E, 1]
+    w_lengths = None
     if table is not None and edge_feats.shape[-1] == 1:
         folded_input, edge_density = table(edge_feats, node_attrs, edge_index)  # the cutoff is in both
-        if chunked or reassociation is not None:
+        if getattr(self, "w_table", None) is not None and chunked and reassociation is None:  # w_tables
+            w_lengths = edge_feats
+        elif chunked or reassociation is not None:
             augmented = folded_input
         else:
             tp_weights = self.conv_tp_weights.folded_layer(folded_input)
@@ -292,7 +295,8 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
         message = reassociation(node_feats, node_attrs, edge_attrs, augmented, edge_index,
                                 self.conv_tp_weights.folded_weight())
     elif getattr(self, "streaming_kernels", None) is not None:  # streaming_conv
-        message = streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented)
+        message = streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented,
+                                    w_lengths, node_attrs)
     elif hasattr(self, "conv_fusion"):
         message = self.conv_tp(node_feats, edge_attrs, tp_weights, edge_index)
     else:
@@ -323,7 +327,8 @@ setattr(cutoff_folded_forward, READS_RESIDUAL_LINEAR, True)
 setattr(cutoff_folded_forward, READS_GATED_ROWS, True)
 
 
-def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented=None):
+def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_nodes, augmented=None,
+                      w_lengths=None, node_attrs=None):
     """The interaction's OEq convolution through the receiver-streaming kernels (attached as streaming_kernels).
 
     With ``augmented`` (chunked_conv_backward) the per-edge weights are ``augmented @ [W, b].T`` of the folded
@@ -343,7 +348,11 @@ def streaming_message(self, node_feats, edge_attrs, tp_weights, edge_index, num_
     conv = self.conv_tp
     transpose = self.streaming_kernels.layout == "mul_ir" and conv.layout_transpose_in is not None
     feats = conv.layout_transpose_in(node_feats) if transpose else node_feats
-    if augmented is not None:
+    if w_lengths is not None:  # w_tables: the per-edge weights from the edge lengths, in float64
+        message = self.w_table.convolution(w_lengths, self.w_table.pair(node_attrs, edge_index), feats, edge_attrs,
+                                           sender.to(torch.int32), receiver.to(torch.int32), row_ptr,
+                                           self.streaming_kernels)
+    elif augmented is not None:
         radial = self.conv_tp_weights
         message = folded_streaming_convolution(augmented, radial.folded_weight(), feats, edge_attrs,
                                                sender.to(torch.int32), receiver.to(torch.int32), row_ptr,

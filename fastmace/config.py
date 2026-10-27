@@ -133,6 +133,10 @@ class RewriteConfig:
     # fitted and certified at setup against float64 (opt-6 OPT6-T05; exactness "certified", owner decision 61);
     # float32 plans only; opt-in, auto = off.
     radial_tables: Toggle = "auto"
+    # Per-piece w-tables: the second MH-1 interaction's per-edge weights straight from the radial tables
+    # (w = sum_k T_k(x) C_k W^T per piece) and their r-gradient without the dw W product (ideas-20261027 D2);
+    # rounding; float64 plans outside reproducible ones, with radial_tables and chunked_conv_backward; opt-in.
+    w_tables: Toggle = "auto"
     # Element-dependent skip connection restricted to the structure's species (GENERIC_SPECIES_SKIP).
     species_skip: Toggle = "auto"
     # Radial hidden block as one Triton kernel pair (FUSED_RADIAL_HIDDEN); opt-in, no measured gain.

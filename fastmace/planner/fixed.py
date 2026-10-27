@@ -94,6 +94,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
     "RewriteConfig.fused_folded_forward": "on_for_mh1_float32_unless_reproducible",
     "RewriteConfig.radial_tables": "on_with_fold_cutoff_unless_reproducible",
+    "RewriteConfig.w_tables": "never_automatic",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
@@ -122,7 +123,7 @@ STAGE2_SUPPORT = (
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
     ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
-    ("radial_tables", "fold_cutoff"),
+    ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"),
     ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
@@ -133,7 +134,7 @@ STAGE2_SUPPORT = (
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
                   "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward",
-                  "fused_folded_forward", "radial_tables",
+                  "fused_folded_forward", "radial_tables", "w_tables",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
@@ -973,6 +974,9 @@ class FixedPlanner:
         # opt-6 OPT6-T05 (certified, owner decision 61); default on by owner decision 62 (27 October 2026) wherever
         # fold_cutoff is, float32 and not reproducible (stage 2, _fastmace_rules).
         needs("radial_tables", r.radial_tables != "off", v["fold_cutoff"], "fold_cutoff")
+        needs("w_tables", r.w_tables == "on", v["fold_cutoff"], "fold_cutoff")  # ideas-20261027 D2, opt-in
+        if r.w_tables == "auto":
+            v["_why"]["w_tables"] = "off: only an explicit 'on' enables it (ideas-20261027 D2, opt-in)"
         note("block_linear", hybrid if r.block_linear == "auto" else r.block_linear == "on",
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")
@@ -1139,6 +1143,12 @@ class FixedPlanner:
         if v["fused_folded_forward"] and dtype != "float32":
             book.refuse(f"RewriteConfig.fused_folded_forward='on' needs float32, not {dtype} (the fused kernel is "
                         "float32; float64 plans keep the cuBLAS product)", "fused-folded-forward-needs-float32")
+        if v["w_tables"] and not (v["radial_tables"] and v["chunked_conv_backward"]):
+            book.refuse("RewriteConfig.w_tables='on' requires radial_tables and chunked_conv_backward, which are not "
+                        "both on", "rewrite-requirement-missing")
+        if v["w_tables"] and (dtype != "float64" or reproducible):
+            book.refuse(f"RewriteConfig.w_tables='on' needs float64 outside reproducible plans, not {dtype}"
+                        f"{' (reproducible)' if reproducible else ''}", "w-tables-needs-float64")
         for name in REWRITE_FIELDS:
             item = f"RewriteConfig.{name}"
             book.decide(item, _toggle(v[name]), _why(getattr(self.rewrites, name), AUTO_RULES[item], v["_why"][name]))

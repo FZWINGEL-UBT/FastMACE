@@ -466,11 +466,97 @@ def _apply(model, context):
     return tabulate_radials(model, context)
 
 
+# --------------------------------------------------------------------------- w_tables (ideas-20261027 D2)
+
+# The w-tables hold [pairs * pieces + 1, degree + 1, Q] values twice; above this many bytes the record does not
+# apply (a size rule: superset pairs grow quadratically with the species).
+W_TABLE_MAX_BYTES = 2 << 30
+
+
+def attach_w_tables(model):
+    """Per-piece w-tables (``fastmace.kernels.triton.w_table``) in every float64 interaction whose tables feed the
+    chunked streaming convolution; returns their names. Reassociated interactions keep their own path."""
+    import torch
+
+    from fastmace.kernels.triton.w_table import WTable
+
+    names = []
+    for index, interaction in _factored(model):
+        table = getattr(interaction, "radial_table", None)
+        if table is None or getattr(interaction, "first_reassociation", None) is not None:
+            continue
+        if getattr(interaction, "streaming_kernels", None) is None or not getattr(interaction,
+                                                                                 "chunked_backward_edges", 0):
+            continue
+        if table.coef.dtype != torch.float64:
+            raise RewriteError(f"w_tables is float64 only, interactions.{index} has {table.coef.dtype} tables")
+        weight = interaction.conv_tp_weights.folded_weight()
+        pairs, pieces, terms, _ = table.coef.shape
+        size = 2 * (pairs * pieces + 1) * terms * weight.shape[0] * 8
+        if size > W_TABLE_MAX_BYTES:
+            raise RewriteError(f"w_tables: interactions.{index} would hold {size / 2**30:.1f} GiB of tables "
+                               f"(more than W_TABLE_MAX_BYTES)")
+        interaction.w_table = WTable(table, weight)
+        names.append(f"interactions.{index} ({pairs * pieces} groups, {size / 2**20:.0f} MiB)")
+    if not names:
+        raise RewriteError("w_tables: no interaction with float64 radial tables and the chunked streaming "
+                           "convolution")
+    return names
+
+
+def _w_selfcheck(original, rewritten, context):
+    """Per interaction and pair, the w-table's values and r-slopes against the chain it replaces (the table's
+    ``a`` times the folded weight), at random lengths of ``[R_PHYSICAL, r_max)``, to SPEC §6.4's float64 limit."""
+    import torch
+
+    from fastmace.kernels.triton.radial_table import radial_table_backward, radial_table_forward
+    from fastmace.kernels.triton.w_table import w_table_backward, w_table_forward
+
+    cases, dtype = CaseErrors(), None
+    generator = torch.Generator().manual_seed(context.seed + 13)
+    for index, interaction in _factored(rewritten):
+        wt = getattr(interaction, "w_table", None)
+        if wt is None:
+            continue
+        table = interaction.radial_table
+        device, dtype = table.coef.device, table.coef.dtype
+        weight = interaction.conv_tp_weights.folded_weight().to(dtype)
+        r = (R_PHYSICAL + (table.r_max - R_PHYSICAL) * torch.rand(257, generator=generator, dtype=dtype)).to(device)
+        for number in range(table.species ** 2):
+            pair = torch.full((r.numel(),), number, dtype=torch.int32, device=device)
+            a, _ = radial_table_forward(r, pair, table.coef, table.starts, table.scales, table.bins, table.r_lo,
+                                        table.bin_scale, table.r_max)
+            w, xs, gs, perm, slope = w_table_forward(r, pair, wt.g, wt.starts, wt.scales, wt.bins, wt.r_lo,
+                                                     wt.bin_scale, wt.r_max)
+            name = f"interactions.{index}.pair{number}"
+            cases.add(f"{name}.w", a @ weight.T, w)
+            dw = torch.randn(w.shape, generator=generator, dtype=dtype).to(device)
+            da = dw @ weight
+            chain = radial_table_backward(r, pair, table.dcoef, table.starts, table.scales, table.bins,
+                                          da.contiguous(), torch.zeros_like(da[:, :1]), table.r_lo, table.bin_scale,
+                                          table.r_max).reshape(-1)
+            cases.add(f"{name}.dr", chain, w_table_backward(dw, wt.dg, xs, gs, perm, slope))
+    return cases.result(dtype)
+
+
+def _w_support(model):
+    return _support(model)
+
+
+def _apply_w_tables(model, context):
+    return attach_w_tables(model)
+
+
 RECORDS = {
     "radial_tables": Rewrite(
         name="radial_tables", applies_to=_support, requires=("fold_cutoff",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="certified", default="auto", deterministic=True,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply, selfcheck=_selfcheck),
+    # ideas-20261027 D2: rounding (the series and the folded product reassociated); float64; opt-in.
+    "w_tables": Rewrite(
+        name="w_tables", applies_to=_w_support, requires=("radial_tables", "chunked_conv_backward"), conflicts=(),
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=False,
+        workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_w_tables, selfcheck=_w_selfcheck),
 }
 
-__all__ = ["DEGREE", "R_LO", "RECORDS", "certify", "fit", "tabulate_radials"]
+__all__ = ["DEGREE", "R_LO", "RECORDS", "W_TABLE_MAX_BYTES", "attach_w_tables", "certify", "fit", "tabulate_radials"]

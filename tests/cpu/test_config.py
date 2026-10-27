@@ -69,6 +69,7 @@ AUTO_RULES = {
     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
     "RewriteConfig.fused_folded_forward": "on_for_mh1_float32_unless_reproducible",
     "RewriteConfig.radial_tables": "on_with_fold_cutoff_unless_reproducible",
+    "RewriteConfig.w_tables": "never_automatic",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
