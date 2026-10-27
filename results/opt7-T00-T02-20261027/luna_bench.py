@@ -50,6 +50,14 @@ for path in sys.argv[1:]:
         torch.autograd.grad(yy, (xx, ss, ww), dout)
 
     row["forward_ms"] = graph_time(forward)
+    from LunaEquivariance.lunatp.uvu_conv.interface import run_backward
+    tables = graph._tables[("uvu", conv.op.index_bits)]
+    needs = (True, True, True, False)
+    gd = run_backward(conv.op, x0, sh0, w0, dout, tables, None, None, needs=needs)
+    row["direct_dx_vs"], row["direct_dsh_vs"] = rel(gd[0], ref["dx"]), rel(gd[1], ref["dsh"])
+    row["direct_dw_vs"] = rel(gd[2], ref["dw"])
+    row["backward_direct_ms"] = graph_time(lambda: run_backward(conv.op, x0, sh0, w0, dout, tables, None, None,
+                                                                needs=needs))
     try:
         row["forward_backward_ms"] = graph_time(both)
         row["clone_ms"] = graph_time(lambda: (x0.clone(), sh0.clone(), w0.clone()))
