@@ -17,7 +17,8 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 - Exactness class `certified` (SPEC §6.1, owner decision 61), and its first record,
   `RewriteConfig.radial_tables` (opt-6 OPT6-T05, opt-in): per species pair, MH-1's radial chain from the edge
   length to the folded layer's input and the edge density as Chebyshev tables fitted and certified at setup
-  against float64; float32 plans only: `docs/validation/opt6-T05.md`.
+  against float64; float32 plans only: `docs/validation/opt6-T05.md`. **On by default** (owner decision 62)
+  in float32 plans that are not reproducible: NaCl −10 %, NbCl5 −8 %, NaNbO3 −19 % per MD step (RTX 5060 Ti).
 
 ## [1.0.0] - 2026-10-25
 

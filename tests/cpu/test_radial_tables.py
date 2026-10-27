@@ -48,12 +48,12 @@ def _rewritten(tables):
 
 def test_the_record_is_certified_opt_in_and_deterministic():
     record = radial.RECORDS["radial_tables"]
-    assert (record.exactness, record.default, record.deterministic) == ("certified", "off", True)
+    assert (record.exactness, record.default, record.deterministic) == ("certified", "auto", True)
     assert record.requires == ("fold_cutoff",)
     assert "certified" in reg.EXACTNESS
     from fastmace.planner import fixed
 
-    assert fixed.AUTO_RULES["RewriteConfig.radial_tables"] == "never_automatic"
+    assert fixed.AUTO_RULES["RewriteConfig.radial_tables"] == "on_with_fold_cutoff_float32_unless_reproducible"
 
 
 def test_tables_are_certified_and_the_forces_follow_the_network():
@@ -113,8 +113,12 @@ def test_float64_models_are_refused():
     asked = {name: "on" for name in PACKAGE} | {"radial_tables": "on"}
     asked |= {name: "off" for name in regs.names() if name not in asked}
     resolution = regs.resolve(model, asked, strict=False)
-    with pytest.raises(reg.RewriteError, match="float32 models only"):
-        regs.apply(copy.deepcopy(model), resolution, context(batch), original=model)
+    # Decision 62: the record's support check declines float64 models, so even "on" resolves off with the reason
+    # (and "auto", the default, skips them); applying the resolution leaves the radial chain alone.
+    decision = resolution.decision("radial_tables")
+    assert not decision.enabled and "float32 models only" in decision.reason
+    applied = regs.apply(copy.deepcopy(model), resolution, context(batch), original=model)
+    assert all(entry.name != "radial_tables" for entry in applied)
 
 
 def test_the_planner_refuses_radial_tables_in_float64():
@@ -125,6 +129,7 @@ def test_the_planner_refuses_radial_tables_in_float64():
 
     with pytest.raises(PlanRefused, match="radial_tables='on' needs float32"):
         plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"), rewrites=RewriteConfig(radial_tables="on"))
-    plan = plan_for("mh1-r2scan")
-    assert plan.rewrites.radial_tables == "off"
-    assert plan_for("mh1-r2scan", rewrites=RewriteConfig(radial_tables="on")).rewrites.radial_tables == "on"
+    # Owner decision 62: on by default in float32 plans with fold_cutoff, off in float64 ones.
+    assert plan_for("mh1-r2scan").rewrites.radial_tables == "on"
+    assert plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64")).rewrites.radial_tables == "off"
+    assert plan_for("mh1-r2scan", rewrites=RewriteConfig(radial_tables="off")).rewrites.radial_tables == "off"

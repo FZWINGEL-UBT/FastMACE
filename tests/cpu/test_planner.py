@@ -223,6 +223,8 @@ FASTMACE_ONLY_DEFAULTS = {
     "polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     # Owner decision 60, 27 October 2026 (OPT6-T02): with streaming_conv and fused_folded_backward (MH-1 class).
     "chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
+    # Owner decision 62, 27 October 2026 (OPT6-T05): with fold_cutoff (MH-1 class), float32, not reproducible.
+    "radial_tables": "on_with_fold_cutoff_float32_unless_reproducible",
 }
 # Where each FastMACE-only default applies (labels): the factored interaction, or the OPT-T08 records' own scope
 # (docs/design/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
@@ -232,7 +234,7 @@ MH1_LABELS = ("mh1-omat", "mh1-mp", "mh1-r2scan")
 GENERIC_FAMILY_LABELS = tuple(label for label, facts in LABEL_FACTS.items()
                               if facts[0] != "PolarMACE" and set(facts[1]) <= {RESIDUAL, DENSITY_FIRST, DENSITY})
 APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "folded_backward_tiles": FACTORED_LABELS,
-           "chunked_conv_backward": FACTORED_LABELS,
+           "chunked_conv_backward": FACTORED_LABELS, "radial_tables": FACTORED_LABELS,
            "species_tables": MH1_LABELS, "fold_product_linear": MH1_LABELS,
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"), "grouped_launch": GENERIC_FAMILY_LABELS,
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS}

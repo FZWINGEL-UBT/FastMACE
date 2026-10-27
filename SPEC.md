@@ -466,7 +466,7 @@ class Rewrite:
 | `polar_graph_sums` (PolarMACE's one-graph per-graph sums as a sum over atoms and a broadcast instead of `scatter_add_` and `x[batch]`; OPT4-T02) | rounding (another summation order; deterministic, no atomics) | PolarMACE, one graph per batch; by default as `fx_e3nn_linear` | alone NaCl −8 %, NbCl5 −9 % of the force call (the float64 `index_put` backward); none on top of `fx_e3nn_linear` | default on with `fx_e3nn_linear` by owner decision 58 |
 | `streaming_conv` (OEq PR 223 kernels, NVRTC) | exact (summation order; atomic sums, not bitwise reproducible) | folded MH-1 class, `GENERIC_*` with OEq fusion | −7.7% NaNbO3; generic −16 to −28% with reassociation | OEq present; per-engine edge counter (§8.1) |
 | `chunked_conv_backward` (the streaming backward in L2-sized edge chunks, each chunk's weight gradient read at once by the folded layer's input gradient on a side stream; optimisation round 6, OPT6-T02) | exact (the same kernels per edge; atomic sender sums as `streaming_conv`, not bitwise reproducible) | with `streaming_conv` and `fused_folded_backward` (MH-1 class); weights of at most 4 L2s run unchunked | NbCl5 −2.0 to −3.3 %, NaNbO3 −3.1 to −3.6 % (sm_120); NaCl +0.8 % | default on by owner decision 60, 27 October 2026 |
-| `radial_tables` (per-species-pair Chebyshev tables for the radial chain r → `[h c, c]` and the edge density, fitted at setup; optimisation round 6, OPT6-T04/T05) | certified (§6.1; deterministic) | factored folded MH-1 class, float32 | stub ceiling per force call NbCl5 −7.2 %, NaNbO3 −16 %, NaCl −10 % (sm_120) | opt-in; class by owner decision 61, 27 October 2026 |
+| `radial_tables` (per-species-pair Chebyshev tables for the radial chain r → `[h c, c]` and the edge density, fitted at setup; optimisation round 6, OPT6-T04/T05) | certified (§6.1; deterministic) | factored folded MH-1 class, float32 | stub ceiling per force call NbCl5 −7.2 %, NaNbO3 −16 %, NaCl −10 % (sm_120) | default on by owner decision 62 (float32, not reproducible, with `fold_cutoff`); class by owner decision 61, 27 October 2026 |
 | `generic_species_skip` | exact (absent columns multiply zeros) | MP-0/density family | −7 to −39% | fixed species superset |
 | `generic_fused_radial_backward` | rounding | MP-0/density family | −3 to −5% large cells | — |
 | `polar_uvu` (PR 1711) | rounding (GEMM form) | PolarMACE | 4–5× faster with the MH-1 rewrites (step time ÷ 4–5) | — |
@@ -2687,6 +2687,15 @@ Open decisions for the owner:
    `docs/validation/opt4-T05.md`). Plans that compile nothing (eager,
    reference, `compile_mode="none"`) turn it off with a reason; an explicit
    `False` restores the second compile.
+62. Decided (user, 27 October 2026, optimisation round 6, OPT6-T05: "yes
+   default"): `RewriteConfig.radial_tables` is on by default wherever
+   `fold_cutoff` is (the factored MH-1 class), in float32 plans that are not
+   reproducible (rule `on_with_fold_cutoff_float32_unless_reproducible`).
+   Float64 and reproducible plans keep MACE's radial chain; the record's
+   self-check (its certificate at most 1) can still turn it off (rule 13).
+   Measured: certificates 0.15–0.30, force gate passed, 20 ps NVE drift
+   unchanged, full-step b/a NaCl 0.90, NbCl5 0.92, NaNbO3 0.81 on the RTX
+   5060 Ti (`docs/validation/opt6-T05.md`); the Ada check follows.
 
 ---
 

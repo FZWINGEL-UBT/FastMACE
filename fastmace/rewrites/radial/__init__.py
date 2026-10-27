@@ -51,6 +51,8 @@ def _factored(model):
 
 
 def _support(model):
+    import torch
+
     from fastmace.rewrites import mh1
 
     verdict = mh1.RECORDS["fold_cutoff"].applies_to(model)
@@ -58,6 +60,10 @@ def _support(model):
         return verdict
     if len(_factored(model)) != len(model.interactions):
         return Support(False, "every interaction must be a factored MH-1 interaction (the embedding is shared)")
+    parameter = next(model.parameters(), None)
+    if parameter is not None and parameter.dtype != torch.float32:
+        # Decision 62's "auto" skips float64 models; the certificate bounds float32 rounding (decision 61).
+        return Support(False, f"float32 models only (the certificate bounds float32 rounding), not {parameter.dtype}")
     return verdict
 
 
@@ -436,7 +442,7 @@ def _apply(model, context):
 RECORDS = {
     "radial_tables": Rewrite(
         name="radial_tables", applies_to=_support, requires=("fold_cutoff",), conflicts=(),
-        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="certified", default="off", deterministic=True,
+        mace_versions=MACE_VERSIONS, source_hashes={}, exactness="certified", default="auto", deterministic=True,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply, selfcheck=_selfcheck),
 }
 

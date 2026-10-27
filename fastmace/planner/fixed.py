@@ -91,7 +91,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
-    "RewriteConfig.radial_tables": "never_automatic",
+    "RewriteConfig.radial_tables": "on_with_fold_cutoff_float32_unless_reproducible",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
@@ -895,10 +895,9 @@ class FixedPlanner:
         # are; the op itself keeps cells whose weights fit a few L2s unchunked (UNCHUNKED_L2_MULTIPLE).
         needs("chunked_conv_backward", r.chunked_conv_backward != "off",
               v["streaming_conv"] and v["fused_folded_backward"], "streaming_conv and fused_folded_backward")
-        # opt-6 OPT6-T05 (certified, owner decision 61): opt-in until its full-step A/B.
-        needs("radial_tables", r.radial_tables == "on", v["fold_cutoff"], "fold_cutoff")
-        if r.radial_tables == "auto":
-            v["_why"]["radial_tables"] = "off: only an explicit 'on' enables it (OPT6-T05, opt-in)"
+        # opt-6 OPT6-T05 (certified, owner decision 61); default on by owner decision 62 (27 October 2026) wherever
+        # fold_cutoff is, float32 and not reproducible (stage 2, _fastmace_rules).
+        needs("radial_tables", r.radial_tables != "off", v["fold_cutoff"], "fold_cutoff")
         note("block_linear", hybrid if r.block_linear == "auto" else r.block_linear == "on",
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")
@@ -979,6 +978,11 @@ class FixedPlanner:
                 book.refuse("RewriteConfig.tf32x3_gemms and grouped_launch both reroute the block linears' products",
                             "rewrite-conflict")
         # Owner decision 61 (27 October 2026): the certified class bounds float32 rounding, so float32 plans only.
+        # Decision 62: "auto" is on with fold_cutoff in float32 plans that are not reproducible.
+        if v["radial_tables"] and "radial_tables" not in explicit and (dtype != "float32" or reproducible):
+            v["radial_tables"] = False
+            v["_why"]["radial_tables"] += ("; off: reproducible=True keeps MACE's radial chain" if reproducible
+                                           else f"; off: {dtype} plans keep MACE's radial chain (decision 62)")
         if v["radial_tables"] and dtype != "float32":
             book.refuse(f"RewriteConfig.radial_tables='on' needs float32, not {dtype} (its certificate bounds "
                         "float32 rounding)", "radial-tables-needs-float32")
