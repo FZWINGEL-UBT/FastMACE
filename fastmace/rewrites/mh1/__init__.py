@@ -26,7 +26,7 @@ module switches became these records (docs/design/switch-map.md, section 1).
 - ``chunked_conv_backward`` (opt-6 OPT6-T02): the streaming convolution builds its per-edge weights from the
   folded layer's input, and its backward runs in L2-sized edge chunks whose weight gradients the folded layer's
   input gradient reads at once (two slots, a side stream), so the [E, Q] weight gradient never reaches DRAM;
-  exact, opt-in, off.
+  exact; default on (owner decision 60), the op itself keeping cells whose weights fit a few L2s unchunked.
 - ``reassociate_first``: the first interaction summed per receiver and sender species before
   its last radial layer; needs the structure's one-hot species as ``Context.inputs["node_attrs"]``.
 - ``segmented_first_sum``: that sum as a run-segmented Triton kernel.
@@ -640,9 +640,10 @@ RECORDS = {
                               constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
                               deterministic=False,  # OEq kernels add sender gradients atomically
                               memory=memory_terms.streaming_conv),
-    # opt-6 OPT6-T02: the same kernels on edge ranges; only the atomic sender additions change order.
+    # opt-6 OPT6-T02: the same kernels on edge ranges; only the atomic sender additions change order. Default on
+    # by owner decision 60 (27 October 2026); small cells stay unchunked inside the op (UNCHUNKED_L2_MULTIPLE).
     "chunked_conv_backward": _record("chunked_conv_backward", _chunked_support, _apply(chunked_conv_backwards),
-                                     ("streaming_conv", "fused_folded_backward"), exactness="exact", default="off",
+                                     ("streaming_conv", "fused_folded_backward"), exactness="exact",
                                      constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
                                      deterministic=False),
     "reassociate_first": _record("reassociate_first", _reassociate_support, _apply_reassociate, ("fold_cutoff",),

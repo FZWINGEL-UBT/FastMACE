@@ -127,8 +127,7 @@ def test_records_have_the_spec_fields():
     assert {name for name, r in mh1.RECORDS.items() if r.exactness == "exact"} == exact
     assert all(r.exactness == "rounding" for name, r in mh1.RECORDS.items() if name not in exact)
     assert {name for name, r in mh1.RECORDS.items() if r.default != "auto"} == {
-        "fused_radial_hidden", "folded_backward_tiles", "direct_node_feats", "folded_constants",
-        "chunked_conv_backward"}
+        "fused_radial_hidden", "folded_backward_tiles", "direct_node_feats", "folded_constants"}
     assert mh1.RECORDS["fused_radial_hidden"].default == "off"  # opt-in, no gain (SPEC §6.2)
     pinned = {name for name, r in mh1.RECORDS.items() if r.source_hashes}
     assert pinned == {"factor_species", "fold_cutoff"}

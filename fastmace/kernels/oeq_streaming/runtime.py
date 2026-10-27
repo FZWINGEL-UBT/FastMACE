@@ -191,14 +191,28 @@ def _(x, sh, weights, senders, receivers, row_ptr, dout, kernel_id):
     return torch.empty_like(x), torch.empty_like(sh), torch.empty_like(weights)
 
 
+# The size rule (owner decision 60, 27 October 2026): weights of at most this many L2s run unchunked. NaCl 3x3x3
+# (35-42 MB against a 32 MiB L2) was 0.6-1.1 % slower chunked; NbCl5 (268 MB) and NaNbO3 (430 MB) gain.
+UNCHUNKED_L2_MULTIPLE = 4
+
+
+def l2_bytes(device):
+    """The L2 size of ``device`` in bytes (CUDA)."""
+    return int(torch.cuda.get_device_properties(device).L2_cache_size)
+
+
 def l2_chunk_edges(device, weight_dim, itemsize):
     """Edges per chunk of ``chunked_conv_backward``: a chunk's weight gradient fills a quarter of the L2, rounded
     down to a multiple of 128 edges (at least 128). The quarter leaves room for the weights and sender features
     that stream through the L2 beside it; on the RTX 5060 Ti (32 MiB, Q = 1280) that is 1,536 edges, the best of
     the OPT6-T01 screen (docs/validation/opt6-T01.md)."""
-    l2 = int(torch.cuda.get_device_properties(device).L2_cache_size)
-    rows = l2 // (4 * int(weight_dim) * int(itemsize))
+    rows = l2_bytes(device) // (4 * int(weight_dim) * int(itemsize))
     return max(128, rows // 128 * 128)
+
+
+def chunks_the_backward(edges, weight_dim, itemsize, device):
+    """Whether the chunked backward chunks: the per-edge weights exceed ``UNCHUNKED_L2_MULTIPLE`` L2s."""
+    return int(edges) * int(weight_dim) * int(itemsize) > UNCHUNKED_L2_MULTIPLE * l2_bytes(device)
 
 
 _SIDE_STREAMS = {}  # device index -> the side stream of the chunked backward's input gradients
@@ -219,12 +233,14 @@ def streaming_conv_folded_backward(x: torch.Tensor, sh: torch.Tensor, weights: t
                                    tile_rule: str) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """The edge-owned backward of ``weights = a @ weight.T`` and the streaming convolution, returning (dx, dsh, da).
 
-    The edges run in chunks of ``chunk_edges``. Each chunk's weight gradient goes into one of two chunk-sized
-    slots, and the folded layer's input gradient reads it at once, from the L2, on a side stream while the
-    next chunk's backward runs (one stream left the small input-gradient grids exposed: NbCl5 2.83 against
-    2.10 ms at 1,536 edges, docs/validation/opt6-T01.md). Every edge's values are those of
-    ``streaming_conv_backward`` followed by ``folded_linear_input_grad`` (the same kernels, the same reduction
-    order); only the order of the atomic sender-gradient additions differs, as between any two runs.
+    Where the weights exceed ``UNCHUNKED_L2_MULTIPLE`` L2s (``chunks_the_backward``), the edges run in chunks of
+    ``chunk_edges``: each chunk's weight gradient goes into one of two chunk-sized slots, and the folded layer's
+    input gradient reads it at once, from the L2, on a side stream while the next chunk's backward runs (one
+    stream left the small input-gradient grids exposed: NbCl5 2.83 against 2.10 ms at 1,536 edges,
+    docs/validation/opt6-T01.md). Smaller cells run the two kernels once over all edges, as without the rewrite.
+    Every edge's values are those of ``streaming_conv_backward`` followed by ``folded_linear_input_grad`` (the
+    same kernels, the same reduction order); only the order of the atomic sender-gradient additions differs, as
+    between any two runs.
     """
     from fastmace.kernels.triton.skinny_linear import input_grad_into
 
@@ -235,6 +251,11 @@ def streaming_conv_folded_backward(x: torch.Tensor, sh: torch.Tensor, weights: t
     dx = torch.zeros_like(x)  # sender gradients are added atomically (all on the current stream)
     dsh = torch.empty_like(sh)
     da = weights.new_empty((edges, weight.shape[1]))
+    if not chunks_the_backward(edges, weights.shape[1], weights.element_size(), x.device):
+        dweights = torch.empty_like(weights)
+        kernels.backward(x, sh, weights, senders, receivers, dout, dx, dsh, dweights)
+        input_grad_into(dweights, weight, main, last, da, tile_rule)
+        return dx, dsh, da
     rows = max(1, min(int(chunk_edges), edges))
     slots = weights.new_empty((2, rows, weights.shape[1]))
     current, side = torch.cuda.current_stream(x.device), _side_stream(x.device)

@@ -114,12 +114,13 @@ print(json.dumps({"ok": True}))
 """
 
 FOLDED_CHUNKED = r"""
-from fastmace.kernels.oeq_streaming import folded_streaming_convolution
+from fastmace.kernels.oeq_streaming import folded_streaming_convolution, runtime
 from fastmace.kernels.triton.skinny_linear import folded_linear
 
 # chunked_conv_backward (opt-6 OPT6-T02): the per-edge weights a @ [W, b].T built inside the convolution and
 # the backward in edge chunks equal folded_linear followed by streaming_convolution. The last 40 edges are
-# padding past every row, as the engine's edges after the compacted count.
+# padding past every row, as the engine's edges after the compacted count. These weights are far below the
+# size rule's threshold, so the chunked branch runs with UNCHUNKED_L2_MULTIPLE = 0, the unchunked with its value.
 a = torch.randn((edges, 9), device="cuda", generator=g)
 weight = torch.randn((problem.weight_numel, 9), device="cuda", generator=g)
 key = torch.where(torch.arange(edges, device="cuda") < edges - 40, receiver, torch.full_like(receiver, nodes))
@@ -146,12 +147,17 @@ def gradients(path, kernels):
 kernels = StreamingKernels(problem, np.float32)
 reference = gradients(reference_path, kernels)
 halves = (weight[:, :8].contiguous(), weight[:, 8].contiguous())
-for chunk, parts in ((64, None), (150, halves), (399, None), (4096, None)):
-    out, dx, dy, da = gradients(chunked_path(chunk, parts), kernels)
-    assert torch.equal(out, reference[0]), chunk  # the same GEMM and forward kernel
-    assert torch.equal(dy, reference[2]), chunk  # per edge, no atomics
-    assert torch.equal(da, reference[3]), chunk  # the same input-gradient reduction order per row
-    torch.testing.assert_close(dx, reference[1], rtol=1e-5, atol=1e-5)  # atomic sender sums
+default_multiple = runtime.UNCHUNKED_L2_MULTIPLE
+assert not runtime.chunks_the_backward(edges, problem.weight_numel, 4, "cuda")
+for multiple in (0, default_multiple):
+    runtime.UNCHUNKED_L2_MULTIPLE = multiple
+    for chunk, parts in ((64, None), (150, halves), (399, None), (4096, None)):
+        out, dx, dy, da = gradients(chunked_path(chunk, parts), kernels)
+        assert torch.equal(out, reference[0]), (multiple, chunk)  # the same GEMM and forward kernel
+        assert torch.equal(dy, reference[2]), (multiple, chunk)  # per edge, no atomics
+        assert torch.equal(da, reference[3]), (multiple, chunk)  # the same input-gradient reduction order per row
+        torch.testing.assert_close(dx, reference[1], rtol=1e-5, atol=1e-5)  # atomic sender sums
+runtime.UNCHUNKED_L2_MULTIPLE = 0  # the captured graph below runs the chunked branch
 
 graph = torch.cuda.CUDAGraph()
 with torch.cuda.graph(graph):
@@ -161,6 +167,7 @@ torch.cuda.synchronize()
 for n, o in zip(captured, reference):
     torch.testing.assert_close(n, o, rtol=1e-5, atol=1e-5)
 assert torch.equal(captured[3], reference[3])
+runtime.UNCHUNKED_L2_MULTIPLE = default_multiple
 print(json.dumps({"ok": True}))
 """
 

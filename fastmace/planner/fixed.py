@@ -90,7 +90,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.fused_folded_backward": "on_with_stage1_fold_cutoff_if_model_supports",
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
-    "RewriteConfig.chunked_conv_backward": "never_automatic",
+    "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
@@ -890,11 +890,10 @@ class FixedPlanner:
         needs("streaming_conv", r.streaming_conv != "off", hybrid and v["fold_cutoff"] and v["sort_receivers"],
               "the hybrid backend, fold_cutoff (stage 1) and sort_receivers (a hard requirement: streaming "
               "kernels on unsorted edges give wrong results)")
-        # opt-6 OPT6-T02 (exact, opt-in until its full-step A/B).
-        needs("chunked_conv_backward", r.chunked_conv_backward == "on",
+        # opt-6 OPT6-T02, owner decision 60 (27 October 2026): on wherever streaming_conv and fused_folded_backward
+        # are; the op itself keeps cells whose weights fit a few L2s unchunked (UNCHUNKED_L2_MULTIPLE).
+        needs("chunked_conv_backward", r.chunked_conv_backward != "off",
               v["streaming_conv"] and v["fused_folded_backward"], "streaming_conv and fused_folded_backward")
-        if r.chunked_conv_backward == "auto":
-            v["_why"]["chunked_conv_backward"] = "off: only an explicit 'on' enables it (OPT6-T02, opt-in)"
         note("block_linear", hybrid if r.block_linear == "auto" else r.block_linear == "on",
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")

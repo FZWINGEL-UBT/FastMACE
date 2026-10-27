@@ -121,8 +121,9 @@ class RewriteConfig:
     # GENERIC_STREAMING for MP-0 and the density family).
     streaming_conv: Toggle = "auto"
     # The streaming backward in L2-sized edge chunks, each chunk's per-edge weight gradient consumed at once by
-    # the folded layer's input gradient, so the [E, Q] gradient never reaches DRAM (opt-6 OPT6-T02); exact,
-    # opt-in, auto = off; needs streaming_conv and fused_folded_backward.
+    # the folded layer's input gradient, so the [E, Q] gradient never reaches DRAM (opt-6 OPT6-T02); exact; auto =
+    # on with streaming_conv and fused_folded_backward (owner decision 60, 27 October 2026); cells whose weights fit
+    # UNCHUNKED_L2_MULTIPLE L2s run unchunked inside the op.
     chunked_conv_backward: Toggle = "auto"
     # Element-dependent skip connection restricted to the structure's species (GENERIC_SPECIES_SKIP).
     species_skip: Toggle = "auto"
