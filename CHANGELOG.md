@@ -6,7 +6,13 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `RewriteConfig.chunked_conv_backward` (opt-6 OPT6-T02): MH-1's streaming convolution builds its per-edge
+  weights from the folded radial layer's input and runs its backward in L2-sized edge chunks, so the
+  `[E, 1280]` weight gradient never reaches DRAM. Exact (values per edge unchanged; only the order of the
+  existing atomic sender sums changes), opt-in (`auto` = off) until its full-step A/B is decided:
+  `docs/validation/opt6-T02.md`.
 
 ## [1.0.0] - 2026-10-25
 
