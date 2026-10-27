@@ -91,6 +91,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
+    "RewriteConfig.radial_tables": "never_automatic",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
@@ -118,7 +119,7 @@ STAGE2_SUPPORT = (
     ("density_first", "fold_cutoff"), ("joint_radial_input", "fold_cutoff"), ("fused_radial_hidden", "fold_cutoff"),
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
-    ("chunked_conv_backward", "fold_cutoff"),
+    ("chunked_conv_backward", "fold_cutoff"), ("radial_tables", "fold_cutoff"),
     ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
@@ -128,7 +129,7 @@ STAGE2_SUPPORT = (
 # The rewrite fields in the order the research engine resolves them (parse_args).
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
-                  "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward",
+                  "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward", "radial_tables",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
@@ -894,6 +895,10 @@ class FixedPlanner:
         # are; the op itself keeps cells whose weights fit a few L2s unchunked (UNCHUNKED_L2_MULTIPLE).
         needs("chunked_conv_backward", r.chunked_conv_backward != "off",
               v["streaming_conv"] and v["fused_folded_backward"], "streaming_conv and fused_folded_backward")
+        # opt-6 OPT6-T05 (certified, owner decision 61): opt-in until its full-step A/B.
+        needs("radial_tables", r.radial_tables == "on", v["fold_cutoff"], "fold_cutoff")
+        if r.radial_tables == "auto":
+            v["_why"]["radial_tables"] = "off: only an explicit 'on' enables it (OPT6-T05, opt-in)"
         note("block_linear", hybrid if r.block_linear == "auto" else r.block_linear == "on",
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")
@@ -973,6 +978,10 @@ class FixedPlanner:
             if v["grouped_launch"]:
                 book.refuse("RewriteConfig.tf32x3_gemms and grouped_launch both reroute the block linears' products",
                             "rewrite-conflict")
+        # Owner decision 61 (27 October 2026): the certified class bounds float32 rounding, so float32 plans only.
+        if v["radial_tables"] and dtype != "float32":
+            book.refuse(f"RewriteConfig.radial_tables='on' needs float32, not {dtype} (its certificate bounds "
+                        "float32 rounding)", "radial-tables-needs-float32")
         # OPT-DEF-2 (owner, 21 October 2026): the rounding-class OPT-T08 records keep the stock path in float64 and
         # reproducible plans. species_tables too: its tables are not bitwise the per-atom products on the GPU
         # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).

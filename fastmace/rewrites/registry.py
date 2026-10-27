@@ -17,7 +17,9 @@ together with the ``RewriteConfig`` field that switches each one, and provides:
 - **resolution** (``Registry.resolve``): turns per-record requests (``"on"``, ``"off"``,
   ``"auto"``, from a ``RewriteConfig`` or a mapping) into enabled or disabled decisions with
   reasons. ``"auto"`` means the record's default; an ``approximate`` record is never enabled by
-  default (SPEC §6.1), and cannot even be built with a default other than ``"off"``. A record is
+  default (SPEC §6.1), and cannot even be built with a default other than ``"off"``. A ``certified``
+  record (owner decision 61) may be a default: its self-check holds a certificate that its float32
+  error is at most the float32 rounding error of what it replaces. A record is
   disabled when a record it requires is not enabled or a conflicting one is. An explicit ``"on"``
   that cannot be honoured is refused (``RewriteRefusedError``), never silently downgraded;
 - **application and self-checks** (``Registry.apply``, ``Registry.selfcheck``, SPEC §6.4): the
@@ -60,9 +62,12 @@ from fastmace.errors import RewriteError, RewriteRefusedError, SelfCheckError  #
 from fastmace.model.capabilities import RewriteSupport
 
 Support = RewriteSupport
-Exactness = Literal["exact", "rounding", "approximate"]
+# "certified" (owner decision 61, 27 October 2026; SPEC §6.1): an approximation whose error, measured at setup on
+# the plan's own species and domain against a float64 evaluation of the same weights, is at most the float32
+# rounding error of the computation it replaces (values and first derivatives); float32 plans only.
+Exactness = Literal["exact", "rounding", "certified", "approximate"]
 Default = Literal["on", "off", "auto"]
-EXACTNESS = ("exact", "rounding", "approximate")
+EXACTNESS = ("exact", "rounding", "certified", "approximate")
 DEFAULTS = ("on", "off", "auto")
 
 # SPEC §6.4 per-module thresholds: relative error max |rewritten - original| / max |original|.
@@ -82,6 +87,9 @@ RECORD_SOURCES = (
     "fastmace.rewrites.species",
     # Optimisation round 4 (OPT4-T03, opt-in): 3xTF32 atom GEMMs, after every module family that multiplies atom rows.
     "fastmace.rewrites.precision",
+    # Optimisation round 6 (OPT6-T05, opt-in): certified radial tables, after every module family, so the fit sees
+    # the embeddings and radial networks the model finally runs, and no later record's self-check sees the tables.
+    "fastmace.rewrites.radial",
     # OPT4-T02 (opt-in): e3nn's generated code as fx graphs, after every record that replaces e3nn modules.
     "fastmace.rewrites.codegen",
     # Process-wide stress-path patch (MACE PR 1498), as a record so the planner gets a decision and reason.

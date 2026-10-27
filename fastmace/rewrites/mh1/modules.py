@@ -87,7 +87,10 @@ class FactoredRadialMLP(torch.nn.Module):
                 return self.rest[-1](run_hidden_plan(hidden, self.fused_hidden))
             return self.rest(hidden)
         # Cutoff folded into the last layer: one GEMM over [h c, c], (h W + b) c = [h c, c] [W; b].
-        augmented = self.augmented_after_first(hidden, cutoff)
+        return self.folded_layer(self.augmented_after_first(hidden, cutoff))
+
+    def folded_layer(self, augmented):
+        """The folded last layer on its input ``[h c, c]`` (also the radial tables' output, radial_tables)."""
         if self.fused_backward:
             return folded_linear(augmented, self.folded_weight(), tile_rule=self.folded_tiles,
                                  parts=self.folded_parts)
@@ -248,38 +251,44 @@ def cutoff_folded_forward(self, node_attrs, node_feats, edge_attrs, edge_feats, 
                                               lammps_natoms=lammps_natoms, first_layer=first_layer)
         node_feats = node_feats_attrs[:, : node_feats.shape[-1]]
         node_attrs = node_feats_attrs[:, node_feats.shape[-1]:]
-    source_embedding = self.source_embedding(node_attrs)
-    target_embedding = self.target_embedding(node_attrs)
     reassociation = getattr(self, "first_reassociation", None)  # reassociate_first
     # chunked_conv_backward: the streaming convolution takes the folded layer's input and applies its weight itself.
     chunked = reassociation is None and getattr(self, "chunked_backward_edges", 0) > 0
     tp_weights = augmented = None
-    joint = getattr(self, "joint_radial_weight", None)  # joint_radial_input
-    if joint is not None:
-        # Both first layers at once; the gathered species terms join inside the add.
-        first = torch.nn.functional.linear(edge_feats, joint)
-        hidden = (first + source_embedding[edge_index[0]]
-                  + target_embedding[edge_index[1]])
-        conv_hidden, density_hidden = hidden.split(self.joint_radial_widths, dim=1)
-        if chunked:
-            augmented = self.conv_tp_weights.augmented_after_first(conv_hidden, cutoff)
-        elif reassociation is None:
-            tp_weights = self.conv_tp_weights.after_first(conv_hidden, cutoff)
-        edge_density = torch.tanh(self.density_fn.after_first(density_hidden) ** 2)
+    table = getattr(self, "radial_table", None)  # radial_tables: edge_feats are then the edge lengths [E, 1]
+    if table is not None and edge_feats.shape[-1] == 1:
+        folded_input, edge_density = table(edge_feats, node_attrs, edge_index)  # the cutoff is in both
+        if chunked or reassociation is not None:
+            augmented = folded_input
+        else:
+            tp_weights = self.conv_tp_weights.folded_layer(folded_input)
     else:
-        edge_feats = torch.cat([edge_feats, source_embedding[edge_index[0]],
-                                target_embedding[edge_index[1]]], dim=-1)
-        if chunked:
-            augmented = self.conv_tp_weights.augmented(edge_feats, cutoff)
-        elif reassociation is None:
-            tp_weights = self.conv_tp_weights(edge_feats, cutoff)  # changed: cutoff applied inside
-        edge_density = torch.tanh(self.density_fn(edge_feats) ** 2)
-    if cutoff is not None:
-        edge_density = edge_density * cutoff
+        source_embedding = self.source_embedding(node_attrs)
+        target_embedding = self.target_embedding(node_attrs)
+        joint = getattr(self, "joint_radial_weight", None)  # joint_radial_input
+        if joint is not None:
+            # Both first layers at once; the gathered species terms join inside the add.
+            first = torch.nn.functional.linear(edge_feats, joint)
+            hidden = (first + source_embedding[edge_index[0]]
+                      + target_embedding[edge_index[1]])
+            conv_hidden, density_hidden = hidden.split(self.joint_radial_widths, dim=1)
+            if chunked or reassociation is not None:
+                augmented = self.conv_tp_weights.augmented_after_first(conv_hidden, cutoff)
+            else:
+                tp_weights = self.conv_tp_weights.after_first(conv_hidden, cutoff)
+            edge_density = torch.tanh(self.density_fn.after_first(density_hidden) ** 2)
+        else:
+            edge_feats = torch.cat([edge_feats, source_embedding[edge_index[0]],
+                                    target_embedding[edge_index[1]]], dim=-1)
+            if chunked or reassociation is not None:
+                augmented = self.conv_tp_weights.augmented(edge_feats, cutoff)
+            else:
+                tp_weights = self.conv_tp_weights(edge_feats, cutoff)  # changed: cutoff applied inside
+            edge_density = torch.tanh(self.density_fn(edge_feats) ** 2)
+        if cutoff is not None:
+            edge_density = edge_density * cutoff
     density = scatter_sum(src=edge_density, index=edge_index[1], dim=0, dim_size=num_nodes)
     if reassociation is not None:
-        augmented = (self.conv_tp_weights.augmented_after_first(conv_hidden, cutoff) if joint is not None
-                     else self.conv_tp_weights.augmented(edge_feats, cutoff))
         message = reassociation(node_feats, node_attrs, edge_attrs, augmented, edge_index,
                                 self.conv_tp_weights.folded_weight())
     elif getattr(self, "streaming_kernels", None) is not None:  # streaming_conv

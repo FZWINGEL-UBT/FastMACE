@@ -4,7 +4,7 @@ Plan revision 1, tier graph (molecular dynamics on the graph tier), from step 0
       fused_folded_backward, folded_backward_tiles, segmented_first_sum, chunked_conv_backward, block_linear,
       grouped_linear, merged_residual, gated_rows, segment_gemm, single_graph_strain, species_tables, fold_readout_tail,
       fold_product_linear, polar_uvu
-  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, combo_kernels,
+  rewrites off: fused_radial_hidden, direct_node_feats, folded_constants, radial_tables, combo_kernels,
       tf32x3_gemms (only an explicit 'on' enables it); streaming_conv (fallback-rewrite-off);
       grouped_launch (not the generic MACE family, decision 57) (+4 more; describe(full=True) lists them)
   sizes: skin 0.3 A, headroom 1.15 (fixed), edge bucket +5 %, multiple 256, re-capture budget 64, variant cap 64
