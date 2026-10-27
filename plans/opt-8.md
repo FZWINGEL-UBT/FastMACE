@@ -1,0 +1,40 @@
+# Optimisation round 8: radial-table output straight into the streaming convolution
+
+Owner request, 27 October 2026 (after radial tables, `fastmace-after-radial-tables`): algorithmic changes only; the
+fused table → `w` → convolution kernel is the first item.
+
+## Idea
+
+Since `radial_tables` (owner decision 62) the second MH-1 interaction's chain is: table op → `a = [h c, c]`
+`[E, 65]` → folded last layer `w = a Wᵀ` (cuBLAS, `W [1280, 65]`) → `w [E, 1280]` in DRAM → receiver-streaming
+forward reads it; in the backward the edge-owned streaming kernel reads `w` again and writes `dw [E, 1280]` (in
+L2-sized chunks, `chunked_conv_backward`), and the Triton skinny kernel reads `dw` for `da = dw W`. Nsight puts `w`
+at 64–67 % of the streaming forward's L2 bytes and `w` + `dw` at 49–51 % of the backward's
+(`docs/validation/opt7-T00-T02.md` on `fastmace/opt7-plan`). A fused kernel would build each edge's `w` on chip
+from `a` and `W`, use it, and drop it; the backward would build `dw`, fold it into `da` on chip and drop it.
+
+**Cost side.** The fused path does three `[E, 65] × [65, 1280]`-sized products where the chain does two (the
+backward must rebuild `w` for `dx` and `dsh`): 7.0 G FMA each on NaNbO3 (84k edges), 4.4 G on NbCl5, in FP32 SIMT
+(no TF32; the tensor-core path is a later option, see T02). `W` is 333 KB, more than the shared memory of a block
+(about 99 KB on sm_120), so a block keeps a channel slice of `W` (32 channels × 10 paths × 65 = 83 KB) and the
+other operands are re-read per slice.
+
+**Sobek's reassociation** (arXiv 2607.18074: accumulate per receiver before the channel products, so no per-edge
+weight tensor exists) pays when the per-edge weight comes from a short radial basis. Here the weight comes from a
+65-wide `a`: accumulating `Σ_e a[e,k] · TP(x_s, sh_e)` per receiver is 65 × 5120 values per receiver and
+65 × 5120 = 333k FMA per edge, against 83k FMA per edge to build the `w` row and use it (the tile approach). It is
+4× the arithmetic of the tile approach before any memory is counted, so T01 measures the tile approach; the
+reassociation is recorded as rejected on that count.
+
+## Tasks
+
+| Task | What | Stop rule | Status |
+| --- | --- | --- | --- |
+| **OPT8-T01** | Falsifier, no production code (`tools/bench/opt8_fused_conv.py`). Real operands (`x`, `sh`, senders, receivers, CSR rows, `dout`, `a`, the folded `W`) of one force call of the default float32 hybrid plan. (a) Ceilings: the streaming kernels with `w` and `dw` made register-only (stub), and the `w`/`da` products with their outputs kept in L2. (b) A prototype fused forward (`a`, `W` → message) and fused backward (→ `dx`, `dsh`, `da`), plain FP32 SIMT, against today's chain (cuBLAS GEMM + streaming forward; `chunked_conv_backward` = chunked streaming backward + Triton input gradient on the side stream). CUDA-graph replays with an L2 flush, same process, alternating; exactness against the chain | fused forward + backward ≥ 25 % faster than the chain on NaNbO3 **and** NbCl5; otherwise report in `docs/validation/opt8-T01.md`, commit, push, stop. If (a)'s ceilings already miss 25 %, (b) is not built | **done, not passed**, [report](../docs/validation/opt8-T01.md). The (a) ceilings were not bounds: cuBLAS on L2 chunks is slower than the prototype's own product. (b) is exact (message bitwise). Fused / chain: NbCl5 **0.82**, NaNbO3 **0.83**, NaCl 0.80. The forward halves; the backward is 1.12–1.13× the chain's chunked backward. **Stop**; whether a 4–7 % step gain justifies a record is an owner decision |
+| OPT8-T02 | Only if T01 passes (it did not): opt-in record (plain FP32 SIMT; the `w`-tile product behind a small interface so a normalised FP16×3 path could follow, enabled only by a general hardware rule: tensor-core : FP32 rate above the split count, never a per-GPU table). CPU tests; GPU exactness tests against the unfused chain; the MH-1 family (POLAR-1, OMOL-0) keeps working | exact to float32 rounding against the chain | not started |
+| OPT8-T03 | Gates for the built record: `tools/force_stress_gate.py --engine fastmace --rewrites <record>=on`; NVE drift (`tools/bench/nve_drift.py`, 20 ps NaCl and NbCl5, off vs on); same-process A/B (`tools/ab_rewrites.py`) in both build orders on NaCl, NbCl5, NaNbO3; report `docs/validation/opt8-T03.md`. Not a default (owner decision) | gate passes, drift unchanged, b/a ≤ 0.95 on NbCl5 and NaNbO3 | not started |
+
+## Rules
+
+General optimisations only (any crystal, composition and GPU; no per-GPU or per-crystal tables, no shape-keyed
+caches), algorithmic only (no timestep change). Local GPU work inside `tools/ci/local_gpu.py run` reservations.

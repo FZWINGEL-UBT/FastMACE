@@ -1,0 +1,238 @@
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 1500 (/home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/python3.10)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+==PROF== Profiling "fused_forward": 0%....50%....100% - 21 passes
+==PROF== Profiling "fused_backward": 0%....50%....100% - 21 passes
+==PROF== Disconnected from process 1500
+[1500] python3.10@127.0.0.1
+  fused_forward (9, 4, 2)x(512, 1, 1), Context 1, Stream 7, Device 0, CC 12.0
+    Warning: Data collection happened without fixed GPU frequencies. Profiling results may be inconsistent.
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ----------- ------------
+    Metric Name             Metric Unit Metric Value
+    ----------------------- ----------- ------------
+    DRAM Frequency                  Ghz        11.76
+    SM Frequency                    Ghz         2.22
+    Elapsed Cycles                cycle      4666331
+    Memory Throughput                 %        63.17
+    DRAM Throughput                   %        16.28
+    Duration                         ms         2.10
+    L1/TEX Cache Throughput           %        68.76
+    L2 Cache Throughput               %        21.29
+    SM Active Cycles              cycle   4283897.44
+    Compute (SM) Throughput           %        63.17
+    ----------------------- ----------- ------------
+
+    INF   Compute and Memory are well-balanced: To reduce runtime, both computation and memory traffic must be reduced. 
+          Check both the Compute Workload Analysis and Memory Workload Analysis sections.                               
+
+    Section: Compute Workload Analysis
+    -------------------- ----------- ------------
+    Metric Name          Metric Unit Metric Value
+    -------------------- ----------- ------------
+    Executed Ipc Active   inst/cycle         2.73
+    Executed Ipc Elapsed  inst/cycle         2.50
+    Issue Slots Busy               %        62.62
+    Issued Ipc Active     inst/cycle         2.73
+    SM Busy                        %        62.62
+    -------------------- ----------- ------------
+
+    INF   Shared FMA Heavy is the highest-utilized pipeline (55.5%) based on elapsed cycles in the workload, taking     
+          into account the rates of its different instructions. It is a physical pipe and shared by the logical pipes   
+          FMA Heavy and ALU Lite. It's dominated by its FMA Heavy sub-pipeline. It is well-utilized, but should not be  
+          a bottleneck. Based on the number of executed instructions, the highest utilized pipeline (63.2%) is LSU. It  
+          executes load/store memory operations. Comparing the two, the overall pipeline utilization appears to be      
+          caused by frequent, low-latency instructions. See the Profiling Guide                                         
+          (https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#metrics-decoder) or hover over the          
+          pipeline name to understand the workloads handled by each pipeline. The Instruction Statistics section shows  
+          the mix of executed instructions for this workload. Check the Warp State Statistics section for which         
+          reasons cause warps to stall.                                                                                 
+
+    Section: Memory Workload Analysis
+    --------------------------------------- ----------- ------------
+    Metric Name                             Metric Unit Metric Value
+    --------------------------------------- ----------- ------------
+    Local Memory Spilling Requests                                 0
+    Local Memory Spilling Request Overhead            %            0
+    L2 Sector Promotion Misses                        %            0
+    Shared Memory Spilling Requests                                0
+    Shared Memory Spilling Request Overhead           %            0
+    Memory Throughput                           Gbyte/s        61.25
+    Mem Busy                                          %        46.26
+    Max Bandwidth                                     %        63.17
+    L1/TEX Hit Rate                                   %        15.18
+    L2 Persisting Size                            Mbyte         6.29
+    L2 Compression Success Rate                       %            0
+    L2 Compression Ratio                                           0
+    L2 Compression Input Sectors                 sector          248
+    L2 Hit Rate                                       %        88.25
+    Mem Pipes Busy                                    %        63.17
+    --------------------------------------- ----------- ------------
+
+    Section: Warp State Statistics
+    ---------------------------------------- ----------- ------------
+    Metric Name                              Metric Unit Metric Value
+    ---------------------------------------- ----------- ------------
+    Warp Cycles Per Issued Instruction             cycle         5.67
+    Warp Cycles Per Executed Instruction           cycle         5.67
+    Avg. Active Threads Per Warp                                31.90
+    Avg. Not Predicated Off Threads Per Warp                    31.81
+    ---------------------------------------- ----------- ------------
+
+    WRN   The optional metric smsp__pcsamp_sample_count could not be found. Collecting it as an additional metric could 
+          enable the rule to provide more guidance.                                                                     
+
+    Section: Instruction Statistics
+    ---------------------------------------- ----------- ------------
+    Metric Name                              Metric Unit Metric Value
+    ---------------------------------------- ----------- ------------
+    Local Memory Spilling Requests                  byte            0
+    Shared Memory Spilling Requests                 byte            0
+    Avg. Executed Instructions Per Scheduler        inst   2920317.25
+    Executed Instructions                           inst    420525684
+    Avg. Issued Instructions Per Scheduler          inst   2920317.25
+    Issued Instructions                             inst    420525684
+    ---------------------------------------- ----------- ------------
+
+    Section: Occupancy
+    ------------------------------- ----------- ------------
+    Metric Name                     Metric Unit Metric Value
+    ------------------------------- ----------- ------------
+    Max Active Clusters                 cluster            0
+    Max Cluster Size                      block            8
+    Overall GPU Occupancy                     %            0
+    Cluster Occupancy                         %            0
+    Block Limit Barriers                  block           24
+    Block Limit SM                        block           24
+    Block Limit Registers                 block            1
+    Block Limit Shared Mem                block            1
+    Block Limit Warps                     block            3
+    Theoretical Active Warps per SM        warp           16
+    Theoretical Occupancy                     %        33.33
+    Achieved Occupancy                        %        32.20
+    Achieved Active Warps Per SM           warp        15.46
+    ------------------------------- ----------- ------------
+
+    OPT   Est. Local Speedup: 66.67%                                                                                    
+          The 4.00 theoretical warps per scheduler this kernel can issue according to its occupancy are below the       
+          hardware maximum of 12. This kernel's theoretical occupancy (33.3%) is limited by the number of required      
+          registers, and the required amount of shared memory.                                                          
+
+  fused_backward (9, 4, 2)x(512, 1, 1), Context 1, Stream 7, Device 0, CC 12.0
+    Warning: Data collection happened without fixed GPU frequencies. Profiling results may be inconsistent.
+    Section: GPU Speed Of Light Throughput
+    ----------------------- ----------- ------------
+    Metric Name             Metric Unit Metric Value
+    ----------------------- ----------- ------------
+    DRAM Frequency                  Ghz        12.94
+    SM Frequency                    Ghz         2.41
+    Elapsed Cycles                cycle     11706395
+    Memory Throughput                 %        72.42
+    DRAM Throughput                   %        17.07
+    Duration                         ms         4.85
+    L1/TEX Cache Throughput           %        77.90
+    L2 Cache Throughput               %        33.32
+    SM Active Cycles              cycle  10874032.08
+    Compute (SM) Throughput           %        72.42
+    ----------------------- ----------- ------------
+
+    INF   Compute and Memory are well-balanced: To reduce runtime, both computation and memory traffic must be reduced. 
+          Check both the Compute Workload Analysis and Memory Workload Analysis sections.                               
+
+    Section: Compute Workload Analysis
+    -------------------- ----------- ------------
+    Metric Name          Metric Unit Metric Value
+    -------------------- ----------- ------------
+    Executed Ipc Active   inst/cycle         2.89
+    Executed Ipc Elapsed  inst/cycle         2.69
+    Issue Slots Busy               %        67.24
+    Issued Ipc Active     inst/cycle         2.89
+    SM Busy                        %        67.24
+    -------------------- ----------- ------------
+
+    INF   Shared FMA Heavy is the highest-utilized pipeline (56.7%) based on elapsed cycles in the workload, taking     
+          into account the rates of its different instructions. It is a physical pipe and shared by the logical pipes   
+          FMA Heavy and ALU Lite. It's dominated by its FMA Heavy sub-pipeline. It is well-utilized, but should not be  
+          a bottleneck. Based on the number of executed instructions, the highest utilized pipeline (72.4%) is LSU. It  
+          executes load/store memory operations. Comparing the two, the overall pipeline utilization appears to be      
+          caused by frequent, low-latency instructions. See the Profiling Guide                                         
+          (https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#metrics-decoder) or hover over the          
+          pipeline name to understand the workloads handled by each pipeline. The Instruction Statistics section shows  
+          the mix of executed instructions for this workload. Check the Warp State Statistics section for which         
+          reasons cause warps to stall.                                                                                 
+
+    Section: Memory Workload Analysis
+    --------------------------------------- ----------- ------------
+    Metric Name                             Metric Unit Metric Value
+    --------------------------------------- ----------- ------------
+    Local Memory Spilling Requests                                 0
+    Local Memory Spilling Request Overhead            %            0
+    L2 Sector Promotion Misses                        %            0
+    Shared Memory Spilling Requests                                0
+    Shared Memory Spilling Request Overhead           %            0
+    Memory Throughput                           Gbyte/s        70.67
+    Mem Busy                                          %        44.85
+    Max Bandwidth                                     %        72.42
+    L1/TEX Hit Rate                                   %        25.76
+    L2 Persisting Size                            Mbyte         6.29
+    L2 Compression Success Rate                       %            0
+    L2 Compression Ratio                                           0
+    L2 Compression Input Sectors                 sector          240
+    L2 Hit Rate                                       %        91.56
+    Mem Pipes Busy                                    %        72.42
+    --------------------------------------- ----------- ------------
+
+    Section: Warp State Statistics
+    ---------------------------------------- ----------- ------------
+    Metric Name                              Metric Unit Metric Value
+    ---------------------------------------- ----------- ------------
+    Warp Cycles Per Issued Instruction             cycle         5.41
+    Warp Cycles Per Executed Instruction           cycle         5.42
+    Avg. Active Threads Per Warp                                31.82
+    Avg. Not Predicated Off Threads Per Warp                    31.59
+    ---------------------------------------- ----------- ------------
+
+    WRN   The optional metric smsp__pcsamp_sample_count could not be found. Collecting it as an additional metric could 
+          enable the rule to provide more guidance.                                                                     
+
+    Section: Instruction Statistics
+    ---------------------------------------- ----------- ------------
+    Metric Name                              Metric Unit Metric Value
+    ---------------------------------------- ----------- ------------
+    Local Memory Spilling Requests                  byte            0
+    Shared Memory Spilling Requests                 byte            0
+    Avg. Executed Instructions Per Scheduler        inst   7860508.19
+    Executed Instructions                           inst   1131913180
+    Avg. Issued Instructions Per Scheduler          inst   7865974.19
+    Issued Instructions                             inst   1132700284
+    ---------------------------------------- ----------- ------------
+
+    Section: Occupancy
+    ------------------------------- ----------- ------------
+    Metric Name                     Metric Unit Metric Value
+    ------------------------------- ----------- ------------
+    Max Active Clusters                 cluster            0
+    Max Cluster Size                      block            8
+    Overall GPU Occupancy                     %            0
+    Cluster Occupancy                         %            0
+    Block Limit Barriers                  block           24
+    Block Limit SM                        block           24
+    Block Limit Registers                 block            1
+    Block Limit Shared Mem                block            1
+    Block Limit Warps                     block            3
+    Theoretical Active Warps per SM        warp           16
+    Theoretical Occupancy                     %        33.33
+    Achieved Occupancy                        %        32.61
+    Achieved Active Warps Per SM           warp        15.65
+    ------------------------------- ----------- ------------
+
+    OPT   Est. Local Speedup: 66.67%                                                                                    
+          The 4.00 theoretical warps per scheduler this kernel can issue according to its occupancy are below the       
+          hardware maximum of 12. This kernel's theoretical occupancy (33.3%) is limited by the number of required      
+          registers, and the required amount of shared memory.                                                          
+

@@ -1,0 +1,72 @@
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/torch/cuda/__init__.py:68: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+==WARNING== Note: Running with unmodified GPU clocks. If not controlled otherwise, profiling results may be inconsistent.
+==PROF== Connected to process 1682 (/home/fzwin/.local/share/uv/python/cpython-3.10.12-linux-x86_64-gnu/bin/python3.10)
+/home/fzwin/environments/mace_cueq_oeq/lib/python3.10/site-packages/openequivariance/__init__.py:38: UserWarning: Precompiled extension shared object not found.
+For these reasons, falling back to JIT compilation of OpenEquivariance extension. If another process holds the build lock, this waits up to 5 minutes, then raises an error naming the lock file to delete.
+
+  from openequivariance._torch.TensorProduct import TensorProduct
+==PROF== Profiling "fused_forward": 0%....50%....100% - 6 passes
+==PROF== Profiling "fused_backward": 0%....50%....100% - 6 passes
+==PROF== Disconnected from process 1682
+[1682] python3.10@127.0.0.1
+  fused_forward (9, 4, 2)x(512, 1, 1), Context 1, Stream 7, Device 0, CC 12.0
+    Warning: Data collection happened without fixed GPU frequencies. Profiling results may be inconsistent.
+    Section: Command line profiler metrics
+    --------------------------------------------------- ----------- ------------
+    Metric Name                                         Metric Unit Metric Value
+    --------------------------------------------------- ----------- ------------
+    gpu__time_duration.sum                                       ms         1.72
+    l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum                  10172318
+    smsp__inst_executed.sum                                    inst    420525684
+    smsp__inst_executed_op_global_atom.sum                               (!) n/a
+    smsp__inst_executed_op_global_ld.sum                       inst      5363784
+    smsp__inst_executed_op_global_red.sum                      inst            0
+    smsp__inst_executed_op_local_ld.sum                        inst      1467888
+    smsp__inst_executed_op_local_st.sum                        inst      1342176
+    smsp__inst_executed_op_shared_ld.sum                       inst     42241248
+    smsp__inst_executed_op_shared_st.sum                       inst      1859976
+    smsp__inst_executed_pipe_adu.sum                           inst       677304
+    smsp__inst_executed_pipe_alu.sum                           inst     55711608
+    smsp__inst_executed_pipe_cbu.sum                           inst      1693400
+    smsp__inst_executed_pipe_fma.sum                           inst    305317464
+    smsp__inst_executed_pipe_fmaheavy.sum                      inst    165741207
+    smsp__inst_executed_pipe_lsu.sum                           inst     53022960
+    smsp__inst_executed_pipe_uniform.sum                       inst        15264
+    smsp__inst_executed_pipe_xu.sum                            inst         3456
+    smsp__sass_inst_executed_op_shared_ld.sum                  inst     42241248
+    smsp__sass_thread_inst_executed_op_fadd_pred_on.sum        inst            0
+    smsp__sass_thread_inst_executed_op_ffma_pred_on.sum        inst   8239054848
+    smsp__sass_thread_inst_executed_op_fmul_pred_on.sum        inst   1085927424
+    --------------------------------------------------- ----------- ------------
+
+  fused_backward (9, 4, 2)x(512, 1, 1), Context 1, Stream 7, Device 0, CC 12.0
+    Warning: Data collection happened without fixed GPU frequencies. Profiling results may be inconsistent.
+    Section: Command line profiler metrics
+    --------------------------------------------------- ----------- ------------
+    Metric Name                                         Metric Unit Metric Value
+    --------------------------------------------------- ----------- ------------
+    gpu__time_duration.sum                                       ms         4.46
+    l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum                  10586947
+    smsp__inst_executed.sum                                    inst   1131913180
+    smsp__inst_executed_op_global_atom.sum                               (!) n/a
+    smsp__inst_executed_op_global_ld.sum                       inst      5536584
+    smsp__inst_executed_op_global_red.sum                      inst      4849632
+    smsp__inst_executed_op_local_ld.sum                        inst      5825312
+    smsp__inst_executed_op_local_st.sum                        inst      4142400
+    smsp__inst_executed_op_shared_ld.sum                       inst     70664448
+    smsp__inst_executed_op_shared_st.sum                       inst      1859976
+    smsp__inst_executed_pipe_adu.sum                           inst      1066536
+    smsp__inst_executed_pipe_alu.sum                           inst    243141972
+    smsp__inst_executed_pipe_cbu.sum                           inst     18216819
+    smsp__inst_executed_pipe_fma.sum                           inst    696980476
+    smsp__inst_executed_pipe_fmaheavy.sum                      inst    438749691
+    smsp__inst_executed_pipe_lsu.sum                           inst    152481920
+    smsp__inst_executed_pipe_uniform.sum                       inst        20160
+    smsp__inst_executed_pipe_xu.sum                            inst         3456
+    smsp__sass_inst_executed_op_shared_ld.sum                  inst     70664448
+    smsp__sass_thread_inst_executed_op_fadd_pred_on.sum        inst   1833077760
+    smsp__sass_thread_inst_executed_op_ffma_pred_on.sum        inst  17440825344
+    smsp__sass_thread_inst_executed_op_fmul_pred_on.sum        inst   2364883968
+    --------------------------------------------------- ----------- ------------
+
