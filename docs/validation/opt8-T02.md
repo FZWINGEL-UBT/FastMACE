@@ -6,11 +6,11 @@ the record ("Yes build it"); it is **opt-in, not a default**. Runs and scripts:
 
 **Verdict: exact, gate passed, NVE drift unchanged.**
 
-| Cell | Local RTX 5060 Ti (sm_120), b/a, both build orders | Colab L4 (sm_89), b/a, order ab |
-| --- | --- | --- |
-| NaNbO3 | **0.928 / 0.927** (−7.2 %) | 0.977 |
-| NbCl5 | **0.970 / 0.964** (−3.3 %) | 0.991 |
-| NaCl | 0.991 / 1.000 (neutral) | not run |
+| Cell | Local RTX 5060 Ti (sm_120), b/a, both build orders | murphy RTX 4000 Ada (sm_89), b/a, both build orders | Colab L4 (sm_89), b/a, order ab |
+| --- | --- | --- | --- |
+| NaNbO3 | **0.928 / 0.927** (−7.2 %) | **0.958 / 0.958** (−4.2 %) | 0.977 |
+| NbCl5 | **0.970 / 0.964** (−3.3 %) | **0.983 / 0.982** (−1.8 %) | 0.991 |
+| NaCl | 0.991 / 1.000 (neutral) | **0.980 / 0.983** (−1.9 %) | not run |
 
 - **POLAR-1-S:** takes the record; the A/B is neutral (1.004).
 - **OMOL-0:** takes the record, but it is **3.5 % slower** there (1.035).
@@ -111,6 +111,26 @@ These match T01b's subgraph savings: 0.66 ms (NbCl5) and 1.10 ms (NaNbO3) per fo
 
 ## Other GPUs and models
 
+**murphy, RTX 4000 Ada Generation (sm_89, driver 595.99.02, NAS `mace_cueq_oeq`; source `059b2cfa`;
+`ada-murphy-059b2cfa/`, script `ada.sh`).** Run by the conductor on 27 October 2026, 19:08–19:36 UTC, after the
+idle check (no GPU compute process, no other user's job); every job repeated the check.
+- **Force/stress gate** (`--engine fastmace --rewrites fused_folded_forward=on`, reference `mace_cueq_latest`):
+  passed. Ratios to the float32 ASE calculator's error, energy / forces / stress: NaCl 0.70 / 1.03 / 0.98,
+  NbCl5 0.12 / 1.04 / 0.35, NaNbO3 0.29 / 0.99 / 0.52.
+- **GPU test** (the child script of `tests/gpu/test_fused_folded_forward_cuda.py`, run directly with the hybrid
+  environment because it has no pytest; the first `check` entry in `run.log` is that missing pytest): passed.
+  `w` and the message are bitwise equal to the chain for K = 65; for K = 9 they differ by FP32 rounding from
+  cuBLAS on sm_89 and pass the tolerances.
+- **A/B** (12 blocks of 300 steps, both build orders; median ms, a = off, b = on):
+
+  | Cell | Order ab: a / b, b/a | Order ba: a / b, b/a | Pair ratios |
+  | --- | --- | --- | --- |
+  | NaNbO3 | 18.13 / 17.37, **0.958** | 18.28 / 17.50, **0.958** | 0.955–0.963 |
+  | NbCl5 | 21.92 / 21.54, **0.983** | 22.01 / 21.62, **0.982** | 0.981–0.984 |
+  | NaCl | 2.867 / 2.811, **0.980** | 2.859 / 2.809, **0.983** | 0.976–0.985 |
+
+  Every block pair favours the record on all three cells. Unlike the local GPU, NaCl gains too.
+
 **Colab L4 (sm_89, driver 580.82.07; `colab-l4-9eb1ab1e/`).** The workstations were busy (leto with the
 conductor's check, leeloo and coraline with other users), so the Ada check ran on Colab. One A/B per cell,
 order ab:
@@ -139,8 +159,8 @@ stopped afterwards; 1.2 compute units.
 ## Decisions for the owner
 
 1. **Default or not.** The record stays opt-in, as instructed. On this PC it is −7.2 % (NaNbO3) and −3.3 %
-   (NbCl5) per MD step; on an Ada-class L4 it is −2.3 % and −0.9 %. It is neutral on NaCl and POLAR-1-S, and
-   +3.5 % on OMOL-0. A default would need a rule: the MH-1 width, or a gain model from the folded width and the
+   (NbCl5) per MD step; on the RTX 4000 Ada (murphy) −4.2 %, −1.8 % and −1.9 % (NaCl), on an Ada-class L4
+   −2.3 % and −0.9 %. It is neutral on NaCl locally and on POLAR-1-S, and +3.5 % on OMOL-0. A default would need a rule: the MH-1 width, or a gain model from the folded width and the
    edge count.
 2. **Separate from this record: OMOL-0's default plan fails at setup.** `radial_tables` (default on since
    decision 62) fails its self-check on `omol0-xl` here. The planner's self-check revision (SPEC §9.3 rule 13)
@@ -149,6 +169,7 @@ stopped afterwards; 1.2 compute units.
 
 ## Not done
 
-- No sm_89 A/B on a workstation (all busy); no Colab `ba` order; no NaCl on the L4.
+- No Colab `ba` order and no NaCl on the L4 (the murphy run covers sm_89 in both orders).
+- MH-1 family models were not run on Ada.
 - The POLAR-1-S hot path was not traced further.
 - The CPU full suite: per the conductor, it runs before merging.
