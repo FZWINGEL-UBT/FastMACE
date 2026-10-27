@@ -19,7 +19,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | 5. Planner completion | [phase-5.md](phase-5.md) | **complete**, tag `fastmace-5`; [acceptance report](../docs/validation/phase-5.md) |
 | 6. Release | [phase-6.md](phase-6.md) | **released `v1.0.0`**, PyPI packages and docs live; Python 3.13 public-index hybrid install verified; [release evidence](../docs/validation/release-1.0.0.md) |
 | Optimisation round 5 | [opt-5.md](opt-5.md) | **complete** (26 October 2026); `uses_tf32x3_tile` hybrid SIMT/TC shape dispatch adopted inside `tf32x3_gemms` (`6.90× → 1.52–1.73×` max error ratio vs IEEE, `−31 to −39 %` gate energy offset); `sched_iso` and `x3_pipe` probes recorded; [report](../docs/validation/opt-5.md) |
-| Optimisation round 6 | [opt-6.md](opt-6.md) | started 26 October 2026 (owner). OPT6-T01 falsifier done ([report](../docs/validation/opt6-T01.md)); OPT6-T02 `chunked_conv_backward` built, exact, opt-in: b/a NbCl5 0.977 / 0.980, NaNbO3 0.964 / 0.965, NaCl 1.006 / 1.011 ([report](../docs/validation/opt6-T02.md)); default awaits the owner. OPT6-T04 radial-table stub ceiling running |
+| Optimisation round 6 | [opt-6.md](opt-6.md) | started 26 October 2026 (owner). OPT6-T01 falsifier done ([report](../docs/validation/opt6-T01.md)); OPT6-T02 `chunked_conv_backward` built, exact, opt-in: b/a NbCl5 0.977 / 0.980, NaNbO3 0.964 / 0.965, NaCl 1.006 / 1.011 ([report](../docs/validation/opt6-T02.md)); default awaits the owner. OPT6-T04 radial-table stub ceiling passed: per force call NbCl5 0.928, NaNbO3 0.84, NaCl 0.90 ([report](../docs/validation/opt6-T04.md)); OPT6-T05 (build) next |
 
 ## Workstation availability (owner, 20 October 2026)
 
