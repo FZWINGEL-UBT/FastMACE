@@ -371,6 +371,35 @@ class CompiledModelCache:
 # --------------------------------------------------------------------------- allocator
 
 
+# cuBLAS's float64 emulation (cuBLAS 13; integer Ozaki scheme on INT8 tensor cores), eager: every float64 product
+# (f64-T01: eager 0.80 / 0.55 of the native MD step on NaCl / NbCl5 against 0.86 / 0.67 for the default strategy).
+FP64_EMULATION_SETTINGS = (("CUBLAS_EMULATE_DOUBLE_PRECISION", "1"), ("CUBLAS_EMULATION_STRATEGY", "eager"))
+
+
+def configure_fp64_emulation(environ=None):
+    """Set ``FP64_EMULATION_SETTINGS`` where the environment sets none; returns the values in effect.
+
+    cuBLAS reads them when it creates a handle, so they act only on handles created afterwards: run it before the
+    process's first float64 matrix product (``FixedPlanner.build`` does, for plans with ``fp64_emulation="on"``)."""
+    environ = os.environ if environ is None else environ
+    for key, value in FP64_EMULATION_SETTINGS:
+        environ.setdefault(key, value)
+    return {key: environ.get(key) for key, _ in FP64_EMULATION_SETTINGS}
+
+
+def fp64_emulation_active(device="cuda"):
+    """Whether a float64 matrix product on ``device`` runs cuBLAS's emulated (INT8) kernels: one 512 x 512 x 512
+    product under the profiler, its kernel names checked (the native ones are ``dgemm``/``d884gemm`` kernels)."""
+    import torch
+
+    a = torch.ones((512, 512), dtype=torch.float64, device=device)
+    with torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CUDA]) as profile:
+        a @ a
+        torch.cuda.synchronize(device)
+    names = [event.name.lower() for event in profile.events() if event.device_type.name == "CUDA"]
+    return any("imma" in name or "emulat" in name for name in names)
+
+
 def configure_allocator(enabled=True, environ=None, torch_version=None):
     """Set ``PYTORCH_CUDA_ALLOC_CONF`` to ``ALLOCATOR_SETTINGS`` unless already set; returns the value in effect.
 
@@ -390,7 +419,8 @@ def configure_allocator(enabled=True, environ=None, torch_version=None):
 
 
 __all__ = [
-    "ALLOCATOR_MIN_TORCH", "ALLOCATOR_SETTINGS", "CompiledEntry", "CompiledModelCache", "compile_model",
-    "configure_allocator", "cpu_cueq_problems", "install_engine_patches", "mark_edges_dynamic", "naive_cueq",
+    "ALLOCATOR_MIN_TORCH", "ALLOCATOR_SETTINGS", "CompiledEntry", "CompiledModelCache", "FP64_EMULATION_SETTINGS",
+    "compile_model", "configure_allocator", "configure_fp64_emulation", "cpu_cueq_problems", "fp64_emulation_active",
+    "install_engine_patches", "mark_edges_dynamic", "naive_cueq",
     "private_copy", "restore_cueq_conv_fusion", "restore_oeq_wrappers", "simplify_traceable",
 ]

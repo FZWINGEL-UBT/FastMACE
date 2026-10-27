@@ -72,6 +72,7 @@ AUTO_RULES = MappingProxyType({
     "EngineConfig.async_output": "on_with_graph_engine",
     "EngineConfig.cueq_conv_fusion": "on_for_plain_cueq_unless_reproducible",
     "EngineConfig.expandable_segments": "on_for_torch_2_14_unless_alloc_conf_set",
+    "EngineConfig.fp64_emulation": "on_for_float64_cuda_with_reduced_rate_fp64_unless_reproducible",
     "PrecisionConfig.dtype": "float32_for_hybrid_float64_for_cueq",
     "NeighbourConfig.sort_receivers": "on_for_hybrid_graph_engine",
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
@@ -91,7 +92,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.segmented_first_sum": "on_with_reassociate_first_and_sort_receivers",
     "RewriteConfig.streaming_conv": "on_for_hybrid_with_stage1_fold_cutoff_and_sort_receivers_if_model_supports",
     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
-    "RewriteConfig.radial_tables": "on_with_fold_cutoff_float32_unless_reproducible",
+    "RewriteConfig.radial_tables": "on_with_fold_cutoff_unless_reproducible",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
@@ -107,8 +108,8 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.tf32x3_gemms": "never_automatic",
     "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
-    "RewriteConfig.species_tables": "on_float32_unless_reproducible_if_model_supports",
-    "RewriteConfig.fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
+    "RewriteConfig.species_tables": "on_unless_reproducible_if_model_supports",
+    "RewriteConfig.fold_readout_tail": "on_with_block_linear_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
@@ -323,6 +324,30 @@ def _stress_text(config):
     return "(" + ", ".join(f"{value:.6g}" for value in stress) + ") (external_stress_GPa, Voigt)"
 
 
+def _cuda_available():
+    import torch
+
+    return torch.cuda.is_available()
+
+
+# EngineConfig.fp64_emulation's threshold (decision 63): emulate where float64 runs below 1/8 of float32.
+FP64_EMULATION_RATE = 1 / 8
+
+
+def _check_fp64_emulation(device):
+    """Warn when the plan asked for cuBLAS's float64 emulation but float64 products still run native kernels: a
+    cuBLAS handle created before ``configure_fp64_emulation`` (another plan or a float64 product earlier in the
+    process) keeps its mode. The run stays correct; only the speed-up is missing."""
+    import warnings
+
+    from fastmace.model import compile as compiling
+
+    if not compiling.fp64_emulation_active(device):
+        warnings.warn("EngineConfig.fp64_emulation='on' did not take effect: float64 products run native cuBLAS "
+                      "kernels (a cuBLAS handle existed before the plan set CUBLAS_EMULATE_DOUBLE_PRECISION; plan "
+                      "first in a fresh process to get the emulation)", RuntimeWarning, stacklevel=3)
+
+
 def _why(request, rule, explanation):
     """The reason string of one resolved option."""
     if request == "auto":
@@ -490,6 +515,39 @@ class FixedPlanner:
             return compiling.configure_allocator(environ=self.environ, torch_version=self.torch_version)
         return self.environ.get("PYTORCH_CUDA_ALLOC_CONF")
 
+    def _fp64_emulation(self, book, dtype, reproducible, hardware):
+        """``EngineConfig.fp64_emulation`` (owner decision 63, 27 October 2026): cuBLAS's float64 emulation on INT8
+        tensor cores where it pays and keeps float64 accuracy (f64-T01: 1.2-1.8x per MD step on the RTX 5060 Ti,
+        products more accurate than native DGEMM). A general hardware rule, measured: on where the GPU's float64
+        multiply-add rate is below ``FP64_EMULATION_RATE`` of its float32 rate (consumer and workstation parts,
+        about 1/64; data-centre parts are about 1/2). The compute capability cannot tell (sm_120 is 12.0)."""
+        rule = AUTO_RULES["EngineConfig.fp64_emulation"]
+        request = self.engine.fp64_emulation
+        cuda = self._device_type() == "cuda"
+        if request == "on" and reproducible:
+            book.refuse("EngineConfig.fp64_emulation='on' is not available with reproducible=True (the reproducible "
+                        "plans keep native float64 products)", "fp64-emulation-reproducible")
+        if not cuda:
+            value, why = False, "CPU device: no cuBLAS"
+        elif dtype != "float64":
+            value, why = False, f"{dtype} plan: no float64 matrix products"
+        elif reproducible:
+            value, why = False, "reproducible=True keeps native float64 products"
+        elif request == "off":
+            value, why = False, "requested off"
+        elif not _cuda_available():
+            value, why = False, "CUDA is not available in this process: the float64 rate cannot be measured"
+        else:
+            from fastmace.kernels.triton.fp64_rate import fp64_rate_ratio
+
+            ratio = fp64_rate_ratio(self.engine.device)
+            value = request == "on" or ratio < FP64_EMULATION_RATE
+            why = (f"float64 rate 1/{1 / ratio:.0f} of float32 (measured), "
+                   + ("CUBLAS_EMULATE_DOUBLE_PRECISION=1, CUBLAS_EMULATION_STRATEGY=eager before the first float64 "
+                      "product" if value else f"at least {FP64_EMULATION_RATE}: native products"))
+        book.decide("EngineConfig.fp64_emulation", _toggle(value), _why(request, rule, why))
+        return _toggle(value)
+
     def hardware(self) -> Hardware:
         """``detect_hardware`` of the engine's device, after ``configure_process``."""
         self.configure_process()
@@ -592,6 +650,7 @@ class FixedPlanner:
         values = self._stage1(book, hybrid, npt)
         self._stage2(book, values, traits, explicit, model_label)
         self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible, hardware.compute_capability)
+        fp64_emulation = self._fp64_emulation(book, dtype, reproducible, hardware)
         rewrite_values = {name: _toggle(values[name]) for name in REWRITE_FIELDS}
 
         rewrites = self.rewrites
@@ -710,7 +769,8 @@ class FixedPlanner:
             rewrites=dataclasses.replace(rewrites, **rewrite_values),
             engine=dataclasses.replace(engine, backend=backend, pipelined=_toggle(pipelined),
                                        async_output=_toggle(async_output), cueq_conv_fusion=_toggle(bool(fusion)),
-                                       expandable_segments=expandable, **phase_3["engine"]),
+                                       expandable_segments=expandable, fp64_emulation=fp64_emulation,
+                                       **phase_3["engine"]),
             precision=dataclasses.replace(self.precision, dtype=dtype, **phase_3["precision"]),
             neighbours=dataclasses.replace(self.neighbours, sort_receivers=_toggle(values["sort_receivers"]),
                                            gpu_neighbour_list=_toggle(values["gpu_neighbour_list"]),
@@ -978,11 +1038,13 @@ class FixedPlanner:
                 book.refuse("RewriteConfig.tf32x3_gemms and grouped_launch both reroute the block linears' products",
                             "rewrite-conflict")
         # Owner decision 61 (27 October 2026): the certified class bounds float32 rounding, so float32 plans only.
-        # Decision 62: "auto" is on with fold_cutoff in float32 plans that are not reproducible.
-        if v["radial_tables"] and "radial_tables" not in explicit and (dtype != "float32" or reproducible):
+        # Decisions 62 and 63 (27 October 2026): "auto" is on with fold_cutoff in float32 and float64 plans that are
+        # not reproducible (float64 tables are held to float64 rounding, f64-T01).
+        if v["radial_tables"] and "radial_tables" not in explicit and (dtype not in ("float32", "float64")
+                                                                       or reproducible):
             v["radial_tables"] = False
             v["_why"]["radial_tables"] += ("; off: reproducible=True keeps MACE's radial chain" if reproducible
-                                           else f"; off: {dtype} plans keep MACE's radial chain (decision 62)")
+                                           else f"; off: {dtype} plans keep MACE's radial chain")
         # Float64 tables (f64-T01): an explicit "on" is allowed in float64 plans outside reproducible ones.
         if v["radial_tables"] and (dtype not in ("float32", "float64") or (dtype == "float64" and reproducible)):
             book.refuse(f"RewriteConfig.radial_tables='on' needs float32, or float64 outside reproducible plans, not "
@@ -990,8 +1052,10 @@ class FixedPlanner:
         # OPT-DEF-2 (owner, 21 October 2026): the rounding-class OPT-T08 records keep the stock path in float64 and
         # reproducible plans. species_tables too: its tables are not bitwise the per-atom products on the GPU
         # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).
+        # Decision 63 (27 October 2026): also on in float64 plans that are not reproducible (f64-T01: forces within
+        # the stock float64 backends' own scatter).
         for name in ("species_tables", "fold_readout_tail", "fold_product_linear"):
-            if v[name] and name not in explicit and (dtype != "float32" or reproducible):
+            if v[name] and name not in explicit and (dtype not in ("float32", "float64") or reproducible):
                 v[name] = False
                 v["_why"][name] += ("; off: reproducible=True keeps the stock products" if reproducible
                                     else f"; off: {dtype} keeps the stock products (rounding class)")
@@ -1116,6 +1180,10 @@ class FixedPlanner:
         refuse_unsupported(book, plan.integrator, atoms, plan.optimizer)
         book.raise_refusals()
         self.configure_process(plan.engine)
+        if plan.engine.fp64_emulation == "on":  # owner decision 63: before the model's first float64 product
+            from fastmace.model import compile as compiling
+
+            compiling.configure_fp64_emulation(self.environ)
 
         from fastmace.rewrites import registry as reg
 
@@ -1130,6 +1198,8 @@ class FixedPlanner:
         field = _with_d3(field, plan, atoms)
         state = SimulationState.from_atoms(atoms, field.device, plan.integrator.seed, compute_stress=npt)
         integrator = build_stepper(state, plan, temperature_K=temperature_K)
+        if plan.engine.fp64_emulation == "on":
+            _check_fp64_emulation(field.device)
         if plan.tier == COMPILED_TIER:
             from fastmace.engine.compiled import CompiledEngine
 

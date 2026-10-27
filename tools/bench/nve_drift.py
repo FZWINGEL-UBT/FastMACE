@@ -38,6 +38,10 @@ def parse_args(argv=None):
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="RewriteConfig overrides on the default plan, e.g. tf32x3_gemms=on (OPT4-T03)")
+    p.add_argument("--precision", choices=("float32", "float64"), default="float32",
+                   help="The ForceField's force precision (f64-T01: float64 plans)")
+    p.add_argument("--engine", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="EngineConfig overrides, e.g. fp64_emulation=off (f64-T01)")
     return p.parse_args(argv)
 
 
@@ -56,7 +60,7 @@ def main(argv=None):
     import torch
 
     import fastmace as fm
-    from fastmace.config import RewriteConfig
+    from fastmace.config import EngineConfig, RewriteConfig
     from fastmace.integrators.base import CONSERVED_KEY
     from fastmace.quick import nve_max_temperature_K
 
@@ -75,9 +79,11 @@ def main(argv=None):
     frontends.thermalize(atoms, args.temperature_K, args.seed)
     n = len(atoms)
     started = time.perf_counter()
-    sim = fm.Simulation(atoms, fm.ForceField(fm.load(args.model), atoms, rewrites=RewriteConfig(**rewrites)),
-                        integrator=fm.integrators.NVE(timestep_fs=args.timestep_fs), seed=args.seed,
-                        workload=fm.Workload(max_temperature_K=nve_max_temperature_K(atoms)))
+    engine_options = dict(item.split("=", 1) for item in args.engine)
+    field = fm.ForceField(fm.load(args.model), atoms, precision=args.precision, rewrites=RewriteConfig(**rewrites))
+    sim = fm.Simulation(atoms, field, integrator=fm.integrators.NVE(timestep_fs=args.timestep_fs), seed=args.seed,
+                        workload=fm.Workload(max_temperature_K=nve_max_temperature_K(atoms)),
+                        engine=EngineConfig(**engine_options) if engine_options else None)
     setup_s = time.perf_counter() - started
     engine = sim._engine
 
@@ -97,7 +103,8 @@ def main(argv=None):
     record = dict(tool="nve_drift", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                   python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), model=args.model,
                   structure=structure, natoms=n, temperature_K=args.temperature_K, timestep_fs=args.timestep_fs,
-                  ps=args.ps, every=args.every, rewrites=rewrites, plan=sim.plan.describe(), setup_s=setup_s,
+                  ps=args.ps, every=args.every, rewrites=rewrites, precision=args.precision,
+                  engine_options=engine_options, plan=sim.plan.describe(), setup_s=setup_s,
                   seconds=seconds,
                   drift_meV_per_atom_per_ps=1e3 * slope, rms_meV_per_atom=1e3 * rms, range_meV_per_atom=1e3 * spread,
                   rows_step_conserved_kinetic_eV_per_atom=rows, gpu=torch.cuda.get_device_name(),

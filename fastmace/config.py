@@ -227,6 +227,9 @@ class EngineConfig:
     dynamo_cache_size_limit: int = 64
     # PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True before the first CUDA allocation (ALLOCATOR_SETTINGS).
     expandable_segments: Toggle = "auto"
+    # cuBLAS's float64 emulation on INT8 tensor cores (integer Ozaki scheme; f64-T01, owner decision 63): float64
+    # plans that are not reproducible, on GPUs without full-rate FP64 (compute capability minor != 0).
+    fp64_emulation: Toggle = "auto"
     # Release cached free blocks between a stage's eager warm-up and its capture.
     empty_cache_before_capture: bool = True
     # Eager warm-ups after the first capture run inside the graph pool.

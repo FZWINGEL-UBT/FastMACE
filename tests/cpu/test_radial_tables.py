@@ -53,7 +53,7 @@ def test_the_record_is_certified_opt_in_and_deterministic():
     assert "certified" in reg.EXACTNESS
     from fastmace.planner import fixed
 
-    assert fixed.AUTO_RULES["RewriteConfig.radial_tables"] == "on_with_fold_cutoff_float32_unless_reproducible"
+    assert fixed.AUTO_RULES["RewriteConfig.radial_tables"] == "on_with_fold_cutoff_unless_reproducible"
 
 
 def test_tables_are_certified_and_the_forces_follow_the_network():

@@ -212,8 +212,8 @@ FASTMACE_ONLY_DEFAULTS = {
     # Owner decision, 21 October 2026 (OPT-DEF-2): OPT2-T03's tiles wherever fused_folded_backward is (MH-1 class),
     # and the OPT-T08 records where the model takes them, float32, not reproducible.
     "folded_backward_tiles": "on_with_fused_folded_backward",
-    "species_tables": "on_float32_unless_reproducible_if_model_supports",
-    "fold_readout_tail": "on_with_block_linear_float32_unless_reproducible_if_model_supports",
+    "species_tables": "on_unless_reproducible_if_model_supports",
+    "fold_readout_tail": "on_with_block_linear_unless_reproducible_if_model_supports",
     "fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
     # Owner decision 57, 24 October 2026 (OPT4-T04): the generic MACE family only, float32, not reproducible.
     "grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
@@ -224,7 +224,7 @@ FASTMACE_ONLY_DEFAULTS = {
     # Owner decision 60, 27 October 2026 (OPT6-T02): with streaming_conv and fused_folded_backward (MH-1 class).
     "chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
     # Owner decision 62, 27 October 2026 (OPT6-T05): with fold_cutoff (MH-1 class), float32, not reproducible.
-    "radial_tables": "on_with_fold_cutoff_float32_unless_reproducible",
+    "radial_tables": "on_with_fold_cutoff_unless_reproducible",
 }
 # Where each FastMACE-only default applies (labels): the factored interaction, or the OPT-T08 records' own scope
 # (docs/design/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
@@ -244,10 +244,10 @@ def fastmace_only_expected(name, label, backend):
     """(on, switched off by stage 2) of a FastMACE-only default for main.py's defaults on ``backend``."""
     applies = label in APPLIES[name]
     hybrid = backend == "hybrid"
-    # species_tables is noted in stage 1 for any backend (plain cuEq drops it later, as float64), so stage 2 sees it
-    # on plain cuEq too; the others follow hybrid-only rewrites.
+    # species_tables is noted in stage 1 for any backend, so stage 2 sees it on plain cuEq too, and since owner
+    # decision 63 (27 October 2026) it stays on there in float64; the others follow hybrid-only rewrites.
     reaches_stage2 = hybrid or name == "species_tables"
-    return hybrid and applies, reaches_stage2 and not applies
+    return reaches_stage2 and applies, reaches_stage2 and not applies
 
 
 def expected(label, backend):
@@ -282,7 +282,7 @@ def test_default_plans_equal_main_py(label, backend):
     assert {name for name in OPTIONS if got[name]} == want_on
     assert {k: v for k, v in dict(plan.auto_options_off).items() if k not in FASTMACE_ONLY_DEFAULTS} == want_off
     # The FastMACE-only defaults are on where they apply on the hybrid (float32); stage 2 drops them where the
-    # model does not take them; plain cuEq (float64) keeps the rounding-class ones off.
+    # model does not take them; plain cuEq (float64) keeps species_tables where it applies (decision 63).
     for name in FASTMACE_ONLY_DEFAULTS:
         want_on, want_dropped = fastmace_only_expected(name, label, backend)
         assert on(getattr(plan.rewrites, name)) == want_on, name
@@ -801,9 +801,11 @@ def test_build_on_the_cpu_equals_a_hand_built_engine(tiny_checkpoint, quiet_lice
     record = constraints.ProcessRecord()
     engine = p.build(plan, loaded, atoms, temperature_K=300.0, constraints=record)
     assert isinstance(engine, GraphEngine) and engine.mode == "pipelined" and record.engines == 1
-    # main.py --backend cueq: no MH-1 or linear rewrites; the strain patch is process-wide (both ensembles).
+    # main.py --backend cueq: no MH-1 or block-linear rewrites; the strain patch is process-wide (both ensembles);
+    # species_tables applies to MH-1 in float64 since owner decision 63.
     applied = set(engine.force_field.info()["rewrites"])
-    assert applied == ({"generic_species_skip"} if family == "density" else set()) | {"single_graph_strain"}
+    family_rewrites = {"generic_species_skip"} if family == "density" else {"species_tables"}
+    assert applied == family_rewrites | {"single_graph_strain"}
 
     # The same parts by hand (T13's test helper), from the plan's resolved configs.
     names = engine.force_field.resolution.enabled
@@ -863,3 +865,35 @@ def test_plan_record_names_the_scheme_that_runs(integrator, name):
     assert choice == name, (choice, reason)
     if name == "Langevin":
         assert str(reason) == f"NVT, fixcm={integrator.fixcm} (workflow.GPUEngine)"
+
+
+@pytest.mark.parametrize(("ratio", "want"), [(1 / 64, "on"), (1 / 2, "off")])
+def test_fp64_emulation_follows_the_measured_float64_rate(monkeypatch, ratio, want):
+    """Owner decision 63 (f64-T01): float64 plans emulate float64 products where the GPU's float64 rate is below
+    1/8 of its float32 rate; float32 and reproducible plans never do."""
+    from fastmace.kernels.triton import fp64_rate
+
+    monkeypatch.setattr(fixed, "_cuda_available", lambda: True)
+    monkeypatch.setattr(fp64_rate, "fp64_rate_ratio", lambda device: ratio)
+    float64 = PrecisionConfig(dtype="float64")
+    item, choice, reason = decision(plan_for("mh1-r2scan", precision=float64), "EngineConfig.fp64_emulation")
+    assert choice == want and "measured" in str(reason), reason
+    assert plan_for("mh1-r2scan", precision=float64).engine.fp64_emulation == want
+    assert plan_for("mh1-r2scan").engine.fp64_emulation == "off"  # float32
+    off = plan_for("mh1-r2scan", precision=float64, engine=EngineConfig(fp64_emulation="off"))
+    assert off.engine.fp64_emulation == "off"
+
+
+def test_fp64_emulation_without_cuda_is_off():
+    plan = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"))
+    if not torch.cuda.is_available():
+        assert plan.engine.fp64_emulation == "off"
+        assert "not available" in str(decision(plan, "EngineConfig.fp64_emulation")[2])
+
+
+def test_configure_fp64_emulation_keeps_the_callers_settings():
+    from fastmace.model import compile as compiling
+
+    environ = {"CUBLAS_EMULATION_STRATEGY": "performant"}
+    assert compiling.configure_fp64_emulation(environ) == {"CUBLAS_EMULATE_DOUBLE_PRECISION": "1",
+                                                           "CUBLAS_EMULATION_STRATEGY": "performant"}
