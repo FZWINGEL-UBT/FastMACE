@@ -50,6 +50,10 @@ _PROBE_ROWS = 7
 # The interaction forward that passes the one-hot node_attrs as the residual input when ``species_residual`` is set
 # (fastmace.rewrites.mh1.modules.cutoff_folded_forward); a forward without the marker is refused.
 READS_SPECIES_RESIDUAL = "fastmace_species_residual"
+# Prototype (fp32 profile, 29 October 2026; not a RewriteConfig field): with an int, fold_readout_tail also keeps only
+# that head's hidden columns of a multi-head nonlinear readout (MH-1: 16 of 96), so the folded products are 16 wide.
+# Exact for that head only: the readout's other output columns become meaningless. None (the default) keeps all.
+TAIL_HEAD = None
 
 
 def _modules():
@@ -198,9 +202,41 @@ def fold_tail(model):
         else:
             raise ValueError("fold_readout_tail: the last skip_tp is neither a block linear nor a species table")
         setattr(readout, attribute, torch.nn.Identity())
+        if TAIL_HEAD is not None and getattr(readout, "num_heads", 1) > 1:
+            _slice_head(readout, product, last, int(TAIL_HEAD), m)
     index = len(model.interactions) - 1
     return [f"products.{index}.linear", f"interactions.{index}.skip_tp",
             f"readouts.{len(model.readouts) - 1}.{attribute}"]
+
+
+def _slice_head(readout, product, last, head, m):
+    """TAIL_HEAD: keep one head's hidden columns in the folded products and the readout (exact for that head)."""
+    import torch
+
+    if type(readout).__name__ != "NonLinearReadoutBlock":
+        raise ValueError("TAIL_HEAD needs MACE's NonLinearReadoutBlock")
+    hidden = product.linear.segments_out[0][1]
+    width = hidden // readout.num_heads
+    cols = slice(head * width, (head + 1) * width)
+    weight = product.linear.weight_0
+    eye = torch.eye(hidden, dtype=weight.dtype, device=weight.device)
+    if torch.any(readout.linear_2(torch.zeros_like(eye[:1])) != 0):
+        raise ValueError("TAIL_HEAD: the readout's linear_2 has a bias")
+    out = readout.linear_2(eye)  # [hidden, heads]: the effective matrix (normalisation included)
+    probe = torch.randn((7, hidden), generator=torch.Generator().manual_seed(5), dtype=torch.float64).to(weight)
+    heads = torch.full((7,), head, dtype=torch.long, device=weight.device)
+    before = readout(probe, heads)[:, head]
+    lin = torch.nn.Linear(width, out.shape[1], bias=False).to(device=weight.device, dtype=weight.dtype)
+    lin.weight.copy_(out[cols].t())
+    act = readout.non_linearity
+    readout.non_linearity = m.HeadActivation(act.acts[0])
+    readout.linear_2 = lin
+    readout.num_heads = 1
+    after = readout(probe[:, cols])[:, head]
+    if not torch.allclose(before, after, rtol=1e-5, atol=1e-6 * float(before.abs().max())):
+        raise ValueError(f"TAIL_HEAD: head {head} differs after slicing ({float((before - after).abs().max())})")
+    product.linear = m.compose(product.linear, m.slice_columns(product.linear, cols.start, width))
+    last.skip_tp = m.compose(last.skip_tp, m.slice_columns(last.skip_tp, cols.start, width))
 
 
 def _tail_selfcheck(original, rewritten, context):

@@ -136,6 +136,28 @@ def compose(first, second):
     return composed
 
 
+class HeadActivation(torch.nn.Module):
+    """The readout's scalar activation on the active head's hidden columns only (TAIL_HEAD prototype)."""
+
+    def __init__(self, act):
+        super().__init__()
+        self.act = act
+
+    def forward(self, x):
+        return self.act(x)
+
+
+def slice_columns(layer, start, width):
+    """A BlockLinear that keeps columns ``start:start + width`` of a one-segment scalar layer's output."""
+    (offset, mul, dim), = layer.segments_out
+    if offset != 0 or dim != 1:
+        raise ValueError("slice_columns: the layer's output is not one scalar segment")
+    weight = torch.zeros((mul, width), dtype=layer.weight_0.dtype, device=layer.weight_0.device)
+    weight[start:start + width] = torch.eye(width, dtype=weight.dtype, device=weight.device)
+    return BlockLinear(layer.transpose_out, layer.transpose_out, layer.segments_out, ((0, width, 1),),
+                       [(0, 0, weight)])
+
+
 class Chain:
     """``second(first(x))`` as a plain picklable callable (a self-check reference, not a module)."""
 
