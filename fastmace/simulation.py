@@ -97,6 +97,7 @@ from fastmace.config import (
     IntegratorConfig,
     Mode,
     NeighbourConfig,
+    PolarConfig,
     RunnerConfig,
 )
 
@@ -213,7 +214,8 @@ def phase_5_pending(adaptation: AdaptationConfig, calibration: CalibrationConfig
             f"AdaptationConfig({', '.join(f'{name}={getattr(adaptation, name)!r}' for name in unsupported)}): "
             "runtime adaptation implements owner decisions 52 and 53 only (SPEC §18): "
             + "; ".join(f"{name} one of {ADAPTATION_SUPPORTED[name]}" for name in unsupported)
-            + "; or pass adapt='off'", code=PHASE_5_PENDING_CODES["adaptation"]))
+            + " (refused with adapt='off' too: leave these fields at their defaults)",
+            code=PHASE_5_PENDING_CODES["adaptation"]))
     if calibration.choose is not True:
         reasons.append(Reason("CalibrationConfig(choose=False): the calibration's measurement breaks the backend's tie "
                               "(owner decision 55, D5 (a)); a calibration that only reports, D5 (b), was not chosen",
@@ -1690,7 +1692,8 @@ class Simulation:
             setup_s=self._setup_s,
             outputs=outputs, charge_spin=(model.charge, model.spin_multiplicity) if reads_charge else None,
             dispersion=getattr(self.force_field, "dispersion", None),
-            warnings=tuple(getattr(self.force_field, "dispersion_warnings", ())),
+            warnings=tuple(getattr(self.force_field, "dispersion_warnings", ()))
+            + tuple(getattr(self.force_field, "polar_warnings", ())),
             cell_heights_A=tuple(float(h) for h in heights), cutoff_A=self.force_field.traits.r_max,
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,
             start_step=int(self._engine.state.step) if start_step is None else start_step)
@@ -1909,6 +1912,11 @@ class Simulation:
                   "rewrites": "auto" if field.rewrites == "auto" else dataclasses.asdict(field.rewrites)}
         if getattr(field, "dispersion", None) is not None:
             record["dispersion"] = dataclasses.asdict(field.dispersion)
+        polar = getattr(field, "polar", None)
+        if polar is not None and polar != PolarConfig():  # absent at the default, so older records are unchanged
+            record["polar"] = {"fukui_regularisation": polar.fukui_regularisation,
+                               "dipole_cap": None if polar.dipole_cap is None else list(polar.dipole_cap),
+                               "kspace_headroom": polar.kspace_headroom}
         return record
 
     @classmethod
@@ -2342,23 +2350,45 @@ def _same_reference(first, second):
     return None not in records and records[0].content_digest() == records[1].content_digest()
 
 
+# RewriteConfig fields a simulation.json may hold that are gone: selfcheck_cache (checkpoint 2: no self-check cache).
+_REMOVED_REWRITE_FIELDS = ("selfcheck_cache",)
+
+
+def _record_rewrites(rewrites):
+    """The ``RewriteConfig`` (or ``"auto"``) of a ``simulation.json`` record, without removed fields."""
+    if rewrites == "auto":
+        return rewrites
+    from fastmace.config import RewriteConfig
+
+    return RewriteConfig(**{name: value for name, value in rewrites.items() if name not in _REMOVED_REWRITE_FIELDS})
+
+
 def _record_force_field(record):
     """The ``ForceField`` of a ``simulation.json`` record: its model loaded again (by SHA-256), precision,
     rewrites, species and the D3 record (3b-T04)."""
     from fastmace.model.forcefield import ForceField
 
-    rewrites = record["force_field"]["rewrites"]
-    if rewrites != "auto":
-        from fastmace.config import RewriteConfig
-
-        rewrites = RewriteConfig(**rewrites)
+    rewrites = _record_rewrites(record["force_field"]["rewrites"])
     dispersion = record["force_field"].get("dispersion")
     if dispersion is not None:
         from fastmace.longrange.d3 import D3
 
         dispersion = D3(**dispersion)
     return ForceField(_load_model(record["model"]), precision=record["force_field"]["precision"], rewrites=rewrites,
-                      species=record["force_field"]["species"], dispersion=dispersion)
+                      species=record["force_field"]["species"], dispersion=dispersion,
+                      polar=_record_polar(record["force_field"]))
+
+
+def _record_polar(force_field_record):
+    """The ``PolarConfig`` of ``simulation.json``'s force field, or ``None`` (the default) without one."""
+    polar = force_field_record.get("polar")
+    if polar is None:
+        return None
+    from fastmace.config import PolarConfig
+
+    cap = polar.get("dipole_cap")
+    return PolarConfig(fukui_regularisation=polar["fukui_regularisation"],
+                       dipole_cap=None if cap is None else tuple(cap), kspace_headroom=polar["kspace_headroom"])
 
 
 def _restart_atoms(structure, stored):
@@ -2397,6 +2427,8 @@ def _integrator(record):
     fields = dict(record["fields"])
     if record["class"] == "Langevin":  # a record from before the option ran ASE's projection (3-T22c)
         fields.setdefault("fixcm_projection", "ase")
+    if record["class"] == "LangevinBAOAB":  # a record from before kept fixcm=True, which BAOAB never applied
+        fields["fixcm"] = False
     if isinstance(fields.get("external_stress_GPa"), list):
         fields["external_stress_GPa"] = tuple(fields["external_stress_GPa"])
     return classes[record["class"]](**fields)

@@ -119,3 +119,5 @@ print(run.summary)
 
 See [FastMACE in five minutes](../quickstart.md) for the arguments and the
 command-line equivalent, `fastmace md`.
+
+See also: [API: ASE front end](../api/ase.md), [Integrators and optimisers](../reference/integrators.md).

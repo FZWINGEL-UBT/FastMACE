@@ -39,7 +39,7 @@ def add_arguments(parser):
     model.add_argument("--precision", choices=PRECISIONS, default="float32", help="force-field precision "
                        "(default float32)")
     model.add_argument("--dispersion", choices=DISPERSION_CHOICES,
-                       help="D3(BJ) dispersion: expanded from the head's training functional (SPEC §7.7)")
+                       help="D3(BJ) dispersion: expanded from the head's training functional")
     model.add_argument("--d3-functional", metavar="NAME", help="the D3 parameter set, with --dispersion d3bj")
     relax = parser.add_argument_group("relaxation")
     relax.add_argument("--optimizer", choices=OPTIMIZERS, default=DEFAULT_OPTIMIZER,

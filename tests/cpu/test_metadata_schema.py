@@ -243,7 +243,20 @@ def test_plan_and_its_revision_chain():
 def test_precision_records_float64_energy_from_the_plan():
     record = _full_record()
     assert record["precision"] == {"force": "float64", "integration": "float64", "tf32": False,
-                                   "float64_energy": True}
+                                   "tf32_requested": False, "float64_energy": True}
+
+
+def test_precision_tf32_is_the_process_flag_not_the_config(monkeypatch):
+    """PrecisionConfig.tf32 only labels the plan; the record's tf32 is what PyTorch's matmuls run with."""
+    import torch
+
+    before = torch.get_float32_matmul_precision()
+    torch.set_float32_matmul_precision("high")  # a user's script enabling TF32 process-wide
+    try:
+        record = _full_record()
+    finally:
+        torch.set_float32_matmul_precision(before)
+    assert record["precision"]["tf32"] is True and record["precision"]["tf32_requested"] is False
 
 
 def test_identity_and_reference_record():

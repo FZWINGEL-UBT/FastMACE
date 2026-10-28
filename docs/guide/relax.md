@@ -57,7 +57,8 @@ filters are refused with the reason.
 
 ## Anneal and quench protocols
 
-`schedule="anneal"` (or the profiles `slow`, `fast`, `ultrafast`) runs a
+`schedule=fm.protocols.PROFILES["anneal"].schedule` (or the profiles
+`slow`, `fast`, `ultrafast`; in TOML just `schedule = "anneal"`) runs a
 temperature schedule; `fm.protocols.ramp` and `fm.protocols.hold` build your
 own:
 
@@ -68,3 +69,5 @@ sim.run(schedule=anneal)
 
 A protocol file's `[relax]` and `[quench]` tables take the same optimizer
 names.
+
+See also: [Integrators and optimisers](../reference/integrators.md), [Command line and TOML](../reference/cli.md).

@@ -17,7 +17,7 @@ from fastmace.cli import md as md_command
 HELP = "write a commented TOML of fm.md's arguments for fastmace run (takes fastmace md's flags)"
 
 HEADER = """\
-# fastmace run: the arguments of fm.md (SPEC §7.7), written by fastmace init.
+# fastmace run: the arguments of fm.md, written by fastmace init.
 # Run it with: fastmace run run.toml
 # A commented line shows an argument at its default or with an example; uncomment it to set it.
 # Paths are taken relative to the directory fastmace run starts in."""
@@ -55,11 +55,12 @@ SCALARS = (
     ("seed", "Noise seed; without it one is drawn and recorded in metadata.json.", "1"),
     ("check", '"skip" (default), "gate" (the gate on this structure, opt-in) or "allow_unavailable".', '"skip"'),
     ("output", "Output directory, default ./<structure stem>.fastmace/; or the [output] table below.", '"run/"'),
-    ("mode", 'Execution mode: unset lets the planner choose ("graph", or "compiled" where rules 4 and 9 need '
-             'it); or "graph", "compiled", "eager", "reference".', '"compiled"'),
-    ("allow_reference", "Allow the reference tier where rule 1 needs it (SPEC §9.3).", "false"),
+    ("mode", 'Execution mode: unset lets the planner choose ("graph", or "compiled" where the model or the '
+             'workload needs it); or "graph", "compiled", "eager", "reference".', '"compiled"'),
+    ("allow_reference", "Recorded in the plan only: it lifts no refusal (mode \"reference\" works without "
+                        "it).", "false"),
     ("calibrate", "Time hybrid against plain cuEq on this structure first and take the faster where the rules tie "
-                  "(SPEC §9.1; four child builds; MD only).", "true"),
+                  "(four child builds; MD only).", "true"),
 )
 
 # (comment, commented table lines): the records, after every top-level key; "" is an empty comment line.
@@ -86,7 +87,7 @@ TABLES = (
     ("Planner options (the fields of fastmace.config.EngineConfig and NeighbourConfig); without them the\n"
      "# default planner's.",
      ("[engine]", 'backend = "cueq"', "", "[neighbours]", "skin = 0.3")),
-    ("Safety options (fastmace.config.FallbackConfig, GateConfig, RunnerConfig; SPEC §9.4, §12.3, §8.7).",
+    ("Safety options (the fields of fastmace.config.FallbackConfig, GateConfig and RunnerConfig).",
      ("[fallback]", 'fallback = "auto"', "", "[gate]", "cpu_float64_time_limit_s = 300.0", "",
       "[runner]", "stall_timeout_s = 1800.0")),
 )

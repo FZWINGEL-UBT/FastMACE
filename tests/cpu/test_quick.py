@@ -503,3 +503,16 @@ def test_no_refusal_is_left_in_fm_md(tmp_path):
     with pytest.raises(Exception) as raised:
         md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, ensemble="NVE", steps=3, seed=1)
     assert not isinstance(raised.value, PlanRefused)
+
+
+def test_displace_declares_its_largest_delta(tmp_path):
+    """fm.md sets Workload.max_displacement_A from the Displace moves, so mc=Displace(...) plans."""
+    from fastmace import mc, quick
+
+    moves = [mc.Displace(delta_A=0.1, every=2, attempts=3), mc.Displace(delta_A=0.25, every=5, attempts=1), _swap()]
+    assert quick.max_displacement_A(moves) == 0.25
+    assert quick.max_displacement_A([_swap()]) is None
+    with pytest.raises(Exception) as raised:  # the absent model, not the workload
+        quick.md(_atoms(), model=str(tmp_path / "absent.model"), trusted=True, mc=moves[0], temperature_K=300.0,
+                 steps=3, seed=1)
+    assert "max_displacement_A" not in str(raised.value)
