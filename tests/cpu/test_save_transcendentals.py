@@ -42,3 +42,16 @@ def test_the_partitioner_keeps_the_gradients_and_restores_the_op_list():
     assert torch.equal(got, want)  # the same operations, only saved instead of recomputed: bitwise on the CPU
     torch.testing.assert_close(got, eager, rtol=1e-12, atol=1e-12)
     assert partitioners.get_default_op_list is original
+
+
+def test_the_partitioner_pickles_by_name():
+    """Inductor's FX-graph cache pickles the compile options; a local class made every compile bypass the cache
+    (decision 65's local check, 28 October 2026)."""
+    import pickle
+
+    from fastmace.rewrites import inductor
+
+    partitioner = inductor.save_transcendentals_partitioner()
+    copy = pickle.loads(pickle.dumps(partitioner))
+    assert type(copy) is type(partitioner) is inductor.SaveTranscendentals
+    assert copy.uuid() == inductor.SAVE_TRANSCENDENTALS_UUID

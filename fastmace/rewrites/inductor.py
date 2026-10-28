@@ -82,6 +82,12 @@ PARTITIONER_SOURCES = {
 
 
 def _partitioner_class():
+    """The ``SaveTranscendentals`` class, built on first use (torch is imported late) and published as this
+    module's attribute: Inductor's FX-graph cache pickles the compile options, so the class must be importable
+    by name (``__getattr__`` below builds it in a fresh process)."""
+    cls = globals().get("SaveTranscendentals")
+    if cls is not None:
+        return cls
     from torch._inductor.custom_graph_pass import CustomPartitionerFn
 
     class SaveTranscendentals(CustomPartitionerFn):
@@ -109,7 +115,16 @@ def _partitioner_class():
         def uuid(self):
             return SAVE_TRANSCENDENTALS_UUID
 
+    SaveTranscendentals.__module__ = __name__
+    SaveTranscendentals.__qualname__ = "SaveTranscendentals"
+    globals()["SaveTranscendentals"] = SaveTranscendentals
     return SaveTranscendentals
+
+
+def __getattr__(name):
+    if name == "SaveTranscendentals":
+        return _partitioner_class()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def save_transcendentals_partitioner():
