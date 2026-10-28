@@ -155,7 +155,7 @@ fastmace run --resume RUN_DIR [--steps N]
 | --- | --- | --- | --- |
 | `CONFIG.toml` | a file, `-`, or a shipped protocol name | | the run file; `-` reads standard input (as TOML); a `.yaml` or `.yml` file is read as YAML |
 | `--resume RUN_DIR` | directory | | continues the protocol run in `RUN_DIR`; not together with `CONFIG.toml` |
-| `--steps N` | int ≥ 1 | the whole run | runs at most `N` MD steps, writes a restart and stops; makes the run a protocol run (below) |
+| `--steps N` | int ≥ 1 | the whole run | runs at most `N` MD steps, writes a restart and stops; makes the run a protocol run (below). A `steps` key in the file is the run's length; `--steps` shortens this piece of it |
 | `--output DIR` | directory | the file's `output` | the output directory, in place of the file's (also replaces `directory` in an `[output]` table) |
 | `--calibrate` | | off | the file's `calibrate = true`: times hybrid against plain cuEquivariance on this structure before the run; refused with `--resume` |
 

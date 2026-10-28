@@ -32,11 +32,11 @@ when you build the record, before anything is loaded. An option the plan
 cannot honour raises `PlanRefused` with the reason when the `Simulation` is
 built, before the first step.
 
-**A record you pass replaces the default one as a whole.** Without
-`engine=`, the planner uses `EngineConfig()` on a machine with CUDA and
-`EngineConfig(device="cpu", compile_mode="none")` without it. If you pass an
-`EngineConfig` on a CPU-only machine, set `device="cpu"` and
-`compile_mode="none"` yourself.
+**A record you pass replaces the default one as a whole**, so set every
+field you need in one `EngineConfig`. Without `engine=`, a `Simulation` uses
+`EngineConfig()`, on `cuda:0`. Only `fm.ForceField.evaluate`, which takes no
+`engine=`, falls back to `EngineConfig(device="cpu", compile_mode="none")`
+on a machine without CUDA.
 
 For `"auto"`, `"on"` and `"off"` see the
 [reference overview](index.md#auto-on-and-off). Each resolved value and its
@@ -79,7 +79,7 @@ reason is in `sim.plan.describe(full=True)`, under the key
 | --- | --- | --- | --- | --- |
 | `backend` | `"auto"`, `"hybrid"`, `"cueq"` | `"auto"`: `hybrid` when OpenEquivariance can build, the device is CUDA, MACE was not imported before FastMACE, and the process has not compiled a plain cuEq model; else `cueq`, with the reason | Chooses the model backend. | `reproducible=True` in the workload resolves `auto` to `cueq` and refuses `hybrid`. `hybrid` on a CPU device is refused. The reference tier always uses MACE's stock cuEq model. |
 | `compile_mode` | `"default"`, `"none"` | `"default"` | `"default"` compiles the model with `torch.compile`. `"none"` runs it uncompiled. | The eager and reference tiers set `"none"` themselves. If the installed MACE lacks the compile interface, the planner sets `"none"` and records why. With `"none"` on the graph tier, the uncompiled model is still captured in CUDA graphs. |
-| `device` | a torch device string | `"cuda:0"` | The device of the model and the simulation state. | Without `engine=`, a machine without CUDA gets `"cpu"`. |
+| `device` | a torch device string | `"cuda:0"` | The device of the model and the simulation state. | `fm.ForceField.evaluate` uses `"cpu"` on a machine without CUDA. |
 | `pipelined` | `"auto"`, `"on"`, `"off"` | `"auto"`: on for MD, unless `speculative_graph` is set | Launches the force stage of a step before the host has read the step's neighbour flags. The step is checked while the force stage runs. A step that needed a rebuild, or more edges than were padded, is restored and redone. | Off for relaxations (an explicit `"on"` there is refused). `"on"` together with `speculative_graph=True` is refused. The reference tier turns it off. |
 | `async_output` | `"auto"`, `"on"`, `"off"` | `"auto"`: on for MD and relaxations | Copies thermo samples and trajectory frames behind their step and writes them while the next steps run. | Off for one-off evaluations (`fm.calc`, `ForceField.evaluate`). |
 | `speculative_graph` | `True`, `False` | `False` | One combined graph per step (integrator and force stage), checked one step later and rolled back when a rebuild was needed. | NVT with a fixed cell only: refused with NPT and for relaxations. Turns `pipelined` off. Opt-in. |
@@ -143,5 +143,5 @@ reason is in `sim.plan.describe(full=True)`, under the key
   missing or MACE was imported first. `fastmace doctor` names the reason.
 - **Float64 on consumer GPUs.** `fp64_emulation="auto"` already turns on
   where it pays. Set `"off"` to compare against native float64 products.
-- **CPU runs.** Pass `EngineConfig(device="cpu", compile_mode="none")`, or
-  pass no `engine=` at all.
+- **CPU runs** (testing only; FastMACE's engines are for NVIDIA GPUs). Pass
+  `EngineConfig(device="cpu", compile_mode="none")`.

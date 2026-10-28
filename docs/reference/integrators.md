@@ -134,7 +134,7 @@ fm.integrators.LangevinBAOAB(timestep_fs=1.0, temperature_K=300, friction_per_fs
 | `barostat_tau_fs` | fs, > 0, or `None` | `None` | Barostat time constant, ASE's `P_tau`. | `None` is ASE's default, 20 `T_tau` (about 10.2 ps with `fm.md`'s friction). |
 | `barostat_mass_factor` | > 0 | 1.0 | Factor on ASE's heuristic barostat mass, ASE's `P_mass_factor`. | ASE's mass gives a cell period of about `P_tau`/4. |
 | `disable_cell_langevin` | bool | `False` | No friction and noise on the cell degrees of freedom. | As ASE. |
-| `fixcm` | bool | `True` | Recorded; see the note below. | |
+| `fixcm` | `False` | `False` | BAOAB does not remove centre-of-mass motion; `True` is refused. | See the note below. |
 | `max_volume_ratio` | > 1, or `None` | 20.0 | Stop with `CellDivergedError` once the volume leaves [V0/ratio, V0·ratio]. V0 is the starting volume. | `None` turns the check off. |
 | `max_cell_length_A` | Å, > 0, or `None` | 1000.0 | Stop with `CellDivergedError` once a cell vector is longer than this. | float32 coordinates still resolve 6e-5 Å at 1000 Å. |
 
@@ -143,9 +143,11 @@ a vapour at low pressure expands without bound until the coordinates lose
 their precision.
 
 **`fixcm` in `LangevinBAOAB`.** ASE's `LangevinBAOAB` does not remove the
-centre-of-mass motion, and neither does FastMACE's port: `fixcm` does not
-change the dynamics. It does count for MC moves, which treat the run as one
-with a fixed centre of mass (see [MC](mc.md#velocity-treatments)).
+centre-of-mass motion, and neither does FastMACE's port, so the record takes
+`fixcm=False` only. MC moves under BAOAB therefore treat the run as one
+without a fixed centre of mass (see [MC](mc.md#velocity-treatments)). A
+restart written before this rule, which recorded `fixcm=True`, resumes with
+`False`; its dynamics were the same.
 
 The drag term in the full-cell barostat is the corrected one. ASE 3.27's
 variant, which applies a trace term to all nine drag elements, stays an

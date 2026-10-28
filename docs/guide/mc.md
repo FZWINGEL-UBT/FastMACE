@@ -15,7 +15,7 @@ captured graph**, so a swap does not cost a re-capture. The species superset
 | --- | --- |
 | `fm.mc.Swap(pairs=[("O", "Cl")], every=100, attempts=50)` | swap the species of two atoms; `velocities="exchange"` (default), `"rescale"`, `"redraw"` or `"redraw_all"` |
 | `fm.mc.Transmute(species=("Na", "K"), every=..., attempts=..., mu={...})` | semi-grand canonical species change; `mu` are configurational chemical-potential differences in eV, `fm.mc.configurational_mu` converts full ones |
-| `fm.mc.Displace(delta_A=0.1, every=..., attempts=...)` | displace one atom in a sphere; `adaptive=True` tunes δ during equilibration |
+| `fm.mc.Displace(delta_A=0.1, every=..., attempts=...)` | displace one atom in a sphere; `adaptive=True` retunes δ after every block (equilibration only; sample with a fixed δ) |
 
 Each attempt is accepted by the Metropolis rule at the thermostat's current
 target temperature. The thermo output has `mc_<move>_attempted` and

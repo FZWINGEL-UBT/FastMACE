@@ -265,7 +265,8 @@ files above:
 `protocol.json` keys: `protocol_record_version` (1), `source`, `structure`,
 `repeat`, `atoms`, `timestep_fs`, `relax` and `relaxation` (settings and
 summary), `quench` and `quench_result`, `mc`, `min_mc_temperature_K`,
-`dispersion`, `pieces` (each `first_step`, `last_step`, `wall_s`,
+`md_steps` (the run's MD steps for a run without a schedule, so that
+`--resume` continues to it; `null` with a schedule), `dispersion`, `pieces` (each `first_step`, `last_step`, `wall_s`,
 `counters`), `counters` (the sums of `neighbour_rebuilds`, `d3_builds`,
 `d3_rebuilds`, `d3_build_s`), and `status`:
 

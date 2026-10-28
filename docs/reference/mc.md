@@ -117,8 +117,9 @@ so use an adaptive move for equilibration and a fixed one for sampling.
 
 Displacements need `fm.Workload(max_displacement_A=...)`, because the
 neighbour-list skin is sized for them (2δ is added to the skin). They are
-refused with a variable cell (NPT). `fm.md` does not set
-`max_displacement_A`, so run displacement moves through `fm.Simulation`.
+refused with a variable cell (NPT). `fm.md` sets `max_displacement_A` to the
+largest `delta_A` of its `Displace` moves; with `fm.Simulation`, pass it in
+the `Workload`.
 
 An attempt that would need a neighbour-list rebuild, or more edges than the
 captured graph holds, is redone on the host with the same random numbers.
@@ -144,10 +145,9 @@ The integrator's centre-of-mass setting limits the choice:
   or `"redraw_all"`.
 - `"redraw_all"` under `fixcm` draws (3N − 3)·k_B T of kinetic energy. It
   needs the Langevin noise projection `fixcm_projection="mass_weighted"`,
-  which is what `"auto"` gives under NVT `Langevin` with `fixcm` on. Under
-  `LangevinBAOAB` (its `fixcm` defaults to `True` and its projection resolves
-  to `"ase"`), `"redraw_all"` is refused, so swaps there use `"exchange"` and
-  transmutations need `fixcm=False`.
+  which is what `"auto"` gives under NVT `Langevin` with `fixcm` on.
+  `LangevinBAOAB` never fixes the centre of mass (`fixcm=False`), so its
+  moves follow the rules without `fixcm`.
 
 ## Random numbers and seeds
 
