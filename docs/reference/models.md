@@ -213,15 +213,32 @@ contribute exactly zero.
   cell); the compiled plain cuEquivariance backend, which returns zero forces
   for PolarMACE. The hybrid backend is exact.
 - PolarMACE NPT stress has an extra "experimental" report line: it was
-  validated against finite differences on NaCl only.
+  validated against finite differences on NaCl and NbCl5 3×3×3 only.
 
 ### `PolarConfig`
 
 `fastmace.config.PolarConfig` holds PolarMACE's options; it has no effect on
 other models. The defaults reproduce the released model. The two stabilising
 options are MACE pull request 1762, open upstream; they change the model, so
-they are opt-in only. `fm.md`, `Simulation` and the TOML files take no
-`PolarConfig` and always run the defaults.
+they are opt-in only. Pass the record to the force field:
+
+```python
+from fastmace.config import PolarConfig
+
+model = fm.load("polar1-s")
+ff = fm.ForceField(model, atoms, polar=PolarConfig(fukui_regularisation=0.1, dipole_cap=(0.5, 2.0)))
+sim = fm.Simulation(atoms, ff, integrator=..., seed=1)
+```
+
+!!! warning "Not tested"
+    The PR 1762 options are wired through the planner, the gate's float64
+    reference, `simulation.json` and resume, and they are part of the
+    force-field identity. No PolarMACE run with them has been validated.
+    The run report carries a "not tested" warning whenever they are set.
+
+A non-default `PolarConfig` on a model that is not PolarMACE raises
+`ValueError`. `fm.md` and the TOML files take no `PolarConfig` and run the
+defaults.
 
 | Option | Values / units | Default | What it does | Notes |
 | --- | --- | --- | --- | --- |

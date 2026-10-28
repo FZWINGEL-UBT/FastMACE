@@ -14,7 +14,7 @@ settings on [Environment and cache](environment.md).
 | Where you set it | What it takes | Page |
 | --- | --- | --- |
 | `fm.load(label, head=..., ...)` | the model, head, charge, spin, trust | [Models, D3, PolarMACE and schedules](models.md) |
-| `fm.ForceField(model, atoms, precision=..., rewrites=..., dispersion=...)` | force precision, a `RewriteConfig`, D3 | [Rewrites and precision](rewrites.md) |
+| `fm.ForceField(model, atoms, precision=..., rewrites=..., dispersion=..., polar=...)` | force precision, a `RewriteConfig`, D3, a `PolarConfig` | [Rewrites and precision](rewrites.md), [PolarMACE](models.md#polarconfig) |
 | `fm.Simulation(..., integrator=...)` or `optimizer=...` | an `fm.integrators` or `fm.optimize` record | [Integrators and optimisers](integrators.md) |
 | `fm.Simulation(..., engine=..., neighbours=...)` | `EngineConfig`, `NeighbourConfig` | [Engine and neighbour list](engine.md) |
 | `fm.Simulation(..., mode=..., check=..., workload=..., fallback=..., gate=..., runner=..., adaptation=..., calibration=...)` | the planner's inputs | [Planner, gate and fallback](planner.md) |

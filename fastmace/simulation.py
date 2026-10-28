@@ -97,6 +97,7 @@ from fastmace.config import (
     IntegratorConfig,
     Mode,
     NeighbourConfig,
+    PolarConfig,
     RunnerConfig,
 )
 
@@ -1687,7 +1688,8 @@ class Simulation:
             setup_s=self._setup_s,
             outputs=outputs, charge_spin=(model.charge, model.spin_multiplicity) if reads_charge else None,
             dispersion=getattr(self.force_field, "dispersion", None),
-            warnings=tuple(getattr(self.force_field, "dispersion_warnings", ())),
+            warnings=tuple(getattr(self.force_field, "dispersion_warnings", ()))
+            + tuple(getattr(self.force_field, "polar_warnings", ())),
             cell_heights_A=tuple(float(h) for h in heights), cutoff_A=self.force_field.traits.r_max,
             warmup_steps=reports.DEFAULT_WARMUP_STEPS, window_steps=reports.DEFAULT_WINDOW_STEPS,
             start_step=int(self._engine.state.step) if start_step is None else start_step)
@@ -1906,6 +1908,11 @@ class Simulation:
                   "rewrites": "auto" if field.rewrites == "auto" else dataclasses.asdict(field.rewrites)}
         if getattr(field, "dispersion", None) is not None:
             record["dispersion"] = dataclasses.asdict(field.dispersion)
+        polar = getattr(field, "polar", None)
+        if polar is not None and polar != PolarConfig():  # absent at the default, so older records are unchanged
+            record["polar"] = {"fukui_regularisation": polar.fukui_regularisation,
+                               "dipole_cap": None if polar.dipole_cap is None else list(polar.dipole_cap),
+                               "kspace_headroom": polar.kspace_headroom}
         return record
 
     @classmethod
@@ -2364,7 +2371,20 @@ def _record_force_field(record):
 
         dispersion = D3(**dispersion)
     return ForceField(_load_model(record["model"]), precision=record["force_field"]["precision"], rewrites=rewrites,
-                      species=record["force_field"]["species"], dispersion=dispersion)
+                      species=record["force_field"]["species"], dispersion=dispersion,
+                      polar=_record_polar(record["force_field"]))
+
+
+def _record_polar(force_field_record):
+    """The ``PolarConfig`` of ``simulation.json``'s force field, or ``None`` (the default) without one."""
+    polar = force_field_record.get("polar")
+    if polar is None:
+        return None
+    from fastmace.config import PolarConfig
+
+    cap = polar.get("dipole_cap")
+    return PolarConfig(fukui_regularisation=polar["fukui_regularisation"],
+                       dipole_cap=None if cap is None else tuple(cap), kspace_headroom=polar["kspace_headroom"])
 
 
 def _restart_atoms(structure, stored):
