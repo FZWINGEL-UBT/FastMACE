@@ -56,6 +56,11 @@ def parse_args(argv=None):
     p.add_argument("--a-engine", nargs="*", default=[], metavar="FIELD=true|false",
                    help="Side a's boolean EngineConfig fields (opt-2 OPT2-T04: overlap_rebuild, step_graph)")
     p.add_argument("--b-engine", nargs="*", default=[], metavar="FIELD=true|false", help="Side b's, as --a-engine")
+    p.add_argument("--a-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
+                   help="Module constants set while side a is built (screens; e.g. "
+                        "fastmace.kernels.oeq_streaming.fused_forward:BLOCKS_PER_SM=4), restored after")
+    p.add_argument("--b-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE", help="Side b's, as --a-constant")
+    p.add_argument("--timestep-fs", type=float, default=None, help="Default: IntegratorConfig's (0.5 fs)")
     p.add_argument("--structures", nargs="+", default=["NaCl", "NbCl5"])
     p.add_argument("--temperature-K", type=float, default=300.0)
     p.add_argument("--warmup", type=int, default=300)
@@ -71,9 +76,51 @@ def parse_args(argv=None):
         args.a_engine, args.b_engine = engine_overrides(args.a_engine), engine_overrides(args.b_engine)
     except ValueError as exc:
         p.error(str(exc))
-    if args.a == args.b and args.a_engine == args.b_engine:
+    try:
+        args.a_constant, args.b_constant = constant_overrides(args.a_constant), constant_overrides(args.b_constant)
+    except ValueError as exc:
+        p.error(str(exc))
+    if args.a == args.b and args.a_engine == args.b_engine and args.a_constant == args.b_constant:
         p.error("the two sides have the same rewrite and engine fields")
     return args
+
+
+def constant_overrides(items):
+    """{(module, name): value} of ``MODULE:NAME=VALUE`` items; VALUE is a Python literal of the constant's type."""
+    import ast
+    import importlib
+
+    out = {}
+    for item in items:
+        target, _, value = item.partition("=")
+        module, _, name = target.partition(":")
+        if not module or not name or not value:
+            raise ValueError(f"{item!r}: expected MODULE:NAME=VALUE")
+        current = getattr(importlib.import_module(module), name)
+        new = ast.literal_eval(value)
+        if type(new) is not type(current):
+            raise ValueError(f"{item!r}: {name} is {type(current).__name__}, not {type(new).__name__}")
+        out[(module, name)] = new
+    return out
+
+
+class _Constants:
+    """Sets module constants for one side's build and restores them afterwards."""
+
+    def __init__(self, values):
+        self.values, self.saved = values, {}
+
+    def __enter__(self):
+        import importlib
+        for (module, name), value in self.values.items():
+            owner = importlib.import_module(module)
+            self.saved[(module, name)] = getattr(owner, name)
+            setattr(owner, name, value)
+
+    def __exit__(self, *exc):
+        import importlib
+        for (module, name), value in self.saved.items():
+            setattr(importlib.import_module(module), name, value)
 
 
 def engine_overrides(items):
@@ -117,6 +164,9 @@ def main(argv=None):
                 gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, checkpoint_sha256=sha,
                 sides=fields, engine_sides={"a": args.a_engine, "b": args.b_engine},
+                constant_sides={side: {f"{m}:{n}": v for (m, n), v in values.items()}
+                                for side, values in (("a", args.a_constant), ("b", args.b_constant))},
+                timestep_fs=args.timestep_fs,
                 protocol=protocol.as_dict(), pattern=args.pattern, order=order, precision=args.precision,
                 load=list(os.getloadavg()), structures={})
     for spec in args.structures:
@@ -126,10 +176,12 @@ def main(argv=None):
             started = time.perf_counter()
             rewrites = RewriteConfig(**fields[side]) if fields[side] else "auto"
             field = ForceField(loaded, base, precision=args.precision, rewrites=rewrites)
-            integrator = IntegratorConfig(temperature_K=args.temperature_K)
+            integrator = (IntegratorConfig(temperature_K=args.temperature_K) if args.timestep_fs is None else
+                          IntegratorConfig(temperature_K=args.temperature_K, timestep_fs=args.timestep_fs))
             planner = planners[side]
             plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
-            engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
+            with _Constants(args.a_constant if side == "a" else args.b_constant):
+                engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
             sides[side] = ab_step_time.FastMACESide(engine, torch)
             setup[side] = time.perf_counter() - started
             lines[side] = [line.strip() for line in plan.describe(full=True).splitlines()
