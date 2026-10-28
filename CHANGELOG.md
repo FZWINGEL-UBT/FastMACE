@@ -8,6 +8,12 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- `fm.md(initial_velocities=...)` (TOML `initial_velocities`, `fastmace md --initial-velocities`), opt-in: a
+  structure at rest starts with seeded Maxwell-Boltzmann velocities at the run's starting target
+  (`"maxwell_boltzmann"`) or at a given temperature in K; `"keep"` (default) leaves it at rest as before. Drawn
+  from `seed` on a stream of its own, never for a structure that already moves, and recorded in the report and
+  `metadata.json`'s warnings (owner, 28 October 2026: an option, documented clearly; `docs/guide/md.md`,
+  "Starting velocities").
 - Three float64 speed-ups, **on by default on the measured GPUs** (owner decision 65; `plans/ideas-20261027.md`):
   `EngineConfig.fp64_emulation_mantissa_bits` ("auto" = 56 fixed mantissa bits in cuBLAS's float64 emulation,
   "dynamic" or a bit count from 8 to 128 to choose), `RewriteConfig.w_tables` (per-piece folded radial tables,

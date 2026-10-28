@@ -125,9 +125,46 @@ re-captures the CUDA graphs once, and the change is recorded.
 
 ## Starting velocities
 
-FastMACE draws no starting velocities. A run starts from the momenta stored
-on the structure; most structure files have none, so the atoms start at
-rest and the thermostat heats them. To start warm, set the momenta first:
+By default FastMACE draws no starting velocities. A run starts from the
+momenta stored on the structure; most structure files have none, so the
+atoms start at rest and a Langevin thermostat heats them. CSVR cannot start
+from rest (it rescales velocities, and there are none): it refuses such a
+structure at once with an `InputError`, before anything is compiled.
+
+`fm.md(..., initial_velocities=...)` (TOML key `initial_velocities`,
+`fastmace md --initial-velocities`) changes this. It is opt-in and acts
+**only on a structure at rest** (zero kinetic energy):
+
+| Value | A structure at rest starts with |
+| --- | --- |
+| `"keep"` (default) | no velocities: it starts at rest, as in ASE |
+| `"maxwell_boltzmann"` | Maxwell-Boltzmann velocities at the run's starting target: `temperature_K`, the integrator's, or the schedule's first temperature. Refused when that is 0 K (a schedule from 0 K) and for NVE, which has no target |
+| a float, K | Maxwell-Boltzmann velocities at that temperature; works for NVE and for a schedule that starts at 0 K |
+
+```python
+from fastmace.protocols import ramp
+
+# CSVR heating from 0 K: start the atoms at 10 K, then follow the ramp.
+run = fm.md(atoms, model="mh1", head="matpes_r2scan",
+            integrator=fm.integrators.CSVR(timestep_fs=1.0, temperature_K=0.0, tau_fs=100.0),
+            schedule=ramp(0, 1000, ps=20), initial_velocities=10.0, seed=1, output="heat/")
+```
+
+What to know before using it:
+
+- **Seeded.** The draw uses `seed=` (a drawn seed when `seed` is `None`, recorded in
+  `metadata.json` as always), through its own random stream, so the thermostat noise is
+  the same as without the option. The same seed gives the same starting velocities.
+- **Only at rest.** A structure that already has momenta keeps them; nothing is redrawn.
+- **Recorded.** The report and `metadata.json`'s warnings say which happened, for example
+  `starting velocities: Maxwell-Boltzmann at 10 K, drawn from seed 1`.
+- **What is drawn.** ASE's Maxwell-Boltzmann draw (`thermalize_momenta`, or `MaxwellBoltzmannDistribution` before ASE 3.29), without rescaling to the exact
+  temperature; `FixAtoms` atoms get none. The integrator then treats the momenta as usual:
+  with `fixcm` it removes the total momentum at the start.
+- **`fm.Simulation` does not draw.** The option belongs to `fm.md` (and so `fastmace run` and
+  `fastmace md`); with `Simulation`, set the momenta on the `Atoms` yourself, as below.
+
+To set the momenta yourself instead:
 
 ```python
 import numpy as np

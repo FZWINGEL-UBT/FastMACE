@@ -10,9 +10,10 @@ Schedules, MC moves, explicit integrators and the full D3 record go through ``fa
 is printed by ``fastmace.cli.main`` (exit 1).
 """
 
+import argparse
 import sys
 
-from fastmace.quick import ENSEMBLES
+from fastmace.quick import ENSEMBLES, INITIAL_VELOCITIES
 
 HELP = "run constant-temperature or NVE MD in one command (the CLI face of fm.md)"
 
@@ -35,6 +36,7 @@ _PLAIN = {
     "timestep": "timestep_fs",
     "steps": "steps",
     "seed": "seed",
+    "initial_velocities": "initial_velocities",
     "check": "check",
     "output": "output",
     "sha256": "sha256",
@@ -67,8 +69,22 @@ def add_arguments(parser, *, required=True):
                      help="D3(BJ) dispersion: expanded from the head's training functional")
     run.add_argument("--d3-functional", metavar="NAME", help="the D3 parameter set, with --dispersion d3bj")
     run.add_argument("--seed", type=int, help="noise seed (default: drawn and recorded)")
+    run.add_argument("--initial-velocities", type=_velocities, metavar="keep|maxwell_boltzmann|K",
+                     help="starting velocities of a structure at rest: keep (default, it starts at rest), "
+                          "maxwell_boltzmann (seeded, at the starting target) or a temperature in K")
     run.add_argument("--check", choices=CHECK_CHOICES, help="gate on the structure (default skip; opt-in: gate)")
     run.add_argument("--output", metavar="DIR", help="output directory (default ./<structure stem>.fastmace/)")
+
+
+def _velocities(text):
+    """``--initial-velocities``: a choice of ``INITIAL_VELOCITIES`` or a temperature in K."""
+    if text in INITIAL_VELOCITIES:
+        return text
+    try:
+        return float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"{text!r} is not one of {INITIAL_VELOCITIES} or a temperature in K") \
+            from None
 
 
 def _dispersion(args):

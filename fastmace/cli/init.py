@@ -53,6 +53,9 @@ SCALARS = (
     ("dispersion", "\"d3bj\": the D3(BJ) record of the head's training functional (MACE plus D3);\n"
                    "# a full record is the [dispersion] table below.", '"d3bj"'),
     ("seed", "Noise seed; without it one is drawn and recorded in metadata.json.", "1"),
+    ("initial_velocities", '"keep" (default: a structure at rest starts at rest), "maxwell_boltzmann" (seeded, at '
+                           'the\n# starting target) or a temperature in K; drawn only for a structure at rest.',
+     '"maxwell_boltzmann"'),
     ("check", '"skip" (default), "gate" (the gate on this structure, opt-in) or "allow_unavailable".', '"skip"'),
     ("output", "Output directory, default ./<structure stem>.fastmace/; or the [output] table below.", '"run/"'),
     ("mode", 'Execution mode: unset lets the planner choose ("graph", or "compiled" where the model or the '
