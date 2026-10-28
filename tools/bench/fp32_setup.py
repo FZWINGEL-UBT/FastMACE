@@ -233,6 +233,7 @@ def main(argv=None):
     md_s = time.perf_counter() - md_started
     if profiler is not None:
         profiler.disable()
+        profiler.dump_stats(str(args.output / "cprofile.prof"))  # raw, for callers/callees queries
         import io
         import pstats
         text = io.StringIO()
