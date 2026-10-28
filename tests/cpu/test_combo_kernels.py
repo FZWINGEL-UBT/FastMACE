@@ -31,7 +31,9 @@ def test_the_record_is_exact_opt_in_and_registered_last():
     assert (record.default, record.exactness, record.deterministic, record.requires) == ("off", "rounding", True, ())
     assert reg.RECORD_SOURCES[-1] == "fastmace.rewrites.inductor"
     registry = reg.default_registry()
-    assert registry.order()[-1] == "combo_kernels" and registry.config_field("combo_kernels") == "combo_kernels"
+    # The Inductor-option records come last; save_transcendentals (ideas-20261027 D3) follows combo_kernels.
+    assert tuple(registry.order()[-2:]) == ("combo_kernels", "save_transcendentals")
+    assert registry.config_field("combo_kernels") == "combo_kernels"
     from fastmace.planner import fixed
 
     assert fixed.AUTO_RULES["RewriteConfig.combo_kernels"] == "never_automatic"
