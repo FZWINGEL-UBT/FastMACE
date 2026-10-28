@@ -33,8 +33,12 @@ def test_the_partitioner_keeps_the_gradients_and_restores_the_op_list():
 
     x = torch.randn(32, 8, dtype=torch.float64, requires_grad=True)
     w = torch.randn(8, 8, dtype=torch.float64)
-    want = torch.autograd.grad(energy(x, w), x)[0]
+    eager = torch.autograd.grad(energy(x, w), x)[0]
+    want = torch.autograd.grad(torch.compile(energy)(x, w), x)[0]
+    torch._dynamo.reset()
     compiled = torch.compile(energy, options={"custom_partitioner_fn": inductor.save_transcendentals_partitioner()})
     got = torch.autograd.grad(compiled(x, w), x)[0]
-    torch.testing.assert_close(got, want, rtol=1e-12, atol=1e-12)
+    torch._dynamo.reset()
+    assert torch.equal(got, want)  # the same operations, only saved instead of recomputed: bitwise on the CPU
+    torch.testing.assert_close(got, eager, rtol=1e-12, atol=1e-12)
     assert partitioners.get_default_op_list is original
