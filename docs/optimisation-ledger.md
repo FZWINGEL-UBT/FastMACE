@@ -525,6 +525,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [setup-other-items](#setup-other-items) | OEq build, portable artifacts, self-check cost, load, graph variants | none | FM | NOT BUILT | 2026-10-24 | below the build rule | [opt4-T05](validation/opt4-T05.md) |
 | [setup-selfcheck-cache](#setup-selfcheck-cache) | Qualification cache to skip self-checks | `selfcheck_cache` | FM | NOT BUILT | 2-T19, 2026-10-20 | ≤ 1.4 s per process warm | [2-T19](validation/2-T19-setup.md) |
 | [setup-gap](#setup-gap) | Setup gap diagnosis (1b-T11) | none | FM | MEASUREMENT | 2026-10-18/19 | artefact of cold caches | [1b-T11](validation/1b-T11-mp0-setup.md) |
+| [profile-fp32-20261028](#profile-fp32-20261028) | Fine-grained float32 step and setup profile (1 fs) | none | FM | MEASUREMENT | 2026-10-28 | step 2.72 / 14.36 / 18.68 ms; `fm.md` loop +0.40 ms NaCl; warm start 34–41 s | [fp32 profile](validation/fp32-profile-20261028.md) |
 
 ### Output
 
@@ -3232,6 +3233,17 @@ stated), not in FastMACE. Paths beginning `LT/` are `ResearchModule:Experiments/
 - Sources: `ResearchModule:Experiments/Benchmark_MACE_GPU_OPTIMIZATIONS/README.md`; `ResearchModule:LT/studies/optimization_history/launch_history.md`.
 
 ### Setup, compilation and start-up
+
+<a id="profile-fp32-20261028"></a>
+#### profile-fp32-20261028: fine-grained float32 step and setup profile
+- Switch: none (measurement)
+- Engine: FM
+- Date/round: 28 October 2026, after round 8 and the ideas round (owner request)
+- What: MH-1 default float32 plan, NaCl/NaNbO3/NbCl5 3×3×3 at 1 fs and 1000 K, local RTX 5060 Ti. Stages (CUDA events), kernels by part (torch.profiler), Nsight Compute per kernel, Nsight Systems over graph replays and over whole steps (NVTX per stage), module attribution on the eager tier, and `fm.md` setup timers (cold and warm).
+- Status: MEASUREMENT.
+- Measured: engine loop 2.716 / 14.358 / 18.675 ms; through `fm.md` with default output 3.12 / 14.79 / 19.32 ms. Large cells 98 % GPU-busy on two graph streams; NaCl 86 %. Rebuild kernels 0.03–0.13 ms per step at 161–214 rebuilds per 1,000 steps. Warm `fm.md` → first step 34–41 s, cold 71 s (NaCl). Ranked opportunities O1–O9 in the report.
+- Why: to guide the next round.
+- Sources: [fp32 profile](validation/fp32-profile-20261028.md); `results/fp32-profile-20261028/`.
 
 <a id="setup-torch-compile"></a>
 #### setup-torch-compile: torch.compile kernel fusion in `default` mode

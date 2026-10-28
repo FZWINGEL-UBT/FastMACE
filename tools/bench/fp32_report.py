@@ -99,6 +99,57 @@ def categories(run, present):
     return table(["Part (compiled eager force call): ms (share, kernels)"] + list(present), body)
 
 
+REFINED = (  # (substring of "op kernel", part): step_breakdown's categories predate these kernels
+    ("fused_folded_forward", "Int. 2: radial last layer + convolution forward (fused_folded_forward)"),
+    ("streaming_conv_folded_backward", "Int. 2: convolution backward, chunked (oeq_projected_backward)"),
+    ("oeq_projected_backward", "Int. 2: convolution backward, chunked (oeq_projected_backward)"),
+    ("folded_linear_input_grad", "Int. 2: radial last layer, input gradient (Triton)"),
+    ("radial_table", "Radial tables (hidden radial chain, forward + backward)"),
+    ("joined_products", "Atom GEMMs: segment_gemm (joined products, Triton)"),
+    ("edge_outer_sum", "Int. 1: reassociated edge sums (Triton)"),
+    ("cuequivariance", "Symmetric contraction (cuEq)"),
+    ("splitKreduce", "Atom GEMMs: cuBLAS (incl. split-K reduce, memset)"),
+)
+
+
+def refined_part(row):
+    name = f"{row['op']} {row['kernel']}"
+    for key, part in REFINED:
+        if key in name:
+            return part
+    if row["op"] in ("aten::mm", "aten::addmm", "aten::bmm"):
+        if row["category"].startswith("Radial"):
+            return row["category"]
+        return "Atom GEMMs: cuBLAS (incl. split-K reduce, memset)"
+    if row["category"].startswith("Edge elementwise"):
+        return "Edge elementwise (geometry, basis, gathers, scatters)"
+    return row["category"]
+
+
+def refined(run, present):
+    data, parts = {}, []
+    for s in present:
+        agg = {}
+        for r in rows(run / s / "ops.csv"):
+            p = refined_part(r)
+            us, n = agg.get(p, (0.0, 0.0))
+            agg[p] = (us + float(r["us_per_call"]), n + float(r["launches_per_call"]))
+        data[s] = agg
+        for p in agg:
+            if p not in parts:
+                parts.append(p)
+    last = present[-1]
+    parts.sort(key=lambda p: -data[last].get(p, (0, 0))[0])
+    totals = {s: sum(v[0] for v in data[s].values()) for s in present}
+    body = []
+    for p in parts:
+        body.append([p] + [("–" if p not in data[s] else
+                            f"{data[s][p][0] / 1e3:.3f} ({data[s][p][0] / totals[s]:.0%}, {data[s][p][1]:g})")
+                           for s in present])
+    body.append(["Total eager kernel time"] + [f"{totals[s] / 1e3:.3f}" for s in present])
+    return table(["Part (compiled eager force call, refined): ms (share, kernels)"] + list(present), body)
+
+
 def top_ops(run, s, n=20):
     body = []
     for r in rows(run / s / "ops.csv")[:n]:
@@ -228,7 +279,8 @@ def main(argv=None):
               f"{s0['max_sm_clock_mhz']} MHz, FP32 peak {fmt(s0['fp32_peak_tflops'], 1)} TFLOPS); FastMACE "
               f"{s0['fastmace_commit']}; torch {s0['packages'].get('torch')}\n")
         print("## Step stages\n\n" + text + "\n")
-        print("## Force call by part (compiled kernels)\n\n" + categories(run, present) + "\n")
+        print("## Force call by part (compiled kernels, refined)\n\n" + refined(run, present) + "\n")
+        print("## Force call by step_breakdown category\n\n" + categories(run, present) + "\n")
         for s in present:
             print(f"## Top operators, {s}\n\n" + top_ops(run, s) + "\n")
             print(f"## GEMMs, {s}\n\n" + gemms(run, s) + "\n")
