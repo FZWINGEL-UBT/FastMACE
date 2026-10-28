@@ -64,7 +64,7 @@ def add_arguments(parser, *, required=True):
     run.add_argument("--timestep", type=float, metavar="FS", help="timestep in fs (default 0.5)")
     run.add_argument("--steps", type=int, help="number of MD steps")
     run.add_argument("--dispersion", choices=DISPERSION_CHOICES,
-                     help="D3(BJ) dispersion: expanded from the head's training functional (SPEC §7.7)")
+                     help="D3(BJ) dispersion: expanded from the head's training functional")
     run.add_argument("--d3-functional", metavar="NAME", help="the D3 parameter set, with --dispersion d3bj")
     run.add_argument("--seed", type=int, help="noise seed (default: drawn and recorded)")
     run.add_argument("--check", choices=CHECK_CHOICES, help="gate on the structure (default skip; opt-in: gate)")
