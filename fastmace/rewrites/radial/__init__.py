@@ -16,6 +16,9 @@ cutoff. The record replaces that chain by piecewise Chebyshev tables (``fastmace
   ``w = [h c, c] @ [W, b]^T``, their r-derivatives, the edge density and its r-derivative, each normalised per
   output, over the whole domain and over ``[R_PHYSICAL, r_max)``. The certificate's ratio is the table's error
   over the network's; the self-check fails, and rule 13 turns the record off, if any ratio exceeds 1.
+- **Cache:** the fitted tables and their certificate are stored under ``FASTMACE_CACHE/radial-tables`` by
+  ``cache_key`` (the model's state, the species set, dtype, ``r_max``, the constants and this module's source) and
+  reused by later builds; the self-check still runs on cached tables, so a bad entry turns the record off.
 - **Model:** the record sets each interaction's ``radial_table`` and replaces ``model.radial_embedding`` by
   ``LengthsEmbedding``, which hands the interactions the edge lengths ``[E, 1]`` and no cutoff. The folded forward
   takes the table path when its ``edge_feats`` have width 1 and the network path otherwise (the other records'
@@ -387,6 +390,95 @@ def _superset(model, context):
     return [int(c) for c in (columns.tolist() if isinstance(columns, torch.Tensor) else columns)]
 
 
+# --------------------------------------------------------------------------- the table cache
+
+CACHE_KIND = "radial-tables"
+CACHE_FORMAT = 1
+TABLE_TENSORS = ("coef", "dcoef", "starts", "scales", "bins")
+TABLE_SCALARS = ("r_lo", "bin_scale", "r_max", "fit_error")
+
+
+def _state_digest(model):
+    """SHA-256 over every parameter and buffer of ``model`` (names, dtypes, shapes, bytes): the tables read the
+    model's own modules, so anything in its state may change them."""
+    import hashlib
+
+    import torch
+
+    digest = hashlib.sha256()
+    for name, tensor in sorted(model.state_dict(keep_vars=False).items()):
+        tensor = tensor.detach()
+        digest.update(f"{name}|{tensor.dtype}|{tuple(tensor.shape)}|".encode())
+        if tensor.dtype == torch.bfloat16:
+            tensor = tensor.view(torch.int16)
+        digest.update(tensor.contiguous().cpu().numpy().tobytes())
+    return digest.hexdigest()
+
+
+def cache_key(model, index, columns, dtype, r_max, state_digest=None):
+    """The cache key of interaction ``index``'s tables: the model's state, the species set (atomic numbers, in
+    superset order), the tables' dtype, ``r_max``, every fit and certificate constant, this module's source and the
+    torch and FastMACE versions. Anything else that changes the tables changes one of these."""
+    import hashlib
+    import inspect
+    import sys
+
+    import torch
+
+    import fastmace
+
+    numbers = [int(model.atomic_numbers[c]) for c in columns]
+    constants = (R_LO, R_PHYSICAL, DEGREE, INITIAL_PIECES, MAX_DEPTH, TOLERANCE, FLOOR, DEGREE_64, TOLERANCE_64,
+                 FLOOR_64, CERTIFY_BOUND_64, CERTIFY_POINTS, CACHE_FORMAT)
+    parts = [state_digest or _state_digest(model), str(index), repr(numbers), str(dtype), repr(float(r_max)),
+             repr(constants), hashlib.sha256(inspect.getsource(sys.modules[__name__]).encode()).hexdigest(),
+             torch.__version__, fastmace.__version__]
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+
+def _cache_path(key):
+    from fastmace import _cache
+
+    return _cache.cache_dir(CACHE_KIND) / f"{key}.pt"
+
+
+def _load_cached(key):
+    """The cached ``(tables, certificate)`` of ``key``, or None (absent, unreadable or of another format)."""
+    import torch
+
+    try:
+        path = _cache_path(key)
+        if not path.is_file():
+            return None
+        entry = torch.load(path, map_location="cpu", weights_only=True)
+        if entry.get("format") != CACHE_FORMAT or entry.get("key") != key:
+            return None
+        tables = {name: entry["tables"][name] for name in TABLE_TENSORS}
+        tables.update({name: float(entry["tables"][name]) for name in TABLE_SCALARS})
+        return tables, entry["certificate"]
+    except Exception:  # a damaged or foreign file is a miss; the fit replaces it
+        return None
+
+
+def _store_cached(key, tables, certificate):
+    """Write the entry atomically (temporary file, then rename), so processes sharing the cache never read half a
+    file. A cache that cannot be written is skipped: the tables are already fitted."""
+    import os
+
+    import torch
+
+    try:
+        path = _cache_path(key)
+        entry = {"format": CACHE_FORMAT, "key": key, "certificate": certificate,
+                 "tables": {**{name: tables[name].detach().cpu() for name in TABLE_TENSORS},
+                            **{name: float(tables[name]) for name in TABLE_SCALARS}}}
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        torch.save(entry, temporary)
+        os.replace(temporary, path)
+    except OSError:
+        pass
+
+
 def tabulate_radials(model, context):
     """Fit, certify and install the tables of every interaction of ``model``; returns the applied names."""
     import torch
@@ -406,14 +498,26 @@ def tabulate_radials(model, context):
     pairs = [(s, t) for s in range(len(columns)) for t in range(len(columns))]
     r_max = float(model.r_max)
     names = []
+    digest = _state_digest(model)  # before any interaction gets its table: every key sees the same state
     for index, interaction in factored:
-        chain64 = _Chain(model, interaction, columns, torch.float64, torch.device("cpu"))
-        chain32 = _Chain(model, interaction, columns, parameter.dtype, parameter.device)
-        table = _table_module(fit(chain64, pairs, r_max, table_dtype=parameter.dtype), columns, parameter.device)
-        table.certificate = certify(table, chain64, chain32, pairs, r_max, seed=index)
+        key = cache_key(model, index, columns, parameter.dtype, r_max, state_digest=digest)
+        cached = _load_cached(key)
+        if cached is not None:
+            tables, certificate = cached
+            source = "cached"
+        else:
+            chain64 = _Chain(model, interaction, columns, torch.float64, torch.device("cpu"))
+            chain32 = _Chain(model, interaction, columns, parameter.dtype, parameter.device)
+            tables = fit(chain64, pairs, r_max, table_dtype=parameter.dtype)
+            certificate = certify(_table_module(tables, columns, parameter.device), chain64, chain32, pairs, r_max,
+                                  seed=index)
+            _store_cached(key, tables, certificate)
+            source = "fitted"
+        table = _table_module(tables, columns, parameter.device)
+        table.certificate = certificate
         interaction.radial_table = table
         names.append(f"interactions.{index} ({table.coef.shape[1]} pieces, {len(pairs)} pairs, "
-                     f"certificate {table.certificate['worst']:.2f})")
+                     f"certificate {table.certificate['worst']:.2f}, {source})")
     model.radial_embedding = _lengths_embedding(model.radial_embedding)
     return names
 
