@@ -232,7 +232,7 @@ The keys are `fm.md`'s arguments under their own names. See
 | `check` | `"skip"`, `"gate"`, `"allow_unavailable"` | `"skip"` | the gate; opt-in |
 | `integrator` | an `[integrator]` table | none | an explicit integrator (below); it wins over `ensemble` |
 | `mode` | `"graph"`, `"compiled"`, `"eager"`, `"reference"` | unset | the execution tier; unset lets the planner choose |
-| `allow_reference` | bool | `false` | allows the reference tier where a hard rule needs it |
+| `allow_reference` | bool | `false` | recorded in the plan only: it lifts no refusal, and `mode = "reference"` works without it |
 | `calibrate` | bool | `false` | times hybrid against plain cuEquivariance first and takes plain cuEq only if it is more than 5 % faster; MD only, refused with MC |
 | `fallback` | a `[fallback]` table | defaults | the fallback options |
 | `gate` | a `[gate]` table | defaults | where the gate's references may run |
