@@ -560,6 +560,10 @@ class Simulation:
         self._child = False  # set by the subprocess runner's child: switches are the parent's
         started = time.perf_counter()
         stored = getattr(self, "_resume_plan", None)  # a resume of a fallback revision (2-T15)
+        if stored is None and not getattr(self, "_resuming", False) and self._optimizer_config is None:
+            from fastmace.integrators.csvr import check_initial_motion
+
+            check_initial_motion(self._config, atoms)  # before planning: no candidate can run it (InputError)
         calibrated = None
         if options.calibration.calibrate and stored is None and not getattr(self, "_resuming", False):
             calibrated = self._calibrate(planner, workload)  # the optional calibration (SPEC §9.1, 5-T09)

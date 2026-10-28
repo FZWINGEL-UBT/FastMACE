@@ -39,6 +39,24 @@ if TYPE_CHECKING:
     from fastmace.state import SimulationState
 
 
+def zero_kinetic_energy_error():
+    """CSVR's refusal of a structure at rest (as ASE's ``Bussi``): an ``InputError``, which no fallback retries."""
+    from fastmace.errors import InputError
+
+    return InputError("Initial kinetic energy is zero. Set the initial velocities before running CSVR "
+                      "(as ASE's Bussi).",
+                      why="CSVR rescales the velocities, and a structure at rest has none to rescale.",
+                      next_step="Draw velocities first, for example ase.md.velocitydistribution."
+                                "MaxwellBoltzmannDistribution(atoms, temperature_K=..., rng=...), or start "
+                                "with a Langevin segment.")
+
+
+def check_initial_motion(config: IntegratorConfig, atoms) -> None:
+    """Refuse a CSVR run whose structure is at rest before anything is planned or compiled."""
+    if config.scheme == "csvr" and math.isclose(float(atoms.get_kinetic_energy()), 0.0, rel_tol=0, abs_tol=1e-12):
+        raise zero_kinetic_energy_error()
+
+
 class CSVR(Integrator):
     """``ase.md.bussi.Bussi`` with the state on the device.
 
@@ -64,8 +82,7 @@ class CSVR(Integrator):
         self.fixed_rows = fixed_rows(state)
         self.x_old = None if self.fixed_rows is None else torch.zeros_like(state.positions)
         if math.isclose(float(kinetic_energy(state)), 0.0, rel_tol=0, abs_tol=1e-12):
-            raise ValueError("Initial kinetic energy is zero. Set the initial velocities before running CSVR "
-                             "(as ASE's Bussi).")
+            raise zero_kinetic_energy_error()
         f64 = dict(dtype=torch.float64, device=state.positions.device)
         self._exp_term = math.exp(-self.dt / self.taut)
         self.noise = torch.zeros(2, **f64)

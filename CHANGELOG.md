@@ -38,6 +38,13 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
   against float64; float32 plans only: `docs/validation/opt6-T05.md`. **On by default** (owner decision 62)
   in float32 plans that are not reproducible: NaCl −10 %, NbCl5 −8 %, NaNbO3 −19 % per MD step (RTX 5060 Ti).
 
+### Fixed
+
+- A CSVR run from a structure at rest is refused at once, before planning, with `fastmace.errors.InputError`
+  (a `ValueError`) that says how to draw velocities. Before, the integrator's refusal counted as a fallback
+  candidate failure: each candidate compiled first, and the run ended in a misleading `FallbackExhausted`
+  (NaMOCl4 report, 28 October 2026). The fallback search now passes every `InputError` through.
+
 ## [1.0.0] - 2026-10-25
 
 First stable release (SPEC section 16, phase 6). Acceptance: `docs/validation/phase-6.md`. Qualified stack as
