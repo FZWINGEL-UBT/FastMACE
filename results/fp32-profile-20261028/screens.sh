@@ -70,9 +70,6 @@ for mode in "$@"; do
     bucket025) ab bucket025 "NaCl NbCl5" --b-neighbours edge_bucket_fraction=0.025 ;;
     savetrans) ab savetrans "NaCl NbCl5" --b save_transcendentals=on ;;
     aggrfusion) ab aggrfusion "NaCl NbCl5" --b-constant "torch._inductor.config:aggressive_fusion=True" ;;
-    asyncrb) ab asyncrb "NaCl NbCl5 NaNbO3" --b-constant "fastmace.neighbors.skin:ASYNC_EARLY_BUILD=True" ;;
-    margin005) ab margin005 "NbCl5 NaNbO3 NaCl" --b-engine pipeline_edge_margin=0.005 ;;
-    gputest) run gputest "$PY" -m pytest -p no:cacheprovider -q -rf "$FM/tests/gpu/test_async_rebuild_gpu.py" ;;
   esac
 done
 note DONE
