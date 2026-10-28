@@ -40,16 +40,22 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Fixed
 
-- Float64 relaxations, quenches and NPT steps under decision 65's 56 fixed mantissa bits (D1, default on the
-  RTX 5060 Ti and RTX 4000 Ada): inside a captured graph, cuBLAS's fixed-mantissa float64 emulation returned the
-  step's small FP64 products about 8 bits accurate, so a variable-cell `gpu-LBFGS` relaxation from a non-minimal
-  start diverged (NaCl 3×3×3: cell 16.75000 instead of 16.76443 Å after one step), and fixed-cell LBFGS drifted
-  from the emulation-off path by up to 5e-3 eV/Å. The model's own products were exact. Every small product of
-  the step code outside the model (the LBFGS mat-vecs and history, the Frechet cell filter, `expm_3x3`, the BAOAB,
-  MTK and Berendsen barostats, the variable-cell neighbour and D3 rebuild tests, the D3 image shifts, the leader
-  shift copy) is now element-wise sums (`neighbors.skin.matmul_small`, `matvec_small`, `vecmat_small`), which no
-  cuBLAS setting reaches; LBFGS's two triangular solves stay TRSM. Rounding changes by a few ulps (`logm` within
-  2e-14 of SciPy, was 1e-14): `docs/validation/fp64-d1-relax.md`.
+- **Decision 65's D1 default is suspended** (owner, 28 October 2026): `EngineConfig.fp64_emulation_mantissa_bits`
+  "auto" is cuBLAS's dynamic choice everywhere; an explicit bit count still applies. With 56 fixed mantissa bits
+  (D1's default on the RTX 5060 Ti and RTX 4000 Ada), float64 graphs went wrong in two ways, in ResearchModule's
+  Energy_Hull relaxations of MH-1:
+  - the step's small FP64 products came back about 8 bits accurate: a variable-cell `gpu-LBFGS` relaxation of
+    NaCl 3×3×3 set the cell to 16.75000 instead of 16.76443 Å after one step and diverged;
+  - a graph re-captured during the run computed wrong energies and forces: NbOCl3 3×3×3 was +0.34 eV/atom from
+    the first step after the re-capture on, with the same edges, and never converged.
+
+  The same runs with dynamic bits follow ASE's path. The root cause in cuBLAS's fixed-mantissa emulation is not
+  known. As hardening, every small product of the step code outside the model is now element-wise sums
+  (`neighbors.skin.matmul_small`, `matvec_small`, `vecmat_small`), which no cuBLAS setting reaches: the LBFGS
+  mat-vecs and history, the Frechet cell filter, `expm_3x3`, the BAOAB, MTK and Berendsen barostats, the
+  variable-cell neighbour and D3 rebuild tests, the D3 image shifts and the leader shift copy. LBFGS's two
+  triangular solves stay TRSM. That hardening alone fixes the first defect, not the second. Rounding changes by a
+  few ulps (`logm` within 2e-14 of SciPy, was 1e-14): `docs/validation/fp64-d1-relax.md`.
 - A CSVR run from a structure at rest is refused at once, before planning, with `fastmace.errors.InputError`
   (a `ValueError`) that says how to draw velocities. Before, the integrator's refusal counted as a fallback
   candidate failure: each candidate compiled first, and the run ended in a misleading `FallbackExhausted`

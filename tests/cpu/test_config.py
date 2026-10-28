@@ -47,7 +47,7 @@ AUTO_RULES = {
     "EngineConfig.cueq_conv_fusion": "on_for_plain_cueq_unless_reproducible",
     "EngineConfig.expandable_segments": "on_for_torch_2_14_unless_alloc_conf_set",
     "EngineConfig.fp64_emulation": "on_for_float64_cuda_with_reduced_rate_fp64_unless_reproducible",
-    "EngineConfig.fp64_emulation_mantissa_bits": "56_for_mh1_float64_on_measured_gpus_decision_65_else_dynamic",
+    "EngineConfig.fp64_emulation_mantissa_bits": "dynamic_decision_65_d1_suspended_after_recapture_defect",
     "PrecisionConfig.dtype": "float32_for_hybrid_float64_for_cueq",
     "NeighbourConfig.sort_receivers": "on_for_hybrid_graph_engine",
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
