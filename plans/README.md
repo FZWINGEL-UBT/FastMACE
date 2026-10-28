@@ -74,6 +74,12 @@ workers"). 2-T21 works in the ResearchModule worktree
 - Waiting for go: the rest. Answers to all prestart reports are in
   `phase-2.md`, "Conductor answers to the prestart reports".
 
+## Future work
+
+| Topic | Plan | Status |
+| --- | --- | --- |
+| Faster training and fine-tuning | [future-training.md](future-training.md) | **documented only** (owner, 28 October 2026: no compute for it now); which speed-ups carry over, package boundary, steps starting with profiling MACE's trainer |
+
 ## Open owner decisions
 
 Open owner decisions that phases wait on (SPEC §18): none open. Decided on
