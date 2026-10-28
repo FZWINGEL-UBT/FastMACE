@@ -197,7 +197,10 @@ def main():
         times = {k: [] for k in graphs}
         for _ in range(args.blocks):
             for k, g in graphs.items():
-                times[k].append(replay_ms(g, args.calls))
+                try:
+                    times[k].append(replay_ms(g, args.calls))
+                except Exception as error:
+                    raise RuntimeError(f"replay of {k!r} failed") from error
         flush_ms = statistics.median(times.pop("flush"))
         for k, v in times.items():
             record[f"{k}_ms"] = statistics.median(v) - flush_ms
