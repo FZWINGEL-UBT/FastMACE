@@ -191,9 +191,10 @@ def main():
         config = min(quick, key=quick.get)
         record.update(config="%dx%dx%d" % config[:3], errors=errors,
                       quick_ms={"%dx%dx%d" % c[:3]: v for c, v in quick.items()})
-        graphs = {"chain": graph_of(chain, flush, args.calls),
-                  "fused": graph_of(fused_fn(ops, config), flush, args.calls),
-                  "flush": graph_of(lambda: None, flush, args.calls)}
+        # Keep every closure alive while its graph replays: the fused one owns its output buffers, and with
+        # expandable segments freed memory can be unmapped (an illegal address in the replay).
+        fns = {"chain": chain, "fused": fused_fn(ops, config), "flush": lambda: None}
+        graphs = {k: graph_of(fn, flush, args.calls) for k, fn in fns.items()}
         times = {k: [] for k in graphs}
         for _ in range(args.blocks):
             for k, g in graphs.items():
