@@ -2393,6 +2393,8 @@ def _integrator(record):
     fields = dict(record["fields"])
     if record["class"] == "Langevin":  # a record from before the option ran ASE's projection (3-T22c)
         fields.setdefault("fixcm_projection", "ase")
+    if record["class"] == "LangevinBAOAB":  # a record from before kept fixcm=True, which BAOAB never applied
+        fields["fixcm"] = False
     if isinstance(fields.get("external_stress_GPa"), list):
         fields["external_stress_GPa"] = tuple(fields["external_stress_GPa"])
     return classes[record["class"]](**fields)

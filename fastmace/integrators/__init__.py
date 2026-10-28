@@ -110,7 +110,9 @@ class LangevinBAOAB:
       volume leaves [V0 / ratio, V0 ratio], V0 the run's starting volume, or a cell vector is longer
       than ``max_cell_length_A`` (1000 Å: float32 coordinates still resolve 6e-5 Å there). A vapour at
       a low pressure expands without bound otherwise, until the coordinates lose their precision.
-      ``None`` turns a limit off.
+      ``None`` turns a limit off;
+    - ``fixcm``: ``False`` only. BAOAB, as ASE's, never removes the total momentum, so the record does not
+      claim a fixed centre of mass (MC velocity treatments and refusals follow it).
 
     The production drag term is the corrected one (SPEC §12.1, 1b-T09); ASE's own variant stays an
     ``IntegratorConfig`` option for comparisons with ASE.
@@ -125,12 +127,15 @@ class LangevinBAOAB:
     barostat_tau_fs: float | None = None
     barostat_mass_factor: float = 1.0
     disable_cell_langevin: bool = False
-    fixcm: bool = True
+    fixcm: bool = False
     max_volume_ratio: float | None = 20.0
     max_cell_length_A: float | None = 1000.0
 
     def __post_init__(self):
         _validate(self)
+        if self.fixcm is not False:
+            raise ValueError(f"LangevinBAOAB.fixcm must be False, got {self.fixcm!r}: BAOAB (as ASE's LangevinBAOAB) "
+                             "does not remove centre-of-mass motion")
         for field, low in (("max_volume_ratio", 1.0), ("max_cell_length_A", 0.0)):
             value = getattr(self, field)
             if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))
