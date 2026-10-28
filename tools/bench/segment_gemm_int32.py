@@ -60,6 +60,13 @@ def main(argv=None):
 
     from fastmace.kernels.triton import segment_gemm, tile_rule
 
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    import ab_step_time
+
+    if ab_step_time.gpu_processes():
+        raise SystemExit("GPU must be idle")
     args.output.mkdir(parents=True, exist_ok=False)
     kernels = {"int64": segment_gemm._kernel(), "int32": int32_kernel()}
     bm, bn, bk, warps, stages = (tile_rule.BLOCK_M, tile_rule.BLOCK_N, tile_rule.BLOCK_K, tile_rule.NUM_WARPS,
