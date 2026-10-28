@@ -376,15 +376,25 @@ class CompiledModelCache:
 FP64_EMULATION_SETTINGS = (("CUBLAS_EMULATE_DOUBLE_PRECISION", "1"), ("CUBLAS_EMULATION_STRATEGY", "eager"))
 
 
-def configure_fp64_emulation(environ=None):
+FP64_EMULATION_MANTISSA_VARIABLE = "CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT"
+
+
+def configure_fp64_emulation(environ=None, mantissa_bits=None):
     """Set ``FP64_EMULATION_SETTINGS`` where the environment sets none; returns the values in effect.
+
+    An int ``mantissa_bits`` (a plan's resolved ``EngineConfig.fp64_emulation_mantissa_bits``) also sets a fixed
+    mantissa bit count (``FP64_EMULATION_MANTISSA_VARIABLE``), again only where the environment sets none; None or
+    "dynamic" keeps cuBLAS's dynamic choice.
 
     cuBLAS reads them when it creates a handle, so they act only on handles created afterwards: run it before the
     process's first float64 matrix product (``FixedPlanner.build`` does, for plans with ``fp64_emulation="on"``)."""
     environ = os.environ if environ is None else environ
-    for key, value in FP64_EMULATION_SETTINGS:
+    settings = list(FP64_EMULATION_SETTINGS)
+    if mantissa_bits not in (None, "dynamic", "auto"):
+        settings.append((FP64_EMULATION_MANTISSA_VARIABLE, str(int(mantissa_bits))))
+    for key, value in settings:
         environ.setdefault(key, value)
-    return {key: environ.get(key) for key, _ in FP64_EMULATION_SETTINGS}
+    return {key: environ.get(key) for key, _ in settings}
 
 
 def fp64_emulation_active(device="cuda"):

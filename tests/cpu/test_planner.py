@@ -900,9 +900,121 @@ def test_fp64_emulation_without_cuda_is_off():
         assert "not available" in str(decision(plan, "EngineConfig.fp64_emulation")[2])
 
 
+def test_configure_fp64_emulation_sets_a_fixed_mantissa_only_when_asked():
+    from fastmace.model import compile as compiling
+
+    environ = {}
+    assert compiling.FP64_EMULATION_MANTISSA_VARIABLE not in compiling.configure_fp64_emulation(environ)
+    assert compiling.FP64_EMULATION_MANTISSA_VARIABLE not in environ
+    environ = {}
+    values = compiling.configure_fp64_emulation(environ, mantissa_bits=56)
+    variable = compiling.FP64_EMULATION_MANTISSA_VARIABLE
+    assert values[variable] == "56" == environ["CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT"]
+    environ = {variable: "64"}
+    assert compiling.configure_fp64_emulation(environ, mantissa_bits=56)[variable] == "64"
+    assert compiling.FP64_EMULATION_MANTISSA_VARIABLE not in compiling.configure_fp64_emulation({}, "dynamic")
+    for bad in (True, 4, 200, 56.0, "56", None):
+        with pytest.raises(ValueError, match="fp64_emulation_mantissa_bits"):
+            EngineConfig(fp64_emulation_mantissa_bits=bad)
+    assert EngineConfig(fp64_emulation_mantissa_bits=56).fp64_emulation_mantissa_bits == 56
+    assert EngineConfig().fp64_emulation_mantissa_bits == "auto"
+
+
 def test_configure_fp64_emulation_keeps_the_callers_settings():
     from fastmace.model import compile as compiling
 
     environ = {"CUBLAS_EMULATION_STRATEGY": "performant"}
     assert compiling.configure_fp64_emulation(environ) == {"CUBLAS_EMULATE_DOUBLE_PRECISION": "1",
                                                            "CUBLAS_EMULATION_STRATEGY": "performant"}
+
+
+ADA = Hardware("NVIDIA RTX 4000 Ada Generation", (8, 9), 20 * 2**30)
+A100 = Hardware("NVIDIA A100-SXM4-40GB", (8, 0), 40 * 2**30)
+L4 = Hardware("NVIDIA L4", (8, 9), 24 * 2**30)  # sm_89 like the Ada card, never measured
+RTX_5090 = Hardware("NVIDIA GeForce RTX 5090", (12, 0), 32 * 2**30)  # sm_120 like the RTX 5060 Ti, never measured
+DECISION_65 = ("RewriteConfig.w_tables", "RewriteConfig.save_transcendentals",
+               "EngineConfig.fp64_emulation_mantissa_bits")
+
+
+def float64_plan(monkeypatch, hardware, ratio=1 / 64, label="mh1-r2scan", atoms=None, dtype="float64", **configs):
+    """A hybrid plan on ``hardware`` whose float64 rate is ``ratio`` of float32 (decision 63's probe)."""
+    from fastmace.kernels.triton import fp64_rate
+
+    monkeypatch.setattr(fixed, "_cuda_available", lambda: True)
+    monkeypatch.setattr(fp64_rate, "fp64_rate_ratio", lambda device: ratio)
+    engine = dataclasses.replace(configs.pop("engine", EngineConfig()), backend="auto")
+    return planner(engine=engine, precision=PrecisionConfig(dtype=dtype), **configs).plan(
+        traits(label), atoms if atoms is not None else nacl(), IntegratorConfig(), hardware, model_label=label)
+
+
+@pytest.mark.parametrize("hardware", [GPU, ADA], ids=lambda h: h.name)
+def test_decision_65_turns_d1_d2_d3_on_on_the_measured_gpus(monkeypatch, hardware):
+    """Owner decision 65 (28 October 2026): the 56 fixed mantissa bits, w_tables and save_transcendentals are on in
+    float64 MH-1 plans on the GPU models where the A/Bs measured a speed-up."""
+    assert fixed.DECISION_65_GPUS == ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+    plan = float64_plan(monkeypatch, hardware)
+    assert plan.engine.fp64_emulation == "on" and plan.engine.fp64_emulation_mantissa_bits == 56
+    assert plan.rewrites.w_tables == "on" and plan.rewrites.save_transcendentals == "on"
+    assert plan.rewrites.radial_tables == "on" and plan.rewrites.chunked_conv_backward == "on"
+    for item in DECISION_65:
+        assert "decision 65" in str(decision(plan, item)[2]), item
+
+
+@pytest.mark.parametrize(("hardware", "ratio"), [(A100, 1 / 2), (L4, 1 / 64), (RTX_5090, 1 / 64)],
+                         ids=lambda value: getattr(value, "name", value))
+def test_decision_65_keeps_other_gpus_off(monkeypatch, hardware, ratio):
+    """The A100 measured slower; unmeasured GPUs stay off even where their compute capability matches a measured
+    one. The reason names the GPU; it is not listed among the auto options switched off."""
+    plan = float64_plan(monkeypatch, hardware, ratio)
+    assert plan.engine.fp64_emulation == ("off" if ratio == 1 / 2 else "on")  # decision 63, unchanged
+    assert plan.engine.fp64_emulation_mantissa_bits == "dynamic"
+    assert plan.rewrites.w_tables == "off" and plan.rewrites.save_transcendentals == "off"
+    for item in DECISION_65[:2]:
+        assert f"not a measured GPU, decision 65 ({hardware.name})" in str(decision(plan, item)[2]), item
+    if ratio != 1 / 2:
+        assert f"not a measured GPU, decision 65 ({hardware.name})" in str(decision(plan, DECISION_65[2])[2])
+    assert not {"w_tables", "save_transcendentals"} & set(dict(plan.auto_options_off))
+
+
+def test_decision_65_keeps_float32_the_cpu_other_models_and_reproducible_off(monkeypatch):
+    float32 = float64_plan(monkeypatch, GPU, dtype="float32")
+    assert float32.rewrites.w_tables == "off" and float32.rewrites.save_transcendentals == "off"
+    assert float32.engine.fp64_emulation == "off" and float32.engine.fp64_emulation_mantissa_bits == "dynamic"
+    assert "float32 plan, decision 65" in str(decision(float32, "RewriteConfig.save_transcendentals")[2])
+    cpu = float64_plan(monkeypatch, CPU)
+    assert cpu.rewrites.w_tables == "off" and cpu.rewrites.save_transcendentals == "off"
+    assert "not a measured GPU, decision 65 (cpu)" in str(decision(cpu, "RewriteConfig.save_transcendentals")[2])
+    other = float64_plan(monkeypatch, GPU, label="mp0-medium")
+    assert other.rewrites.w_tables == "off" and other.rewrites.save_transcendentals == "off"
+    assert other.engine.fp64_emulation_mantissa_bits == "dynamic"
+    assert "not MH-1, decision 65" in str(decision(other, "RewriteConfig.save_transcendentals")[2])
+    # Reproducible plans (minimal planner, rule 5) keep the native route the speed-ups were not measured on.
+    assert fixed._decision_65("float64", True, GPU, "mh1-r2scan") == "reproducible=True, decision 65"
+    assert fixed._decision_65("float64", False, GPU, "mh1-r2scan") is None
+
+
+def test_decision_65_w_tables_stay_off_above_three_species(monkeypatch):
+    """Measured on two and three species; four would pass W_TABLE_MAX_BYTES (the tables grow with the square)."""
+    from ase import Atoms
+
+    four = Atoms("NaNbOCl", scaled_positions=[(0, 0, 0), (0.5, 0.5, 0.5), (0.5, 0, 0), (0, 0.5, 0.5)],
+                 cell=[4.0, 4.0, 4.0], pbc=True).repeat((2, 2, 2))
+    plan = float64_plan(monkeypatch, ADA, atoms=four)
+    assert plan.rewrites.w_tables == "off" and plan.rewrites.save_transcendentals == "on"
+    assert plan.engine.fp64_emulation_mantissa_bits == 56
+    assert dict(plan.auto_options_off)["w_tables"].startswith("4 species, decision 65")
+
+
+def test_decision_65_explicit_requests_override(monkeypatch):
+    on = EngineConfig(fp64_emulation="on", fp64_emulation_mantissa_bits=48)
+    plan = float64_plan(monkeypatch, A100, 1 / 2, engine=on,
+                        rewrites=RewriteConfig(w_tables="on", save_transcendentals="on"))
+    assert plan.rewrites.w_tables == "on" and plan.rewrites.save_transcendentals == "on"
+    assert plan.engine.fp64_emulation_mantissa_bits == 48
+    off = EngineConfig(fp64_emulation_mantissa_bits="dynamic")
+    plan = float64_plan(monkeypatch, ADA, engine=off, rewrites=RewriteConfig(w_tables="off",
+                                                                            save_transcendentals="off"))
+    assert plan.rewrites.w_tables == "off" and plan.rewrites.save_transcendentals == "off"
+    assert plan.engine.fp64_emulation == "on" and plan.engine.fp64_emulation_mantissa_bits == "dynamic"
+    with pytest.raises(PlanRefused, match="w-tables|needs float64"):
+        float64_plan(monkeypatch, ADA, dtype="float32", rewrites=RewriteConfig(w_tables="on"))

@@ -140,3 +140,49 @@ def test_the_planner_allows_float64_tables_outside_reproducible_plans():
     assert plan_for("mh1-r2scan").rewrites.radial_tables == "on"
     assert plan_for("mh1-r2scan", precision=float64).rewrites.radial_tables == "on"
     assert plan_for("mh1-r2scan", rewrites=RewriteConfig(radial_tables="off")).rewrites.radial_tables == "off"
+
+
+def test_w_tables_equal_the_table_and_folded_product():
+    """ideas-20261027 D2: the folded per-piece series equal the chain ``table -> a -> a W^T`` to float64 rounding;
+    edges beyond the cutoff get zero rows; the planner keeps the record float64-only (decision 65: on by default on
+    the measured GPUs)."""
+    from test_planner import plan_for
+
+    from fastmace.config import PrecisionConfig, RewriteConfig
+    from fastmace.errors import PlanRefused
+    from fastmace.kernels.triton.radial_table import evaluate
+    from fastmace.kernels.triton.w_table import fold_tables, w_table_reference
+
+    gen = torch.Generator().manual_seed(1028)
+    pairs, pieces, terms, width, outputs = 4, 6, 17, 66, 40
+    coef = torch.randn(pairs, pieces, terms, width, generator=gen, dtype=torch.float64)
+    dcoef = torch.randn(pairs, pieces, terms - 1, width, generator=gen, dtype=torch.float64)
+    weight = torch.randn(outputs, width - 1, generator=gen, dtype=torch.float64)
+    r_lo, r_max = 0.3, 6.0
+    starts = torch.linspace(r_lo, r_max, pieces + 1, dtype=torch.float64)[:-1]
+    scales = torch.full((pieces,), 2 * pieces / (r_max - r_lo), dtype=torch.float64)
+    bins = torch.arange(pieces, dtype=torch.int32)
+    r = torch.cat([0.35 + 5.6 * torch.rand(300, generator=gen, dtype=torch.float64),
+                   torch.tensor([6.0, 7.5, 0.1], dtype=torch.float64)])
+    pair = torch.randint(0, pairs, (r.numel(),), generator=gen, dtype=torch.int32)
+    g, dg = fold_tables(coef, dcoef, weight)
+    assert g.shape == dg.shape == (pairs * pieces + 1, terms, outputs)
+    want = evaluate(r, pair, coef, starts, scales, bins, r_lo, pieces / (r_max - r_lo), r_max)[:, :width - 1] @ weight.T
+    got = w_table_reference(r, pair, g, starts, scales, bins, r_lo, pieces / (r_max - r_lo), r_max)
+    assert float((got - want).abs().max()) <= 1e-13 * float(want.abs().max())
+    assert bool((got[-3:-1] == 0).all())  # at and beyond the cutoff
+    slopes = w_table_reference(r, pair, dg, starts, scales, bins, r_lo, pieces / (r_max - r_lo), r_max)
+    want_slopes = evaluate(r, pair, dcoef, starts, scales, bins, r_lo, pieces / (r_max - r_lo), r_max,
+                           derivative=True)[:, :width - 1] @ weight.T
+    inside = r >= r_lo
+    assert float((slopes[inside] - want_slopes[inside]).abs().max()) <= 1e-13 * float(want_slopes.abs().max())
+    # Owner decision 65: "auto" is on in float64 MH-1 plans on a measured GPU (plan_for's RTX 5060 Ti).
+    assert plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64")).rewrites.w_tables == "on"
+    assert plan_for("mh1-r2scan").rewrites.w_tables == "off"  # float32
+    on = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"), rewrites=RewriteConfig(w_tables="on"))
+    assert on.rewrites.w_tables == "on" and on.rewrites.radial_tables == "on"
+    with pytest.raises(PlanRefused, match="w_tables='on' needs float64"):
+        plan_for("mh1-r2scan", rewrites=RewriteConfig(w_tables="on"))
+    with pytest.raises(PlanRefused, match="w_tables='on' requires radial_tables"):
+        plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"),
+                 rewrites=RewriteConfig(w_tables="on", radial_tables="off"))

@@ -133,6 +133,10 @@ class RewriteConfig:
     # fitted and certified at setup against float64 (opt-6 OPT6-T05; exactness "certified", owner decision 61);
     # float32 plans only; opt-in, auto = off.
     radial_tables: Toggle = "auto"
+    # Per-piece w-tables: the second MH-1 interaction's per-edge weights straight from the radial tables
+    # (w = sum_k T_k(x) C_k W^T per piece) and their r-gradient without the dw W product (ideas-20261027 D2);
+    # rounding; float64 plans outside reproducible ones, with radial_tables and chunked_conv_backward; opt-in.
+    w_tables: Toggle = "auto"
     # Element-dependent skip connection restricted to the structure's species (GENERIC_SPECIES_SKIP).
     species_skip: Toggle = "auto"
     # Radial hidden block as one Triton kernel pair (FUSED_RADIAL_HIDDEN); opt-in, no measured gain.
@@ -174,6 +178,10 @@ class RewriteConfig:
     # one launch; rounding (the energy moves by ~1e-9 relative), not adopted (opt-3 OPT3-T04,
     # fastmace.rewrites.inductor); opt-in, auto = off.
     combo_kernels: Toggle = "auto"
+    # A custom AOTAutograd partitioner for the compiled model that saves transcendental ops (exp, tanh, sigmoid,
+    # ...) for the backward instead of recomputing them there (ideas-20261027 D3; fastmace.rewrites.inductor):
+    # float64 MD step 0.970-0.979 on the RTX 5060 Ti; exact; opt-in, auto = off.
+    save_transcendentals: Toggle = "auto"
     # Every atom GEMM (block linears, segment_gemm, species skip, reassociated first interaction) and its input
     # gradients as 3xTF32 through Triton's tf32x3 (opt-4 OPT4-T03 stage 1, fastmace.rewrites.precision); rounding,
     # not IEEE-equivalent under cancellation; float32 on compute capability >= 8.0 only; opt-in, auto = off.
@@ -234,6 +242,12 @@ class EngineConfig:
     # cuBLAS's float64 emulation on INT8 tensor cores (integer Ozaki scheme; f64-T01, owner decision 63): float64
     # plans that are not reproducible, on GPUs without full-rate FP64 (compute capability minor != 0).
     fp64_emulation: Toggle = "auto"
+    # With fp64_emulation on: a fixed mantissa bit count for cuBLAS's emulation
+    # (CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT, an int from 8 to 128), or "dynamic" for cuBLAS's own choice.
+    # "auto" (owner decision 65, 28 October 2026): 56 in float64 MH-1 plans on the measured GPUs
+    # (planner.fixed.DECISION_65_GPUS; MD step 0.86-0.88 of the dynamic setting, same product errors;
+    # plans/ideas-20261027.md, D1), "dynamic" elsewhere.
+    fp64_emulation_mantissa_bits: int | Literal["auto", "dynamic"] = "auto"
     # Release cached free blocks between a stage's eager warm-up and its capture.
     empty_cache_before_capture: bool = True
     # Eager warm-ups after the first capture run inside the graph pool.
@@ -283,6 +297,11 @@ class EngineConfig:
         if self.recapture_budget != "auto":
             _count(self, "recapture_budget")
         _count(self, "graph_variant_cap", minimum=1)
+        bits = self.fp64_emulation_mantissa_bits
+        if bits not in ("auto", "dynamic") and (isinstance(bits, bool) or not isinstance(bits, int)
+                                                or not 8 <= bits <= 128):
+            raise ValueError(f"EngineConfig.fp64_emulation_mantissa_bits must be 'auto', 'dynamic' or an int from 8 "
+                             f"to 128, got {bits!r}")
         if self.graph_variant_cap > min(64, self.dynamo_cache_size_limit):
             raise ValueError(f"EngineConfig.graph_variant_cap must be at most 64 and at most dynamo_cache_size_limit "
                              f"({self.dynamo_cache_size_limit}), got {self.graph_variant_cap!r}")

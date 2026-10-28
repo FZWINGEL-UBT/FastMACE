@@ -63,6 +63,8 @@ def parse_args(argv=None):
     p.add_argument("--blocks", type=int, default=12)
     p.add_argument("--pattern", choices=("abab", "abba"), default="abab")
     p.add_argument("--order", choices=("ab", "ba"), default="ab", help="Build order")
+    p.add_argument("--precision", choices=("float32", "float64"), default="float32",
+                   help="Both sides' force precision (float64: the decision 63 package by default)")
     args = p.parse_args(argv)
     try:
         args.a, args.b = rewrite_overrides(args.a), rewrite_overrides(args.b)
@@ -115,7 +117,7 @@ def main(argv=None):
                 gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, checkpoint_sha256=sha,
                 sides=fields, engine_sides={"a": args.a_engine, "b": args.b_engine},
-                protocol=protocol.as_dict(), pattern=args.pattern, order=order,
+                protocol=protocol.as_dict(), pattern=args.pattern, order=order, precision=args.precision,
                 load=list(os.getloadavg()), structures={})
     for spec in args.structures:
         name, base = ab_step_time.read_structure(spec, None)
@@ -123,7 +125,7 @@ def main(argv=None):
         for side in order:
             started = time.perf_counter()
             rewrites = RewriteConfig(**fields[side]) if fields[side] else "auto"
-            field = ForceField(loaded, base, precision="float32", rewrites=rewrites)
+            field = ForceField(loaded, base, precision=args.precision, rewrites=rewrites)
             integrator = IntegratorConfig(temperature_K=args.temperature_K)
             planner = planners[side]
             plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)

@@ -73,6 +73,7 @@ AUTO_RULES = MappingProxyType({
     "EngineConfig.cueq_conv_fusion": "on_for_plain_cueq_unless_reproducible",
     "EngineConfig.expandable_segments": "on_for_torch_2_14_unless_alloc_conf_set",
     "EngineConfig.fp64_emulation": "on_for_float64_cuda_with_reduced_rate_fp64_unless_reproducible",
+    "EngineConfig.fp64_emulation_mantissa_bits": "56_for_mh1_float64_on_measured_gpus_decision_65_else_dynamic",
     "PrecisionConfig.dtype": "float32_for_hybrid_float64_for_cueq",
     "NeighbourConfig.sort_receivers": "on_for_hybrid_graph_engine",
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
@@ -94,6 +95,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.chunked_conv_backward": "on_with_streaming_conv_and_fused_folded_backward",
     "RewriteConfig.fused_folded_forward": "on_for_mh1_float32_unless_reproducible",
     "RewriteConfig.radial_tables": "on_with_fold_cutoff_unless_reproducible",
+    "RewriteConfig.w_tables": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.species_skip": "on_with_graph_engine_if_model_supports",
     "RewriteConfig.fused_radial_hidden": "never_automatic",
     "RewriteConfig.direct_node_feats": "never_automatic",
@@ -106,6 +108,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
     "RewriteConfig.combo_kernels": "never_automatic",
+    "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.tf32x3_gemms": "never_automatic",
     "RewriteConfig.fx_e3nn_linear": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
     "RewriteConfig.polar_graph_sums": "on_for_hybrid_float32_unless_reproducible_for_qualified_polar1_checkpoints",
@@ -122,7 +125,7 @@ STAGE2_SUPPORT = (
     ("gated_rows", "fold_cutoff"), ("segment_gemm", "fold_cutoff"),
     ("folded_backward_tiles", "fold_cutoff"), ("direct_node_feats", "fold_cutoff"), ("folded_constants", "fold_cutoff"),
     ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
-    ("radial_tables", "fold_cutoff"),
+    ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"),
     ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
@@ -133,11 +136,11 @@ STAGE2_SUPPORT = (
 REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate_first", "joint_radial_input",
                   "fused_folded_backward", "folded_backward_tiles", "segmented_first_sum", "fused_radial_hidden",
                   "direct_node_feats", "folded_constants", "streaming_conv", "chunked_conv_backward",
-                  "fused_folded_forward", "radial_tables",
+                  "fused_folded_forward", "radial_tables", "w_tables",
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
-                  "combo_kernels", "tf32x3_gemms",
+                  "combo_kernels", "save_transcendentals", "tf32x3_gemms",
                   "fx_e3nn_linear", "polar_graph_sums")
 
 # Workload constraints of the rewrite records (SPEC §6.1) and what each needs from the plan.
@@ -343,6 +346,31 @@ def _cuda_available():
 
 # EngineConfig.fp64_emulation's threshold (decision 63): emulate where float64 runs below 1/8 of float32.
 FP64_EMULATION_RATE = 1 / 8
+FP64_EMULATION_MANTISSA_NAME = "CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT"
+
+# Owner decision 65 (28 October 2026): "Make all 3 default on gpu where we measured a speed up but if slowdown or
+# nothing measured dont enable it". The 56 fixed mantissa bits (D1), w_tables (D2) and save_transcendentals (D3)
+# are "auto" on in float64 MH-1 plans that are not reproducible, on these GPU models only (same-process A/Bs in
+# both orders, plans/ideas-20261027.md); the A100 measured slower (D2, D3). Exact device names: a compute
+# capability would take in GPUs never measured (the L4, other sm_89 and sm_120 cards). Adding a GPU here needs its
+# own A/B of all three in both orders.
+DECISION_65_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+DECISION_65_MANTISSA_BITS = 56
+# w_tables: measured on two and three species (NaNbO3: 1.3 GB of tables); four would pass W_TABLE_MAX_BYTES.
+DECISION_65_MAX_SPECIES = 3
+
+
+def _decision_65(dtype, reproducible, hardware, model_label):
+    """None where decision 65's float64 defaults apply, else why they stay off."""
+    if dtype != "float64":
+        return f"{dtype} plan, decision 65"
+    if reproducible:
+        return "reproducible=True, decision 65"
+    if hardware.name not in DECISION_65_GPUS:
+        return f"not a measured GPU, decision 65 ({hardware.name})"
+    if not _mh1(model_label):
+        return f"not MH-1, decision 65 (label {model_label})"
+    return None
 
 
 def _check_fp64_emulation(device):
@@ -559,6 +587,25 @@ class FixedPlanner:
         book.decide("EngineConfig.fp64_emulation", _toggle(value), _why(request, rule, why))
         return _toggle(value)
 
+    def _fp64_mantissa(self, book, fp64_emulation, decision_65):
+        """``EngineConfig.fp64_emulation_mantissa_bits`` (ideas-20261027 D1, owner decision 65): "auto" is
+        ``DECISION_65_MANTISSA_BITS`` where the emulation is on in a float64 MH-1 plan on ``DECISION_65_GPUS``,
+        else "dynamic" (cuBLAS's own choice). Returns an int or "dynamic"."""
+        rule = AUTO_RULES["EngineConfig.fp64_emulation_mantissa_bits"]
+        request = self.engine.fp64_emulation_mantissa_bits
+        if fp64_emulation != "on":
+            value, why = (request if request != "auto" else "dynamic"), "no effect: fp64_emulation is off"
+        elif request != "auto":
+            value, why = request, ("cuBLAS's dynamic mantissa bits" if request == "dynamic"
+                                   else f"{request} fixed mantissa bits ({FP64_EMULATION_MANTISSA_NAME})")
+        elif decision_65 is None:
+            value, why = DECISION_65_MANTISSA_BITS, (f"{DECISION_65_MANTISSA_BITS} fixed mantissa bits on a measured "
+                                                     f"GPU, decision 65 ({FP64_EMULATION_MANTISSA_NAME})")
+        else:
+            value, why = "dynamic", f"cuBLAS's dynamic mantissa bits: {decision_65}"
+        book.decide("EngineConfig.fp64_emulation_mantissa_bits", str(value), _why(request, rule, why))
+        return value
+
     def hardware(self) -> Hardware:
         """``detect_hardware`` of the engine's device, after ``configure_process``."""
         self.configure_process()
@@ -590,7 +637,8 @@ class FixedPlanner:
         return Plan(**parts, reason="fixed plan of phase 1a (main.py)")
 
     def _resolve(self, book, traits, atoms, integrator, hardware, *, backend_choice=None, evaluation=False,
-                 texts=None, reproducible=False, rule_11=None, mc=None, optimizer=None, model_label=None):
+                 texts=None, reproducible=False, rule_11=None, mc=None, optimizer=None, model_label=None,
+                 superset=None):
         """The plan's parts (``Plan`` keywords except the reason), decisions and refusals in ``book``.
 
         Shared with the minimal planner (1b-T12): ``backend_choice`` is its backend rule;
@@ -603,6 +651,8 @@ class FixedPlanner:
         ``OptimizerConfig``: rule 1 from the optimiser's record, checked steps only, the stress path for a
         cell filter (rule 10); ``integrator`` then only carries the MD-side defaults. ``model_label`` is the
         checkpoint's label-table label or None (decision 58: the POLAR-1 defaults need a qualified checkpoint).
+        ``superset`` (minimal planner) holds the ForceField's species (atomic numbers); None takes the structure's
+        (decision 65's species limit for ``w_tables``).
         """
         from fastmace.longrange import polar as longrange
         from fastmace.model.capabilities import ModelTraits, model_traits
@@ -660,8 +710,12 @@ class FixedPlanner:
         hybrid = backend == "hybrid"
         values = self._stage1(book, hybrid, npt)
         self._stage2(book, values, traits, explicit, model_label)
-        self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible, hardware.compute_capability)
+        decision_65 = _decision_65(dtype, reproducible, hardware, model_label)
+        species = len(set(superset)) if superset else len(set(int(z) for z in atoms.get_atomic_numbers()))
+        self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible, hardware.compute_capability,
+                             decision_65=decision_65, species=species)
         fp64_emulation = self._fp64_emulation(book, dtype, reproducible, hardware)
+        mantissa_bits = self._fp64_mantissa(book, fp64_emulation, decision_65)
         rewrite_values = {name: _toggle(values[name]) for name in REWRITE_FIELDS}
 
         rewrites = self.rewrites
@@ -781,6 +835,7 @@ class FixedPlanner:
             engine=dataclasses.replace(engine, backend=backend, pipelined=_toggle(pipelined),
                                        async_output=_toggle(async_output), cueq_conv_fusion=_toggle(bool(fusion)),
                                        expandable_segments=expandable, fp64_emulation=fp64_emulation,
+                                       fp64_emulation_mantissa_bits=mantissa_bits,
                                        **phase_3["engine"]),
             precision=dataclasses.replace(self.precision, dtype=dtype, **phase_3["precision"]),
             neighbours=dataclasses.replace(self.neighbours, sort_receivers=_toggle(values["sort_receivers"]),
@@ -973,6 +1028,9 @@ class FixedPlanner:
         # opt-6 OPT6-T05 (certified, owner decision 61); default on by owner decision 62 (27 October 2026) wherever
         # fold_cutoff is, float32 and not reproducible (stage 2, _fastmace_rules).
         needs("radial_tables", r.radial_tables != "off", v["fold_cutoff"], "fold_cutoff")
+        # ideas-20261027 D2; owner decision 65: "auto" on in float64 MH-1 plans on the measured GPUs (the FastMACE
+        # rules).
+        needs("w_tables", r.w_tables != "off", v["fold_cutoff"], "fold_cutoff")
         note("block_linear", hybrid if r.block_linear == "auto" else r.block_linear == "on",
              f"stage 1: {backend_name} backend")
         needs("grouped_linear", r.grouped_linear != "off", v["block_linear"], "block_linear")
@@ -994,6 +1052,9 @@ class FixedPlanner:
         note("combo_kernels", r.combo_kernels == "on",
              "on: Inductor's pointwise combo kernels in the compiled model" if r.combo_kernels == "on"
              else "off: only an explicit 'on' enables it (opt-in until its A/B on both GPUs)")
+        # ideas-20261027 D3; owner decision 65 as w_tables (the FastMACE rules).
+        note("save_transcendentals", r.save_transcendentals != "off",
+             "transcendental ops saved for the backward, not recomputed (ideas-20261027 D3)")
         needs("tf32x3_gemms", r.tf32x3_gemms == "on", v["block_linear"], "block_linear")
         if r.tf32x3_gemms == "auto":
             v["_why"]["tf32x3_gemms"] = "off: only an explicit 'on' enables it (OPT4-T03, accuracy screen)"
@@ -1047,7 +1108,8 @@ class FixedPlanner:
                 v["_auto_off"]["fused_folded_forward"] = reason
                 v["_why"]["fused_folded_forward"] += f"; stage 2: off, {reason}"
 
-    def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False, capability=None):
+    def _fastmace_rules(self, book, v, hybrid, explicit, dtype="float32", reproducible=False, capability=None,
+                        decision_65="no hardware given, decision 65", species=None):
         """FastMACE's hard rules on the rewrites, then one decision per rewrite field and neighbour option."""
         if v["tf32x3_gemms"]:
             from fastmace.kernels.triton.tf32x3_gemm import MIN_CAPABILITY
@@ -1139,6 +1201,35 @@ class FixedPlanner:
         if v["fused_folded_forward"] and dtype != "float32":
             book.refuse(f"RewriteConfig.fused_folded_forward='on' needs float32, not {dtype} (the fused kernel is "
                         "float32; float64 plans keep the cuBLAS product)", "fused-folded-forward-needs-float32")
+        # Owner decision 65 (28 October 2026): "auto" keeps w_tables and save_transcendentals only in float64 MH-1
+        # plans on DECISION_65_GPUS; w_tables also needs its requirements and at most DECISION_65_MAX_SPECIES.
+        for name in ("w_tables", "save_transcendentals"):
+            if not v[name] or name in explicit:
+                continue
+            reason = decision_65
+            if reason is None and name == "w_tables":
+                if not (v["radial_tables"] and v["chunked_conv_backward"]):
+                    reason = "requires radial_tables and chunked_conv_backward"
+                elif species is not None and species > DECISION_65_MAX_SPECIES:
+                    reason = (f"{species} species, decision 65 measured at most {DECISION_65_MAX_SPECIES} (the "
+                              "tables grow with the square of the species)")
+            if reason is None:
+                v["_why"][name] += "; on: a measured GPU, decision 65"
+            else:
+                v[name] = False
+                v["_why"][name] += f"; off: {reason}"
+                if reason is not decision_65:  # the workload's limits; the plan's dtype and GPU are not listed
+                    v["_auto_off"][name] = reason
+        if decision_65 is not None:  # float64 records: stage 2's drops are not listed outside decision 65's plans
+            for name in ("w_tables", "save_transcendentals"):
+                if name not in explicit:
+                    v["_auto_off"].pop(name, None)
+        if v["w_tables"] and not (v["radial_tables"] and v["chunked_conv_backward"]):
+            book.refuse("RewriteConfig.w_tables='on' requires radial_tables and chunked_conv_backward, which are not "
+                        "both on", "rewrite-requirement-missing")
+        if v["w_tables"] and (dtype != "float64" or reproducible):
+            book.refuse(f"RewriteConfig.w_tables='on' needs float64 outside reproducible plans, not {dtype}"
+                        f"{' (reproducible)' if reproducible else ''}", "w-tables-needs-float64")
         for name in REWRITE_FIELDS:
             item = f"RewriteConfig.{name}"
             book.decide(item, _toggle(v[name]), _why(getattr(self.rewrites, name), AUTO_RULES[item], v["_why"][name]))
@@ -1221,7 +1312,7 @@ class FixedPlanner:
         if plan.engine.fp64_emulation == "on":  # owner decision 63: before the model's first float64 product
             from fastmace.model import compile as compiling
 
-            compiling.configure_fp64_emulation(self.environ)
+            compiling.configure_fp64_emulation(self.environ, plan.engine.fp64_emulation_mantissa_bits)
 
         from fastmace.rewrites import registry as reg
 

@@ -18,6 +18,14 @@ instead of 157 µs (``results/opt3-T04-graph-gaps/``).
   compiled with and one without the option are never shared. Nothing is patched process-wide, and an
   uncompiled plan (the CPU, ``compile_mode="none"``) is not affected.
 - **Opt-in** (default off, the planner's ``never_automatic``); the owner decides defaults.
+
+``save_transcendentals`` (ideas-20261027 D3) gives the model's compile a custom AOTAutograd partitioner
+(``torch._inductor.config.custom_partitioner_fn``, keyed by its uuid in the compiler caches): PyTorch's min-cut
+partitioner, with exp, tanh, sigmoid, log and the other transcendental ops removed from its recomputable list for
+that one call, so their forward outputs are saved for the backward instead of recomputed there. On reduced-rate
+float64 GPUs those ops run on the FP64 pipe (84-89 % busy in the float64 profiles, f64-T03); there the float64
+package's MD step took 0.970 (NbCl5) and 0.979 (NaCl) of its time on the RTX 5060 Ti. Exact: the same operations,
+computed once in the forward instead of again in the backward. Opt-in.
 """
 
 from __future__ import annotations
@@ -60,11 +68,97 @@ def _combo_selfcheck(original, rewritten, context):
                        else "combo kernels without the pointwise-only restriction")
 
 
+# The ops ``save_transcendentals`` keeps out of the partitioner's recomputable list.
+TRANSCENDENTAL_OPS = ("exp", "expm1", "exp2", "log", "log1p", "log2", "tanh", "sigmoid", "sin", "cos", "erf",
+                      "rsqrt", "sqrt", "pow", "reciprocal", "silu")
+SAVE_TRANSCENDENTALS_UUID = "fastmace-save-transcendentals-v1"
+# PyTorch 2.14.1's partitioner and its op list, which save_transcendentals calls and filters.
+PARTITIONER_SOURCES = {
+    "torch._functorch.partitioners:get_default_op_list":
+        "7f709132ee0250052e71f493fea11758a17701a09a02ef74aa85710bfda2487b",
+    "torch._functorch.partitioners:min_cut_rematerialization_partition":
+        "ad6fd8a246b3535b6c1048260539b87dd40eab42e146238b2b9b440ec24562ee",
+}
+
+
+def _partitioner_class():
+    """The ``SaveTranscendentals`` class, built on first use (torch is imported late) and published as this
+    module's attribute: Inductor's FX-graph cache pickles the compile options, so the class must be importable
+    by name (``__getattr__`` below builds it in a fresh process)."""
+    cls = globals().get("SaveTranscendentals")
+    if cls is not None:
+        return cls
+    from torch._inductor.custom_graph_pass import CustomPartitionerFn
+
+    class SaveTranscendentals(CustomPartitionerFn):
+        """The min-cut partitioner without recomputation of ``TRANSCENDENTAL_OPS`` (``save_transcendentals``)."""
+
+        def __call__(self, gm, joint_inputs, **kwargs):
+            import torch
+            from torch._functorch import partitioners
+
+            original = partitioners.get_default_op_list
+            banned = {getattr(torch.ops.aten, name) for name in TRANSCENDENTAL_OPS if hasattr(torch.ops.aten, name)}
+
+            def op_list():
+                op_types = original()
+                for op in [op for op in op_types.recomputable_ops if op in banned]:
+                    op_types.recomputable_ops.discard(op)
+                return op_types
+
+            partitioners.get_default_op_list = op_list  # for this call only, restored below
+            try:
+                return partitioners.min_cut_rematerialization_partition(gm, joint_inputs, **kwargs)
+            finally:
+                partitioners.get_default_op_list = original
+
+        def uuid(self):
+            return SAVE_TRANSCENDENTALS_UUID
+
+    SaveTranscendentals.__module__ = __name__
+    SaveTranscendentals.__qualname__ = "SaveTranscendentals"
+    globals()["SaveTranscendentals"] = SaveTranscendentals
+    return SaveTranscendentals
+
+
+def __getattr__(name):
+    if name == "SaveTranscendentals":
+        return _partitioner_class()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def save_transcendentals_partitioner():
+    """The ``custom_partitioner_fn`` of ``save_transcendentals``."""
+    return _partitioner_class()()
+
+
+def _apply_save(model, context):
+    if "custom_partitioner_fn" in inductor_options(model):
+        from fastmace.rewrites.registry import RewriteError
+
+        raise RewriteError("save_transcendentals: another record already set a custom partitioner")
+    return sorted(set_options(model, {"custom_partitioner_fn": save_transcendentals_partitioner()}))
+
+
+def _save_selfcheck(original, rewritten, context):
+    """Only the compile option is set (the modules are unchanged); its exactness is measured on the GPU
+    (``plans/ideas-20261027.md``, D3)."""
+    option = inductor_options(rewritten).get("custom_partitioner_fn")
+    passed = option is not None and option.uuid() == SAVE_TRANSCENDENTALS_UUID
+    return CheckResult(passed, 0.0, 0.0, 0, "compile option only; transcendental ops saved, not recomputed"
+                       if passed else "the custom partitioner is not save_transcendentals'")
+
+
 RECORDS = {
     "combo_kernels": Rewrite(
         name="combo_kernels", applies_to=_always, requires=(), conflicts=(), mace_versions=MACE_VERSIONS,
         source_hashes={}, exactness="rounding", default="off", deterministic=True, workload_constraints=(),
         apply=_apply_combo, selfcheck=_combo_selfcheck),
+    "save_transcendentals": Rewrite(
+        name="save_transcendentals", applies_to=_always, requires=(), conflicts=(), mace_versions=MACE_VERSIONS,
+        source_hashes=PARTITIONER_SOURCES, exactness="exact", default="off", deterministic=True,
+        workload_constraints=(), apply=_apply_save, selfcheck=_save_selfcheck),
 }
 
-__all__ = ["COMBO_OPTIONS", "INDUCTOR_OPTIONS", "RECORDS", "inductor_options", "set_options"]
+__all__ = ["COMBO_OPTIONS", "INDUCTOR_OPTIONS", "PARTITIONER_SOURCES", "RECORDS", "SAVE_TRANSCENDENTALS_UUID",
+           "TRANSCENDENTAL_OPS", "inductor_options", "save_transcendentals_partitioner", "set_options"]

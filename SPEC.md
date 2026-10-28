@@ -2722,6 +2722,44 @@ Open decisions for the owner:
    NVE drift unchanged; b/a in both build orders NaNbO3 0.928, NbCl5 0.967,
    NaCl 0.996 on the RTX 5060 Ti and NaNbO3 0.958, NbCl5 0.982, NaCl 0.981 on
    the RTX 4000 Ada (murphy) (`docs/validation/opt8-T02.md`).
+65. Decided (user, 28 October 2026, ideas-20261027: "Make all 3 default on
+   gpu where we measured a speed up but if slowdown or nothing measured dont
+   enable it"): in float64 MH-1 plans that are not reproducible, three float64
+   speed-ups are on by default on the GPU models where same-process A/Bs in
+   both orders measured a speed-up, matched by exact device name
+   (`planner.fixed.DECISION_65_GPUS`: "NVIDIA GeForce RTX 5060 Ti", sm_120;
+   "NVIDIA RTX 4000 Ada Generation", sm_89). A compute capability would take
+   in GPUs never measured (the L4, other sm_89 and sm_120 cards), so it is not
+   used. The three:
+   (a) D1, `EngineConfig.fp64_emulation_mantissa_bits` "auto" = 56 fixed
+   mantissa bits in cuBLAS's float64 emulation (only where decision 63's
+   emulation is on; "dynamic" elsewhere);
+   (b) D2, `RewriteConfig.w_tables` (per-piece folded radial tables, rounding,
+   nondeterministic), which also needs `radial_tables`,
+   `chunked_conv_backward` and at most three species (its tables grow with
+   the square of the species: 1.3 GB on NaNbO3; `W_TABLE_MAX_BYTES` 2 GiB);
+   (c) D3, `RewriteConfig.save_transcendentals` (a custom AOTAutograd
+   partitioner that saves transcendental ops for the backward; exact).
+   Off everywhere else: on the A100 (measured slower), on every unmeasured
+   GPU, on the CPU, in float32 and reproducible plans, and for other models
+   (all measurements are MH-1). D3 is deterministic, but reproducible plans
+   keep it off too: they take native products and MACE's code, a route the
+   speed-up was not measured on. The off reason names the GPU, for example
+   "not a measured GPU, decision 65 (NVIDIA A100-SXM4-40GB)". An explicit
+   "on", "off", "dynamic" or bit count still overrides. Adding a GPU to the
+   list needs its own A/B of all three in both orders. Measured (MD step,
+   new/old; D2 and D3 same-process A/Bs in both build orders, D1 ABBA in
+   separate processes; `plans/ideas-20261027.md`, "Per-GPU confirmation"):
+
+   | Idea, cell | RTX 5060 Ti | RTX 4000 Ada | A100-SXM4-40GB |
+   | --- | ---: | ---: | ---: |
+   | D1 NbCl5 / NaNbO3 / NaCl | 0.877 / 0.881 / 0.862 | 0.876 / 0.884 / 0.858 | not applied (emulation off) |
+   | D2 NbCl5 / NaNbO3 / NaCl | 0.911 / 0.855 / 0.942 | 0.918 / 0.870 / 0.944 | 1.063 / 1.103 / 1.268 |
+   | D3 NbCl5 / NaNbO3 / NaCl | 0.969 / 0.980 / 0.975 | 0.971 / 0.982 / 0.979 | 1.010 / 1.022 / 0.994 |
+
+   All three together: 0.797 (NbCl5), 0.782 (NaNbO3), 0.806 (NaCl) locally.
+   Forces within 2–5e-15 eV/Å of the decision-63 package; 20 ps NaCl NVE
+   drift unchanged for each idea alone and for all three together.
 
 ---
 
