@@ -45,14 +45,14 @@ monitor() {
   done
 }
 
-idle_check() {  # name: settle up to 120 s for utilization <= 5 % in both views and no WSL compute process
+idle_check() {  # name: settle up to 30 min for utilization <= 5 % in both views and no WSL compute process
   local name=$1 waited=0 pids util wutil
   while true; do
     pids=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader | tr -d ' ' | paste -sd, -)
     util=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | tr -d ' ')
     wutil=$($WSMI --query-gpu=utilization.gpu --format=csv,noheader,nounits | tr -d ' \r')
     if [ -z "$pids" ] && [ "$util" -le 5 ] && [ "$wutil" -le 5 ]; then break; fi
-    if [ $waited -ge 120 ]; then
+    if [ $waited -ge 1800 ]; then
       echo "$(date -u +%FT%TZ) $name NOT IDLE pids=$pids util=$util win_util=$wutil" >> "$ROOT/idle-checks.log"
       return 1
     fi
