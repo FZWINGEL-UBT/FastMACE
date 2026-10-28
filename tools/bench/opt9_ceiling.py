@@ -14,7 +14,10 @@ radial r-gradient is missing): its timing is a ceiling for the w'-dot backward o
 remove both and the ``dw`` chunk stores (not stubbed here; standalone 0.16-0.40 ms in OPT9-T01). It is an
 over-estimate in that a fused kernel adds its own work (OPT9-T01's ``wdot``) and that the table backward of
 interaction 0 is stubbed too. Timed blocks alternate (``fastmace.bench.ab.run_ab``); a recompile while timed makes
-the structure invalid. Writes ``<output>.json``. Use an idle GPU.
+the structure invalid. Both sides use a tiny timestep (``--timestep-fs``, default 0.001 fs): with the default
+0.5 fs, side ``b``'s missing radial forces heated NaNbO3 to 28,800 K within the run and its edge count (and step
+time) grew. With the tiny step both sides keep the starting neighbour list, so they do the same work; neither
+rebuilds it. Writes ``<output>.json``. Use an idle GPU.
 
 Usage: python tools/bench/opt9_ceiling.py --output OUT --checkpoint mace-mh-1.model [--structures NaNbO3 NbCl5]
 """
@@ -90,6 +93,8 @@ def main(argv=None):
     p.add_argument("--model", default="mh1-r2scan")
     p.add_argument("--structures", nargs="+", default=["NaNbO3", "NbCl5"])
     p.add_argument("--temperature-K", type=float, default=300.0)
+    p.add_argument("--timestep-fs", type=float, default=0.001,
+                   help="Both sides; tiny so side b's wrong forces cannot heat it and the neighbour list stays fixed")
     p.add_argument("--warmup", type=int, default=300)
     p.add_argument("--block", type=int, default=200)
     p.add_argument("--blocks", type=int, default=8)
@@ -126,7 +131,7 @@ def main(argv=None):
             STUB.update(active=side == "b", input_grad=0, table_backward=0)
             started = time.perf_counter()
             field = ForceField(loaded, base, precision="float32", rewrites="auto")
-            integrator = IntegratorConfig(temperature_K=args.temperature_K)
+            integrator = IntegratorConfig(temperature_K=args.temperature_K, timestep_fs=args.timestep_fs)
             plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
             engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
             sides[side] = ab_step_time.FastMACESide(engine, torch)
