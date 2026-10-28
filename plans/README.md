@@ -80,6 +80,7 @@ workers"). 2-T21 works in the ResearchModule worktree
 | --- | --- | --- |
 | Faster training and fine-tuning | [future-training.md](future-training.md) | **documented only** (owner, 28 October 2026: no compute for it now); which speed-ups carry over, package boundary, steps starting with profiling MACE's trainer |
 | Rename FastMACE to loup | [future-rename-loup.md](future-rename-loup.md) | **planned** (owner, 28 October 2026); after the open branches merge; the GitHub rename and the PyPI publication wait for the owner's go-ahead |
+| O(N) neighbour-list rebuild for very large cells | [future-neighbour-list.md](future-neighbour-list.md) | **documented only** (owner, 28 October 2026); today's rebuild screens N² tile pairs; sorted tiles with bounding-box pruning first, then a GPU cell list, from a measured crossover |
 
 ## Open owner decisions
 
