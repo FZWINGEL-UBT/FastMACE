@@ -154,12 +154,34 @@ the run as a whole is shorter:
 
 The junit files are in `results/suite-speed-20261027/` (gzip).
 
+## The 60 s stall of the GPU-queue test (fixed)
+
+`test_concurrent_waiters_run_in_arrival_order` took 60.05 s in 3 of 9 full murphy runs and 0.1 s in the
+others, and it still passed. It never reproduced alone.
+
+- **Cause:** a bug in `tools/ci/local_gpu.py` that shows on NFS. `release()` (and `remove_stale()`)
+  deleted the marker with `shutil.rmtree(..., ignore_errors=True)`.
+  - When another waiter had `holder.json` open for reading at that moment, NFS renamed the file to
+    `.nfsXXXX` instead of deleting it. The `rmdir` then failed, and the error was hidden.
+  - An empty marker directory stayed behind. A marker without `holder.json` reads as a reserver between
+    `mkdir` and write for `UNWRITTEN_GRACE_S = 60 s`, so every waiter waited 60 s.
+  - Shown on murphy's NFS with one open handle. `release()` returned True, the marker stayed with only
+    `.nfs000…` in it, and the next `reserve` got "being reserved".
+- **Fix:** `_remove_marker` renames the marker directory aside (`.<marker>.removed-<pid>-<thread>-<ns>`),
+  which frees its path at once, and then deletes it. Later removals retry any leftovers. If the rename
+  fails, it falls back to deleting in place as before.
+  - On murphy's NFS with the open handle, the marker is now gone at once and the next `reserve` succeeds.
+- **Regression test:** `test_a_release_frees_the_marker_even_when_its_directory_cannot_be_removed`
+  mimics the NFS behaviour on any filesystem. It fails on the old code and passes on the new.
+- **Full runs after the fix:** two runs on murphy (357.3 s and 344.3 s, 4,503 passed). The waiter test
+  took 0.10 s and 0.13 s. Two runs alone would not prove much against 3 stalls in 9; the deterministic
+  NFS reproduction above is the evidence.
+- **Where it mattered:** the local PC's home directory is ext4, which deletes open files, so real
+  reservations there were not affected. It mattered for any marker on NFS, such as this test's temporary
+  directory under `--basetemp` on the NAS.
+
 ## Found on the way, not changed
 
-- **`test_concurrent_waiters_run_in_arrival_order`** (`tools/ci/local_gpu.py`) took 60.05 s, its waiters'
-  `wait_s`, in 3 of 9 full runs and 0.1 s in the others. It still passes. It did not reproduce in 12 runs
-  alone or under a 100-test load. One waiter seems to miss its turn until it times out; this is worth a
-  look with the queue's polling on NFS (`--basetemp` on the NAS).
 - **Child processes do not get the caches.** A gate reference child (8.8 s, measured) loads the same model
   twice: 2.7 s of conversions, about 1 s of which the naive-kernel cache would save. Reaching the children
   needs a start-up hook (`sitecustomize` on `PYTHONPATH`). Murphy's system Python already has one, which

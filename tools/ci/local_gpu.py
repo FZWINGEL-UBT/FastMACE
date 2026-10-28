@@ -48,6 +48,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -199,7 +200,29 @@ def remove_stale(marker, proc_root="/proc"):
     if marker.is_dir() and live_holder(marker, proc_root) is None:
         holder = read_holder(marker) or {}
         print(f"local_gpu: removing a stale reservation ({describe(holder)}; holder process gone)", file=sys.stderr)
+        _remove_marker(marker)
+
+
+def _remove_marker(marker):
+    """Free the marker's path at once: rename the directory aside, then delete it.
+
+    Deleting in place could leave the directory behind: on NFS a ``holder.json`` that another process has
+    open is renamed to ``.nfsXXXX`` instead of deleted, ``rmdir`` then fails, and the empty marker read as
+    a reserver between mkdir and write for ``UNWRITTEN_GRACE_S``. That stalled every waiter for 60 s (the
+    queue test with its temporary directory on murphy's NFS, suite-speed, 27 October 2026). A directory
+    renamed aside is out of the way however long its deletion takes; later removals retry the leftovers.
+    """
+    marker = Path(marker)
+    aside = marker.with_name(f".{marker.name}.removed-{os.getpid()}-{threading.get_ident()}-{time.monotonic_ns()}")
+    try:
+        marker.rename(aside)
+    except FileNotFoundError:
+        return
+    except OSError:  # not renamable here: delete in place, as before
         shutil.rmtree(marker, ignore_errors=True)
+        return
+    for leftover in [aside, *marker.parent.glob(f".{marker.name}.removed-*")]:
+        shutil.rmtree(leftover, ignore_errors=True)
 
 
 def reserve(marker, purpose, pid, proc_root="/proc", user=None, now=None, quiet=False):
@@ -232,7 +255,7 @@ def release(marker, pid):
     holder = read_holder(marker)
     if holder is None or holder.get("pid") != pid:
         return False
-    shutil.rmtree(marker, ignore_errors=True)
+    _remove_marker(marker)
     return True
 
 
