@@ -57,7 +57,7 @@ def install_stubs():
             def launch(*args, **kwargs):
                 if STUB["active"]:
                     STUB["table_backward"] += 1
-                    args[10].zero_()  # grad_r
+                    args[8].zero_()  # grad_r (r, pair, dcoef, starts, scales, bins, grad_g, grad_density, grad_r, ...)
                     return None
                 return backward[grid](*args, **kwargs)
             return launch
