@@ -74,14 +74,25 @@ must add is larger than the ceiling: T01's `wdot` alone is 2.46 ms (NaNbO3) and 
 against at most 1.19 + 0.40 ms (ceiling plus the `dw` stores) and 0.72 + 0.26 ms. **On the RTX 4000 Ada the fused
 backward would be slower than today's.** The verdict of T01 stands.
 
-On the A100 the step-level ceiling was not measured (a Modal run failed at setup before the stubs were fixed;
-the owner then asked for the workstations). An estimate from T01's standalone numbers: if the A100's ceiling is a
-similar share of its step, the gain would be the ceiling plus the stores (0.25 ms) minus `wdot` (0.91 ms), around
-0.5 ms or 3–4 % of a NaNbO3 step. That is an inference, not a measurement.
+**A100 (owner request, Modal A100-SXM4-40GB, job `ap-37ElDNqiDn5khCxqRwXazl`, source `93bde431`, 707 s,
+about $0.49):** the same tool and protocol.
+
+| Cell (A100) | default ms | stubbed ms | b/a (block range) | ceiling |
+| --- | ---: | ---: | --- | ---: |
+| NaCl | 2.274 | 2.135 | 0.939 (0.936–0.939) | 0.14 ms, 6.1 % |
+| NbCl5 | 12.56 | 11.39 | 0.907 (0.905–0.908) | 1.17 ms, 9.3 % |
+| NaNbO3 | 11.49 | 9.51 | **0.828** (0.826–0.828) | 1.98 ms, 17.2 % |
+
+On the A100 the removed work is much less hidden than on the Ada (17 % against 7 % of the NaNbO3 step), and
+T01's added `wdot` is small there (0.91 / 0.49 ms, on the A100-SXM4-80GB). Estimate for a fused kernel (ceiling
++ `dw` stores − `wdot`; inference across two A100 variants, not a measurement): NaNbO3 1.98 + 0.25 − 0.91 ≈ 1.3 ms
+(≈ 11 % of the step), NbCl5 1.17 + 0.16 − 0.49 ≈ 0.8 ms (≈ 7 %). That is large, but only on a GPU class whose L2
+bandwidth absorbs the receiver-order `G'` gathers; on the RTX 4000 Ada it is a loss. A default would need a
+general hardware rule (for example from a measured L2 gather rate), which is an owner decision.
 
 ## Not done
 
-- OPT9-T02's A100 ceiling and the prototype in the vendored streaming backward.
+- The prototype in the vendored streaming backward (only worth building for an A100-class rule).
 - The local RTX 5060 Ti (32 MiB L2, smaller than NaNbO3's 29 MiB `G'` plus the working set); its record is added
   when the queued run finishes.
 - Real operands (real r distribution: MD edges reach fewer pieces than uniform groups, which would shrink the
