@@ -6,8 +6,9 @@ Side ``a`` is the minimal planner's default plan. Side ``b`` is the same plan bu
   ``streaming_conv_folded_backward`` for every chunk) only zeroes its output rows;
 - the radial tables' backward kernel (both interactions) only zeroes ``dL/dr``.
 
-The stubs act while side ``b`` is built and warmed up, which is when its CUDA graphs are captured, except inside
-the rewrites' setup self-checks (``Registry.selfcheck``), which compare against the original model; side ``a`` is
+The stubs act while side ``b`` is planned, built and warmed up, which is when its CUDA graphs are captured; they are
+off while its force field applies the rewrites (their self-checks and the radial tables' certificates compare
+against the original model, and ``Registry.selfcheck`` also turns them off); side ``a`` is
 built and warmed up first with them off, so its graphs hold the real kernels. Side ``b``'s forces are wrong (the
 radial r-gradient is missing): its timing is a ceiling for the w'-dot backward of plans/opt-9.md, which would
 remove both and the ``dw`` chunk stores (not stubbed here; standalone 0.16-0.40 ms in OPT9-T01). It is an
@@ -119,9 +120,10 @@ def main(argv=None):
         name, base = ab_step_time.read_structure(spec, None)
         sides, setup, stubbed = {}, {}, {}
         for side in ("a", "b"):
-            STUB.update(active=side == "b", input_grad=0, table_backward=0)
+            STUB.update(active=False, input_grad=0, table_backward=0)
             started = time.perf_counter()
             field = ForceField(loaded, base, precision="float32", rewrites="auto")
+            STUB["active"] = side == "b"  # after the rewrites' self-checks and the tables' certificates
             integrator = IntegratorConfig(temperature_K=args.temperature_K)
             plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
             engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
