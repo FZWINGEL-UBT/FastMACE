@@ -56,6 +56,9 @@ def parse_args(argv=None):
     p.add_argument("--a-engine", nargs="*", default=[], metavar="FIELD=true|false",
                    help="Side a's boolean EngineConfig fields (opt-2 OPT2-T04: overlap_rebuild, step_graph)")
     p.add_argument("--b-engine", nargs="*", default=[], metavar="FIELD=true|false", help="Side b's, as --a-engine")
+    p.add_argument("--a-neighbours", nargs="*", default=[], metavar="FIELD=VALUE",
+                   help="Side a's NeighbourConfig fields (e.g. skin=0.66, edge_bucket_fraction=0.025)")
+    p.add_argument("--b-neighbours", nargs="*", default=[], metavar="FIELD=VALUE", help="Side b's, as --a-neighbours")
     p.add_argument("--a-constant", nargs="*", default=[], metavar="MODULE:NAME=VALUE",
                    help="Module constants set while side a is built (screens; e.g. "
                         "fastmace.kernels.oeq_streaming.fused_forward:BLOCKS_PER_SM=4), restored after")
@@ -80,7 +83,13 @@ def parse_args(argv=None):
         args.a_constant, args.b_constant = constant_overrides(args.a_constant), constant_overrides(args.b_constant)
     except ValueError as exc:
         p.error(str(exc))
-    if args.a == args.b and args.a_engine == args.b_engine and args.a_constant == args.b_constant:
+    try:
+        args.a_neighbours, args.b_neighbours = (neighbour_overrides(args.a_neighbours),
+                                                neighbour_overrides(args.b_neighbours))
+    except ValueError as exc:
+        p.error(str(exc))
+    if (args.a == args.b and args.a_engine == args.b_engine and args.a_constant == args.b_constant
+            and args.a_neighbours == args.b_neighbours):
         p.error("the two sides have the same rewrite and engine fields")
     return args
 
@@ -124,16 +133,39 @@ class _Constants:
 
 
 def engine_overrides(items):
-    """{field: bool} of ``FIELD=true|false`` items, each a boolean EngineConfig field."""
+    """{field: value} of ``FIELD=VALUE`` items: a boolean EngineConfig field with true|false, or a float one."""
     from fastmace.config import EngineConfig
 
-    fields = {f.name: f for f in dataclasses.fields(EngineConfig) if isinstance(f.default, bool)}
+    fields = {f.name: f for f in dataclasses.fields(EngineConfig)
+              if isinstance(f.default, bool) or type(f.default) is float}
     out = {}
     for item in items:
         name, _, value = item.partition("=")
-        if name not in fields or value.lower() not in ("true", "false"):
-            raise ValueError(f"{item!r}: expected FIELD=true|false with a boolean EngineConfig field")
-        out[name] = value.lower() == "true"
+        if name not in fields:
+            raise ValueError(f"{item!r}: expected FIELD=VALUE with a boolean or float EngineConfig field")
+        if isinstance(fields[name].default, bool):
+            if value.lower() not in ("true", "false"):
+                raise ValueError(f"{item!r}: {name} takes true or false")
+            out[name] = value.lower() == "true"
+        else:
+            out[name] = float(value)
+    return out
+
+
+def neighbour_overrides(items):
+    """{field: value} of ``FIELD=VALUE`` items, each a NeighbourConfig field; numbers become floats."""
+    from fastmace.config import NeighbourConfig
+
+    fields = {f.name for f in dataclasses.fields(NeighbourConfig)}
+    out = {}
+    for item in items:
+        name, _, value = item.partition("=")
+        if name not in fields or not value:
+            raise ValueError(f"{item!r}: expected FIELD=VALUE with a NeighbourConfig field")
+        try:
+            out[name] = float(value)
+        except ValueError:
+            out[name] = value
     return out
 
 
@@ -153,8 +185,12 @@ def main(argv=None):
     if ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     protocol = step_time.TimingProtocol(warmup=args.warmup, block=args.block, blocks=args.blocks)
-    planners = {"a": minimal.MinimalPlanner(engine=EngineConfig(backend="hybrid", **args.a_engine)),
-                "b": minimal.MinimalPlanner(engine=EngineConfig(backend="hybrid", **args.b_engine))}
+    from fastmace.config import NeighbourConfig
+
+    planners = {"a": minimal.MinimalPlanner(engine=EngineConfig(backend="hybrid", **args.a_engine),
+                                            neighbours=NeighbourConfig(**args.a_neighbours)),
+                "b": minimal.MinimalPlanner(engine=EngineConfig(backend="hybrid", **args.b_engine),
+                                            neighbours=NeighbourConfig(**args.b_neighbours))}
     hardware = planners["a"].hardware()
     sha = hashlib.sha256(args.checkpoint.read_bytes()).hexdigest()
     loaded = loading.load_pristine(args.model, checkpoint=str(args.checkpoint), sha256=sha)
@@ -164,6 +200,7 @@ def main(argv=None):
                 gpu=torch.cuda.get_device_name(), torch=torch.__version__,
                 fastmace_commit=ab_step_time.fastmace_commit(), model=args.model, checkpoint_sha256=sha,
                 sides=fields, engine_sides={"a": args.a_engine, "b": args.b_engine},
+                neighbour_sides={"a": args.a_neighbours, "b": args.b_neighbours},
                 constant_sides={side: {f"{m}:{n}": v for (m, n), v in values.items()}
                                 for side, values in (("a", args.a_constant), ("b", args.b_constant))},
                 timestep_fs=args.timestep_fs,
@@ -188,6 +225,12 @@ def main(argv=None):
                            if any(f"RewriteConfig.{f} " in line for f in {**args.a, **args.b})]
         for side in order:  # warm up outside the compile-counter window (new edge sizes compile here)
             step_time.warm_up(sides[side], protocol.warmup)
+
+        def engine_counters():  # rebuilds and redos explain a neighbour-list A/B (fp32 profile)
+            return {side: {key: getattr(sides[side].engine, key, None)
+                           for key in ("rebuilds", "pipelined_redos", "pipelined_early_rebuilds")} for side in sides}
+
+        counters_before = engine_counters()
         counted = ab_step_time.compile_counters(counters)
         result = ab.run_ab(sides, dataclasses.replace(protocol, warmup=0), pattern=args.pattern)
         changes, recompiled = ab_step_time.compile_changes(counted, ab_step_time.compile_counters(counters))
@@ -197,6 +240,10 @@ def main(argv=None):
                      pair_ratios=[b / a for a, b in zip(blocks["a"], blocks["b"])], setup_s=setup, plan_lines=lines,
                      compile_during_timing=dict(changes=changes, recompiled=recompiled),
                      observables={side: sides[side].observables() for side in sides}, load_after=list(os.getloadavg()),
+                     engine_counters_timed={side: {key: (value - counters_before[side][key]
+                                                         if value is not None and counters_before[side][key] is not None
+                                                         else None) for key, value in now.items()}
+                                            for side, now in engine_counters().items()},
                      other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()])
         entry["valid"] = not recompiled and not entry["other_gpu_processes"]
         meta["structures"][name] = entry

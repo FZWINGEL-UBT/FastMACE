@@ -3,6 +3,7 @@
 #   o7     fused_folded_forward grid: BLOCKS_PER_SM 2 (a, the default) against 4 (b); NaCl and NaNbO3, 1 fs, 300 K,
 #          tools/ab_rewrites.py, 12 blocks of 300 steps, both build orders
 #   tiles  tools/bench/segment_gemm_tiles.py (segment_gemm tiles against cuBLAS)
+#   skin066 skin100 tiles128 bucket025 savetrans aggrfusion: A/Bs of the rebuild/brainstorm screens (ab below)
 # Usage: bash screens.sh local|ws ROOT FM MODE...
 # local: inside `tools/ci/local_gpu.py run --quiet`; ws: from a scratch folder under /mnt/homes/zwingel, and every job
 # first checks that no other user's job runs and the GPU has no compute process (AGENTS.md, "Shared workstations").
@@ -44,6 +45,13 @@ run() {  # name command...
   "$@" > "$ROOT/$name.log" 2>&1 < /dev/null
   note "end $name exit=$?"
 }
+ab() {  # name "structures" side args...: tools/ab_rewrites.py, 1 fs, 1000 K, both build orders per structure
+  local name=$1 structures=$2; shift 2
+  for s in $structures; do for order in ab ba; do
+    if [ "$order" = ab ]; then pattern=abab; else pattern=abba; fi
+    run "$name-$s-$order" "$PY" "$FM/tools/ab_rewrites.py" --output "$ROOT/$name-$s-$order" --checkpoint "$CK"       --model mh1-r2scan --structures "$s" --timestep-fs 1 --temperature-K 1000 --order "$order"       --pattern "$pattern" "$@"
+  done; done
+}
 note "fastmace=$(cat "$FM/.source_commit") gpu=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader) modes=$*"
 for mode in "$@"; do
   case $mode in
@@ -56,6 +64,12 @@ for mode in "$@"; do
           --b-constant "$FF:BLOCKS_PER_SM=4" --order "$order" --pattern "$pattern"
       done; done ;;
     tiles) run tiles "$PY" "$FM/tools/bench/segment_gemm_tiles.py" --output "$ROOT/tiles" ;;
+    skin066) ab skin066 "NaCl NbCl5 NaNbO3" --b-neighbours skin=0.66 ;;
+    skin100) ab skin100 "NaCl NbCl5" --b-neighbours skin=1.0 ;;
+    tiles128) ab tiles128 "NaNbO3 NbCl5" --b-constant "fastmace.kernels.triton.tile_rule:TRITON_BLOCK_M=128"                 "fastmace.kernels.triton.tile_rule:TRITON_NUM_WARPS=8"                 --a-constant "fastmace.kernels.triton.tile_rule:TRITON_BLOCK_M=64" ;;
+    bucket025) ab bucket025 "NaCl NbCl5" --b-neighbours edge_bucket_fraction=0.025 ;;
+    savetrans) ab savetrans "NaCl NbCl5" --b save_transcendentals=on ;;
+    aggrfusion) ab aggrfusion "NaCl NbCl5" --b-constant "torch._inductor.config:aggressive_fusion=True" ;;
   esac
 done
 note DONE
