@@ -104,7 +104,6 @@ the run report and the output directory, and exits 0.
 | `--dispersion` | `none`, `d3bj` | `none` | `dispersion` | `d3bj` adds D3(BJ), with the parameters of the head's training functional from the label table |
 | `--d3-functional NAME` | parameter set, e.g. `pbe`, `r2scan` | none | `dispersion=fm.D3(functional=NAME)` | the D3 parameter set; needs `--dispersion d3bj` |
 | `--seed` | int ≥ 0 | drawn | `seed` | the noise seed; a drawn seed is recorded in `metadata.json` |
-| `--initial-velocities` | `keep`, `maxwell_boltzmann` or K | `keep` | `initial_velocities` | starting velocities of a structure at rest (see [Starting velocities](../guide/md.md#starting-velocities)) |
 | `--check` | `skip`, `gate`, `allow_unavailable` | `skip` | `check` | `gate` runs the gate before the first step; `allow_unavailable` runs it but goes on if no reference can run |
 | `--output DIR` | directory | `./<structure stem>.fastmace/` | `output` | the output directory, with `fm.Output`'s default intervals |
 

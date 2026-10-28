@@ -582,17 +582,8 @@ def test_initial_velocities_keeps_a_moving_structure(loaded, tmp_path):
     assert "starting velocities: the structure's own" in run.summary
 
 
-def test_cli_initial_velocities():
-    from fastmace.cli import md as md_command
+def test_fastmace_run_takes_initial_velocities():
+    """fastmace run passes every fm.md argument; fastmace md has no flag for it (SPEC §7.5's flag set)."""
+    from fastmace.cli import run as run_command
 
-    for given, expected in (("keep", "keep"), ("maxwell_boltzmann", "maxwell_boltzmann"), ("10", 10.0)):
-        args = _parse_md(["--initial-velocities", given])
-        assert md_command.md_arguments(args)[1]["initial_velocities"] == expected
-    with pytest.raises(SystemExit):
-        _parse_md(["--initial-velocities", "warm"])
-
-
-def _parse_md(argv):
-    from fastmace import cli
-
-    return cli.build_parser().parse_args(["md", "--model", "mh1", "--structure", "NaCl.cif", *argv])
+    assert "initial_velocities" in run_command._md_parameters()

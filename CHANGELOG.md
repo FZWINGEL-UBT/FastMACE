@@ -8,7 +8,7 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
-- `fm.md(initial_velocities=...)` (TOML `initial_velocities`, `fastmace md --initial-velocities`), opt-in: a
+- `fm.md(initial_velocities=...)` (and the `fastmace run` key `initial_velocities`), opt-in: a
   structure at rest starts with seeded Maxwell-Boltzmann velocities at the run's starting target
   (`"maxwell_boltzmann"`) or at a given temperature in K; `"keep"` (default) leaves it at rest as before. Drawn
   from `seed` on a stream of its own, never for a structure that already moves, and recorded in the report and

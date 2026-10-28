@@ -131,8 +131,8 @@ atoms start at rest and a Langevin thermostat heats them. CSVR cannot start
 from rest (it rescales velocities, and there are none): it refuses such a
 structure at once with an `InputError`, before anything is compiled.
 
-`fm.md(..., initial_velocities=...)` (TOML key `initial_velocities`,
-`fastmace md --initial-velocities`) changes this. It is opt-in and acts
+`fm.md(..., initial_velocities=...)` (in a `fastmace run` file, the key
+`initial_velocities`; `fastmace md` has no flag for it) changes this. It is opt-in and acts
 **only on a structure at rest** (zero kinetic energy):
 
 | Value | A structure at rest starts with |
@@ -161,8 +161,8 @@ What to know before using it:
 - **What is drawn.** ASE's Maxwell-Boltzmann draw (`thermalize_momenta`, or `MaxwellBoltzmannDistribution` before ASE 3.29), without rescaling to the exact
   temperature; `FixAtoms` atoms get none. The integrator then treats the momenta as usual:
   with `fixcm` it removes the total momentum at the start.
-- **`fm.Simulation` does not draw.** The option belongs to `fm.md` (and so `fastmace run` and
-  `fastmace md`); with `Simulation`, set the momenta on the `Atoms` yourself, as below.
+- **`fm.Simulation` does not draw.** The option belongs to `fm.md` (and so `fastmace run`);
+  with `Simulation`, set the momenta on the `Atoms` yourself, as below.
 
 To set the momenta yourself instead:
 
