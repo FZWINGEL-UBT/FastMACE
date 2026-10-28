@@ -149,6 +149,12 @@ class ProcessConstraintError(FastMACEError, RuntimeError):
     default_environment = True
 
 
+class InputError(FastMACEError, ValueError):
+    """The run's input cannot start: no plan or fallback candidate changes that, so it is raised at once."""
+
+    default_next_step = "Fix the input named above and start the run again."
+
+
 class FallbackExhausted(PlanRefused):
     """No fallback candidate passed validation (SPEC §9.4 step 5); ``revisions`` holds every tried plan.
 

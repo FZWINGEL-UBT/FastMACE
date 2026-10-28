@@ -354,10 +354,11 @@ def _parse(candidate_plan):
 
 
 def _propagates(error) -> bool:
-    """Errors that are not candidate failures (conductor answers, T15 Q7): process constraints, memory, non-finite."""
-    from fastmace.errors import NonFiniteError, ProcessConstraintError
+    """Errors that are not candidate failures (conductor answers, T15 Q7): process constraints, memory, non-finite,
+    and input errors (an input no candidate can run)."""
+    from fastmace.errors import InputError, NonFiniteError, ProcessConstraintError
 
-    if isinstance(error, (ProcessConstraintError, NonFiniteError, MemoryError)):
+    if isinstance(error, (ProcessConstraintError, NonFiniteError, InputError, MemoryError)):
         return True
     return type(error).__name__ == "OutOfMemoryError"  # torch.cuda.OutOfMemoryError, without importing torch
 
