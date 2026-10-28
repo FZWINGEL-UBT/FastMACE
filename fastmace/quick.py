@@ -237,7 +237,8 @@ def md(structure: Any, *, model: Any, head: str | None = None, charge: int | Non
                 raise ValueError("temperature_K=0 with mc=: the MC temperature would be 0 K, which makes the ΔE "
                                  "floor 0.01 k_B T_min zero (SPEC §7.7, §12.3)")
             workload_fields["min_mc_temperature_K"] = start
-        workload_fields.update(mc_moves=moves, species_changes=any(move in SPECIES_MOVES for move in moves))
+        workload_fields.update(mc_moves=moves, species_changes=any(move in SPECIES_MOVES for move in moves),
+                               max_displacement_A=max_displacement_A(mc))
     workload = Workload(**workload_fields)
 
     record, d3_warnings = d3.expand(dispersion, functional=functional, model=name)
@@ -310,6 +311,15 @@ def _mc_moves(mc):
         if block.move not in moves:
             moves.append(block.move)
     return tuple(moves)
+
+
+def max_displacement_A(mc: Any) -> float | None:
+    """The largest ``delta_A`` of the ``Displace`` moves in a move set (``None`` without one), Å: the skin is
+    sized for it."""
+    from fastmace.simulation import mc_moves
+
+    deltas = [block.delta_A for block in mc_moves(mc) if block.move == "displace"]
+    return max(deltas) if deltas else None
 
 
 def mc_species(mc: Any) -> set[int]:
