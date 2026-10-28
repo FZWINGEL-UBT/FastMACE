@@ -40,6 +40,15 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Fixed
 
+- Float64 relaxations, quenches and NPT steps under decision 65's 56 fixed mantissa bits (D1, default on the
+  RTX 5060 Ti and RTX 4000 Ada): inside a captured graph, cuBLAS's fixed-mantissa float64 emulation returned the
+  step's small FP64 products about 8 bits accurate, so a variable-cell `gpu-LBFGS` relaxation from a non-minimal
+  start diverged (NaCl 3×3×3: cell 16.75000 instead of 16.76443 Å after one step), and fixed-cell LBFGS drifted
+  from the emulation-off path by up to 5e-3 eV/Å. The model's own products were exact. Every small product of
+  the step code outside the model (LBFGS two-loop and history, the Frechet cell filter, `expm_3x3`, the BAOAB,
+  MTK and Berendsen barostats, the variable-cell neighbour and D3 rebuild tests, the D3 image shifts, the leader
+  shift copy) is now element-wise sums (`neighbors.skin.matmul_small`, `matvec_small`, `vecmat_small`,
+  `solve_unit_triangular`), which no cuBLAS setting reaches: `docs/validation/fp64-d1-relax.md`.
 - A CSVR run from a structure at rest is refused at once, before planning, with `fastmace.errors.InputError`
   (a `ValueError`) that says how to draw velocities. Before, the integrator's refusal counted as a fallback
   candidate failure: each candidate compiled first, and the run ended in a misleading `FallbackExhausted`

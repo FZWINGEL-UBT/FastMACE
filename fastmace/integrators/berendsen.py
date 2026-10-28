@@ -36,7 +36,7 @@ import torch
 from ase import units
 
 from fastmace.config import IntegratorConfig
-from fastmace.neighbors.skin import det_3x3, inverse_3x3, times_3x3
+from fastmace.neighbors.skin import det_3x3, inverse_3x3, matmul_small, times_3x3
 
 from .base import Integrator
 from .langevin import base_output_values, fixed_rows
@@ -159,7 +159,7 @@ class Berendsen(Integrator):
         else:
             factor = 1.0 - self.pressure_coefficient * (self.berendsen_pressure + torch.diagonal(stress)) * self.flags
             new_cell = factor[:, None] * cell
-        transform = inverse_3x3(cell) @ new_cell
+        transform = matmul_small(inverse_3x3(cell), new_cell)
         state.positions.copy_(times_3x3(state.positions, transform))
         cell.copy_(new_cell)
 
