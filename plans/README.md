@@ -19,6 +19,7 @@ phase before it is under way, not all in advance. Worker rules are in
 | 5. Planner completion | [phase-5.md](phase-5.md) | **complete**, tag `fastmace-5`; [acceptance report](../docs/validation/phase-5.md) |
 | 6. Release | [phase-6.md](phase-6.md) | **released `v1.0.0`**, PyPI packages and docs live; Python 3.13 public-index hybrid install verified; [release evidence](../docs/validation/release-1.0.0.md) |
 | Optimisation round 5 | [opt-5.md](opt-5.md) | **complete** (26 October 2026); `uses_tf32x3_tile` hybrid SIMT/TC shape dispatch adopted inside `tf32x3_gemms` (`6.90× → 1.52–1.73×` max error ratio vs IEEE, `−31 to −39 %` gate energy offset); `sched_iso` and `x3_pipe` probes recorded; [report](../docs/validation/opt-5.md) |
+| Speed-up ideas (27–28 October 2026) | [ideas-20261027.md](ideas-20261027.md) | D1–D3 built and confirmed per GPU (RTX 5060 Ti, RTX 4000 Ada, A100); **decision 65**: all three on by default in float64 MH-1 plans on the two measured GPU models only (exact names), off on the A100 and unmeasured GPUs; branch `fastmace/ideas-20261027` |
 | Optimisation round 6 | [opt-6.md](opt-6.md) | started 26 October 2026 (owner). OPT6-T02 `chunked_conv_backward` **default on** (decision 60): NbCl5 0.97, NaNbO3 0.97, NaCl 1.01 ([report](../docs/validation/opt6-T02.md)). OPT6-T05 `radial_tables` (new class `certified`, decision 61), opt-in: certificates 0.15–0.30, gate passed, b/a NaCl 0.90, NbCl5 0.92, NaNbO3 0.81 ([report](../docs/validation/opt6-T05.md)); its default awaits the owner |
 
 ## Workstation availability (owner, 20 October 2026)

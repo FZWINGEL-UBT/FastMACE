@@ -8,6 +8,15 @@ versions). How versions are set and released: `docs/development.md`, "Releasing"
 
 ### Added
 
+- Three float64 speed-ups, **on by default on the measured GPUs** (owner decision 65; `plans/ideas-20261027.md`):
+  `EngineConfig.fp64_emulation_mantissa_bits` ("auto" = 56 fixed mantissa bits in cuBLAS's float64 emulation,
+  "dynamic" or a bit count from 8 to 128 to choose), `RewriteConfig.w_tables` (per-piece folded radial tables,
+  `fastmace.kernels.triton.w_table`; rounding) and `RewriteConfig.save_transcendentals` (transcendental ops saved
+  for the backward instead of recomputed; exact). "auto" turns them on in float64 MH-1 plans that are not
+  reproducible on the "NVIDIA GeForce RTX 5060 Ti" and the "NVIDIA RTX 4000 Ada Generation" only (exact device
+  names), `w_tables` with at most three species. MH-1 float64 MD step 0.80 (NbCl5), 0.78 (NaNbO3), 0.81 (NaCl) of
+  the decision-63 package on the RTX 5060 Ti; forces within 5e-15 eV/Å of it. Off on the A100, where D2 and D3
+  measured 1-27 % slower, and on every GPU not measured.
 - `RewriteConfig.fused_folded_forward` (opt-8 OPT8-T02, float32; **on by default for MH-1**, owner decision 64): one
   generated kernel builds MH-1's per-edge weights from the folded radial layer's input and the streaming message, and stores the weights for
   the unchanged chunked backward. Exact (weights and message bitwise the cuBLAS + streaming chain's on the

@@ -382,14 +382,15 @@ FP64_EMULATION_MANTISSA_VARIABLE = "CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COU
 def configure_fp64_emulation(environ=None, mantissa_bits=None):
     """Set ``FP64_EMULATION_SETTINGS`` where the environment sets none; returns the values in effect.
 
-    ``mantissa_bits`` (``EngineConfig.fp64_emulation_mantissa_bits``) also sets a fixed mantissa bit count
-    (``FP64_EMULATION_MANTISSA_VARIABLE``), again only where the environment sets none.
+    An int ``mantissa_bits`` (a plan's resolved ``EngineConfig.fp64_emulation_mantissa_bits``) also sets a fixed
+    mantissa bit count (``FP64_EMULATION_MANTISSA_VARIABLE``), again only where the environment sets none; None or
+    "dynamic" keeps cuBLAS's dynamic choice.
 
     cuBLAS reads them when it creates a handle, so they act only on handles created afterwards: run it before the
     process's first float64 matrix product (``FixedPlanner.build`` does, for plans with ``fp64_emulation="on"``)."""
     environ = os.environ if environ is None else environ
     settings = list(FP64_EMULATION_SETTINGS)
-    if mantissa_bits is not None:
+    if mantissa_bits not in (None, "dynamic", "auto"):
         settings.append((FP64_EMULATION_MANTISSA_VARIABLE, str(int(mantissa_bits))))
     for key, value in settings:
         environ.setdefault(key, value)

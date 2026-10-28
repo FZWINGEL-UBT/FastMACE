@@ -46,4 +46,5 @@ np.savez(Path("f64pkg") / f"{spec}-{label}.npz", forces=f, stress=s, energy=floa
          options=np.array(options_on), emulation_active=active)
 print(label, spec, "energy", float(energy.detach().double().sum().cpu()), "fp64_emulation", plan.engine.fp64_emulation,
       "active", active, "radial_tables", plan.rewrites.radial_tables, "species_tables", plan.rewrites.species_tables,
-      flush=True)
+      "w_tables", plan.rewrites.w_tables, "save_transcendentals", plan.rewrites.save_transcendentals,
+      "mantissa_bits", plan.engine.fp64_emulation_mantissa_bits, "gpu", hardware.name, flush=True)

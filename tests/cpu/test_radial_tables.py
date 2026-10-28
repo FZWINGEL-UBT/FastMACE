@@ -144,7 +144,8 @@ def test_the_planner_allows_float64_tables_outside_reproducible_plans():
 
 def test_w_tables_equal_the_table_and_folded_product():
     """ideas-20261027 D2: the folded per-piece series equal the chain ``table -> a -> a W^T`` to float64 rounding;
-    edges beyond the cutoff get zero rows; the planner keeps the record opt-in and float64-only."""
+    edges beyond the cutoff get zero rows; the planner keeps the record float64-only (decision 65: on by default on
+    the measured GPUs)."""
     from test_planner import plan_for
 
     from fastmace.config import PrecisionConfig, RewriteConfig
@@ -175,7 +176,9 @@ def test_w_tables_equal_the_table_and_folded_product():
                            derivative=True)[:, :width - 1] @ weight.T
     inside = r >= r_lo
     assert float((slopes[inside] - want_slopes[inside]).abs().max()) <= 1e-13 * float(want_slopes.abs().max())
-    assert plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64")).rewrites.w_tables == "off"
+    # Owner decision 65: "auto" is on in float64 MH-1 plans on a measured GPU (plan_for's RTX 5060 Ti).
+    assert plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64")).rewrites.w_tables == "on"
+    assert plan_for("mh1-r2scan").rewrites.w_tables == "off"  # float32
     on = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"), rewrites=RewriteConfig(w_tables="on"))
     assert on.rewrites.w_tables == "on" and on.rewrites.radial_tables == "on"
     with pytest.raises(PlanRefused, match="w_tables='on' needs float64"):
