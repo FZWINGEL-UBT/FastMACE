@@ -72,6 +72,8 @@ for mode in "$@"; do
     aggrfusion) ab aggrfusion "NaCl NbCl5" --b-constant "torch._inductor.config:aggressive_fusion=True" ;;
     asyncrb) ab asyncrb "NaCl NbCl5 NaNbO3" --b-constant "fastmace.neighbors.skin:ASYNC_EARLY_BUILD=True" ;;
     margin005) ab margin005 "NbCl5 NaNbO3 NaCl" --b-engine pipeline_edge_margin=0.005 ;;
+    specres) ab specres "NbCl5 NaNbO3 NaCl" --b species_residual=on ;;
+    rerun1) ab skin100 "NbCl5" --b-neighbours skin=1.0; ab savetrans "NaCl" --b save_transcendentals=on ;;
     gputest) run gputest "$PY" -m pytest -p no:cacheprovider -q -rf "$FM/tests/gpu/test_async_rebuild_gpu.py" ;;
   esac
 done

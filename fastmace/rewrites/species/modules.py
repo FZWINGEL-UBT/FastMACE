@@ -44,6 +44,80 @@ class SpeciesTable(torch.nn.Module):
         return self.table[node_attrs.argmax(dim=-1)]
 
 
+class SpeciesResidualBlockLinear(torch.nn.Module):
+    """A ``ResidualBlockLinear`` whose residual input is a species table's output (``species_residual``).
+
+    ``first(x) + residual(table[species])``: the residual's products are computed once per species (in float64,
+    stored in the model's dtype) and gathered by the one-hot ``node_attrs`` that the interaction passes in place of
+    the residual input. ``first``'s products are the merged module's with the residual rows of each group removed,
+    so the products lose those inputs and, as ``node_attrs`` carries no gradient, their backward.
+    """
+
+    def __init__(self, merged, input_table):
+        from fastmace.rewrites.linear.modules import ResidualBlockLinear
+
+        super().__init__()
+        if not isinstance(merged, ResidualBlockLinear):
+            raise TypeError(f"species_residual needs a ResidualBlockLinear, not {type(merged).__name__}")
+        self.first_transpose, self.residual_transpose = merged.first_transpose, merged.residual_transpose
+        self.transpose_out = merged.transpose_out
+        self.first_count = merged.first_count
+        self.segments_in, self.segments_out = merged.segments_in, merged.segments_out
+        self.grouped_launch, self.sms, self.tf32x3 = merged.grouped_launch, merged.sms, merged.tf32x3
+        first, residual = {}, {}
+        for index, (members, j) in enumerate(merged.block_ends):
+            weight = getattr(merged, f"weight_{index}")
+            start = 0
+            for k in members:
+                mul = self.segments_in[k][1]
+                (first if k < self.first_count else residual).setdefault(j, []).append((k, weight[start:start + mul]))
+                start += mul
+        self.block_ends = tuple((tuple(k for k, _ in members), j) for j, members in first.items())
+        for index, members in enumerate(first.values()):
+            weight = torch.cat([w for _, w in members], dim=0).contiguous()
+            self.register_buffer(f"weight_{index}", weight)
+            self.register_buffer(f"weight_t_{index}", weight.t().contiguous())
+        with torch.no_grad():
+            y = self.residual_transpose(input_table).double()
+            species = y.shape[0]
+            rows = {k: y[:, o:o + d * m].reshape(species * d, m) for k, (o, m, d) in enumerate(self.segments_in)
+                    if k >= self.first_count}
+            self.residual_segments = tuple(residual)
+            for j, members in residual.items():
+                _, mul_out, dim_out = self.segments_out[j]
+                table = sum(rows[k] @ w.double() for k, w in members)
+                self.register_buffer(f"residual_{j}", table.reshape(species, dim_out * mul_out).to(weight.dtype))
+        self._reference = (merged, input_table)
+
+    @property
+    def reference(self):
+        return self._reference
+
+    def forward(self, x, node_attrs):
+        from fastmace.rewrites.linear.modules import join_rows
+
+        outputs, n, x = self.output_rows(x, node_attrs)
+        return self.transpose_out(join_rows(self.segments_out, outputs, n, x))
+
+    def output_rows(self, x, node_attrs):
+        """As ``ResidualBlockLinear.output_rows``, with the one-hot ``node_attrs`` in place of the residual input."""
+        from fastmace.rewrites.linear.modules import block_products
+
+        x = self.first_transpose(x)
+        n = x.shape[0]
+        rows = [x[:, o:o + d * m].reshape(n * d, m) for o, m, d in self.segments_in[:self.first_count]]
+        outputs = [None] * len(self.segments_out)
+        lefts = [rows[i[0]] if len(i) == 1 else torch.cat([rows[k] for k in i], dim=1) for i, _ in self.block_ends]
+        for (_, j), part in zip(self.block_ends, block_products(self, lefts)):
+            outputs[j] = part
+        species = node_attrs.argmax(dim=-1)
+        for j in self.residual_segments:
+            _, mul_out, dim_out = self.segments_out[j]
+            add = getattr(self, f"residual_{j}")[species].reshape(n * dim_out, mul_out)
+            outputs[j] = add if outputs[j] is None else outputs[j] + add
+        return outputs, n, x
+
+
 def compose(first, second):
     """The BlockLinear of ``second(first(x))`` for two BlockLinear layers (first's outputs = second's inputs)."""
     if tuple(first.segments_out) != tuple(second.segments_in):

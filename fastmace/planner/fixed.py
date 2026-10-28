@@ -115,6 +115,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.species_tables": "on_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_readout_tail": "on_with_block_linear_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
+    "RewriteConfig.species_residual": "never_automatic",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
 })
@@ -127,6 +128,7 @@ STAGE2_SUPPORT = (
     ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
     ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"),
     ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
+    ("species_residual", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
     ("streaming_conv", "streaming_conv"), ("fold_cutoff", "fold_cutoff"), ("factor_species", "factor_species"),
@@ -140,6 +142,7 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "grouped_launch",
                   "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
+                  "species_residual",
                   "combo_kernels", "save_transcendentals", "tf32x3_gemms",
                   "fx_e3nn_linear", "polar_graph_sums")
 
@@ -1045,6 +1048,12 @@ class FixedPlanner:
         # where the model takes them, and the FastMACE rules drop them in float64 and reproducible plans.
         note("species_tables", r.species_tables != "off", "stage 1: graph engine, any backend")
         needs("fold_readout_tail", r.fold_readout_tail != "off", v["block_linear"], "block_linear")
+        # fp32 profile (28 October 2026): opt-in, needs the species table of the first linear_up and the merged
+        # residual product it then replaces half of.
+        needs("species_residual", r.species_residual == "on", v["species_tables"] and v["merged_residual"],
+              "species_tables and merged_residual")
+        if r.species_residual == "auto":
+            v["_why"]["species_residual"] = "off: only an explicit 'on' enables it (fp32 profile, opt-in)"
         needs("fold_product_linear", r.fold_product_linear != "off", v["block_linear"] and v["species_tables"],
               "block_linear and species_tables")
         note("single_graph_strain", r.single_graph_strain != "off",
@@ -1140,7 +1149,7 @@ class FixedPlanner:
         # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).
         # Decision 63 (27 October 2026): also on in float64 plans that are not reproducible (f64-T01: forces within
         # the stock float64 backends' own scatter).
-        for name in ("species_tables", "fold_readout_tail", "fold_product_linear"):
+        for name in ("species_tables", "fold_readout_tail", "fold_product_linear", "species_residual"):
             if v[name] and name not in explicit and (dtype not in ("float32", "float64") or reproducible):
                 v[name] = False
                 v["_why"][name] += ("; off: reproducible=True keeps the stock products" if reproducible
@@ -1151,6 +1160,12 @@ class FixedPlanner:
                             "rewrite-requirement-missing")
             v["fold_product_linear"] = False
             v["_why"]["fold_product_linear"] += "; off: requires species_tables, which is off"
+        if v["species_residual"] and not v["species_tables"]:
+            if "species_residual" in explicit:
+                book.refuse("RewriteConfig.species_residual='on' requires species_tables, which is off",
+                            "rewrite-requirement-missing")
+            v["species_residual"] = False
+            v["_why"]["species_residual"] += "; off: requires species_tables, which is off"
         if v["segment_gemm"] and "segment_gemm" not in explicit and (dtype != "float32" or reproducible):
             # Owner decision, 20 October 2026: float64 and the reproducible mode keep the stock products and join.
             v["segment_gemm"] = False

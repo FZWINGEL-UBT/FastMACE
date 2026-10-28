@@ -174,6 +174,10 @@ class RewriteConfig:
     # products.0.linear folded into the linear consumers of layer 0's output, with the species carried next to
     # the contraction (OPT-T08 C3); auto = on with species_tables and block_linear (owner, 21 October 2026).
     fold_product_linear: Toggle = "auto"
+    # The first interaction's residual product linear_res(linear_up(embedding)) is species-only: with species_tables
+    # it becomes per-species rows added to linear_1's products, so the merged product loses that half of its inputs
+    # and of its backward (fp32 profile, 28 October 2026); rounding; opt-in, auto = off.
+    species_residual: Toggle = "auto"
     # Inductor's combo kernels, pointwise only, in the compiled model: independent adjacent pointwise kernels in
     # one launch; rounding (the energy moves by ~1e-9 relative), not adopted (opt-3 OPT3-T04,
     # fastmace.rewrites.inductor); opt-in, auto = off.
