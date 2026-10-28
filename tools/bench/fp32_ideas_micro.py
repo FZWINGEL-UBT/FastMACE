@@ -133,6 +133,74 @@ def mode_gemmchunk(args):
             _emit({"mode": "gemmchunk", "rows": rows, "chunks": chunks, "ms": ms, "ratio": ms / base})
 
 
+def mode_block(args):
+    """An atom block as the model runs it: per l, GEMM, gate (sigmoid times the value), GEMM, residual add, over
+    NbCl5's four l blocks (64 MB per tensor in all); whole, and with every l block split into the same atom
+    fraction (the chain of one atom chunk runs before the next; idea 1 with its GEMMs counted)."""
+    weights = [torch.randn(512, 512, device="cuda") / 512**0.5 for _ in range(2)]
+    xs = [torch.randn(rows, 512, device="cuda") for rows in ROWS]
+    bufs = [[torch.empty_like(x) for _ in range(4)] for x in xs]
+
+    def chain(lo, hi):
+        for x, (y, z, u, v) in zip(xs, bufs):
+            a, b = x.shape[0] * lo // 1944, x.shape[0] * hi // 1944
+            torch.mm(x[a:b], weights[0], out=y[a:b])
+            torch.mul(torch.sigmoid(y[a:b]), y[a:b], out=z[a:b])
+            torch.mm(z[a:b], weights[1], out=u[a:b])
+            torch.add(u[a:b], x[a:b], out=v[a:b])
+
+    base = _time(_graph(lambda: chain(0, 1944)))
+    _emit({"mode": "block", "chunks": 1, "ms": base})
+    for chunks in args.chunks:
+        bounds = [1944 * i // chunks for i in range(chunks + 1)]
+
+        def chunked():
+            for lo, hi in zip(bounds[:-1], bounds[1:]):
+                chain(lo, hi)
+
+        ms = _time(_graph(chunked))
+        _emit({"mode": "block", "chunks": chunks, "ms": ms, "ratio": ms / base})
+
+
+def mode_streams(args):
+    """Idea 4's overlap factor: pairs of independent kernels on one stream against two streams (both captured in
+    one CUDA graph): a GEMM with a 64 MB elementwise kernel (compute-bound with memory-bound), and the two GEMMs of
+    two l blocks (both compute-bound), at NbCl5's sizes."""
+    w = torch.randn(512, 512, device="cuda") / 512**0.5
+    a = {rows: torch.randn(rows, 512, device="cuda") for rows in ROWS}
+    out = {rows: torch.empty(rows, 512, device="cuda") for rows in ROWS}
+    x = torch.rand(1944, 8192, device="cuda")
+    y = torch.empty_like(x)
+    side = torch.cuda.Stream()
+    pairs = {
+        "gemm13608+pointwise64MB": (lambda: torch.mm(a[13608], w, out=out[13608]),
+                                    lambda: torch.mul(x, 1.0001, out=y)),
+        "gemm5832+pointwise64MB": (lambda: torch.mm(a[5832], w, out=out[5832]), lambda: torch.mul(x, 1.0001, out=y)),
+        "gemm9720+gemm13608": (lambda: torch.mm(a[9720], w, out=out[9720]),
+                               lambda: torch.mm(a[13608], w, out=out[13608])),
+        "gemm1944+gemm5832": (lambda: torch.mm(a[1944], w, out=out[1944]), lambda: torch.mm(a[5832], w, out=out[5832])),
+    }
+    for name, (first, second) in pairs.items():
+        alone = [_time(_graph(first)), _time(_graph(second))]
+
+        def serial():
+            first()
+            second()
+
+        def concurrent():
+            main = torch.cuda.current_stream()
+            side.wait_stream(main)
+            first()
+            with torch.cuda.stream(side):
+                second()
+            main.wait_stream(side)
+
+        one, two = _time(_graph(serial)), _time(_graph(concurrent))
+        _emit({"mode": "streams", "pair": name, "first_ms": alone[0], "second_ms": alone[1], "one_stream_ms": one,
+               "two_streams_ms": two, "ratio": two / one,
+               "hidden_share_of_shorter": (one - two) / min(alone)})
+
+
 def _winograd(a, b_sums, half):
     """One Strassen-Winograd level of ``a @ b`` (square 2x2 blocks of b, rows of a split in two), with b's sums
     (``b_sums``: B11, B12, B21, B22, T1..T4) precomputed."""
@@ -199,7 +267,8 @@ def mode_emu(args):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--mode", nargs="+", choices=("bw", "chain", "gemmchunk", "strassen", "emu"), required=True)
+    p.add_argument("--mode", nargs="+", required=True,
+                   choices=("bw", "chain", "block", "streams", "gemmchunk", "strassen", "emu"))
     p.add_argument("--chain-length", type=int, default=6)
     p.add_argument("--chunks", type=int, nargs="+", default=[2, 4, 8, 16])
     args = p.parse_args()
