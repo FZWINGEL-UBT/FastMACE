@@ -40,10 +40,12 @@ breadth of the integrator catalogue:
    ASE plus `MACECalculator`. Measured on the research engine: 3–22× in NVT,
    depending on model and crystal; see §3. It uses only rewrites that are
    exact up to floating-point rounding.
-2. **General.** Any crystal, composition, cell and GPU, with no per-GPU or
-   per-structure tuning tables, shape-keyed caches or one-GPU kernel schedules
-   (project rule, 10 October 2026). Every optimisation must hold for other
-   crystals, melt–quench protocols and atom exchanges.
+2. **General.** Any crystal, composition, cell and GPU, with no per-structure
+   tuning tables or shape-keyed caches (project rule, 10 October 2026). Every
+   optimisation must hold for other crystals, melt–quench protocols and atom
+   exchanges. Per-GPU choices are allowed since decision 66 (29 October 2026):
+   a rewrite may be on by default only on the GPU models where same-process
+   A/Bs measured it faster.
 3. **Broad simulation coverage.** NVE, several thermostats and barostats,
    relaxations, Monte Carlo moves (species swaps at high temperature in
    particular), simulated annealing and quench, and restartable long runs.
@@ -1289,8 +1291,11 @@ The planner uses rules, not measurement tables: it decides from properties of
 the model, workload and hardware, then verifies with self-checks. An optional
 short calibration (`CalibrationConfig(calibrate=True)` through `Simulation(calibration=)`, `fm.md(calibrate=True)` or
 `fastmace run --calibrate`; decision 55: the backend dimension only, about 50 steps per candidate,
-results never persisted across runs) may break ties, but no per-GPU or
-per-shape table is ever stored. This is the project's generality rule.
+results never persisted across runs) may break ties, but no per-shape table is ever stored. This is the
+project's generality rule. Since decision 66 (owner, 29 October 2026) a rule may name GPU models: a default
+that holds only on the GPU models where same-process A/Bs in both build orders measured a whole-step speed-up,
+matched by exact device name as in decision 65, and off on every other GPU. No measured value is stored or
+looked up at run time; the list of GPU names is the only per-GPU data.
 
 ### 9.2 Inputs
 
@@ -2760,6 +2765,23 @@ Open decisions for the owner:
    All three together: 0.797 (NbCl5), 0.782 (NaNbO3), 0.806 (NaCl) locally.
    Forces within 2–5e-15 eV/Å of the decision-63 package; 20 ps NaCl NVE
    drift unchanged for each idea alone and for all three together.
+66. Decided (user, 29 October 2026, on OPT9's A100 ceiling: "Go ahead and make
+   it default on gpus where its faster overall the no per gpu optimization
+   decision has been overruled per gpu optimization is fine"): the generality
+   rule's ban on per-GPU choices (goal 2, §9.1, project rule of 10 October
+   2026) is lifted. A rewrite may be on by default on the GPU models where
+   same-process A/Bs of the whole MD step, in both build orders, measured it
+   faster, matched by exact device name as in decision 65 (an unmeasured GPU of
+   the same capability stays off); everywhere else it stays off or opt-in, and
+   the planner's off reason names the GPU. The usual gates still apply per
+   record (force/stress gate, NVE drift, exactness class). Per-structure and
+   shape-keyed tables stay forbidden, and measured values are never stored or
+   looked up at run time. First candidate: OPT9's w'-dot radial backward
+   (`plans/opt-9.md`), estimated about 11 % (NaNbO3) and 7 % (NbCl5) on the
+   A100 and a loss on the RTX 4000 Ada; it becomes default only where its step
+   A/B measures a speed-up. Earlier findings closed only for being per-GPU
+   (for example `grouped_launch` for MH-1 on sm_120) may be reopened the same
+   way.
 
 ---
 
@@ -3230,3 +3252,7 @@ launcher remains a requirement. Results: `docs/validation/6-T15.md`.
   derivatives, against float64 of the same weights; float32 plans only; the
   self-check holds the certificate. First record: `radial_tables` (opt-in,
   `never_automatic`; refused in float64 plans).
+
+**Decision 66 (29 October 2026, owner):** per-GPU defaults allowed. Goal 2 and §9.1 now permit a default that
+names the GPU models where same-process A/Bs measured a whole-step speed-up (exact device names, as in decision
+65); per-structure and shape-keyed tables stay forbidden. See §18, decision 66.
