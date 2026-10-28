@@ -42,7 +42,7 @@ from typing import Any
 
 import torch
 
-from fastmace.neighbors.skin import matvec_small, solve_unit_triangular, vecmat_small
+from fastmace.neighbors.skin import matvec_small, vecmat_small
 from fastmace.optimize.base import Optimizer
 
 # ASE's limit on ``maxstep`` (``LBFGS.__init__``), Angstrom.
@@ -165,10 +165,14 @@ class DeviceLBFGS(Optimizer):
         order = torch.remainder(iteration - memory + torch.arange(memory, device=s.device), memory)
         S, Y, R = s.index_select(0, order), y.index_select(0, order), rho.index_select(0, order)
         G = sy.index_select(0, order).index_select(1, order)  # chronological, oldest first
-        # Element-wise products and the doubling triangular solve, no FP64 GEMV or TRSM (neighbors.skin.matmul_small).
-        a = solve_unit_triangular(R.unsqueeze(1) * G, R * matvec_small(S, q0), upper=True)
+        # The mat-vecs as element-wise sums (neighbors.skin.matmul_small: no FP64 GEMV for cuBLAS's fixed-mantissa
+        # emulation to reach); the two memory x memory triangular solves stay TRSM, which a captured fixed-mantissa
+        # replay leaves exact (fp64-D1 graph probe) and which keeps ASE's rounding on the cell rows.
+        a = torch.linalg.solve_triangular(R.unsqueeze(1) * G, (R * matvec_small(S, q0)).unsqueeze(1), upper=True,
+                                          unitriangular=True).squeeze(1)
         z0 = H0 * (q0 - vecmat_small(a, Y))
-        c = solve_unit_triangular(R.unsqueeze(1) * G.T, a - R * matvec_small(Y, z0), upper=False)
+        c = torch.linalg.solve_triangular(R.unsqueeze(1) * G.T, (a - R * matvec_small(Y, z0)).unsqueeze(1), upper=False,
+                                          unitriangular=True).squeeze(1)
         return -(z0 + vecmat_small(c, S))
 
 

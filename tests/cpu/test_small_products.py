@@ -6,7 +6,7 @@ relaxation of NaCl 3x3x3 from a non-minimal start set the cell to 16.75000 inste
 step and diverged (ResearchModule Experiments/Energy_Hull, H0-diag). The model's own products were exact. The
 products of the optimisers, the cell filter, the barostats, the variable-cell neighbour tests, the D3 image shifts
 and the leader-shift copy are therefore written as element-wise sums (``neighbors.skin.matmul_small`` and friends),
-which no cuBLAS setting reaches. These tests hold the helpers to torch's products and keep GEMMs out of the step code.
+which no cuBLAS setting reaches (LBFGS's triangular solves excepted, see ``ALLOWED``). These tests hold the helpers to torch's products and keep GEMMs out of the step code.
 """
 
 import ast
@@ -35,29 +35,6 @@ def test_matvec_and_vecmat_small_equal_matmul():
     m, v, w = rand(100, 1620, scale=0.01), rand(1620), rand(100)
     torch.testing.assert_close(skin.matvec_small(m, v), m @ v, rtol=1e-14, atol=1e-15)
     torch.testing.assert_close(skin.vecmat_small(w, m), w @ m, rtol=1e-14, atol=1e-15)
-
-
-@pytest.mark.parametrize("upper", [True, False])
-@pytest.mark.parametrize("size", [1, 2, 7, 64, 100, 129])
-def test_solve_unit_triangular_equals_solve_triangular(upper, size):
-    t = rand(size, size, scale=1.0 / size)  # LBFGS-like: rho_i s_i . y_j small off the diagonal
-    t.diagonal().fill_(123.0)  # ignored, as unitriangular=True ignores it
-    b = rand(size)
-    want = torch.linalg.solve_triangular(t, b.unsqueeze(1), upper=upper, unitriangular=True).squeeze(1)
-    torch.testing.assert_close(skin.solve_unit_triangular(t, b, upper=upper), want, rtol=1e-12, atol=1e-12)
-
-
-def test_solve_unit_triangular_with_empty_rows():
-    """The LBFGS ring before ``memory`` pairs: unfilled slots are zero rows and columns, which drop out exactly."""
-    t = rand(100, 100, scale=0.01)
-    t[:40] = 0.0
-    t[:, :40] = 0.0
-    b = rand(100)
-    b[:40] = 0.0
-    want = torch.linalg.solve_triangular(t, b.unsqueeze(1), upper=True, unitriangular=True).squeeze(1)
-    got = skin.solve_unit_triangular(t, b, upper=True)
-    torch.testing.assert_close(got, want, rtol=1e-12, atol=1e-12)
-    assert torch.equal(got[:40], torch.zeros(40, dtype=torch.float64))
 
 
 def _step_functions():
@@ -100,8 +77,18 @@ def _products(function):
     return found
 
 
+# LBFGS's two memory x memory triangular solves stay TRSM: a captured fixed-mantissa replay leaves TRSM exact (the
+# fp64-D1 graph probe), and a TRSM-free doubling solve lost ASE's step-by-step agreement on the cell rows.
+ALLOWED = {"lbfgs.DeviceLBFGS.two_loop": ["solve_triangular", "solve_triangular"]}
+
+
 def test_step_code_has_no_matrix_products():
     """Every function that runs inside a captured step: no ``@``, ``matmul``, ``mm``, ``einsum`` or
-    ``solve_triangular`` (host-side NumPy products live elsewhere, in ``build`` and the constructors)."""
-    offenders = {name: found for name, function in _step_functions().items() if (found := _products(function))}
+    ``solve_triangular`` beyond ``ALLOWED`` (host-side NumPy products live elsewhere, in ``build`` and the
+    constructors)."""
+    offenders = {}
+    for name, function in _step_functions().items():
+        found = [entry.split(": ")[1] for entry in _products(function)]
+        if found != ALLOWED.get(name, []):
+            offenders[name] = _products(function)
     assert not offenders, offenders

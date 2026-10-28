@@ -43,25 +43,6 @@ def vecmat_small(v, m):
     return (v.unsqueeze(-1) * m).sum(-2)
 
 
-def solve_unit_triangular(t, b, *, upper):
-    """``solve_triangular(t, b, upper=upper, unitriangular=True)`` for a vector ``b``, without TRSM.
-
-    With ``N`` the strict triangle of ``t``, ``(I + N)^-1 = (I - N)(I + N^2)(I + N^4)...``: ``N`` is nilpotent
-    (``N^m = 0`` for an ``m x m`` matrix), so ``ceil(log2 m)`` doubling steps are exact up to rounding. Each step
-    is an element-wise mat-vec and a ``matmul_small`` square, a fixed count of kernels for a capturable step
-    (a row-by-row substitution would launch three per row). The diagonal of ``t`` is ignored, as TRSM ignores it.
-    """
-    size = t.shape[-1]
-    strict = torch.triu(t, diagonal=1) if upper else torch.tril(t, diagonal=-1)
-    power = -strict
-    x = b
-    for step in range(max(1, math.ceil(math.log2(max(size, 2))))):
-        x = x + matvec_small(power, x)
-        if step + 1 < math.ceil(math.log2(max(size, 2))):
-            power = matmul_small(power, power)
-    return x
-
-
 def det_3x3(m):
     """Determinant of a 3 x 3 tensor from element-wise products (no LAPACK call, CUDA-graph safe)."""
     return (m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
