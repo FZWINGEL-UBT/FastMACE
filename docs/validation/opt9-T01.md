@@ -49,9 +49,39 @@ relative to the row's absolute dot. Rounding level, as expected for the reassoci
   is 2.6 % of the NaNbO3 step and 0.5 % of NbCl5. Even on the A100, the step-level gain would be bounded by that
   ceiling plus the table backward and the stores.
 
+## Step-level ceiling (OPT9-T02 part 1, owner request, 29 October 2026)
+
+The owner asked what the idea would save at step level. `tools/bench/opt9_ceiling.py` (source `9edef64b`) times
+the default float32 MD step (side a) against the same plan with the input gradient and the radial tables'
+backward stubbed out (side b: outputs zeroed, wrong forces, timing only), in one process with alternating blocks
+(8 × 200 steps after 300 warm-up steps, ABAB). Both sides run at 0.001 fs so side b's missing radial forces cannot
+heat it and both keep the starting neighbour list. The first try at the default 0.5 fs heated side b's NaNbO3 to
+28,800 K and its step time grew block by block (b/a 0.91 to 1.42); that record is kept in
+`results/opt9-T02-ceiling-20261029/first-try-0.5fs/` and not used. The `dw` chunk stores are not stubbed (they
+are inside the streaming kernel); OPT9-T01 measured them standalone.
+
+GPUs: leto (NaNbO3) and murphy (NaCl, NbCl5), both RTX 4000 Ada, `mace_cueq_oeq`; idle checks passed at
+23:33 UTC. Every run is valid (no compile while timed, no other GPU process).
+
+| Cell (RTX 4000 Ada) | default ms | stubbed ms | b/a (block range) | ceiling |
+| --- | ---: | ---: | --- | ---: |
+| NaCl | 2.659 | 2.461 | 0.926 (0.925–0.927) | 0.20 ms, 7.4 % |
+| NbCl5 | 20.70 | 19.97 | 0.965 (0.963–0.967) | 0.72 ms, 3.5 % |
+| NaNbO3 | 17.00 | 15.81 | 0.930 (0.929–0.933) | 1.19 ms, 7.0 % |
+
+The ceiling clears the plan's T02 bar (≥ 3 % NaNbO3, ≥ 1.5 % NbCl5), but on this GPU the work a fused kernel
+must add is larger than the ceiling: T01's `wdot` alone is 2.46 ms (NaNbO3) and 1.45 ms (NbCl5) standalone,
+against at most 1.19 + 0.40 ms (ceiling plus the `dw` stores) and 0.72 + 0.26 ms. **On the RTX 4000 Ada the fused
+backward would be slower than today's.** The verdict of T01 stands.
+
+On the A100 the step-level ceiling was not measured (a Modal run failed at setup before the stubs were fixed;
+the owner then asked for the workstations). An estimate from T01's standalone numbers: if the A100's ceiling is a
+similar share of its step, the gain would be the ceiling plus the stores (0.25 ms) minus `wdot` (0.91 ms), around
+0.5 ms or 3–4 % of a NaNbO3 step. That is an inference, not a measurement.
+
 ## Not done
 
-- OPT9-T02 (step-level ceiling, prototype in the vendored streaming backward).
+- OPT9-T02's A100 ceiling and the prototype in the vendored streaming backward.
 - The local RTX 5060 Ti (32 MiB L2, smaller than NaNbO3's 29 MiB `G'` plus the working set); its record is added
   when the queued run finishes.
 - Real operands (real r distribution: MD edges reach fewer pieces than uniform groups, which would shrink the
