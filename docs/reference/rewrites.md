@@ -224,12 +224,6 @@ These apply only to MACE-POLAR-1 models.
 | --- | --- | --- | --- | --- |
 | `single_graph_strain` | `auto`, `on`, `off` | On for every engine. It acts only where stress is computed (variable-cell MD, relaxations with a cell filter). | Uses MACE PR 1498's one-structure strain: the strained cell is used directly instead of being gathered per edge. Bound into the force field's own forward; nothing in MACE is patched process-wide. | rounding, deterministic. Needs one structure per evaluation. |
 
-## Self-check cache
-
-| Option | Values | Default (`auto` means) | What it does | Exactness / limits |
-| --- | --- | --- | --- | --- |
-| `selfcheck_cache` | `use`, `off`, `refresh` | `use`. | Meant to cache self-check results by checkpoint, sources, rewrite set, package versions and device kind: `use` reads and writes the cache, `off` does neither, `refresh` runs every check and rewrites the cache. | No effect in this version: the value is validated but nothing reads it, so self-check results are not cached. |
-
 ## PrecisionConfig
 
 The force evaluation runs in float32 or float64. **Integration is always

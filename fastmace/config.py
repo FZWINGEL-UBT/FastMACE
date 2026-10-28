@@ -208,10 +208,6 @@ class RewriteConfig:
     single_graph_strain: Toggle = "auto"
     # PolarMACE: reassociated SparseUvuTensorProduct, MACE PR 1711 (polar_gpu.REASSOCIATE_UVU).
     polar_uvu: bool = True
-    # Self-check results cached by checkpoint, sources, rewrite set, versions and device kind (2-T19):
-    # "use" reads and writes the cache, "off" neither, "refresh" runs every check and rewrites it.
-    # No effect until 2-T19.
-    selfcheck_cache: Literal["use", "off", "refresh"] = "use"
 
     def __post_init__(self):
         _check_choices(self)

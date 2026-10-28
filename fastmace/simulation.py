@@ -2339,16 +2339,25 @@ def _same_reference(first, second):
     return None not in records and records[0].content_digest() == records[1].content_digest()
 
 
+# RewriteConfig fields a simulation.json may hold that are gone: selfcheck_cache (checkpoint 2: no self-check cache).
+_REMOVED_REWRITE_FIELDS = ("selfcheck_cache",)
+
+
+def _record_rewrites(rewrites):
+    """The ``RewriteConfig`` (or ``"auto"``) of a ``simulation.json`` record, without removed fields."""
+    if rewrites == "auto":
+        return rewrites
+    from fastmace.config import RewriteConfig
+
+    return RewriteConfig(**{name: value for name, value in rewrites.items() if name not in _REMOVED_REWRITE_FIELDS})
+
+
 def _record_force_field(record):
     """The ``ForceField`` of a ``simulation.json`` record: its model loaded again (by SHA-256), precision,
     rewrites, species and the D3 record (3b-T04)."""
     from fastmace.model.forcefield import ForceField
 
-    rewrites = record["force_field"]["rewrites"]
-    if rewrites != "auto":
-        from fastmace.config import RewriteConfig
-
-        rewrites = RewriteConfig(**rewrites)
+    rewrites = _record_rewrites(record["force_field"]["rewrites"])
     dispersion = record["force_field"].get("dispersion")
     if dispersion is not None:
         from fastmace.longrange.d3 import D3
