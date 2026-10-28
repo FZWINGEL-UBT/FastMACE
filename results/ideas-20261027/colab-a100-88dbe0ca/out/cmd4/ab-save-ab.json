@@ -1,0 +1,373 @@
+{
+  "tool": "ab_rewrites",
+  "created_utc": "2026-10-28T02:18:46.814547+00:00",
+  "host": "718c13481848",
+  "gpu": "NVIDIA A100-SXM4-40GB",
+  "torch": "2.14.1+cu130",
+  "fastmace_commit": "88dbe0ca8eb93262f7b5c0461723c10b4a741537",
+  "model": "mh1-r2scan",
+  "checkpoint_sha256": "a522eb7f59c7879963d41586528f4980baf33e086c94aa92e3eafdeccad3be47",
+  "sides": {
+    "a": {
+      "save_transcendentals": "off"
+    },
+    "b": {
+      "save_transcendentals": "on"
+    }
+  },
+  "engine_sides": {
+    "a": {},
+    "b": {}
+  },
+  "protocol": {
+    "warmup": 60,
+    "block": 60,
+    "blocks": 6
+  },
+  "pattern": "abab",
+  "order": [
+    "a",
+    "b"
+  ],
+  "precision": "float64",
+  "load": [
+    1.46044921875,
+    1.76513671875,
+    1.4755859375
+  ],
+  "structures": {
+    "NbCl5": {
+      "natoms": 1944,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 17.910808674995828,
+            "mean_ms": 17.992748033332695,
+            "min_ms": 17.906022750003103,
+            "max_ms": 18.405163349999988,
+            "stdev_ms": 0.20208217455053415,
+            "spread": 0.027868121928726987,
+            "block_ms": [
+              17.906022750003103,
+              17.906513066668595,
+              17.909811899994565,
+              18.405163349999988,
+              17.911805449997093,
+              17.917171683332832
+            ]
+          },
+          "b": {
+            "median_ms": 18.080339316668415,
+            "mean_ms": 18.1578889555567,
+            "min_ms": 18.07130861667095,
+            "max_ms": 18.556478533332665,
+            "stdev_ms": 0.19531022597896056,
+            "spread": 0.02683411567472256,
+            "block_ms": [
+              18.07130861667095,
+              18.07625396666784,
+              18.082613983331917,
+              18.556478533332665,
+              18.079307466670492,
+              18.081371166666337
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.009465270091867,
+        "pair_ratios_b_over_a": [
+          1.0092307414647856,
+          1.0094792827261942,
+          1.0096484588616703,
+          1.0082213442203802,
+          1.0093514870480813,
+          1.009164364009876
+        ]
+      },
+      "ratio_b_over_a": 1.009465270091867,
+      "pair_ratios": [
+        1.0092307414647856,
+        1.0094792827261942,
+        1.0096484588616703,
+        1.0082213442203802,
+        1.0093514870480813,
+        1.009164364009876
+      ],
+      "setup_s": {
+        "a": 55.82444707000013,
+        "b": 65.63852384799975
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.save_transcendentals = off  (requested 'off': off: only an explicit 'on' enables it (ideas-20261027 D3))"
+        ],
+        "b": [
+          "RewriteConfig.save_transcendentals = on  (requested 'on': on: transcendental ops saved for the backward, not recomputed (ideas-20261027 D3))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 104.12512633849477,
+          "potential_eV_atom": -10.610884757139983,
+          "kinetic_eV_atom": 0.01345920915094929
+        },
+        "b": {
+          "temperature_K": 104.12512633849532,
+          "potential_eV_atom": -10.610884757139992,
+          "kinetic_eV_atom": 0.01345920915094936
+        }
+      },
+      "load_after": [
+        1.71533203125,
+        1.8349609375,
+        1.54248046875
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NaNbO3": {
+      "natoms": 1080,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 17.25774706666622,
+            "mean_ms": 17.275445188887613,
+            "min_ms": 17.222920683335968,
+            "max_ms": 17.407294133333078,
+            "stdev_ms": 0.06619338450569726,
+            "spread": 0.010683517917192832,
+            "block_ms": [
+              17.222920683335968,
+              17.24471038332922,
+              17.254607633337095,
+              17.407294133333078,
+              17.262251799994978,
+              17.260886499995348
+            ]
+          },
+          "b": {
+            "median_ms": 17.638266933336883,
+            "mean_ms": 17.655781244445734,
+            "min_ms": 17.606312583332816,
+            "max_ms": 17.77948413333282,
+            "stdev_ms": 0.06214827431897139,
+            "spread": 0.009817945870447346,
+            "block_ms": [
+              17.606312583332816,
+              17.627287633339016,
+              17.63492388333816,
+              17.77948413333282,
+              17.641609983335606,
+              17.645069249995988
+            ]
+          }
+        },
+        "ratio_b_over_a": 1.0220492202835472,
+        "pair_ratios_b_over_a": [
+          1.022260562366045,
+          1.0221851942714932,
+          1.0220414313720045,
+          1.021381266792467,
+          1.021976170185441,
+          1.0222574170799827
+        ]
+      },
+      "ratio_b_over_a": 1.0220492202835472,
+      "pair_ratios": [
+        1.022260562366045,
+        1.0221851942714932,
+        1.0220414313720045,
+        1.021381266792467,
+        1.021976170185441,
+        1.0222574170799827
+      ],
+      "setup_s": {
+        "a": 65.57637374299975,
+        "b": 90.96610213699978
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.save_transcendentals = off  (requested 'off': off: only an explicit 'on' enables it (ideas-20261027 D3))"
+        ],
+        "b": [
+          "RewriteConfig.save_transcendentals = on  (requested 'on': on: transcendental ops saved for the backward, not recomputed (ideas-20261027 D3))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 102.0120675848012,
+          "potential_eV_atom": -11.86573479855824,
+          "kinetic_eV_atom": 0.013186075271411399
+        },
+        "b": {
+          "temperature_K": 102.01206758482516,
+          "potential_eV_atom": -11.865734798558233,
+          "kinetic_eV_atom": 0.013186075271414497
+        }
+      },
+      "load_after": [
+        1.7587890625,
+        2.02099609375,
+        1.6787109375
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    },
+    "NaCl": {
+      "natoms": 216,
+      "ab": {
+        "names": [
+          "a",
+          "b"
+        ],
+        "pattern": "abab",
+        "order": [
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b",
+          "a",
+          "b"
+        ],
+        "sides": {
+          "a": {
+            "median_ms": 2.9088729833347315,
+            "mean_ms": 2.9135163361110643,
+            "min_ms": 2.901628766668788,
+            "max_ms": 2.950095916662576,
+            "stdev_ms": 0.01826678277683895,
+            "spread": 0.016661830981091984,
+            "block_ms": [
+              2.9094949333360396,
+              2.9091079000030122,
+              2.9086380666664504,
+              2.950095916662576,
+              2.901628766668788,
+              2.902132433329522
+            ]
+          },
+          "b": {
+            "median_ms": 2.8914400166665173,
+            "mean_ms": 2.897614655555319,
+            "min_ms": 2.8851456833308475,
+            "max_ms": 2.9361577666729013,
+            "stdev_ms": 0.01905907628583513,
+            "spread": 0.017642449107716424,
+            "block_ms": [
+              2.8915954333342597,
+              2.892286616664326,
+              2.8912845999987744,
+              2.9361577666729013,
+              2.889217833330804,
+              2.8851456833308475
+            ]
+          }
+        },
+        "ratio_b_over_a": 0.9940069687579727,
+        "pair_ratios_b_over_a": [
+          0.9938479012983685,
+          0.9942177176244756,
+          0.9940338171096122,
+          0.9952753570109534,
+          0.9957227700936283,
+          0.9941468039833089
+        ]
+      },
+      "ratio_b_over_a": 0.9940069687579727,
+      "pair_ratios": [
+        0.9938479012983685,
+        0.9942177176244756,
+        0.9940338171096122,
+        0.9952753570109534,
+        0.9957227700936283,
+        0.9941468039833089
+      ],
+      "setup_s": {
+        "a": 50.81479237900021,
+        "b": 72.34348827200029
+      },
+      "plan_lines": {
+        "a": [
+          "RewriteConfig.save_transcendentals = off  (requested 'off': off: only an explicit 'on' enables it (ideas-20261027 D3))"
+        ],
+        "b": [
+          "RewriteConfig.save_transcendentals = on  (requested 'on': on: transcendental ops saved for the backward, not recomputed (ideas-20261027 D3))"
+        ]
+      },
+      "compile_during_timing": {
+        "changes": {},
+        "recompiled": false
+      },
+      "observables": {
+        "a": {
+          "temperature_K": 109.25803917026819,
+          "potential_eV_atom": -6.873345211572992,
+          "kinetic_eV_atom": 0.014122689232902278
+        },
+        "b": {
+          "temperature_K": 109.25803917026991,
+          "potential_eV_atom": -6.8733452115729925,
+          "kinetic_eV_atom": 0.0141226892329025
+        }
+      },
+      "load_after": [
+        1.44580078125,
+        1.77490234375,
+        1.62744140625
+      ],
+      "other_gpu_processes": [],
+      "valid": true
+    }
+  }
+}
