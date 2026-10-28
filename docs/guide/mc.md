@@ -73,3 +73,5 @@ attempts = 50
 For models that read charges (PolarMACE) or a total charge or spin
 (OMOL-0), a transmutation must keep ΔZ − Δq even (`formal_charges=`), or it
 is refused with `ChargeParityRefused`.
+
+See also: [Monte Carlo](../reference/mc.md), [Command line and TOML](../reference/cli.md).
