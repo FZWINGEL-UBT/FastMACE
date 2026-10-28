@@ -317,7 +317,9 @@ class PrecisionConfig:
 
     # Model and force precision (--dtype).
     dtype: Literal["auto", "float32", "float64"] = "auto"
-    # TF32 matrix products; off everywhere in the research engine (main.py: "TF32 off").
+    # TF32 matrix products; off everywhere in the research engine (main.py: "TF32 off"). A label of the plan only:
+    # FastMACE never sets PyTorch's TF32 flag; metadata.json records that flag (precision.tf32) next to this one
+    # (precision.tf32_requested).
     tf32: bool = False
     # Potential energy accumulated in float64 (SPEC §7.3; a reference treatment, not a rewrite).
     # False reproduces phase 1a's float32 sum, for A/B against the research engine only (1b-T03).

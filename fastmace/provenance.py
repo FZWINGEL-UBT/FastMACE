@@ -764,11 +764,21 @@ def subprocess_block(runner):
 
 
 def _precision(plan, identity):
+    """``tf32`` is PyTorch's process-wide matmul flag when the record is made (a script may set it; FastMACE never
+    does), ``tf32_requested`` the plan's ``PrecisionConfig.tf32`` label."""
     if plan is not None:
-        force, tf32, energy = plan.precision.dtype, plan.precision.tf32, plan.precision.float64_energy
+        force, requested, energy = plan.precision.dtype, plan.precision.tf32, plan.precision.float64_energy
     else:
-        force, tf32, energy = (None if identity is None else identity["force_precision"]), None, None
-    return {"force": force, "integration": INTEGRATION_PRECISION, "tf32": tf32, "float64_energy": energy}
+        force, requested, energy = (None if identity is None else identity["force_precision"]), None, None
+    return {"force": force, "integration": INTEGRATION_PRECISION, "tf32": _tf32_flag(), "tf32_requested": requested,
+            "float64_energy": energy}
+
+
+def _tf32_flag():
+    """``torch.backends.cuda.matmul.allow_tf32`` (also set by ``torch.set_float32_matmul_precision``); ``None``
+    before torch is imported."""
+    torch = sys.modules.get("torch")
+    return None if torch is None else bool(torch.backends.cuda.matmul.allow_tf32)
 
 
 def _hardware(device):

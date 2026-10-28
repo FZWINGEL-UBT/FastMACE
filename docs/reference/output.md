@@ -217,7 +217,7 @@ random states (generator states appear as SHA-256 hashes).
 | `reference_record` | the reference record, with at least `id` |
 | `plan` | the active plan: `revision`, `tier`, `reason`, `step`, `description` (`str(plan)`), `description_full` (`plan.describe(full=True)`), `backend`, `conv_fusion`, `rewrites`, `engine`, `neighbours`, `polar`, `integrator`, `decisions` (`key`, `choice`, `reason`, `code`, `rule`), `requested`, `auto_options_off`, `superset`, `workload`, `software`, `allowances`, `fallbacks_tried`, `predicted_memory_bytes`, `runner` (`"in-process"` or `"subprocess"`), `calibration`, `adaptation` |
 | `plan_revisions` | every revision, oldest first, the active one last: `revision`, `tier`, `step`, `reason`, `description`, `description_full`, `runner`, `fallback` |
-| `precision` | `force`, `integration` (always `"float64"`), `tf32`, `float64_energy` |
+| `precision` | `force`, `integration` (always `"float64"`), `tf32` (PyTorch's process-wide matmul TF32 flag when the record was written: `torch.backends.cuda.matmul.allow_tf32`, also set by `torch.set_float32_matmul_precision`), `tf32_requested` (the plan's `PrecisionConfig.tf32`), `float64_energy` |
 | `runtime` | `file_locks` (`"soft"` or `"kernel"`), `file_lock_source`, `file_lock_switch_late`, `cuda_driver_cache` (see [Environment and cache](environment.md#file-locks-on-nfs)) |
 | `software` | `versions` (Python and packages), `kernels`, `patches`, `triton`, `oeq_extension` (the OEq build variables for a hybrid plan, else `null`), `treatments` |
 | `hardware` | `gpu`, `driver`, `compute_capability`; `null` off CUDA |
