@@ -213,7 +213,8 @@ def phase_5_pending(adaptation: AdaptationConfig, calibration: CalibrationConfig
             f"AdaptationConfig({', '.join(f'{name}={getattr(adaptation, name)!r}' for name in unsupported)}): "
             "runtime adaptation implements owner decisions 52 and 53 only (SPEC §18): "
             + "; ".join(f"{name} one of {ADAPTATION_SUPPORTED[name]}" for name in unsupported)
-            + "; or pass adapt='off'", code=PHASE_5_PENDING_CODES["adaptation"]))
+            + " (refused with adapt='off' too: leave these fields at their defaults)",
+            code=PHASE_5_PENDING_CODES["adaptation"]))
     if calibration.choose is not True:
         reasons.append(Reason("CalibrationConfig(choose=False): the calibration's measurement breaks the backend's tie "
                               "(owner decision 55, D5 (a)); a calibration that only reports, D5 (b), was not chosen",

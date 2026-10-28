@@ -66,13 +66,14 @@ def _friction(friction_per_fs):
 class Langevin:
     """Langevin NVT, ASE's ``Langevin`` on the graph engine (SPEC §10.2).
 
-    ``fm.integrators.Langevin(timestep_fs=0.5, temperature_K=300, friction_per_fs=0.02)``.
+    ``fm.integrators.Langevin(timestep_fs=0.5, temperature_K=300, friction_per_fs=0.002)`` (about
+    ``fm.md``'s friction, ``quick.default_friction_per_fs``).
     ``temperature_K`` is the starting target; a schedule (``Simulation.run(schedule=…)``) moves it.
     ``fixcm_projection`` is how ``fixcm`` projects the noise (``IntegratorConfig.fixcm_projection``;
     docs/design/fixcm-projection.md): ``"ase"``, ASE's, ``"mass_weighted"``, canonical at a fixed centre
-    of mass for unequal masses too, or ``"auto"``, the planner's choice (``"mass_weighted"`` for MC plans
-    under ``fixcm``, else ``"ase"``). ``fixcm``: ``"auto"`` (off with ``FixAtoms``, on otherwise), ``True`` or
-    ``False``.
+    of mass for unequal masses too, or ``"auto"``, the planner's choice (``"mass_weighted"`` under
+    ``fixcm``, for MD as for MC (decision 37), else ``"ase"``). ``fixcm``: ``"auto"`` (off with
+    ``FixAtoms``, on otherwise), ``True`` or ``False``.
     """
 
     timestep_fs: float = 0.5
@@ -198,7 +199,8 @@ class NVE:
 
     ``fixcm``: remove the total momentum at the start and project it out each step (owner decision D2);
     ``"auto"`` turns it off with ``FixAtoms``. ``dof``: ``"auto"`` (3N - 3 under ``fixcm``, 3(N - n_fixed) with
-    ``FixAtoms``) or ``"ase"`` (ASE's count), for the reported temperature. The conserved quantity is
+    ``FixAtoms``; the same as ``"fastmace"``) or ``"ase"`` (ASE's count), for the reported temperature. The
+    conserved quantity is
     E_kin + E_pot.
     """
 

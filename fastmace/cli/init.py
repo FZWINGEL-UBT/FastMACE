@@ -57,7 +57,8 @@ SCALARS = (
     ("output", "Output directory, default ./<structure stem>.fastmace/; or the [output] table below.", '"run/"'),
     ("mode", 'Execution mode: unset lets the planner choose ("graph", or "compiled" where the model or the '
              'workload needs it); or "graph", "compiled", "eager", "reference".', '"compiled"'),
-    ("allow_reference", "Recorded in the plan only: it lifts no refusal (mode \"reference\" works without it).", "false"),
+    ("allow_reference", "Recorded in the plan only: it lifts no refusal (mode \"reference\" works without "
+                        "it).", "false"),
     ("calibrate", "Time hybrid against plain cuEq on this structure first and take the faster where the rules tie "
                   "(four child builds; MD only).", "true"),
 )
