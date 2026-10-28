@@ -6,7 +6,8 @@ Side ``a`` is the minimal planner's default plan. Side ``b`` is the same plan bu
   ``streaming_conv_folded_backward`` for every chunk) only zeroes its output rows;
 - the radial tables' backward kernel (both interactions) only zeroes ``dL/dr``.
 
-The stubs act while side ``b`` is built and warmed up, which is when its CUDA graphs are captured; side ``a`` is
+The stubs act while side ``b`` is built and warmed up, which is when its CUDA graphs are captured, except inside
+the rewrites' setup self-checks (``Registry.selfcheck``), which compare against the original model; side ``a`` is
 built and warmed up first with them off, so its graphs hold the real kernels. Side ``b``'s forces are wrong (the
 radial r-gradient is missing): its timing is a ceiling for the w'-dot backward of plans/opt-9.md, which would
 remove both and the ``dw`` chunk stores (not stubbed here; standalone 0.16-0.40 ms in OPT9-T01). It is an
@@ -63,6 +64,19 @@ def install_stubs():
 
     stub = (forward, Backward())
     radial_table._kernels = lambda: stub
+
+    # The rewrites' self-checks at setup compare against the original model: run them with the stubs off.
+    from fastmace.rewrites import registry
+    real_selfcheck = registry.Registry.selfcheck
+
+    def selfcheck(self, *args, **kwargs):
+        active, STUB["active"] = STUB["active"], False
+        try:
+            return real_selfcheck(self, *args, **kwargs)
+        finally:
+            STUB["active"] = active
+
+    registry.Registry.selfcheck = selfcheck
 
 
 def main(argv=None):
@@ -123,7 +137,8 @@ def main(argv=None):
         blocks = {side: result.statistics[side].block_ms for side in sides}
         late = {k: STUB[k] for k in ("input_grad", "table_backward")}  # stub calls while timed: a recapture
         entry = dict(natoms=len(base), ab=result.as_dict(), ratio_b_over_a=medians["b"] / medians["a"],
-                     ceiling_ms=medians["a"] - medians["b"], pair_ratios=[b / a for a, b in zip(blocks["a"], blocks["b"])],
+                     ceiling_ms=medians["a"] - medians["b"],
+                     pair_ratios=[b / a for a, b in zip(blocks["a"], blocks["b"])],
                      setup_s=setup, stub_calls_during_build=stubbed, stub_calls_while_timed=late,
                      compile_during_timing=dict(changes=changes, recompiled=recompiled),
                      observables={side: sides[side].observables() for side in sides},
