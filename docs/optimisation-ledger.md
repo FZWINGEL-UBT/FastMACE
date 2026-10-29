@@ -404,6 +404,7 @@ Each ID links to its appendix entry. RE-only evidence is given as `ResearchModul
 | [prec-dtype](#prec-dtype) | Float32 forces, TF32 off | `dtype`, `tf32` | both | DEFAULT | RE 2026-10-09 | see hybrid backend | [switch-map](design/switch-map.md) §3 |
 | [prec-float64-energy](#prec-float64-energy) | Energy accumulated in float64 | `float64_energy` | FM | DEFAULT | 1b-T01/T03 | 0.3 % faster, inside noise | [1b-T03](validation/1b-T03-energy.md) |
 | [prec-tf32](#prec-tf32) | TF32 matrix products (global, selective) | `allow_tf32` | both | REJECTED | RE 2026-10-08/09/12 | NaCl −19.9 % but force error 1,020–1,500× | `ResearchModule:LT/studies/remaining_optimizations/report.md` |
+| prec-tf32-fm-ada | TF32 matrix products on FastMACE's default plan, Ada (screen) | tools' `--tf32` switches | FM | REJECTED | 2026-10-29 | step 0.68× NaCl, 0.83× NaNbO3/NbCl5, force error 3,500–5,100×; 3×TF32 1.12–1.22× slower; BF16×9 absent on sm_89 | [tf32-screen](validation/tf32-screen.md) |
 | [prec-fp32-emulation-re](#prec-fp32-emulation-re) | cuBLAS FP32 emulation on tensor cores (RE) | none | RE | REJECTED | 2026-10-07 | unavailable on GeForce Blackwell | `ResearchModule:LT/studies/optimization_history/report.md` §8 |
 | [prec-torch-modes](#prec-torch-modes) | torch FP32 matmul precision modes | none | FM | REJECTED | 2026-10-20 | no FP32-accurate mode | [opt-T01](validation/opt-T01-tensor-cores.md) §1 |
 | [prec-bf16x9](#prec-bf16x9) | cuBLAS BF16×9 FP32 emulation | none | FM | REJECTED | 2026-10-20 | sm_100/103 only | [opt-T01](validation/opt-T01-tensor-cores.md) §1 |

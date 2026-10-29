@@ -38,6 +38,8 @@ def parse_args(argv=None):
     p.add_argument("--seed", type=int, default=1)
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="RewriteConfig overrides on the default plan, e.g. tf32x3_gemms=on (OPT4-T03)")
+    p.add_argument("--tf32", action="store_true",
+                   help="PyTorch's TF32 matmul mode for the whole run (TF32 screen, 29 October 2026; never default)")
     p.add_argument("--precision", choices=("float32", "float64"), default="float32",
                    help="The ForceField's force precision (f64-T01: float64 plans)")
     p.add_argument("--engine", nargs="*", default=[], metavar="FIELD=VALUE",
@@ -86,6 +88,8 @@ def main(argv=None):
                         engine=EngineConfig(**engine_options) if engine_options else None)
     setup_s = time.perf_counter() - started
     engine = sim._engine
+    if args.tf32:
+        ab_step_time.tf32_after_build(torch, engine)
 
     def sample(step):
         values = engine.integrator.output_values(engine.state)
@@ -103,7 +107,7 @@ def main(argv=None):
     record = dict(tool="nve_drift", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
                   python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), model=args.model,
                   structure=structure, natoms=n, temperature_K=args.temperature_K, timestep_fs=args.timestep_fs,
-                  ps=args.ps, every=args.every, rewrites=rewrites, precision=args.precision,
+                  ps=args.ps, every=args.every, rewrites=rewrites, precision=args.precision, tf32=args.tf32,
                   engine_options=engine_options, plan=sim.plan.describe(), setup_s=setup_s,
                   seconds=seconds,
                   drift_meV_per_atom_per_ps=1e3 * slope, rms_meV_per_atom=1e3 * rms, range_meV_per_atom=1e3 * spread,
