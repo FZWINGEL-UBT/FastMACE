@@ -2,7 +2,7 @@
 # CAP-T07 (recompute_conv_weights) on the local RTX 5060 Ti (sm_120, WSL2), inside a reservation:
 #   python3 tools/ci/local_gpu.py run --purpose "fm CAP-T07 JOB" -- \
 #     env FM=<pinned source copy> bash results/cap-t07-20261029/local.sh ROOT JOB...
-# Jobs: gate (tools/force_stress_gate.py, recompute_conv_weights=on; NaCl NbCl5 NaNbO3);
+# Jobs: gate (tools/force_stress_gate.py, recompute_conv_weights=on; NaCl NbCl5 NaNbO3); gate-default (the default plan);
 # nbcl5-ab / nbcl5-ba: tools/ab_rewrites.py on NbCl5 3x3x3, 12 blocks of 300 steps;
 # big-ab / big-ba: NbCl5 4x4x8 (9,216 atoms), 8 blocks of 100 steps after 100 warm-up steps;
 # a = recompute_conv_weights=off, b = on, build order ab (pattern abab) / ba (abba);
@@ -57,6 +57,9 @@ for job in "$@"; do
     gate) run $job "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/gate" --engine fastmace \
               --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
               --rewrites recompute_conv_weights=on --reference-command "$REF" --production-command "$PY" ;;
+    gate-default) run $job "$PY" "$FM/tools/force_stress_gate.py" --output "$ROOT/gate-default" --engine fastmace \
+              --checkpoint "$CK" --model mh1-r2scan --structures NaCl NbCl5 NaNbO3 --structures-root "$B" \
+              --reference-command "$REF" --production-command "$PY" ;;
     plans) run $job "$PY" "${PLAN_TOOL:-$FM/tools/bench/rescue_plans.py}" --output "$ROOT/plans.json" \
                NaCl@3x3x3 NbCl5@3x3x3 NaNbO3@3x3x3 NbCl5@4x4x8 NbCl5@5x5x12 NbCl5@5x5x13 NbCl5@5x5x14 NbCl5@5x5x15 NbCl5@5x5x16 NbCl5@5x5x18 NbCl5@5x6x17 ;;
     nbcl5-ab) ab $job NbCl5 ab abab ;;  nbcl5-ba) ab $job NbCl5 ba abba ;;
