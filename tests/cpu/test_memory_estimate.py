@@ -25,7 +25,7 @@ from fastmace.config import IntegratorConfig, RewriteConfig
 from fastmace.model import capabilities
 from fastmace.planner import memory, rules
 from fastmace.planner.workload import Workload
-from fastmace.rewrites import fusion, generic, linear, mh1
+from fastmace.rewrites import fusion, generic, linear, mh1, radial
 from fastmace.rewrites import memory as terms
 from fastmace.rewrites import registry as reg
 
@@ -224,9 +224,18 @@ def test_declared_terms():
                 if (record["memory"] if isinstance(record, dict) else record.memory) is not None}
     assert fusion.RECORDS["segment_gemm"].selfcheck_memory is not None
     assert declared == {"factor_species", "fold_cutoff", "joint_radial_input", "fused_radial_hidden",
-                        "reassociate_first", "streaming_conv", "generic_reassociate", "generic_streaming"}
+                        "reassociate_first", "streaming_conv", "chunked_conv_backward", "generic_reassociate",
+                        "generic_streaming"}
+    assert radial.RECORDS["radial_tables"].memory is terms.radial_tables
     dims = capabilities.model_dims(tiny_mace_model(list(Z), **FAMILIES["mh1"]))
     assert terms.streaming_conv(dims, 4) == (8, 0)
+    # Decision 67: MH-1's fused path keeps less per edge than the stock structure, so its terms are negative and
+    # rule 12 never turns it off for memory (decision 51 drops only positive per-edge terms).
+    for width in (4, 8):
+        for term in (terms.mh1_streaming_conv, terms.chunked_conv_backward, terms.radial_tables):
+            edge, node = term(dims, width)
+            assert edge < 0 and node == 0, (term.__name__, width)
+    assert mh1.RECORDS["streaming_conv"].memory is terms.mh1_streaming_conv
     with pytest.raises(ValueError, match="memory is not callable"):
         dataclasses.replace(mh1.RECORDS["fold_cutoff"], memory=3)
     assert {name for name, record in linear.RECORDS.items() if record.resident_memory is not None} == {
@@ -455,6 +464,22 @@ def test_rule_12_warns_when_nothing_more_can_go():
     check(reason)
     assert "factor_species" in str(reason)  # turned off on the way
     assert planned.tier == "graph" and planned.precision == plan().precision
+
+
+@pytest.mark.rule(12)
+def test_rule_12_never_drops_a_group_that_saves_nothing(monkeypatch):
+    """Decision 67: a rewrite whose own per-edge term is positive stays on when turning it off with its dependants
+    would raise the estimate (here the streaming convolution with its old +8 bytes, beside the chunked backward's
+    measured saving)."""
+    monkeypatch.setattr(terms, "_MH1_STREAMING_FLOATS", {4: -1, 8: -1})  # +12 bytes per edge in float32
+    assert terms.mh1_streaming_conv(None, 4) == (12, 0)
+    full = plan()
+    if full.rewrites.chunked_conv_backward != "on":
+        pytest.skip("the plan does not enable the chunked backward here")
+    with pytest.warns(ResourceWarning, match="rule 12"):
+        tight = plan(memory_bytes=2**20)
+    assert tight.rewrites.streaming_conv == "on" and tight.rewrites.chunked_conv_backward == "on"
+    assert getattr(tight.decision("RewriteConfig.streaming_conv")[2], "code", None) != "rule-12-memory-drop"
 
 
 @pytest.mark.rule(12)

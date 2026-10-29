@@ -14,6 +14,12 @@ recorded GPU and SM count):
 and the measured peaks. The test rebuilds each estimate with today's code and terms, so a change to the
 formula, a rewrite's declared term, ``SAFETY`` or the workspaces that moves any case outside [1.0, 1.5] of
 its measured peak fails here.
+
+``tests/_support/data/rule12_capacity.json`` holds the capacity scan's MH-1 cells (decision 67, plans/capacity.md
+CAP-T02; docs/validation/capacity-T02.md): NaCl, NbCl5 and SrTiO3 from 2,000 to 30,600 atoms, float32 and float64,
+the default plan with the fused path on, measured on the RTX 5060 Ti (WSL2) and the RTX 4000 Ada (Linux). Their
+estimate must stay between the measured peak and ``CAPACITY_HIGH`` times it, so that rule 12 predicts the
+limit instead of acting at half of it.
 """
 
 import json
@@ -27,6 +33,8 @@ from fastmace.planner import memory, minimal
 DATA = Path(__file__).resolve().parents[1] / "_support" / "data" / "rule12_fit.json"
 FIT = json.loads(DATA.read_text())
 LOW, HIGH = 1.0, 1.5
+CAPACITY = json.loads((DATA.parent / "rule12_capacity.json").read_text())
+CAPACITY_HIGH = 1.35
 
 
 def predicted(case):
@@ -66,3 +74,19 @@ def test_polar_streaming_backward_term():
     w_max = max(block.weight_numel for block in dims.interactions)
     assert name == memory.POLAR_STREAMING_BACKWARD and term.edge_bytes == 4 * w_max and term.node_bytes == 0
     assert term.edge_sized
+
+
+@pytest.mark.rule(12)
+@pytest.mark.parametrize("case", CAPACITY, ids=[f"{c['structure']}-{c['natoms']}-{c['dtype']}-{c['platform']}"
+                                                 for c in CAPACITY])
+def test_large_mh1_cells_stay_within_the_capacity_fit(case):
+    """Decision 67: never below the measured peak, at most CAPACITY_HIGH above it."""
+    found = predicted(case)
+    ratio = found.total / case["peak_bytes"]
+    assert LOW <= ratio <= CAPACITY_HIGH, (ratio, found.text(), case["peak_bytes"])
+
+
+def test_the_capacity_fit_covers_both_platforms_and_precisions():
+    assert {case["dtype"] for case in CAPACITY} == {"float32", "float64"}
+    assert {case["structure"] for case in CAPACITY} == {"NaCl", "NbCl5", "SrTiO3"}
+    assert max(case["natoms"] for case in CAPACITY) >= 25_000

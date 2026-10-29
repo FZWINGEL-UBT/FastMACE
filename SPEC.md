@@ -1381,7 +1381,7 @@ Rules 13–15 are **reactions** to checks.
 | 9 | preference | `host_callbacks_every` set, `fastmace.ase` observers included | graph mode stays. A replay per callback interval is cheap: in 3-T06's measurement a callback every step added 25 % on NaCl and 3 % on NbCl5, while compiled mode was 1.3–4.7× slower. Compiled mode only under rule 4 or with an explicit `mode="compiled"` (decision 38) |
 | 10 | preference | the integrator or optimiser and its cell mode (§9.2) | a barostat integrator or a cell-filtered optimiser (FIRE/LBFGS, never an NPT integrator for a relaxation) enables the stress path and the deformation-aware neighbour test; polar: k-vector headroom |
 | 11 | preference | `max_temperature_K` high; `"displace"` in `mc_moves`; D3 on | larger skin and bucket headroom (scaled from expected displacement per rebuild interval); a skin that keeps displacement trial rebuilds rare (§10.4); the D3 list's own skin (§11.2); re-capture budget |
-| 12 | preference | estimated memory (model dimensions × edge bucket and nodes, forward and backward, plus the D3 list) above 90 % of free GPU memory | drop the rewrites that declare an edge-sized buffer, largest first, then warn (decision 51; e.g. generic-only POLAR-1-L NPT on NbCl5 ran out of memory on 20 GB). The estimate may carry one global safety factor, the same for every model and GPU, fitted on the 19 labels and recorded with its fit (5-T03); per-model, per-GPU or per-shape factors stay forbidden (§9.1) |
+| 12 | preference | estimated memory (model dimensions × edge bucket and nodes, forward and backward, plus the D3 list) above 90 % of free GPU memory | drop the rewrites that declare an edge-sized buffer, largest first, then warn (decision 51; e.g. generic-only POLAR-1-L NPT on NbCl5 ran out of memory on 20 GB). Only when the estimate with them on does not fit: a rewrite whose term saves no memory is never dropped (decision 67). The estimate may carry one global safety factor, the same for every model and GPU, fitted on the 19 labels and recorded with its fit (5-T03); per-model, per-GPU or per-shape factors stay forbidden (§9.1). A rewrite's declared term may be measured or fitted on the GPU for its own path (decision 67: MH-1's fused path, fitted on the capacity scan) |
 | 13 | reaction | a rewrite self-check fails | disable that rewrite and every rewrite that requires it, record reasons, re-plan |
 | 14 | reaction | the gate fails (§12.3) | fallback algorithm (§9.4); never run silently with a failing gate |
 | 15 | reaction | known model–structure warning (§4.3) | warn (not refuse), with the documented diagnosis |
@@ -2623,7 +2623,9 @@ Open decisions for the owner:
      Never shrink rule 11's skin or headroom. Never change the tier, the
      precision or an explicit user setting. The margin and the estimate's
      accuracy come from 5-T03's measurements, and the estimate is never below the
-     measured peak on the 19 labels.
+     measured peak on the 19 labels. Amended by decision 67 (29 October 2026): a
+     rewrite is turned off only while the estimate with it on does not fit, and
+     only if its term lowers the estimate.
    - **Adaptation trigger** (52, D2 (a)): the re-capture budget is exceeded and
      re-capturing takes more than 20 % of wall time over the segments since the
      last switch. The one switch is graph → compiled (same backend, rewrites
@@ -2792,6 +2794,24 @@ Open decisions for the owner:
    (`planner.fixed.DECISION_66_WPRIME_GPUS`; MD step b/a in both orders 0.81-0.89
    on the A100, 0.94-0.97 on the RTX 5060 Ti, 0.93-0.96 on the RTX 4000 Ada,
    every block pair below 1; `docs/validation/opt9-T03.md`).
+67. Decided (user, 29 October 2026, on the capacity scan, CAP-T02 in
+   `plans/capacity.md`: "It should only do this if memory would not be
+   enough"): rule 12 turns off `streaming_conv` and the records that require it
+   (`chunked_conv_backward`, `fused_folded_forward`, `wprime_backward`) only when
+   the estimate with them on does not fit the free memory (decision 51's margin),
+   and only if turning them off lowers the estimate. The estimate predicts the
+   measured limit: MH-1's fused path declares what it does not keep per edge.
+   `chunked_conv_backward` and `radial_tables` carry their measured savings
+   (2,086 and 2,306 bytes per edge in float32), and MH-1's streaming convolution
+   the remainder of the fused path, fitted per precision on the capacity scan's
+   peaks (RTX 5060 Ti under WSL2, RTX 4000 Ada under Linux). The estimate then
+   stays between 1.0 and 1.35 times the measured peak on NaCl, NbCl5 and SrTiO3
+   up to 30,600 atoms. Before, it was 1.5-2.3 times, so rule 12 turned the fused
+   path off from about 13k atoms. That raised the peak, slowed the step and, under
+   WSL2, let OEq's own convolution kernels reserve several GiB of stack memory.
+   Turning the fused path off never lowers the estimate now, so rule 12 keeps it.
+   `tests/cpu/test_memory_fit.py` holds the fit; `docs/validation/capacity-T02.md`
+   the measurements.
 
 ---
 
@@ -3262,6 +3282,12 @@ launcher remains a requirement. Results: `docs/validation/6-T15.md`.
   derivatives, against float64 of the same weights; float32 plans only; the
   self-check holds the certificate. First record: `radial_tables` (opt-in,
   `never_automatic`; refused in float64 plans).
+
+**Decision 67 (29 October 2026, owner: "It should only do this if memory would not be enough"):** rule 12
+(§9.3) turns off the streaming convolution and its dependants only when the plan would not fit with them on and
+turning them off lowers the estimate; decision 51 amended to match. MH-1's fused-path rewrites declare their
+measured and fitted per-edge savings, so the estimate predicts the capacity scan's peaks (1.0-1.35x, was
+1.5-2.3x). See §18, decision 67.
 
 **Decision 66 (29 October 2026, owner):** per-GPU defaults allowed. Goal 2 and §9.1 now permit a default that
 names the GPU models where same-process A/Bs measured a whole-step speed-up (exact device names, as in decision
