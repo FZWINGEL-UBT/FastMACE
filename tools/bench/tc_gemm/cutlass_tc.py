@@ -37,6 +37,8 @@ _ARGS = [ctypes.c_int] * 7 + [ctypes.c_void_p, ctypes.c_longlong, ctypes.c_longl
 
 @cache
 def library(path=None):
+    import torch  # noqa: F401  (PyTorch's own libraries first: they own the process's libstdc++)
+
     lib = ctypes.CDLL(path or os.environ[ENV_LIB])
     for v in VARIANTS.values():
         fn = getattr(lib, f"fm_tc_gemm_v{v}")
