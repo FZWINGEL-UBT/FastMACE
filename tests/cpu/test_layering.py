@@ -64,7 +64,12 @@ SWITCH_EXEMPT_FILES = ("fastmace/config.py",)
 # Module-level UPPER_CASE names bound to bool or None outside config.py. Every entry is
 # a constant that nothing changes at run time, with the reason it is not a config field:
 # {"fastmace/<file>.py": {"NAME": "reason"}}.
-SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {}
+SWITCH_ALLOW_LIST: dict[str, dict[str, str]] = {
+    # fp32 profile screens (28-29 October 2026): A/B switches read by the screen tools, off by default; neither
+    # prototype was adopted, so neither is a config field (conductor, batch-2 trial merge).
+    "fastmace/neighbors/skin.py": {"ASYNC_EARLY_BUILD": "async early rebuild screen; no gain on sm_120 or sm_89"},
+    "fastmace/rewrites/species/__init__.py": {"TAIL_HEAD": "readout head-slice prototype; mixed A/B, not adopted"},
+}
 
 UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")
 
