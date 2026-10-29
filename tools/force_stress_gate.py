@@ -684,7 +684,7 @@ def _activate_baseline(job):
 def _torch_record(torch, result):
     result.update(gpu=torch.cuda.get_device_name(0), torch=torch.__version__,
                   peak_memory_bytes=int(torch.cuda.max_memory_reserved()),
-                  tf32_matmul=bool(torch.backends.cuda.matmul.allow_tf32))
+                  tf32_matmul=getattr(torch.backends.cuda.matmul, "fp32_precision", None))
 
 
 def _models_environment(job):
