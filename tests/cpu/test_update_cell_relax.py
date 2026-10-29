@@ -53,18 +53,19 @@ RECORDS = [optimize.LBFGS(cell_filter=optimize.FrechetCell()),
            optimize.FIRE(cell_filter=optimize.FrechetCell(scalar_pressure_GPa=0.5))]
 
 
-@pytest.mark.parametrize("record", RECORDS, ids=["lbfgs", "fire-pressure"])
-def test_frame_b_on_frame_a_engine_equals_a_fresh_relaxation(loaded, record):
+# FIRE at 0.5 GPa compresses the tiny model's cell out of the filter's range after about 100 steps: 40 stay inside.
+@pytest.mark.parametrize("record, steps", zip(RECORDS, (200, 40)), ids=["lbfgs", "fire-pressure"])
+def test_frame_b_on_frame_a_engine_equals_a_fresh_relaxation(loaded, record, steps):
     sim = relaxation(loaded, record, frame(5, FRAME_A))
-    sim.relax(fmax=0.01, steps=200)
+    sim.relax(fmax=0.01, steps=steps)
     b = frame(9, FRAME_B)
     sim.update(cell=b.cell.array, positions=b.positions)
     committed = sim.committed()
     np.testing.assert_array_equal(committed.cell, b.cell.array)
     np.testing.assert_array_equal(committed.positions, b.positions)
-    reused = sim.relax(fmax=0.01, steps=200)
+    reused = sim.relax(fmax=0.01, steps=steps)
     assert reused[1]["steps"] > 5  # a real relaxation, not a converged start
-    assert_same_relaxation(reused, relaxation(loaded, record, b.copy()).relax(fmax=0.01, steps=200))
+    assert_same_relaxation(reused, relaxation(loaded, record, b.copy()).relax(fmax=0.01, steps=steps))
 
 
 def test_the_filter_starts_from_the_new_cell(loaded):
