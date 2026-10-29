@@ -11,7 +11,10 @@ Under WSL2 a FastMACE run holds 2-7 GiB of device memory outside PyTorch's cachi
 - ``linear``: a cuBLAS GEMM chain captured as a graph (library workspaces inside a capture);
 - ``triton``: a Triton kernel captured as a graph;
 - ``nodes-5000``, ``nodes-20000``: that many tiny kernels captured in one graph (memory per graph node);
-- ``local-memory``: a Triton kernel whose large per-thread array spills to local memory, captured as a graph.
+- ``local-memory``: a Triton kernel whose large per-thread array spills to local memory, captured as a graph;
+- ``stack-limit``: as ``local-memory``, then ``cudaDeviceSetLimit(cudaLimitStackSize)`` lowered to 1 KiB after the
+  capture, then the graph replayed and the kernel launched eagerly again (does the driver give the reservation back,
+  and grow it again when a kernel needs it?).
 
 Each case prints one JSON line: the outside-allocator bytes after every step. ``--gib`` sets the size of the
 intermediates. Run inside a local GPU reservation, with or without ``PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True``.
@@ -25,7 +28,40 @@ import os
 import subprocess
 import sys
 
-CASES = ("eager", "graph", "graph-reuse", "linear", "triton", "nodes-5000", "nodes-20000", "local-memory")
+CASES = ("eager", "graph", "graph-reuse", "linear", "triton", "nodes-5000", "nodes-20000", "local-memory",
+         "stack-limit")
+
+
+def _cudart():
+    import ctypes
+
+    import torch
+
+    torch.cuda.init()
+    for name in ("libcudart.so", "libcudart.so.13", "libcudart.so.12"):
+        try:
+            return ctypes.CDLL(name)
+        except OSError:
+            continue
+    import glob
+    import os
+
+    base = os.path.dirname(torch.__file__) + "/../nvidia"
+    for path in glob.glob(base + "/*/lib/libcudart.so*"):
+        return ctypes.CDLL(path)
+    raise OSError("libcudart not found")
+
+
+def stack_limit(value=None):
+    """cudaLimitStackSize (bytes per thread): read, or set to ``value`` first."""
+    import ctypes
+
+    rt = _cudart()
+    if value is not None:
+        assert rt.cudaDeviceSetLimit(0, ctypes.c_size_t(value)) == 0
+    out = ctypes.c_size_t()
+    assert rt.cudaDeviceGetLimit(ctypes.byref(out), 0) == 0
+    return out.value
 
 
 def outside(torch):
@@ -149,7 +185,7 @@ def run_case(case, gib):
         del graph
         torch.cuda.empty_cache()
         steps["after_delete"] = outside(torch)
-    elif case == "local-memory":
+    elif case in ("local-memory", "stack-limit"):
         import triton
         import triton.language as tl
 
@@ -172,13 +208,22 @@ def run_case(case, gib):
         with torch.cuda.stream(stream):
             launch(x)
         torch.cuda.current_stream().wait_stream(stream)
-        steps["after_eager_launch"] = outside(torch)
+        steps["after_eager_launch"] = dict(outside(torch), stack=stack_limit())
         graph = torch.cuda.CUDAGraph()
         with torch.cuda.graph(graph):
             out = launch(x)
         steps["after_capture"] = outside(torch)
         graph.replay()
         steps["after_replay"] = outside(torch)
+        if case == "stack-limit":
+            reference = out.clone()
+            steps["after_limit"] = dict(outside(torch), stack=stack_limit(1024))
+            graph.replay()
+            steps["after_limited_replay"] = dict(outside(torch), stack=stack_limit(),
+                                                 same=bool(torch.equal(out, reference)))
+            again = launch(x)
+            steps["after_limited_eager"] = dict(outside(torch), stack=stack_limit(),
+                                                same=bool(torch.equal(again, reference)))
         del graph, out
         torch.cuda.empty_cache()
         steps["after_delete"] = outside(torch)
