@@ -205,9 +205,15 @@ def run_point(args):
     times = {}
 
     def peaks():
-        return dict(max_allocated=int(torch.cuda.max_memory_allocated()),
-                    max_reserved=int(torch.cuda.max_memory_reserved()),
-                    allocated=int(torch.cuda.memory_allocated()), reserved=int(torch.cuda.memory_reserved()))
+        found = dict(max_allocated=int(torch.cuda.max_memory_allocated()),
+                     max_reserved=int(torch.cuda.max_memory_reserved()),
+                     allocated=int(torch.cuda.memory_allocated()), reserved=int(torch.cuda.memory_reserved()))
+        try:  # device memory in use outside PyTorch's allocator (libraries, graphs, the context)
+            free_now, total_now = torch.cuda.mem_get_info()
+            found.update(cuda_free=int(free_now), outside_allocator=int(total_now - free_now - found["reserved"]))
+        except Exception:  # noqa: BLE001  (after a sticky error)
+            pass
+        return found
 
     def edges():
         engine = getattr(sim, "_engine", None)
