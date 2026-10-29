@@ -153,6 +153,16 @@ def _causes(error, limit=6):
     return found
 
 
+def _value(text):
+    """A command-line config value: true/false as bools, integers as ints, else the string."""
+    if text.lower() in ("true", "false"):
+        return text.lower() == "true"
+    try:
+        return int(text)
+    except ValueError:
+        return text
+
+
 def _tried(message):
     match = re.search(r"Tried to allocate ([\d.]+ [KMGT]iB)", message)
     return match.group(1) if match else None
@@ -208,7 +218,7 @@ def run_point(args):
     free, total = torch.cuda.mem_get_info()
     record["start"] = dict(cuda_free_bytes=int(free), cuda_total_bytes=int(total), windows=windows_memory())
     record["rewrites"] = dict(item.split("=", 1) for item in args.rewrites)
-    record["engine"] = dict(item.split("=", 1) for item in args.engine)
+    record["engine"] = {key: _value(value) for key, value in (item.split("=", 1) for item in args.engine)}
     record["environment"] = {key: os.environ.get(key) for key in ("CUDA_LAUNCH_BLOCKING", "PYTORCH_CUDA_ALLOC_CONF")}
     if args.diagnose:
         torch.cuda.memory._record_memory_history(max_entries=200_000)
