@@ -72,6 +72,9 @@ def parse_args(argv=None):
     p.add_argument("--blocks", type=int, default=12)
     p.add_argument("--pattern", choices=("abab", "abba"), default="abab")
     p.add_argument("--order", choices=("ab", "ba"), default="ab", help="Build order")
+    p.add_argument("--a-tf32", action="store_true",
+                   help="Side a builds and steps with PyTorch's TF32 matmul mode (TF32 screen); IEEE otherwise")
+    p.add_argument("--b-tf32", action="store_true", help="Side b's, as --a-tf32")
     p.add_argument("--precision", choices=("float32", "float64"), default="float32",
                    help="Both sides' force precision (float64: the decision 63 package by default)")
     args = p.parse_args(argv)
@@ -90,7 +93,7 @@ def parse_args(argv=None):
     except ValueError as exc:
         p.error(str(exc))
     if (args.a == args.b and args.a_engine == args.b_engine and args.a_constant == args.b_constant
-            and args.a_neighbours == args.b_neighbours):
+            and args.a_neighbours == args.b_neighbours and args.a_tf32 == args.b_tf32):
         p.error("the two sides have the same rewrite and engine fields")
     return args
 
@@ -207,7 +210,7 @@ def main(argv=None):
                 neighbour_sides={"a": args.a_neighbours, "b": args.b_neighbours},
                 constant_sides={side: {f"{m}:{n}": v for (m, n), v in values.items()}
                                 for side, values in (("a", args.a_constant), ("b", args.b_constant))},
-                timestep_fs=args.timestep_fs,
+                tf32_sides={"a": args.a_tf32, "b": args.b_tf32}, timestep_fs=args.timestep_fs,
                 protocol=protocol.as_dict(), pattern=args.pattern, order=order, precision=args.precision,
                 load=list(os.getloadavg()), structures={})
     for spec in args.structures:
@@ -215,6 +218,8 @@ def main(argv=None):
         sides, setup, lines = {}, {}, {}
         for side in order:
             started = time.perf_counter()
+            tf32 = args.a_tf32 if side == "a" else args.b_tf32
+            ab_step_time.set_tf32(torch, tf32)
             rewrites = RewriteConfig(**fields[side]) if fields[side] else "auto"
             field = ForceField(loaded, base, precision=args.precision, rewrites=rewrites)
             integrator = (IntegratorConfig(temperature_K=args.temperature_K) if args.timestep_fs is None else
@@ -223,7 +228,7 @@ def main(argv=None):
             plan = planner.plan(field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
             with _Constants(args.a_constant if side == "a" else args.b_constant):
                 engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
-            sides[side] = ab_step_time.FastMACESide(engine, torch)
+            sides[side] = ab_step_time.Tf32Side(ab_step_time.FastMACESide(engine, torch), tf32, torch)
             setup[side] = time.perf_counter() - started
             lines[side] = [line.strip() for line in plan.describe(full=True).splitlines()
                            if any(f"RewriteConfig.{f} " in line for f in {**args.a, **args.b})]
@@ -255,6 +260,7 @@ def main(argv=None):
               "valid" if entry["valid"] else "INVALID", flush=True)
         args.output.with_suffix(".json").write_text(json.dumps(meta, indent=2, default=str) + "\n")
         sides = None
+        ab_step_time.set_tf32(torch, False)
         torch.cuda.empty_cache()
 
 

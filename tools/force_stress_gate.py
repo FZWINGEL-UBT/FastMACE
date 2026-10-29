@@ -440,6 +440,9 @@ def parse_args(argv=None):
                    help="RewriteConfig fields for FastMACE's minimal planner (e.g. gated_rows=on); others stay auto")
     p.add_argument("--engine-config", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="Boolean EngineConfig fields for FastMACE's minimal planner (e.g. model_template_cache=false)")
+    p.add_argument("--production-tf32", action="store_true",
+                   help="The FastMACE production process runs with PyTorch's TF32 matmul mode (TF32 screen, 29 "
+                        "October 2026; never default, SPEC §1.2); the references stay IEEE")
     p.add_argument("--reference-command", default=sys.executable,
                    help="Interpreter (with an optional launcher prefix) of the reference processes")
     p.add_argument("--production-command", default=sys.executable,
@@ -461,6 +464,8 @@ def parse_args(argv=None):
         p.error("--engine-config are EngineConfig fields of FastMACE's minimal planner (--engine fastmace)")
     if args.rewrites and (args.engine != "fastmace" or args.planner != "minimal"):
         p.error("--rewrites are RewriteConfig fields of FastMACE's minimal planner (--engine fastmace)")
+    if args.production_tf32 and args.engine != "fastmace":
+        p.error("--production-tf32 applies to FastMACE's production process (--engine fastmace)")
     if args.engine == "baseline" and args.baseline is None:
         p.error("--engine baseline builds the research engine from its export: give --baseline DIR")
     if args.baseline is None and args.structures_root is None:
@@ -556,7 +561,7 @@ def main(argv=None, runner=run_child, gpu_check=gpu_processes):
         common = dict(model=args.model, label=args.model, checkpoint=str(checkpoint),
                       checkpoint_sha256=checkpoint_sha256, baseline=str(export.root) if export else None,
                       backend=args.backend, md_dtype=args.dtype, main_args=args.main_args, rewrites=args.rewrites,
-                      engine_config=args.engine_config)
+                      engine_config=args.engine_config, production_tf32=args.production_tf32)
         jobs = reference_jobs(list(keys), keys, args.reference_scope)
         # One finite-difference self-test, by the first float64 reference (it acts for polar models only), on
         # its structure's first hydrostatic configuration.
@@ -678,7 +683,8 @@ def _activate_baseline(job):
 
 def _torch_record(torch, result):
     result.update(gpu=torch.cuda.get_device_name(0), torch=torch.__version__,
-                  peak_memory_bytes=int(torch.cuda.max_memory_reserved()))
+                  peak_memory_bytes=int(torch.cuda.max_memory_reserved()),
+                  tf32_matmul=bool(torch.backends.cuda.matmul.allow_tf32))
 
 
 def _models_environment(job):
@@ -904,8 +910,12 @@ def fastmace_production_child(job, result):
 
     Needs no launcher: loading prepares the OEq runtime in this process before MACE is imported.
     """
-    build = _fastmace_build(job, result)
     import torch
+
+    if job.get("production_tf32"):
+        import ab_step_time
+        ab_step_time.set_tf32(torch, True)
+    build = _fastmace_build(job, result)
 
     from fastmace import _patches
     result.update(edges={}, setup_s={}, plans={}, force_fields={})

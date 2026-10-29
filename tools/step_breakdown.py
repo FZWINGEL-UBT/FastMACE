@@ -705,6 +705,8 @@ def parse_args(argv=None):
     p.add_argument("--calls", type=int, default=10)
     p.add_argument("--rewrites", nargs="*", default=[], metavar="FIELD=VALUE",
                    help="RewriteConfig fields (e.g. gated_rows=on); the others stay auto")
+    p.add_argument("--tf32", action="store_true",
+                   help="PyTorch's TF32 matmul mode for the whole pass (TF32 screen, 29 October 2026; never default)")
     p.add_argument("--allow-busy-gpu", action="store_true", help="CPU checks of the tool only (no timing)")
     args = p.parse_args(argv)
     try:
@@ -736,6 +738,7 @@ def main(argv=None):
     from torch.profiler import ProfilerActivity, profile
 
     label_triton_kernels()
+    ab_step_time.set_tf32(torch, args.tf32)
     if not args.allow_busy_gpu and ab_step_time.gpu_processes():
         raise SystemExit("GPU must be idle")
     if args.pass_ == "main":
@@ -925,7 +928,7 @@ def main(argv=None):
 
     summary = dict(
         tool="step_breakdown", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
-        python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), packages=package_versions(),
+        python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), packages=package_versions(), tf32=args.tf32,
         gpu=torch.cuda.get_device_name(), cuda=torch.version.cuda, oeq_runtime=oeq_runtime,
         other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()],
         compute_capability=f"{properties.major}.{properties.minor}", sms=properties.multi_processor_count,

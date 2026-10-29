@@ -112,6 +112,33 @@ class FastMACESide:
                     kinetic_eV_atom=kinetic / n)
 
 
+def set_tf32(torch, on):
+    """PyTorch's process-wide FP32 matmul mode: TF32 if ``on``, IEEE otherwise (TF32 screen, 29 October 2026).
+    It acts where a GEMM is compiled or launched: a CUDA graph keeps the cuBLAS kernel of its capture, Inductor
+    bakes the mode into its Triton templates (and keys its cache on it). FastMACE's own ``tl.dot`` kernels set
+    ``input_precision="ieee"`` and stay FP32 either way."""
+    matmul = torch.backends.cuda.matmul
+    if hasattr(matmul, "fp32_precision"):
+        matmul.fp32_precision = "tf32" if on else "ieee"
+    else:
+        matmul.allow_tf32 = bool(on)
+
+
+class Tf32Side:
+    """A TimedEngine under its own matmul mode (``set_tf32``): set before every step, so whatever the side
+    compiles or captures (its build, new edge sizes in warm-up) and launches eagerly uses its mode."""
+
+    def __init__(self, side, tf32, torch):
+        self.side, self.tf32, self.torch = side, tf32, torch
+
+    def step(self):
+        set_tf32(self.torch, self.tf32)
+        self.side.step()
+
+    def __getattr__(self, name):
+        return getattr(self.side, name)
+
+
 class CustomPassSlot:
     """Gives each side its own key in Inductor's single ``post_grad_custom_pre_pass`` slot (1a-T19, option (a)).
 
