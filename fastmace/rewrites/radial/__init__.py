@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import copy
 
+from fastmace.rewrites import memory as memory_terms
 from fastmace.rewrites.registry import CaseErrors, CheckResult, Rewrite, RewriteError, Support
 
 MACE_VERSIONS = ">=0.3.16,<0.3.17"
@@ -764,7 +765,8 @@ RECORDS = {
     "radial_tables": Rewrite(
         name="radial_tables", applies_to=_support, requires=("fold_cutoff",), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="certified", default="auto", deterministic=True,
-        workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply, selfcheck=_selfcheck),
+        workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply, selfcheck=_selfcheck,
+        memory=memory_terms.radial_tables),
     # ideas-20261027 D2: rounding (the series and the folded product reassociated); float64; opt-in.
     "w_tables": Rewrite(
         name="w_tables", applies_to=_w_support, requires=("radial_tables", "chunked_conv_backward"), conflicts=(),

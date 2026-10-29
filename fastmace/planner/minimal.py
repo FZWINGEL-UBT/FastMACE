@@ -954,8 +954,11 @@ class MinimalPlanner:
                 if explicit.intersection(group):
                     continue  # its dependants were set by the caller: never turned off by a rule
                 before = found
-                enabled = [other for other in enabled if other not in group]
-                found = estimate(enabled)
+                candidate = [other for other in enabled if other not in group]
+                lowered = estimate(candidate)
+                if lowered.total >= before.total:
+                    continue  # decision 67: turning it off (with its dependants) saves nothing, so it stays on
+                enabled, found = candidate, lowered
                 for other in group:
                     dropped.append((other, name, before.total - found.total))
                 if memory.fits(found, free):

@@ -66,6 +66,9 @@ def parse_args(argv=None):
                        help="EngineConfig overrides on the default plan (candidates), e.g. force_graphs=one")
     point = sub.choices["point"]
     point.add_argument("--repeat", required=True, help="NXxNYxNZ")
+    point.add_argument("--trace", action="store_true",
+                       help="sample free and reserved device memory at 20 Hz in a thread and log FastMACE's log lines "
+                            "with times (CAP-T03: memory outside the allocator per build step)")
     point.add_argument("--diagnose", action="store_true",
                        help="record the allocator's history; on a failure, list the largest live blocks and where "
                             "they were allocated (run with CUDA_LAUNCH_BLOCKING=1 to stop at the failing call); "
@@ -153,6 +156,48 @@ def _causes(error, limit=6):
     return found
 
 
+class _Tracer:
+    """``--trace``: [seconds, free, reserved, allocated] every 50 ms from a thread, and FastMACE's log records
+    [seconds, logger, message]. Free memory comes from ``cudaMemGetInfo`` (no stream synchronisation)."""
+
+    def __init__(self, torch):
+        import logging
+        import threading
+
+        self.torch, self.start, self.samples, self.events = torch, time.perf_counter(), [], []
+        self._stop = threading.Event()
+        tracer = self
+
+        class Handler(logging.Handler):
+            def emit(self, entry):
+                tracer.events.append([time.perf_counter() - tracer.start, entry.name, entry.getMessage()[:300]])
+
+        self.handler = Handler(level=logging.INFO)
+        self.logger = logging.getLogger("fastmace")
+        self.level = self.logger.level
+        self.logger.setLevel(logging.INFO)
+        self.logger.addHandler(self.handler)
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _run(self):
+        cuda = self.torch.cuda
+        while not self._stop.wait(0.05):
+            try:
+                free, _ = cuda.mem_get_info()
+                self.samples.append([time.perf_counter() - self.start, int(free), int(cuda.memory_reserved()),
+                                     int(cuda.memory_allocated())])
+            except Exception:  # noqa: BLE001  (after a sticky error)
+                return
+
+    def stop(self):
+        self._stop.set()
+        self.thread.join(timeout=2)
+        self.logger.removeHandler(self.handler)
+        self.logger.setLevel(self.level)
+        return dict(samples=self.samples, events=self.events)
+
+
 def _value(text):
     """A command-line config value: true/false as bools, integers as ints, else the string."""
     if text.lower() in ("true", "false"):
@@ -224,6 +269,7 @@ def run_point(args):
     if args.diagnose:
         torch.cuda.memory._record_memory_history(max_entries=200_000)
     phase, caught, sim = "load", [], None
+    tracer = _Tracer(torch) if args.trace else None
     times = {}
 
     def peaks():
@@ -323,6 +369,8 @@ def run_point(args):
             except Exception as problem:  # noqa: BLE001  (after a sticky CUDA error)
                 record["edges"] = f"not readable: {type(problem).__name__}"
     finally:
+        if tracer is not None:
+            record["trace"] = tracer.stop()
         record["times"] = times
         record["warnings"] = [f"{w.category.__name__}: {w.message}" for w in caught][:20]
         if sim is not None:
