@@ -671,13 +671,13 @@ RECORDS = {
                               ("fold_cutoff",), exactness="exact",
                               constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
                               deterministic=False,  # OEq kernels add sender gradients atomically
-                              memory=memory_terms.streaming_conv),
+                              memory=memory_terms.mh1_streaming_conv),
     # opt-6 OPT6-T02: the same kernels on edge ranges; only the atomic sender additions change order. Default on
     # by owner decision 60 (27 October 2026); small cells stay unchunked inside the op (UNCHUNKED_L2_MULTIPLE).
     "chunked_conv_backward": _record("chunked_conv_backward", _chunked_support, _apply(chunked_conv_backwards),
                                      ("streaming_conv", "fused_folded_backward"), exactness="exact",
                                      constraints=(OEQ, SORT_RECEIVERS, PER_ENGINE_EDGE_COUNTER),
-                                     deterministic=False),
+                                     deterministic=False, memory=memory_terms.chunked_conv_backward),
     # opt-8 OPT8-T02: the folded layer fused into the streaming forward, weights stored for the unchanged chunked
     # backward; the same FP32 sums in the same order (bitwise on sm_120). Float32; default on for MH-1 by owner
     # decision 64 (27 October 2026; the planner's rule picks the model).
