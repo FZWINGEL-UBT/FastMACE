@@ -6,28 +6,29 @@ build orders measured a speed-up). Runs and scripts: `results/opt10-gate-epilogu
 
 **Verdict.**
 - **Backward half:** built as the opt-in record `gate_epilogue`. Rounding-class; the force/stress gate passes on
-  both GPUs and the NVE drift is unchanged. The whole-step gain is much smaller than the subgraph screen suggested:
-  0.2-0.5 % on the RTX 4000 Ada, and 2 % (NaNbO3) and 0.1-0.7 % (NbCl5) on the RTX 5060 Ti.
+  both GPUs and the NVE drift is unchanged.
+- **No speed-up against today's default:** main `70593240`, with OPT9's `wprime_backward` on for MH-1 on both
+  GPUs. On each GPU one of the two cells where the record acts is now slower in both orders. Against the earlier
+  defaults it was 0.2-0.5 % faster on the RTX 4000 Ada and up to 2 % on the RTX 5060 Ti (tables below).
 - **Forward half:** dropped. Its Triton forward is slower than today's cuBLAS chain in the subgraph on every cell
   (1.05-1.29×), so no record was built.
 
-**Final A/Bs** on the branch with main `030e2fe2` merged (FastMACE `61657b29` local, `8497f2fe` on murphy; the two
-differ only in docs and golden texts). On the RTX 5060 Ti that plan includes decision 66's `grouped_launch` for
-MH-1:
+**Final A/Bs** on the branch with main `70593240` merged (FastMACE `0eacf4bd` on both GPUs; `wprime_backward` and,
+on the RTX 5060 Ti, `grouped_launch` are on in the default plan):
 
 | Cell | RTX 5060 Ti (local), b/a, orders ab / ba | RTX 4000 Ada (murphy), b/a, orders ab / ba |
 | --- | --- | --- |
-| NaNbO3 (1,080 atoms) | **0.980 / 0.978** | **0.9966 / 0.9952** |
-| NbCl5 (1,944 atoms) | **0.993 / 0.999** (pairs 0.980-1.017) | **0.9984 / 0.9986** |
-| NaCl (216 atoms) | 1.007 / 0.980 (same code on both sides) | 0.9993 / 1.0008 (same code on both sides) |
+| NaNbO3 (1,080 atoms) | **1.009 / 1.007** (slower) | 0.9971 / 0.9986 |
+| NbCl5 (1,944 atoms) | 0.996 / 0.985 (pairs 0.960-1.029) | **1.003 / 1.002** (slower) |
+| NaCl (216 atoms) | 0.999 / 0.999 (same code on both sides) | 1.003 / 0.998 (same code on both sides) |
 
-**Before the merge** (FastMACE `cccb0521` local, `d903a4cc` on murphy):
+**Earlier runs**, against defaults without `wprime_backward`:
 
-| Cell | RTX 5060 Ti (local), b/a, orders ab / ba | RTX 4000 Ada (murphy), b/a, orders ab / ba |
-| --- | --- | --- |
-| NaNbO3 | 0.983 / 0.988 | 0.9965 / 0.9963 |
-| NbCl5 | 1.000 / 1.002 | 0.9978 / 0.9983 |
-| NaCl | 1.017 / 0.996 (same code) | 1.001 / 1.001 (same code) |
+| Cell | RTX 5060 Ti, main `030e2fe2` merged (`61657b29`) | RTX 5060 Ti, before any merge (`cccb0521`) | RTX 4000 Ada, main `030e2fe2` merged (`8497f2fe`) | RTX 4000 Ada, before any merge (`d903a4cc`) |
+| --- | --- | --- | --- | --- |
+| NaNbO3 | 0.980 / 0.978 | 0.983 / 0.988 | 0.9966 / 0.9952 | 0.9965 / 0.9963 |
+| NbCl5 | 0.993 / 0.999 | 1.000 / 1.002 | 0.9984 / 0.9986 | 0.9978 / 0.9983 |
+| NaCl (same code) | 1.007 / 0.980 | 1.017 / 0.996 | 0.9993 / 1.0008 | 1.001 / 1.001 |
 
 **Protocol.**
 - b = `gate_epilogue=on`, a = off, everything else the default plan (MH-1 r2SCAN, hybrid float32, NVT 300 K).
@@ -39,15 +40,13 @@ MH-1:
 
 ## Proposed default (decision 66), for the owner
 
-- **On for "NVIDIA RTX 4000 Ada Generation".** Both cells where the record acts measured faster in both orders,
-  before and after the merge. The gain is small (0.2-0.5 %), but every per-pair ratio is at most 1.001.
-- **On for "NVIDIA GeForce RTX 5060 Ti", by the letter of the rule; marginal.**
-  - The final A/Bs are faster in both orders on both cells where the record acts.
-  - NaNbO3 is a clear 2 %.
-  - NbCl5 is within noise: 0.993 / 0.999, with pair ratios up to 1.017; it was 1.000 / 1.002 before the merge.
-  - The fixed tile is not this GPU's best for NbCl5 (below). If the owner wants only clear gains, leave this GPU
-    off.
-- **Off for every other GPU.** None is measured. The A100 (Modal) waits for November's budget.
+- **Off on every GPU.**
+  - **RTX 4000 Ada:** NbCl5 is slower in both orders (1.003 / 1.002) against today's default.
+  - **RTX 5060 Ti:** NaNbO3 is slower in both orders (1.009 / 1.007).
+  - **Every other GPU:** not measured. An A100 run could wait for November's budget, but with no gain on either
+    RTX GPU it has little to show.
+- The record stays opt-in. `wprime_backward` changed the second interaction's backward, next to the gate's, and
+  the small gain measured before it is gone.
 
 Not made default; `RewriteConfig.gate_epilogue` stays `never_automatic`.
 
@@ -191,12 +190,16 @@ the review named ("moving the merged product from cuBLAS to Triton"). It was not
 - **Local:** Fabi-PC (WSL2), RTX 5060 Ti (sm_120, driver 610.88), `mace_cueq_oeq` (torch 2.14.1+cu130),
   `tools/ci/local_gpu.py run --quiet` per job group. The idle check runs before each job (`run.log`).
   - FastMACE `cccb0521` (`local-cccb0521/`): A/Bs, gate, drifts.
-  - FastMACE `61657b29`, with main merged (`local-61657b29/`): the final A/Bs.
+  - FastMACE `61657b29`, with main `030e2fe2` merged (`local-61657b29/`): A/Bs.
+  - FastMACE `0eacf4bd`, with main `70593240` merged (`local-0eacf4bd/`): the final A/Bs.
 - **murphy:** RTX 4000 Ada (sm_89, driver 595.99.02), NAS `mace_cueq_oeq` (torch 2.14.1+cu130). The other-users and
   GPU check runs before every job (`run.log`).
   - FastMACE `d903a4cc` (`murphy-d903a4cc/`): check, gate and A/Bs. It differs from `cccb0521` only in the run
     script's test Python.
-  - FastMACE `8497f2fe`, with main merged (`murphy-8497f2fe/`): check, gate (passed again) and the final A/Bs.
+  - FastMACE `8497f2fe`, with main `030e2fe2` merged (`murphy-8497f2fe/`): check, gate (passed again) and A/Bs.
+  - FastMACE `0eacf4bd`, with main `70593240` merged (`murphy-0eacf4bd/`): check, gate (passed again) and the
+    final A/Bs. The affected CPU files pass there (`murphy-0eacf4bd-cpu/`: 359 passed); golden plan texts were
+    regenerated on murphy.
 - **Unit tests** use `mace_cueq_latest`: the OEq environments have no pytest.
 - **Gate references:** `mace_cueq_latest` float64 and float32. The baseline structures are
   `fastmace-baseline/1a-T18`.
@@ -204,4 +207,4 @@ the review named ("moving the merged product from cuBLAS to Triton"). It was not
 **Not run:**
 - A100 (Modal): November budget.
 - NaCl drift with the record acting: it acts on NaCl on no measured GPU.
-- The drifts were not repeated after the merge.
+- The drifts were not repeated after the merges.

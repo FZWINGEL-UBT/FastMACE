@@ -279,7 +279,7 @@ no gain, or a loss, in the measurements so far:
 | `combo_kernels` | NaCl about 1–2 % faster, NbCl5 2–3 % slower on an RTX 5060 Ti and an L4. |
 | `fused_radial_hidden` | No measured gain. |
 | `tf32x3_gemms` | An accuracy screen; slower than cuBLAS float32 on most production shapes measured. |
-| `gate_epilogue` | MH-1: 0.2–0.4 % faster on an RTX 4000 Ada (NaNbO3, NbCl5); on an RTX 5060 Ti 2 % faster on NaNbO3, NbCl5 within noise. Small cells such as NaCl run the stock path. |
+| `gate_epilogue` | MH-1 with `wprime_backward` on (the default on both GPUs): no gain; NbCl5 0.3 % slower on an RTX 4000 Ada, NaNbO3 0.7-0.9 % slower on an RTX 5060 Ti. Small cells such as NaCl run the stock path. |
 
 Test them with a same-process A/B on your own GPU and structure before you
 rely on them.
