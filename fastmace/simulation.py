@@ -2151,10 +2151,11 @@ class Simulation:
           graphs, which bake it in (a recorded re-capture), and with the default barostat τ moves ``P_tau``
           and the barostat mass with it;
         - ``positions`` (Å) and ``momenta`` (ASE units), ``(N, 3)``; momenta use the new masses;
-        - ``cell`` (Å, ``(3, 3)``, rows the lattice vectors), fixed-cell runs only (4-T05; 4-T09 relaxes quench
-          frames with their own NPT cells on one engine): the positions are not scaled, so give them too. The
-          lists and cell inputs change in place, so the captured graphs stay unless the rebuild grows a capacity
-          or the edge count needs a new padded size.
+        - ``cell`` (Å, ``(3, 3)``, rows the lattice vectors), fixed-cell runs and cell-filter relaxations, not a
+          barostat (4-T05; 4-T09 relaxes quench frames with their own NPT cells on one engine; relax-throughput
+          A-T01 relaxes variable-cell frames on one engine, the filter's reference cell restarting at the new
+          cell): the positions are not scaled, so give them too. The lists and cell inputs change in place, so
+          the captured graphs stay unless the rebuild grows a capacity or the edge count needs a new padded size.
 
         Everything is validated before anything is written. The changes apply in this order: species,
         masses, charges, friction, cell, positions, momenta; then a canonical point (neighbour list rebuilt at the

@@ -112,6 +112,49 @@ class FastMACESide:
                     kinetic_eV_atom=kinetic / n)
 
 
+def set_tf32(torch, on):
+    """PyTorch's process-wide FP32 matmul mode: TF32 if ``on``, IEEE otherwise (TF32 screen, 29 October 2026).
+    It acts where a GEMM is compiled or launched: a CUDA graph keeps the cuBLAS kernel of its capture, Inductor
+    bakes the mode into its Triton templates (and keys its cache on it). FastMACE's own ``tl.dot`` kernels set
+    ``input_precision="ieee"`` and stay FP32 either way."""
+    matmul = torch.backends.cuda.matmul
+    if hasattr(matmul, "fp32_precision"):
+        matmul.fp32_precision = "tf32" if on else "ieee"
+    else:
+        matmul.allow_tf32 = bool(on)
+
+
+def tf32_on(torch):
+    """The matmul mode ``set_tf32`` set, read through the same API (mixing the legacy and new APIs raises)."""
+    matmul = torch.backends.cuda.matmul
+    return matmul.fp32_precision == "tf32" if hasattr(matmul, "fp32_precision") else bool(matmul.allow_tf32)
+
+
+def tf32_after_build(torch, engine):
+    """Switch a built engine to TF32: set the mode and drop its captured CUDA graphs, which re-capture on the next
+    step with TF32 cuBLAS kernels (Inductor sends the model's GEMMs to cuBLAS here: too few SMs for its GEMM
+    templates). The engine is built in IEEE FP32 as production builds it: under TF32 the rewrite self-checks
+    (SPEC §6.4, tolerance 1e-4) fail on TF32's own rounding (factor_species 4e-4 to 1.1e-3, block_linear 1.6e-4 to
+    4.8e-4; murphy, 29 October 2026) and rule 13 would re-plan without the rewrites."""
+    set_tf32(torch, True)
+    engine.invalidate_graphs("TF32 screen: re-capture with TF32 GEMMs")
+
+
+class Tf32Side:
+    """A TimedEngine under its own matmul mode (``set_tf32``): set before every step, so whatever the side
+    compiles or captures (its build, new edge sizes in warm-up) and launches eagerly uses its mode."""
+
+    def __init__(self, side, tf32, torch):
+        self.side, self.tf32, self.torch = side, tf32, torch
+
+    def step(self):
+        set_tf32(self.torch, self.tf32)
+        self.side.step()
+
+    def __getattr__(self, name):
+        return getattr(self.side, name)
+
+
 class CustomPassSlot:
     """Gives each side its own key in Inductor's single ``post_grad_custom_pre_pass`` slot (1a-T19, option (a)).
 
