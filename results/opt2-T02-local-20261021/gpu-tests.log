@@ -1,0 +1,12 @@
+local_gpu: reserved /home/fzwin/.fastmace-local-gpu for 'opt2-T02 kernel tests + spills (<10 min)' (pid 6303)
+Cannot read termcap database;
+using dumb terminal settings.
+......................................................                   [100%]
+=============================== warnings summary ===============================
+tests/gpu/test_radial_mlp_cuda.py::test_kernels_match_autograd[64-2-8192-None]
+  /mnt/d/Margraf/FastMACE/.claude/worktrees/2-t19-683af8/tests/gpu/test_radial_mlp_cuda.py:51: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+  Consider using tensor.detach() first. (Triggered internally at /__w/pytorch/pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:820.)
+    return float((a - b).abs().max() / b.abs().max())
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+54 passed, 1 warning in 54.02s

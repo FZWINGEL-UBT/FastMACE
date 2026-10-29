@@ -1,0 +1,11 @@
+{
+  "gpu_requested": "A100",
+  "source_commit": "93bde431437d46db38e8993b690bca0a5cb3bb04",
+  "command": "echo CONTAINER_STARTED $(date -u +%FT%TZ) >&2; nvidia-smi -L >&2; python tools/bench/opt9_ceiling.py --output $OUT/ceiling --checkpoint $FASTMACE_MODELS/mace-mh-1.model --label modal-A100 --structures NaCl NaNbO3 NbCl5 2>&1 | grep --line-buffered -vE \"Warning|warnings.warn\" | tee $OUT/ceiling.log >&2",
+  "nvidia_smi": "NVIDIA A100-SXM4-40GB, 610.57.04, 40960 MiB, 8.0",
+  "cuda": "CUDA UMD Version: 13.3",
+  "pip_freeze_sha256": "82d5d7aedddbe5c7ad89185a1649c38da5cbe50c274d9b3ebec781ca78d4487a",
+  "exit": 0,
+  "wall_s": 669.1404714584351,
+  "estimated_gpu_cost_usd": 0.39033194168408714
+}

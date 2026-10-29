@@ -484,7 +484,7 @@ class Report:
             lines.append("NPT barostat: experimental: not yet qualified (§10.2)")
             if self.plan is not None and self.plan.polar is not None:
                 lines.append("PolarMACE NPT stress: experimental: validated against finite differences on "
-                             "NaCl 3×3×3 only (phase 3b)")
+                             "NaCl and NbCl5 3×3×3 (phase 3b, 3b-T08)")
         record = None if self.integrator is None else _scheme_record(self.integrator)
         if record is not None and record.non_canonical:
             lines.append(f"{_scheme_name(self.integrator)}: non-canonical: equilibration only (§10.2)")

@@ -60,6 +60,7 @@ import numpy as np
 import torch
 
 from fastmace.longrange import d3
+from fastmace.neighbors.skin import times_3x3
 
 K1 = 16.0  # torch-dftd d3_k1: steepness of the coordination-number counting function
 K3 = -4.0  # torch-dftd d3_k3: Gaussian weight of the C6 reference interpolation
@@ -235,7 +236,7 @@ class D3Kernel:
         valid = self.pair_i < n
         i = torch.where(valid, self.pair_i, 0).to(torch.int64)
         j = torch.where(valid, self.pair_j, 0).to(torch.int64)
-        shifts = self.image_table.to(cell.dtype) @ cell
+        shifts = times_3x3(self.image_table.to(cell.dtype), cell)  # no FP64 GEMM (neighbors.skin.matmul_small)
         vector = ((positions[j] + shifts[self.image_index.to(torch.int64)] - positions[i]) / self.autoang).to(dt)
         r2 = (vector * vector).sum(-1)
         in_cn = valid & (r2 <= self.cn_cutoff2)
@@ -283,7 +284,7 @@ class D3Kernel:
     def _triton(self, positions, cell, energy_only, virial):
         n, f64 = self.n_atoms, torch.float64
         positions = positions.contiguous()
-        shifts = (self.image_table.to(positions.dtype) @ cell.to(positions.dtype)).contiguous()
+        shifts = times_3x3(self.image_table.to(positions.dtype), cell.to(positions.dtype)).contiguous()
         cn = torch.empty(n, dtype=f64, device=self.device)
         energy = torch.empty(n, dtype=f64, device=self.device)
         if energy_only:

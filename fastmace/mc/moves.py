@@ -146,7 +146,8 @@ class Transmute:
 @dataclass(frozen=True)
 class Displace:
     """Displace one atom uniformly within a sphere of radius ``delta_A`` (§10.4). ``adaptive=True``
-    tunes δ during equilibration only, and the value is recorded."""
+    retunes δ after every block while it is set (toward 30 % acceptance, at most ``delta_A``), and each
+    value is recorded; a fixed δ keeps the chain's detailed balance, so sample with ``adaptive=False``."""
 
     move: ClassVar[str] = "displace"
 

@@ -493,3 +493,14 @@ def test_init_lists_the_integrators():
     for name in ("Langevin", "LangevinBAOAB", "NVE", "CSVR", "NoseHooverChain", "MTK", "Berendsen"):
         assert name in text, name
     assert "equilibration only" in text
+
+
+def test_help_and_init_name_no_internal_documents(capsys):
+    """What the commands print for users cites no SPEC sections, planner rule numbers or decisions."""
+    internal = re.compile(r"SPEC §|\brule \d|\brules \d|decision \d")
+    assert not internal.search(_init_text())
+    for name in cli.COMMANDS:
+        with pytest.raises(SystemExit):
+            cli.main([name, "--help"])
+        text = capsys.readouterr().out
+        assert not internal.search(text), (name, internal.findall(text))

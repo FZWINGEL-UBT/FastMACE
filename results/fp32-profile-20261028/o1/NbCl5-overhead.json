@@ -1,0 +1,64 @@
+{
+  "tool": "sim_loop_overhead",
+  "created_utc": "2026-10-28T21:21:31.543204+00:00",
+  "host": "Fabi-PC",
+  "fastmace_commit": "",
+  "gpu": "NVIDIA GeForce RTX 5060 Ti",
+  "structure": "NbCl5",
+  "natoms": 1944,
+  "block": 600,
+  "repeats": 4,
+  "ms_per_step": {
+    "engine": {
+      "median": 18.797919694164495,
+      "blocks": [
+        19.01832351499858,
+        18.828340140001576,
+        18.767499248327415,
+        18.767445435005357
+      ]
+    },
+    "no-output": {
+      "median": 18.73969305499486,
+      "blocks": [
+        18.751751239979058,
+        19.488179823335184,
+        18.695400994984084,
+        18.72763487001066
+      ]
+    },
+    "thermo": {
+      "median": 18.9844014474996,
+      "blocks": [
+        18.95148796000285,
+        19.17683531498672,
+        19.017314934996346,
+        18.707215423322243
+      ]
+    },
+    "default": {
+      "median": 18.91853599499882,
+      "blocks": [
+        18.977664171664703,
+        19.43263071999051,
+        18.733220083328586,
+        18.859407818332937
+      ]
+    }
+  },
+  "host_ms_per_step": {
+    "no-output": {
+      "queue.drain (wait + write)": 0.002092494905809872
+    },
+    "thermo": {
+      "queue.drain (wait + write)": 0.8717042168427724,
+      "engine.snapshot (flush + copies)": 0.9514185107885471,
+      "writer.write": 0.006763452486969376
+    },
+    "default": {
+      "queue.drain (wait + write)": 0.899110782459805,
+      "engine.snapshot (flush + copies)": 0.9564570075235679,
+      "writer.write": 0.05039209753401034
+    }
+  }
+}

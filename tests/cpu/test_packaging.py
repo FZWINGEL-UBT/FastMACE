@@ -29,9 +29,7 @@ REQUIRED = [
 FORBIDDEN_TOP = {"results", "tests", "tools", "spikes", "plans", "docs", "constraints"}
 
 
-@pytest.fixture(scope="module")
-def dist(tmp_path_factory):
-    out = tmp_path_factory.mktemp("dist")
+def _build(out):
     subprocess.run([sys.executable, "-m", "build", "--outdir", str(out), str(ROOT)], check=True, capture_output=True)
     return out
 
@@ -45,7 +43,15 @@ def _check(names):
     assert not leaked, f"leaked into the distribution: {leaked}"
 
 
-def test_wheel_contents(dist):
+def test_wheel_and_sdist_contents(tmp_path):
+    """One build for both checks: two xdist workers building in the same source tree raced on its
+    ``*.egg-info`` and ``build/`` (suite-speed, 27 October 2026), and one build is half the time."""
+    dist = _build(tmp_path)
+    _check_wheel(dist)
+    _check_sdist(dist)
+
+
+def _check_wheel(dist):
     (wheel,) = dist.glob("*.whl")
     with zipfile.ZipFile(wheel) as zf:
         names = set(zf.namelist())
@@ -56,7 +62,7 @@ def test_wheel_contents(dist):
         assert any(n.endswith(".dist-info/licenses/" + name) for n in names), name
 
 
-def test_sdist_contents(dist):
+def _check_sdist(dist):
     (sdist,) = dist.glob("*.tar.gz")
     with tarfile.open(sdist) as tf:
         names = {n.split("/", 1)[1] for n in tf.getnames() if "/" in n}

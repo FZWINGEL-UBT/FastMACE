@@ -28,6 +28,11 @@ under the external profilers after the main pass and writing into its directory:
                 kernel_sequence.csv and writes ncu_kernels.csv, ncu_categories.csv and ncu_ops.csv
   --pass nsys   --calls force-graph replays in that range, for ``nsys profile --capture-range=cudaProfilerApi
                 --cuda-graph-trace=node``; ``--summarize-nsys`` adds the gaps between graph nodes
+  --pass nsys-steps
+                --steps whole MD steps in that range, with NVTX ranges around each step, each stage
+                (graph replays), the neighbour-list rebuilds and the noise upload (fp32 profile, 28 October
+                2026), for the same nsys command; ``nsys stats --report nvtx_gpu_proj_sum`` then gives GPU
+                time per stage
 
 The engine comes from the minimal planner (what ``Simulation`` and ``fm.md`` build) with every
 default of the plan. Velocities start from a Maxwell-Boltzmann distribution at --temperature-K with
@@ -197,7 +202,8 @@ def build_engine(args, base):
     rewrites = RewriteConfig(**args.rewrites) if args.rewrites else "auto"
     force_field = ForceField(loaded, base, precision="float32" if args.backend == "hybrid" else "float64",
                              rewrites=rewrites)
-    integrator = IntegratorConfig(temperature_K=args.temperature_K)
+    integrator = (IntegratorConfig(temperature_K=args.temperature_K) if args.timestep_fs is None else
+                  IntegratorConfig(temperature_K=args.temperature_K, timestep_fs=args.timestep_fs))
     plan = planner.plan(force_field, base, integrator, Workload(max_temperature_K=args.temperature_K), hardware)
     engine = planner.build(plan, force_field, base.copy(), temperature_K=args.temperature_K)
     options = {name: True for name in fixed.enabled_options(plan)}
@@ -600,6 +606,8 @@ def profiler_pass(args, engine, torch):
         field(positions)
     torch.cuda.synchronize()
     record = dict(pass_=args.pass_, padded_edges=edges, created_utc=datetime.now(timezone.utc).isoformat())
+    if args.pass_ == "nsys-steps":
+        return nsys_steps_pass(args, engine, torch, record)
     if args.pass_ == "ncu":
         torch.cuda.profiler.start()
         field(positions)
@@ -618,6 +626,39 @@ def profiler_pass(args, engine, torch):
         torch.cuda.profiler.stop()
         record.update(graph=str(key), replays=args.calls)
     (args.output / f"{args.pass_}_pass.json").write_text(json.dumps(record, indent=2) + "\n")
+    return record
+
+
+def nsys_steps_pass(args, engine, torch, record):
+    """--steps MD steps between cudaProfilerStart/Stop, every stage inside an NVTX range (wrapped on the instance
+    only, as part 2 of the main pass)."""
+    nvtx = torch.cuda.nvtx
+    field, integrator = engine.force_field, engine.integrator
+    original_run, original_rebuild, original_prepare = engine._run, field.rebuild, integrator.prepare_step
+
+    def ranged(label, fn, *a):
+        nvtx.range_push(label)
+        try:
+            return fn(*a)
+        finally:
+            nvtx.range_pop()
+
+    engine._run = lambda key: ranged(f"stage {stage_name(key).split(':')[0]}", original_run, key)
+    field.rebuild = lambda positions: ranged("neighbour-list rebuild", original_rebuild, positions)
+    integrator.prepare_step = lambda state: ranged("noise upload", original_prepare, state)
+    rebuilds = engine.rebuilds
+    torch.cuda.synchronize()
+    torch.cuda.profiler.start()
+    for _ in range(args.steps):
+        nvtx.range_push("md step")
+        engine.step()
+        nvtx.range_pop()
+    engine.flush()
+    torch.cuda.synchronize()
+    torch.cuda.profiler.stop()
+    del engine._run, field.rebuild, integrator.prepare_step
+    record.update(steps=args.steps, rebuilds=engine.rebuilds - rebuilds)
+    (args.output / "nsys-steps_pass.json").write_text(json.dumps(record, indent=2) + "\n")
     return record
 
 
@@ -644,7 +685,7 @@ def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--output", type=Path,
                    help="Fresh directory (main pass), or the main pass's directory (profiler passes, summaries)")
-    p.add_argument("--pass", dest="pass_", choices=("main", "ncu", "nsys"), default="main",
+    p.add_argument("--pass", dest="pass_", choices=("main", "ncu", "nsys", "nsys-steps"), default="main",
                    help="main: the breakdown; ncu: one eager force call between cudaProfilerStart/Stop for "
                         "`ncu --profile-from-start off`; nsys: --calls force-graph replays in that range for "
                         "`nsys profile --capture-range=cudaProfilerApi --cuda-graph-trace=node`")
@@ -657,6 +698,7 @@ def parse_args(argv=None):
                    help="Benchmark name under FASTMACE_STRUCTURES (3x3x3), or a file with PATH@NXxNYxNZ")
     p.add_argument("--backend", choices=("hybrid", "cueq"), default="hybrid")
     p.add_argument("--temperature-K", type=float, default=1000.0)
+    p.add_argument("--timestep-fs", type=float, default=None, help="Default: IntegratorConfig's (0.5 fs)")
     p.add_argument("--velocity-seed", type=int, default=20261007, help="The research probe's Maxwell-Boltzmann seed")
     p.add_argument("--equilibrate-steps", type=int, default=300)
     p.add_argument("--steps", type=int, default=1000)

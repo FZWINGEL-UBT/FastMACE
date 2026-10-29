@@ -52,7 +52,7 @@ def add_arguments(parser):
     parser.add_argument("--output", metavar="DIR", help="the output directory (in place of the file's)")
     parser.add_argument("--calibrate", action="store_true",
                         help="measure hybrid against plain cuEq on this structure before the MD run and take the "
-                        "faster where the rules rank them equal (fm.md's calibrate=True; SPEC §9.1)")
+                        "faster where the rules rank them equal (fm.md's calibrate=True)")
 
 
 def _tomllib():

@@ -65,11 +65,15 @@ def _expm_3x3_before(a):
     return result
 
 
-def test_expm_is_bitwise_unchanged_on_3x3():
+def test_expm_is_unchanged_on_3x3_to_rounding():
+    """Bitwise until the fp64-D1 fix (28 October 2026): ``expm_3x3`` now multiplies with element-wise sums
+    (``neighbors.skin.matmul_small``), which round each product where the GEMM of ``_expm_3x3_before`` fuses them,
+    so the two agree to a few ulps (and bit for bit only where the BLAS happens to sum the same way)."""
     generator = np.random.default_rng(1)
     for scale in (1e-6, 1e-3, 0.1, 1.0):
         a = torch.tensor(generator.standard_normal((3, 3)) * scale)
-        assert torch.equal(expm_3x3(a), _expm_3x3_before(a))
+        # A few ulps: 6.7e-16 relative on leto's CPU (29 October 2026), so 4e-16 was too tight.
+        torch.testing.assert_close(expm_3x3(a), _expm_3x3_before(a), rtol=1e-15, atol=1e-16)
 
 
 def test_expm_takes_larger_squares():
@@ -94,7 +98,8 @@ def test_logm_matches_scipy():
 
     for f in deformations():
         ours = cell.logm_3x3(torch.tensor(f)).numpy()
-        np.testing.assert_allclose(ours, logm(f).real, rtol=0, atol=1e-14)
+        # 2e-14 since the fp64-D1 fix: element-wise sums round each product (1e-14 with the fused GEMM before)
+        np.testing.assert_allclose(ours, logm(f).real, rtol=0, atol=2e-14)
 
 
 def test_frechet_adjoint_matches_ases_nine_directions():

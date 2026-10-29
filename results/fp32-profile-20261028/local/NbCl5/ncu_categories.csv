@@ -1,0 +1,10 @@
+category,kernels,duration_us,dram_mb,l2_mb,dram_gb_per_s,fp32_gflop,achieved_tflops,share_of_fp32_peak,achieved_occupancy_pct
+Other,12,6743.3,1388.08,4253.85,205.847,61.3375,9.09607,0.319413,24.6152
+Atom-level linear layers (GEMM),46,5454.14,565.89,3043.4,103.754,49.2796,9.03527,0.317278,27.0546
+Unattributed (not aligned with the profiler),58,5203.55,805.315,1463.42,154.762,12.2393,2.3521,0.0825951,28.285
+"Atom-level elementwise (gates, products, residuals, readouts)",83,5051.14,1165.59,1799.61,230.757,0.920812,0.182298,0.00640149,80.4587
+"Edge elementwise (geometry, radial basis, gathers, scatters)",23,4177.41,660.412,1245.46,158.091,14.1779,3.39396,0.11918,28.2838
+Atom-level cuEq tensor products (symmetric contraction),4,2648.54,473.005,600.002,178.591,7.00512,2.64489,0.0928768,80.4154
+Interaction 1: reassociated edge sums,3,628.16,91.8751,180.159,146.261,0.826744,1.31614,0.0462168,32.6622
+"Radial networks: folded last layer, input gradient",8,480.384,69.7572,130.359,145.211,1.97083,4.10262,0.144065,8.3266
+Copies and fills,13,149.664,25.2001,73.8108,168.378,0,0,0,82.3805

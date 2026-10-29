@@ -47,6 +47,13 @@ TAIL_FORWARDS = {
     "RealAgnosticResidualNonLinearInteractionBlock": (INTERACTION_FORWARD, INTERACTION_FORWARD_SHA256),
 }
 _PROBE_ROWS = 7
+# The interaction forward that passes the one-hot node_attrs as the residual input when ``species_residual`` is set
+# (fastmace.rewrites.mh1.modules.cutoff_folded_forward); a forward without the marker is refused.
+READS_SPECIES_RESIDUAL = "fastmace_species_residual"
+# Prototype (fp32 profile, 29 October 2026; not a RewriteConfig field): with an int, fold_readout_tail also keeps only
+# that head's hidden columns of a multi-head nonlinear readout (MH-1: 16 of 96), so the folded products are 16 wide.
+# Exact for that head only: the readout's other output columns become meaningless. None (the default) keeps all.
+TAIL_HEAD = None
 
 
 def _modules():
@@ -195,9 +202,41 @@ def fold_tail(model):
         else:
             raise ValueError("fold_readout_tail: the last skip_tp is neither a block linear nor a species table")
         setattr(readout, attribute, torch.nn.Identity())
+        if TAIL_HEAD is not None and getattr(readout, "num_heads", 1) > 1:
+            _slice_head(readout, product, last, int(TAIL_HEAD), m)
     index = len(model.interactions) - 1
     return [f"products.{index}.linear", f"interactions.{index}.skip_tp",
             f"readouts.{len(model.readouts) - 1}.{attribute}"]
+
+
+def _slice_head(readout, product, last, head, m):
+    """TAIL_HEAD: keep one head's hidden columns in the folded products and the readout (exact for that head)."""
+    import torch
+
+    if type(readout).__name__ != "NonLinearReadoutBlock":
+        raise ValueError("TAIL_HEAD needs MACE's NonLinearReadoutBlock")
+    hidden = product.linear.segments_out[0][1]
+    width = hidden // readout.num_heads
+    cols = slice(head * width, (head + 1) * width)
+    weight = product.linear.weight_0
+    eye = torch.eye(hidden, dtype=weight.dtype, device=weight.device)
+    if torch.any(readout.linear_2(torch.zeros_like(eye[:1])) != 0):
+        raise ValueError("TAIL_HEAD: the readout's linear_2 has a bias")
+    out = readout.linear_2(eye)  # [hidden, heads]: the effective matrix (normalisation included)
+    probe = torch.randn((7, hidden), generator=torch.Generator().manual_seed(5), dtype=torch.float64).to(weight)
+    heads = torch.full((7,), head, dtype=torch.long, device=weight.device)
+    before = readout(probe, heads)[:, head]
+    lin = torch.nn.Linear(width, out.shape[1], bias=False).to(device=weight.device, dtype=weight.dtype)
+    lin.weight.copy_(out[cols].t())
+    act = readout.non_linearity
+    readout.non_linearity = m.HeadActivation(act.acts[0])
+    readout.linear_2 = lin
+    readout.num_heads = 1
+    after = readout(probe[:, cols])[:, head]
+    if not torch.allclose(before, after, rtol=1e-5, atol=1e-6 * float(before.abs().max())):
+        raise ValueError(f"TAIL_HEAD: head {head} differs after slicing ({float((before - after).abs().max())})")
+    product.linear = m.compose(product.linear, m.slice_columns(product.linear, cols.start, width))
+    last.skip_tp = m.compose(last.skip_tp, m.slice_columns(last.skip_tp, cols.start, width))
 
 
 def _tail_selfcheck(original, rewritten, context):
@@ -317,6 +356,74 @@ def _apply_tables(model, context):
     return tabulate(model)
 
 
+# --------------------------------------------------------------------------- species_residual
+
+
+def _residual_support(model):
+    found = _tables_support(model)
+    if not found.supported:
+        return found
+    if getattr(model.interactions[0], "linear_res", None) is None:
+        return Support(False, "the first interaction has no linear_res")
+    return Support(True, "ok")
+
+
+def residual_rows(model):
+    """Make the first interaction's residual products per-species rows; returns the replaced names."""
+    m = _modules()
+    first = model.interactions[0]
+    forward = getattr(getattr(first, "forward", None), "__func__", None)
+    if not getattr(forward, READS_SPECIES_RESIDUAL, False):
+        raise ValueError("species_residual needs the interaction forward of fold_cutoff (cutoff_folded_forward)")
+    table = getattr(first, "linear_up", None)
+    if not isinstance(table, m.SpeciesTable):
+        raise ValueError("species_residual needs the first linear_up as a species table (species_tables)")
+    merged = getattr(first, "residual_linear", None)
+    if merged is None:
+        raise ValueError("species_residual needs the merged residual product (merged_residual)")
+    rows = m.SpeciesResidualBlockLinear(merged, table.table)
+    first.residual_linear = rows
+    names = ["interactions.0.residual_linear"]
+    chain = getattr(first, "gated_rows", None)
+    if chain is not None and chain.first is merged:
+        chain.first = rows
+        names.append("interactions.0.gated_rows.first")
+    first.species_residual = True
+    return names
+
+
+def _residual_selfcheck(original, rewritten, context):
+    """The new rows against the merged product on the gathered table rows, values and the input gradient."""
+    import torch
+
+    m = _modules()
+    generator = torch.Generator().manual_seed(context.seed)
+    first = rewritten.interactions[0]
+    rows = first.residual_linear
+    if not isinstance(rows, m.SpeciesResidualBlockLinear):
+        return check_tensors([], None)
+    merged, table = rows.reference
+    attrs = _probe_attrs(rewritten, context, generator)
+    weight = rows.weight_0
+    width = sum(mul * dim for _, mul, dim in rows.segments_in[:rows.first_count])
+    x = torch.randn((attrs.shape[0], width), generator=generator, dtype=torch.float64).to(weight).requires_grad_()
+    y = table[attrs.argmax(dim=-1)]
+    cases = []
+    with torch.enable_grad():
+        expected = merged(x, y)
+        got = rows(x, attrs)
+        grad = torch.randn(expected.shape, generator=generator, dtype=torch.float64).to(expected)
+        (gx_expected,) = torch.autograd.grad(expected, x, grad)
+        (gx_got,) = torch.autograd.grad(got, x, grad)
+    cases.append(("interactions.0.residual_linear", expected.detach(), got.detach()))
+    cases.append(("interactions.0.residual_linear (input gradient)", gx_expected, gx_got))
+    return check_tensors(cases, weight.dtype)
+
+
+def _apply_residual(model, context):
+    return residual_rows(model)
+
+
 def _apply_tail(model, context):
     return fold_tail(model)
 
@@ -344,6 +451,13 @@ RECORDS = {
         source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256, INTERACTION_FORWARD: INTERACTION_FORWARD_SHA256},
         exactness="rounding", default="off", workload_constraints=("fixed_species_superset",),
         apply=_apply_product, selfcheck=_product_selfcheck, deterministic=True),
+    "species_residual": Rewrite(
+        name="species_residual", applies_to=_residual_support,
+        requires=("species_tables", "merged_residual"), conflicts=("tf32x3_gemms",),
+        mace_versions=MACE_VERSIONS,
+        source_hashes={MODEL_FORWARD: MODEL_FORWARD_SHA256, INTERACTION_FORWARD: INTERACTION_FORWARD_SHA256},
+        exactness="rounding", default="off", workload_constraints=("fixed_species_superset",),
+        apply=_apply_residual, selfcheck=_residual_selfcheck, deterministic=True),
 }
 
-__all__ = ["RECORDS", "fold_product", "fold_tail", "tabulate"]
+__all__ = ["READS_SPECIES_RESIDUAL", "RECORDS", "fold_product", "fold_tail", "residual_rows", "tabulate"]

@@ -1,0 +1,33 @@
+diff --git a/fastmace/rewrites/fusion/modules.py b/fastmace/rewrites/fusion/modules.py
+index b8c9615a..a7700286 100644
+--- a/fastmace/rewrites/fusion/modules.py
++++ b/fastmace/rewrites/fusion/modules.py
+@@ -40,6 +40,13 @@ def _segment_of(segments, start, length):
+     return None
+ 
+ 
++def _atom_chunks():
++    """fp32 idea 1 prototype (plans/fp32-ideas-20261028.md): FASTMACE_ATOM_CHUNKS atom chunks per gated chain."""
++    import os
++
++    return int(os.environ.get("FASTMACE_ATOM_CHUNKS", "1") or 1)
++
++
+ class GatedRows(torch.nn.Module):
+     """``second(gate(first(x, y)))`` on per-segment rows; see the module docstring."""
+ 
+@@ -90,6 +97,14 @@ class GatedRows(torch.nn.Module):
+         return any(tile_rule.uses_triton(n * dim, self.sms) for _, _, dim, _ in self.joined)
+ 
+     def forward(self, x, y):
++        chunks = _atom_chunks()
++        if chunks > 1 and x.shape[0] >= 2 * chunks:  # fp32 idea 1 prototype: the chain on atom chunks
++            n = x.shape[0]
++            bounds = [n * i // chunks for i in range(chunks + 1)]
++            return torch.cat([self._rows(x[a:b], y[a:b]) for a, b in zip(bounds[:-1], bounds[1:])])
++        return self._rows(x, y)
++
++    def _rows(self, x, y):
+         outputs, n, like = self.first.output_rows(x, y)
+         index, start, length = self.scalars
+         scalars = outputs[index].narrow(1, start, length)

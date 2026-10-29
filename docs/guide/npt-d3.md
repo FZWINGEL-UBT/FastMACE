@@ -54,12 +54,14 @@ float64. The expanded record is printed in the report and recorded in
 
 - the training reference already contains dispersion (MACE-OFF, OMOL-0,
   MH-1's `omol` head), since D3 would count it twice;
-- the training functional is unknown (POLAR-1, or a model loaded from a path
-  or URL). Pass an explicit record then:
+- the training functional is unknown (a model loaded from a path or URL).
+  Pass an explicit record then:
 
 ```python
-run = fm.md(..., model="polar1-m", dispersion=fm.D3(functional="pbe"))
+run = fm.md(..., model=model, dispersion=fm.D3(functional="pbe"))
 ```
+
+PolarMACE (POLAR-1) with D3 is refused with any record.
 
 An explicit `fm.D3` is used as given; a functional that differs from the
 training functional is a report warning. In TOML, a `[dispersion]` table
@@ -67,3 +69,5 @@ holds the record's fields.
 
 **When to use it.** The molecular chlorides need D3 in NPT: without it,
 NbCl5 swelled by 20 % at 300 K and evaporated at 600 K in our tests.
+
+See also: [Integrators and optimisers](../reference/integrators.md), [Models, D3, PolarMACE and schedules](../reference/models.md).

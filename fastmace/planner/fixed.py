@@ -73,7 +73,7 @@ AUTO_RULES = MappingProxyType({
     "EngineConfig.cueq_conv_fusion": "on_for_plain_cueq_unless_reproducible",
     "EngineConfig.expandable_segments": "on_for_torch_2_14_unless_alloc_conf_set",
     "EngineConfig.fp64_emulation": "on_for_float64_cuda_with_reduced_rate_fp64_unless_reproducible",
-    "EngineConfig.fp64_emulation_mantissa_bits": "56_for_mh1_float64_on_measured_gpus_decision_65_else_dynamic",
+    "EngineConfig.fp64_emulation_mantissa_bits": "dynamic_decision_65_d1_suspended_after_recapture_defect",
     "PrecisionConfig.dtype": "float32_for_hybrid_float64_for_cueq",
     "NeighbourConfig.sort_receivers": "on_for_hybrid_graph_engine",
     "NeighbourConfig.gpu_neighbour_list": "on_with_graph_engine",
@@ -107,7 +107,8 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.gated_rows": "on_with_merged_residual",
     "RewriteConfig.segment_gemm": "on_with_gated_rows_float32_unless_reproducible",
     "RewriteConfig.gate_epilogue": "never_automatic",
-    "RewriteConfig.grouped_launch": "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family",
+    "RewriteConfig.grouped_launch":
+        "on_with_block_linear_float32_unless_reproducible_for_generic_mace_family_and_mh1_on_decision_66_gpus",
     "RewriteConfig.combo_kernels": "never_automatic",
     "RewriteConfig.save_transcendentals": "on_for_mh1_float64_on_measured_gpus_decision_65",
     "RewriteConfig.tf32x3_gemms": "never_automatic",
@@ -116,6 +117,7 @@ AUTO_RULES = MappingProxyType({
     "RewriteConfig.species_tables": "on_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_readout_tail": "on_with_block_linear_unless_reproducible_if_model_supports",
     "RewriteConfig.fold_product_linear": "on_with_species_tables_and_block_linear_if_model_supports",
+    "RewriteConfig.species_residual": "never_automatic",
     "RewriteConfig.single_graph_strain": "on",
     "PolarConfig.kspace_headroom": "variable_cell_0_1_else_0",
 })
@@ -128,6 +130,7 @@ STAGE2_SUPPORT = (
     ("chunked_conv_backward", "fold_cutoff"), ("fused_folded_forward", "fold_cutoff"),
     ("radial_tables", "fold_cutoff"), ("w_tables", "fold_cutoff"),
     ("species_tables", "species_tables"), ("fold_product_linear", "species_tables"),
+    ("species_residual", "species_tables"),
     ("fold_readout_tail", "fold_readout_tail"),
     ("fused_folded_backward", "fused_folded_backward"), ("species_skip", "species_skip"),
     ("streaming_conv", "streaming_conv"), ("fold_cutoff", "fold_cutoff"), ("factor_species", "factor_species"),
@@ -141,6 +144,7 @@ REWRITE_FIELDS = ("factor_species", "fold_cutoff", "density_first", "reassociate
                   "block_linear", "grouped_linear", "merged_residual", "gated_rows", "segment_gemm", "gate_epilogue",
                   "grouped_launch", "species_skip",
                   "single_graph_strain", "species_tables", "fold_readout_tail", "fold_product_linear",
+                  "species_residual",
                   "combo_kernels", "save_transcendentals", "tf32x3_gemms",
                   "fx_e3nn_linear", "polar_graph_sums")
 
@@ -356,9 +360,14 @@ FP64_EMULATION_MANTISSA_NAME = "CUBLAS_FIXEDPOINT_EMULATION_MANTISSA_BIT_COUNT"
 # capability would take in GPUs never measured (the L4, other sm_89 and sm_120 cards). Adding a GPU here needs its
 # own A/B of all three in both orders.
 DECISION_65_GPUS = ("NVIDIA GeForce RTX 5060 Ti", "NVIDIA RTX 4000 Ada Generation")
+# D1's bit count; its "auto" default is suspended (_fp64_mantissa), explicit requests stay.
 DECISION_65_MANTISSA_BITS = 56
 # w_tables: measured on two and three species (NaNbO3: 1.3 GB of tables); four would pass W_TABLE_MAX_BYTES.
 DECISION_65_MAX_SPECIES = 3
+# Decision 66 (owner, 29 October 2026): per-GPU defaults where same-process whole-step A/Bs in both build orders
+# measured a speed-up, by exact device name. grouped_launch for MH-1 on the RTX 5060 Ti (current main, 29 October):
+# NaCl 0.971 / 0.975, NbCl5 1.002 / 0.998, NaNbO3 1.001 / 0.999. The RTX 4000 Ada lost 0.5 % in OPT-T03b.
+DECISION_66_GROUPED_LAUNCH_GPUS = ("NVIDIA GeForce RTX 5060 Ti",)
 
 
 def _decision_65(dtype, reproducible, hardware, model_label):
@@ -590,8 +599,11 @@ class FixedPlanner:
 
     def _fp64_mantissa(self, book, fp64_emulation, decision_65):
         """``EngineConfig.fp64_emulation_mantissa_bits`` (ideas-20261027 D1, owner decision 65): "auto" is
-        ``DECISION_65_MANTISSA_BITS`` where the emulation is on in a float64 MH-1 plan on ``DECISION_65_GPUS``,
-        else "dynamic" (cuBLAS's own choice). Returns an int or "dynamic"."""
+        "dynamic" (cuBLAS's own choice). D1's ``DECISION_65_MANTISSA_BITS`` default on ``DECISION_65_GPUS`` is
+        suspended (owner, 28 October 2026): with 56 fixed bits, a CUDA graph captured during a run computed wrong
+        energies and forces (NbOCl3 3x3x3 relaxation: +0.34 eV/atom after the first re-capture, the same edges),
+        and the step's small products were ~8 bits accurate (fp64-D1 fix). An explicit int still applies.
+        Returns an int or "dynamic"."""
         rule = AUTO_RULES["EngineConfig.fp64_emulation_mantissa_bits"]
         request = self.engine.fp64_emulation_mantissa_bits
         if fp64_emulation != "on":
@@ -600,8 +612,9 @@ class FixedPlanner:
             value, why = request, ("cuBLAS's dynamic mantissa bits" if request == "dynamic"
                                    else f"{request} fixed mantissa bits ({FP64_EMULATION_MANTISSA_NAME})")
         elif decision_65 is None:
-            value, why = DECISION_65_MANTISSA_BITS, (f"{DECISION_65_MANTISSA_BITS} fixed mantissa bits on a measured "
-                                                     f"GPU, decision 65 ({FP64_EMULATION_MANTISSA_NAME})")
+            value, why = "dynamic", (f"cuBLAS's dynamic mantissa bits: decision 65 D1 ({DECISION_65_MANTISSA_BITS} "
+                                     "fixed bits) suspended, graphs captured during a run computed wrong energies "
+                                     "with it")
         else:
             value, why = "dynamic", f"cuBLAS's dynamic mantissa bits: {decision_65}"
         book.decide("EngineConfig.fp64_emulation_mantissa_bits", str(value), _why(request, rule, why))
@@ -710,7 +723,7 @@ class FixedPlanner:
         backend, dtype, fusion = self._backend(book, backend_choice, reproducible)
         hybrid = backend == "hybrid"
         values = self._stage1(book, hybrid, npt)
-        self._stage2(book, values, traits, explicit, model_label)
+        self._stage2(book, values, traits, explicit, model_label, hardware)
         decision_65 = _decision_65(dtype, reproducible, hardware, model_label)
         species = len(set(superset)) if superset else len(set(int(z) for z in atoms.get_atomic_numbers()))
         self._fastmace_rules(book, values, hybrid, explicit, dtype, reproducible, hardware.compute_capability,
@@ -1050,6 +1063,12 @@ class FixedPlanner:
         # where the model takes them, and the FastMACE rules drop them in float64 and reproducible plans.
         note("species_tables", r.species_tables != "off", "stage 1: graph engine, any backend")
         needs("fold_readout_tail", r.fold_readout_tail != "off", v["block_linear"], "block_linear")
+        # fp32 profile (28 October 2026): opt-in, needs the species table of the first linear_up and the merged
+        # residual product it then replaces half of.
+        needs("species_residual", r.species_residual == "on", v["species_tables"] and v["merged_residual"],
+              "species_tables and merged_residual")
+        if r.species_residual == "auto":
+            v["_why"]["species_residual"] = "off: only an explicit 'on' enables it (fp32 profile, opt-in)"
         needs("fold_product_linear", r.fold_product_linear != "off", v["block_linear"] and v["species_tables"],
               "block_linear and species_tables")
         note("single_graph_strain", r.single_graph_strain != "off",
@@ -1070,7 +1089,7 @@ class FixedPlanner:
                  f"stage 1: {backend_name} backend")
         return v
 
-    def _stage2(self, book, v, traits, explicit, model_label=None):
+    def _stage2(self, book, v, traits, explicit, model_label=None, hardware=None):
         """``workflow.adapt_options_to_model``: unsupported options off (auto) or refused (on)."""
         support = traits.rewrite_support
         for name, key in STAGE2_SUPPORT:
@@ -1086,12 +1105,19 @@ class FixedPlanner:
             elif v[name]:
                 v["_why"][name] += f"; stage 2: supported ({reason})"
         if v["grouped_launch"] and "grouped_launch" not in explicit and not _generic_mace_family(traits):
-            # Measured only on the generic family (OPT4-T04); MH-1 lost 0.5 % on sm_89 (OPT-T03b).
-            reason = (f"not the generic MACE family, decision 57 (interactions "
-                      f"{sorted(set(traits.interaction_classes))}{', PolarMACE' if traits.polar else ''})")
-            v["grouped_launch"] = False
-            v["_auto_off"]["grouped_launch"] = reason
-            v["_why"]["grouped_launch"] += f"; stage 2: off, {reason}"
+            # Measured on the generic family (OPT4-T04); MH-1 lost 0.5 % on sm_89 (OPT-T03b) and gains on the
+            # RTX 5060 Ti (decision 66).
+            name = getattr(hardware, "name", None)
+            if _mh1(model_label) and name in DECISION_66_GROUPED_LAUNCH_GPUS:
+                v["_why"]["grouped_launch"] += f"; stage 2: on, MH-1 on a measured GPU, decision 66 ({name})"
+            else:
+                reason = (f"not the generic MACE family, decision 57 (interactions "
+                          f"{sorted(set(traits.interaction_classes))}{', PolarMACE' if traits.polar else ''})")
+                if _mh1(model_label):
+                    reason += f"; MH-1 not on a measured GPU, decision 66 ({name})"
+                v["grouped_launch"] = False
+                v["_auto_off"]["grouped_launch"] = reason
+                v["_why"]["grouped_launch"] += f"; stage 2: off, {reason}"
         for name in POLAR_GRAPH_RECORDS:
             if v[name] and name not in explicit and not _qualified_polar(traits, model_label):
                 # Gated on the three POLAR-1 checkpoints (OPT4-T02); other models were not screened.
@@ -1145,7 +1171,7 @@ class FixedPlanner:
         # (reproducible mode, local RTX 5060 Ti: forces differ by 8e-16, docs/validation/opt-def-2.md).
         # Decision 63 (27 October 2026): also on in float64 plans that are not reproducible (f64-T01: forces within
         # the stock float64 backends' own scatter).
-        for name in ("species_tables", "fold_readout_tail", "fold_product_linear"):
+        for name in ("species_tables", "fold_readout_tail", "fold_product_linear", "species_residual"):
             if v[name] and name not in explicit and (dtype not in ("float32", "float64") or reproducible):
                 v[name] = False
                 v["_why"][name] += ("; off: reproducible=True keeps the stock products" if reproducible
@@ -1156,6 +1182,12 @@ class FixedPlanner:
                             "rewrite-requirement-missing")
             v["fold_product_linear"] = False
             v["_why"]["fold_product_linear"] += "; off: requires species_tables, which is off"
+        if v["species_residual"] and not v["species_tables"]:
+            if "species_residual" in explicit:
+                book.refuse("RewriteConfig.species_residual='on' requires species_tables, which is off",
+                            "rewrite-requirement-missing")
+            v["species_residual"] = False
+            v["_why"]["species_residual"] += "; off: requires species_tables, which is off"
         if v["segment_gemm"] and "segment_gemm" not in explicit and (dtype != "float32" or reproducible):
             # Owner decision, 20 October 2026: float64 and the reproducible mode keep the stock products and join.
             v["segment_gemm"] = False

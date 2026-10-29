@@ -210,6 +210,16 @@ the MC cases can occupy one worker while the others finish. Small scheduling chu
 without dropping cases, shortening trajectories or changing tolerances. They do not increase the worker
 limit. Timing evidence and the coverage comparison are recorded in `docs/validation/6-T16.md`.
 
+Since suite-speed (27 October 2026, `docs/validation/suite-speed.md`) `tests/conftest.py` applies these
+defaults itself whenever `-n` is given, so a plain `pytest -n 8 -m "not acceptance" tests/cpu` gets them
+too. It sets `OMP_NUM_THREADS=2`, `MKL_NUM_THREADS=2` and `TORCHINDUCTOR_COMPILE_THREADS=1` for the
+workers and their child processes, unless the caller already set them, and `--maxschedchunk=1` with
+`--dist=load`. Without the thread limits, every worker's OpenMP pool used every core: eight local workers
+ran at a load of about 130 and took about 100 minutes. The workers also start the test functions listed in
+`tests/_support/data/cpu_durations.json` first, longest first, so that the 40–75 s tests do not start at
+the end of the run. Refresh the file from a full run's junit file after large test changes:
+`python tools/test_order.py <run>/junit.xml`. A stale file changes only the order, never which tests run.
+
 ## Bitwise equality in CPU float64 tests
 
 Found in task 0-T04 (17 October 2026, `fastmace_cpu`, torch 2.14.1+cpu,
