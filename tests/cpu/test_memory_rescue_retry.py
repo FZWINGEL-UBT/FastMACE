@@ -69,14 +69,30 @@ def test_a_recoverable_out_of_memory_error_turns_the_rescue_on(stubbed):
                                   "rule 12; CAP-T07)"}]
 
 
-def test_a_sticky_context_raises_the_error_with_the_fix(stubbed):
-    error = oom()
-    with pytest.raises(torch.cuda.OutOfMemoryError) as raised:
+class AcceleratorError(RuntimeError):
+    """As ``torch.AcceleratorError``: the driver's error, not the caching allocator's."""
+
+
+DRIVER_OOM = ("CUDA error: out of memory\nThe CUDA driver logged these messages, which may provide useful details:\n"
+              "Sticky error detected")
+
+
+def test_the_driver_s_out_of_memory_error_is_never_a_fallback_trigger():
+    """CAP-T07, NbCl5 36,720 atoms on WSL2: a sticky driver error went into the fallback search, whose re-plan then
+    failed in cudaMemGetInfo."""
+    assert fallback._out_of_memory(AcceleratorError(DRIVER_OOM)) and fallback._propagates(AcceleratorError(DRIVER_OOM))
+    assert fallback._propagates(oom())
+    assert not fallback._propagates(AcceleratorError("CUDA error: an illegal memory access was encountered"))
+
+
+@pytest.mark.parametrize("error", [oom(), AcceleratorError(DRIVER_OOM)], ids=["allocator", "driver"])
+def test_a_sticky_context_raises_the_error_with_the_fix(stubbed, error):
+    with pytest.raises(type(error)) as raised:
         fallback.memory_rescue(stub_plan(), error, types.SimpleNamespace(rewrites="auto"), None, planner=None,
                                stage="capture", usable=lambda device: False)
     assert raised.value is error
     text = str(raised.value)
-    assert text.startswith("CUDA out of memory") and "not usable" in text
+    assert "out of memory" in text.lower() and "not usable" in text
     assert 'RewriteConfig(recompute_conv_weights="on")' in text
     assert stubbed == []
 

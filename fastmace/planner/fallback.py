@@ -360,7 +360,7 @@ def _propagates(error) -> bool:
 
     if isinstance(error, (ProcessConstraintError, NonFiniteError, InputError, MemoryError)):
         return True
-    return type(error).__name__ == "OutOfMemoryError"  # torch.cuda.OutOfMemoryError, without importing torch
+    return _out_of_memory(error)
 
 
 def _with_estimate(error, plan):
@@ -371,7 +371,13 @@ def _with_estimate(error, plan):
 
 
 def _out_of_memory(error) -> bool:
-    return isinstance(error, MemoryError) or type(error).__name__ == "OutOfMemoryError"
+    """The caching allocator's ``torch.cuda.OutOfMemoryError`` (without importing torch), a host ``MemoryError``,
+    or the driver's "CUDA error: out of memory" (``torch.AcceleratorError``, e.g. a launch or capture that could
+    not reserve its stack; CAP-T07): never a fallback trigger, since the search's re-plans read the free memory
+    (``cudaMemGetInfo``), which fails once such an error left the context sticky."""
+    if isinstance(error, MemoryError) or type(error).__name__ == "OutOfMemoryError":
+        return True
+    return "cuda error: out of memory" in str(error).lower()
 
 
 def _context_usable(device) -> bool:

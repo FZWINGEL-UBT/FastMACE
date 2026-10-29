@@ -52,7 +52,7 @@ MARGIN = 0.9
 # (``short_by_far``).
 MEMORY_RESCUE = ("recompute_conv_weights",)
 # The estimate's largest overstatement of the measured peak in decision 67's fit (the capacity cells: 1.05 to 1.34
-# times the peak): a cell whose estimate, divided by it, still exceeds the free memory cannot fit (CAP-T07).
+# times the peak): a cell whose estimate, divided by it, still does not fit cannot fit (CAP-T07).
 RESCUE_OVERSTATEMENT = 1.34
 # One factor on the activations and rewrite terms, for every model and GPU (SPEC §9.3 rule 12), fitted on the
 # 19 labels' GPU peaks (docs/validation/5-T03.md; tests/cpu/test_memory_fit.py keeps every case in [1.0, 1.5]).
@@ -270,9 +270,10 @@ def fits(estimate_: MemoryEstimate, free_bytes: int | None) -> bool:
 
 
 def short_by_far(estimate_: MemoryEstimate, free_bytes: int | None) -> bool:
-    """CAP-T07: is the free memory below even the smallest peak the estimate allows (``needed`` divided by
-    ``RESCUE_OVERSTATEMENT``)? Then a build without the memory rescue would only fail. ``False`` off CUDA."""
-    return bool(free_bytes) and estimate_.needed / RESCUE_OVERSTATEMENT > free_bytes
+    """CAP-T07: does even the smallest peak the estimate allows (``needed`` divided by ``RESCUE_OVERSTATEMENT``)
+    not fit (decision 51's ``MARGIN`` of the free memory)? Then a build without the memory rescue would only fail,
+    and on WSL2 its out-of-memory error can leave the CUDA context unusable. ``False`` off CUDA."""
+    return bool(free_bytes) and estimate_.needed / RESCUE_OVERSTATEMENT > MARGIN * free_bytes
 
 
 def drop_order(rewrite_terms: tuple[tuple[str, int], ...], edge_sized: set[str], explicit: set[str]) -> list[str]:
