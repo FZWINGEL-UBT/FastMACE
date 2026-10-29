@@ -3,6 +3,7 @@
 # float32 default plan; side a = IEEE FP32 (production), side b = PyTorch's TF32 matmul mode. Phases:
 #   speed  same-process A/Bs (tools/ab_rewrites.py --b-tf32, 12 blocks of 300 steps), both build orders,
 #          NaCl NaNbO3 NbCl5
+#   control  NaCl A/B with side b's graphs dropped and re-captured in IEEE (the TF32 side's method, no TF32)
 #   gemms  per-GEMM breakdown: tools/step_breakdown.py main pass with and without --tf32 (in-model GEMM times),
 #          then tools/gemm_precision_bench.py on the FP32 pass's shapes (cuBLAS IEEE / TF32 / Triton tf32x3)
 #   acc    force/stress gate with --production-tf32 and an IEEE control; NVE drift 20 ps at 1 fs, NaCl NbCl5,
@@ -48,6 +49,11 @@ speed)
     run "speed-$s-$order" $E/bin/python "$FM/tools/ab_rewrites.py" --output "$ROOT/speed-$s-$order" --checkpoint "$CK" \
       --model mh1-r2scan --structures "$s" --b-tf32 --order "$order" --pattern "$pattern"
   done; done ;;
+control)
+  for order in ab ba; do
+    if [ "$order" = ab ]; then pattern=abab; else pattern=abba; fi
+    run "control-NaCl-$order" $E/bin/python "$FM/tools/ab_rewrites.py" --output "$ROOT/control-NaCl-$order"       --checkpoint "$CK" --model mh1-r2scan --structures NaCl --b-recapture --order "$order" --pattern "$pattern"
+  done ;;
 gemms)
   for s in NaCl NaNbO3 NbCl5; do
     run "sb-fp32-$s" $E/bin/python "$FM/tools/step_breakdown.py" --output "$ROOT/sb-fp32/$s" --checkpoint "$CK" \

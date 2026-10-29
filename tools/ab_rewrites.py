@@ -75,6 +75,10 @@ def parse_args(argv=None):
     p.add_argument("--a-tf32", action="store_true",
                    help="Side a builds and steps with PyTorch's TF32 matmul mode (TF32 screen); IEEE otherwise")
     p.add_argument("--b-tf32", action="store_true", help="Side b's, as --a-tf32")
+    p.add_argument("--a-recapture", action="store_true",
+                   help="Side a drops its CUDA graphs after the build and re-captures them in IEEE (the control of "
+                        "--a-tf32's re-capture)")
+    p.add_argument("--b-recapture", action="store_true", help="Side b's, as --a-recapture")
     p.add_argument("--precision", choices=("float32", "float64"), default="float32",
                    help="Both sides' force precision (float64: the decision 63 package by default)")
     args = p.parse_args(argv)
@@ -93,7 +97,8 @@ def parse_args(argv=None):
     except ValueError as exc:
         p.error(str(exc))
     if (args.a == args.b and args.a_engine == args.b_engine and args.a_constant == args.b_constant
-            and args.a_neighbours == args.b_neighbours and args.a_tf32 == args.b_tf32):
+            and args.a_neighbours == args.b_neighbours and args.a_tf32 == args.b_tf32
+            and args.a_recapture == args.b_recapture):
         p.error("the two sides have the same rewrite and engine fields")
     return args
 
@@ -210,7 +215,8 @@ def main(argv=None):
                 neighbour_sides={"a": args.a_neighbours, "b": args.b_neighbours},
                 constant_sides={side: {f"{m}:{n}": v for (m, n), v in values.items()}
                                 for side, values in (("a", args.a_constant), ("b", args.b_constant))},
-                tf32_sides={"a": args.a_tf32, "b": args.b_tf32}, timestep_fs=args.timestep_fs,
+                tf32_sides={"a": args.a_tf32, "b": args.b_tf32},
+                recapture_sides={"a": args.a_recapture, "b": args.b_recapture}, timestep_fs=args.timestep_fs,
                 protocol=protocol.as_dict(), pattern=args.pattern, order=order, precision=args.precision,
                 load=list(os.getloadavg()), structures={})
     for spec in args.structures:
@@ -230,6 +236,8 @@ def main(argv=None):
                 engine = planner.build(plan, field, base.copy(), temperature_K=args.temperature_K)
             if tf32:
                 ab_step_time.tf32_after_build(torch, engine)
+            elif args.a_recapture if side == "a" else args.b_recapture:
+                engine.invalidate_graphs("TF32 screen control: re-capture in IEEE")
             sides[side] = ab_step_time.Tf32Side(ab_step_time.FastMACESide(engine, torch), tf32, torch)
             setup[side] = time.perf_counter() - started
             lines[side] = [line.strip() for line in plan.describe(full=True).splitlines()
