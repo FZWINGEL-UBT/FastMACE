@@ -929,7 +929,8 @@ def main(argv=None):
 
     summary = dict(
         tool="step_breakdown", created_utc=datetime.now(timezone.utc).isoformat(), host=os.uname().nodename,
-        python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), packages=package_versions(), tf32=args.tf32,
+        python=sys.executable, fastmace_commit=ab_step_time.fastmace_commit(), packages=package_versions(),
+        tf32=args.tf32,
         gpu=torch.cuda.get_device_name(), cuda=torch.version.cuda, oeq_runtime=oeq_runtime,
         other_gpu_processes=[pid for pid in ab_step_time.gpu_processes() if pid != os.getpid()],
         compute_capability=f"{properties.major}.{properties.minor}", sms=properties.multi_processor_count,
