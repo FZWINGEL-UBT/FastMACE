@@ -166,7 +166,7 @@ def test_record_and_requirements():
 
     record = radial.RECORDS["wprime_backward"]
     assert record.requires == ("radial_tables", "chunked_conv_backward")
-    assert record.exactness == "rounding" and record.default == "off" and not record.deterministic
+    assert record.exactness == "rounding" and record.default == "auto" and not record.deterministic
     order = tuple(radial.RECORDS)
     assert order.index("radial_tables") < order.index("wprime_backward")
 
@@ -178,10 +178,12 @@ def test_planner_rules_and_resolution():
     from fastmace.planner import fixed
     from fastmace.planner.fixed import PlanRefused
 
-    assert fixed.AUTO_RULES["RewriteConfig.wprime_backward"] == "never_automatic"
+    assert (fixed.AUTO_RULES["RewriteConfig.wprime_backward"]
+            == "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus")
     assert "wprime_backward" in fixed.REWRITE_FIELDS
-    plan = plan_for("mh1-r2scan")
-    assert plan.rewrites.wprime_backward == "off" and plan.rewrites.radial_tables == "on"
+    plan = plan_for("mh1-r2scan")  # the RTX 5060 Ti: decision 66 (test_planner.py has the per-GPU cases)
+    assert plan.rewrites.wprime_backward == "on" and plan.rewrites.radial_tables == "on"
+    assert plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64")).rewrites.wprime_backward == "off"
     on = plan_for("mh1-r2scan", rewrites=RewriteConfig(wprime_backward="on"))
     assert on.rewrites.wprime_backward == "on" and on.rewrites.chunked_conv_backward == "on"
     with pytest.raises(PlanRefused, match="wprime_backward='on' needs float32"):

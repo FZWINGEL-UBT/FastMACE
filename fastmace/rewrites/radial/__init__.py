@@ -770,10 +770,11 @@ RECORDS = {
         name="w_tables", applies_to=_w_support, requires=("radial_tables", "chunked_conv_backward"), conflicts=(),
         mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off", deterministic=False,
         workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_w_tables, selfcheck=_w_selfcheck),
-    # opt-9 OPT9-T03: rounding (the derivative series and the folded product reassociated); float32; opt-in.
+    # opt-9 OPT9-T03: rounding (the derivative series and the folded product reassociated); float32; default on
+    # for MH-1 on the measured GPUs (decision 66, planner.fixed.DECISION_66_WPRIME_GPUS).
     "wprime_backward": Rewrite(
         name="wprime_backward", applies_to=_w_support, requires=("radial_tables", "chunked_conv_backward"),
-        conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="off",
+        conflicts=(), mace_versions=MACE_VERSIONS, source_hashes={}, exactness="rounding", default="auto",
         deterministic=False, workload_constraints=(FIXED_SPECIES_SUPERSET,), apply=_apply_wprime,
         selfcheck=_wprime_selfcheck),
 }

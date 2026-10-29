@@ -229,6 +229,9 @@ FASTMACE_ONLY_DEFAULTS = {
     # Owner decision 64, 27 October 2026 (OPT8-T02): with chunked_conv_backward, MH-1 only, float32, not
     # reproducible.
     "fused_folded_forward": "on_for_mh1_float32_unless_reproducible",
+    # Decision 66, 29 October 2026 (OPT9-T05): MH-1 on DECISION_66_WPRIME_GPUS (this file's GPU is one), float32, not
+    # reproducible.
+    "wprime_backward": "on_for_mh1_float32_unless_reproducible_on_decision_66_gpus",
 }
 # Where each FastMACE-only default applies (labels): the factored interaction, or the OPT-T08 records' own scope
 # (docs/design/opt-T08-linear-audit.md section 3: C1 and C3 the MH-1 labels, C2 also OMOL-0).
@@ -243,7 +246,7 @@ APPLIES = {"gated_rows": FACTORED_LABELS, "segment_gemm": FACTORED_LABELS, "fold
            "fold_readout_tail": (*MH1_LABELS, "omol0-xl"),
            "grouped_launch": (*GENERIC_FAMILY_LABELS, *MH1_LABELS),  # MH-1: decision 66 on the RTX 5060 Ti (GPU)
            "fx_e3nn_linear": fixed.POLAR_GRAPH_LABELS, "polar_graph_sums": fixed.POLAR_GRAPH_LABELS,
-           "fused_folded_forward": MH1_LABELS}
+           "fused_folded_forward": MH1_LABELS, "wprime_backward": MH1_LABELS}
 
 
 def fastmace_only_expected(name, label, backend):
@@ -1004,6 +1007,39 @@ def test_decision_65_keeps_float32_the_cpu_other_models_and_reproducible_off(mon
     # Reproducible plans (minimal planner, rule 5) keep the native route the speed-ups were not measured on.
     assert fixed._decision_65("float64", True, GPU, "mh1-r2scan") == "reproducible=True, decision 65"
     assert fixed._decision_65("float64", False, GPU, "mh1-r2scan") is None
+
+
+def test_decision_66_wprime_backward_on_the_measured_gpus():
+    """Decision 66 (owner, 29 October 2026; OPT9-T05): wprime_backward is on for MH-1 in float32 plans on the GPU
+    models whose MD step A/Bs measured it faster in both build orders, by exact name; off elsewhere, the reason
+    naming the GPU or the model; explicit requests override."""
+    assert fixed.DECISION_66_WPRIME_GPUS == ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+                                             "NVIDIA RTX 4000 Ada Generation")
+    a100_80 = Hardware("NVIDIA A100-SXM4-80GB", (8, 0), 80 * 2**30)
+    for hardware in (GPU, ADA, a100_80):
+        plan = planner(engine=EngineConfig()).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), hardware,
+                                                   model_label="mh1-r2scan")
+        item, choice, reason = decision(plan, "RewriteConfig.wprime_backward")
+        assert choice == "on" and f"MH-1 on a measured GPU, decision 66 ({hardware.name})" in reason, hardware.name
+    for hardware in (A100, L4, RTX_5090):  # same capability or family, never measured
+        plan = planner(engine=EngineConfig()).plan(traits("mh1-r2scan"), nacl(), IntegratorConfig(), hardware,
+                                                   model_label="mh1-r2scan")
+        assert plan.rewrites.wprime_backward == "off", hardware.name
+        assert dict(plan.auto_options_off)["wprime_backward"] == f"not a measured GPU, decision 66 ({hardware.name})"
+    for label in ("polar1-s", "omol0-xl"):
+        plan = plan_for(label)
+        assert plan.rewrites.wprime_backward == "off", label
+        assert dict(plan.auto_options_off)["wprime_backward"].startswith("not MH-1, decision 66"), label
+    float64 = plan_for("mh1-r2scan", precision=PrecisionConfig(dtype="float64"))
+    item, choice, reason = decision(float64, "RewriteConfig.wprime_backward")
+    assert choice == "off" and "float64 plans keep the chained backward" in reason
+    tables_off = plan_for("mh1-r2scan", rewrites=RewriteConfig(radial_tables="off"))
+    item, choice, reason = decision(tables_off, "RewriteConfig.wprime_backward")
+    assert choice == "off" and "requires radial_tables and chunked_conv_backward" in reason
+    plan = planner(engine=EngineConfig(), rewrites=RewriteConfig(wprime_backward="on")).plan(
+        traits("mh1-r2scan"), nacl(), IntegratorConfig(), L4, model_label="mh1-r2scan")
+    assert plan.rewrites.wprime_backward == "on"
+    assert plan_for("mh1-r2scan", rewrites=RewriteConfig(wprime_backward="off")).rewrites.wprime_backward == "off"
 
 
 def test_decision_65_w_tables_stay_off_above_three_species(monkeypatch):

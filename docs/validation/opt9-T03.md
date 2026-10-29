@@ -1,4 +1,4 @@
-# OPT9-T03/T04/T05: the record `wprime_backward`, gates and per-GPU A/Bs (29 October 2026)
+# OPT9-T03/T04/T05: the record `wprime_backward`, default on three GPUs (29 October 2026)
 
 Plan: `plans/opt-9.md` (OPT9-T03 onward). It follows the falsifier and ceilings in
 `docs/validation/opt9-T01.md`. Decision 66 (29 October 2026) allows a default by exact GPU name where
@@ -12,15 +12,18 @@ same-process whole-step A/Bs in both build orders measured a speed-up. Runs and 
   orders, with every block pair favouring the record.
 - **Local RTX 5060 Ti: 6.0–6.3 % faster (NaNbO3), 2.9–3.0 % (NbCl5) and 5.4–6.5 % (NaCl)**, every block pair
   favouring the record.
-- The RTX 4000 Ada was not measured (see "Not done").
+- **RTX 4000 Ada (leto): 6.1–6.2 % faster (NaNbO3), 3.6 % (NbCl5) and 6.6 % (NaCl)**, every block pair
+  favouring the record, against OPT9-T01's prediction of a loss there.
+- **Default (owner, decision 66, 29 October 2026):** on for MH-1 in float32 plans that are not reproducible on
+  the three measured device names, off on every other GPU.
 
-## Per-GPU A/B table (the owner's input for decision 66)
+## Per-GPU A/B table (the basis of the decision-66 default)
 
 `tools/ab_rewrites.py`, a = `wprime_backward=off`, b = `on`. MH-1 hybrid float32 NVT at 300 K, 12 blocks of
 300 steps after 300 warm-up steps, everything else the default plan. Median step in ms. Order `ab` uses the abab
 block pattern and order `ba` uses abba.
 
-| GPU (exact device name) | Cell | order ab: a / b, b/a | order ba: a / b, b/a | block pairs | proposed |
+| GPU (exact device name) | Cell | order ab: a / b, b/a | order ba: a / b, b/a | block pairs | default |
 | --- | --- | --- | --- | --- | --- |
 | `NVIDIA A100-SXM4-80GB` (Modal) | NaNbO3 | 11.33 / 9.24, **0.815** | 11.35 / 9.22, **0.812** | 0.811–0.817 | on |
 | | NbCl5 | 12.56 / 11.16, **0.889** | 12.55 / 11.15, **0.889** | 0.887–0.894 | |
@@ -28,11 +31,26 @@ block pattern and order `ba` uses abba.
 | `NVIDIA GeForce RTX 5060 Ti` (local) | NaNbO3 | 14.47 / 13.56, **0.937** | 14.64 / 13.77, **0.940** | 0.934–0.944 | on |
 | | NbCl5 | 18.25 / 17.71, **0.970** | 18.29 / 17.76, **0.971** | 0.946–0.996 | |
 | | NaCl | 2.536 / 2.400, **0.946** | 2.572 / 2.405, **0.935** | 0.929–0.960 | |
-| `NVIDIA RTX 4000 Ada Generation` | — | not measured | | | off (unmeasured; T01 predicts a loss) |
+| `NVIDIA RTX 4000 Ada Generation` (leto) | NaNbO3 | 17.13 / 16.07, **0.938** | 17.19 / 16.14, **0.939** | 0.935–0.940 | on |
+| | NbCl5 | 21.35 / 20.59, **0.964** | 21.38 / 20.59, **0.964** | 0.961–0.968 | |
+| | NaCl | 2.777 / 2.593, **0.934** | 2.771 / 2.588, **0.934** | 0.927–0.939 | |
 
-**Proposed device-name list for a decision-66 default:** `("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti")`.
-The A100-SXM4-40GB (T02's ceiling GPU) was not A/B'd and stays off by decision 66's exact-name rule. Off everywhere else, with the off reason
-naming the GPU.
+**Default.** `planner.fixed.DECISION_66_WPRIME_GPUS = ("NVIDIA A100-SXM4-80GB", "NVIDIA GeForce RTX 5060 Ti",
+"NVIDIA RTX 4000 Ada Generation")`, rule `on_for_mh1_float32_unless_reproducible_on_decision_66_gpus`:
+- on for MH-1 labels (as decision 64) in float32 plans that are not reproducible, with `radial_tables` and
+  `chunked_conv_backward` on, on those device names;
+- off elsewhere. The stage-2 reason names the GPU (`not a measured GPU, decision 66 (<name>)`) or the model
+  (`not MH-1, decision 66 (label ...)`). The A100-SXM4-40GB (T02's ceiling GPU), the L4 and other sm_89 or
+  sm_120 cards were not A/B'd and stay off;
+- an explicit `"on"` enables it on any GPU in float32 plans outside reproducible ones.
+
+The planner, the switch map, `docs/reference/rewrites.md`, SPEC §18 decision 66's applied note and the CHANGELOG
+were updated. The record's default is `auto`. The report golden counts 20 rewrites on, and the plan-text goldens
+were recomputed with `plan_text._wrap`: their non-MH-1 plans show the record off as "not MH-1, decision 66".
+
+**Why the Ada gains, against T01.** T01 measured the added `G'` gathers standalone, with the L2 flushed before
+every call and uniformly random groups, at 0.76 / 0.71 of the removed work. In the MD step the edges reach fewer
+pieces, and part of the working set is warm. The step A/B is the measurement that counts.
 
 The A100 gain is larger than OPT9-T02's estimate (11 % NaNbO3, 7 % NbCl5) and even than its NaNbO3 ceiling
 (0.828). The ceiling stubbed only the input gradient and the table backward. The record also drops the `dw`
@@ -145,6 +163,15 @@ quantity in meV/atom):
 | NaCl | −1.3e-6, rms 2.75e-4 | −3.7e-7, rms 2.75e-4 |
 | NbCl5 | 1.3e-6, rms 3.80e-4 | 7.8e-7, rms 3.79e-4 |
 
+**RTX 4000 Ada gate** (leto, run by the conductor with `ada.sh`): **passed**. Error against float64, with the
+ratio to the float32 ASE calculator's error in brackets:
+
+| Cell | energy (eV) | forces (eV/Å) | stress (eV/Å³) |
+| --- | ---: | ---: | ---: |
+| NaCl | 8.1e-5 (0.78) | 3.8e-6 (0.94) | 3.9e-8 (0.92) |
+| NbCl5 | 9.6e-5 (0.12) | 8.3e-5 (1.03) | 3.5e-8 (0.32) |
+| NaNbO3 | 3.1e-4 (0.29) | 1.3e-4 (1.00) | 1.8e-7 (0.57) |
+
 ## Runs
 
 - **Modal A100** (`modal-a100/`): `NVIDIA A100-SXM4-80GB`, driver 610.57.04, image torch 2.14.1+cu130; job
@@ -156,13 +183,13 @@ quantity in meV/atom):
   02:08–02:15 UTC; the PC rebooted on its own during NbCl5, which was rerun with NaCl at 08:47–09:07 UTC). No
   compile while timed, both sides' plans as requested.
 
+- **leto, RTX 4000 Ada Generation** (`leto-rtx4000ada/`): driver 595.99.02, NAS `mace_cueq_oeq`, source `9ef70e89`;
+  run by the conductor on 29 October 2026, 09:09–09:32 UTC (10:09–10:32 CET), idle check before every job. The
+  gate and the six A/Bs; the GPU unit test did not run (`check.log`: no pytest in that environment). Its
+  exactness rests on the RTX 5060 Ti and A100 runs above.
+
 ## Not done
 
-- **RTX 4000 Ada (murphy, leto):** not measured. murphy's GPU was idle at 01:13 CET on 29 October, but
-  deploying the source there (writing under `/mnt/homes/zwingel` over ssh) was refused by this session's
-  permission settings. `results/opt9-T03-wprime-backward-20261029/ada.sh` runs the GPU test, the gate and the six
-  A/Bs from an archive of the branch. Until it runs, the Ada stays off: T01 measured the added `G'` gathers at
-  0.76 / 0.71 of the removed work there, against 0.21 / 0.17 on the A100.
 - NaCl on the A100.
 - MH-1 family models (POLAR-1-S, OMOL-0) were not run.
 - **CPU tests after the merge of main (`030e2fe2`, merge `4859055f`) were not run.** The owner's rule of
@@ -170,4 +197,5 @@ quantity in meV/atom):
   were the golden plan texts, `test_report.py`'s count, the switch map and the plans. The new
   `species_residual` and `wprime_backward` off fields were recomputed by hand with `plan_text._wrap`. Before the
   merge, 431 targeted CPU tests passed on the PC.
-- The full CPU suite (merge tier) is the conductor's.
+- The GPU unit test on sm_89.
+- The full CPU suite (merge tier) is the conductor's (on leto).
