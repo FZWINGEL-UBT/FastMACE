@@ -352,7 +352,8 @@ def run_point(args):
             record["status"] = "ok"
     except Exception as error:  # noqa: BLE001  (a failing size is a result)
         message = str(error)
-        record["status"] = "oom" if type(error).__name__ == "OutOfMemoryError" or "out of memory" in message else "error"
+        oom = type(error).__name__ == "OutOfMemoryError" or "out of memory" in message
+        record["status"] = "oom" if oom else "error"
         record["failure"] = dict(phase=phase, type=f"{type(error).__module__}.{type(error).__name__}",
                                  message=message[:4000], tried_to_allocate=_tried(message),
                                  stage=getattr(error, "fastmace_stage", None),
