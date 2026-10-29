@@ -412,6 +412,34 @@ def test_concurrent_waiters_run_in_arrival_order(proc, tmp_path):
     assert order == [43, 41, 44, 42]
 
 
+def test_a_release_frees_the_marker_even_when_its_directory_cannot_be_removed(proc, tmp_path, monkeypatch):
+    """On NFS a holder.json that a waiter has open becomes ``.nfsXXXX`` and the directory survives an rmtree;
+    an in-place removal left an empty marker that read as "being reserved" for 60 s (suite-speed)."""
+    marker = tmp_path / "gpu"
+    proc.add(40, ["bash"])
+    proc.add(41, ["bash"])
+    assert lg.reserve(marker, "holder", pid=40, proc_root=proc.root)[0]
+    rmtree = lg.shutil.rmtree
+
+    def nfs_rmtree(path, ignore_errors=False):
+        path = Path(path)
+        for child in path.iterdir():
+            child.unlink()
+        (path / ".nfs0000000000abcd0000000001").write_text("")  # silly-renamed, still open elsewhere
+
+    monkeypatch.setattr(lg.shutil, "rmtree", nfs_rmtree)
+    assert lg.release(marker, pid=40)
+    assert not marker.exists()
+    assert lg.live_holder(marker, proc.root) is None
+    ok, holder = lg.reserve(marker, "next", pid=41, proc_root=proc.root)
+    assert ok and holder["pid"] == 41
+    leftovers = list(tmp_path.glob(".gpu.removed-*"))
+    assert len(leftovers) == 1  # the directory renamed aside, waiting for its deletion
+    monkeypatch.setattr(lg.shutil, "rmtree", rmtree)
+    assert lg.release(marker, pid=41)
+    assert not marker.exists() and not list(tmp_path.glob(".gpu.removed-*"))  # later removals clear leftovers
+
+
 def test_status_lists_the_queue(proc, tmp_path, monkeypatch, capsys):
     marker = tmp_path / "gpu"
     monkeypatch.setattr(lg.time, "time", lambda: 1000.0)
