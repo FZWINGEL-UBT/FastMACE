@@ -257,6 +257,10 @@ def time_modes(torch, runners, modes, reps, iters, blocks):
         for i in range(len(runners)):
             for mode in order:
                 g = graphs[i, mode]
+                if os.environ.get("FASTMACE_SCREEN_VERBOSE") and block == 0:
+                    print(f"replay product {i} mode {mode}", flush=True)
+                    g.replay()
+                    torch.cuda.synchronize()
                 g.replay()
                 start.record()
                 for _ in range(iters):
